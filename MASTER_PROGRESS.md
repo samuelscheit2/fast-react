@@ -30,7 +30,7 @@ M0: Orchestration Foundation.
 
 | Worker | Status | Assignment | Progress File |
 | --- | --- | --- | --- |
-| worker-001-architecture | running | Test Rust core and renderer-boundary architecture hypotheses | `worker-progress/worker-001-architecture.md` |
+| worker-001-architecture | running via managed subagent after CLI usage-limit failure | Test Rust core and renderer-boundary architecture hypotheses | `worker-progress/worker-001-architecture.md` |
 | worker-002-conformance | running via managed subagent after CLI usage-limit failure | Design React 19.2.6 compatibility inventory and test strategy | `worker-progress/worker-002-conformance.md` |
 | worker-003-scaffold | running via managed subagent after CLI usage-limit failure | Propose Cargo workspace, JS package scaffold, and worktree task split | `worker-progress/worker-003-scaffold.md` |
 
@@ -61,5 +61,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Second tmux worker launch failed before doing work because this `codex exec` build rejected `-a`. Runner now uses `--dangerously-bypass-approvals-and-sandbox` instead.
 - 2026-05-09: `ORCHESTRATOR.md` was updated to move model/yolo guidance into a general guideline section. Worker brief now carries only worker-safe assumption-checking guidance.
 - 2026-05-09: Relaunched workers 001, 002, and 003 in tmux with corrected worker prompts and runner flags.
+- 2026-05-09: tmux worker 001 hit a Codex CLI usage-limit failure before writing `worker-progress/worker-001-architecture.md`; reassigned the same scoped task to managed subagent `Helmholtz`.
 - 2026-05-09: tmux worker 002 hit a Codex CLI usage-limit failure before writing `worker-progress/worker-002-conformance.md`; reassigned the same scoped task to managed subagent `Leibniz`.
 - 2026-05-09: tmux worker 003 hit a Codex CLI usage-limit failure before writing `worker-progress/worker-003-scaffold.md`; reassigned the same scoped task to managed subagent `Halley`.
