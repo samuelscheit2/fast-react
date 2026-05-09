@@ -2,6 +2,7 @@
 
 const compatibilityTarget = 'react-dom@19.2.6';
 const placeholderVersion = '0.0.0-fast-react-dom-placeholder';
+const reactDomVersion = '19.2.6';
 const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';
 const reactServerUnsupportedCode = 'FAST_REACT_REACT_SERVER_UNSUPPORTED';
 
@@ -23,20 +24,44 @@ function createUnsupportedError(entrypoint, exportName, action, detail) {
   return error;
 }
 
-function createUnsupportedFunction(entrypoint, exportName) {
-  const fn = function fastReactDomUnimplementedPlaceholder() {
-    throw createUnsupportedError(entrypoint, exportName, 'was called');
-  };
-
-  Object.defineProperty(fn, 'name', {
-    configurable: true,
-    value: exportName
+function defineFunctionShape(fn, name, length) {
+  Object.defineProperties(fn, {
+    length: {
+      configurable: true,
+      value: length
+    },
+    name: {
+      configurable: true,
+      value: name
+    }
   });
 
   return fn;
 }
 
-function createPrivateInternalsPlaceholder(entrypoint, exportName) {
+function createUnsupportedFunction(entrypoint, exportName, options) {
+  const length = typeof options === 'number' ? options : 0;
+  const name = typeof options === 'number' ? '' : exportName;
+  const fn = function fastReactDomUnimplementedPlaceholder() {
+    throw createUnsupportedError(entrypoint, exportName, 'was called');
+  };
+
+  return defineFunctionShape(fn, name, length);
+}
+
+function createBatchedUpdates() {
+  const fn = function fastReactDomBatchedUpdates(callback, a) {
+    return callback(a);
+  };
+
+  return defineFunctionShape(fn, '', 2);
+}
+
+function createInternalsDispatchPlaceholder(entrypoint, exportName, key) {
+  return createUnsupportedFunction(entrypoint, `${exportName}.d.${key}`);
+}
+
+function createOpaquePrivateInternalsPlaceholder(entrypoint, exportName) {
   const target = Object.create(null);
 
   Object.defineProperty(target, Symbol.toStringTag, {
@@ -82,6 +107,30 @@ function createPrivateInternalsPlaceholder(entrypoint, exportName) {
   });
 }
 
+function createPrivateInternalsPlaceholder(entrypoint, exportName, options) {
+  if (options !== 'react-dom-export-oracle-shape') {
+    return createOpaquePrivateInternalsPlaceholder(entrypoint, exportName);
+  }
+
+  const dispatch = {
+    f: createInternalsDispatchPlaceholder(entrypoint, exportName, 'f'),
+    r: createInternalsDispatchPlaceholder(entrypoint, exportName, 'r'),
+    D: createInternalsDispatchPlaceholder(entrypoint, exportName, 'D'),
+    C: createInternalsDispatchPlaceholder(entrypoint, exportName, 'C'),
+    L: createInternalsDispatchPlaceholder(entrypoint, exportName, 'L'),
+    m: createInternalsDispatchPlaceholder(entrypoint, exportName, 'm'),
+    X: createInternalsDispatchPlaceholder(entrypoint, exportName, 'X'),
+    S: createInternalsDispatchPlaceholder(entrypoint, exportName, 'S'),
+    M: createInternalsDispatchPlaceholder(entrypoint, exportName, 'M')
+  };
+
+  return {
+    d: dispatch,
+    p: 0,
+    findDOMNode: null
+  };
+}
+
 function createReactServerUnsupportedError(entrypoint) {
   const error = new Error(
     `${entrypoint} is not supported in React Server Components.`
@@ -120,12 +169,15 @@ function definePlaceholderMetadata(exportsObject, entrypoint) {
 
 module.exports = {
   compatibilityTarget,
+  createBatchedUpdates,
   createPrivateInternalsPlaceholder,
   createReactServerUnsupportedError,
   createUnsupportedError,
   createUnsupportedFunction,
+  defineFunctionShape,
   definePlaceholderMetadata,
   placeholderVersion,
+  reactDomVersion,
   reactServerUnsupportedCode,
   throwReactServerUnsupported,
   unimplementedCode
