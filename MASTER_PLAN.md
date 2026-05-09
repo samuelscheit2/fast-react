@@ -87,18 +87,20 @@ The current project push is a minimal real root render/update/unmount path:
 - Worker 122 is running the DOM container marker and root listener shell source
   implementation; it must not remove public root placeholders or implement
   synthetic event dispatch.
+- Worker 123 is running the reconciler FiberRoot/HostRoot internal model slice
+  and owns `crates/fast-react-reconciler/src/lib.rs` for that tranche.
 
 ## Near-Term Plan
 
-1. Keep workers 120-122 running in parallel while they show active `Working` or
+1. Keep workers 120-123 running in parallel while they show active `Working` or
    `Pursuing goal` state; ignore stale usage-limit text in pane scrollback
    unless the worker process is actually stopped or blocked at a prompt.
-2. Queue the reconciler FiberRoot/HostRoot model as the next source slice now
-   that core topology is accepted; serialize workers touching
-   `crates/fast-react-reconciler/src/lib.rs`.
+2. Keep worker 123 serialized around `crates/fast-react-reconciler/src/lib.rs`;
+   do not queue HostRoot update, scheduler, work-loop, or commit source slices
+   until its root model is accepted or intentionally abandoned.
 3. Let workers 120-122 continue in parallel because their write scopes are
    isolated from the next reconciler root tranche.
-4. After accepting any of workers 120-122, run the worker's scoped checks, merge
+4. After accepting any of workers 120-123, run the worker's scoped checks, merge
    with a no-fast-forward commit, then update this file with the next active
    queue and move completed facts to `MASTER_PROGRESS.md`.
 5. Queue follow-up source slices from the accepted root/reconciler/DOM/test
