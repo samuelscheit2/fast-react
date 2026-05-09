@@ -1,0 +1,2938 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-dom-namespace-svg-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 namespace, SVG, and MathML host output oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-040-dom-mutation-renderer-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "generation": {
+    "method": "checked runtime inventory plus exact npm tarballs extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per probe mode, action, and scenario",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false
+  },
+  "evidenceClaims": {
+    "checkedRuntimeInventoryRead": true,
+    "checkedRuntimeInventoryMatched": true,
+    "exactTarballUrlsFromInventory": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListsMatchedInventory": true,
+    "reactDomServerOutputProbed": true,
+    "reactDomClientFakeDomHostOutputProbed": true,
+    "namespaceCreationObserved": true,
+    "namespacedAttributeOperationsObserved": true,
+    "consoleWarningsCaptured": true,
+    "fastReactComparedToReactDom": false
+  },
+  "conformanceClaims": {
+    "realReactDomBehaviorProbed": true,
+    "fastReactComparedToReactDom": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomRuntimeInventoryMatched": true
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-runtime-target"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-dom-peer-needed-for-rendering-probes"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-client-runtime-dependency-needed-for-client-probes"
+    }
+  ],
+  "namespaces": {
+    "html": "http://www.w3.org/1999/xhtml",
+    "svg": "http://www.w3.org/2000/svg",
+    "mathml": "http://www.w3.org/1998/Math/MathML",
+    "xlink": "http://www.w3.org/1999/xlink",
+    "xml": "http://www.w3.org/XML/1998/namespace"
+  },
+  "probeModes": [
+    {
+      "id": "development",
+      "nodeEnv": "development",
+      "reason": "Development captures observable host output plus React DOM warning channels."
+    },
+    {
+      "id": "production",
+      "nodeEnv": "production",
+      "reason": "Production captures the minified-runtime host output without development diagnostics."
+    }
+  ],
+  "serverScenarios": [
+    {
+      "id": "svg-common-attributes",
+      "description": "Server rendering serializes common React SVG attribute names, xlink attributes, and xml attributes.",
+      "coverage": [
+        "svg-namespace",
+        "svg-attribute-aliases",
+        "namespaced-attributes",
+        "server-markup"
+      ]
+    },
+    {
+      "id": "foreignobject-html-boundary",
+      "description": "Server rendering preserves SVG foreignObject with HTML descendants and nested SVG descendants.",
+      "coverage": [
+        "svg-to-html-boundary",
+        "foreignObject",
+        "nested-svg",
+        "server-markup"
+      ]
+    },
+    {
+      "id": "mathml-basic-tree",
+      "description": "Server rendering serializes MathML elements, MathML attributes, and annotation-xml descendants.",
+      "coverage": [
+        "mathml-namespace",
+        "mathml-attributes",
+        "server-markup"
+      ]
+    }
+  ],
+  "clientScenarios": [
+    {
+      "id": "client-svg-common-attributes",
+      "container": {
+        "nodeName": "DIV",
+        "namespaceURI": "http://www.w3.org/1999/xhtml"
+      },
+      "description": "Client rendering applies common SVG attributes through setAttribute and namespaced attributes through setAttributeNS.",
+      "coverage": [
+        "svg-namespace",
+        "svg-attribute-aliases",
+        "namespaced-attributes",
+        "client-host-output"
+      ]
+    },
+    {
+      "id": "client-html-svg-foreignobject-html-svg",
+      "container": {
+        "nodeName": "DIV",
+        "namespaceURI": "http://www.w3.org/1999/xhtml"
+      },
+      "description": "Client rendering switches from HTML to SVG, back to HTML below foreignObject, then back to SVG for nested svg.",
+      "coverage": [
+        "html-to-svg",
+        "foreignObject",
+        "svg-to-html-boundary",
+        "nested-svg",
+        "client-host-output"
+      ]
+    },
+    {
+      "id": "client-svg-container-child-context",
+      "container": {
+        "nodeName": "svg",
+        "namespaceURI": "http://www.w3.org/2000/svg"
+      },
+      "description": "Client rendering derives child namespace context from an SVG root container.",
+      "coverage": [
+        "svg-container-context",
+        "foreignObject",
+        "client-host-output"
+      ]
+    },
+    {
+      "id": "client-mathml-tree",
+      "container": {
+        "nodeName": "DIV",
+        "namespaceURI": "http://www.w3.org/1999/xhtml"
+      },
+      "description": "Client rendering creates MathML roots and descendants in the MathML namespace.",
+      "coverage": [
+        "mathml-namespace",
+        "mathml-attributes",
+        "client-host-output"
+      ]
+    }
+  ],
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react-dom.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./client",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./client.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./client.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "bun"
+              ],
+              "target": "./server.bun.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./server.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.bun",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.bun.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./static.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./profiling",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./profiling.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./profiling.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./test-utils",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./test-utils.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ]
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": {
+          "node": ">=0.10.0"
+        }
+      },
+      "publicSubpaths": [
+        ".",
+        "./package.json",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-dev-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-dev-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-dev-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./compiler-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./compiler-runtime.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./compiler-runtime.js"
+            }
+          ]
+        }
+      ]
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-artifact-probes",
+      "targetStatus": "supporting-package-not-official-react-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null
+      },
+      "publicSubpaths": [],
+      "runtimeSubpaths": [],
+      "exportMapRows": []
+    }
+  },
+  "serverObservations": {
+    "development": [
+      {
+        "status": "ok",
+        "action": "server",
+        "scenarioId": "svg-common-attributes",
+        "scenario": {
+          "id": "svg-common-attributes",
+          "description": "Server rendering serializes common React SVG attribute names, xlink attributes, and xml attributes.",
+          "coverage": [
+            "svg-namespace",
+            "svg-attribute-aliases",
+            "namespaced-attributes",
+            "server-markup"
+          ]
+        },
+        "nodeEnv": "development",
+        "console": [],
+        "renderers": {
+          "renderToStaticMarkup": "<svg accent-height=\"7\" alignment-baseline=\"middle\" class=\"icon\" clip-path=\"url(#clip)\" fill-rule=\"evenodd\" focusable=\"false\" stroke-width=\"2\" tabindex=\"0\" viewBox=\"0 0 10 10\" xlink:href=\"#symbol\" xml:lang=\"en\" xml:space=\"preserve\"><use href=\"#href-target\" xlink:href=\"#xlink-target\"></use></svg>",
+          "renderToString": "<svg accent-height=\"7\" alignment-baseline=\"middle\" class=\"icon\" clip-path=\"url(#clip)\" fill-rule=\"evenodd\" focusable=\"false\" stroke-width=\"2\" tabindex=\"0\" viewBox=\"0 0 10 10\" xlink:href=\"#symbol\" xml:lang=\"en\" xml:space=\"preserve\"><use href=\"#href-target\" xlink:href=\"#xlink-target\"></use></svg>"
+        }
+      },
+      {
+        "status": "ok",
+        "action": "server",
+        "scenarioId": "foreignobject-html-boundary",
+        "scenario": {
+          "id": "foreignobject-html-boundary",
+          "description": "Server rendering preserves SVG foreignObject with HTML descendants and nested SVG descendants.",
+          "coverage": [
+            "svg-to-html-boundary",
+            "foreignObject",
+            "nested-svg",
+            "server-markup"
+          ]
+        },
+        "nodeEnv": "development",
+        "console": [],
+        "renderers": {
+          "renderToStaticMarkup": "<svg><foreignObject height=\"4\" width=\"3\" x=\"1\" y=\"2\"><div class=\"inside\"><svg><circle cx=\"5\" stroke-width=\"2\" xlink:href=\"#circle\"></circle></svg></div></foreignObject></svg>",
+          "renderToString": "<svg><foreignObject height=\"4\" width=\"3\" x=\"1\" y=\"2\"><div class=\"inside\"><svg><circle cx=\"5\" stroke-width=\"2\" xlink:href=\"#circle\"></circle></svg></div></foreignObject></svg>"
+        }
+      },
+      {
+        "status": "ok",
+        "action": "server",
+        "scenarioId": "mathml-basic-tree",
+        "scenario": {
+          "id": "mathml-basic-tree",
+          "description": "Server rendering serializes MathML elements, MathML attributes, and annotation-xml descendants.",
+          "coverage": [
+            "mathml-namespace",
+            "mathml-attributes",
+            "server-markup"
+          ]
+        },
+        "nodeEnv": "development",
+        "console": [],
+        "renderers": {
+          "renderToStaticMarkup": "<math display=\"block\"><mrow><mi mathvariant=\"bold\">x</mi><annotation-xml encoding=\"application/xhtml+xml\"><div class=\"html-looking-child\"><svg><circle></circle></svg></div></annotation-xml></mrow></math>",
+          "renderToString": "<math display=\"block\"><mrow><mi mathvariant=\"bold\">x</mi><annotation-xml encoding=\"application/xhtml+xml\"><div class=\"html-looking-child\"><svg><circle></circle></svg></div></annotation-xml></mrow></math>"
+        }
+      }
+    ],
+    "production": [
+      {
+        "status": "ok",
+        "action": "server",
+        "scenarioId": "svg-common-attributes",
+        "scenario": {
+          "id": "svg-common-attributes",
+          "description": "Server rendering serializes common React SVG attribute names, xlink attributes, and xml attributes.",
+          "coverage": [
+            "svg-namespace",
+            "svg-attribute-aliases",
+            "namespaced-attributes",
+            "server-markup"
+          ]
+        },
+        "nodeEnv": "production",
+        "console": [],
+        "renderers": {
+          "renderToStaticMarkup": "<svg accent-height=\"7\" alignment-baseline=\"middle\" class=\"icon\" clip-path=\"url(#clip)\" fill-rule=\"evenodd\" focusable=\"false\" stroke-width=\"2\" tabindex=\"0\" viewBox=\"0 0 10 10\" xlink:href=\"#symbol\" xml:lang=\"en\" xml:space=\"preserve\"><use href=\"#href-target\" xlink:href=\"#xlink-target\"></use></svg>",
+          "renderToString": "<svg accent-height=\"7\" alignment-baseline=\"middle\" class=\"icon\" clip-path=\"url(#clip)\" fill-rule=\"evenodd\" focusable=\"false\" stroke-width=\"2\" tabindex=\"0\" viewBox=\"0 0 10 10\" xlink:href=\"#symbol\" xml:lang=\"en\" xml:space=\"preserve\"><use href=\"#href-target\" xlink:href=\"#xlink-target\"></use></svg>"
+        }
+      },
+      {
+        "status": "ok",
+        "action": "server",
+        "scenarioId": "foreignobject-html-boundary",
+        "scenario": {
+          "id": "foreignobject-html-boundary",
+          "description": "Server rendering preserves SVG foreignObject with HTML descendants and nested SVG descendants.",
+          "coverage": [
+            "svg-to-html-boundary",
+            "foreignObject",
+            "nested-svg",
+            "server-markup"
+          ]
+        },
+        "nodeEnv": "production",
+        "console": [],
+        "renderers": {
+          "renderToStaticMarkup": "<svg><foreignObject height=\"4\" width=\"3\" x=\"1\" y=\"2\"><div class=\"inside\"><svg><circle cx=\"5\" stroke-width=\"2\" xlink:href=\"#circle\"></circle></svg></div></foreignObject></svg>",
+          "renderToString": "<svg><foreignObject height=\"4\" width=\"3\" x=\"1\" y=\"2\"><div class=\"inside\"><svg><circle cx=\"5\" stroke-width=\"2\" xlink:href=\"#circle\"></circle></svg></div></foreignObject></svg>"
+        }
+      },
+      {
+        "status": "ok",
+        "action": "server",
+        "scenarioId": "mathml-basic-tree",
+        "scenario": {
+          "id": "mathml-basic-tree",
+          "description": "Server rendering serializes MathML elements, MathML attributes, and annotation-xml descendants.",
+          "coverage": [
+            "mathml-namespace",
+            "mathml-attributes",
+            "server-markup"
+          ]
+        },
+        "nodeEnv": "production",
+        "console": [],
+        "renderers": {
+          "renderToStaticMarkup": "<math display=\"block\"><mrow><mi mathvariant=\"bold\">x</mi><annotation-xml encoding=\"application/xhtml+xml\"><div class=\"html-looking-child\"><svg><circle></circle></svg></div></annotation-xml></mrow></math>",
+          "renderToString": "<math display=\"block\"><mrow><mi mathvariant=\"bold\">x</mi><annotation-xml encoding=\"application/xhtml+xml\"><div class=\"html-looking-child\"><svg><circle></circle></svg></div></annotation-xml></mrow></math>"
+        }
+      }
+    ]
+  },
+  "clientObservations": {
+    "development": [
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-svg-common-attributes",
+        "scenario": {
+          "id": "client-svg-common-attributes",
+          "container": {
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml"
+          },
+          "description": "Client rendering applies common SVG attributes through setAttribute and namespaced attributes through setAttributeNS.",
+          "coverage": [
+            "svg-namespace",
+            "svg-attribute-aliases",
+            "namespaced-attributes",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "development",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "svg",
+                "namespaceURI": "http://www.w3.org/2000/svg",
+                "attributes": [
+                  {
+                    "name": "accent-height",
+                    "localName": "accent-height",
+                    "namespaceURI": null,
+                    "value": "7"
+                  },
+                  {
+                    "name": "alignment-baseline",
+                    "localName": "alignment-baseline",
+                    "namespaceURI": null,
+                    "value": "middle"
+                  },
+                  {
+                    "name": "class",
+                    "localName": "class",
+                    "namespaceURI": null,
+                    "value": "icon"
+                  },
+                  {
+                    "name": "clip-path",
+                    "localName": "clip-path",
+                    "namespaceURI": null,
+                    "value": "url(#clip)"
+                  },
+                  {
+                    "name": "fill-rule",
+                    "localName": "fill-rule",
+                    "namespaceURI": null,
+                    "value": "evenodd"
+                  },
+                  {
+                    "name": "focusable",
+                    "localName": "focusable",
+                    "namespaceURI": null,
+                    "value": "false"
+                  },
+                  {
+                    "name": "stroke-width",
+                    "localName": "stroke-width",
+                    "namespaceURI": null,
+                    "value": "2"
+                  },
+                  {
+                    "name": "tabindex",
+                    "localName": "tabindex",
+                    "namespaceURI": null,
+                    "value": "0"
+                  },
+                  {
+                    "name": "viewBox",
+                    "localName": "viewBox",
+                    "namespaceURI": null,
+                    "value": "0 0 10 10"
+                  },
+                  {
+                    "name": "xlink:href",
+                    "localName": "href",
+                    "namespaceURI": "http://www.w3.org/1999/xlink",
+                    "value": "#symbol"
+                  },
+                  {
+                    "name": "xml:lang",
+                    "localName": "lang",
+                    "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+                    "value": "en"
+                  },
+                  {
+                    "name": "xml:space",
+                    "localName": "space",
+                    "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+                    "value": "preserve"
+                  }
+                ],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "use",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [
+                      {
+                        "name": "href",
+                        "localName": "href",
+                        "namespaceURI": null,
+                        "value": "#href-target"
+                      },
+                      {
+                        "name": "xlink:href",
+                        "localName": "href",
+                        "namespaceURI": "http://www.w3.org/1999/xlink",
+                        "value": "#xlink-target"
+                      }
+                    ],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "use"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "use",
+              "name": "href",
+              "value": "#href-target"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "use",
+              "namespaceURI": "http://www.w3.org/1999/xlink",
+              "name": "xlink:href",
+              "value": "#xlink-target"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "use"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "accent-height",
+              "value": "7"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "alignment-baseline",
+              "value": "middle"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "class",
+              "value": "icon"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "clip-path",
+              "value": "url(#clip)"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "fill-rule",
+              "value": "evenodd"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "focusable",
+              "value": "false"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "stroke-width",
+              "value": "2"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "tabindex",
+              "value": "0"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "viewBox",
+              "value": "0 0 10 10"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "svg",
+              "namespaceURI": "http://www.w3.org/1999/xlink",
+              "name": "xlink:href",
+              "value": "#symbol"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "svg",
+              "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+              "name": "xml:lang",
+              "value": "en"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "svg",
+              "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+              "name": "xml:space",
+              "value": "preserve"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "DIV",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "svg"
+            }
+          ]
+        }
+      },
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-html-svg-foreignobject-html-svg",
+        "scenario": {
+          "id": "client-html-svg-foreignobject-html-svg",
+          "container": {
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml"
+          },
+          "description": "Client rendering switches from HTML to SVG, back to HTML below foreignObject, then back to SVG for nested svg.",
+          "coverage": [
+            "html-to-svg",
+            "foreignObject",
+            "svg-to-html-boundary",
+            "nested-svg",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "development",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "svg",
+                "namespaceURI": "http://www.w3.org/2000/svg",
+                "attributes": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "foreignObject",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [
+                      {
+                        "name": "height",
+                        "localName": "height",
+                        "namespaceURI": null,
+                        "value": "4"
+                      },
+                      {
+                        "name": "width",
+                        "localName": "width",
+                        "namespaceURI": null,
+                        "value": "3"
+                      },
+                      {
+                        "name": "x",
+                        "localName": "x",
+                        "namespaceURI": null,
+                        "value": "1"
+                      },
+                      {
+                        "name": "y",
+                        "localName": "y",
+                        "namespaceURI": null,
+                        "value": "2"
+                      }
+                    ],
+                    "children": [
+                      {
+                        "nodeType": 1,
+                        "nodeName": "DIV",
+                        "namespaceURI": "http://www.w3.org/1999/xhtml",
+                        "attributes": [
+                          {
+                            "name": "class",
+                            "localName": "class",
+                            "namespaceURI": null,
+                            "value": "inside"
+                          }
+                        ],
+                        "children": [
+                          {
+                            "nodeType": 1,
+                            "nodeName": "svg",
+                            "namespaceURI": "http://www.w3.org/2000/svg",
+                            "attributes": [],
+                            "children": [
+                              {
+                                "nodeType": 1,
+                                "nodeName": "circle",
+                                "namespaceURI": "http://www.w3.org/2000/svg",
+                                "attributes": [
+                                  {
+                                    "name": "cx",
+                                    "localName": "cx",
+                                    "namespaceURI": null,
+                                    "value": "5"
+                                  },
+                                  {
+                                    "name": "stroke-width",
+                                    "localName": "stroke-width",
+                                    "namespaceURI": null,
+                                    "value": "2"
+                                  },
+                                  {
+                                    "name": "xlink:href",
+                                    "localName": "href",
+                                    "namespaceURI": "http://www.w3.org/1999/xlink",
+                                    "value": "#circle"
+                                  }
+                                ],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "circle"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "circle",
+              "name": "cx",
+              "value": "5"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "circle",
+              "name": "stroke-width",
+              "value": "2"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "circle",
+              "namespaceURI": "http://www.w3.org/1999/xlink",
+              "name": "xlink:href",
+              "value": "#circle"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "circle"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "svg"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "class",
+              "value": "inside"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "foreignObject"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "foreignObject",
+              "childNodeName": "DIV"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "height",
+              "value": "4"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "width",
+              "value": "3"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "x",
+              "value": "1"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "y",
+              "value": "2"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "foreignObject"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "DIV",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "svg"
+            }
+          ]
+        }
+      },
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-svg-container-child-context",
+        "scenario": {
+          "id": "client-svg-container-child-context",
+          "container": {
+            "nodeName": "svg",
+            "namespaceURI": "http://www.w3.org/2000/svg"
+          },
+          "description": "Client rendering derives child namespace context from an SVG root container.",
+          "coverage": [
+            "svg-container-context",
+            "foreignObject",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "development",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "svg",
+            "namespaceURI": "http://www.w3.org/2000/svg",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "g",
+                "namespaceURI": "http://www.w3.org/2000/svg",
+                "attributes": [
+                  {
+                    "name": "stroke-width",
+                    "localName": "stroke-width",
+                    "namespaceURI": null,
+                    "value": "2"
+                  }
+                ],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "text",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [],
+                    "textContent": "label",
+                    "children": []
+                  },
+                  {
+                    "nodeType": 1,
+                    "nodeName": "foreignObject",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [
+                      {
+                        "name": "height",
+                        "localName": "height",
+                        "namespaceURI": null,
+                        "value": "8"
+                      },
+                      {
+                        "name": "width",
+                        "localName": "width",
+                        "namespaceURI": null,
+                        "value": "9"
+                      }
+                    ],
+                    "children": [
+                      {
+                        "nodeType": 1,
+                        "nodeName": "DIV",
+                        "namespaceURI": "http://www.w3.org/1999/xhtml",
+                        "attributes": [
+                          {
+                            "name": "class",
+                            "localName": "class",
+                            "namespaceURI": null,
+                            "value": "from-svg-container"
+                          }
+                        ],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "text"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "text",
+              "value": "label"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "class",
+              "value": "from-svg-container"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "foreignObject"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "foreignObject",
+              "childNodeName": "DIV"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "height",
+              "value": "8"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "width",
+              "value": "9"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "g"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "g",
+              "childNodeName": "text"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "g",
+              "childNodeName": "foreignObject"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "g",
+              "name": "stroke-width",
+              "value": "2"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "svg",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "g"
+            }
+          ]
+        }
+      },
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-mathml-tree",
+        "scenario": {
+          "id": "client-mathml-tree",
+          "container": {
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml"
+          },
+          "description": "Client rendering creates MathML roots and descendants in the MathML namespace.",
+          "coverage": [
+            "mathml-namespace",
+            "mathml-attributes",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "development",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "math",
+                "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                "attributes": [
+                  {
+                    "name": "display",
+                    "localName": "display",
+                    "namespaceURI": null,
+                    "value": "block"
+                  }
+                ],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "mrow",
+                    "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                    "attributes": [],
+                    "children": [
+                      {
+                        "nodeType": 1,
+                        "nodeName": "mi",
+                        "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                        "attributes": [
+                          {
+                            "name": "mathvariant",
+                            "localName": "mathvariant",
+                            "namespaceURI": null,
+                            "value": "bold"
+                          }
+                        ],
+                        "textContent": "x",
+                        "children": []
+                      },
+                      {
+                        "nodeType": 1,
+                        "nodeName": "annotation-xml",
+                        "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                        "attributes": [
+                          {
+                            "name": "encoding",
+                            "localName": "encoding",
+                            "namespaceURI": null,
+                            "value": "application/xhtml+xml"
+                          }
+                        ],
+                        "children": [
+                          {
+                            "nodeType": 1,
+                            "nodeName": "div",
+                            "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                            "attributes": [
+                              {
+                                "name": "class",
+                                "localName": "class",
+                                "namespaceURI": null,
+                                "value": "html-looking-child"
+                              }
+                            ],
+                            "children": [
+                              {
+                                "nodeType": 1,
+                                "nodeName": "svg",
+                                "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                                "attributes": [],
+                                "children": [
+                                  {
+                                    "nodeType": 1,
+                                    "nodeName": "circle",
+                                    "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                                    "attributes": [],
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "mi"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "mi",
+              "name": "mathvariant",
+              "value": "bold"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "mi",
+              "value": "x"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "circle"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "circle"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "div"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "div",
+              "childNodeName": "svg"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "div",
+              "name": "class",
+              "value": "html-looking-child"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "annotation-xml"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "annotation-xml",
+              "childNodeName": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "annotation-xml",
+              "name": "encoding",
+              "value": "application/xhtml+xml"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "mrow"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "mrow",
+              "childNodeName": "mi"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "mrow",
+              "childNodeName": "annotation-xml"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "math"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "math",
+              "childNodeName": "mrow"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "math",
+              "name": "display",
+              "value": "block"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "DIV",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "math"
+            }
+          ]
+        }
+      }
+    ],
+    "production": [
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-svg-common-attributes",
+        "scenario": {
+          "id": "client-svg-common-attributes",
+          "container": {
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml"
+          },
+          "description": "Client rendering applies common SVG attributes through setAttribute and namespaced attributes through setAttributeNS.",
+          "coverage": [
+            "svg-namespace",
+            "svg-attribute-aliases",
+            "namespaced-attributes",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "production",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "svg",
+                "namespaceURI": "http://www.w3.org/2000/svg",
+                "attributes": [
+                  {
+                    "name": "accent-height",
+                    "localName": "accent-height",
+                    "namespaceURI": null,
+                    "value": "7"
+                  },
+                  {
+                    "name": "alignment-baseline",
+                    "localName": "alignment-baseline",
+                    "namespaceURI": null,
+                    "value": "middle"
+                  },
+                  {
+                    "name": "class",
+                    "localName": "class",
+                    "namespaceURI": null,
+                    "value": "icon"
+                  },
+                  {
+                    "name": "clip-path",
+                    "localName": "clip-path",
+                    "namespaceURI": null,
+                    "value": "url(#clip)"
+                  },
+                  {
+                    "name": "fill-rule",
+                    "localName": "fill-rule",
+                    "namespaceURI": null,
+                    "value": "evenodd"
+                  },
+                  {
+                    "name": "focusable",
+                    "localName": "focusable",
+                    "namespaceURI": null,
+                    "value": "false"
+                  },
+                  {
+                    "name": "stroke-width",
+                    "localName": "stroke-width",
+                    "namespaceURI": null,
+                    "value": "2"
+                  },
+                  {
+                    "name": "tabindex",
+                    "localName": "tabindex",
+                    "namespaceURI": null,
+                    "value": "0"
+                  },
+                  {
+                    "name": "viewBox",
+                    "localName": "viewBox",
+                    "namespaceURI": null,
+                    "value": "0 0 10 10"
+                  },
+                  {
+                    "name": "xlink:href",
+                    "localName": "href",
+                    "namespaceURI": "http://www.w3.org/1999/xlink",
+                    "value": "#symbol"
+                  },
+                  {
+                    "name": "xml:lang",
+                    "localName": "lang",
+                    "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+                    "value": "en"
+                  },
+                  {
+                    "name": "xml:space",
+                    "localName": "space",
+                    "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+                    "value": "preserve"
+                  }
+                ],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "use",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [
+                      {
+                        "name": "href",
+                        "localName": "href",
+                        "namespaceURI": null,
+                        "value": "#href-target"
+                      },
+                      {
+                        "name": "xlink:href",
+                        "localName": "href",
+                        "namespaceURI": "http://www.w3.org/1999/xlink",
+                        "value": "#xlink-target"
+                      }
+                    ],
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "use"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "use",
+              "name": "href",
+              "value": "#href-target"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "use",
+              "namespaceURI": "http://www.w3.org/1999/xlink",
+              "name": "xlink:href",
+              "value": "#xlink-target"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "use"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "accent-height",
+              "value": "7"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "alignment-baseline",
+              "value": "middle"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "class",
+              "value": "icon"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "clip-path",
+              "value": "url(#clip)"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "fill-rule",
+              "value": "evenodd"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "focusable",
+              "value": "false"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "stroke-width",
+              "value": "2"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "tabindex",
+              "value": "0"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "svg",
+              "name": "viewBox",
+              "value": "0 0 10 10"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "svg",
+              "namespaceURI": "http://www.w3.org/1999/xlink",
+              "name": "xlink:href",
+              "value": "#symbol"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "svg",
+              "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+              "name": "xml:lang",
+              "value": "en"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "svg",
+              "namespaceURI": "http://www.w3.org/XML/1998/namespace",
+              "name": "xml:space",
+              "value": "preserve"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "DIV",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "svg"
+            }
+          ]
+        }
+      },
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-html-svg-foreignobject-html-svg",
+        "scenario": {
+          "id": "client-html-svg-foreignobject-html-svg",
+          "container": {
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml"
+          },
+          "description": "Client rendering switches from HTML to SVG, back to HTML below foreignObject, then back to SVG for nested svg.",
+          "coverage": [
+            "html-to-svg",
+            "foreignObject",
+            "svg-to-html-boundary",
+            "nested-svg",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "production",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "svg",
+                "namespaceURI": "http://www.w3.org/2000/svg",
+                "attributes": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "foreignObject",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [
+                      {
+                        "name": "height",
+                        "localName": "height",
+                        "namespaceURI": null,
+                        "value": "4"
+                      },
+                      {
+                        "name": "width",
+                        "localName": "width",
+                        "namespaceURI": null,
+                        "value": "3"
+                      },
+                      {
+                        "name": "x",
+                        "localName": "x",
+                        "namespaceURI": null,
+                        "value": "1"
+                      },
+                      {
+                        "name": "y",
+                        "localName": "y",
+                        "namespaceURI": null,
+                        "value": "2"
+                      }
+                    ],
+                    "children": [
+                      {
+                        "nodeType": 1,
+                        "nodeName": "DIV",
+                        "namespaceURI": "http://www.w3.org/1999/xhtml",
+                        "attributes": [
+                          {
+                            "name": "class",
+                            "localName": "class",
+                            "namespaceURI": null,
+                            "value": "inside"
+                          }
+                        ],
+                        "children": [
+                          {
+                            "nodeType": 1,
+                            "nodeName": "svg",
+                            "namespaceURI": "http://www.w3.org/2000/svg",
+                            "attributes": [],
+                            "children": [
+                              {
+                                "nodeType": 1,
+                                "nodeName": "circle",
+                                "namespaceURI": "http://www.w3.org/2000/svg",
+                                "attributes": [
+                                  {
+                                    "name": "cx",
+                                    "localName": "cx",
+                                    "namespaceURI": null,
+                                    "value": "5"
+                                  },
+                                  {
+                                    "name": "stroke-width",
+                                    "localName": "stroke-width",
+                                    "namespaceURI": null,
+                                    "value": "2"
+                                  },
+                                  {
+                                    "name": "xlink:href",
+                                    "localName": "href",
+                                    "namespaceURI": "http://www.w3.org/1999/xlink",
+                                    "value": "#circle"
+                                  }
+                                ],
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "circle"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "circle",
+              "name": "cx",
+              "value": "5"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "circle",
+              "name": "stroke-width",
+              "value": "2"
+            },
+            {
+              "type": "setAttributeNS",
+              "targetNodeName": "circle",
+              "namespaceURI": "http://www.w3.org/1999/xlink",
+              "name": "xlink:href",
+              "value": "#circle"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "circle"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "svg"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "class",
+              "value": "inside"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "foreignObject"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "foreignObject",
+              "childNodeName": "DIV"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "height",
+              "value": "4"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "width",
+              "value": "3"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "x",
+              "value": "1"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "y",
+              "value": "2"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "foreignObject"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "DIV",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "svg"
+            }
+          ]
+        }
+      },
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-svg-container-child-context",
+        "scenario": {
+          "id": "client-svg-container-child-context",
+          "container": {
+            "nodeName": "svg",
+            "namespaceURI": "http://www.w3.org/2000/svg"
+          },
+          "description": "Client rendering derives child namespace context from an SVG root container.",
+          "coverage": [
+            "svg-container-context",
+            "foreignObject",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "production",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "svg",
+            "namespaceURI": "http://www.w3.org/2000/svg",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "g",
+                "namespaceURI": "http://www.w3.org/2000/svg",
+                "attributes": [
+                  {
+                    "name": "stroke-width",
+                    "localName": "stroke-width",
+                    "namespaceURI": null,
+                    "value": "2"
+                  }
+                ],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "text",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [],
+                    "textContent": "label",
+                    "children": []
+                  },
+                  {
+                    "nodeType": 1,
+                    "nodeName": "foreignObject",
+                    "namespaceURI": "http://www.w3.org/2000/svg",
+                    "attributes": [
+                      {
+                        "name": "height",
+                        "localName": "height",
+                        "namespaceURI": null,
+                        "value": "8"
+                      },
+                      {
+                        "name": "width",
+                        "localName": "width",
+                        "namespaceURI": null,
+                        "value": "9"
+                      }
+                    ],
+                    "children": [
+                      {
+                        "nodeType": 1,
+                        "nodeName": "DIV",
+                        "namespaceURI": "http://www.w3.org/1999/xhtml",
+                        "attributes": [
+                          {
+                            "name": "class",
+                            "localName": "class",
+                            "namespaceURI": null,
+                            "value": "from-svg-container"
+                          }
+                        ],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "text"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "text",
+              "value": "label"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "class",
+              "value": "from-svg-container"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "foreignObject"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "foreignObject",
+              "childNodeName": "DIV"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "height",
+              "value": "8"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "foreignObject",
+              "name": "width",
+              "value": "9"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/2000/svg",
+              "name": "g"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "g",
+              "childNodeName": "text"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "g",
+              "childNodeName": "foreignObject"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "g",
+              "name": "stroke-width",
+              "value": "2"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "svg",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "g"
+            }
+          ]
+        }
+      },
+      {
+        "status": "ok",
+        "action": "client",
+        "scenarioId": "client-mathml-tree",
+        "scenario": {
+          "id": "client-mathml-tree",
+          "container": {
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml"
+          },
+          "description": "Client rendering creates MathML roots and descendants in the MathML namespace.",
+          "coverage": [
+            "mathml-namespace",
+            "mathml-attributes",
+            "client-host-output"
+          ]
+        },
+        "nodeEnv": "production",
+        "hostEnvironment": {
+          "kind": "deterministic-fake-dom",
+          "recordsEventListeners": false,
+          "recordsLayout": false,
+          "recordsParserBehavior": false
+        },
+        "console": [],
+        "output": {
+          "container": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "namespaceURI": "http://www.w3.org/1999/xhtml",
+            "attributes": [],
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "math",
+                "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                "attributes": [
+                  {
+                    "name": "display",
+                    "localName": "display",
+                    "namespaceURI": null,
+                    "value": "block"
+                  }
+                ],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "mrow",
+                    "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                    "attributes": [],
+                    "children": [
+                      {
+                        "nodeType": 1,
+                        "nodeName": "mi",
+                        "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                        "attributes": [
+                          {
+                            "name": "mathvariant",
+                            "localName": "mathvariant",
+                            "namespaceURI": null,
+                            "value": "bold"
+                          }
+                        ],
+                        "textContent": "x",
+                        "children": []
+                      },
+                      {
+                        "nodeType": 1,
+                        "nodeName": "annotation-xml",
+                        "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                        "attributes": [
+                          {
+                            "name": "encoding",
+                            "localName": "encoding",
+                            "namespaceURI": null,
+                            "value": "application/xhtml+xml"
+                          }
+                        ],
+                        "children": [
+                          {
+                            "nodeType": 1,
+                            "nodeName": "div",
+                            "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                            "attributes": [
+                              {
+                                "name": "class",
+                                "localName": "class",
+                                "namespaceURI": null,
+                                "value": "html-looking-child"
+                              }
+                            ],
+                            "children": [
+                              {
+                                "nodeType": 1,
+                                "nodeName": "svg",
+                                "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                                "attributes": [],
+                                "children": [
+                                  {
+                                    "nodeType": 1,
+                                    "nodeName": "circle",
+                                    "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+                                    "attributes": [],
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "operations": [
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "DIV",
+              "name": "oninput",
+              "value": "return;"
+            },
+            {
+              "type": "createElement",
+              "name": "div"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "mi"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "mi",
+              "name": "mathvariant",
+              "value": "bold"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "mi",
+              "value": "x"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "circle"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "svg"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "svg",
+              "childNodeName": "circle"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "div"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "div",
+              "childNodeName": "svg"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "div",
+              "name": "class",
+              "value": "html-looking-child"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "annotation-xml"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "annotation-xml",
+              "childNodeName": "div"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "annotation-xml",
+              "name": "encoding",
+              "value": "application/xhtml+xml"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "mrow"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "mrow",
+              "childNodeName": "mi"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "mrow",
+              "childNodeName": "annotation-xml"
+            },
+            {
+              "type": "createElementNS",
+              "namespaceURI": "http://www.w3.org/1998/Math/MathML",
+              "name": "math"
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "math",
+              "childNodeName": "mrow"
+            },
+            {
+              "type": "setAttribute",
+              "targetNodeName": "math",
+              "name": "display",
+              "value": "block"
+            },
+            {
+              "type": "setTextContent",
+              "targetNodeName": "DIV",
+              "value": ""
+            },
+            {
+              "type": "appendChild",
+              "parentNodeName": "DIV",
+              "childNodeName": "math"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-react-dom-comparison",
+      "reason": "This oracle records pinned React DOM behavior only; Fast React React DOM rendering behavior is not implemented in this worker scope."
+    },
+    {
+      "id": "client-probes-use-deterministic-fake-dom",
+      "reason": "Client probes record React DOM host API calls against a deterministic fake DOM so namespace and attribute decisions are observable without adding jsdom or browser dependencies. They do not claim browser parser, layout, focus, event, or platform API parity."
+    },
+    {
+      "id": "no-hydration-or-update-diffing",
+      "reason": "Hydration, mismatch handling, event delegation, resource hints, controlled forms, style diffing, and update/removal behavior are separate oracle tracks."
+    }
+  ]
+}
