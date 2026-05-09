@@ -32,6 +32,10 @@ The orchestrator goal is continuous. Do not call
 - Prefer interactive Codex TUI workers wrapped with `script -q -F "$log_file"
   codex --yolo --no-alt-screen ... "$prompt_text"` so tmux panes remain
   inspectable and logs are captured.
+- Load prompt markdown into a shell variable or otherwise quote it so literal
+  backticks, `$()`, and paths in worker prompts are passed to Codex as text.
+  Never inline `$(cat prompt.md)` or unquoted prompt text in a way that lets the
+  shell execute markdown code spans before Codex starts.
 - Use `tmux capture-pane -pt <session>` to inspect live status such as
   `Pursuing goal` or `Goal achieved`.
 - Classify worker liveness from the current pane state first. If a pane shows
