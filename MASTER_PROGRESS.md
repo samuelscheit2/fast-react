@@ -52,12 +52,17 @@ M0: Orchestration Foundation.
 | worker-008-renderer-host-config | merged | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` |
 | worker-009-benchmark-strategy | merged | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` |
 | worker-010-initial-scaffold | merged | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `worker-progress/worker-010-initial-scaffold.md` |
+| worker-011-core-element-model | running in tmux worktree; nested subagents allowed | Implement first Rust core element/model primitives | `../fast-react-worker-011-core-element-model/worker-progress/worker-011-core-element-model.md` |
+| worker-012-host-config-traits | running in tmux worktree; nested subagents allowed | Implement first capability-grouped host-config trait skeleton | `../fast-react-worker-012-host-config-traits/worker-progress/worker-012-host-config-traits.md` |
+| worker-013-conformance-inventory-tooling | running in tmux worktree; nested subagents allowed | Implement initial conformance inventory tooling placeholder | `../fast-react-worker-013-conformance-inventory-tooling/worker-progress/worker-013-conformance-inventory-tooling.md` |
+| worker-014-react-entrypoint-placeholders | running in tmux worktree; nested subagents allowed | Improve React package placeholders and smoke tests from API inventory | `../fast-react-worker-014-react-entrypoint-placeholders/worker-progress/worker-014-react-entrypoint-placeholders.md` |
+| worker-015-native-loader-boundary | running in tmux worktree; nested subagents allowed | Improve native loader and Rust N-API boundary placeholders | `../fast-react-worker-015-native-loader-boundary/worker-progress/worker-015-native-loader-boundary.md` |
 
 ## Next Actions
 
-1. Launch the next implementation workers from the merged scaffold.
-2. Collect and merge their scoped changes with verification evidence.
-3. Keep root manifest changes owned by a dedicated worker or merge worker.
+1. Collect and merge workers 011-015 with verification evidence.
+2. Keep root manifest changes owned by a dedicated worker or merge worker.
+3. Launch merge workers if host/core/test changes require integration fixes.
 
 ## Risks And Open Questions
 
@@ -103,3 +108,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-004 API inventory report in commit `772447d`. Closed the worker-004 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-010 initial scaffold implementation in commit `33e1990`. Closed the worker-010 tmux session after merge.
 - 2026-05-09: Verified merged scaffold on `main` with `npm run check`, `cargo test --workspace --all-features`, and `node tests/smoke/import-entrypoints.mjs`. Removed generated `Cargo.lock` and `target/` afterward.
+- 2026-05-09: Queued workers 011-015 as disjoint scaffold follow-up implementation tasks: core model, host-config traits, conformance inventory tooling, React entrypoint placeholders, and native loader boundary.
