@@ -140,8 +140,8 @@ M0: Orchestration Foundation.
 
 ## Next Actions
 
-1. Audit idle worker sessions 045-053, accepting clean completions or relaunching usage-limit failures in their existing worktrees.
-2. Monitor workers 054-074 as the active parallel tranche and audit/merge them only after their scoped reports, tests, and status are clean.
+1. Monitor workers 045-074 as the active 30-worker parallel pool and audit/merge them only after their scoped reports, tests, and status are clean.
+2. Relaunch usage-limit exits in place, using continuation prompts whenever scoped partial changes are present.
 3. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 4. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
@@ -286,3 +286,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched workers 045-053 as real `codex exec --yolo` tmux processes in isolated worktrees. Top-level Fast React worker count after launch: 9.
 - 2026-05-09: Queued workers 054-074 as an expanded parallel tranche to fill the 30 top-level tmux worker cap with disjoint React DOM, scheduler, core, reconciler, test-renderer, and benchmark tasks.
 - 2026-05-09: Workers 045-053 had exited to idle tmux shells before the expanded launch and need audit/relaunch decisions. Launched workers 054-074 as real `codex exec --yolo -m gpt-5.5` tmux processes with `model_reasoning_effort="xhigh"` in isolated worktrees. Immediate clean or partial exits were relaunched in place; live top-level Codex worker count during maintenance fluctuated between 19 and 21.
+- 2026-05-09: Rebased clean idle workers 045-050, 052-053, 055-056, 064, 070, and 074 onto current `main`; continued partial idle workers 051, 054, 060, 065, 069, and 072 without discarding scoped edits; relaunched additional clean idle workers as needed. Observed active top-level tmux Codex worker count reached the 30-worker cap across workers 045-074.
