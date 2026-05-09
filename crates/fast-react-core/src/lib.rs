@@ -7,6 +7,7 @@
 mod compatibility;
 mod element;
 mod lane;
+mod root_lanes;
 mod symbols;
 
 use std::error::Error;
@@ -19,6 +20,11 @@ pub use compatibility::{
 };
 pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
+pub use root_lanes::{
+    LaneClaimers, LaneTimestamp, NO_TIMESTAMP, RETRY_LANE_EXPIRATION_MS, RootFinishedLanes,
+    RootLaneFeatureFlags, RootLaneState, SYNC_LANE_EXPIRATION_MS, TRANSITION_LANE_EXPIRATION_MS,
+    highest_priority_lanes,
+};
 pub use symbols::ReactSymbolTag;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
