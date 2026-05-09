@@ -29,6 +29,7 @@ M0: Orchestration Foundation.
 - Worker runner requests `gpt-5.5` with `model_reasoning_effort="xhigh"` and uses the local yolo-equivalent Codex flag.
 - Accepted architecture direction from worker-001: Rust should own renderer-agnostic React semantics behind arena/generational handles, use a capability-grouped host-config boundary, and expose a JS-compatible package facade through N-API first. WASM and third-party `react-reconciler` compatibility are deferred until conformance evidence justifies them.
 - Accepted conformance direction from worker-002: React 19.2.6 compatibility must be proven by generated inventories and black-box dual-run oracle scenarios, not export names alone. Benchmarks must link to green conformance scenario IDs before they count.
+- Accepted scaffold direction from worker-003: create a Cargo workspace with `fast-react-core`, `fast-react-host-config`, `fast-react-reconciler`, `fast-react-test-renderer`, and `fast-react-napi`; use npm workspaces for `packages/react`, `bindings/node`, and tests; defer `react-dom`, browser WASM, and standalone scheduler crates until conformance evidence justifies them.
 
 ## Worker Roster
 
@@ -36,7 +37,7 @@ M0: Orchestration Foundation.
 | --- | --- | --- | --- |
 | worker-001-architecture | merged | Test Rust core and renderer-boundary architecture hypotheses | `worker-progress/worker-001-architecture.md` |
 | worker-002-conformance | merged | Design React 19.2.6 compatibility inventory and test strategy | `worker-progress/worker-002-conformance.md` |
-| worker-003-scaffold | running in tmux worktree; nested subagents allowed | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
+| worker-003-scaffold | merged | Propose Cargo workspace, JS package scaffold, and worktree task split | `worker-progress/worker-003-scaffold.md` |
 | worker-004-api-inventory | running in tmux worktree; nested subagents allowed | Build exact public API, runtime export, subpath, and type inventory | `../fast-react-worker-004-api-inventory/worker-progress/worker-004-api-inventory.md` |
 | worker-005-upstream-tests | running in tmux worktree; nested subagents allowed | Assess upstream React 19.2.6 test reuse and harness requirements | `../fast-react-worker-005-upstream-tests/worker-progress/worker-005-upstream-tests.md` |
 | worker-006-binding-strategy | running in tmux worktree; nested subagents allowed | Design JS-to-Rust binding and package artifact strategy | `../fast-react-worker-006-binding-strategy/worker-progress/worker-006-binding-strategy.md` |
@@ -46,9 +47,9 @@ M0: Orchestration Foundation.
 
 ## Next Actions
 
-1. Collect the seven active workers' progress files and final recommendations.
-2. Update the master plan with accepted architecture and scaffold decisions.
-3. Create implementation worktrees from the accepted scaffold plan.
+1. Collect the six active research workers' progress files and final recommendations.
+2. Launch the scaffold implementation worker with ownership of root manifests, initial crates, package wrappers, and smoke/conformance placeholders.
+3. Update the master plan with accepted findings from workers 004-009.
 
 ## Risks And Open Questions
 
@@ -84,3 +85,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Added six more non-overlapping research workers: public API inventory, upstream test reuse, binding strategy, scheduler/fiber model, renderer host config, and benchmark strategy.
 - 2026-05-09: Accepted and merged worker-001 architecture report in commit `b5a0da1`. Closed the worker-001 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-002 conformance report in commit `a468c5f`. Closed the worker-002 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-003 scaffold report in commit `93dfe83`. Closed the worker-003 tmux session after merge.
