@@ -2,6 +2,7 @@
 
 const REACT_MEMO_TYPE = Symbol.for('react.memo');
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
+const REACT_FORWARD_REF_TYPE = Symbol.for('react.forward_ref');
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const createConsoleTask =
@@ -38,6 +39,59 @@ function memo(type, compare) {
         if (!type.name && !type.displayName) {
           Object.defineProperty(type, 'name', { value: name });
           type.displayName = name;
+        }
+      }
+    });
+  }
+
+  return elementType;
+}
+
+function forwardRef(render) {
+  if (isDevelopment) {
+    if (render != null && render.$$typeof === REACT_MEMO_TYPE) {
+      console.error(
+        'forwardRef requires a render function but received a `memo` component. Instead of forwardRef(memo(...)), use memo(forwardRef(...)).'
+      );
+    } else if (typeof render !== 'function') {
+      console.error(
+        'forwardRef requires a render function but was given %s.',
+        render === null ? 'null' : typeof render
+      );
+    } else if (render.length !== 0 && render.length !== 2) {
+      console.error(
+        'forwardRef render functions accept exactly two parameters: props and ref. %s',
+        render.length === 1
+          ? 'Did you forget to use the ref parameter?'
+          : 'Any additional parameter will be undefined.'
+      );
+    }
+
+    if (render != null && render.defaultProps != null) {
+      console.error(
+        'forwardRef render functions do not support defaultProps. Did you accidentally pass a React component?'
+      );
+    }
+  }
+
+  const elementType = {
+    $$typeof: REACT_FORWARD_REF_TYPE,
+    render
+  };
+
+  if (isDevelopment) {
+    let ownName;
+    Object.defineProperty(elementType, 'displayName', {
+      enumerable: false,
+      configurable: true,
+      get() {
+        return ownName;
+      },
+      set(name) {
+        ownName = name;
+        if (!render.name && !render.displayName) {
+          Object.defineProperty(render, 'name', { value: name });
+          render.displayName = name;
         }
       }
     });
@@ -197,12 +251,18 @@ Object.defineProperty(memo, 'name', {
   value: ''
 });
 
+Object.defineProperty(forwardRef, 'name', {
+  configurable: true,
+  value: ''
+});
+
 Object.defineProperty(lazy, 'name', {
   configurable: true,
   value: ''
 });
 
 module.exports = {
+  forwardRef,
   lazy,
   memo
 };

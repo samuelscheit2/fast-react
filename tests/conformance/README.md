@@ -30,6 +30,7 @@ Checked-in generated artifact:
 - `oracles/react-19.2.6-ref-object-oracle.json`
 - `oracles/react-19.2.6-children-helper-oracle.json`
 - `oracles/react-19.2.6-wrapper-object-oracle.json`
+- `oracles/react-19.2.6-forward-ref-oracle.json`
 
 Commands:
 
@@ -49,6 +50,9 @@ npm run children-helper:print:markdown --workspace @fast-react/conformance
 npm run wrapper-object:generate --workspace @fast-react/conformance
 npm run wrapper-object:print --workspace @fast-react/conformance
 npm run wrapper-object:print:markdown --workspace @fast-react/conformance
+npm run forward-ref:generate --workspace @fast-react/conformance
+npm run forward-ref:print --workspace @fast-react/conformance
+npm run forward-ref:print:markdown --workspace @fast-react/conformance
 npm test --workspace @fast-react/conformance
 ```
 
@@ -165,3 +169,26 @@ The wrapper object oracle intentionally excludes rendering, Suspense resolution
 through a renderer, memo compare invocation, memo bailout behavior, component
 invocation, owner stacks, hooks, context, refs lifecycle, `forwardRef`, and
 private internals.
+
+Forward-ref oracle strategy:
+
+1. Resolve exact `react@19.2.6` npm metadata.
+2. Download the exact React tarball into a temporary directory.
+3. Verify tarball integrity from `dist.integrity`.
+4. Extract React and copy the local `@fast-react/react` package into a
+   temporary `node_modules` tree.
+5. Run one isolated Node child process per target, scenario, and mode. Modes
+   cover default Node and `--conditions=react-server`, each in development and
+   production.
+6. Capture normalized JSON for direct `forwardRef` wrapper-object behavior,
+   including export descriptors, function descriptors, wrapper own-key order,
+   property descriptors, `$$typeof`, render value identity, development-only
+   `displayName`, console warnings, invalid render values, arity checks,
+   extra arguments, `this` handling, and constructor calls.
+7. Compare local Fast React observations against the React oracle as explicit
+   `matched-but-compatibility-not-claimed`, `known-mismatch`, or
+   `unsupported-placeholder` statuses.
+
+The forward-ref oracle intentionally excludes render-time ref attachment,
+callback ref invocation, owner stacks, component invocation, hooks, context,
+renderer integration, refs lifecycle, `useRef`, and private internals.
