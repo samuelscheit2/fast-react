@@ -188,9 +188,10 @@ Dependencies: M8.
 | worker-010-initial-scaffold | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | root scaffold paths plus `worker-progress/worker-010-initial-scaffold.md` | workers 001-003 | merged |
 | worker-011-core-element-model | Implement first Rust core element/model primitives | `crates/fast-react-core/**`, `worker-progress/worker-011-core-element-model.md` | workers 001,004,010 | queued |
 | worker-012-host-config-traits | Implement first capability-grouped host-config trait skeleton | `crates/fast-react-host-config/**`, `worker-progress/worker-012-host-config-traits.md` | workers 008,010 | queued |
-| worker-013-conformance-inventory-tooling | Implement initial conformance inventory tooling placeholder | `tests/conformance/**`, `worker-progress/worker-013-conformance-inventory-tooling.md` | workers 002,004,010 | queued |
+| worker-013-conformance-inventory-tooling | Implement initial conformance inventory tooling placeholder | `tests/conformance/**`, `worker-progress/worker-013-conformance-inventory-tooling.md` | workers 002,004,010 | merged |
 | worker-014-react-entrypoint-placeholders | Improve React package placeholders and smoke tests from API inventory | `packages/react/**`, `tests/smoke/**`, `worker-progress/worker-014-react-entrypoint-placeholders.md` | workers 004,010 | queued |
-| worker-015-native-loader-boundary | Improve native loader and Rust N-API boundary placeholders | `bindings/node/**`, `crates/fast-react-napi/**`, `worker-progress/worker-015-native-loader-boundary.md` | workers 006,010 | queued |
+| worker-015-native-loader-boundary | Improve native loader and Rust N-API boundary placeholders | `bindings/node/**`, `crates/fast-react-napi/**`, `worker-progress/worker-015-native-loader-boundary.md` | workers 006,010 | merged |
+| worker-016-root-lockfile-sync | Synchronize root `package-lock.json` after package metadata changes | `package-lock.json`, `worker-progress/worker-016-root-lockfile-sync.md` | workers 013,014,015 | pending |
 
 ## Merge Policy
 

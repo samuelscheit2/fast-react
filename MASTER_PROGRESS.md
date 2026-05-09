@@ -37,6 +37,9 @@ M0: Orchestration Foundation.
 - Accepted scheduler/fiber direction from worker-007: model lane bitsets, root lane bookkeeping, Scheduler heaps, double-buffered fiber arenas, circular/rebased update queues, and flags/subtreeFlags commit traversal directly. Flat priority enums, FIFO queues, or a global effect list are root-cause mismatches.
 - Accepted API inventory direction from worker-004: inventory package subpaths, runtime exports, type declarations, and environment conditions from pinned tarballs and isolated probes. `@types/react-dom@19.2.3` needs an explicit target decision before TypeScript compatibility claims include `react-dom`.
 - Accepted scaffold implementation from worker-010: root Cargo/npm workspaces, placeholder Rust crates, placeholder React/native packages, conformance/smoke placeholders, and CI skeleton are merged. Real React behavior remains explicitly unimplemented and gated by future conformance-backed workers.
+- Accepted conformance inventory tooling from worker-013: the conformance workspace now has deterministic pinned target metadata and tests that explicitly keep all real conformance claims false until tarball/runtime/type inventory generation exists.
+- Accepted native loader boundary from worker-015: native loading remains loudly unavailable, but CJS/ESM loader metadata now exposes future platform package names, Node `>=22.0.0`, N-API floor 8, and native-specific Rust boundary errors without adding N-API dependencies.
+- Root lockfile sync is pending after package metadata changes. `npm ci --ignore-scripts --dry-run` passes, but `package-lock.json` still records older workspace metadata for `bindings/node`; update it after the remaining package-facing worker completes.
 
 ## Worker Roster
 
@@ -54,14 +57,15 @@ M0: Orchestration Foundation.
 | worker-010-initial-scaffold | merged | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `worker-progress/worker-010-initial-scaffold.md` |
 | worker-011-core-element-model | running in tmux worktree; nested subagents allowed | Implement first Rust core element/model primitives | `../fast-react-worker-011-core-element-model/worker-progress/worker-011-core-element-model.md` |
 | worker-012-host-config-traits | running in tmux worktree; nested subagents allowed | Implement first capability-grouped host-config trait skeleton | `../fast-react-worker-012-host-config-traits/worker-progress/worker-012-host-config-traits.md` |
-| worker-013-conformance-inventory-tooling | running in tmux worktree; nested subagents allowed | Implement initial conformance inventory tooling placeholder | `../fast-react-worker-013-conformance-inventory-tooling/worker-progress/worker-013-conformance-inventory-tooling.md` |
+| worker-013-conformance-inventory-tooling | merged | Implement initial conformance inventory tooling placeholder | `worker-progress/worker-013-conformance-inventory-tooling.md` |
 | worker-014-react-entrypoint-placeholders | running in tmux worktree; nested subagents allowed | Improve React package placeholders and smoke tests from API inventory | `../fast-react-worker-014-react-entrypoint-placeholders/worker-progress/worker-014-react-entrypoint-placeholders.md` |
-| worker-015-native-loader-boundary | running in tmux worktree; nested subagents allowed | Improve native loader and Rust N-API boundary placeholders | `../fast-react-worker-015-native-loader-boundary/worker-progress/worker-015-native-loader-boundary.md` |
+| worker-015-native-loader-boundary | merged | Improve native loader and Rust N-API boundary placeholders | `worker-progress/worker-015-native-loader-boundary.md` |
+| worker-016-root-lockfile-sync | pending | Synchronize root `package-lock.json` after package metadata changes | `../fast-react-worker-016-root-lockfile-sync/worker-progress/worker-016-root-lockfile-sync.md` |
 
 ## Next Actions
 
-1. Collect and merge workers 011-015 with verification evidence.
-2. Keep root manifest changes owned by a dedicated worker or merge worker.
+1. Collect and merge workers 011, 012, and 014 with verification evidence.
+2. Launch worker-016 to synchronize `package-lock.json` after worker-014 package changes are accepted.
 3. Launch merge workers if host/core/test changes require integration fixes.
 
 ## Risks And Open Questions
@@ -109,3 +113,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-010 initial scaffold implementation in commit `33e1990`. Closed the worker-010 tmux session after merge.
 - 2026-05-09: Verified merged scaffold on `main` with `npm run check`, `cargo test --workspace --all-features`, and `node tests/smoke/import-entrypoints.mjs`. Removed generated `Cargo.lock` and `target/` afterward.
 - 2026-05-09: Queued workers 011-015 as disjoint scaffold follow-up implementation tasks: core model, host-config traits, conformance inventory tooling, React entrypoint placeholders, and native loader boundary.
+- 2026-05-09: Accepted and merged worker-013 conformance inventory tooling in commit `d990db5`. Closed the worker-013 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-015 native loader boundary in commit `09e6b3f`. Closed the worker-015 tmux session after merge.
+- 2026-05-09: Checked `npm ci --ignore-scripts --dry-run` on main after worker-015; it passes. `package-lock.json` metadata still needs sync for the changed native package engine, so worker-016 is pending.
