@@ -198,7 +198,7 @@ Dependencies: M8.
 | worker-020-element-object-conformance-probes | Probe React 19.2.6 element object behavior and plan safe implementation | `worker-progress/worker-020-element-object-conformance-probes.md` | workers 001,004,011,014 | merged |
 | worker-021-element-object-oracle | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `tests/conformance/**`, `worker-progress/worker-021-element-object-oracle.md` | workers 017,020 | merged |
 | worker-022-host-operation-errors | Add structured host operation errors for invalid test-renderer operations | `crates/fast-react-host-config/**`, `crates/fast-react-test-renderer/**`, optional compile-only `crates/fast-react-reconciler/**`, `worker-progress/worker-022-host-operation-errors.md` | workers 018,019 | merged |
-| worker-023-js-element-factory | Implement conformance-backed JS element factory behavior from the checked oracle | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-023-js-element-factory.md` | workers 014,020,021 | queued |
+| worker-023-js-element-factory | Implement conformance-backed JS element factory behavior from the checked oracle | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-023-js-element-factory.md` | workers 014,020,021 | running |
 
 ## Merge Policy
 
