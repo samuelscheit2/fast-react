@@ -1,0 +1,3744 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "scheduler-0.27.0-post-task-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "scheduler@0.27.0 unstable_post_task behavior oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-007-scheduler-fiber.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-034-scheduler-package-inventory.md",
+    "worker-progress/worker-038-scheduler-root-oracle.md",
+    "worker-progress/worker-039-scheduler-variant-oracles.md"
+  ],
+  "generation": {
+    "method": "exact scheduler npm tarball extracted into a temporary node_modules tree and probed through isolated Node child processes with controlled Task Scheduling API shims",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per scheduler/unstable_post_task scenario and mode",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false,
+    "timingNormalization": "raw wall-clock timestamps are omitted; probes use a controlled window.performance.now shim and record only logical scheduler calls, priority values, delay value categories, abort state, and shouldYield booleans"
+  },
+  "evidenceClaims": {
+    "npmMetadataResolved": true,
+    "tarballDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "schedulerPostTaskBehaviorProbed": true,
+    "plainNodeUnsupportedBehaviorProbed": true,
+    "controlledTaskSchedulingApiShimUsed": true,
+    "exportDescriptorBehaviorProbed": true,
+    "fastReactComparedToScheduler": false
+  },
+  "conformanceClaims": {
+    "realSchedulerBehaviorProbed": true,
+    "fastReactComparedToScheduler": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "schedulerTarget": {
+    "packageName": "scheduler",
+    "version": "0.27.0",
+    "entrypoint": "scheduler/unstable_post_task",
+    "role": "official-scheduler-post-task-variant-target",
+    "targetStatus": "browser-task-scheduling-api-dependent-variant",
+    "expectedDistIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+    "expectedDistShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
+  },
+  "probeModes": [
+    {
+      "id": "node-development",
+      "nodeEnv": "development",
+      "nodeArgs": [],
+      "reason": "The scheduler/unstable_post_task wrapper selects cjs/scheduler-unstable_post_task.development.js when NODE_ENV is not production."
+    },
+    {
+      "id": "node-production",
+      "nodeEnv": "production",
+      "nodeArgs": [],
+      "reason": "The scheduler/unstable_post_task wrapper selects cjs/scheduler-unstable_post_task.production.js when NODE_ENV is production."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "scheduler-post-task-export-shape",
+      "area": "post-task export shape and descriptors",
+      "entrypoints": [
+        "scheduler/unstable_post_task"
+      ],
+      "captures": [
+        "package identity",
+        "subpath resolution",
+        "export key order",
+        "priority constants",
+        "export descriptors",
+        "function names and lengths",
+        "no-op paint and frame-rate APIs"
+      ]
+    },
+    {
+      "id": "scheduler-post-task-environment-require",
+      "area": "post-task environment feature access",
+      "entrypoints": [
+        "scheduler/unstable_post_task"
+      ],
+      "captures": [
+        "plain Node missing-window import failure",
+        "missing window.performance import failure",
+        "load success with minimal window globals",
+        "schedule failure when TaskController is absent",
+        "schedule failure when global scheduler is absent",
+        "schedule failure when scheduler.postTask is absent"
+      ]
+    },
+    {
+      "id": "scheduler-post-task-priority-context",
+      "area": "post-task priority context APIs",
+      "entrypoints": [
+        "scheduler/unstable_post_task"
+      ],
+      "captures": [
+        "default current priority",
+        "runWithPriority priority assignment and restoration",
+        "invalid runWithPriority priority preservation",
+        "priority restoration after throw",
+        "next priority lowering rules",
+        "wrapCallback priority capture and forwarding"
+      ]
+    },
+    {
+      "id": "scheduler-post-task-scheduling",
+      "area": "post-task scheduling calls under a controlled Task Scheduling API shim",
+      "entrypoints": [
+        "scheduler/unstable_post_task"
+      ],
+      "captures": [
+        "public priority to postTask priority mapping",
+        "delay option normalization",
+        "returned task node and controller descriptor shape",
+        "callback didTimeout argument",
+        "current priority during callbacks",
+        "deadline-based shouldYield behavior with controlled time"
+      ]
+    },
+    {
+      "id": "scheduler-post-task-cancellation",
+      "area": "post-task cancellation through TaskController.abort",
+      "entrypoints": [
+        "scheduler/unstable_post_task"
+      ],
+      "captures": [
+        "cancelCallback return value",
+        "controller signal aborted mutation",
+        "abort event shape",
+        "aborted task is skipped by the controlled shim"
+      ]
+    },
+    {
+      "id": "scheduler-post-task-continuations",
+      "area": "post-task continuation scheduling fallback",
+      "entrypoints": [
+        "scheduler/unstable_post_task"
+      ],
+      "captures": [
+        "continuation uses scheduler.yield when available",
+        "continuation falls back to scheduler.postTask when scheduler.yield is absent",
+        "continuation preserves current priority",
+        "continuation reuses the original signal"
+      ]
+    }
+  ],
+  "packages": {
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "official-scheduler-post-task-variant-target",
+      "targetStatus": "browser-task-scheduling-api-dependent-variant",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "description": "Cooperative scheduler for the browser environment.",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null,
+        "license": "MIT",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/facebook/react.git",
+          "directory": "packages/scheduler"
+        },
+        "bugs": {
+          "url": "https://github.com/facebook/react/issues"
+        },
+        "homepage": "https://react.dev/"
+      }
+    }
+  },
+  "coverage": {
+    "exportKeys": true,
+    "exportDescriptors": true,
+    "environmentFeatureAccess": true,
+    "plainNodeUnsupportedImport": true,
+    "missingTaskSchedulingApiUnsupportedBehavior": true,
+    "noopPaintAndFrameRateApis": true,
+    "priorityContextApis": true,
+    "priorityToPostTaskPriorityMapping": true,
+    "delayOptionNormalization": true,
+    "returnedTaskNodeDescriptors": true,
+    "cancellationAbortSignal": true,
+    "deadlineShouldYieldWithControlledTime": true,
+    "continuationWithSchedulerYield": true,
+    "continuationPostTaskFallbackWithoutYield": true,
+    "browserTaskOrdering": false,
+    "rawTiming": false
+  },
+  "timingCaveats": [
+    "The checked artifact intentionally omits raw times and absolute timestamps.",
+    "The Task Scheduling API is represented by a controlled Node shim; it records scheduler module calls but does not claim browser host task ordering.",
+    "The controlled shim uses deterministic window.performance.now values to classify shouldYield behavior around the module's 5ms local deadline.",
+    "Continuation probes assert whether scheduler.yield or scheduler.postTask is called, not browser promise scheduling latency."
+  ],
+  "schedulerObservations": {
+    "node-development": [
+      {
+        "scenarioId": "scheduler-post-task-export-shape",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "result": {
+          "status": "returned",
+          "value": {
+            "packageJson": {
+              "name": "scheduler",
+              "version": "0.27.0",
+              "description": "Cooperative scheduler for the browser environment.",
+              "main": null,
+              "type": null,
+              "exports": null,
+              "files": [
+                "LICENSE",
+                "README.md",
+                "index.js",
+                "index.native.js",
+                "unstable_mock.js",
+                "unstable_post_task.js",
+                "cjs/"
+              ],
+              "dependencies": null,
+              "peerDependencies": null,
+              "engines": null,
+              "license": "MIT",
+              "repository": {
+                "type": "git",
+                "url": "https://github.com/facebook/react.git",
+                "directory": "packages/scheduler"
+              },
+              "bugs": {
+                "url": "https://github.com/facebook/react/issues"
+              },
+              "homepage": "https://react.dev/"
+            },
+            "requireResolution": {
+              "specifier": "scheduler/unstable_post_task",
+              "status": "ok",
+              "path": "node_modules/scheduler/unstable_post_task.js"
+            },
+            "shimEnvironment": {
+              "hasWindow": true,
+              "hasWindowPerformanceNow": true,
+              "hasWindowSetTimeout": true,
+              "hasTaskController": true,
+              "hasSchedulerPostTask": true,
+              "hasSchedulerYield": true
+            },
+            "exportKeys": [
+              "unstable_IdlePriority",
+              "unstable_ImmediatePriority",
+              "unstable_LowPriority",
+              "unstable_NormalPriority",
+              "unstable_Profiling",
+              "unstable_UserBlockingPriority",
+              "unstable_cancelCallback",
+              "unstable_forceFrameRate",
+              "unstable_getCurrentPriorityLevel",
+              "unstable_next",
+              "unstable_now",
+              "unstable_requestPaint",
+              "unstable_runWithPriority",
+              "unstable_scheduleCallback",
+              "unstable_shouldYield",
+              "unstable_wrapCallback"
+            ],
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "unstable_IdlePriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_ImmediatePriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_LowPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_NormalPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_Profiling"
+              },
+              {
+                "type": "string",
+                "value": "unstable_UserBlockingPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_cancelCallback"
+              },
+              {
+                "type": "string",
+                "value": "unstable_forceFrameRate"
+              },
+              {
+                "type": "string",
+                "value": "unstable_getCurrentPriorityLevel"
+              },
+              {
+                "type": "string",
+                "value": "unstable_next"
+              },
+              {
+                "type": "string",
+                "value": "unstable_now"
+              },
+              {
+                "type": "string",
+                "value": "unstable_requestPaint"
+              },
+              {
+                "type": "string",
+                "value": "unstable_runWithPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_scheduleCallback"
+              },
+              {
+                "type": "string",
+                "value": "unstable_shouldYield"
+              },
+              {
+                "type": "string",
+                "value": "unstable_wrapCallback"
+              }
+            ],
+            "expectedRootExportKeysSubset": [
+              "unstable_IdlePriority",
+              "unstable_ImmediatePriority",
+              "unstable_LowPriority",
+              "unstable_NormalPriority",
+              "unstable_Profiling",
+              "unstable_UserBlockingPriority",
+              "unstable_cancelCallback",
+              "unstable_forceFrameRate",
+              "unstable_getCurrentPriorityLevel",
+              "unstable_next",
+              "unstable_now",
+              "unstable_requestPaint",
+              "unstable_runWithPriority",
+              "unstable_scheduleCallback",
+              "unstable_shouldYield",
+              "unstable_wrapCallback"
+            ],
+            "constants": {
+              "unstable_ImmediatePriority": 1,
+              "unstable_UserBlockingPriority": 2,
+              "unstable_NormalPriority": 3,
+              "unstable_LowPriority": 4,
+              "unstable_IdlePriority": 5,
+              "unstable_Profiling": null
+            },
+            "descriptors": [
+              {
+                "key": "unstable_IdlePriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "key": "unstable_ImmediatePriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "unstable_LowPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 4
+                  }
+                }
+              },
+              {
+                "key": "unstable_NormalPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 3
+                  }
+                }
+              },
+              {
+                "key": "unstable_Profiling",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "null"
+                  }
+                }
+              },
+              {
+                "key": "unstable_UserBlockingPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "key": "unstable_cancelCallback",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  }
+                }
+              },
+              {
+                "key": "unstable_forceFrameRate",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_getCurrentPriorityLevel",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_next",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  }
+                }
+              },
+              {
+                "key": "unstable_now",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "bound now",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_requestPaint",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_runWithPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 2
+                  }
+                }
+              },
+              {
+                "key": "unstable_scheduleCallback",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 3
+                  }
+                }
+              },
+              {
+                "key": "unstable_shouldYield",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_wrapCallback",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  }
+                }
+              }
+            ],
+            "functionExports": [
+              {
+                "key": "unstable_cancelCallback",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_forceFrameRate",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_getCurrentPriorityLevel",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_next",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_now",
+                "value": {
+                  "type": "function",
+                  "name": "bound now",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_requestPaint",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_runWithPriority",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 2
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_scheduleCallback",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 3
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_shouldYield",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_wrapCallback",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            ],
+            "initialNow": 100,
+            "initialShouldYield": true,
+            "noops": {
+              "requestPaint": {
+                "type": "undefined"
+              },
+              "forceFrameRate": {
+                "type": "undefined"
+              }
+            }
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-environment-require",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "result": {
+          "status": "returned",
+          "value": {
+            "cases": [
+              {
+                "label": "plain-node-missing-window",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "throws",
+                    "name": "ReferenceError",
+                    "code": null,
+                    "message": "window is not defined"
+                  }
+                },
+                "operation": null
+              },
+              {
+                "label": "window-without-performance",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "throws",
+                    "name": "TypeError",
+                    "code": null,
+                    "message": "Cannot read properties of undefined (reading 'now')"
+                  }
+                },
+                "operation": null
+              },
+              {
+                "label": "minimal-window-without-task-controller",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "ok",
+                    "exportKeys": [
+                      "unstable_IdlePriority",
+                      "unstable_ImmediatePriority",
+                      "unstable_LowPriority",
+                      "unstable_NormalPriority",
+                      "unstable_Profiling",
+                      "unstable_UserBlockingPriority",
+                      "unstable_cancelCallback",
+                      "unstable_forceFrameRate",
+                      "unstable_getCurrentPriorityLevel",
+                      "unstable_next",
+                      "unstable_now",
+                      "unstable_requestPaint",
+                      "unstable_runWithPriority",
+                      "unstable_scheduleCallback",
+                      "unstable_shouldYield",
+                      "unstable_wrapCallback"
+                    ],
+                    "priorityConstants": {
+                      "unstable_ImmediatePriority": 1,
+                      "unstable_UserBlockingPriority": 2,
+                      "unstable_NormalPriority": 3,
+                      "unstable_LowPriority": 4,
+                      "unstable_IdlePriority": 5,
+                      "unstable_Profiling": null
+                    }
+                  }
+                },
+                "operation": {
+                  "status": "ok",
+                  "value": {
+                    "now": 123,
+                    "initialShouldYield": true,
+                    "scheduleCallback": {
+                      "status": "throws",
+                      "name": "ReferenceError",
+                      "code": null,
+                      "message": "TaskController is not defined"
+                    }
+                  }
+                }
+              },
+              {
+                "label": "task-controller-without-global-scheduler",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "ok",
+                    "exportKeys": [
+                      "unstable_IdlePriority",
+                      "unstable_ImmediatePriority",
+                      "unstable_LowPriority",
+                      "unstable_NormalPriority",
+                      "unstable_Profiling",
+                      "unstable_UserBlockingPriority",
+                      "unstable_cancelCallback",
+                      "unstable_forceFrameRate",
+                      "unstable_getCurrentPriorityLevel",
+                      "unstable_next",
+                      "unstable_now",
+                      "unstable_requestPaint",
+                      "unstable_runWithPriority",
+                      "unstable_scheduleCallback",
+                      "unstable_shouldYield",
+                      "unstable_wrapCallback"
+                    ],
+                    "priorityConstants": {
+                      "unstable_ImmediatePriority": 1,
+                      "unstable_UserBlockingPriority": 2,
+                      "unstable_NormalPriority": 3,
+                      "unstable_LowPriority": 4,
+                      "unstable_IdlePriority": 5,
+                      "unstable_Profiling": null
+                    }
+                  }
+                },
+                "operation": {
+                  "status": "ok",
+                  "value": {
+                    "scheduleCallback": {
+                      "status": "throws",
+                      "name": "TypeError",
+                      "code": null,
+                      "message": "Cannot read properties of undefined (reading 'postTask')"
+                    }
+                  }
+                }
+              },
+              {
+                "label": "scheduler-without-post-task",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "ok",
+                    "exportKeys": [
+                      "unstable_IdlePriority",
+                      "unstable_ImmediatePriority",
+                      "unstable_LowPriority",
+                      "unstable_NormalPriority",
+                      "unstable_Profiling",
+                      "unstable_UserBlockingPriority",
+                      "unstable_cancelCallback",
+                      "unstable_forceFrameRate",
+                      "unstable_getCurrentPriorityLevel",
+                      "unstable_next",
+                      "unstable_now",
+                      "unstable_requestPaint",
+                      "unstable_runWithPriority",
+                      "unstable_scheduleCallback",
+                      "unstable_shouldYield",
+                      "unstable_wrapCallback"
+                    ],
+                    "priorityConstants": {
+                      "unstable_ImmediatePriority": 1,
+                      "unstable_UserBlockingPriority": 2,
+                      "unstable_NormalPriority": 3,
+                      "unstable_LowPriority": 4,
+                      "unstable_IdlePriority": 5,
+                      "unstable_Profiling": null
+                    }
+                  }
+                },
+                "operation": {
+                  "status": "ok",
+                  "value": {
+                    "scheduleCallback": {
+                      "status": "throws",
+                      "name": "TypeError",
+                      "code": null,
+                      "message": "scheduler.postTask is not a function"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-priority-context",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "result": {
+          "status": "returned",
+          "value": {
+            "defaultCurrentPriorityLevel": 3,
+            "runWithPriority": [
+              {
+                "label": "immediate",
+                "returnValue": {
+                  "currentPriorityLevel": 1
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "user-blocking",
+                "returnValue": {
+                  "currentPriorityLevel": 2
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "normal",
+                "returnValue": {
+                  "currentPriorityLevel": 3
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "low",
+                "returnValue": {
+                  "currentPriorityLevel": 4
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "idle",
+                "returnValue": {
+                  "currentPriorityLevel": 5
+                },
+                "afterReturnPriorityLevel": 3
+              }
+            ],
+            "invalidRunWithPriority": [
+              {
+                "input": {
+                  "type": "number",
+                  "value": 0
+                },
+                "currentPriorityLevel": 0,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "input": {
+                  "type": "number",
+                  "value": 6
+                },
+                "currentPriorityLevel": 6,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "input": {
+                  "type": "number",
+                  "value": 99
+                },
+                "currentPriorityLevel": 99,
+                "afterReturnPriorityLevel": 3
+              }
+            ],
+            "restorationAfterThrow": {
+              "status": "ok",
+              "value": {
+                "error": {
+                  "status": "throws",
+                  "name": "Error",
+                  "code": null,
+                  "message": "post-task priority context probe"
+                },
+                "currentPriorityLevel": 3
+              }
+            },
+            "nextByParent": [
+              {
+                "parent": "immediate",
+                "currentPriorityLevel": 3,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "user-blocking",
+                "currentPriorityLevel": 3,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "normal",
+                "currentPriorityLevel": 3,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "low",
+                "currentPriorityLevel": 4,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "idle",
+                "currentPriorityLevel": 5,
+                "afterReturnPriorityLevel": 3
+              }
+            ],
+            "wrapCallback": {
+              "beforeCallPriorityLevel": 4,
+              "callResult": {
+                "status": "ok",
+                "value": {
+                  "thisType": "undefined",
+                  "thisIsUndefined": true,
+                  "thisLabel": null,
+                  "args": [
+                    null,
+                    null
+                  ],
+                  "currentPriorityLevel": 2
+                }
+              },
+              "afterCallPriorityLevel": 4,
+              "wrappedFunction": {
+                "type": "function",
+                "name": "",
+                "length": 0
+              }
+            }
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-scheduling",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "result": {
+          "status": "returned",
+          "value": {
+            "scheduled": [
+              {
+                "label": "immediate",
+                "priorityLevel": 1,
+                "inputOptions": {
+                  "type": "undefined"
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 1,
+                    "aborted": false,
+                    "priority": "user-blocking"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-blocking",
+                    "signalId": 1
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "signalId": 1,
+                    "signalPriority": "user-blocking",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "user-blocking-null-options",
+                "priorityLevel": 2,
+                "inputOptions": {
+                  "type": "null"
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 2,
+                    "aborted": false,
+                    "priority": "user-blocking"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-blocking",
+                    "signalId": 2
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "signalId": 2,
+                    "signalPriority": "user-blocking",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "normal-empty-options",
+                "priorityLevel": 3,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": []
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 3,
+                    "aborted": false,
+                    "priority": "user-visible"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-visible",
+                    "signalId": 3
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "undefined"
+                    },
+                    "signalId": 3,
+                    "signalPriority": "user-visible",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "low-delay",
+                "priorityLevel": 4,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": [
+                    "delay"
+                  ]
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 4,
+                    "aborted": false,
+                    "priority": "user-visible"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-visible",
+                    "signalId": 4
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 7
+                    },
+                    "signalId": 4,
+                    "signalPriority": "user-visible",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "idle-zero-delay",
+                "priorityLevel": 5,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": [
+                    "delay"
+                  ]
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 5,
+                    "aborted": false,
+                    "priority": "background"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "background",
+                    "signalId": 5
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "signalId": 5,
+                    "signalPriority": "background",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "invalid-delay",
+                "priorityLevel": 99,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": [
+                    "delay"
+                  ]
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 6,
+                    "aborted": false,
+                    "priority": "user-visible"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-visible",
+                    "signalId": 6
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 2
+                    },
+                    "signalId": 6,
+                    "signalPriority": "user-visible",
+                    "signalAborted": false
+                  }
+                ]
+              }
+            ],
+            "flush": [
+              {
+                "type": "run-post-task",
+                "signalId": 1,
+                "signalPriority": "user-blocking"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 2,
+                "signalPriority": "user-blocking"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 3,
+                "signalPriority": "user-visible"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 4,
+                "signalPriority": "user-visible"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 5,
+                "signalPriority": "background"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 6,
+                "signalPriority": "user-visible"
+              }
+            ],
+            "callbackEvents": [
+              {
+                "label": "immediate",
+                "didTimeout": false,
+                "currentPriorityLevel": 1,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "immediate-at-deadline",
+                "shouldYieldAtDeadline": true
+              },
+              {
+                "label": "user-blocking-null-options",
+                "didTimeout": false,
+                "currentPriorityLevel": 2,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "normal-empty-options",
+                "didTimeout": false,
+                "currentPriorityLevel": 3,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "low-delay",
+                "didTimeout": false,
+                "currentPriorityLevel": 4,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "idle-zero-delay",
+                "didTimeout": false,
+                "currentPriorityLevel": 5,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "invalid-delay",
+                "didTimeout": false,
+                "currentPriorityLevel": 99,
+                "shouldYieldAtCallbackStart": false
+              }
+            ],
+            "pendingPostTaskCount": 0,
+            "shimEventsAfterFlush": []
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-cancellation",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "result": {
+          "status": "returned",
+          "value": {
+            "scheduleEvents": [
+              {
+                "type": "TaskController",
+                "priority": "user-visible",
+                "signalId": 1
+              },
+              {
+                "type": "postTask",
+                "hasDelayProperty": true,
+                "delay": {
+                  "type": "number",
+                  "value": 0
+                },
+                "signalId": 1,
+                "signalPriority": "user-visible",
+                "signalAborted": false
+              }
+            ],
+            "beforeCancel": {
+              "ownKeys": [
+                "_controller"
+              ],
+              "descriptors": [
+                {
+                  "key": "_controller",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "ownKeys": [
+                        "priority",
+                        "signal"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "controllerOwnKeys": [
+                "priority",
+                "signal"
+              ],
+              "signal": {
+                "ownKeys": [
+                  "id",
+                  "aborted",
+                  "priority"
+                ],
+                "id": 1,
+                "aborted": false,
+                "priority": "user-visible"
+              }
+            },
+            "cancelReturn": {
+              "type": "undefined"
+            },
+            "afterCancel": {
+              "ownKeys": [
+                "_controller"
+              ],
+              "descriptors": [
+                {
+                  "key": "_controller",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "ownKeys": [
+                        "priority",
+                        "signal"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "controllerOwnKeys": [
+                "priority",
+                "signal"
+              ],
+              "signal": {
+                "ownKeys": [
+                  "id",
+                  "aborted",
+                  "priority"
+                ],
+                "id": 1,
+                "aborted": true,
+                "priority": "user-visible"
+              }
+            },
+            "abortEvents": [
+              {
+                "type": "abort",
+                "priority": "user-visible",
+                "signalId": 1
+              }
+            ],
+            "flush": [
+              {
+                "type": "skip-aborted",
+                "signalId": 1,
+                "signalPriority": "user-visible"
+              }
+            ],
+            "callbackRan": false,
+            "pendingPostTaskCount": 0
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-continuations",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "result": {
+          "status": "returned",
+          "value": {
+            "withSchedulerYield": {
+              "withYield": true,
+              "returnedNode": {
+                "ownKeys": [
+                  "_controller"
+                ],
+                "descriptors": [
+                  {
+                    "key": "_controller",
+                    "descriptor": {
+                      "kind": "data",
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "ownKeys": [
+                          "priority",
+                          "signal"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "controllerOwnKeys": [
+                  "priority",
+                  "signal"
+                ],
+                "signal": {
+                  "ownKeys": [
+                    "id",
+                    "aborted",
+                    "priority"
+                  ],
+                  "id": 1,
+                  "aborted": false,
+                  "priority": "user-visible"
+                }
+              },
+              "scheduleEvents": [
+                {
+                  "type": "TaskController",
+                  "priority": "user-visible",
+                  "signalId": 1
+                },
+                {
+                  "type": "postTask",
+                  "hasDelayProperty": true,
+                  "delay": {
+                    "type": "number",
+                    "value": 0
+                  },
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "flush": [
+                {
+                  "type": "run-post-task",
+                  "signalId": 1,
+                  "signalPriority": "user-visible"
+                }
+              ],
+              "events": [
+                {
+                  "label": "normal-start",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "normal-continuation",
+                  "currentPriorityLevel": 3
+                }
+              ],
+              "postFlushShimEvents": [
+                {
+                  "type": "yield",
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                },
+                {
+                  "type": "yield.then",
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "pendingPostTaskCount": 0
+            },
+            "withoutSchedulerYield": {
+              "withYield": false,
+              "returnedNode": {
+                "ownKeys": [
+                  "_controller"
+                ],
+                "descriptors": [
+                  {
+                    "key": "_controller",
+                    "descriptor": {
+                      "kind": "data",
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "ownKeys": [
+                          "priority",
+                          "signal"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "controllerOwnKeys": [
+                  "priority",
+                  "signal"
+                ],
+                "signal": {
+                  "ownKeys": [
+                    "id",
+                    "aborted",
+                    "priority"
+                  ],
+                  "id": 1,
+                  "aborted": false,
+                  "priority": "user-visible"
+                }
+              },
+              "scheduleEvents": [
+                {
+                  "type": "TaskController",
+                  "priority": "user-visible",
+                  "signalId": 1
+                },
+                {
+                  "type": "postTask",
+                  "hasDelayProperty": true,
+                  "delay": {
+                    "type": "number",
+                    "value": 0
+                  },
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "flush": [
+                {
+                  "type": "run-post-task",
+                  "signalId": 1,
+                  "signalPriority": "user-visible"
+                },
+                {
+                  "type": "run-post-task",
+                  "signalId": 1,
+                  "signalPriority": "user-visible"
+                }
+              ],
+              "events": [
+                {
+                  "label": "normal-start",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "normal-continuation",
+                  "currentPriorityLevel": 3
+                }
+              ],
+              "postFlushShimEvents": [
+                {
+                  "type": "postTask",
+                  "hasDelayProperty": false,
+                  "delay": {
+                    "type": "undefined"
+                  },
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "pendingPostTaskCount": 0
+            }
+          }
+        }
+      }
+    ],
+    "node-production": [
+      {
+        "scenarioId": "scheduler-post-task-export-shape",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "result": {
+          "status": "returned",
+          "value": {
+            "packageJson": {
+              "name": "scheduler",
+              "version": "0.27.0",
+              "description": "Cooperative scheduler for the browser environment.",
+              "main": null,
+              "type": null,
+              "exports": null,
+              "files": [
+                "LICENSE",
+                "README.md",
+                "index.js",
+                "index.native.js",
+                "unstable_mock.js",
+                "unstable_post_task.js",
+                "cjs/"
+              ],
+              "dependencies": null,
+              "peerDependencies": null,
+              "engines": null,
+              "license": "MIT",
+              "repository": {
+                "type": "git",
+                "url": "https://github.com/facebook/react.git",
+                "directory": "packages/scheduler"
+              },
+              "bugs": {
+                "url": "https://github.com/facebook/react/issues"
+              },
+              "homepage": "https://react.dev/"
+            },
+            "requireResolution": {
+              "specifier": "scheduler/unstable_post_task",
+              "status": "ok",
+              "path": "node_modules/scheduler/unstable_post_task.js"
+            },
+            "shimEnvironment": {
+              "hasWindow": true,
+              "hasWindowPerformanceNow": true,
+              "hasWindowSetTimeout": true,
+              "hasTaskController": true,
+              "hasSchedulerPostTask": true,
+              "hasSchedulerYield": true
+            },
+            "exportKeys": [
+              "unstable_IdlePriority",
+              "unstable_ImmediatePriority",
+              "unstable_LowPriority",
+              "unstable_NormalPriority",
+              "unstable_Profiling",
+              "unstable_UserBlockingPriority",
+              "unstable_cancelCallback",
+              "unstable_forceFrameRate",
+              "unstable_getCurrentPriorityLevel",
+              "unstable_next",
+              "unstable_now",
+              "unstable_requestPaint",
+              "unstable_runWithPriority",
+              "unstable_scheduleCallback",
+              "unstable_shouldYield",
+              "unstable_wrapCallback"
+            ],
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "unstable_IdlePriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_ImmediatePriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_LowPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_NormalPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_Profiling"
+              },
+              {
+                "type": "string",
+                "value": "unstable_UserBlockingPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_cancelCallback"
+              },
+              {
+                "type": "string",
+                "value": "unstable_forceFrameRate"
+              },
+              {
+                "type": "string",
+                "value": "unstable_getCurrentPriorityLevel"
+              },
+              {
+                "type": "string",
+                "value": "unstable_next"
+              },
+              {
+                "type": "string",
+                "value": "unstable_now"
+              },
+              {
+                "type": "string",
+                "value": "unstable_requestPaint"
+              },
+              {
+                "type": "string",
+                "value": "unstable_runWithPriority"
+              },
+              {
+                "type": "string",
+                "value": "unstable_scheduleCallback"
+              },
+              {
+                "type": "string",
+                "value": "unstable_shouldYield"
+              },
+              {
+                "type": "string",
+                "value": "unstable_wrapCallback"
+              }
+            ],
+            "expectedRootExportKeysSubset": [
+              "unstable_IdlePriority",
+              "unstable_ImmediatePriority",
+              "unstable_LowPriority",
+              "unstable_NormalPriority",
+              "unstable_Profiling",
+              "unstable_UserBlockingPriority",
+              "unstable_cancelCallback",
+              "unstable_forceFrameRate",
+              "unstable_getCurrentPriorityLevel",
+              "unstable_next",
+              "unstable_now",
+              "unstable_requestPaint",
+              "unstable_runWithPriority",
+              "unstable_scheduleCallback",
+              "unstable_shouldYield",
+              "unstable_wrapCallback"
+            ],
+            "constants": {
+              "unstable_ImmediatePriority": 1,
+              "unstable_UserBlockingPriority": 2,
+              "unstable_NormalPriority": 3,
+              "unstable_LowPriority": 4,
+              "unstable_IdlePriority": 5,
+              "unstable_Profiling": null
+            },
+            "descriptors": [
+              {
+                "key": "unstable_IdlePriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "key": "unstable_ImmediatePriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "unstable_LowPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 4
+                  }
+                }
+              },
+              {
+                "key": "unstable_NormalPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 3
+                  }
+                }
+              },
+              {
+                "key": "unstable_Profiling",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "null"
+                  }
+                }
+              },
+              {
+                "key": "unstable_UserBlockingPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "number",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "key": "unstable_cancelCallback",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  }
+                }
+              },
+              {
+                "key": "unstable_forceFrameRate",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_getCurrentPriorityLevel",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_next",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  }
+                }
+              },
+              {
+                "key": "unstable_now",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "bound now",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_requestPaint",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_runWithPriority",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 2
+                  }
+                }
+              },
+              {
+                "key": "unstable_scheduleCallback",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 3
+                  }
+                }
+              },
+              {
+                "key": "unstable_shouldYield",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  }
+                }
+              },
+              {
+                "key": "unstable_wrapCallback",
+                "descriptor": {
+                  "kind": "data",
+                  "configurable": true,
+                  "enumerable": true,
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  }
+                }
+              }
+            ],
+            "functionExports": [
+              {
+                "key": "unstable_cancelCallback",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_forceFrameRate",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_getCurrentPriorityLevel",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_next",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_now",
+                "value": {
+                  "type": "function",
+                  "name": "bound now",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_requestPaint",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_runWithPriority",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 2
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_scheduleCallback",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 3
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_shouldYield",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              },
+              {
+                "key": "unstable_wrapCallback",
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1
+                },
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            ],
+            "initialNow": 100,
+            "initialShouldYield": true,
+            "noops": {
+              "requestPaint": {
+                "type": "undefined"
+              },
+              "forceFrameRate": {
+                "type": "undefined"
+              }
+            }
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-environment-require",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "result": {
+          "status": "returned",
+          "value": {
+            "cases": [
+              {
+                "label": "plain-node-missing-window",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "throws",
+                    "name": "ReferenceError",
+                    "code": null,
+                    "message": "window is not defined"
+                  }
+                },
+                "operation": null
+              },
+              {
+                "label": "window-without-performance",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "throws",
+                    "name": "TypeError",
+                    "code": null,
+                    "message": "Cannot read properties of undefined (reading 'now')"
+                  }
+                },
+                "operation": null
+              },
+              {
+                "label": "minimal-window-without-task-controller",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "ok",
+                    "exportKeys": [
+                      "unstable_IdlePriority",
+                      "unstable_ImmediatePriority",
+                      "unstable_LowPriority",
+                      "unstable_NormalPriority",
+                      "unstable_Profiling",
+                      "unstable_UserBlockingPriority",
+                      "unstable_cancelCallback",
+                      "unstable_forceFrameRate",
+                      "unstable_getCurrentPriorityLevel",
+                      "unstable_next",
+                      "unstable_now",
+                      "unstable_requestPaint",
+                      "unstable_runWithPriority",
+                      "unstable_scheduleCallback",
+                      "unstable_shouldYield",
+                      "unstable_wrapCallback"
+                    ],
+                    "priorityConstants": {
+                      "unstable_ImmediatePriority": 1,
+                      "unstable_UserBlockingPriority": 2,
+                      "unstable_NormalPriority": 3,
+                      "unstable_LowPriority": 4,
+                      "unstable_IdlePriority": 5,
+                      "unstable_Profiling": null
+                    }
+                  }
+                },
+                "operation": {
+                  "status": "ok",
+                  "value": {
+                    "now": 123,
+                    "initialShouldYield": true,
+                    "scheduleCallback": {
+                      "status": "throws",
+                      "name": "ReferenceError",
+                      "code": null,
+                      "message": "TaskController is not defined"
+                    }
+                  }
+                }
+              },
+              {
+                "label": "task-controller-without-global-scheduler",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "ok",
+                    "exportKeys": [
+                      "unstable_IdlePriority",
+                      "unstable_ImmediatePriority",
+                      "unstable_LowPriority",
+                      "unstable_NormalPriority",
+                      "unstable_Profiling",
+                      "unstable_UserBlockingPriority",
+                      "unstable_cancelCallback",
+                      "unstable_forceFrameRate",
+                      "unstable_getCurrentPriorityLevel",
+                      "unstable_next",
+                      "unstable_now",
+                      "unstable_requestPaint",
+                      "unstable_runWithPriority",
+                      "unstable_scheduleCallback",
+                      "unstable_shouldYield",
+                      "unstable_wrapCallback"
+                    ],
+                    "priorityConstants": {
+                      "unstable_ImmediatePriority": 1,
+                      "unstable_UserBlockingPriority": 2,
+                      "unstable_NormalPriority": 3,
+                      "unstable_LowPriority": 4,
+                      "unstable_IdlePriority": 5,
+                      "unstable_Profiling": null
+                    }
+                  }
+                },
+                "operation": {
+                  "status": "ok",
+                  "value": {
+                    "scheduleCallback": {
+                      "status": "throws",
+                      "name": "TypeError",
+                      "code": null,
+                      "message": "Cannot read properties of undefined (reading 'postTask')"
+                    }
+                  }
+                }
+              },
+              {
+                "label": "scheduler-without-post-task",
+                "require": {
+                  "specifier": "scheduler/unstable_post_task",
+                  "requireResolve": {
+                    "specifier": "scheduler/unstable_post_task",
+                    "status": "ok",
+                    "path": "node_modules/scheduler/unstable_post_task.js"
+                  },
+                  "require": {
+                    "status": "ok",
+                    "exportKeys": [
+                      "unstable_IdlePriority",
+                      "unstable_ImmediatePriority",
+                      "unstable_LowPriority",
+                      "unstable_NormalPriority",
+                      "unstable_Profiling",
+                      "unstable_UserBlockingPriority",
+                      "unstable_cancelCallback",
+                      "unstable_forceFrameRate",
+                      "unstable_getCurrentPriorityLevel",
+                      "unstable_next",
+                      "unstable_now",
+                      "unstable_requestPaint",
+                      "unstable_runWithPriority",
+                      "unstable_scheduleCallback",
+                      "unstable_shouldYield",
+                      "unstable_wrapCallback"
+                    ],
+                    "priorityConstants": {
+                      "unstable_ImmediatePriority": 1,
+                      "unstable_UserBlockingPriority": 2,
+                      "unstable_NormalPriority": 3,
+                      "unstable_LowPriority": 4,
+                      "unstable_IdlePriority": 5,
+                      "unstable_Profiling": null
+                    }
+                  }
+                },
+                "operation": {
+                  "status": "ok",
+                  "value": {
+                    "scheduleCallback": {
+                      "status": "throws",
+                      "name": "TypeError",
+                      "code": null,
+                      "message": "scheduler.postTask is not a function"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-priority-context",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "result": {
+          "status": "returned",
+          "value": {
+            "defaultCurrentPriorityLevel": 3,
+            "runWithPriority": [
+              {
+                "label": "immediate",
+                "returnValue": {
+                  "currentPriorityLevel": 1
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "user-blocking",
+                "returnValue": {
+                  "currentPriorityLevel": 2
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "normal",
+                "returnValue": {
+                  "currentPriorityLevel": 3
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "low",
+                "returnValue": {
+                  "currentPriorityLevel": 4
+                },
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "label": "idle",
+                "returnValue": {
+                  "currentPriorityLevel": 5
+                },
+                "afterReturnPriorityLevel": 3
+              }
+            ],
+            "invalidRunWithPriority": [
+              {
+                "input": {
+                  "type": "number",
+                  "value": 0
+                },
+                "currentPriorityLevel": 0,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "input": {
+                  "type": "number",
+                  "value": 6
+                },
+                "currentPriorityLevel": 6,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "input": {
+                  "type": "number",
+                  "value": 99
+                },
+                "currentPriorityLevel": 99,
+                "afterReturnPriorityLevel": 3
+              }
+            ],
+            "restorationAfterThrow": {
+              "status": "ok",
+              "value": {
+                "error": {
+                  "status": "throws",
+                  "name": "Error",
+                  "code": null,
+                  "message": "post-task priority context probe"
+                },
+                "currentPriorityLevel": 3
+              }
+            },
+            "nextByParent": [
+              {
+                "parent": "immediate",
+                "currentPriorityLevel": 3,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "user-blocking",
+                "currentPriorityLevel": 3,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "normal",
+                "currentPriorityLevel": 3,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "low",
+                "currentPriorityLevel": 4,
+                "afterReturnPriorityLevel": 3
+              },
+              {
+                "parent": "idle",
+                "currentPriorityLevel": 5,
+                "afterReturnPriorityLevel": 3
+              }
+            ],
+            "wrapCallback": {
+              "beforeCallPriorityLevel": 4,
+              "callResult": {
+                "status": "ok",
+                "value": {
+                  "thisType": "undefined",
+                  "thisIsUndefined": true,
+                  "thisLabel": null,
+                  "args": [
+                    null,
+                    null
+                  ],
+                  "currentPriorityLevel": 2
+                }
+              },
+              "afterCallPriorityLevel": 4,
+              "wrappedFunction": {
+                "type": "function",
+                "name": "",
+                "length": 0
+              }
+            }
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-scheduling",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "result": {
+          "status": "returned",
+          "value": {
+            "scheduled": [
+              {
+                "label": "immediate",
+                "priorityLevel": 1,
+                "inputOptions": {
+                  "type": "undefined"
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 1,
+                    "aborted": false,
+                    "priority": "user-blocking"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-blocking",
+                    "signalId": 1
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "signalId": 1,
+                    "signalPriority": "user-blocking",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "user-blocking-null-options",
+                "priorityLevel": 2,
+                "inputOptions": {
+                  "type": "null"
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 2,
+                    "aborted": false,
+                    "priority": "user-blocking"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-blocking",
+                    "signalId": 2
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "signalId": 2,
+                    "signalPriority": "user-blocking",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "normal-empty-options",
+                "priorityLevel": 3,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": []
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 3,
+                    "aborted": false,
+                    "priority": "user-visible"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-visible",
+                    "signalId": 3
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "undefined"
+                    },
+                    "signalId": 3,
+                    "signalPriority": "user-visible",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "low-delay",
+                "priorityLevel": 4,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": [
+                    "delay"
+                  ]
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 4,
+                    "aborted": false,
+                    "priority": "user-visible"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-visible",
+                    "signalId": 4
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 7
+                    },
+                    "signalId": 4,
+                    "signalPriority": "user-visible",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "idle-zero-delay",
+                "priorityLevel": 5,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": [
+                    "delay"
+                  ]
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 5,
+                    "aborted": false,
+                    "priority": "background"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "background",
+                    "signalId": 5
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "signalId": 5,
+                    "signalPriority": "background",
+                    "signalAborted": false
+                  }
+                ]
+              },
+              {
+                "label": "invalid-delay",
+                "priorityLevel": 99,
+                "inputOptions": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "ownKeys": [
+                    "delay"
+                  ]
+                },
+                "returnedNode": {
+                  "ownKeys": [
+                    "_controller"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "_controller",
+                      "descriptor": {
+                        "kind": "data",
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "ownKeys": [
+                            "priority",
+                            "signal"
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "controllerOwnKeys": [
+                    "priority",
+                    "signal"
+                  ],
+                  "signal": {
+                    "ownKeys": [
+                      "id",
+                      "aborted",
+                      "priority"
+                    ],
+                    "id": 6,
+                    "aborted": false,
+                    "priority": "user-visible"
+                  }
+                },
+                "scheduleEvents": [
+                  {
+                    "type": "TaskController",
+                    "priority": "user-visible",
+                    "signalId": 6
+                  },
+                  {
+                    "type": "postTask",
+                    "hasDelayProperty": true,
+                    "delay": {
+                      "type": "number",
+                      "value": 2
+                    },
+                    "signalId": 6,
+                    "signalPriority": "user-visible",
+                    "signalAborted": false
+                  }
+                ]
+              }
+            ],
+            "flush": [
+              {
+                "type": "run-post-task",
+                "signalId": 1,
+                "signalPriority": "user-blocking"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 2,
+                "signalPriority": "user-blocking"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 3,
+                "signalPriority": "user-visible"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 4,
+                "signalPriority": "user-visible"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 5,
+                "signalPriority": "background"
+              },
+              {
+                "type": "run-post-task",
+                "signalId": 6,
+                "signalPriority": "user-visible"
+              }
+            ],
+            "callbackEvents": [
+              {
+                "label": "immediate",
+                "didTimeout": false,
+                "currentPriorityLevel": 1,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "immediate-at-deadline",
+                "shouldYieldAtDeadline": true
+              },
+              {
+                "label": "user-blocking-null-options",
+                "didTimeout": false,
+                "currentPriorityLevel": 2,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "normal-empty-options",
+                "didTimeout": false,
+                "currentPriorityLevel": 3,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "low-delay",
+                "didTimeout": false,
+                "currentPriorityLevel": 4,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "idle-zero-delay",
+                "didTimeout": false,
+                "currentPriorityLevel": 5,
+                "shouldYieldAtCallbackStart": false
+              },
+              {
+                "label": "invalid-delay",
+                "didTimeout": false,
+                "currentPriorityLevel": 99,
+                "shouldYieldAtCallbackStart": false
+              }
+            ],
+            "pendingPostTaskCount": 0,
+            "shimEventsAfterFlush": []
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-cancellation",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "result": {
+          "status": "returned",
+          "value": {
+            "scheduleEvents": [
+              {
+                "type": "TaskController",
+                "priority": "user-visible",
+                "signalId": 1
+              },
+              {
+                "type": "postTask",
+                "hasDelayProperty": true,
+                "delay": {
+                  "type": "number",
+                  "value": 0
+                },
+                "signalId": 1,
+                "signalPriority": "user-visible",
+                "signalAborted": false
+              }
+            ],
+            "beforeCancel": {
+              "ownKeys": [
+                "_controller"
+              ],
+              "descriptors": [
+                {
+                  "key": "_controller",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "ownKeys": [
+                        "priority",
+                        "signal"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "controllerOwnKeys": [
+                "priority",
+                "signal"
+              ],
+              "signal": {
+                "ownKeys": [
+                  "id",
+                  "aborted",
+                  "priority"
+                ],
+                "id": 1,
+                "aborted": false,
+                "priority": "user-visible"
+              }
+            },
+            "cancelReturn": {
+              "type": "undefined"
+            },
+            "afterCancel": {
+              "ownKeys": [
+                "_controller"
+              ],
+              "descriptors": [
+                {
+                  "key": "_controller",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "ownKeys": [
+                        "priority",
+                        "signal"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "controllerOwnKeys": [
+                "priority",
+                "signal"
+              ],
+              "signal": {
+                "ownKeys": [
+                  "id",
+                  "aborted",
+                  "priority"
+                ],
+                "id": 1,
+                "aborted": true,
+                "priority": "user-visible"
+              }
+            },
+            "abortEvents": [
+              {
+                "type": "abort",
+                "priority": "user-visible",
+                "signalId": 1
+              }
+            ],
+            "flush": [
+              {
+                "type": "skip-aborted",
+                "signalId": 1,
+                "signalPriority": "user-visible"
+              }
+            ],
+            "callbackRan": false,
+            "pendingPostTaskCount": 0
+          }
+        }
+      },
+      {
+        "scenarioId": "scheduler-post-task-continuations",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "result": {
+          "status": "returned",
+          "value": {
+            "withSchedulerYield": {
+              "withYield": true,
+              "returnedNode": {
+                "ownKeys": [
+                  "_controller"
+                ],
+                "descriptors": [
+                  {
+                    "key": "_controller",
+                    "descriptor": {
+                      "kind": "data",
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "ownKeys": [
+                          "priority",
+                          "signal"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "controllerOwnKeys": [
+                  "priority",
+                  "signal"
+                ],
+                "signal": {
+                  "ownKeys": [
+                    "id",
+                    "aborted",
+                    "priority"
+                  ],
+                  "id": 1,
+                  "aborted": false,
+                  "priority": "user-visible"
+                }
+              },
+              "scheduleEvents": [
+                {
+                  "type": "TaskController",
+                  "priority": "user-visible",
+                  "signalId": 1
+                },
+                {
+                  "type": "postTask",
+                  "hasDelayProperty": true,
+                  "delay": {
+                    "type": "number",
+                    "value": 0
+                  },
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "flush": [
+                {
+                  "type": "run-post-task",
+                  "signalId": 1,
+                  "signalPriority": "user-visible"
+                }
+              ],
+              "events": [
+                {
+                  "label": "normal-start",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "normal-continuation",
+                  "currentPriorityLevel": 3
+                }
+              ],
+              "postFlushShimEvents": [
+                {
+                  "type": "yield",
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                },
+                {
+                  "type": "yield.then",
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "pendingPostTaskCount": 0
+            },
+            "withoutSchedulerYield": {
+              "withYield": false,
+              "returnedNode": {
+                "ownKeys": [
+                  "_controller"
+                ],
+                "descriptors": [
+                  {
+                    "key": "_controller",
+                    "descriptor": {
+                      "kind": "data",
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "ownKeys": [
+                          "priority",
+                          "signal"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "controllerOwnKeys": [
+                  "priority",
+                  "signal"
+                ],
+                "signal": {
+                  "ownKeys": [
+                    "id",
+                    "aborted",
+                    "priority"
+                  ],
+                  "id": 1,
+                  "aborted": false,
+                  "priority": "user-visible"
+                }
+              },
+              "scheduleEvents": [
+                {
+                  "type": "TaskController",
+                  "priority": "user-visible",
+                  "signalId": 1
+                },
+                {
+                  "type": "postTask",
+                  "hasDelayProperty": true,
+                  "delay": {
+                    "type": "number",
+                    "value": 0
+                  },
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "flush": [
+                {
+                  "type": "run-post-task",
+                  "signalId": 1,
+                  "signalPriority": "user-visible"
+                },
+                {
+                  "type": "run-post-task",
+                  "signalId": 1,
+                  "signalPriority": "user-visible"
+                }
+              ],
+              "events": [
+                {
+                  "label": "normal-start",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "normal-continuation",
+                  "currentPriorityLevel": 3
+                }
+              ],
+              "postFlushShimEvents": [
+                {
+                  "type": "postTask",
+                  "hasDelayProperty": false,
+                  "delay": {
+                    "type": "undefined"
+                  },
+                  "signalId": 1,
+                  "signalPriority": "user-visible",
+                  "signalAborted": false
+                }
+              ],
+              "pendingPostTaskCount": 0
+            }
+          }
+        }
+      }
+    ]
+  }
+}
