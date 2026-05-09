@@ -57,3 +57,7 @@ Last updated: 2026-05-10
 - Merged worker 120 scheduler mock source implementation; verified with
   scheduler mock `node --check`, oracle regeneration/test, `npm run check:js`,
   and `git diff --check`.
+- Merged worker 121 React DOM root render/update/unmount e2e oracle; verified
+  with oracle generation, focused oracle test, deterministic byte-compare,
+  worker-branch conformance, combined `main` conformance with 413 tests, and
+  `git diff --check`.
