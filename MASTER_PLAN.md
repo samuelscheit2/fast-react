@@ -90,15 +90,13 @@ The current project push is a minimal real root render/update/unmount path:
    `Pursuing goal` state; ignore stale usage-limit text in pane scrollback
    unless the worker process is actually stopped or blocked at a prompt.
 2. Keep worker 123 serialized around `crates/fast-react-reconciler/src/lib.rs`;
-   do not queue HostRoot update, scheduler, work-loop, or commit source slices
-   until its root model is accepted or intentionally abandoned.
-3. Do not queue DOM event-dispatch, React DOM facade, HostRoot update,
-   scheduler, work-loop, or commit source slices until worker 123 is accepted
-   or intentionally abandoned.
-4. After accepting worker 123, run the worker's scoped checks, merge
+   do not launch dependent HostRoot update, scheduler, work-loop, commit,
+   DOM event-dispatch, or React DOM facade source slices until its root model is
+   accepted or intentionally abandoned.
+3. After accepting worker 123, run the worker's scoped checks, merge
    with a no-fast-forward commit, then update this file with the next active
    queue and move completed facts to `MASTER_PROGRESS.md`.
-5. Queue follow-up source slices from the accepted root/reconciler/DOM/test
+4. Queue follow-up source slices from the accepted root/reconciler/DOM/test
    renderer sequencing reports only when their write scopes do not overlap with
    live workers.
 
