@@ -209,7 +209,7 @@ Dependencies: M8.
 | worker-031-host-capability-diagnostics | Improve host-config capability-set diagnostics and tests | `crates/fast-react-host-config/**`, `worker-progress/worker-031-host-capability-diagnostics.md` | workers 008,012,022 | merged |
 | worker-032-native-boundary-guardrails | Tighten native binding placeholder guardrails and platform target checks | `bindings/node/**`, `crates/fast-react-napi/**`, `worker-progress/worker-032-native-boundary-guardrails.md` | workers 006,015 | running |
 | worker-033-react-dom-inventory | Build a report-only React DOM 19.2.6 package and behavior inventory | `worker-progress/worker-033-react-dom-inventory.md` | workers 004,005,008,017 | running |
-| worker-034-scheduler-package-inventory | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` | workers 007,017 | running |
+| worker-034-scheduler-package-inventory | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` | workers 007,017 | merged |
 
 ## Merge Policy
 

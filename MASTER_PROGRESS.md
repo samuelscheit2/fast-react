@@ -96,7 +96,7 @@ M0: Orchestration Foundation.
 | worker-031-host-capability-diagnostics | merged | Improve host-config capability-set diagnostics and tests | `worker-progress/worker-031-host-capability-diagnostics.md` |
 | worker-032-native-boundary-guardrails | running in tmux worktree; nested subagents allowed | Tighten native binding placeholder guardrails and platform target checks | `../fast-react-worker-032-native-boundary-guardrails/worker-progress/worker-032-native-boundary-guardrails.md` |
 | worker-033-react-dom-inventory | running in tmux worktree; nested subagents allowed | Build a report-only React DOM 19.2.6 package and behavior inventory | `../fast-react-worker-033-react-dom-inventory/worker-progress/worker-033-react-dom-inventory.md` |
-| worker-034-scheduler-package-inventory | running in tmux worktree; nested subagents allowed | Build a report-only public scheduler package behavior inventory | `../fast-react-worker-034-scheduler-package-inventory/worker-progress/worker-034-scheduler-package-inventory.md` |
+| worker-034-scheduler-package-inventory | merged | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` |
 
 ## Next Actions
 
@@ -213,3 +213,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-031 host capability diagnostics in commit `517234a` via merge commit `ca67f18` on `main`. Verified in the worker worktree with `cargo fmt --all --check`, `cargo test -p fast-react-host-config --all-features`, `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`, and scoped `git diff --check`.
 - 2026-05-09: Verified merged `main` after worker-031 with `cargo fmt --all --check`, `cargo test -p fast-react-host-config --all-features`, and `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`. Root `Cargo.lock` files remain untracked regenerable artifacts by policy.
 - 2026-05-09: Closed the worker-031 tmux session and removed the accepted worker-031 worktree; its only remaining untracked file was a regenerable `Cargo.lock`.
+- 2026-05-09: Accepted and merged worker-034 scheduler package inventory in commit `345bf77` via merge commit `5a468ee` on `main`. Verified the report-only change with scoped status, no concrete local path leak checks, no trailing whitespace, no-index diff whitespace check for the untracked report, and required section/prompt keyword checks. No source tests were run because the task changed only the report.
