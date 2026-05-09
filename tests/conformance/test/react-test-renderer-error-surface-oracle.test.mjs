@@ -1,0 +1,364 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import test from "node:test";
+
+import {
+  REACT_TEST_RENDERER_ERROR_SURFACE_ORACLE_ARTIFACT_PATH,
+  REACT_TEST_RENDERER_ERROR_SURFACE_PROBE_MODES,
+  REACT_TEST_RENDERER_ERROR_SURFACE_SUPPORTING_TARGETS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_TARGET
+} from "../src/react-test-renderer-error-surface-targets.mjs";
+import {
+  REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIO_IDS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIOS
+} from "../src/react-test-renderer-error-surface-scenarios.mjs";
+import {
+  findReactTestRendererErrorSurfaceObservation,
+  readCheckedReactTestRendererErrorSurfaceOracle,
+  readCheckedReactTestRendererErrorSurfaceOracleText
+} from "../src/react-test-renderer-error-surface-oracle.mjs";
+
+const oracle = readCheckedReactTestRendererErrorSurfaceOracle();
+const DEFAULT_MODE = "default-node-development";
+const DEPRECATION_WARNING =
+  "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer";
+const UNMOUNTED_ROOT_MESSAGE =
+  "Can't access .root on unmounted test renderer";
+const UNMOUNTED_INSTANCE_MESSAGE =
+  "Unable to find node on an unmounted component.";
+const OBJECT_CHILD_MESSAGE =
+  "Objects are not valid as a React child (found: object with keys {foo}). If you meant to render a collection of children, use an array instead.";
+const INVALID_UNDEFINED_TYPE_MESSAGE =
+  "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.";
+const INVALID_NULL_TYPE_MESSAGE =
+  "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: null.";
+const SHALLOW_REMOVAL_MESSAGE =
+  "react-test-renderer/shallow has been removed. See https://react.dev/warnings/react-test-renderer.";
+
+test("checked React test renderer error surface oracle artifact has the expected schema and targets", () => {
+  assert.equal(
+    REACT_TEST_RENDERER_ERROR_SURFACE_ORACLE_ARTIFACT_PATH,
+    "oracles/react-19.2.6-react-test-renderer-error-surface-oracle.json"
+  );
+  assert.equal(oracle.schemaVersion, 1);
+  assert.equal(
+    oracle.oracleKind,
+    "react-19.2.6-react-test-renderer-error-surface-oracle"
+  );
+  assert.equal(oracle.generatedArtifacts, true);
+  assert.equal(oracle.deterministic, true);
+  assert.deepEqual(oracle.generation, {
+    method: "exact npm tarballs extracted into a temporary node_modules tree",
+    lifecycleScriptsExecuted: false,
+    rootManifestsOrLockfilesMutated: false,
+    probeIsolation: "one Node child process per scenario and mode",
+    probeTimeoutMs: 10000,
+    generatedTimestampIncluded: false,
+    pathNormalization:
+      "temporary roots, package roots, file URLs, stack paths, and local workspace paths are normalized before artifact serialization",
+    actEnvironment:
+      "probes set IS_REACT_ACT_ENVIRONMENT and wrap create/update/unmount work in react-test-renderer act()"
+  });
+
+  assert.deepEqual(
+    oracle.reactTestRendererTarget,
+    REACT_TEST_RENDERER_ERROR_SURFACE_TARGET
+  );
+  assert.deepEqual(
+    oracle.supportingRuntimePackages,
+    REACT_TEST_RENDERER_ERROR_SURFACE_SUPPORTING_TARGETS
+  );
+  assert.equal(oracle.packages["react-test-renderer"].version, "19.2.6");
+  assert.equal(oracle.packages.react.version, "19.2.6");
+  assert.equal(oracle.packages.scheduler.version, "0.27.0");
+  assert.equal(oracle.packages["react-is"].version, "19.2.6");
+});
+
+test("React test renderer error surface oracle keeps Fast React compatibility claims false", () => {
+  assert.deepEqual(oracle.evidenceClaims, {
+    npmMetadataResolved: true,
+    tarballsDownloaded: true,
+    tarballIntegrityVerified: true,
+    packageDependencyGraphVerified: true,
+    testInstanceQueryErrorsProbed: true,
+    unmountedRootAccessProbed: true,
+    invalidCreateUpdateInputsProbed: true,
+    shallowRemovalProbed: true,
+    unsupportedUseMessageProbed: true,
+    deterministicPathNormalizationApplied: true,
+    fastReactComparedToReactTestRenderer: false
+  });
+  assert.deepEqual(oracle.conformanceClaims, {
+    realReactTestRendererBehaviorProbed: true,
+    fastReactComparedToReactTestRenderer: false,
+    fastReactBehaviorCompatible: false,
+    fullDualRunOracleExists: false,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(oracle.coverage, {
+    invalidFindAndFindByResults: true,
+    unmountedRootAccess: true,
+    retainedUnmountedTestInstanceAccess: true,
+    invalidCreateInputs: true,
+    invalidUpdateInputs: true,
+    shallowRemoval: true,
+    unsupportedMessages: true,
+    consoleWarningCapture: true,
+    productionBehavior: false,
+    fastReactComparison: false
+  });
+});
+
+test("React test renderer error surface oracle covers every scenario in every probe mode", () => {
+  assert.deepEqual(
+    oracle.probeModes,
+    REACT_TEST_RENDERER_ERROR_SURFACE_PROBE_MODES
+  );
+  assert.deepEqual(
+    oracle.scenarios,
+    REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIOS
+  );
+
+  const areas = new Set(oracle.scenarios.map((scenario) => scenario.area));
+  for (const requiredArea of [
+    "TestInstance queries",
+    "unmounted renderer access",
+    "invalid root inputs",
+    "removed shallow renderer",
+    "unsupported renderer/runtime messages"
+  ]) {
+    assert.ok(areas.has(requiredArea), `missing scenario area ${requiredArea}`);
+  }
+
+  for (const mode of REACT_TEST_RENDERER_ERROR_SURFACE_PROBE_MODES) {
+    const observations =
+      oracle.reactTestRendererErrorSurfaceObservations[mode.id];
+    assert.equal(
+      observations.length,
+      REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIO_IDS.length
+    );
+
+    for (const scenarioId of REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIO_IDS) {
+      const scenarioObservation = observation(mode.id, scenarioId);
+      assert.equal(scenarioObservation.scenarioId, scenarioId);
+      assert.equal(scenarioObservation.packageName, "react-test-renderer");
+      assert.equal(
+        scenarioObservation.result.targetPackage,
+        "react-test-renderer"
+      );
+      assert.equal(scenarioObservation.result.scenarioId, scenarioId);
+      assert.equal(scenarioObservation.result.result.status, "ok");
+    }
+  }
+});
+
+test("React test renderer error surface oracle captures package evidence", () => {
+  const rendererPackage = oracle.packages["react-test-renderer"];
+  assert.equal(rendererPackage.tarball.integrityVerified, true);
+  assert.deepEqual(rendererPackage.tarball.files, [
+    "LICENSE",
+    "README.md",
+    "cjs/react-test-renderer.development.js",
+    "cjs/react-test-renderer.production.js",
+    "index.js",
+    "package.json",
+    "shallow.js"
+  ]);
+  assert.deepEqual(rendererPackage.packageJson.dependencies, {
+    "react-is": "^19.2.6",
+    scheduler: "^0.27.0"
+  });
+  assert.deepEqual(rendererPackage.packageJson.peerDependencies, {
+    react: "^19.2.6"
+  });
+  assert.equal(
+    rendererPackage.registry.distIntegrity,
+    REACT_TEST_RENDERER_ERROR_SURFACE_TARGET.expectedDistIntegrity
+  );
+  assert.equal(
+    rendererPackage.registry.distShasum,
+    REACT_TEST_RENDERER_ERROR_SURFACE_TARGET.expectedDistShasum
+  );
+});
+
+test("React test renderer error surface oracle captures find and findBy result errors", () => {
+  const value = scenarioValue(DEFAULT_MODE, "test-instance-query-errors");
+  assert.deepEqual(value.rootSummary.type, {
+    kind: "host",
+    value: "main"
+  });
+  assert.equal(value.rootSummary.childCount, 3);
+  assert.equal(value.findAllNoMatchCount, 0);
+  assert.equal(value.findAllDuplicateRoleCount, 2);
+
+  assertThrows(
+    value.noMatchPredicate,
+    'No instances found matching custom predicate: function matchesNothing(instance) { return instance.props.id === "missing"; }'
+  );
+  assertThrows(
+    value.multiMatchPredicate,
+    'Expected 1 but found 2 instances matching custom predicate: function matchesDuplicateRole(instance) { return instance.props.role === "dup"; }'
+  );
+  assertThrows(
+    value.noMatchByType,
+    'No instances found with node type: "aside"'
+  );
+  assertThrows(
+    value.multiMatchByType,
+    'Expected 1 but found 2 instances with node type: "section"'
+  );
+  assertThrows(
+    value.noMatchByProps,
+    'No instances found with props: {"id":"missing"}'
+  );
+  assertThrows(
+    value.multiMatchByProps,
+    'Expected 1 but found 2 instances with props: {"role":"dup"}'
+  );
+});
+
+test("React test renderer error surface oracle captures unmounted root and retained TestInstance access", () => {
+  const value = scenarioValue(DEFAULT_MODE, "unmounted-root-access-errors");
+
+  assertThrows(value.rendererRoot, UNMOUNTED_ROOT_MESSAGE);
+  assertOkValue(value.rendererToJSON, { type: "null" });
+  assertOkValue(value.rendererToTree, { type: "null" });
+  assertOkValue(value.rendererGetInstance, { type: "null" });
+  assertOkValue(value.rendererUpdateAgain, { type: "null" });
+  assertOkValue(value.rendererUnmountAgain, {
+    type: "string",
+    value: "done"
+  });
+
+  assertOkValue(value.retainedRootType, {
+    type: "string",
+    value: "main"
+  });
+  assertThrows(value.retainedRootProps, UNMOUNTED_INSTANCE_MESSAGE);
+  assertThrows(value.retainedRootChildren, UNMOUNTED_INSTANCE_MESSAGE);
+  assertThrows(value.retainedRootFindAll, UNMOUNTED_INSTANCE_MESSAGE);
+  assertOkValue(value.retainedChildType, {
+    type: "string",
+    value: "section"
+  });
+  assertThrows(value.retainedChildProps, UNMOUNTED_INSTANCE_MESSAGE);
+  assertOkValue(value.retainedChildParent, { type: "null" });
+});
+
+test("React test renderer error surface oracle captures deterministic invalid create and update inputs", () => {
+  const value = scenarioValue(DEFAULT_MODE, "invalid-create-update-inputs");
+
+  assertThrows(value.createPlainObjectChild, OBJECT_CHILD_MESSAGE);
+  assertThrows(value.updatePlainObjectChild, OBJECT_CHILD_MESSAGE);
+  assertThrows(value.createInvalidUndefinedType, INVALID_UNDEFINED_TYPE_MESSAGE);
+  assertThrows(value.updateInvalidUndefinedType, INVALID_UNDEFINED_TYPE_MESSAGE);
+  assertThrows(value.createInvalidNullType, INVALID_NULL_TYPE_MESSAGE);
+  assertThrows(value.updateInvalidNullType, INVALID_NULL_TYPE_MESSAGE);
+});
+
+test("React test renderer error surface oracle captures shallow removal and unsupported use messages", () => {
+  const shallow = scenarioValue(DEFAULT_MODE, "shallow-removal-error");
+  assert.deepEqual(shallow.exportShape, {
+    type: "function",
+    name: "ReactShallowRenderer",
+    length: 0,
+    ownPropertyNames: ["length", "name", "prototype"],
+    hasOwnPrototype: true
+  });
+  assertThrows(shallow.call, SHALLOW_REMOVAL_MESSAGE);
+  assertThrows(shallow.construct, SHALLOW_REMOVAL_MESSAGE);
+
+  const unsupported = scenarioValue(DEFAULT_MODE, "unsupported-use-error");
+  assertThrows(
+    unsupported.createUnsupportedUse,
+    "An unsupported type was passed to use(): [object Object]"
+  );
+});
+
+test("React test renderer error surface oracle captures expected console warnings", () => {
+  assert.deepEqual(consoleMessages(DEFAULT_MODE, "test-instance-query-errors"), [
+    DEPRECATION_WARNING
+  ]);
+  assert.deepEqual(consoleMessages(DEFAULT_MODE, "unmounted-root-access-errors"), [
+    DEPRECATION_WARNING
+  ]);
+  assert.deepEqual(consoleMessages(DEFAULT_MODE, "invalid-create-update-inputs"), [
+    DEPRECATION_WARNING,
+    DEPRECATION_WARNING,
+    DEPRECATION_WARNING,
+    DEPRECATION_WARNING,
+    DEPRECATION_WARNING,
+    DEPRECATION_WARNING
+  ]);
+  assert.deepEqual(consoleMessages(DEFAULT_MODE, "shallow-removal-error"), []);
+  assert.deepEqual(consoleMessages(DEFAULT_MODE, "unsupported-use-error"), [
+    DEPRECATION_WARNING
+  ]);
+});
+
+test("React test renderer error surface oracle artifact has no temp or local path leaks", () => {
+  const oracleText = readCheckedReactTestRendererErrorSurfaceOracleText();
+  assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
+  assert.doesNotMatch(oracleText, /\/var\/folders/u);
+  assert.doesNotMatch(oracleText, /\/tmp\//u);
+  assert.doesNotMatch(
+    oracleText,
+    /fast-react-react-test-renderer-error-surface-oracle-[A-Za-z0-9]/u
+  );
+  assert.doesNotMatch(oracleText, /Users\/user/u);
+  assert.doesNotMatch(oracleText, /Developer\/Developer/u);
+  assert.doesNotMatch(oracleText, /file:\/\//u);
+});
+
+test("print React test renderer error surface oracle CLI emits the checked-in artifact", () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      "scripts/print-react-test-renderer-error-surface-oracle.mjs",
+      "--format=json"
+    ],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+      maxBuffer:
+        readCheckedReactTestRendererErrorSurfaceOracleText().length + 1024
+    }
+  );
+
+  assert.equal(output, readCheckedReactTestRendererErrorSurfaceOracleText());
+});
+
+function observation(modeId, scenarioId) {
+  return findReactTestRendererErrorSurfaceObservation(
+    oracle,
+    modeId,
+    scenarioId
+  );
+}
+
+function scenarioValue(modeId, scenarioId) {
+  return observation(modeId, scenarioId).result.result.value;
+}
+
+function consoleMessages(modeId, scenarioId) {
+  return observation(modeId, scenarioId).result.consoleCalls.map((call) => {
+    assert.equal(call.method, "error");
+    assert.equal(call.args.length, 1);
+    assert.equal(call.args[0].type, "string");
+    return call.args[0].value;
+  });
+}
+
+function assertThrows(operation, expectedMessage) {
+  assert.equal(operation.status, "throws");
+  assert.equal(operation.name, "Error");
+  assert.equal(operation.constructorName, "Error");
+  assert.equal(operation.code, null);
+  assert.equal(operation.errors, null);
+  assert.equal(operation.message, expectedMessage);
+}
+
+function assertOkValue(operation, expectedValue) {
+  assert.equal(operation.status, "ok");
+  assert.deepEqual(operation.value, expectedValue);
+}
