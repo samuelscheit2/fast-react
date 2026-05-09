@@ -35,10 +35,16 @@ M0: Orchestration Foundation.
 | worker-001-architecture | running in tmux worktree; nested subagents allowed | Test Rust core and renderer-boundary architecture hypotheses | `../fast-react-worker-001-architecture/worker-progress/worker-001-architecture.md` |
 | worker-002-conformance | running in tmux worktree; nested subagents allowed | Design React 19.2.6 compatibility inventory and test strategy | `../fast-react-worker-002-conformance/worker-progress/worker-002-conformance.md` |
 | worker-003-scaffold | running in tmux worktree; nested subagents allowed | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
+| worker-004-api-inventory | running in tmux worktree; nested subagents allowed | Build exact public API, runtime export, subpath, and type inventory | `../fast-react-worker-004-api-inventory/worker-progress/worker-004-api-inventory.md` |
+| worker-005-upstream-tests | running in tmux worktree; nested subagents allowed | Assess upstream React 19.2.6 test reuse and harness requirements | `../fast-react-worker-005-upstream-tests/worker-progress/worker-005-upstream-tests.md` |
+| worker-006-binding-strategy | running in tmux worktree; nested subagents allowed | Design JS-to-Rust binding and package artifact strategy | `../fast-react-worker-006-binding-strategy/worker-progress/worker-006-binding-strategy.md` |
+| worker-007-scheduler-fiber | running in tmux worktree; nested subagents allowed | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `../fast-react-worker-007-scheduler-fiber/worker-progress/worker-007-scheduler-fiber.md` |
+| worker-008-renderer-host-config | running in tmux worktree; nested subagents allowed | Define renderer host-config boundary across DOM, native, hydration, and portals | `../fast-react-worker-008-renderer-host-config/worker-progress/worker-008-renderer-host-config.md` |
+| worker-009-benchmark-strategy | running in tmux worktree; nested subagents allowed | Design conformance-gated benchmark and profiling strategy | `../fast-react-worker-009-benchmark-strategy/worker-progress/worker-009-benchmark-strategy.md` |
 
 ## Next Actions
 
-1. Collect the three active workers' progress files and final recommendations.
+1. Collect the nine active workers' progress files and final recommendations.
 2. Update the master plan with accepted architecture and scaffold decisions.
 3. Create implementation worktrees from the accepted scaffold plan.
 
@@ -73,3 +79,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Policy corrected: top-level workers still launch as real tmux Codex processes, but workers may spawn managed internal subagents/explorers for their own hypothesis testing. Those nested agents do not count against the 30 top-level tmux worker cap.
 - 2026-05-09: Stopped the three workers before accepting reports written under the superseded managed-subagent prohibition.
 - 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with nested managed subagents allowed.
+- 2026-05-09: Added six more non-overlapping research workers: public API inventory, upstream test reuse, binding strategy, scheduler/fiber model, renderer host config, and benchmark strategy.
