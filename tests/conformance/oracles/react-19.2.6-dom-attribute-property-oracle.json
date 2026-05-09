@@ -1,0 +1,4146 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-dom-attribute-property-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 DOM attribute/property serialization and mutation oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-040-dom-mutation-renderer-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "generation": {
+    "method": "checked runtime inventory plus exact npm tarballs extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per mode, scenario, and probe kind",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false
+  },
+  "evidenceClaims": {
+    "checkedRuntimeInventoryRead": true,
+    "checkedRuntimeInventoryMatched": true,
+    "exactTarballUrlsFromInventory": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListsMatchedInventory": true,
+    "serverSerializationProbed": true,
+    "clientMutationProbed": true,
+    "developmentWarningsProbed": true,
+    "deterministicFakeDomSubstrateUsed": true,
+    "browserNativeDomUsed": false,
+    "fastReactComparedToReactDom": false
+  },
+  "conformanceClaims": {
+    "realReactDomCodeProbed": true,
+    "fastReactComparedToReactDom": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomPackageMatched": true,
+    "supportingPackagesMatched": true
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-attribute-property-target"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-dom-peer-needed-for-host-prop-probes"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-client-probes"
+    }
+  ],
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "reason": "Development mode records React DOM host prop output plus warnings for invalid, unknown, and canonicalized attributes."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "reason": "Production mode records host prop serialization and mutation output without development-only warnings."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "common-host-props-and-aliases",
+      "description": "Common host attributes plus React aliases className and htmlFor on a label.",
+      "coverage": [
+        "common-host-props",
+        "className",
+        "htmlFor"
+      ],
+      "elementType": "label",
+      "phases": [
+        {
+          "id": "initial",
+          "props": [
+            [
+              "id",
+              {
+                "type": "string",
+                "value": "user-label"
+              }
+            ],
+            [
+              "className",
+              {
+                "type": "string",
+                "value": "primary label"
+              }
+            ],
+            [
+              "htmlFor",
+              {
+                "type": "string",
+                "value": "user-input"
+              }
+            ],
+            [
+              "title",
+              {
+                "type": "string",
+                "value": "User name"
+              }
+            ],
+            [
+              "role",
+              {
+                "type": "string",
+                "value": "presentation"
+              }
+            ],
+            [
+              "tabIndex",
+              {
+                "type": "number",
+                "value": 3
+              }
+            ],
+            [
+              "dir",
+              {
+                "type": "string",
+                "value": "ltr"
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "Name"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "boolean-and-booleanish-attributes",
+      "description": "Boolean attributes and booleanish string attributes that React maps to DOM attributes.",
+      "coverage": [
+        "common-host-props",
+        "booleanish-attributes"
+      ],
+      "elementType": "button",
+      "phases": [
+        {
+          "id": "initial",
+          "props": [
+            [
+              "disabled",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "hidden",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "contentEditable",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "spellCheck",
+              {
+                "type": "boolean",
+                "value": false
+              }
+            ],
+            [
+              "draggable",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "translate",
+              {
+                "type": "string",
+                "value": "no"
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "Save"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data-and-aria-attributes",
+      "description": "data-* and aria-* attributes with string, number, boolean, and empty values.",
+      "coverage": [
+        "data-props",
+        "aria-props"
+      ],
+      "elementType": "section",
+      "phases": [
+        {
+          "id": "initial",
+          "props": [
+            [
+              "data-test-id",
+              {
+                "type": "string",
+                "value": "alpha"
+              }
+            ],
+            [
+              "data-count",
+              {
+                "type": "number",
+                "value": 5
+              }
+            ],
+            [
+              "data-empty",
+              {
+                "type": "string",
+                "value": ""
+              }
+            ],
+            [
+              "aria-hidden",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "aria-label",
+              {
+                "type": "string",
+                "value": "Alpha section"
+              }
+            ],
+            [
+              "aria-current",
+              {
+                "type": "string",
+                "value": "page"
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "Accessible"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-and-unknown-attributes",
+      "description": "Lowercase custom attributes, camel-case unknown props, and invalid aria names on a built-in element.",
+      "coverage": [
+        "custom-attributes",
+        "unknown-props",
+        "warnings"
+      ],
+      "elementType": "div",
+      "phases": [
+        {
+          "id": "initial",
+          "props": [
+            [
+              "unknownprop",
+              {
+                "type": "string",
+                "value": "lowercase"
+              }
+            ],
+            [
+              "custom-attr",
+              {
+                "type": "string",
+                "value": "dash"
+              }
+            ],
+            [
+              "unknownProp",
+              {
+                "type": "string",
+                "value": "camel"
+              }
+            ],
+            [
+              "customAttr",
+              {
+                "type": "string",
+                "value": "camel-custom"
+              }
+            ],
+            [
+              "aria-labl",
+              {
+                "type": "string",
+                "value": "typo"
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "Unknown"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-element-attribute-property-routing",
+      "description": "Custom element host props, including existing DOM properties and dash-cased attributes.",
+      "coverage": [
+        "custom-attributes",
+        "custom-elements",
+        "property-routing"
+      ],
+      "elementType": "x-widget",
+      "phases": [
+        {
+          "id": "initial",
+          "props": [
+            [
+              "id",
+              {
+                "type": "string",
+                "value": "widget"
+              }
+            ],
+            [
+              "className",
+              {
+                "type": "string",
+                "value": "widget-card"
+              }
+            ],
+            [
+              "foo-bar",
+              {
+                "type": "string",
+                "value": "dash"
+              }
+            ],
+            [
+              "fooBar",
+              {
+                "type": "string",
+                "value": "camel"
+              }
+            ],
+            [
+              "objectProp",
+              {
+                "type": "object",
+                "entries": [
+                  [
+                    "answer",
+                    {
+                      "type": "number",
+                      "value": 42
+                    }
+                  ]
+                ]
+              }
+            ],
+            [
+              "boolProp",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "falseProp",
+              {
+                "type": "boolean",
+                "value": false
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "Widget"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attribute-update-and-removal",
+      "description": "A two-phase update that changes, removes, and retains host attributes.",
+      "coverage": [
+        "removal-behavior",
+        "update-behavior",
+        "data-props",
+        "aria-props"
+      ],
+      "elementType": "button",
+      "phases": [
+        {
+          "id": "initial",
+          "props": [
+            [
+              "id",
+              {
+                "type": "string",
+                "value": "mutable"
+              }
+            ],
+            [
+              "className",
+              {
+                "type": "string",
+                "value": "alpha"
+              }
+            ],
+            [
+              "disabled",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "title",
+              {
+                "type": "string",
+                "value": "first"
+              }
+            ],
+            [
+              "data-state",
+              {
+                "type": "string",
+                "value": "open"
+              }
+            ],
+            [
+              "aria-hidden",
+              {
+                "type": "boolean",
+                "value": true
+              }
+            ],
+            [
+              "custom-attr",
+              {
+                "type": "string",
+                "value": "initial"
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "First"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "update",
+          "props": [
+            [
+              "id",
+              {
+                "type": "string",
+                "value": "mutable"
+              }
+            ],
+            [
+              "className",
+              {
+                "type": "undefined"
+              }
+            ],
+            [
+              "disabled",
+              {
+                "type": "boolean",
+                "value": false
+              }
+            ],
+            [
+              "title",
+              {
+                "type": "string",
+                "value": "second"
+              }
+            ],
+            [
+              "data-state",
+              {
+                "type": "null"
+              }
+            ],
+            [
+              "aria-hidden",
+              {
+                "type": "boolean",
+                "value": false
+              }
+            ],
+            [
+              "custom-attr",
+              {
+                "type": "undefined"
+              }
+            ],
+            [
+              "children",
+              {
+                "type": "string",
+                "value": "Second"
+              }
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react-dom.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./client",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./client.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./client.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "bun"
+              ],
+              "target": "./server.bun.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./server.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.bun",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.bun.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./static.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./profiling",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./profiling.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./profiling.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./test-utils",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./test-utils.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ]
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": {
+          "node": ">=0.10.0"
+        }
+      },
+      "publicSubpaths": [
+        ".",
+        "./package.json",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-dev-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-dev-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-dev-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./compiler-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./compiler-runtime.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./compiler-runtime.js"
+            }
+          ]
+        }
+      ]
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-artifact-probes",
+      "targetStatus": "supporting-package-not-official-react-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null
+      },
+      "publicSubpaths": [],
+      "runtimeSubpaths": [],
+      "exportMapRows": []
+    }
+  },
+  "fakeDomSubstrate": {
+    "purpose": "exercise React DOM client mutation calls deterministically in Node without adding a DOM dependency to the conformance workspace",
+    "browserNativeDom": false,
+    "browserAttributeNameNormalizationMode": "HTML namespace setAttribute/removeAttribute names are lowercased by the fake DOM before final tree snapshots",
+    "doesNotModel": [
+      "HTML parsing and native outerHTML",
+      "layout, CSS cascade, focus, selection, and accessibility tree behavior",
+      "custom element lifecycle callbacks and browser upgrade timing",
+      "event dispatch and listener semantics",
+      "controlled form wrappers, selection restoration, and value tracking"
+    ]
+  },
+  "serverSerializationObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "common-host-props-and-aliases",
+        "action": "server",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "common-host-props-and-aliases",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<label id=\"user-label\" class=\"primary label\" for=\"user-input\" title=\"User name\" role=\"presentation\" tabindex=\"3\" dir=\"ltr\">Name</label>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "boolean-and-booleanish-attributes",
+        "action": "server",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "boolean-and-booleanish-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<button disabled=\"\" hidden=\"\" contentEditable=\"true\" spellCheck=\"false\" draggable=\"true\" translate=\"no\">Save</button>"
+              },
+              "consoleCalls": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "A component is `contentEditable` and contains `children` managed by React. It is now your responsibility to guarantee that none of those nodes are unexpectedly modified or duplicated. This is probably not intentional."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "data-and-aria-attributes",
+        "action": "server",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "data-and-aria-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<section data-test-id=\"alpha\" data-count=\"5\" data-empty=\"\" aria-hidden=\"true\" aria-label=\"Alpha section\" aria-current=\"page\">Accessible</section>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-and-unknown-attributes",
+        "action": "server",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "custom-and-unknown-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<div unknownprop=\"lowercase\" custom-attr=\"dash\" unknownProp=\"camel\" customAttr=\"camel-custom\" aria-labl=\"typo\">Unknown</div>"
+              },
+              "consoleCalls": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "Invalid aria prop %s on <%s> tag. For details, see https://react.dev/link/invalid-aria-props"
+                    },
+                    {
+                      "type": "string",
+                      "value": "`aria-labl`"
+                    },
+                    {
+                      "type": "string",
+                      "value": "div"
+                    }
+                  ]
+                },
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element."
+                    },
+                    {
+                      "type": "string",
+                      "value": "unknownProp"
+                    },
+                    {
+                      "type": "string",
+                      "value": "unknownprop"
+                    }
+                  ]
+                },
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element."
+                    },
+                    {
+                      "type": "string",
+                      "value": "customAttr"
+                    },
+                    {
+                      "type": "string",
+                      "value": "customattr"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-element-attribute-property-routing",
+        "action": "server",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "custom-element-attribute-property-routing",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<x-widget id=\"widget\" class=\"widget-card\" foo-bar=\"dash\" fooBar=\"camel\" boolProp=\"\">Widget</x-widget>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "attribute-update-and-removal",
+        "action": "server",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "attribute-update-and-removal",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<button id=\"mutable\" class=\"alpha\" disabled=\"\" title=\"first\" data-state=\"open\" aria-hidden=\"true\" custom-attr=\"initial\">First</button>"
+              },
+              "consoleCalls": []
+            },
+            {
+              "phaseId": "update",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<button id=\"mutable\" title=\"second\" aria-hidden=\"false\">Second</button>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "common-host-props-and-aliases",
+        "action": "server",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "common-host-props-and-aliases",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<label id=\"user-label\" class=\"primary label\" for=\"user-input\" title=\"User name\" role=\"presentation\" tabindex=\"3\" dir=\"ltr\">Name</label>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "boolean-and-booleanish-attributes",
+        "action": "server",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "boolean-and-booleanish-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<button disabled=\"\" hidden=\"\" contentEditable=\"true\" spellCheck=\"false\" draggable=\"true\" translate=\"no\">Save</button>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "data-and-aria-attributes",
+        "action": "server",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "data-and-aria-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<section data-test-id=\"alpha\" data-count=\"5\" data-empty=\"\" aria-hidden=\"true\" aria-label=\"Alpha section\" aria-current=\"page\">Accessible</section>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-and-unknown-attributes",
+        "action": "server",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "custom-and-unknown-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<div unknownprop=\"lowercase\" custom-attr=\"dash\" unknownProp=\"camel\" customAttr=\"camel-custom\" aria-labl=\"typo\">Unknown</div>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-element-attribute-property-routing",
+        "action": "server",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "custom-element-attribute-property-routing",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<x-widget id=\"widget\" class=\"widget-card\" foo-bar=\"dash\" fooBar=\"camel\" boolProp=\"\">Widget</x-widget>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "attribute-update-and-removal",
+        "action": "server",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "server",
+          "scenarioId": "attribute-update-and-removal",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<button id=\"mutable\" class=\"alpha\" disabled=\"\" title=\"first\" data-state=\"open\" aria-hidden=\"true\" custom-attr=\"initial\">First</button>"
+              },
+              "consoleCalls": []
+            },
+            {
+              "phaseId": "update",
+              "result": {
+                "status": "ok",
+                "label": "renderToString",
+                "value": "<button id=\"mutable\" title=\"second\" aria-hidden=\"false\">Second</button>"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "clientMutationObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "common-host-props-and-aliases",
+        "action": "client",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "common-host-props-and-aliases",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "label"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "id",
+                  "storedName": "id",
+                  "value": "user-label"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "class",
+                  "storedName": "class",
+                  "value": "primary label"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "for",
+                  "storedName": "for",
+                  "value": "user-input"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "title",
+                  "storedName": "title",
+                  "value": "User name"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "role",
+                  "storedName": "role",
+                  "value": "presentation"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "tabindex",
+                  "storedName": "tabindex",
+                  "value": "3"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "dir",
+                  "storedName": "dir",
+                  "value": "ltr"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "LABEL",
+                  "value": "Name"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Name"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "LABEL",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "LABEL"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "LABEL",
+                    "attributes": [
+                      [
+                        "class",
+                        "primary label"
+                      ],
+                      [
+                        "dir",
+                        "ltr"
+                      ],
+                      [
+                        "for",
+                        "user-input"
+                      ],
+                      [
+                        "id",
+                        "user-label"
+                      ],
+                      [
+                        "role",
+                        "presentation"
+                      ],
+                      [
+                        "tabindex",
+                        "3"
+                      ],
+                      [
+                        "title",
+                        "User name"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Name"
+                      }
+                    ],
+                    "localName": "label",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "boolean-and-booleanish-attributes",
+        "action": "client",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "boolean-and-booleanish-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "button"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "disabled",
+                  "storedName": "disabled",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "hidden",
+                  "storedName": "hidden",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "contentEditable",
+                  "storedName": "contenteditable",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "spellCheck",
+                  "storedName": "spellcheck",
+                  "value": "false"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "draggable",
+                  "storedName": "draggable",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "translate",
+                  "storedName": "translate",
+                  "value": "no"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "BUTTON",
+                  "value": "Save"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Save"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "BUTTON",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "BUTTON"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "BUTTON",
+                    "attributes": [
+                      [
+                        "contenteditable",
+                        "true"
+                      ],
+                      [
+                        "disabled",
+                        ""
+                      ],
+                      [
+                        "draggable",
+                        "true"
+                      ],
+                      [
+                        "hidden",
+                        ""
+                      ],
+                      [
+                        "spellcheck",
+                        "false"
+                      ],
+                      [
+                        "translate",
+                        "no"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Save"
+                      }
+                    ],
+                    "localName": "button",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "A component is `contentEditable` and contains `children` managed by React. It is now your responsibility to guarantee that none of those nodes are unexpectedly modified or duplicated. This is probably not intentional."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "data-and-aria-attributes",
+        "action": "client",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "data-and-aria-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "section"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "data-test-id",
+                  "storedName": "data-test-id",
+                  "value": "alpha"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "data-count",
+                  "storedName": "data-count",
+                  "value": "5"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "data-empty",
+                  "storedName": "data-empty",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "aria-hidden",
+                  "storedName": "aria-hidden",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "aria-label",
+                  "storedName": "aria-label",
+                  "value": "Alpha section"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "aria-current",
+                  "storedName": "aria-current",
+                  "value": "page"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "SECTION",
+                  "value": "Accessible"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Accessible"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "SECTION",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "SECTION"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "SECTION",
+                    "attributes": [
+                      [
+                        "aria-current",
+                        "page"
+                      ],
+                      [
+                        "aria-hidden",
+                        "true"
+                      ],
+                      [
+                        "aria-label",
+                        "Alpha section"
+                      ],
+                      [
+                        "data-count",
+                        "5"
+                      ],
+                      [
+                        "data-empty",
+                        ""
+                      ],
+                      [
+                        "data-test-id",
+                        "alpha"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Accessible"
+                      }
+                    ],
+                    "localName": "section",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-and-unknown-attributes",
+        "action": "client",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "custom-and-unknown-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "div"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "unknownprop",
+                  "storedName": "unknownprop",
+                  "value": "lowercase"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "custom-attr",
+                  "storedName": "custom-attr",
+                  "value": "dash"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "unknownProp",
+                  "storedName": "unknownprop",
+                  "value": "camel"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "customAttr",
+                  "storedName": "customattr",
+                  "value": "camel-custom"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "aria-labl",
+                  "storedName": "aria-labl",
+                  "value": "typo"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": "Unknown"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Unknown"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "DIV"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "DIV",
+                    "attributes": [
+                      [
+                        "aria-labl",
+                        "typo"
+                      ],
+                      [
+                        "custom-attr",
+                        "dash"
+                      ],
+                      [
+                        "customattr",
+                        "camel-custom"
+                      ],
+                      [
+                        "unknownprop",
+                        "camel"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Unknown"
+                      }
+                    ],
+                    "localName": "div",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "Invalid aria prop %s on <%s> tag. For details, see https://react.dev/link/invalid-aria-props"
+                    },
+                    {
+                      "type": "string",
+                      "value": "`aria-labl`"
+                    },
+                    {
+                      "type": "string",
+                      "value": "div"
+                    }
+                  ]
+                },
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element."
+                    },
+                    {
+                      "type": "string",
+                      "value": "unknownProp"
+                    },
+                    {
+                      "type": "string",
+                      "value": "unknownprop"
+                    }
+                  ]
+                },
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element."
+                    },
+                    {
+                      "type": "string",
+                      "value": "customAttr"
+                    },
+                    {
+                      "type": "string",
+                      "value": "customattr"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-element-attribute-property-routing",
+        "action": "client",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "custom-element-attribute-property-routing",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "x-widget"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "id",
+                  "storedName": "id",
+                  "value": "widget"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "className",
+                  "storedName": "classname",
+                  "value": "widget-card"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "foo-bar",
+                  "storedName": "foo-bar",
+                  "value": "dash"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "fooBar",
+                  "storedName": "foobar",
+                  "value": "camel"
+                },
+                {
+                  "type": "setProperty",
+                  "target": "X-WIDGET",
+                  "property": "objectProp",
+                  "value": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "isArray": false,
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "answer"
+                      }
+                    ],
+                    "entries": [
+                      [
+                        "answer",
+                        {
+                          "type": "number",
+                          "value": 42
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "setProperty",
+                  "target": "X-WIDGET",
+                  "property": "boolProp",
+                  "value": {
+                    "type": "boolean",
+                    "value": true
+                  }
+                },
+                {
+                  "type": "setProperty",
+                  "target": "X-WIDGET",
+                  "property": "falseProp",
+                  "value": {
+                    "type": "boolean",
+                    "value": false
+                  }
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "X-WIDGET",
+                  "value": "Widget"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Widget"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "X-WIDGET",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "X-WIDGET"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "X-WIDGET",
+                    "attributes": [
+                      [
+                        "classname",
+                        "widget-card"
+                      ],
+                      [
+                        "foo-bar",
+                        "dash"
+                      ],
+                      [
+                        "foobar",
+                        "camel"
+                      ],
+                      [
+                        "id",
+                        "widget"
+                      ]
+                    ],
+                    "propertyWrites": [
+                      [
+                        "boolProp",
+                        {
+                          "type": "boolean",
+                          "value": true
+                        }
+                      ],
+                      [
+                        "falseProp",
+                        {
+                          "type": "boolean",
+                          "value": false
+                        }
+                      ],
+                      [
+                        "objectProp",
+                        {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "isArray": false,
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "answer"
+                            }
+                          ],
+                          "entries": [
+                            [
+                              "answer",
+                              {
+                                "type": "number",
+                                "value": 42
+                              }
+                            ]
+                          ]
+                        }
+                      ]
+                    ],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Widget"
+                      }
+                    ],
+                    "localName": "x-widget",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "attribute-update-and-removal",
+        "action": "client",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "attribute-update-and-removal",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "button"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "id",
+                  "storedName": "id",
+                  "value": "mutable"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "class",
+                  "storedName": "class",
+                  "value": "alpha"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "disabled",
+                  "storedName": "disabled",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "title",
+                  "storedName": "title",
+                  "value": "first"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "data-state",
+                  "storedName": "data-state",
+                  "value": "open"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "aria-hidden",
+                  "storedName": "aria-hidden",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "custom-attr",
+                  "storedName": "custom-attr",
+                  "value": "initial"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "BUTTON",
+                  "value": "First"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "First"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "BUTTON",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "BUTTON"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "BUTTON",
+                    "attributes": [
+                      [
+                        "aria-hidden",
+                        "true"
+                      ],
+                      [
+                        "class",
+                        "alpha"
+                      ],
+                      [
+                        "custom-attr",
+                        "initial"
+                      ],
+                      [
+                        "data-state",
+                        "open"
+                      ],
+                      [
+                        "disabled",
+                        ""
+                      ],
+                      [
+                        "id",
+                        "mutable"
+                      ],
+                      [
+                        "title",
+                        "first"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "First"
+                      }
+                    ],
+                    "localName": "button",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            },
+            {
+              "phaseId": "update",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render update"
+              },
+              "mutations": [
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "class",
+                  "storedName": "class",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "disabled",
+                  "storedName": "disabled",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "title",
+                  "storedName": "title",
+                  "value": "second"
+                },
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "data-state",
+                  "storedName": "data-state",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "aria-hidden",
+                  "storedName": "aria-hidden",
+                  "value": "false"
+                },
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "custom-attr",
+                  "storedName": "custom-attr",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "setNodeValue",
+                  "target": "#text",
+                  "value": "Second"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "BUTTON",
+                    "attributes": [
+                      [
+                        "aria-hidden",
+                        "false"
+                      ],
+                      [
+                        "id",
+                        "mutable"
+                      ],
+                      [
+                        "title",
+                        "second"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Second"
+                      }
+                    ],
+                    "localName": "button",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "common-host-props-and-aliases",
+        "action": "client",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "common-host-props-and-aliases",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "label"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "id",
+                  "storedName": "id",
+                  "value": "user-label"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "class",
+                  "storedName": "class",
+                  "value": "primary label"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "for",
+                  "storedName": "for",
+                  "value": "user-input"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "title",
+                  "storedName": "title",
+                  "value": "User name"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "role",
+                  "storedName": "role",
+                  "value": "presentation"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "tabindex",
+                  "storedName": "tabindex",
+                  "value": "3"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "LABEL",
+                  "name": "dir",
+                  "storedName": "dir",
+                  "value": "ltr"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "LABEL",
+                  "value": "Name"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Name"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "LABEL",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "LABEL"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "LABEL",
+                    "attributes": [
+                      [
+                        "class",
+                        "primary label"
+                      ],
+                      [
+                        "dir",
+                        "ltr"
+                      ],
+                      [
+                        "for",
+                        "user-input"
+                      ],
+                      [
+                        "id",
+                        "user-label"
+                      ],
+                      [
+                        "role",
+                        "presentation"
+                      ],
+                      [
+                        "tabindex",
+                        "3"
+                      ],
+                      [
+                        "title",
+                        "User name"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Name"
+                      }
+                    ],
+                    "localName": "label",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "boolean-and-booleanish-attributes",
+        "action": "client",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "boolean-and-booleanish-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "button"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "disabled",
+                  "storedName": "disabled",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "hidden",
+                  "storedName": "hidden",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "contentEditable",
+                  "storedName": "contenteditable",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "spellCheck",
+                  "storedName": "spellcheck",
+                  "value": "false"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "draggable",
+                  "storedName": "draggable",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "translate",
+                  "storedName": "translate",
+                  "value": "no"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "BUTTON",
+                  "value": "Save"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Save"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "BUTTON",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "BUTTON"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "BUTTON",
+                    "attributes": [
+                      [
+                        "contenteditable",
+                        "true"
+                      ],
+                      [
+                        "disabled",
+                        ""
+                      ],
+                      [
+                        "draggable",
+                        "true"
+                      ],
+                      [
+                        "hidden",
+                        ""
+                      ],
+                      [
+                        "spellcheck",
+                        "false"
+                      ],
+                      [
+                        "translate",
+                        "no"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Save"
+                      }
+                    ],
+                    "localName": "button",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "data-and-aria-attributes",
+        "action": "client",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "data-and-aria-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "section"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "data-test-id",
+                  "storedName": "data-test-id",
+                  "value": "alpha"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "data-count",
+                  "storedName": "data-count",
+                  "value": "5"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "data-empty",
+                  "storedName": "data-empty",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "aria-hidden",
+                  "storedName": "aria-hidden",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "aria-label",
+                  "storedName": "aria-label",
+                  "value": "Alpha section"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "SECTION",
+                  "name": "aria-current",
+                  "storedName": "aria-current",
+                  "value": "page"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "SECTION",
+                  "value": "Accessible"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Accessible"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "SECTION",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "SECTION"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "SECTION",
+                    "attributes": [
+                      [
+                        "aria-current",
+                        "page"
+                      ],
+                      [
+                        "aria-hidden",
+                        "true"
+                      ],
+                      [
+                        "aria-label",
+                        "Alpha section"
+                      ],
+                      [
+                        "data-count",
+                        "5"
+                      ],
+                      [
+                        "data-empty",
+                        ""
+                      ],
+                      [
+                        "data-test-id",
+                        "alpha"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Accessible"
+                      }
+                    ],
+                    "localName": "section",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-and-unknown-attributes",
+        "action": "client",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "custom-and-unknown-attributes",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "div"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "unknownprop",
+                  "storedName": "unknownprop",
+                  "value": "lowercase"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "custom-attr",
+                  "storedName": "custom-attr",
+                  "value": "dash"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "unknownProp",
+                  "storedName": "unknownprop",
+                  "value": "camel"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "customAttr",
+                  "storedName": "customattr",
+                  "value": "camel-custom"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "DIV",
+                  "name": "aria-labl",
+                  "storedName": "aria-labl",
+                  "value": "typo"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": "Unknown"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Unknown"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "DIV"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "DIV",
+                    "attributes": [
+                      [
+                        "aria-labl",
+                        "typo"
+                      ],
+                      [
+                        "custom-attr",
+                        "dash"
+                      ],
+                      [
+                        "customattr",
+                        "camel-custom"
+                      ],
+                      [
+                        "unknownprop",
+                        "camel"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Unknown"
+                      }
+                    ],
+                    "localName": "div",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "custom-element-attribute-property-routing",
+        "action": "client",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "custom-element-attribute-property-routing",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "x-widget"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "id",
+                  "storedName": "id",
+                  "value": "widget"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "className",
+                  "storedName": "classname",
+                  "value": "widget-card"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "foo-bar",
+                  "storedName": "foo-bar",
+                  "value": "dash"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "X-WIDGET",
+                  "name": "fooBar",
+                  "storedName": "foobar",
+                  "value": "camel"
+                },
+                {
+                  "type": "setProperty",
+                  "target": "X-WIDGET",
+                  "property": "objectProp",
+                  "value": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "isArray": false,
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "answer"
+                      }
+                    ],
+                    "entries": [
+                      [
+                        "answer",
+                        {
+                          "type": "number",
+                          "value": 42
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "type": "setProperty",
+                  "target": "X-WIDGET",
+                  "property": "boolProp",
+                  "value": {
+                    "type": "boolean",
+                    "value": true
+                  }
+                },
+                {
+                  "type": "setProperty",
+                  "target": "X-WIDGET",
+                  "property": "falseProp",
+                  "value": {
+                    "type": "boolean",
+                    "value": false
+                  }
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "X-WIDGET",
+                  "value": "Widget"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "Widget"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "X-WIDGET",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "X-WIDGET"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "X-WIDGET",
+                    "attributes": [
+                      [
+                        "classname",
+                        "widget-card"
+                      ],
+                      [
+                        "foo-bar",
+                        "dash"
+                      ],
+                      [
+                        "foobar",
+                        "camel"
+                      ],
+                      [
+                        "id",
+                        "widget"
+                      ]
+                    ],
+                    "propertyWrites": [
+                      [
+                        "boolProp",
+                        {
+                          "type": "boolean",
+                          "value": true
+                        }
+                      ],
+                      [
+                        "falseProp",
+                        {
+                          "type": "boolean",
+                          "value": false
+                        }
+                      ],
+                      [
+                        "objectProp",
+                        {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "isArray": false,
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "answer"
+                            }
+                          ],
+                          "entries": [
+                            [
+                              "answer",
+                              {
+                                "type": "number",
+                                "value": 42
+                              }
+                            ]
+                          ]
+                        }
+                      ]
+                    ],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Widget"
+                      }
+                    ],
+                    "localName": "x-widget",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "attribute-update-and-removal",
+        "action": "client",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "action": "client",
+          "scenarioId": "attribute-update-and-removal",
+          "targetPackage": "react-dom",
+          "reactVersion": "19.2.6",
+          "reactDomVersion": "19.2.6",
+          "fakeDomSubstrate": {
+            "kind": "deterministic-node-fake-dom",
+            "browserNativeDom": false,
+            "records": [
+              "element and text creation",
+              "setAttribute and removeAttribute",
+              "setAttributeNS and removeAttributeNS",
+              "selected property assignments",
+              "textContent and text node value writes",
+              "appendChild, insertBefore, and removeChild"
+            ],
+            "limitations": [
+              "no HTML parser or real browser outerHTML serialization",
+              "no layout, CSS cascade, selection, focus, or accessibility tree",
+              "no custom element lifecycle callbacks",
+              "event listener installation is stubbed because event behavior is covered by a separate oracle track"
+            ]
+          },
+          "rootSetup": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot"
+            },
+            "mutations": [],
+            "consoleCalls": []
+          },
+          "phases": [
+            {
+              "phaseId": "initial",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render initial"
+              },
+              "mutations": [
+                {
+                  "type": "createElement",
+                  "tagName": "button"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "id",
+                  "storedName": "id",
+                  "value": "mutable"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "class",
+                  "storedName": "class",
+                  "value": "alpha"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "disabled",
+                  "storedName": "disabled",
+                  "value": ""
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "title",
+                  "storedName": "title",
+                  "value": "first"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "data-state",
+                  "storedName": "data-state",
+                  "value": "open"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "aria-hidden",
+                  "storedName": "aria-hidden",
+                  "value": "true"
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "custom-attr",
+                  "storedName": "custom-attr",
+                  "value": "initial"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "BUTTON",
+                  "value": "First"
+                },
+                {
+                  "type": "createTextNode",
+                  "value": "First"
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "BUTTON",
+                  "child": "#text"
+                },
+                {
+                  "type": "setTextContent",
+                  "target": "DIV",
+                  "value": ""
+                },
+                {
+                  "type": "appendChild",
+                  "parent": "DIV",
+                  "child": "BUTTON"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "BUTTON",
+                    "attributes": [
+                      [
+                        "aria-hidden",
+                        "true"
+                      ],
+                      [
+                        "class",
+                        "alpha"
+                      ],
+                      [
+                        "custom-attr",
+                        "initial"
+                      ],
+                      [
+                        "data-state",
+                        "open"
+                      ],
+                      [
+                        "disabled",
+                        ""
+                      ],
+                      [
+                        "id",
+                        "mutable"
+                      ],
+                      [
+                        "title",
+                        "first"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "First"
+                      }
+                    ],
+                    "localName": "button",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            },
+            {
+              "phaseId": "update",
+              "result": {
+                "status": "ok",
+                "label": "flushSync render update"
+              },
+              "mutations": [
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "class",
+                  "storedName": "class",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "disabled",
+                  "storedName": "disabled",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "title",
+                  "storedName": "title",
+                  "value": "second"
+                },
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "data-state",
+                  "storedName": "data-state",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "setAttribute",
+                  "target": "BUTTON",
+                  "name": "aria-hidden",
+                  "storedName": "aria-hidden",
+                  "value": "false"
+                },
+                {
+                  "type": "removeAttribute",
+                  "target": "BUTTON",
+                  "name": "custom-attr",
+                  "storedName": "custom-attr",
+                  "hadAttribute": true
+                },
+                {
+                  "type": "setNodeValue",
+                  "target": "#text",
+                  "value": "Second"
+                }
+              ],
+              "container": {
+                "nodeType": 1,
+                "nodeName": "DIV",
+                "attributes": [],
+                "propertyWrites": [],
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "BUTTON",
+                    "attributes": [
+                      [
+                        "aria-hidden",
+                        "false"
+                      ],
+                      [
+                        "id",
+                        "mutable"
+                      ],
+                      [
+                        "title",
+                        "second"
+                      ]
+                    ],
+                    "propertyWrites": [],
+                    "children": [
+                      {
+                        "nodeType": 3,
+                        "nodeName": "#text",
+                        "text": "Second"
+                      }
+                    ],
+                    "localName": "button",
+                    "namespaceURI": "http://www.w3.org/1999/xhtml"
+                  }
+                ],
+                "localName": "div",
+                "namespaceURI": "http://www.w3.org/1999/xhtml"
+              },
+              "consoleCalls": []
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-react-dom-comparison",
+      "reason": "This oracle records pinned React DOM behavior only; Fast React React DOM mutation behavior is not implemented in this worker."
+    },
+    {
+      "id": "fake-dom-client-substrate",
+      "reason": "Client probes execute real React DOM 19.2.6 mutation code, but the DOM target is a deterministic fake DOM. The oracle records React DOM calls and final fake DOM state, not browser layout, parser, CSSOM, focus, or custom-element reactions."
+    },
+    {
+      "id": "forms-style-dangerous-html-events-and-namespaces-out-of-scope",
+      "reason": "Controlled inputs/selects/textareas/forms, style diffing, dangerouslySetInnerHTML, event delegation, SVG, MathML, hydration, resources, and server Fizz markers have separate oracle tracks."
+    }
+  ]
+}
