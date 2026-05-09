@@ -48,3 +48,6 @@ Last updated: 2026-05-10
   oracle workers 083, 084, 085, 086, 087, and 097. Final merged JS check:
   `npm run check:js` passed with 402 conformance tests.
 - Added and documented the local React reference source clone.
+- Merged worker 118 host-token compile alignment; verified with
+  `cargo fmt --all --check`, host-config/reconciler/test-renderer tests,
+  reconciler/test-renderer clippy, and `git diff --check`.

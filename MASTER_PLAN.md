@@ -81,7 +81,6 @@ The current project push is a minimal real root render/update/unmount path:
 
 ## Current Queue
 
-- Worker 118 is running Slice 0 host-token compile alignment.
 - Worker 119 is running Slice 1 core fiber identity/topology foundation and owns
   `fast-react-core/src/lib.rs` for that tranche.
 - Worker 120 is running scheduler mock source implementation in package-level
@@ -90,7 +89,7 @@ The current project push is a minimal real root render/update/unmount path:
 
 ## Near-Term Plan
 
-1. Keep workers 118-121 running in parallel while they show active `Working` or
+1. Keep workers 119-121 running in parallel while they show active `Working` or
    `Pursuing goal` state; ignore stale usage-limit text in pane scrollback
    unless the worker process is actually stopped or blocked at a prompt.
 2. Keep worker 119 serialized around `fast-react-core/src/lib.rs`; do not queue
@@ -98,7 +97,7 @@ The current project push is a minimal real root render/update/unmount path:
    intentionally abandoned.
 3. Let workers 120 and 121 continue in parallel because their write scopes are
    isolated from the core topology tranche.
-4. After accepting any of workers 118-121, run the worker's scoped checks, merge
+4. After accepting any of workers 119-121, run the worker's scoped checks, merge
    with a no-fast-forward commit, then update this file with the next active
    queue and move completed facts to `MASTER_PROGRESS.md`.
 5. Queue follow-up source slices from the accepted root/reconciler/DOM/test
