@@ -178,6 +178,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/children-helper.js',
   '@fast-react/react/element-factory.js',
   '@fast-react/react/ref-object.js',
+  '@fast-react/react/wrapper-object.js',
   '@fast-react/react/placeholder-utils.js'
 ];
 
@@ -489,6 +490,105 @@ function assertChildrenBehavior(react, label, options = {}) {
   }
 }
 
+function assertWrapperObjectBehavior(react, label, options = {}) {
+  const development = options.development !== false;
+
+  assert.equal(react.memo.name, '', `${label}.memo name`);
+  assert.equal(react.memo.length, 2, `${label}.memo length`);
+  assert.equal(react.lazy.name, '', `${label}.lazy name`);
+  assert.equal(react.lazy.length, 1, `${label}.lazy length`);
+
+  function Component() {}
+  function compare() {
+    return true;
+  }
+
+  const memo = react.memo(Component, compare, 'ignored-extra');
+  assert.deepEqual(Object.keys(memo), ['$$typeof', 'type', 'compare']);
+  assert.deepEqual(
+    Reflect.ownKeys(memo),
+    development
+      ? ['$$typeof', 'type', 'compare', 'displayName']
+      : ['$$typeof', 'type', 'compare']
+  );
+  assert.equal(memo.$$typeof, Symbol.for('react.memo'));
+  assert.equal(memo.type, Component);
+  assert.equal(memo.compare, compare);
+  assert.equal(Object.isExtensible(memo), true);
+  assert.equal(Object.isSealed(memo), false);
+  assert.equal(Object.isFrozen(memo), false);
+  assert.equal(react.memo(Component).compare, null);
+  assert.equal(react.memo(Component, undefined).compare, null);
+  assert.equal(react.memo(Component, false).compare, false);
+
+  if (development) {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => {
+      errors.push(args);
+    };
+    try {
+      react.memo(null);
+      react.memo(undefined);
+      react.memo(42);
+    } finally {
+      console.error = originalError;
+    }
+    assert.deepEqual(errors, [
+      [
+        'memo: The first argument must be a component. Instead received: %s',
+        'null'
+      ],
+      [
+        'memo: The first argument must be a component. Instead received: %s',
+        'undefined'
+      ]
+    ]);
+
+    const anonymous = function () {};
+    Object.defineProperty(anonymous, 'name', {
+      configurable: true,
+      value: ''
+    });
+    const namedMemo = react.memo(anonymous);
+    namedMemo.displayName = 'Shown';
+    assert.equal(namedMemo.displayName, 'Shown');
+    assert.equal(anonymous.name, 'Shown');
+    assert.equal(anonymous.displayName, 'Shown');
+  }
+
+  let loaderCalls = 0;
+  const lazy = react.lazy(function loader() {
+    loaderCalls += 1;
+    return {
+      then(resolve) {
+        resolve({ default: Component });
+      }
+    };
+  }, 'ignored-extra');
+  assert.equal(loaderCalls, 0, `${label}.lazy should not invoke loader`);
+  assert.deepEqual(
+    Object.keys(lazy),
+    development
+      ? ['$$typeof', '_payload', '_init', '_debugInfo']
+      : ['$$typeof', '_payload', '_init']
+  );
+  assert.deepEqual(
+    Object.keys(lazy._payload),
+    development ? ['_status', '_result', '_ioInfo'] : ['_status', '_result']
+  );
+  assert.equal(lazy.$$typeof, Symbol.for('react.lazy'));
+  assert.equal(lazy._payload._status, -1);
+  assert.equal(lazy._payload._result.name, 'loader');
+  assert.equal(lazy._init(lazy._payload), Component);
+  assert.equal(lazy._payload._status, 1);
+  assert.equal(loaderCalls, 1, `${label}.lazy _init invokes loader once`);
+
+  const pending = react.lazy(() => ({ then() {} }));
+  assert.throws(() => pending._init(pending._payload), /\[object Object\]/);
+  assert.equal(pending._payload._status, 0);
+}
+
 function assertJsxRuntimeBehavior(runtime, label) {
   const config = { children: 'child' };
   const element = runtime.jsx('div', config);
@@ -543,6 +643,7 @@ function assertReactPlaceholderBehavior(react, label, options = {}) {
   assertReactElementBehavior(react, label);
   assertCreateRefBehavior(react, label);
   assertChildrenBehavior(react, label, options);
+  assertWrapperObjectBehavior(react, label, options);
   assertUnimplemented(() => react.forwardRef(() => null), `${label}.forwardRef`);
 
   if (Object.hasOwn(react, 'useRef')) {
@@ -707,6 +808,33 @@ async function assertProductionJsxDevUndefined() {
           : /Objects are not valid as a React child/,
         label
       );
+
+      function Component() {}
+      function compare() {
+        return true;
+      }
+      const memo = React.memo(Component, compare, 'ignored-extra');
+      assert.deepEqual(Object.keys(memo), ['$$typeof', 'type', 'compare'], label);
+      assert.deepEqual(Reflect.ownKeys(memo), ['$$typeof', 'type', 'compare'], label);
+      assert.equal(memo.$$typeof, Symbol.for('react.memo'), label);
+      assert.equal(memo.type, Component, label);
+      assert.equal(memo.compare, compare, label);
+      assert.equal(React.memo(Component).compare, null, label);
+
+      const lazy = React.lazy(() => ({
+        then(resolve) {
+          resolve({ default: Component });
+        }
+      }));
+      assert.deepEqual(Object.keys(lazy), ['$$typeof', '_payload', '_init'], label);
+      assert.deepEqual(Object.keys(lazy._payload), ['_status', '_result'], label);
+      assert.equal(lazy.$$typeof, Symbol.for('react.lazy'), label);
+      assert.equal(lazy._payload._status, -1, label);
+      assert.equal(lazy._init(lazy._payload), Component, label);
+      assert.equal(lazy._payload._status, 1, label);
+      const pending = React.lazy(() => ({ then() {} }));
+      assert.throws(() => pending._init(pending._payload), /\\[object Object\\]/, label);
+      assert.equal(pending._payload._status, 0, label);
     }
   `;
 
@@ -830,6 +958,38 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
       );
     }
 
+    function assertDevWrappers(moduleExports, label) {
+      function Component() {}
+      const memo = moduleExports.memo(Component);
+      assert.deepEqual(Object.keys(memo), ['$$typeof', 'type', 'compare'], label);
+      assert.deepEqual(
+        Reflect.ownKeys(memo),
+        ['$$typeof', 'type', 'compare', 'displayName'],
+        label
+      );
+      assert.equal(memo.$$typeof, Symbol.for('react.memo'), label);
+      assert.equal(memo.type, Component, label);
+      assert.equal(memo.compare, null, label);
+
+      const lazy = moduleExports.lazy(() => ({
+        then(resolve) {
+          resolve({ default: Component });
+        }
+      }));
+      assert.deepEqual(
+        Object.keys(lazy),
+        ['$$typeof', '_payload', '_init', '_debugInfo'],
+        label
+      );
+      assert.deepEqual(
+        Object.keys(lazy._payload),
+        ['_status', '_result', '_ioInfo'],
+        label
+      );
+      assert.equal(lazy.$$typeof, Symbol.for('react.lazy'), label);
+      assert.equal(lazy._init(lazy._payload), Component, label);
+    }
+
     (async () => {
       for (const { keys, resolvedFileName, specifier } of entrypoints) {
         assert.equal(
@@ -849,6 +1009,7 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
         if (specifier === '@fast-react/react') {
           assertDevCreateRef(cjsModule, specifier);
           assertDevChildren(cjsModule, specifier);
+          assertDevWrappers(cjsModule, specifier);
         }
 
         const esmModule = await import(specifier);
@@ -891,4 +1052,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element/ref/Children smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/ref/Children/memo/lazy smoke checks.');

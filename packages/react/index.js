@@ -14,6 +14,7 @@ const {
 } = require('./element-factory.js');
 const { createRef } = require('./ref-object.js');
 const { createChildrenHelpers } = require('./children-helper.js');
+const { lazy, memo } = require('./wrapper-object.js');
 
 const entrypoint = 'react';
 
@@ -75,8 +76,8 @@ exports.createElement = createElement;
 exports.createRef = createRef;
 exports.forwardRef = createUnimplementedFunction(entrypoint, 'forwardRef');
 exports.isValidElement = isValidElement;
-exports.lazy = createUnimplementedFunction(entrypoint, 'lazy');
-exports.memo = createUnimplementedFunction(entrypoint, 'memo');
+exports.lazy = lazy;
+exports.memo = memo;
 exports.startTransition = createUnimplementedFunction(
   entrypoint,
   'startTransition'
