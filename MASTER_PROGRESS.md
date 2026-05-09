@@ -55,6 +55,7 @@ M0: Orchestration Foundation.
 - Accepted memo/lazy wrapper behavior from worker-026: `@fast-react/react` now implements direct `memo` and `lazy` wrapper-object behavior for default and `react-server` root entrypoints. The deterministic wrapper-object oracle records 20 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; rendering, Suspense resolution through a renderer, memo bailout and compare invocation, hooks/context, refs lifecycle, owner stacks, and private internals remain explicitly unsupported.
 - Accepted forwardRef wrapper behavior from worker-027: `@fast-react/react` now implements direct `forwardRef` wrapper-object behavior for default and `react-server` root entrypoints. The deterministic forward-ref oracle records 16 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; render-time ref attachment, callback refs, string refs, `useRef`, refs lifecycle, owner stacks, hooks/context, renderer integration, and private internals remain explicitly unsupported.
 - Accepted createContext object behavior from worker-028: `@fast-react/react` now implements direct default-root `createContext` object behavior while preserving `react-server` export absence. The deterministic context-object oracle records 28 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; `useContext`, provider/consumer rendering, context propagation, subscriptions, owner stacks, hooks, renderer integration, and private internals remain explicitly unsupported.
+- Accepted Component/PureComponent class behavior from worker-029: `@fast-react/react` now implements direct default-root `Component` and `PureComponent` constructor, prototype, instance, custom updater forwarding, no-op updater, deprecated accessor, and invocation behavior while preserving `react-server` export absence. The deterministic component-class oracle records 28 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; renderer-driven updates, lifecycle invocation, reconciliation, refs lifecycle, context propagation, owner stacks, hooks, renderer integration, and private internals remain explicitly unsupported.
 
 ## Worker Roster
 
@@ -88,7 +89,7 @@ M0: Orchestration Foundation.
 | worker-026-memo-lazy-behavior | merged | Add a deterministic `memo`/`lazy` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-026-memo-lazy-behavior.md` |
 | worker-027-forward-ref-behavior | merged | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-027-forward-ref-behavior.md` |
 | worker-028-create-context-behavior | merged | Add a deterministic `createContext` object oracle and implement covered default-root JS facade behavior | `worker-progress/worker-028-create-context-behavior.md` |
-| worker-029-component-class-behavior | running in tmux worktree; nested subagents allowed | Add a deterministic `Component`/`PureComponent` class oracle and implement covered default-root JS facade behavior | `../fast-react-worker-029-component-class-behavior/worker-progress/worker-029-component-class-behavior.md` |
+| worker-029-component-class-behavior | merged | Add a deterministic `Component`/`PureComponent` class oracle and implement covered default-root JS facade behavior | `worker-progress/worker-029-component-class-behavior.md` |
 | worker-030-core-lane-model | running in tmux worktree; nested subagents allowed | Implement first React 19.2.6 lane bitset primitives in the Rust core | `../fast-react-worker-030-core-lane-model/worker-progress/worker-030-core-lane-model.md` |
 | worker-031-host-capability-diagnostics | running in tmux worktree; nested subagents allowed | Improve host-config capability-set diagnostics and tests | `../fast-react-worker-031-host-capability-diagnostics/worker-progress/worker-031-host-capability-diagnostics.md` |
 | worker-032-native-boundary-guardrails | running in tmux worktree; nested subagents allowed | Tighten native binding placeholder guardrails and platform target checks | `../fast-react-worker-032-native-boundary-guardrails/worker-progress/worker-032-native-boundary-guardrails.md` |
@@ -97,10 +98,9 @@ M0: Orchestration Foundation.
 
 ## Next Actions
 
-1. Audit/merge completed worker 029 only after independently checking its deterministic `Component`/`PureComponent` class oracle and broader compatibility claims.
-2. Launch workers 030-034 as real tmux Codex processes because their write scopes are disjoint from worker 029 and from each other.
-3. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
-4. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
+1. Monitor workers 030-034 and audit/merge them only after their scoped reports, tests, and status are clean.
+2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
+3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
 ## Risks And Open Questions
 
@@ -202,3 +202,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched worker-029 as a real `codex --yolo` tmux process in `../fast-react-worker-029-component-class-behavior`.
 - 2026-05-09: Queued workers 030-034 as a parallel non-overlapping tranche: Rust core lane primitives, host-config capability diagnostics, native boundary guardrails, React DOM inventory, and public scheduler package inventory.
 - 2026-05-09: Launched workers 030-034 as real `codex --yolo` tmux processes in isolated worktrees.
+- 2026-05-09: Accepted and merged worker-029 Component/PureComponent class behavior in commit `78e45b4` via merge commit `9a9ab19` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, component-class oracle regeneration byte-compare, element-object oracle regeneration byte-compare, component and element oracle temp/local path leak guards, scoped `git diff --check`, and explicit oracle status count checks.
+- 2026-05-09: Verified merged `main` after worker-029 with `npm run check:js`; 81 conformance tests passed through the workspace check. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
