@@ -2,11 +2,13 @@
   "name": "@fast-react/conformance",
   "version": "0.0.0",
   "private": true,
-  "description": "Initial deterministic inventory placeholder for the future Fast React dual-run conformance harness.",
+  "description": "Deterministic runtime/package inventory generation for pinned React targets.",
   "type": "module",
   "scripts": {
-    "inventory:placeholder": "node scripts/print-inventory.mjs --format=json",
-    "inventory:placeholder:markdown": "node scripts/print-inventory.mjs --format=markdown",
+    "inventory:generate": "node scripts/generate-runtime-inventory.mjs --write",
+    "inventory:print": "node scripts/print-inventory.mjs --format=json",
+    "inventory:print:markdown": "node scripts/print-inventory.mjs --format=markdown",
+    "check": "npm test",
     "test": "node --test test/*.test.mjs"
   },
   "engines": {

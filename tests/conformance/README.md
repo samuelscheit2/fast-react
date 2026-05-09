@@ -1,47 +1,56 @@
-# Fast React Conformance Inventory Placeholder
+# Fast React Runtime Package Inventory
 
-This package owns the first deterministic conformance inventory placeholder for
-the React 19.2.6 compatibility target. It records which package targets future
-inventory generation must cover, but it does not fetch tarballs, execute React,
-probe runtime exports, parse declaration files, or compare Fast React against
-React.
+This package owns deterministic runtime/package inventory generation for the
+React 19.2.6 compatibility target. It records evidence from real npm package
+metadata and tarball artifacts, including package export maps, tarball file
+lists, condition-specific resolution, and runtime export keys for pinned React
+entrypoints.
 
-Current target description:
+Current generated runtime targets:
 
 - `react@19.2.6`
 - `react-dom@19.2.6`
-- `@types/react@19.2.14`
-- Supporting package tracked for a future project decision:
-  `@types/react-dom@19.2.3`
-- Supporting package tracked because `react-dom@19.2.6` depends on it:
-  `scheduler@0.27.0`
 
-The checked-in placeholder artifact is
-`inventory/react-19.2.6-target-placeholder.json`.
+Supporting runtime package:
+
+- `scheduler@0.27.0`, because `react-dom@19.2.6` depends on it and React DOM
+  runtime probes need it available.
+
+Manual fields remain explicit:
+
+- `@types/react@19.2.14` and `@types/react-dom@19.2.3` are listed as manual
+  type-declaration targets only. Type parsing is not generated in this worker.
+- Fast React behavior compatibility is explicitly false. Inventory data is not
+  a dual-run oracle result.
+
+Checked-in generated artifact:
+
+- `inventory/react-19.2.6-runtime-package-inventory.json`
 
 Commands:
 
 ```sh
+npm run inventory:generate --workspace @fast-react/conformance
+npm run inventory:print --workspace @fast-react/conformance
+npm run inventory:print:markdown --workspace @fast-react/conformance
 npm test --workspace @fast-react/conformance
-npm run inventory:placeholder --workspace @fast-react/conformance
-npm run inventory:placeholder:markdown --workspace @fast-react/conformance
 ```
 
-Planned strategy:
+Generation strategy:
 
-1. Resolve exact npm metadata and tarball identities for pinned packages.
-2. Download tarballs into a temporary directory only, without mutating the
-   repository.
-3. Parse package export maps into subpath and condition rows.
-4. Probe runtime entrypoints in isolated Node child processes with timeouts.
-5. Parse type declarations with the TypeScript compiler API.
-6. Execute each scenario once against pinned `react@19.2.6` packages.
-7. Execute the same scenario against Fast React aliased to the same public
-   entrypoints.
-8. Compare normalized JSON observations for package resolution, object shapes,
-   errors, warnings, render logs, DOM snapshots, effect order, stream chunks, and
-   TypeScript compile results.
-9. Track expected divergences with an owner, milestone, reason, and expiry.
+1. Resolve exact package metadata from the npm registry.
+2. Download exact tarballs into a temporary directory.
+3. Verify tarball integrity from `dist.integrity`.
+4. Extract tarballs into a temporary `node_modules` tree without running
+   lifecycle scripts or mutating root manifests.
+5. Parse package `exports` into stable subpath and condition rows.
+6. Probe runtime entrypoints in isolated Node child processes with a timeout for
+   default Node and `react-server` conditions in development and production.
+7. Record condition-specific `require.resolve` evidence for browser, worker,
+   edge-light, workerd, bun, and deno conditions as Node resolver evidence only.
+8. Record blocked physical `.js` subpaths such as `react/index.js` and
+   `react-dom/server.js`.
 
-The current package proves only that the pinned target placeholder is stable and
-that the future inventory stages are explicitly marked `not-generated`.
+This inventory still does not execute Fast React, compare Fast React against
+React, parse TypeScript declaration packages, or prove behavior compatibility.
+The future dual-run oracle harness must make those claims separately.
