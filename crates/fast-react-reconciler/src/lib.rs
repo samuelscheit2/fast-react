@@ -161,8 +161,8 @@ pub fn render_placeholder<H: ?Sized>(host: &H) -> Result<(), UnimplementedReactB
 mod tests {
     use super::*;
     use fast_react_host_config::{
-        HostCapabilitySet, HostChild, HostCommit, HostCreation, HostIdentityAndContext, HostResult,
-        HostTypes, InitialChildrenFinalization, MutationHost,
+        HostCapabilitySet, HostChild, HostCommit, HostCreation, HostFiberTokenRef,
+        HostIdentityAndContext, HostResult, HostTypes, InitialChildrenFinalization, MutationHost,
     };
 
     struct LegacyPlaceholderHost;
@@ -186,6 +186,7 @@ mod tests {
     }
 
     impl HostTypes for CanonicalMutationHost {
+        type HostFiberToken = u64;
         type Type = &'static str;
         type Props = ();
         type Container = ();
@@ -274,6 +275,7 @@ mod tests {
 
         fn create_instance(
             &mut self,
+            _token: HostFiberTokenRef<'_, Self>,
             _ty: &Self::Type,
             _props: &Self::Props,
             _container: &Self::Container,
@@ -284,6 +286,7 @@ mod tests {
 
         fn create_text_instance(
             &mut self,
+            _token: HostFiberTokenRef<'_, Self>,
             _text: &str,
             _container: &Self::Container,
             _context: &Self::HostContext,
@@ -344,6 +347,7 @@ mod tests {
 
         fn commit_mount(
             &mut self,
+            _token: HostFiberTokenRef<'_, Self>,
             _instance: &mut Self::Instance,
             _ty: &Self::Type,
             _props: &Self::Props,
@@ -353,6 +357,7 @@ mod tests {
 
         fn commit_update(
             &mut self,
+            _token: HostFiberTokenRef<'_, Self>,
             _instance: &mut Self::Instance,
             _update_payload: Self::UpdatePayload,
             _ty: &Self::Type,
@@ -402,7 +407,11 @@ mod tests {
             Ok(())
         }
 
-        fn detach_deleted_instance(&mut self, _instance: Self::Instance) -> HostResult<()> {
+        fn detach_deleted_instance(
+            &mut self,
+            _token: HostFiberTokenRef<'_, Self>,
+            _instance: Self::Instance,
+        ) -> HostResult<()> {
             Ok(())
         }
     }
