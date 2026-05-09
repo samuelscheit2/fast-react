@@ -51,3 +51,6 @@ Last updated: 2026-05-10
 - Merged worker 118 host-token compile alignment; verified with
   `cargo fmt --all --check`, host-config/reconciler/test-renderer tests,
   reconciler/test-renderer clippy, and `git diff --check`.
+- Merged worker 119 core fiber topology foundation; verified with
+  `cargo fmt --all --check`, full and targeted `fast-react-core` tests,
+  `fast-react-core` clippy, and `git diff --check`.
