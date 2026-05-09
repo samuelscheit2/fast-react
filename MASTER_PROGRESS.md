@@ -80,12 +80,12 @@ M0: Orchestration Foundation.
 | worker-022-host-operation-errors | merged | Add structured host operation errors for invalid test-renderer operations | `worker-progress/worker-022-host-operation-errors.md` |
 | worker-023-js-element-factory | merged | Implement conformance-backed JS element factory behavior from the checked oracle | `worker-progress/worker-023-js-element-factory.md` |
 | worker-024-create-ref-behavior | merged | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `worker-progress/worker-024-create-ref-behavior.md` |
-| worker-025-children-helpers | queued | Add a deterministic `Children` helper oracle and implement covered JS facade behavior | `worker-progress/worker-025-children-helpers.md` |
+| worker-025-children-helpers | running in tmux worktree; nested subagents allowed | Add a deterministic `Children` helper oracle and implement covered JS facade behavior | `../fast-react-worker-025-children-helpers/worker-progress/worker-025-children-helpers.md` |
 
 ## Next Actions
 
-1. Launch worker 025 as a real `codex --yolo` tmux process in its own worktree.
-2. Audit and merge worker 025 only after it checks a deterministic `Children` helper oracle and keeps broader compatibility claims false.
+1. Monitor worker 025 and audit/merge it only after it checks a deterministic `Children` helper oracle and keeps broader compatibility claims false.
+2. Keep additional package behavior work paused while worker 025 owns `packages/react/**` and `tests/conformance/**`.
 
 ## Risks And Open Questions
 
@@ -168,3 +168,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-024 createRef behavior in commit `3216c97`. Closed the worker-024 tmux session after merge. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, ref-object oracle regeneration byte-compare, element-object oracle regeneration byte-compare, the ref-object temp/local path leak guard, and scoped `git diff --check`.
 - 2026-05-09: Verified merged `main` after worker-024 with `npm run check:js`; 28 conformance tests passed through the workspace check. Removed the clean worker-024 worktree after merge.
 - 2026-05-09: Queued worker-025 to add a deterministic React 19.2.6 `Children` helper oracle and implement covered JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
+- 2026-05-09: Launched worker-025 as a real `codex --yolo` tmux process in `../fast-react-worker-025-children-helpers`.
