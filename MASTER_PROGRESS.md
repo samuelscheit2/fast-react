@@ -204,3 +204,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched workers 030-034 as real `codex --yolo` tmux processes in isolated worktrees.
 - 2026-05-09: Accepted and merged worker-029 Component/PureComponent class behavior in commit `78e45b4` via merge commit `9a9ab19` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, component-class oracle regeneration byte-compare, element-object oracle regeneration byte-compare, component and element oracle temp/local path leak guards, scoped `git diff --check`, and explicit oracle status count checks.
 - 2026-05-09: Verified merged `main` after worker-029 with `npm run check:js`; 81 conformance tests passed through the workspace check. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
+- 2026-05-09: Closed the worker-029 tmux session and removed the clean worker-029 worktree after merge.
