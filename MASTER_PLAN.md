@@ -194,7 +194,7 @@ Dependencies: M8.
 | worker-016-root-lockfile-sync | Synchronize root `package-lock.json` after package metadata changes | `package-lock.json`, `worker-progress/worker-016-root-lockfile-sync.md` | workers 013,014,015 | merged |
 | worker-017-runtime-inventory-generation | Generate deterministic React 19.2.6 runtime/package inventory artifacts | `tests/conformance/**`, `worker-progress/worker-017-runtime-inventory-generation.md` | workers 002,004,013,014 | queued |
 | worker-018-test-renderer-mutation-host | Implement minimal canonical mutation test renderer | `crates/fast-react-test-renderer/**`, `worker-progress/worker-018-test-renderer-mutation-host.md` | workers 008,010,012 | queued |
-| worker-019-reconciler-host-boundary-migration | Move reconciler placeholder API toward canonical host trait bounds | `crates/fast-react-reconciler/**`, `worker-progress/worker-019-reconciler-host-boundary-migration.md` | workers 007,008,010,012 | queued |
+| worker-019-reconciler-host-boundary-migration | Move reconciler placeholder API toward canonical host trait bounds | `crates/fast-react-reconciler/**`, `worker-progress/worker-019-reconciler-host-boundary-migration.md` | workers 007,008,010,012 | merged |
 | worker-020-element-object-conformance-probes | Probe React 19.2.6 element object behavior and plan safe implementation | `worker-progress/worker-020-element-object-conformance-probes.md` | workers 001,004,011,014 | queued |
 
 ## Merge Policy
