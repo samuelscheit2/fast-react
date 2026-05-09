@@ -1,4 +1,4 @@
-# Fast React Runtime Package Inventory
+# Fast React Conformance Evidence
 
 This package owns deterministic runtime/package inventory generation for the
 React 19.2.6 compatibility target. It records evidence from real npm package
@@ -26,6 +26,7 @@ Manual fields remain explicit:
 Checked-in generated artifact:
 
 - `inventory/react-19.2.6-runtime-package-inventory.json`
+- `oracles/react-19.2.6-element-object-oracle.json`
 
 Commands:
 
@@ -33,6 +34,9 @@ Commands:
 npm run inventory:generate --workspace @fast-react/conformance
 npm run inventory:print --workspace @fast-react/conformance
 npm run inventory:print:markdown --workspace @fast-react/conformance
+npm run element-object:generate --workspace @fast-react/conformance
+npm run element-object:print --workspace @fast-react/conformance
+npm run element-object:print:markdown --workspace @fast-react/conformance
 npm test --workspace @fast-react/conformance
 ```
 
@@ -54,3 +58,25 @@ Generation strategy:
 This inventory still does not execute Fast React, compare Fast React against
 React, parse TypeScript declaration packages, or prove behavior compatibility.
 The future dual-run oracle harness must make those claims separately.
+
+Element-object oracle strategy:
+
+1. Resolve exact `react@19.2.6` npm metadata.
+2. Download the exact React tarball into a temporary directory.
+3. Verify tarball integrity from `dist.integrity`.
+4. Extract React and copy the local `@fast-react/react` package into a
+   temporary `node_modules` tree.
+5. Run one isolated Node child process per target, scenario, and mode. Modes
+   cover default Node and `--conditions=react-server`, each in development and
+   production.
+6. Capture normalized JSON for `createElement`, `cloneElement`, `jsx`, `jsxs`,
+   `jsxDEV`, and `isValidElement` behavior, including keys, own-key order,
+   descriptors, getter names, `isReactWarning`, key/ref behavior, freeze/seal
+   state, child-array identity/freeze behavior, warnings, thrown errors, and
+   brand checks.
+7. Compare local Fast React observations against the React oracle as explicit
+   `known-mismatch` or `unsupported-placeholder` statuses only.
+
+The element-object oracle is the first behavior oracle. It compares local Fast
+React package entrypoints, but it still explicitly does not claim Fast React
+behavior compatibility.

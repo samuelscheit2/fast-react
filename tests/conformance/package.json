@@ -2,9 +2,12 @@
   "name": "@fast-react/conformance",
   "version": "0.0.0",
   "private": true,
-  "description": "Deterministic runtime/package inventory generation for pinned React targets.",
+  "description": "Deterministic runtime/package inventory and behavior-oracle generation for pinned React targets.",
   "type": "module",
   "scripts": {
+    "element-object:generate": "node scripts/generate-element-object-oracle.mjs --write",
+    "element-object:print": "node scripts/print-element-object-oracle.mjs --format=json",
+    "element-object:print:markdown": "node scripts/print-element-object-oracle.mjs --format=markdown",
     "inventory:generate": "node scripts/generate-runtime-inventory.mjs --write",
     "inventory:print": "node scripts/print-inventory.mjs --format=json",
     "inventory:print:markdown": "node scripts/print-inventory.mjs --format=markdown",
