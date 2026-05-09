@@ -599,6 +599,95 @@ impl Display for HostChildKind {
     }
 }
 
+/// Host node category attached to a reconciler-issued fiber token.
+///
+/// These categories are intentionally renderer-neutral. DOM adapters can use
+/// them to keep element/text/hydration node maps distinct without teaching the
+/// core about DOM node types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostFiberTokenTarget {
+    Instance,
+    TextInstance,
+    HydratableInstance,
+    ActivityBoundary,
+    SuspenseBoundary,
+}
+
+impl HostFiberTokenTarget {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Instance => "instance",
+            Self::TextInstance => "text instance",
+            Self::HydratableInstance => "hydratable instance",
+            Self::ActivityBoundary => "activity boundary",
+            Self::SuspenseBoundary => "suspense boundary",
+        }
+    }
+}
+
+impl Display for HostFiberTokenTarget {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Reconciler phase in which a host fiber token is valid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostFiberTokenPhase {
+    Creation,
+    Hydration,
+    Commit,
+    Deletion,
+}
+
+impl HostFiberTokenPhase {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Creation => "creation",
+            Self::Hydration => "hydration",
+            Self::Commit => "commit",
+            Self::Deletion => "deletion",
+        }
+    }
+}
+
+impl Display for HostFiberTokenPhase {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Why a renderer rejected a reconciler-issued host fiber token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostFiberTokenViolation {
+    Invalid,
+    Stale,
+    WrongRenderer,
+    WrongPhase,
+    WrongTarget,
+}
+
+impl HostFiberTokenViolation {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Invalid => "invalid token",
+            Self::Stale => "stale token",
+            Self::WrongRenderer => "token belongs to another renderer",
+            Self::WrongPhase => "token used in the wrong phase",
+            Self::WrongTarget => "token used for the wrong host target",
+        }
+    }
+}
+
+impl Display for HostFiberTokenViolation {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 /// Why a requested host mutation cannot be represented as a tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HostMutationViolation {
@@ -681,6 +770,23 @@ impl HostOperationError {
     }
 
     #[must_use]
+    pub const fn invalid_fiber_token(
+        renderer_name: &'static str,
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+        violation: HostFiberTokenViolation,
+    ) -> Self {
+        Self {
+            renderer_name,
+            kind: HostOperationErrorKind::InvalidFiberToken {
+                phase,
+                target,
+                violation,
+            },
+        }
+    }
+
+    #[must_use]
     pub const fn renderer_name(&self) -> &'static str {
         self.renderer_name
     }
@@ -718,6 +824,15 @@ impl Display for HostOperationError {
                 "renderer '{}' cannot attach {} child to {} parent: {}",
                 self.renderer_name, child, parent, violation
             ),
+            HostOperationErrorKind::InvalidFiberToken {
+                phase,
+                target,
+                violation,
+            } => write!(
+                formatter,
+                "renderer '{}' rejected {} {} host fiber token: {}",
+                self.renderer_name, phase, target, violation
+            ),
         }
     }
 }
@@ -742,10 +857,18 @@ pub enum HostOperationErrorKind {
         child: HostChildKind,
         violation: HostMutationViolation,
     },
+    InvalidFiberToken {
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+        violation: HostFiberTokenViolation,
+    },
 }
 
 /// Renderer-owned host types. These must remain opaque to the reconciler.
 pub trait HostTypes {
+    /// Reconciler-issued token that lets a renderer associate host instances
+    /// with the internal fiber that owns them without exposing raw fiber data.
+    type HostFiberToken;
     type Type;
     type Props;
     type Container;
@@ -776,6 +899,56 @@ pub trait HostTypes {
     type GestureTimeline;
     type FragmentInstance;
     type RendererInspectionConfig;
+}
+
+/// Phase-scoped view of a reconciler-issued host fiber token.
+///
+/// Renderers may store or validate the token according to their own lifetime
+/// rules. The token is not a DOM node, native tag, or fiber pointer; it is only
+/// an opaque bridge for future event, public-instance, hydration, diagnostic,
+/// and deletion cleanup maps.
+pub struct HostFiberTokenRef<'a, H: HostTypes + ?Sized> {
+    token: &'a H::HostFiberToken,
+    phase: HostFiberTokenPhase,
+    target: HostFiberTokenTarget,
+}
+
+impl<'a, H: HostTypes + ?Sized> Copy for HostFiberTokenRef<'a, H> {}
+
+impl<'a, H: HostTypes + ?Sized> Clone for HostFiberTokenRef<'a, H> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, H: HostTypes + ?Sized> HostFiberTokenRef<'a, H> {
+    #[must_use]
+    pub const fn new(
+        token: &'a H::HostFiberToken,
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+    ) -> Self {
+        Self {
+            token,
+            phase,
+            target,
+        }
+    }
+
+    #[must_use]
+    pub const fn token(&self) -> &'a H::HostFiberToken {
+        self.token
+    }
+
+    #[must_use]
+    pub const fn phase(&self) -> HostFiberTokenPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn target(&self) -> HostFiberTokenTarget {
+        self.target
+    }
 }
 
 /// Core identity and host-context hooks shared by all renderer modes.
@@ -846,6 +1019,7 @@ pub trait HostCreation: HostIdentityAndContext {
 
     fn create_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         ty: &Self::Type,
         props: &Self::Props,
         container: &Self::Container,
@@ -854,6 +1028,7 @@ pub trait HostCreation: HostIdentityAndContext {
 
     fn create_text_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         text: &str,
         container: &Self::Container,
         context: &Self::HostContext,
@@ -898,6 +1073,7 @@ pub trait HostCommit: HostIdentityAndContext {
 
     fn commit_mount(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         instance: &mut Self::Instance,
         ty: &Self::Type,
         props: &Self::Props,
@@ -905,6 +1081,7 @@ pub trait HostCommit: HostIdentityAndContext {
 
     fn commit_update(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         instance: &mut Self::Instance,
         update_payload: Self::UpdatePayload,
         ty: &Self::Type,
@@ -937,7 +1114,11 @@ pub trait HostCommit: HostIdentityAndContext {
         text: &str,
     ) -> HostResult<()>;
 
-    fn detach_deleted_instance(&mut self, instance: Self::Instance) -> HostResult<()>;
+    fn detach_deleted_instance(
+        &mut self,
+        token: HostFiberTokenRef<'_, Self>,
+        instance: Self::Instance,
+    ) -> HostResult<()>;
 
     fn reset_form_instance(&mut self, form: &mut Self::FormInstance) -> HostResult<()> {
         let _form = form;
@@ -1107,6 +1288,7 @@ pub trait HydrationHost: HostIdentityAndContext {
 
     fn hydrate_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         instance: &Self::HydratableInstance,
         ty: &Self::Type,
         props: &Self::Props,
@@ -1115,31 +1297,40 @@ pub trait HydrationHost: HostIdentityAndContext {
 
     fn hydrate_text_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         text_instance: &Self::HydratableInstance,
         text: &str,
     ) -> HostResult<bool>;
 
     fn hydrate_activity_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         activity_instance: &Self::ActivityInstance,
     ) -> HostResult<()>;
 
     fn hydrate_suspense_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         suspense_instance: &Self::SuspenseInstance,
     ) -> HostResult<()>;
 
-    fn commit_hydrated_instance(&mut self, instance: &mut Self::Instance) -> HostResult<()>;
+    fn commit_hydrated_instance(
+        &mut self,
+        token: HostFiberTokenRef<'_, Self>,
+        instance: &mut Self::Instance,
+    ) -> HostResult<()>;
 
     fn commit_hydrated_container(&mut self, container: &mut Self::Container) -> HostResult<()>;
 
     fn commit_hydrated_activity_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         activity_instance: &mut Self::ActivityInstance,
     ) -> HostResult<()>;
 
     fn commit_hydrated_suspense_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         suspense_instance: &mut Self::SuspenseInstance,
     ) -> HostResult<()>;
 
@@ -1654,9 +1845,47 @@ mod tests {
         );
     }
 
+    #[test]
+    fn host_fiber_token_diagnostics_are_stable() {
+        assert_eq!(HostFiberTokenTarget::Instance.to_string(), "instance");
+        assert_eq!(
+            HostFiberTokenTarget::HydratableInstance.to_string(),
+            "hydratable instance"
+        );
+        assert_eq!(HostFiberTokenPhase::Creation.to_string(), "creation");
+        assert_eq!(HostFiberTokenPhase::Deletion.to_string(), "deletion");
+        assert_eq!(
+            HostFiberTokenViolation::WrongPhase.to_string(),
+            "token used in the wrong phase"
+        );
+
+        let error: HostError = HostOperationError::invalid_fiber_token(
+            "minimal-renderer",
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::TextInstance,
+            HostFiberTokenViolation::Stale,
+        )
+        .into();
+        let operation = error.as_operation_error().unwrap();
+
+        assert_eq!(
+            operation.kind(),
+            &HostOperationErrorKind::InvalidFiberToken {
+                phase: HostFiberTokenPhase::Commit,
+                target: HostFiberTokenTarget::TextInstance,
+                violation: HostFiberTokenViolation::Stale,
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "renderer 'minimal-renderer' rejected commit text instance host fiber token: stale token"
+        );
+    }
+
     struct SkeletonHost;
 
     impl HostTypes for SkeletonHost {
+        type HostFiberToken = u64;
         type Type = &'static str;
         type Props = ();
         type Container = ();
@@ -1718,6 +1947,184 @@ mod tests {
             _props: &Self::Props,
         ) -> HostResult<Self::HostContext> {
             let _parent_context = parent_context;
+            Ok(())
+        }
+    }
+
+    impl HostCreation for SkeletonHost {
+        fn should_set_text_content(
+            &self,
+            _ty: &Self::Type,
+            _props: &Self::Props,
+            _context: &Self::HostContext,
+        ) -> bool {
+            false
+        }
+
+        fn create_instance(
+            &mut self,
+            token: HostFiberTokenRef<'_, Self>,
+            _ty: &Self::Type,
+            _props: &Self::Props,
+            _container: &Self::Container,
+            _context: &Self::HostContext,
+        ) -> HostResult<Self::Instance> {
+            assert_eq!(token.phase(), HostFiberTokenPhase::Creation);
+            assert_eq!(token.target(), HostFiberTokenTarget::Instance);
+            Ok(())
+        }
+
+        fn create_text_instance(
+            &mut self,
+            token: HostFiberTokenRef<'_, Self>,
+            _text: &str,
+            _container: &Self::Container,
+            _context: &Self::HostContext,
+        ) -> HostResult<Self::TextInstance> {
+            assert_eq!(token.phase(), HostFiberTokenPhase::Creation);
+            assert_eq!(token.target(), HostFiberTokenTarget::TextInstance);
+            Ok(())
+        }
+
+        fn append_initial_child(
+            &mut self,
+            parent: &mut Self::Instance,
+            child: HostChild<'_, Self>,
+        ) -> HostResult<()> {
+            let _parent = parent;
+            let _child = child;
+            Ok(())
+        }
+
+        fn finalize_initial_children(
+            &mut self,
+            instance: &mut Self::Instance,
+            _ty: &Self::Type,
+            _props: &Self::Props,
+            _container: &Self::Container,
+            _context: &Self::HostContext,
+        ) -> HostResult<InitialChildrenFinalization> {
+            let _instance = instance;
+            Ok(InitialChildrenFinalization::NoCommitMount)
+        }
+
+        fn clone_mutable_instance(
+            &mut self,
+            instance: &Self::Instance,
+            update_payload: Option<&Self::UpdatePayload>,
+        ) -> HostResult<Self::Instance> {
+            let _instance = instance;
+            let _update_payload = update_payload;
+            Ok(())
+        }
+
+        fn clone_mutable_text_instance(
+            &mut self,
+            text_instance: &Self::TextInstance,
+        ) -> HostResult<Self::TextInstance> {
+            let _text_instance = text_instance;
+            Ok(())
+        }
+    }
+
+    impl HostCommit for SkeletonHost {
+        fn prepare_for_commit(
+            &mut self,
+            container: &Self::Container,
+        ) -> HostResult<Self::CommitState> {
+            let _container = container;
+            Ok(())
+        }
+
+        fn reset_after_commit(
+            &mut self,
+            container: &Self::Container,
+            _commit_state: Self::CommitState,
+        ) -> HostResult<()> {
+            let _container = container;
+            Ok(())
+        }
+
+        fn commit_mount(
+            &mut self,
+            token: HostFiberTokenRef<'_, Self>,
+            instance: &mut Self::Instance,
+            _ty: &Self::Type,
+            _props: &Self::Props,
+        ) -> HostResult<()> {
+            assert_eq!(token.phase(), HostFiberTokenPhase::Commit);
+            assert_eq!(token.target(), HostFiberTokenTarget::Instance);
+            let _instance = instance;
+            Ok(())
+        }
+
+        fn commit_update(
+            &mut self,
+            token: HostFiberTokenRef<'_, Self>,
+            instance: &mut Self::Instance,
+            _update_payload: Self::UpdatePayload,
+            _ty: &Self::Type,
+            _old_props: &Self::Props,
+            _new_props: &Self::Props,
+        ) -> HostResult<()> {
+            assert_eq!(token.phase(), HostFiberTokenPhase::Commit);
+            assert_eq!(token.target(), HostFiberTokenTarget::Instance);
+            let _instance = instance;
+            Ok(())
+        }
+
+        fn commit_text_update(
+            &mut self,
+            text_instance: &mut Self::TextInstance,
+            _old_text: &str,
+            _new_text: &str,
+        ) -> HostResult<()> {
+            let _text_instance = text_instance;
+            Ok(())
+        }
+
+        fn reset_text_content(&mut self, instance: &mut Self::Instance) -> HostResult<()> {
+            let _instance = instance;
+            Ok(())
+        }
+
+        fn hide_instance(&mut self, instance: &mut Self::Instance) -> HostResult<()> {
+            let _instance = instance;
+            Ok(())
+        }
+
+        fn unhide_instance(
+            &mut self,
+            instance: &mut Self::Instance,
+            props: &Self::Props,
+        ) -> HostResult<()> {
+            let _instance = instance;
+            let _props = props;
+            Ok(())
+        }
+
+        fn hide_text_instance(&mut self, text_instance: &mut Self::TextInstance) -> HostResult<()> {
+            let _text_instance = text_instance;
+            Ok(())
+        }
+
+        fn unhide_text_instance(
+            &mut self,
+            text_instance: &mut Self::TextInstance,
+            text: &str,
+        ) -> HostResult<()> {
+            let _text_instance = text_instance;
+            let _text = text;
+            Ok(())
+        }
+
+        fn detach_deleted_instance(
+            &mut self,
+            token: HostFiberTokenRef<'_, Self>,
+            _instance: Self::Instance,
+        ) -> HostResult<()> {
+            assert_eq!(token.phase(), HostFiberTokenPhase::Deletion);
+            assert_eq!(token.target(), HostFiberTokenTarget::Instance);
             Ok(())
         }
     }
@@ -1794,6 +2201,56 @@ mod tests {
     }
 
     #[test]
+    fn host_fiber_token_ref_is_opaque_and_phase_scoped() {
+        let raw_token = 42;
+        let token = HostFiberTokenRef::<SkeletonHost>::new(
+            &raw_token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        );
+
+        assert_eq!(*token.token(), raw_token);
+        assert_eq!(token.phase(), HostFiberTokenPhase::Creation);
+        assert_eq!(token.target(), HostFiberTokenTarget::Instance);
+    }
+
+    #[test]
+    fn token_aware_lifecycle_hooks_compile_without_dom_behavior() {
+        let mut host = SkeletonHost;
+        let raw_token = 7;
+        let creation_instance = HostFiberTokenRef::<SkeletonHost>::new(
+            &raw_token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        );
+        let creation_text = HostFiberTokenRef::<SkeletonHost>::new(
+            &raw_token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        );
+        let commit_instance = HostFiberTokenRef::<SkeletonHost>::new(
+            &raw_token,
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::Instance,
+        );
+        let delete_instance = HostFiberTokenRef::<SkeletonHost>::new(
+            &raw_token,
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::Instance,
+        );
+
+        host.create_instance(creation_instance, &"View", &(), &(), &())
+            .unwrap();
+        host.create_text_instance(creation_text, "hello", &(), &())
+            .unwrap();
+        host.commit_mount(commit_instance, &mut (), &"View", &())
+            .unwrap();
+        host.commit_update(commit_instance, &mut (), (), &"View", &(), &())
+            .unwrap();
+        host.detach_deleted_instance(delete_instance, ()).unwrap();
+    }
+
+    #[test]
     fn canonical_traits_keep_handles_opaque_and_capabilities_explicit() {
         let host = SkeletonHost;
 
@@ -1814,7 +2271,9 @@ mod tests {
     #[test]
     fn mutation_capability_is_a_separate_trait_bound() {
         fn assert_mutation_host<H: HostIdentityAndContext + MutationHost>() {}
+        fn assert_mutation_renderer<H: MutationRenderer>() {}
 
         assert_mutation_host::<SkeletonHost>();
+        assert_mutation_renderer::<SkeletonHost>();
     }
 }
