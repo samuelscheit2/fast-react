@@ -216,10 +216,10 @@ Dependencies: M8.
 | worker-038-scheduler-root-oracle | Add deterministic public `scheduler@0.27.0` root behavior oracle files | `tests/conformance/src/scheduler-root-*.mjs`, `tests/conformance/scripts/*scheduler-root-oracle.mjs`, `tests/conformance/test/scheduler-root-oracle.test.mjs`, `tests/conformance/oracles/scheduler-0.27.0-root-oracle.json`, `worker-progress/worker-038-scheduler-root-oracle.md` | workers 017,034 | running |
 | worker-039-scheduler-variant-oracles | Add deterministic scheduler variant/deep-import inventory and oracle files | `tests/conformance/src/scheduler-variant-*.mjs`, `tests/conformance/scripts/*scheduler-variant-oracle.mjs`, `tests/conformance/test/scheduler-variant-oracle.test.mjs`, `tests/conformance/oracles/scheduler-0.27.0-variant-oracle.json`, `worker-progress/worker-039-scheduler-variant-oracles.md` | workers 017,034 | running |
 | worker-040-dom-mutation-renderer-plan | Produce a report-only DOM mutation host implementation plan | `worker-progress/worker-040-dom-mutation-renderer-plan.md` | workers 008,012,018,019,033 | running |
-| worker-041-dom-events-priority-plan | Produce a report-only DOM events, event priority, and hydration replay plan | `worker-progress/worker-041-dom-events-priority-plan.md` | workers 007,008,030,033 | running |
+| worker-041-dom-events-priority-plan | Produce a report-only DOM events, event priority, and hydration replay plan | `worker-progress/worker-041-dom-events-priority-plan.md` | workers 007,008,030,033 | merged |
 | worker-042-react-dom-server-fizz-plan | Produce a report-only React DOM server/static Fizz compatibility plan | `worker-progress/worker-042-react-dom-server-fizz-plan.md` | workers 005,033 | running |
 | worker-043-react-dom-hydration-plan | Produce a report-only hydration model and marker compatibility plan | `worker-progress/worker-043-react-dom-hydration-plan.md` | workers 008,033,042 | running |
-| worker-044-react-dom-client-roots-plan | Produce a report-only client roots, update priority, and root object behavior plan | `worker-progress/worker-044-react-dom-client-roots-plan.md` | workers 007,008,030,033 | running |
+| worker-044-react-dom-client-roots-plan | Produce a report-only client roots, update priority, and root object behavior plan | `worker-progress/worker-044-react-dom-client-roots-plan.md` | workers 007,008,030,033 | merged |
 
 ## Merge Policy
 

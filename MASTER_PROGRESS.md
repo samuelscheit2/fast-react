@@ -103,10 +103,10 @@ M0: Orchestration Foundation.
 | worker-038-scheduler-root-oracle | running in tmux worktree; nested subagents allowed | Add deterministic public `scheduler@0.27.0` root behavior oracle files | `../fast-react-worker-038-scheduler-root-oracle/worker-progress/worker-038-scheduler-root-oracle.md` |
 | worker-039-scheduler-variant-oracles | running in tmux worktree; nested subagents allowed | Add deterministic scheduler variant/deep-import inventory and oracle files | `../fast-react-worker-039-scheduler-variant-oracles/worker-progress/worker-039-scheduler-variant-oracles.md` |
 | worker-040-dom-mutation-renderer-plan | running in tmux worktree; nested subagents allowed | Produce a report-only DOM mutation host implementation plan | `../fast-react-worker-040-dom-mutation-renderer-plan/worker-progress/worker-040-dom-mutation-renderer-plan.md` |
-| worker-041-dom-events-priority-plan | running in tmux worktree; nested subagents allowed | Produce a report-only DOM events, event priority, and hydration replay plan | `../fast-react-worker-041-dom-events-priority-plan/worker-progress/worker-041-dom-events-priority-plan.md` |
+| worker-041-dom-events-priority-plan | merged | Produce a report-only DOM events, event priority, and hydration replay plan | `worker-progress/worker-041-dom-events-priority-plan.md` |
 | worker-042-react-dom-server-fizz-plan | running in tmux worktree; nested subagents allowed | Produce a report-only React DOM server/static Fizz compatibility plan | `../fast-react-worker-042-react-dom-server-fizz-plan/worker-progress/worker-042-react-dom-server-fizz-plan.md` |
 | worker-043-react-dom-hydration-plan | running in tmux worktree; nested subagents allowed | Produce a report-only hydration model and marker compatibility plan | `../fast-react-worker-043-react-dom-hydration-plan/worker-progress/worker-043-react-dom-hydration-plan.md` |
-| worker-044-react-dom-client-roots-plan | running in tmux worktree; nested subagents allowed | Produce a report-only client roots, update priority, and root object behavior plan | `../fast-react-worker-044-react-dom-client-roots-plan/worker-progress/worker-044-react-dom-client-roots-plan.md` |
+| worker-044-react-dom-client-roots-plan | merged | Produce a report-only client roots, update priority, and root object behavior plan | `worker-progress/worker-044-react-dom-client-roots-plan.md` |
 
 ## Next Actions
 
@@ -232,3 +232,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Closed the worker-033 tmux session and removed the clean worker-033 worktree after merge.
 - 2026-05-09: Queued workers 035-044 as a parallel non-overlapping tranche: combined package surface scaffolds, React DOM export oracle, React DOM type inventory, scheduler root oracle, scheduler variant oracles, DOM mutation renderer plan, DOM events priority plan, React DOM server/Fizz plan, React DOM hydration plan, and React DOM client roots plan.
 - 2026-05-09: Launched workers 035-044 as real `codex exec --yolo` tmux processes in isolated worktrees. Top-level Fast React worker count after launch: 10.
+- 2026-05-09: Accepted and merged worker-041 DOM events priority plan in commit `df9216f` via merge commit `ee5b783` on `main`. Verified the report-only change with scoped status, no concrete local path leak checks, no trailing whitespace, no-index diff whitespace check for the untracked report, and prompt coverage checks. No source tests were run because the task changed only the report.
+- 2026-05-09: Accepted and merged worker-044 React DOM client roots plan in commit `2550b96` via merge commit `3506c1a` on `main`. Verified the report-only change with scoped status, no concrete local path leak checks, no trailing whitespace, no-index diff whitespace check for the untracked report, and prompt coverage checks. No source tests were run because the task changed only the report.
+- 2026-05-09: Closed the worker-041 and worker-044 tmux sessions and removed their clean worktrees after merge.
