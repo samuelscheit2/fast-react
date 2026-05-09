@@ -1,7 +1,8 @@
 You are worker-014-react-entrypoint-placeholders for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-004-api-inventory.md`, `worker-progress/worker-010-initial-scaffold.md`, and `worker-progress/worker-011-core-element-model.md` if it exists in your worktree. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task. If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-004-api-inventory.md`, `worker-progress/worker-010-initial-scaffold.md`, and `worker-progress/worker-011-core-element-model.md` if it exists in your worktree. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
+If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Improve the JavaScript React package placeholders and smoke tests using the accepted API inventory. Keep behavior explicitly unimplemented where it cannot yet be proven, but make the package surface and error messages more useful for upcoming conformance work.

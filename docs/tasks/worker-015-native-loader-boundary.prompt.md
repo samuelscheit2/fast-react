@@ -1,7 +1,8 @@
 You are worker-015-native-loader-boundary for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-006-binding-strategy.md`, and `worker-progress/worker-010-initial-scaffold.md` first. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task. If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-006-binding-strategy.md`, and `worker-progress/worker-010-initial-scaffold.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
+If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Improve the native binding loader and Rust N-API boundary placeholders without adding real N-API dependencies yet. Focus on clear package-level failure behavior, future platform package shape, Rust boundary errors, and tests that keep native behavior loudly unimplemented.

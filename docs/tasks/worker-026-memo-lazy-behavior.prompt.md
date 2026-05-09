@@ -1,8 +1,9 @@
 You are a worker for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and `MASTER_PROGRESS.md` first. Do
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and `MASTER_PROGRESS.md`. Do
 not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task. If you create subtasks, call
+If you create subtasks, call
 `create_goal` again with all context about the parent task. Do not call
 `update_goal(status: "complete")` until this whole worker task is complete.
 

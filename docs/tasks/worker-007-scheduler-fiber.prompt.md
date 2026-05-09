@@ -1,7 +1,8 @@
 You are worker-007-scheduler-fiber for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and `MASTER_PROGRESS.md` first. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task if available. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and `MASTER_PROGRESS.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
+Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Investigate the React 19.2.6 scheduler, fiber, lane, update queue, and effect-list semantics that Fast React must model. Focus on root constraints for Rust data structures and what must remain JS-observable.

@@ -1,7 +1,8 @@
 You are worker-018-test-renderer-mutation-host for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-008-renderer-host-config.md`, `worker-progress/worker-010-initial-scaffold.md`, and `worker-progress/worker-012-host-config-traits.md` first. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task. If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-008-renderer-host-config.md`, `worker-progress/worker-010-initial-scaffold.md`, and `worker-progress/worker-012-host-config-traits.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
+If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Implement a minimal in-memory mutation test renderer that uses the canonical host-config traits from `fast-react-host-config`. This should prove the host boundary is implementable without DOM/native behavior and without relying on the legacy `HostConfig` shim.

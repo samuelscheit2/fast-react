@@ -1,7 +1,8 @@
 You are a worker for the Fast React project.
 
-Read WORKER_BRIEF.md, MASTER_PLAN.md, and MASTER_PROGRESS.md first. Do not read ORCHESTRATOR.md unless explicitly asked.
-Call create_goal for this worker task. Do not call update_goal(status: "complete") until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, and MASTER_PROGRESS.md. Do not read ORCHESTRATOR.md unless explicitly asked.
+Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 Objective:
 Add deterministic `scheduler/unstable_mock` behavior oracle files for `scheduler@0.27.0`.

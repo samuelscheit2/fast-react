@@ -23,6 +23,7 @@ M0: Orchestration Foundation.
 - Use `MASTER_PROGRESS.md` for project-wide progress and decisions.
 - Use `worker-progress/<worker-id>.md` for each worker's progress.
 - Workers should read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
+- Workers must call `create_goal` immediately at task start using the objective in their assigned prompt, before research, file reads, implementation, or verification. Worker prompts, the prompt template, the worker brief, and the launcher policy all carry this requirement.
 - Top-level workers are real Codex subprocesses launched in tmux.
 - Top-level tmux workers may spawn managed Codex subagents/explorers internally when useful. Those nested agents do not count against the 30 top-level tmux worker limit and may push the aggregate agent/process count above 30.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
@@ -305,3 +306,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Verified merged `main` after workers 052, 057, 059, 061, 065, and 066 with `npm test --workspace @fast-react/conformance`; 198 tests passed.
 - 2026-05-09: Accepted and merged worker-071 core fiber flags/effect plan in commit `1537088` via merge commit `b4a7e34`. Verified report-only scope, no concrete local path leaks, no trailing whitespace, and scoped `git diff --check`. No source tests were run because the task changed only the report. The worker worktree retained only an untracked regenerable `Cargo.lock` outside the accepted report.
 - 2026-05-09: Accepted and merged worker-045 scheduler root implementation in commit `674fee0` via merge commit `b7120a9`. Verified in the worker worktree with `node --check tests/smoke/import-entrypoints.mjs`, `node tests/smoke/import-entrypoints.mjs`, `npm run check:js`, no concrete local path leaks, no trailing whitespace, and scoped `git diff --check`; verified merged `main` with `npm run check:js`, including 198 conformance tests.
+- 2026-05-09: Tightened worker goal policy after user feedback: every worker prompt now says the first action is `create_goal` using the prompt objective before research, file reads, implementation, or verification. `ORCHESTRATOR.md`, `WORKER_BRIEF.md`, `docs/tasks/worker-prompt-template.md`, all checked worker prompts, and `scripts/run-worker.sh` were updated so future launches and retries carry the same requirement.

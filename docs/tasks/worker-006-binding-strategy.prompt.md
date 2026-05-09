@@ -1,7 +1,8 @@
 You are worker-006-binding-strategy for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and `MASTER_PROGRESS.md` first. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task if available. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and `MASTER_PROGRESS.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
+Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Design the initial JS-to-Rust binding strategy for Fast React. Focus on N-API, napi-rs, Node version support, package entrypoints, native artifact layout, dev/prod builds, and risks of exposing JS-observable React semantics through a native boundary.

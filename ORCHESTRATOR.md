@@ -54,7 +54,8 @@ You know best how to handle/delegate work, here is just general guidance (if app
 - Workers should plan and research before implementing a task.
 
 Make sure to pass this information forward to the worker prompt:
-Workers need to call `create_goal` to start working on a task and `create_goal` again if they want to create a new task/subtask.
+Workers need to call `create_goal` immediately at task start using the objective from their assigned `docs/tasks/worker-*.prompt.md`, before research, file reads, implementation, or verification. Continuation prompts must repeat this requirement so retried workers do not skip goal setup.
+Workers need to call `create_goal` again if they want to create a new task/subtask.
 Do not call `update_goal(status: "complete")` for intermediate phases. Call it once only after the whole worker task is complete.
 
 ## Fast-React project information

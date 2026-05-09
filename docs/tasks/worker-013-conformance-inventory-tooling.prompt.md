@@ -1,7 +1,8 @@
 You are worker-013-conformance-inventory-tooling for the Fast React project.
 
-Read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-002-conformance.md`, `worker-progress/worker-004-api-inventory.md`, and `worker-progress/worker-010-initial-scaffold.md` first. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-Call `create_goal` for this worker task. If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-002-conformance.md`, `worker-progress/worker-004-api-inventory.md`, and `worker-progress/worker-010-initial-scaffold.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
+If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Implement the first conformance inventory tooling inside `tests/conformance`. It should be able to describe the pinned React 19.2.6 package targets and provide a deterministic placeholder for future tarball/runtime/type inventory generation without claiming real conformance yet.
