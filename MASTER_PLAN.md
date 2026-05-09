@@ -282,6 +282,11 @@ Dependencies: M8.
 | worker-104-reconciler-root-model-implementation-plan | Produce a report-only implementation plan for the first reconciler FiberRoot/HostRoot data model slice | `worker-progress/worker-104-reconciler-root-model-implementation-plan.md` | workers 019,044,055,072,079,081,082,090,094,096 | running |
 | worker-105-dom-mutation-host-implementation-plan | Produce a report-only implementation plan for the first minimal DOM mutation host slice | `worker-progress/worker-105-dom-mutation-host-implementation-plan.md` | workers 040,051,055,061,062,063,090,091 | running |
 | worker-106-root-render-e2e-test-plan | Produce a report-only test plan for the first end-to-end root render/update/unmount path | `worker-progress/worker-106-root-render-e2e-test-plan.md` | workers 044,055,058,061,062,063,072,079,081,082,090,091,094 | running |
+| worker-107-core-fiber-topology-implementation-plan | Produce a report-only implementation plan for first core fiber topology data structures | `worker-progress/worker-107-core-fiber-topology-implementation-plan.md` | workers 007,030,070,071,077,078,079,080,082 | running |
+| worker-108-react-dom-root-facade-implementation-plan | Produce a report-only implementation plan for React DOM root facade behavior | `worker-progress/worker-108-react-dom-root-facade-implementation-plan.md` | workers 033,036,044,055,058,079,080,090,092,093,094,095 | running |
+| worker-109-reconciler-commit-minimum-implementation-plan | Produce a report-only implementation plan for the minimal reconciler commit slice | `worker-progress/worker-109-reconciler-commit-minimum-implementation-plan.md` | workers 018,019,022,040,051,071,072,073,077,079,080,082,091,093 | running |
+| worker-110-dom-text-content-host-plan | Produce a report-only plan for DOM text-content host behavior and tests | `worker-progress/worker-110-dom-text-content-host-plan.md` | workers 040,051,055,061,062,063,091 | running |
+| worker-111-reconciler-sync-flush-act-plan | Produce a report-only implementation plan for reconciler sync flushing and act integration | `worker-progress/worker-111-reconciler-sync-flush-act-plan.md` | workers 007,041,044,055,058,067,073,080,081,094 | running |
 
 ## Merge Policy
 
