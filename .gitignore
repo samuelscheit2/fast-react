@@ -3,6 +3,7 @@
 # Worker run artifacts
 worker-progress/*.codex.log
 worker-progress/*.exitcode
+worker-progress/quarantine/
 
 # Rust
 target/
