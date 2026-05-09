@@ -36,6 +36,7 @@ M0: Orchestration Foundation.
 - Accepted upstream-test direction from worker-005: upstream React tests should seed and trace scenarios, but not be used as a drop-in suite. Fast React needs adapters for React's Jest harness contracts, feature gates, Scheduler mocks, noop renderer behavior, and source-only internals.
 - Accepted scheduler/fiber direction from worker-007: model lane bitsets, root lane bookkeeping, Scheduler heaps, double-buffered fiber arenas, circular/rebased update queues, and flags/subtreeFlags commit traversal directly. Flat priority enums, FIFO queues, or a global effect list are root-cause mismatches.
 - Accepted API inventory direction from worker-004: inventory package subpaths, runtime exports, type declarations, and environment conditions from pinned tarballs and isolated probes. `@types/react-dom@19.2.3` needs an explicit target decision before TypeScript compatibility claims include `react-dom`.
+- Accepted scaffold implementation from worker-010: root Cargo/npm workspaces, placeholder Rust crates, placeholder React/native packages, conformance/smoke placeholders, and CI skeleton are merged. Real React behavior remains explicitly unimplemented and gated by future conformance-backed workers.
 
 ## Worker Roster
 
@@ -50,13 +51,13 @@ M0: Orchestration Foundation.
 | worker-007-scheduler-fiber | merged | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `worker-progress/worker-007-scheduler-fiber.md` |
 | worker-008-renderer-host-config | merged | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` |
 | worker-009-benchmark-strategy | merged | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` |
-| worker-010-initial-scaffold | running in tmux worktree; nested subagents allowed | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `../fast-react-worker-010-initial-scaffold/worker-progress/worker-010-initial-scaffold.md` |
+| worker-010-initial-scaffold | merged | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `worker-progress/worker-010-initial-scaffold.md` |
 
 ## Next Actions
 
-1. Collect the scaffold implementation worker's changes and verification results.
-2. Update the master plan with accepted findings from worker-010.
-3. Launch the next implementation workers from the merged scaffold.
+1. Launch the next implementation workers from the merged scaffold.
+2. Collect and merge their scoped changes with verification evidence.
+3. Keep root manifest changes owned by a dedicated worker or merge worker.
 
 ## Risks And Open Questions
 
@@ -100,3 +101,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-005 upstream test reuse report in commit `cc825bf`. Closed the worker-005 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-007 scheduler/fiber report in commit `b63b8c7`. Closed the worker-007 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-004 API inventory report in commit `772447d`. Closed the worker-004 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-010 initial scaffold implementation in commit `33e1990`. Closed the worker-010 tmux session after merge.
+- 2026-05-09: Verified merged scaffold on `main` with `npm run check`, `cargo test --workspace --all-features`, and `node tests/smoke/import-entrypoints.mjs`. Removed generated `Cargo.lock` and `target/` afterward.
