@@ -7,7 +7,14 @@
 mod compatibility;
 mod element;
 mod event_priority;
+mod fiber;
+mod fiber_alternate;
+mod fiber_arena;
+mod fiber_bubbling;
+mod fiber_deletions;
 mod fiber_flags;
+mod fiber_handles;
+mod fiber_id;
 mod hook_effect_flags;
 mod lane;
 mod root_lanes;
@@ -26,10 +33,22 @@ pub use event_priority::{
     EventPriority, event_priority_to_lane, higher_event_priority, is_higher_event_priority,
     lanes_to_event_priority, lower_event_priority,
 };
+pub use fiber::{FiberMode, FiberNode, FiberTag, VALID_FIBER_MODE_BITS};
+pub use fiber_arena::{FiberArena, FiberArenaValidation, FiberTopologyError};
+pub use fiber_bubbling::{
+    FiberBubbledProperties, bubble_child_lanes, bubble_properties, bubble_subtree_flags,
+    preserve_static_subtree_flags,
+};
+pub use fiber_deletions::{DeletionList, DeletionListId};
 pub use fiber_flags::{
     FiberFlags, REACT_19_2_6_ENABLE_CREATE_EVENT_HANDLE_API,
     REACT_19_2_6_ENABLE_USE_EFFECT_EVENT_HOOK, VALID_FIBER_FLAG_BITS,
 };
+pub use fiber_handles::{
+    DependenciesHandle, ElementTypeHandle, FiberTypeHandle, PropsHandle, RefHandle, StateHandle,
+    StateNodeHandle, UpdateQueueHandle,
+};
+pub use fiber_id::{FiberArenaId, FiberGeneration, FiberId, FiberIdError, FiberSlot};
 pub use hook_effect_flags::{HookEffectFlags, VALID_HOOK_EFFECT_FLAG_BITS};
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
