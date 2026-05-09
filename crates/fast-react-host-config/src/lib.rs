@@ -33,6 +33,35 @@ pub enum HostCapability {
 }
 
 impl HostCapability {
+    /// Canonical renderer capability order used by diagnostics.
+    ///
+    /// The enum is non-exhaustive so downstream crates cannot safely enumerate
+    /// every variant themselves. This list is the crate-owned stable order for
+    /// capability reports and set iteration.
+    pub const ALL: [Self; 12] = [
+        Self::Mutation,
+        Self::Persistence,
+        Self::Hydration,
+        Self::Portals,
+        Self::Microtasks,
+        Self::PostPaintCallbacks,
+        Self::CommitSuspension,
+        Self::Forms,
+        Self::Resources,
+        Self::Singletons,
+        Self::ViewTransitions,
+        Self::Diagnostics,
+    ];
+
+    #[must_use]
+    pub fn all() -> &'static [Self] {
+        &Self::ALL
+    }
+
+    pub fn iter() -> impl DoubleEndedIterator<Item = Self> + ExactSizeIterator + Clone {
+        Self::ALL.into_iter()
+    }
+
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -76,17 +105,50 @@ impl Display for HostCapability {
 }
 
 /// Compact runtime declaration of a renderer's supported host capabilities.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HostCapabilitySet {
     bits: u16,
 }
 
 impl HostCapabilitySet {
     pub const EMPTY: Self = Self { bits: 0 };
+    /// Set containing every capability known to this crate version.
+    pub const ALL: Self = Self {
+        bits: Self::KNOWN_BITS,
+    };
+
+    const KNOWN_BITS: u16 = HostCapability::Mutation.bit()
+        | HostCapability::Persistence.bit()
+        | HostCapability::Hydration.bit()
+        | HostCapability::Portals.bit()
+        | HostCapability::Microtasks.bit()
+        | HostCapability::PostPaintCallbacks.bit()
+        | HostCapability::CommitSuspension.bit()
+        | HostCapability::Forms.bit()
+        | HostCapability::Resources.bit()
+        | HostCapability::Singletons.bit()
+        | HostCapability::ViewTransitions.bit()
+        | HostCapability::Diagnostics.bit();
 
     #[must_use]
     pub const fn empty() -> Self {
         Self::EMPTY
+    }
+
+    #[must_use]
+    pub const fn all() -> Self {
+        Self::ALL
+    }
+
+    /// Builds a set from compact bits, rejecting bits that are not assigned to
+    /// a known [`HostCapability`].
+    pub fn from_bits(bits: u16) -> Result<Self, UnknownHostCapabilityBits> {
+        let unknown_bits = bits & !Self::KNOWN_BITS;
+        if unknown_bits == 0 {
+            Ok(Self { bits })
+        } else {
+            Err(UnknownHostCapabilityBits { unknown_bits })
+        }
     }
 
     #[must_use]
@@ -101,6 +163,29 @@ impl HostCapabilitySet {
         self.bits & capability.bit() != 0
     }
 
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.bits == 0
+    }
+
+    #[must_use]
+    pub fn len(self) -> usize {
+        self.iter().count()
+    }
+
+    /// Iterates supported capabilities in [`HostCapability::ALL`] order.
+    #[must_use]
+    pub fn iter(self) -> HostCapabilitySetIter {
+        HostCapabilitySetIter {
+            set: self,
+            next_index: 0,
+        }
+    }
+
+    /// Returns compact storage bits.
+    ///
+    /// Prefer [`Self::iter`] or [`Display`] for diagnostics so output stays
+    /// tied to capability names instead of bit positions.
     #[must_use]
     pub const fn bits(self) -> u16 {
         self.bits
@@ -129,13 +214,139 @@ impl HostCapabilitySet {
             (true, true) => Err(HostTreeUpdateModeError::Conflicting),
         }
     }
+
+    pub fn validate_tree_update_mode(
+        self,
+        renderer_name: &'static str,
+    ) -> Result<HostTreeUpdateMode, HostTreeUpdateModeDiagnostic> {
+        self.tree_update_mode()
+            .map_err(|error| HostTreeUpdateModeDiagnostic::new(renderer_name, self, error))
+    }
 }
+
+impl Display for HostCapabilitySet {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            return formatter.write_str("none");
+        }
+
+        for (index, capability) in self.iter().enumerate() {
+            if index > 0 {
+                formatter.write_str(", ")?;
+            }
+            Display::fmt(&capability, formatter)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Debug for HostCapabilitySet {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(formatter, "HostCapabilitySet({self})")
+    }
+}
+
+impl TryFrom<u16> for HostCapabilitySet {
+    type Error = UnknownHostCapabilityBits;
+
+    fn try_from(bits: u16) -> Result<Self, Self::Error> {
+        Self::from_bits(bits)
+    }
+}
+
+impl IntoIterator for HostCapabilitySet {
+    type Item = HostCapability;
+    type IntoIter = HostCapabilitySetIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+/// Iterator over the supported capabilities in a [`HostCapabilitySet`].
+#[derive(Debug, Clone)]
+pub struct HostCapabilitySetIter {
+    set: HostCapabilitySet,
+    next_index: usize,
+}
+
+impl Iterator for HostCapabilitySetIter {
+    type Item = HostCapability;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.next_index < HostCapability::ALL.len() {
+            let capability = HostCapability::ALL[self.next_index];
+            self.next_index += 1;
+
+            if self.set.supports(capability) {
+                return Some(capability);
+            }
+        }
+
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for HostCapabilitySetIter {
+    fn len(&self) -> usize {
+        self.clone().count()
+    }
+}
+
+impl std::iter::FusedIterator for HostCapabilitySetIter {}
+
+/// Error returned when compact capability bits contain unknown flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnknownHostCapabilityBits {
+    unknown_bits: u16,
+}
+
+impl UnknownHostCapabilityBits {
+    #[must_use]
+    pub const fn unknown_bits(&self) -> u16 {
+        self.unknown_bits
+    }
+}
+
+impl Display for UnknownHostCapabilityBits {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "host capability set contains unknown capability bits {:#06x}",
+            self.unknown_bits
+        )
+    }
+}
+
+impl Error for UnknownHostCapabilityBits {}
 
 /// The reconciler should choose exactly one tree update strategy per root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HostTreeUpdateMode {
     Mutation,
     Persistence,
+}
+
+impl HostTreeUpdateMode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Mutation => "mutation",
+            Self::Persistence => "persistence",
+        }
+    }
+}
+
+impl Display for HostTreeUpdateMode {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,6 +367,65 @@ impl Display for HostTreeUpdateModeError {
 }
 
 impl Error for HostTreeUpdateModeError {}
+
+/// Renderer-scoped tree update mode validation failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostTreeUpdateModeDiagnostic {
+    renderer_name: &'static str,
+    capabilities: HostCapabilitySet,
+    error: HostTreeUpdateModeError,
+}
+
+impl HostTreeUpdateModeDiagnostic {
+    #[must_use]
+    pub const fn new(
+        renderer_name: &'static str,
+        capabilities: HostCapabilitySet,
+        error: HostTreeUpdateModeError,
+    ) -> Self {
+        Self {
+            renderer_name,
+            capabilities,
+            error,
+        }
+    }
+
+    #[must_use]
+    pub const fn renderer_name(&self) -> &'static str {
+        self.renderer_name
+    }
+
+    #[must_use]
+    pub const fn capabilities(&self) -> HostCapabilitySet {
+        self.capabilities
+    }
+
+    #[must_use]
+    pub const fn error(&self) -> HostTreeUpdateModeError {
+        self.error
+    }
+}
+
+impl Display for HostTreeUpdateModeDiagnostic {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self.error {
+            HostTreeUpdateModeError::Missing => write!(
+                formatter,
+                "renderer '{}' must enable exactly one tree update capability \
+                 (mutation or persistence); supported capabilities: {}",
+                self.renderer_name, self.capabilities
+            ),
+            HostTreeUpdateModeError::Conflicting => write!(
+                formatter,
+                "renderer '{}' enabled conflicting tree update capabilities \
+                 (mutation and persistence); supported capabilities: {}",
+                self.renderer_name, self.capabilities
+            ),
+        }
+    }
+}
+
+impl Error for HostTreeUpdateModeDiagnostic {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnsupportedHostCapability {
@@ -542,6 +812,13 @@ pub trait HostIdentityAndContext: HostTypes {
     fn require_capability(&self, capability: HostCapability) -> HostResult<()> {
         self.capabilities()
             .require(self.renderer_name(), capability)
+    }
+
+    fn validate_tree_update_mode(
+        &self,
+    ) -> Result<HostTreeUpdateMode, HostTreeUpdateModeDiagnostic> {
+        self.capabilities()
+            .validate_tree_update_mode(self.renderer_name())
     }
 }
 
@@ -1000,6 +1277,13 @@ pub trait HostConfig {
         self.host_capabilities()
             .require(self.renderer_name(), capability)
     }
+
+    fn validate_tree_update_mode(
+        &self,
+    ) -> Result<HostTreeUpdateMode, HostTreeUpdateModeDiagnostic> {
+        self.host_capabilities()
+            .validate_tree_update_mode(self.renderer_name())
+    }
 }
 
 pub fn create_instance_placeholder<H: HostConfig>(
@@ -1039,6 +1323,144 @@ mod tests {
     }
 
     #[test]
+    fn host_capability_catalog_covers_all_defined_bits_and_display_names() {
+        let expected = [
+            (HostCapability::Mutation, "mutation", 1 << 0),
+            (HostCapability::Persistence, "persistence", 1 << 1),
+            (HostCapability::Hydration, "hydration", 1 << 2),
+            (HostCapability::Portals, "portals", 1 << 3),
+            (HostCapability::Microtasks, "microtasks", 1 << 4),
+            (
+                HostCapability::PostPaintCallbacks,
+                "post-paint-callbacks",
+                1 << 5,
+            ),
+            (
+                HostCapability::CommitSuspension,
+                "commit-suspension",
+                1 << 6,
+            ),
+            (HostCapability::Forms, "forms", 1 << 7),
+            (HostCapability::Resources, "resources", 1 << 8),
+            (HostCapability::Singletons, "singletons", 1 << 9),
+            (HostCapability::ViewTransitions, "view-transitions", 1 << 10),
+            (HostCapability::Diagnostics, "diagnostics", 1 << 11),
+        ];
+
+        let expected_capabilities = expected
+            .iter()
+            .map(|(capability, _, _)| *capability)
+            .collect::<Vec<_>>();
+        assert_eq!(HostCapability::all(), expected_capabilities.as_slice());
+        assert!(
+            expected_capabilities
+                .iter()
+                .all(|capability| HostCapabilitySet::all().supports(*capability))
+        );
+        assert_eq!(
+            HostCapability::iter().collect::<Vec<_>>(),
+            expected_capabilities
+        );
+
+        let expected_names = expected
+            .iter()
+            .map(|(_, name, _)| *name)
+            .collect::<Vec<_>>();
+        let unique_names = expected_names
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(unique_names.len(), expected_names.len());
+
+        let mut known_bits = 0;
+        for (capability, name, bit) in expected {
+            assert_eq!(capability.as_str(), name);
+            assert_eq!(capability.to_string(), name);
+            assert_eq!(capability.bit(), bit);
+            assert_eq!(bit.count_ones(), 1);
+            assert_eq!(known_bits & bit, 0);
+            known_bits |= bit;
+        }
+
+        assert_eq!(HostCapabilitySet::all().bits(), known_bits);
+        assert_eq!(
+            HostCapabilitySet::from_bits(known_bits),
+            Ok(HostCapabilitySet::all())
+        );
+    }
+
+    #[test]
+    fn capability_sets_iterate_and_display_in_stable_order() {
+        let set = HostCapabilitySet::empty()
+            .with(HostCapability::Diagnostics)
+            .with(HostCapability::Hydration)
+            .with(HostCapability::Mutation)
+            .with(HostCapability::ViewTransitions)
+            .with(HostCapability::PostPaintCallbacks);
+
+        assert_eq!(set.len(), 5);
+        assert!(!set.is_empty());
+        assert_eq!(
+            set.iter().map(HostCapability::as_str).collect::<Vec<_>>(),
+            [
+                "mutation",
+                "hydration",
+                "post-paint-callbacks",
+                "view-transitions",
+                "diagnostics",
+            ]
+        );
+        assert_eq!(
+            set.into_iter()
+                .map(HostCapability::as_str)
+                .collect::<Vec<_>>(),
+            [
+                "mutation",
+                "hydration",
+                "post-paint-callbacks",
+                "view-transitions",
+                "diagnostics",
+            ]
+        );
+        assert_eq!(
+            set.to_string(),
+            "mutation, hydration, post-paint-callbacks, view-transitions, diagnostics"
+        );
+        assert_eq!(
+            format!("{set:?}"),
+            "HostCapabilitySet(mutation, hydration, post-paint-callbacks, \
+             view-transitions, diagnostics)"
+        );
+        assert_eq!(HostCapabilitySet::empty().len(), 0);
+        assert!(HostCapabilitySet::empty().is_empty());
+        assert_eq!(HostCapabilitySet::empty().to_string(), "none");
+        assert_eq!(
+            format!("{:?}", HostCapabilitySet::empty()),
+            "HostCapabilitySet(none)"
+        );
+    }
+
+    #[test]
+    fn capability_sets_reject_unknown_bits() {
+        let mutation_bits = HostCapability::Mutation.bit();
+        assert_eq!(
+            HostCapabilitySet::from_bits(mutation_bits),
+            Ok(HostCapabilitySet::empty().with(HostCapability::Mutation))
+        );
+        assert_eq!(
+            HostCapabilitySet::try_from(mutation_bits),
+            Ok(HostCapabilitySet::empty().with(HostCapability::Mutation))
+        );
+
+        let error = HostCapabilitySet::from_bits(1 << 12).unwrap_err();
+        assert_eq!(error.unknown_bits(), 1 << 12);
+        assert_eq!(
+            error.to_string(),
+            "host capability set contains unknown capability bits 0x1000"
+        );
+    }
+
+    #[test]
     fn capability_absence_is_an_explicit_error() {
         let error = HostCapabilitySet::empty()
             .require("minimal-renderer", HostCapability::Hydration)
@@ -1048,17 +1470,22 @@ mod tests {
         assert_eq!(unsupported.renderer_name(), "minimal-renderer");
         assert_eq!(unsupported.capability(), HostCapability::Hydration);
         assert!(error.as_operation_error().is_none());
-        assert!(
-            error
-                .to_string()
-                .contains("does not support host capability 'hydration'")
+        assert_eq!(
+            error.to_string(),
+            "renderer 'minimal-renderer' does not support host capability 'hydration'"
         );
     }
 
     #[test]
-    fn tree_update_mode_requires_exactly_one_strategy() {
+    fn tree_update_mode_accepts_exactly_one_strategy() {
         assert_eq!(
             HostCapabilitySet::empty().tree_update_mode(),
+            Err(HostTreeUpdateModeError::Missing)
+        );
+        assert_eq!(
+            HostCapabilitySet::empty()
+                .with(HostCapability::Hydration)
+                .tree_update_mode(),
             Err(HostTreeUpdateModeError::Missing)
         );
 
@@ -1068,6 +1495,26 @@ mod tests {
                 .tree_update_mode(),
             Ok(HostTreeUpdateMode::Mutation)
         );
+        assert_eq!(
+            HostCapabilitySet::empty()
+                .with(HostCapability::Mutation)
+                .with(HostCapability::Hydration)
+                .tree_update_mode(),
+            Ok(HostTreeUpdateMode::Mutation)
+        );
+        assert_eq!(
+            HostCapabilitySet::empty()
+                .with(HostCapability::Persistence)
+                .tree_update_mode(),
+            Ok(HostTreeUpdateMode::Persistence)
+        );
+        assert_eq!(
+            HostCapabilitySet::empty()
+                .with(HostCapability::Persistence)
+                .with(HostCapability::Hydration)
+                .tree_update_mode(),
+            Ok(HostTreeUpdateMode::Persistence)
+        );
 
         assert_eq!(
             HostCapabilitySet::empty()
@@ -1075,6 +1522,71 @@ mod tests {
                 .with(HostCapability::Persistence)
                 .tree_update_mode(),
             Err(HostTreeUpdateModeError::Conflicting)
+        );
+        assert_eq!(
+            HostCapabilitySet::empty()
+                .with(HostCapability::Mutation)
+                .with(HostCapability::Persistence)
+                .with(HostCapability::Hydration)
+                .tree_update_mode(),
+            Err(HostTreeUpdateModeError::Conflicting)
+        );
+    }
+
+    #[test]
+    fn tree_update_mode_display_strings_are_stable() {
+        assert_eq!(HostTreeUpdateMode::Mutation.to_string(), "mutation");
+        assert_eq!(HostTreeUpdateMode::Persistence.to_string(), "persistence");
+        assert_eq!(
+            HostTreeUpdateModeError::Missing.to_string(),
+            "host config must choose mutation or persistence for tree updates"
+        );
+        assert_eq!(
+            HostTreeUpdateModeError::Conflicting.to_string(),
+            "host config cannot enable both mutation and persistence tree updates"
+        );
+    }
+
+    #[test]
+    fn tree_update_mode_diagnostics_include_renderer_and_capability_set() {
+        let missing = HostCapabilitySet::empty()
+            .with(HostCapability::Hydration)
+            .validate_tree_update_mode("diagnostic-renderer")
+            .unwrap_err();
+
+        assert_eq!(missing.renderer_name(), "diagnostic-renderer");
+        assert_eq!(missing.error(), HostTreeUpdateModeError::Missing);
+        assert_eq!(
+            missing.capabilities(),
+            HostCapabilitySet::empty().with(HostCapability::Hydration)
+        );
+        assert_eq!(
+            missing.to_string(),
+            "renderer 'diagnostic-renderer' must enable exactly one tree update \
+             capability (mutation or persistence); supported capabilities: hydration"
+        );
+
+        let conflicting = HostCapabilitySet::empty()
+            .with(HostCapability::Hydration)
+            .with(HostCapability::Persistence)
+            .with(HostCapability::Mutation)
+            .validate_tree_update_mode("diagnostic-renderer")
+            .unwrap_err();
+
+        assert_eq!(conflicting.renderer_name(), "diagnostic-renderer");
+        assert_eq!(conflicting.error(), HostTreeUpdateModeError::Conflicting);
+        assert_eq!(
+            conflicting.capabilities(),
+            HostCapabilitySet::empty()
+                .with(HostCapability::Mutation)
+                .with(HostCapability::Persistence)
+                .with(HostCapability::Hydration)
+        );
+        assert_eq!(
+            conflicting.to_string(),
+            "renderer 'diagnostic-renderer' enabled conflicting tree update \
+             capabilities (mutation and persistence); supported capabilities: \
+             mutation, persistence, hydration"
         );
     }
 
@@ -1101,6 +1613,10 @@ mod tests {
         assert_eq!(
             host.require_host_capability(HostCapability::Mutation),
             Ok(())
+        );
+        assert_eq!(
+            HostConfig::validate_tree_update_mode(&host),
+            Ok(HostTreeUpdateMode::Mutation)
         );
         assert_eq!(
             host.require_host_capability(HostCapability::Hydration)
@@ -1282,6 +1798,10 @@ mod tests {
         let host = SkeletonHost;
 
         assert_eq!(host.require_capability(HostCapability::Mutation), Ok(()));
+        assert_eq!(
+            HostIdentityAndContext::validate_tree_update_mode(&host),
+            Ok(HostTreeUpdateMode::Mutation)
+        );
 
         let unsupported = host
             .require_capability(HostCapability::Hydration)
