@@ -7,7 +7,10 @@ import nativeDefault, {
   getNativeBindingLoadPlan,
   loadNativeBinding,
   nativeAddonName,
+  nativeBindingManifest,
+  nativeTargetMatrix,
   packageName,
+  platformArtifactPolicy,
   platformPackages,
   supportedNativeTargets,
   unavailableErrorCode
@@ -24,8 +27,11 @@ assert.equal(
 assert.equal(bindingStatus, 'placeholder');
 assert.equal(packageName, '@fast-react/native');
 assert.equal(nativeAddonName, 'fast_react_napi');
+assert.equal(nativeBindingManifest, cjsBinding.nativeBindingManifest);
+assert.equal(nativeTargetMatrix, cjsBinding.nativeTargetMatrix);
 assert.equal(getNativeBindingLoadPlan, cjsBinding.getNativeBindingLoadPlan);
 assert.equal(loadNativeBinding, cjsBinding.loadNativeBinding);
+assert.equal(platformArtifactPolicy, cjsBinding.platformArtifactPolicy);
 assert.equal(platformPackages, cjsBinding.platformPackages);
 assert.equal(supportedNativeTargets, cjsBinding.supportedNativeTargets);
 assert.equal(unavailableErrorCode, cjsBinding.unavailableErrorCode);

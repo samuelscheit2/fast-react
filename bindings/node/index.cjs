@@ -6,19 +6,92 @@ const nativeAddonName = 'fast_react_napi';
 const nodeApiVersionFloor = 8;
 const supportedNodeEngineRange = '>=22.0.0';
 const unavailableErrorCode = 'FAST_REACT_NATIVE_BINDING_UNIMPLEMENTED';
+const platformArtifactPolicy =
+  'future per-platform optional npm packages; no native addon is built or loaded yet';
+const optionalPackagePrefix = '@fast-react/native-';
 
-const platformPackages = Object.freeze({
-  'darwin-arm64': '@fast-react/native-darwin-arm64',
-  'darwin-x64': '@fast-react/native-darwin-x64',
-  'linux-arm64-gnu': '@fast-react/native-linux-arm64-gnu',
-  'linux-arm64-musl': '@fast-react/native-linux-arm64-musl',
-  'linux-x64-gnu': '@fast-react/native-linux-x64-gnu',
-  'linux-x64-musl': '@fast-react/native-linux-x64-musl',
-  'win32-arm64-msvc': '@fast-react/native-win32-arm64-msvc',
-  'win32-x64-msvc': '@fast-react/native-win32-x64-msvc'
+function freezeNativeTarget({ target, platform, arch, libc, toolchain }) {
+  return Object.freeze({
+    target,
+    platform,
+    arch,
+    libc: libc ?? null,
+    toolchain: toolchain ?? null,
+    optionalPackageName: `${optionalPackagePrefix}${target}`,
+    nativeFileName: `${nativeAddonName}.${target}.node`
+  });
+}
+
+const nativeTargetMatrix = Object.freeze([
+  freezeNativeTarget({ target: 'darwin-arm64', platform: 'darwin', arch: 'arm64' }),
+  freezeNativeTarget({ target: 'darwin-x64', platform: 'darwin', arch: 'x64' }),
+  freezeNativeTarget({
+    target: 'linux-arm64-gnu',
+    platform: 'linux',
+    arch: 'arm64',
+    libc: 'gnu'
+  }),
+  freezeNativeTarget({
+    target: 'linux-arm64-musl',
+    platform: 'linux',
+    arch: 'arm64',
+    libc: 'musl'
+  }),
+  freezeNativeTarget({
+    target: 'linux-x64-gnu',
+    platform: 'linux',
+    arch: 'x64',
+    libc: 'gnu'
+  }),
+  freezeNativeTarget({
+    target: 'linux-x64-musl',
+    platform: 'linux',
+    arch: 'x64',
+    libc: 'musl'
+  }),
+  freezeNativeTarget({
+    target: 'win32-arm64-msvc',
+    platform: 'win32',
+    arch: 'arm64',
+    toolchain: 'msvc'
+  }),
+  freezeNativeTarget({
+    target: 'win32-x64-msvc',
+    platform: 'win32',
+    arch: 'x64',
+    toolchain: 'msvc'
+  })
+]);
+
+const nativeTargetsByName = Object.freeze(
+  Object.fromEntries(nativeTargetMatrix.map((target) => [target.target, target]))
+);
+
+const platformPackages = Object.freeze(
+  Object.fromEntries(
+    nativeTargetMatrix.map((target) => [
+      target.target,
+      target.optionalPackageName
+    ])
+  )
+);
+
+const supportedNativeTargets = Object.freeze(
+  nativeTargetMatrix.map((target) => target.target)
+);
+
+const nativeBindingManifest = Object.freeze({
+  status: bindingStatus,
+  packageName,
+  nativeAddonName,
+  nodeApiVersionFloor,
+  supportedNodeEngineRange,
+  platformArtifactPolicy,
+  optionalPackagePrefix,
+  nativeTargetMatrix,
+  platformPackages,
+  supportedNativeTargets
 });
-
-const supportedNativeTargets = Object.freeze(Object.keys(platformPackages));
 
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key);
@@ -53,6 +126,12 @@ function resolveNativeTarget(platform, arch, libc) {
   return null;
 }
 
+function getNativeTargetMetadata(nativeTarget) {
+  return nativeTarget && hasOwn(nativeTargetsByName, nativeTarget)
+    ? nativeTargetsByName[nativeTarget]
+    : null;
+}
+
 function getNativeBindingLoadPlan(options = {}) {
   const loadOptions = options ?? {};
   const platform = loadOptions.platform ?? process.platform;
@@ -60,13 +139,10 @@ function getNativeBindingLoadPlan(options = {}) {
   const libc =
     loadOptions.libc ?? (platform === 'linux' ? detectLinuxLibc() : null);
   const nativeTarget = resolveNativeTarget(platform, arch, libc);
+  const nativeTargetMetadata = getNativeTargetMetadata(nativeTarget);
   const platformPackageName =
-    nativeTarget && hasOwn(platformPackages, nativeTarget)
-      ? platformPackages[nativeTarget]
-      : null;
-  const nativeFileName = nativeTarget
-    ? `${nativeAddonName}.${nativeTarget}.node`
-    : null;
+    nativeTargetMetadata?.optionalPackageName ?? null;
+  const nativeFileName = nativeTargetMetadata?.nativeFileName ?? null;
   const candidateSpecifiers = platformPackageName
     ? Object.freeze([
         platformPackageName,
@@ -82,14 +158,15 @@ function getNativeBindingLoadPlan(options = {}) {
     platform,
     arch,
     libc,
+    nativeTargetMetadata,
     platformPackageName,
     nativeFileName,
     candidateSpecifiers,
     supportedNativeTargets,
     nodeApiVersionFloor,
     supportedNodeEngineRange,
-    reason:
-      'Fast React native artifacts are intentionally not built or loaded yet.'
+    platformArtifactPolicy,
+    reason: 'Fast React native artifacts are intentionally not built or loaded yet.'
   });
 }
 
@@ -123,6 +200,10 @@ class FastReactNativeBindingUnavailableError extends Error {
     this.nativeTarget = loadPlan.nativeTarget;
     this.platformPackageName = loadPlan.platformPackageName;
     this.nativeFileName = loadPlan.nativeFileName;
+    this.bindingStatus = bindingStatus;
+    this.nodeApiVersionFloor = nodeApiVersionFloor;
+    this.supportedNodeEngineRange = supportedNodeEngineRange;
+    this.reason = loadPlan.reason;
     this.loadPlan = loadPlan;
   }
 }
@@ -138,8 +219,12 @@ module.exports = {
   getNativeBindingLoadPlan,
   loadNativeBinding,
   nativeAddonName,
+  nativeBindingManifest,
+  nativeTargetMatrix,
   nodeApiVersionFloor,
+  optionalPackagePrefix,
   packageName,
+  platformArtifactPolicy,
   platformPackages,
   supportedNativeTargets,
   supportedNodeEngineRange,
