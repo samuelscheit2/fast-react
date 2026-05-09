@@ -34,6 +34,10 @@ The orchestrator goal is continuous. Do not call
   inspectable and logs are captured.
 - Use `tmux capture-pane -pt <session>` to inspect live status such as
   `Pursuing goal` or `Goal achieved`.
+- Classify worker liveness from the current pane state first. If a pane shows
+  active `Working` or `Pursuing goal`, stale `usage limit` text in scrollback is
+  not a stop signal. Treat usage-limit text as actionable only when the Codex
+  process is actually idle, blocked at a prompt, or exited.
 
 ## Goal Policy
 

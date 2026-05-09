@@ -90,9 +90,9 @@ The current project push is a minimal real root render/update/unmount path:
 
 ## Near-Term Plan
 
-1. Audit worker 118 first because its latest pane state showed a usage-limit
-   stop; either resume it with its original goal or replace the slice before
-   stacking dependent root work on top of it.
+1. Keep workers 118-121 running in parallel while they show active `Working` or
+   `Pursuing goal` state; ignore stale usage-limit text in pane scrollback
+   unless the worker process is actually stopped or blocked at a prompt.
 2. Keep worker 119 serialized around `fast-react-core/src/lib.rs`; do not queue
    another core-export tranche until its topology foundation is accepted or
    intentionally abandoned.
