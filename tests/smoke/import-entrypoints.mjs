@@ -13,6 +13,8 @@ const repoRoot = path.resolve(
   '..'
 );
 const reactPackageRoot = path.join(repoRoot, 'packages', 'react');
+const reactDomPackageRoot = path.join(repoRoot, 'packages', 'react-dom');
+const schedulerPackageRoot = path.join(repoRoot, 'packages', 'scheduler');
 
 process.env.NODE_ENV = 'development';
 
@@ -184,6 +186,429 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/placeholder-utils.js'
 ];
 
+const defaultReactDomKeys = [
+  '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
+  'createPortal',
+  'flushSync',
+  'preconnect',
+  'prefetchDNS',
+  'preinit',
+  'preinitModule',
+  'preload',
+  'preloadModule',
+  'requestFormReset',
+  'unstable_batchedUpdates',
+  'useFormState',
+  'useFormStatus',
+  'version'
+];
+
+const reactServerReactDomKeys = [
+  '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
+  'preconnect',
+  'prefetchDNS',
+  'preinit',
+  'preinitModule',
+  'preload',
+  'preloadModule',
+  'version'
+];
+
+const reactDomClientKeys = ['createRoot', 'hydrateRoot', 'version'];
+const reactDomServerNodeKeys = [
+  'version',
+  'renderToString',
+  'renderToStaticMarkup',
+  'renderToPipeableStream',
+  'renderToReadableStream',
+  'resumeToPipeableStream',
+  'resume'
+];
+const reactDomServerBrowserKeys = [
+  'version',
+  'renderToString',
+  'renderToStaticMarkup',
+  'renderToReadableStream',
+  'resume'
+];
+const reactDomServerEdgeKeys = [
+  'version',
+  'renderToReadableStream',
+  'renderToString',
+  'renderToStaticMarkup',
+  'resume'
+];
+const reactDomServerBunKeys = [
+  'version',
+  'renderToReadableStream',
+  'resume',
+  'renderToString',
+  'renderToStaticMarkup'
+];
+const reactDomStaticNodeKeys = [
+  'version',
+  'prerenderToNodeStream',
+  'prerender',
+  'resumeAndPrerenderToNodeStream',
+  'resumeAndPrerender'
+];
+const reactDomStaticBrowserKeys = [
+  'version',
+  'prerender',
+  'resumeAndPrerender'
+];
+const reactDomProfilingKeys = [
+  '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
+  'createPortal',
+  'createRoot',
+  'flushSync',
+  'hydrateRoot',
+  'preconnect',
+  'prefetchDNS',
+  'preinit',
+  'preinitModule',
+  'preload',
+  'preloadModule',
+  'requestFormReset',
+  'unstable_batchedUpdates',
+  'useFormState',
+  'useFormStatus',
+  'version'
+];
+const reactDomTestUtilsKeys = ['act'];
+
+const reactDomDefaultEntrypoints = [
+  {
+    fileName: 'index.js',
+    keys: defaultReactDomKeys,
+    resolvedFileName: 'index.js',
+    specifier: '@fast-react/react-dom',
+    unsupportedExport: 'createPortal'
+  },
+  {
+    fileName: 'client.js',
+    keys: reactDomClientKeys,
+    resolvedFileName: 'client.js',
+    specifier: '@fast-react/react-dom/client',
+    unsupportedExport: 'createRoot'
+  },
+  {
+    fileName: 'server.node.js',
+    keys: reactDomServerNodeKeys,
+    resolvedFileName: 'server.node.js',
+    specifier: '@fast-react/react-dom/server',
+    unsupportedExport: 'renderToString'
+  },
+  {
+    fileName: 'server.node.js',
+    keys: reactDomServerNodeKeys,
+    resolvedFileName: 'server.node.js',
+    specifier: '@fast-react/react-dom/server.node',
+    unsupportedExport: 'renderToPipeableStream'
+  },
+  {
+    fileName: 'server.browser.js',
+    keys: reactDomServerBrowserKeys,
+    resolvedFileName: 'server.browser.js',
+    specifier: '@fast-react/react-dom/server.browser',
+    unsupportedExport: 'renderToReadableStream'
+  },
+  {
+    fileName: 'server.edge.js',
+    keys: reactDomServerEdgeKeys,
+    resolvedFileName: 'server.edge.js',
+    specifier: '@fast-react/react-dom/server.edge',
+    unsupportedExport: 'renderToReadableStream'
+  },
+  {
+    fileName: 'server.bun.js',
+    keys: reactDomServerBunKeys,
+    resolvedFileName: 'server.bun.js',
+    specifier: '@fast-react/react-dom/server.bun',
+    unsupportedExport: 'renderToReadableStream'
+  },
+  {
+    fileName: 'static.node.js',
+    keys: reactDomStaticNodeKeys,
+    resolvedFileName: 'static.node.js',
+    specifier: '@fast-react/react-dom/static',
+    unsupportedExport: 'prerender'
+  },
+  {
+    fileName: 'static.node.js',
+    keys: reactDomStaticNodeKeys,
+    resolvedFileName: 'static.node.js',
+    specifier: '@fast-react/react-dom/static.node',
+    unsupportedExport: 'prerenderToNodeStream'
+  },
+  {
+    fileName: 'static.browser.js',
+    keys: reactDomStaticBrowserKeys,
+    resolvedFileName: 'static.browser.js',
+    specifier: '@fast-react/react-dom/static.browser',
+    unsupportedExport: 'prerender'
+  },
+  {
+    fileName: 'static.edge.js',
+    keys: reactDomStaticBrowserKeys,
+    resolvedFileName: 'static.edge.js',
+    specifier: '@fast-react/react-dom/static.edge',
+    unsupportedExport: 'resumeAndPrerender'
+  },
+  {
+    fileName: 'profiling.js',
+    keys: reactDomProfilingKeys,
+    resolvedFileName: 'profiling.js',
+    specifier: '@fast-react/react-dom/profiling',
+    unsupportedExport: 'createRoot'
+  },
+  {
+    fileName: 'test-utils.js',
+    keys: reactDomTestUtilsKeys,
+    resolvedFileName: 'test-utils.js',
+    specifier: '@fast-react/react-dom/test-utils',
+    unsupportedExport: 'act'
+  }
+];
+
+const reactDomReactServerEntrypoints = [
+  {
+    fileName: 'react-dom.react-server.js',
+    keys: reactServerReactDomKeys,
+    resolvedFileName: 'react-dom.react-server.js',
+    specifier: '@fast-react/react-dom',
+    unsupportedExport: 'preconnect'
+  },
+  {
+    fileName: 'test-utils.js',
+    keys: reactDomTestUtilsKeys,
+    resolvedFileName: 'test-utils.js',
+    specifier: '@fast-react/react-dom/test-utils',
+    unsupportedExport: 'act'
+  }
+];
+
+const reactDomReactServerThrowingEntrypoints = [
+  ['@fast-react/react-dom/client', 'client.react-server.js'],
+  ['@fast-react/react-dom/server', 'server.react-server.js'],
+  ['@fast-react/react-dom/server.node', 'server.react-server.js'],
+  ['@fast-react/react-dom/server.browser', 'server.react-server.js'],
+  ['@fast-react/react-dom/server.edge', 'server.react-server.js'],
+  ['@fast-react/react-dom/server.bun', 'server.react-server.js'],
+  ['@fast-react/react-dom/static', 'static.react-server.js'],
+  ['@fast-react/react-dom/static.node', 'static.react-server.js'],
+  ['@fast-react/react-dom/static.browser', 'static.react-server.js'],
+  ['@fast-react/react-dom/static.edge', 'static.react-server.js'],
+  ['@fast-react/react-dom/profiling', 'profiling.react-server.js']
+];
+
+const expectedReactDomPackageExports = {
+  '.': {
+    'react-server': './react-dom.react-server.js',
+    default: './index.js'
+  },
+  './client': {
+    'react-server': './client.react-server.js',
+    default: './client.js'
+  },
+  './server': {
+    'react-server': './server.react-server.js',
+    workerd: './server.edge.js',
+    bun: './server.bun.js',
+    deno: './server.browser.js',
+    worker: './server.browser.js',
+    node: './server.node.js',
+    'edge-light': './server.edge.js',
+    browser: './server.browser.js',
+    default: './server.node.js'
+  },
+  './server.browser': {
+    'react-server': './server.react-server.js',
+    default: './server.browser.js'
+  },
+  './server.bun': {
+    'react-server': './server.react-server.js',
+    default: './server.bun.js'
+  },
+  './server.edge': {
+    'react-server': './server.react-server.js',
+    default: './server.edge.js'
+  },
+  './server.node': {
+    'react-server': './server.react-server.js',
+    default: './server.node.js'
+  },
+  './static': {
+    'react-server': './static.react-server.js',
+    workerd: './static.edge.js',
+    deno: './static.browser.js',
+    worker: './static.browser.js',
+    node: './static.node.js',
+    'edge-light': './static.edge.js',
+    browser: './static.browser.js',
+    default: './static.node.js'
+  },
+  './static.browser': {
+    'react-server': './static.react-server.js',
+    default: './static.browser.js'
+  },
+  './static.edge': {
+    'react-server': './static.react-server.js',
+    default: './static.edge.js'
+  },
+  './static.node': {
+    'react-server': './static.react-server.js',
+    default: './static.node.js'
+  },
+  './profiling': {
+    'react-server': './profiling.react-server.js',
+    default: './profiling.js'
+  },
+  './test-utils': './test-utils.js',
+  './package.json': './package.json'
+};
+
+const blockedReactDomExtensionSubpaths = [
+  '@fast-react/react-dom/index.js',
+  '@fast-react/react-dom/react-dom.react-server.js',
+  '@fast-react/react-dom/client.js',
+  '@fast-react/react-dom/client.react-server.js',
+  '@fast-react/react-dom/server.node.js',
+  '@fast-react/react-dom/server.browser.js',
+  '@fast-react/react-dom/server.edge.js',
+  '@fast-react/react-dom/server.bun.js',
+  '@fast-react/react-dom/server.react-server.js',
+  '@fast-react/react-dom/static.node.js',
+  '@fast-react/react-dom/static.browser.js',
+  '@fast-react/react-dom/static.edge.js',
+  '@fast-react/react-dom/static.react-server.js',
+  '@fast-react/react-dom/profiling.js',
+  '@fast-react/react-dom/profiling.react-server.js',
+  '@fast-react/react-dom/test-utils.js',
+  '@fast-react/react-dom/placeholder-utils.js'
+];
+
+const schedulerRootKeys = [
+  'unstable_scheduleCallback',
+  'unstable_cancelCallback',
+  'unstable_shouldYield',
+  'unstable_now',
+  'unstable_runWithPriority',
+  'unstable_next',
+  'unstable_wrapCallback',
+  'unstable_requestPaint',
+  'unstable_forceFrameRate',
+  'unstable_getCurrentPriorityLevel',
+  'unstable_Profiling',
+  'unstable_ImmediatePriority',
+  'unstable_UserBlockingPriority',
+  'unstable_NormalPriority',
+  'unstable_LowPriority',
+  'unstable_IdlePriority'
+];
+
+const schedulerMockKeys = [
+  ...schedulerRootKeys,
+  'log',
+  'reset',
+  'unstable_advanceTime',
+  'unstable_clearLog',
+  'unstable_flushAll',
+  'unstable_flushAllWithoutAsserting',
+  'unstable_flushExpired',
+  'unstable_flushNumberOfYields',
+  'unstable_flushUntilNextPaint',
+  'unstable_hasPendingWork',
+  'unstable_setDisableYieldValue'
+];
+
+const schedulerEntrypoints = [
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: 'index.js',
+    specifier: 'scheduler',
+    unsupportedExport: 'unstable_scheduleCallback'
+  },
+  {
+    keys: schedulerMockKeys,
+    resolvedFileName: 'unstable_mock.js',
+    specifier: 'scheduler/unstable_mock',
+    unsupportedExport: 'unstable_flushAll'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: 'unstable_post_task.js',
+    specifier: 'scheduler/unstable_post_task',
+    unsupportedExport: 'unstable_scheduleCallback'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: 'index.native.js',
+    specifier: 'scheduler/index.native.js',
+    unsupportedExport: 'unstable_runWithPriority'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: path.join('cjs', 'scheduler.development.js'),
+    specifier: 'scheduler/cjs/scheduler.development.js',
+    unsupportedExport: 'unstable_cancelCallback'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: path.join('cjs', 'scheduler.production.js'),
+    specifier: 'scheduler/cjs/scheduler.production.js',
+    unsupportedExport: 'unstable_shouldYield'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: path.join('cjs', 'scheduler.native.development.js'),
+    specifier: 'scheduler/cjs/scheduler.native.development.js',
+    unsupportedExport: 'unstable_next'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: path.join('cjs', 'scheduler.native.production.js'),
+    specifier: 'scheduler/cjs/scheduler.native.production.js',
+    unsupportedExport: 'unstable_wrapCallback'
+  },
+  {
+    keys: schedulerMockKeys,
+    resolvedFileName: path.join(
+      'cjs',
+      'scheduler-unstable_mock.development.js'
+    ),
+    specifier: 'scheduler/cjs/scheduler-unstable_mock.development.js',
+    unsupportedExport: 'unstable_clearLog'
+  },
+  {
+    keys: schedulerMockKeys,
+    resolvedFileName: path.join(
+      'cjs',
+      'scheduler-unstable_mock.production.js'
+    ),
+    specifier: 'scheduler/cjs/scheduler-unstable_mock.production.js',
+    unsupportedExport: 'unstable_flushExpired'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: path.join(
+      'cjs',
+      'scheduler-unstable_post_task.development.js'
+    ),
+    specifier: 'scheduler/cjs/scheduler-unstable_post_task.development.js',
+    unsupportedExport: 'unstable_forceFrameRate'
+  },
+  {
+    keys: schedulerRootKeys,
+    resolvedFileName: path.join(
+      'cjs',
+      'scheduler-unstable_post_task.production.js'
+    ),
+    specifier: 'scheduler/cjs/scheduler-unstable_post_task.production.js',
+    unsupportedExport: 'unstable_getCurrentPriorityLevel'
+  }
+];
+
 function assertPlaceholderMetadata(moduleExports, label) {
   assert.equal(
     moduleExports.__FAST_REACT_PLACEHOLDER__,
@@ -220,6 +645,124 @@ function assertUnimplemented(callback, label) {
       assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
       assert.equal(error.compatibilityTarget, 'react@19.2.6', label);
       assert.match(error.message, /no React behavior implementation yet/, label);
+      return true;
+    },
+    label
+  );
+}
+
+function assertReactDomPlaceholderMetadata(moduleExports, label) {
+  assert.equal(
+    moduleExports.__FAST_REACT_PLACEHOLDER__,
+    true,
+    `${label} should expose non-enumerable placeholder metadata`
+  );
+  assert.equal(
+    moduleExports.compatibilityTarget,
+    'react-dom@19.2.6',
+    `${label} should expose the React DOM inventory target`
+  );
+  assert.equal(
+    Object.keys(moduleExports).includes('__FAST_REACT_PLACEHOLDER__'),
+    false,
+    `${label} placeholder marker must not be enumerable`
+  );
+  assert.equal(
+    Object.keys(moduleExports).includes('compatibilityTarget'),
+    false,
+    `${label} compatibility metadata must not be enumerable`
+  );
+}
+
+function assertReactDomInventoryKeys(moduleExports, expectedKeys, label) {
+  assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertReactDomPlaceholderMetadata(moduleExports, label);
+}
+
+function assertReactDomUnimplemented(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, 'FastReactDomUnimplementedError', label);
+      assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
+      assert.equal(error.compatibilityTarget, 'react-dom@19.2.6', label);
+      assert.match(
+        error.message,
+        /no React DOM behavior implementation yet/,
+        label
+      );
+      return true;
+    },
+    label
+  );
+}
+
+function assertReactServerUnsupported(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(
+        error.name,
+        'FastReactDomReactServerUnsupportedError',
+        label
+      );
+      assert.equal(
+        error.code,
+        'FAST_REACT_REACT_SERVER_UNSUPPORTED',
+        label
+      );
+      assert.equal(error.compatibilityTarget, 'react-dom@19.2.6', label);
+      assert.match(
+        error.message,
+        /is not supported in React Server Components\./,
+        label
+      );
+      return true;
+    },
+    label
+  );
+}
+
+function assertSchedulerPlaceholderMetadata(moduleExports, label) {
+  assert.equal(
+    moduleExports.__FAST_REACT_PLACEHOLDER__,
+    true,
+    `${label} should expose non-enumerable placeholder metadata`
+  );
+  assert.equal(
+    moduleExports.compatibilityTarget,
+    'scheduler@0.27.0',
+    `${label} should expose the scheduler inventory target`
+  );
+  assert.equal(
+    Object.keys(moduleExports).includes('__FAST_REACT_PLACEHOLDER__'),
+    false,
+    `${label} placeholder marker must not be enumerable`
+  );
+  assert.equal(
+    Object.keys(moduleExports).includes('compatibilityTarget'),
+    false,
+    `${label} compatibility metadata must not be enumerable`
+  );
+}
+
+function assertSchedulerInventoryKeys(moduleExports, expectedKeys, label) {
+  assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertSchedulerPlaceholderMetadata(moduleExports, label);
+}
+
+function assertSchedulerUnimplemented(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, 'FastReactSchedulerUnimplementedError', label);
+      assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
+      assert.equal(error.compatibilityTarget, 'scheduler@0.27.0', label);
+      assert.match(
+        error.message,
+        /no .*scheduler .*implementation yet/,
+        label
+      );
       return true;
     },
     label
@@ -1060,6 +1603,85 @@ async function assertFileEntrypoint(entrypoint, labelPrefix) {
   }
 }
 
+async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
+  const absolutePath = path.join(reactDomPackageRoot, entrypoint.fileName);
+  const cjsModule = require(absolutePath);
+  assertReactDomInventoryKeys(cjsModule, entrypoint.keys, `${labelPrefix} CJS`);
+  if (Object.hasOwn(cjsModule, 'version')) {
+    assert.equal(cjsModule.version, '0.0.0-fast-react-dom-placeholder');
+  }
+  assertReactDomUnimplemented(
+    () => cjsModule[entrypoint.unsupportedExport](),
+    `${labelPrefix}.${entrypoint.unsupportedExport}`
+  );
+
+  if (entrypoint.specifier === '@fast-react/react-dom/server.bun') {
+    assert.equal(cjsModule.resume, undefined, `${labelPrefix}.resume`);
+  }
+
+  const esmModule = await import(pathToFileURL(absolutePath).href);
+  assert.equal(esmModule.default, cjsModule, `${labelPrefix} ESM default`);
+
+  for (const key of entrypoint.keys) {
+    assert.equal(
+      esmModule[key],
+      cjsModule[key],
+      `${labelPrefix} should expose ${key} through Node CJS named import interop`
+    );
+  }
+}
+
+async function assertSchedulerFileEntrypoint(entrypoint, labelPrefix) {
+  const absolutePath = path.join(schedulerPackageRoot, entrypoint.resolvedFileName);
+  const cjsModule = require(absolutePath);
+  assertSchedulerInventoryKeys(cjsModule, entrypoint.keys, `${labelPrefix} CJS`);
+  assert.equal(cjsModule.unstable_ImmediatePriority, 1, labelPrefix);
+  assert.equal(cjsModule.unstable_UserBlockingPriority, 2, labelPrefix);
+  assert.equal(cjsModule.unstable_NormalPriority, 3, labelPrefix);
+  assert.equal(cjsModule.unstable_LowPriority, 4, labelPrefix);
+  assert.equal(cjsModule.unstable_IdlePriority, 5, labelPrefix);
+  assert.equal(cjsModule.unstable_Profiling, null, labelPrefix);
+  assertSchedulerUnimplemented(
+    () => cjsModule[entrypoint.unsupportedExport](),
+    `${labelPrefix}.${entrypoint.unsupportedExport}`
+  );
+
+  const esmModule = await import(pathToFileURL(absolutePath).href);
+  assert.equal(esmModule.default, cjsModule, `${labelPrefix} ESM default`);
+}
+
+async function assertReactDomDirectFileEntrypoints() {
+  for (const entrypoint of reactDomDefaultEntrypoints) {
+    await assertReactDomFileEntrypoint(
+      entrypoint,
+      `react-dom ${entrypoint.fileName}`
+    );
+  }
+
+  for (const entrypoint of reactDomReactServerEntrypoints) {
+    await assertReactDomFileEntrypoint(
+      entrypoint,
+      `react-dom react-server ${entrypoint.fileName}`
+    );
+  }
+
+  for (const [specifier, fileName] of reactDomReactServerThrowingEntrypoints) {
+    assertReactServerUnsupported(
+      () => require(path.join(reactDomPackageRoot, fileName)),
+      `${specifier} direct file`
+    );
+  }
+}
+
+async function assertSchedulerDirectFileEntrypoints() {
+  for (const entrypoint of schedulerEntrypoints) {
+    await assertSchedulerFileEntrypoint(
+      entrypoint,
+      `scheduler ${entrypoint.resolvedFileName}`
+    );
+  }
+}
+
 function assertReactPlaceholderBehavior(react, label, options = {}) {
   assert.equal(react.version, '0.0.0-fast-react-placeholder');
   assert.equal(typeof react.createElement, 'function');
@@ -1156,6 +1778,8 @@ async function assertDirectFileEntrypoints() {
   );
   assertUnimplemented(() => compilerRuntime.c(0), 'react/compiler-runtime.c');
   await assertProductionJsxDevUndefined();
+  await assertReactDomDirectFileEntrypoints();
+  await assertSchedulerDirectFileEntrypoints();
 }
 
 async function assertProductionJsxDevUndefined() {
@@ -1440,6 +2064,25 @@ async function assertProductionJsxDevUndefined() {
 async function assertPackageMetadata() {
   const packageJson = require(path.join(reactPackageRoot, 'package.json'));
   assert.deepEqual(packageJson.exports, expectedPackageExports);
+
+  const reactDomPackageJson = require(
+    path.join(reactDomPackageRoot, 'package.json')
+  );
+  assert.deepEqual(reactDomPackageJson.exports, expectedReactDomPackageExports);
+  assert.deepEqual(reactDomPackageJson.dependencies, {
+    scheduler: '^0.27.0'
+  });
+  assert.deepEqual(reactDomPackageJson.peerDependencies, {
+    '@fast-react/react': '0.0.0'
+  });
+
+  const schedulerPackageJson = require(
+    path.join(schedulerPackageRoot, 'package.json')
+  );
+  assert.equal(schedulerPackageJson.name, 'scheduler');
+  assert.equal(schedulerPackageJson.version, '0.27.0');
+  assert.equal(Object.hasOwn(schedulerPackageJson, 'exports'), false);
+  assert.equal(Object.hasOwn(schedulerPackageJson, 'main'), false);
 }
 
 async function assertPackageSpecifierEntrypoints() {
@@ -1450,10 +2093,20 @@ async function assertPackageSpecifierEntrypoints() {
     '@fast-react'
   );
   const tempReactPackageRoot = path.join(scopedPackageRoot, 'react');
+  const tempReactDomPackageRoot = path.join(scopedPackageRoot, 'react-dom');
+  const tempSchedulerPackageRoot = path.join(tempRoot, 'node_modules', 'scheduler');
 
   try {
     await mkdir(scopedPackageRoot, { recursive: true });
     await cp(reactPackageRoot, tempReactPackageRoot, {
+      recursive: true,
+      verbatimSymlinks: false
+    });
+    await cp(reactDomPackageRoot, tempReactDomPackageRoot, {
+      recursive: true,
+      verbatimSymlinks: false
+    });
+    await cp(schedulerPackageRoot, tempSchedulerPackageRoot, {
       recursive: true,
       verbatimSymlinks: false
     });
@@ -1462,9 +2115,368 @@ async function assertPackageSpecifierEntrypoints() {
     await runPackageProbe(tempRoot, ['--conditions=react-server'], [
       ...reactServerEntrypoints
     ]);
+    await runReactDomPackageProbe(
+      tempRoot,
+      [],
+      reactDomDefaultEntrypoints,
+      []
+    );
+    await runReactDomPackageProbe(
+      tempRoot,
+      ['--conditions=react-server'],
+      reactDomReactServerEntrypoints,
+      reactDomReactServerThrowingEntrypoints
+    );
+    await runReactDomConditionProbe(tempRoot, ['--conditions=workerd'], [
+      ['@fast-react/react-dom/server', 'server.edge.js'],
+      ['@fast-react/react-dom/static', 'static.edge.js']
+    ]);
+    await runReactDomConditionProbe(tempRoot, ['--conditions=bun'], [
+      ['@fast-react/react-dom/server', 'server.bun.js'],
+      ['@fast-react/react-dom/static', 'static.node.js']
+    ]);
+    await runReactDomConditionProbe(tempRoot, ['--conditions=deno'], [
+      ['@fast-react/react-dom/server', 'server.browser.js'],
+      ['@fast-react/react-dom/static', 'static.browser.js']
+    ]);
+    await runReactDomConditionProbe(tempRoot, ['--conditions=browser'], [
+      ['@fast-react/react-dom/server', 'server.node.js'],
+      ['@fast-react/react-dom/static', 'static.node.js']
+    ]);
+    await runSchedulerPackageProbe(tempRoot);
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
   }
+}
+
+async function runReactDomPackageProbe(
+  tempRoot,
+  nodeArgs,
+  entrypoints,
+  throwingEntrypoints
+) {
+  const probePath = path.join(tempRoot, 'react-dom-probe.cjs');
+  const probeSource = `
+    'use strict';
+
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+
+    const entrypoints = ${JSON.stringify(
+      entrypoints.map(
+        ({ keys, resolvedFileName, specifier, unsupportedExport }) => ({
+          keys,
+          resolvedFileName,
+          specifier,
+          unsupportedExport
+        })
+      )
+    )};
+    const throwingEntrypoints = ${JSON.stringify(throwingEntrypoints)};
+    const blockedExtensionSubpaths = ${JSON.stringify(
+      blockedReactDomExtensionSubpaths
+    )};
+
+    function assertInventoryKeys(moduleExports, expectedKeys, label) {
+      assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assert.equal(moduleExports.__FAST_REACT_PLACEHOLDER__, true, label);
+      assert.equal(moduleExports.compatibilityTarget, 'react-dom@19.2.6', label);
+      assert.equal(
+        Object.keys(moduleExports).includes('__FAST_REACT_PLACEHOLDER__'),
+        false,
+        label
+      );
+      assert.equal(
+        Object.keys(moduleExports).includes('compatibilityTarget'),
+        false,
+        label
+      );
+    }
+
+    function assertUnimplemented(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(error.name, 'FastReactDomUnimplementedError', label);
+          assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
+          assert.equal(error.compatibilityTarget, 'react-dom@19.2.6', label);
+          assert.match(error.message, /no React DOM behavior implementation yet/, label);
+          return true;
+        },
+        label
+      );
+    }
+
+    function assertReactServerUnsupported(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(error.name, 'FastReactDomReactServerUnsupportedError', label);
+          assert.equal(error.code, 'FAST_REACT_REACT_SERVER_UNSUPPORTED', label);
+          assert.equal(error.compatibilityTarget, 'react-dom@19.2.6', label);
+          assert.match(error.message, /is not supported in React Server Components\\./, label);
+          return true;
+        },
+        label
+      );
+    }
+
+    (async () => {
+      for (const { keys, resolvedFileName, specifier, unsupportedExport } of entrypoints) {
+        assert.equal(
+          require.resolve(specifier),
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@fast-react',
+            'react-dom',
+            resolvedFileName
+          ),
+          specifier
+        );
+
+        const cjsModule = require(specifier);
+        assertInventoryKeys(cjsModule, keys, specifier);
+        if (Object.hasOwn(cjsModule, 'version')) {
+          assert.equal(cjsModule.version, '0.0.0-fast-react-dom-placeholder');
+        }
+        if (specifier === '@fast-react/react-dom/server.bun') {
+          assert.equal(cjsModule.resume, undefined, specifier);
+        }
+        assertUnimplemented(
+          () => cjsModule[unsupportedExport](),
+          specifier + ' ' + unsupportedExport
+        );
+
+        const esmModule = await import(specifier);
+        assert.equal(esmModule.default, cjsModule, specifier);
+        for (const key of keys) {
+          assert.equal(esmModule[key], cjsModule[key], specifier + ' ' + key);
+        }
+      }
+
+      for (const [specifier, resolvedFileName] of throwingEntrypoints) {
+        assert.equal(
+          require.resolve(specifier),
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@fast-react',
+            'react-dom',
+            resolvedFileName
+          ),
+          specifier
+        );
+        assertReactServerUnsupported(() => require(specifier), specifier);
+        await assert.rejects(
+          import(specifier),
+          (error) => {
+            assert.equal(
+              error.name,
+              'FastReactDomReactServerUnsupportedError',
+              specifier
+            );
+            assert.equal(
+              error.code,
+              'FAST_REACT_REACT_SERVER_UNSUPPORTED',
+              specifier
+            );
+            return true;
+          },
+          specifier
+        );
+      }
+
+      for (const specifier of blockedExtensionSubpaths) {
+        assert.throws(
+          () => require(specifier),
+          (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+          specifier
+        );
+      }
+    })().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+
+  await writeFile(probePath, probeSource);
+
+  const result = spawnSync(process.execPath, [...nodeArgs, probePath], {
+    cwd: tempRoot,
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  assert.equal(
+    result.status,
+    0,
+    `react-dom package probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+}
+
+async function runReactDomConditionProbe(tempRoot, nodeArgs, expectedResolutions) {
+  const probePath = path.join(tempRoot, 'react-dom-condition-probe.cjs');
+  const probeSource = `
+    'use strict';
+
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+
+    const expectedResolutions = ${JSON.stringify(expectedResolutions)};
+
+    for (const [specifier, resolvedFileName] of expectedResolutions) {
+      assert.equal(
+        require.resolve(specifier),
+        path.join(
+          process.cwd(),
+          'node_modules',
+          '@fast-react',
+          'react-dom',
+          resolvedFileName
+        ),
+        specifier
+      );
+    }
+  `;
+
+  await writeFile(probePath, probeSource);
+
+  const result = spawnSync(process.execPath, [...nodeArgs, probePath], {
+    cwd: tempRoot,
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  assert.equal(
+    result.status,
+    0,
+    `react-dom condition probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+}
+
+async function runSchedulerPackageProbe(tempRoot) {
+  const probePath = path.join(tempRoot, 'scheduler-probe.cjs');
+  const probeSource = `
+    'use strict';
+
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+
+    const entrypoints = ${JSON.stringify(schedulerEntrypoints)};
+
+    function assertInventoryKeys(moduleExports, expectedKeys, label) {
+      assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assert.equal(moduleExports.__FAST_REACT_PLACEHOLDER__, true, label);
+      assert.equal(moduleExports.compatibilityTarget, 'scheduler@0.27.0', label);
+      assert.equal(
+        Object.keys(moduleExports).includes('__FAST_REACT_PLACEHOLDER__'),
+        false,
+        label
+      );
+      assert.equal(
+        Object.keys(moduleExports).includes('compatibilityTarget'),
+        false,
+        label
+      );
+    }
+
+    function assertUnimplemented(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(error.name, 'FastReactSchedulerUnimplementedError', label);
+          assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
+          assert.equal(error.compatibilityTarget, 'scheduler@0.27.0', label);
+          assert.match(error.message, /no .*scheduler .*implementation yet/, label);
+          return true;
+        },
+        label
+      );
+    }
+
+    (async () => {
+      const packageJson = require('scheduler/package.json');
+      assert.equal(packageJson.name, 'scheduler');
+      assert.equal(packageJson.version, '0.27.0');
+      assert.equal(Object.hasOwn(packageJson, 'exports'), false);
+      assert.equal(Object.hasOwn(packageJson, 'main'), false);
+      assert.equal(
+        require.resolve('scheduler/package.json'),
+        path.join(process.cwd(), 'node_modules', 'scheduler', 'package.json')
+      );
+
+      for (const { keys, resolvedFileName, specifier, unsupportedExport } of entrypoints) {
+        assert.equal(
+          require.resolve(specifier),
+          path.join(process.cwd(), 'node_modules', 'scheduler', resolvedFileName),
+          specifier
+        );
+
+        const cjsModule = require(specifier);
+        assertInventoryKeys(cjsModule, keys, specifier);
+        assert.equal(cjsModule.unstable_ImmediatePriority, 1, specifier);
+        assert.equal(cjsModule.unstable_UserBlockingPriority, 2, specifier);
+        assert.equal(cjsModule.unstable_NormalPriority, 3, specifier);
+        assert.equal(cjsModule.unstable_LowPriority, 4, specifier);
+        assert.equal(cjsModule.unstable_IdlePriority, 5, specifier);
+        assert.equal(cjsModule.unstable_Profiling, null, specifier);
+        assertUnimplemented(
+          () => cjsModule[unsupportedExport](),
+          specifier + ' ' + unsupportedExport
+        );
+
+        if (
+          specifier === 'scheduler/unstable_mock' ||
+          specifier === 'scheduler/unstable_post_task'
+        ) {
+          await assert.rejects(
+            import(specifier),
+            (error) => error?.code === 'ERR_MODULE_NOT_FOUND',
+            specifier
+          );
+        } else {
+          const esmModule = await import(specifier);
+          assert.equal(esmModule.default, cjsModule, specifier);
+        }
+      }
+
+      assert.equal(
+        require.resolve('scheduler/index.js'),
+        path.join(process.cwd(), 'node_modules', 'scheduler', 'index.js')
+      );
+      assert.equal(
+        require.resolve('scheduler/unstable_mock.js'),
+        path.join(process.cwd(), 'node_modules', 'scheduler', 'unstable_mock.js')
+      );
+      assert.equal(
+        require.resolve('scheduler/unstable_post_task.js'),
+        path.join(
+          process.cwd(),
+          'node_modules',
+          'scheduler',
+          'unstable_post_task.js'
+        )
+      );
+    })().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+
+  await writeFile(probePath, probeSource);
+
+  const result = spawnSync(process.execPath, [probePath], {
+    cwd: tempRoot,
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  assert.equal(
+    result.status,
+    0,
+    `scheduler package probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
 }
 
 async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
