@@ -17,6 +17,9 @@ Last updated: 2026-05-10
 - Core source workers 047, 075, and 076 are merged; root lane bookkeeping,
   event priority, fiber flags, and hook effect flags are now in
   `fast-react-core`.
+- React DOM root/form/control oracles, React DOM root export implementation,
+  react-test-renderer oracles, and React `act` oracle workers 046, 049, 054,
+  060, 064, 083, 084, 085, 086, 087, 088, 089, and 097 are merged.
 
 ## Durable Decisions
 
@@ -52,13 +55,15 @@ Last updated: 2026-05-10
 
 ## Current Worker Snapshot
 
-Top-level tmux worker count should stay at or below 30. Current live count: 13.
+Top-level tmux worker count should stay at or below 30. Current live count: 0.
 
-Ready for audit/merge based on latest pane checks:
+Ready to queue:
 
-- React DOM/client root and DOM behavior oracles: 046, 049, 060, 064, 088, 089.
-- React DOM root export implementation: 054.
-- React test renderer and React `act` oracles: 083, 084, 085, 086, 087, 097.
+- Slice 0 host-token compile alignment.
+- Follow-up core topology modules from Slice 1 that were not covered by
+  workers 047, 075, and 076.
+- Scheduler mock source implementation can run in parallel because it owns
+  package-level scheduler files.
 
 Use live `tmux capture-pane` and worktree status as the source of truth before
 accepting any worker; this snapshot is only a routing aid.
@@ -74,16 +79,21 @@ accepting any worker; this snapshot is only a routing aid.
 - Merged core source workers 047, 075, and 076; verified with
   `cargo fmt --all --check`, `cargo test -p fast-react-core --all-features`,
   and `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`.
+- Merged React DOM root/form/control oracle and root export workers 046, 049,
+  054, 060, 064, 088, and 089; merged react-test-renderer and React `act`
+  oracle workers 083, 084, 085, 086, 087, and 097. Final merged JS check:
+  `npm run check:js` passed with 402 conformance tests.
 - Added and documented the local React reference source clone.
 
 ## Next Actions
 
-1. Audit React DOM/client root workers 046, 049, 054, 060, 064, 088, and 089
-   with their targeted Node tests.
-2. Audit React test renderer and React `act` workers 083, 084, 085, 086, 087,
-   and 097 with targeted conformance checks.
-3. Launch the next conflict-safe implementation workers from the merged
-   104-117 plans once prerequisite source/oracle slices are accepted.
+1. Launch Slice 0 host-token compile alignment to restore a trustworthy Rust
+   baseline before root implementation workers stack on top of current
+   host-config/reconciler/test-renderer drift.
+2. Launch remaining Slice 1 core topology workers with non-overlapping module
+   ownership and serialized `fast-react-core/src/lib.rs` exports.
+3. Launch scheduler mock source implementation in parallel if it stays isolated
+   from root scheduler state.
 4. After each accepted batch, update this file with only the durable delta and
    prune obsolete status lines.
 

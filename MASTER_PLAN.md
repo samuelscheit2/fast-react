@@ -81,11 +81,11 @@ The current project push is a minimal real root render/update/unmount path:
 
 ## Active Or Recently Queued Workstreams
 
-Source/oracle workers ready for audit and merge:
+Recently merged source/oracle workers:
 
-- React DOM/client-root oracles and implementation: workers 046, 049, 054, 060,
-  064, 088, 089.
-- React test renderer and `act` oracles: workers 083-087, 097.
+- React DOM/client-root, form/control, root marker/listener, and root export
+  work: workers 046, 049, 054, 060, 064, 088, and 089.
+- React test renderer and React `act` oracles: workers 083-087 and 097.
 
 Merged core primitives:
 
@@ -98,6 +98,15 @@ Merged implementation plans:
   next conflict-safe implementation queue.
 - Use worker 117's sequencing plan to order follow-up source workers after the
   prerequisite source/oracle slices are accepted.
+
+Next queue:
+
+- Slice 0 host-token compile alignment is the next serial Rust source task.
+- Remaining Slice 1 core topology modules can be split into non-overlapping
+  workers, but `fast-react-core/src/lib.rs` export edits must be serialized.
+- Scheduler mock source implementation may run in parallel because it owns
+  package-level scheduler files and must stay isolated from root scheduler
+  state.
 
 When new implementation workers are queued or accepted, update this plan with
 only durable decisions and the next active queue. Do not re-add a full
