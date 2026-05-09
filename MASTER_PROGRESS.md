@@ -88,10 +88,11 @@ M0: Orchestration Foundation.
 | worker-026-memo-lazy-behavior | merged | Add a deterministic `memo`/`lazy` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-026-memo-lazy-behavior.md` |
 | worker-027-forward-ref-behavior | merged | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-027-forward-ref-behavior.md` |
 | worker-028-create-context-behavior | merged | Add a deterministic `createContext` object oracle and implement covered default-root JS facade behavior | `worker-progress/worker-028-create-context-behavior.md` |
+| worker-029-component-class-behavior | queued | Add a deterministic `Component`/`PureComponent` class oracle and implement covered default-root JS facade behavior | `worker-progress/worker-029-component-class-behavior.md` |
 
 ## Next Actions
 
-1. Queue the next conformance-backed slice from the remaining React root API placeholders, prioritizing behavior that can be proven by deterministic React 19.2.6 probes without renderer integration.
+1. Launch worker 029 as a real tmux Codex process for deterministic `Component`/`PureComponent` direct class behavior.
 2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
@@ -191,3 +192,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched worker-028 as a real `codex --yolo` tmux process in `../fast-react-worker-028-create-context-behavior`.
 - 2026-05-09: Accepted and merged worker-028 createContext object behavior in commit `780e05c` via merge commit `e6ce1cf` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, context-object oracle regeneration byte-compare, element-object oracle regeneration byte-compare, context and element oracle temp/local path leak guards, scoped `git diff --check`, and explicit oracle status count checks.
 - 2026-05-09: Verified merged `main` after worker-028 with `npm run check:js`; 71 conformance tests passed through the workspace check. Closed the worker-028 tmux session and removed the clean worker-028 worktree. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
+- 2026-05-09: Queued worker-029 to add a deterministic React 19.2.6 `Component`/`PureComponent` class oracle and implement covered default-root direct JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
