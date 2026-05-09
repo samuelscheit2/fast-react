@@ -14,6 +14,130 @@ pub const NODE_API_VERSION_FLOOR: u32 = 8;
 pub const SUPPORTED_NODE_ENGINE_RANGE: &str = ">=22.0.0";
 pub const PLATFORM_ARTIFACT_POLICY: &str =
     "future per-platform optional npm packages; no native addon is built or loaded yet";
+pub const OPTIONAL_PACKAGE_PREFIX: &str = "@fast-react/native-";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeTargetMetadata {
+    native_target: &'static str,
+    platform: &'static str,
+    architecture: &'static str,
+    libc: Option<&'static str>,
+    toolchain: Option<&'static str>,
+    optional_package_name: &'static str,
+    native_file_name: &'static str,
+}
+
+impl NativeTargetMetadata {
+    #[must_use]
+    pub const fn native_target(&self) -> &'static str {
+        self.native_target
+    }
+
+    #[must_use]
+    pub const fn platform(&self) -> &'static str {
+        self.platform
+    }
+
+    #[must_use]
+    pub const fn architecture(&self) -> &'static str {
+        self.architecture
+    }
+
+    #[must_use]
+    pub const fn libc(&self) -> Option<&'static str> {
+        self.libc
+    }
+
+    #[must_use]
+    pub const fn toolchain(&self) -> Option<&'static str> {
+        self.toolchain
+    }
+
+    #[must_use]
+    pub const fn optional_package_name(&self) -> &'static str {
+        self.optional_package_name
+    }
+
+    #[must_use]
+    pub const fn native_file_name(&self) -> &'static str {
+        self.native_file_name
+    }
+}
+
+pub const NATIVE_TARGET_MATRIX: &[NativeTargetMetadata] = &[
+    NativeTargetMetadata {
+        native_target: "darwin-arm64",
+        platform: "darwin",
+        architecture: "arm64",
+        libc: None,
+        toolchain: None,
+        optional_package_name: "@fast-react/native-darwin-arm64",
+        native_file_name: "fast_react_napi.darwin-arm64.node",
+    },
+    NativeTargetMetadata {
+        native_target: "darwin-x64",
+        platform: "darwin",
+        architecture: "x64",
+        libc: None,
+        toolchain: None,
+        optional_package_name: "@fast-react/native-darwin-x64",
+        native_file_name: "fast_react_napi.darwin-x64.node",
+    },
+    NativeTargetMetadata {
+        native_target: "linux-arm64-gnu",
+        platform: "linux",
+        architecture: "arm64",
+        libc: Some("gnu"),
+        toolchain: None,
+        optional_package_name: "@fast-react/native-linux-arm64-gnu",
+        native_file_name: "fast_react_napi.linux-arm64-gnu.node",
+    },
+    NativeTargetMetadata {
+        native_target: "linux-arm64-musl",
+        platform: "linux",
+        architecture: "arm64",
+        libc: Some("musl"),
+        toolchain: None,
+        optional_package_name: "@fast-react/native-linux-arm64-musl",
+        native_file_name: "fast_react_napi.linux-arm64-musl.node",
+    },
+    NativeTargetMetadata {
+        native_target: "linux-x64-gnu",
+        platform: "linux",
+        architecture: "x64",
+        libc: Some("gnu"),
+        toolchain: None,
+        optional_package_name: "@fast-react/native-linux-x64-gnu",
+        native_file_name: "fast_react_napi.linux-x64-gnu.node",
+    },
+    NativeTargetMetadata {
+        native_target: "linux-x64-musl",
+        platform: "linux",
+        architecture: "x64",
+        libc: Some("musl"),
+        toolchain: None,
+        optional_package_name: "@fast-react/native-linux-x64-musl",
+        native_file_name: "fast_react_napi.linux-x64-musl.node",
+    },
+    NativeTargetMetadata {
+        native_target: "win32-arm64-msvc",
+        platform: "win32",
+        architecture: "arm64",
+        libc: None,
+        toolchain: Some("msvc"),
+        optional_package_name: "@fast-react/native-win32-arm64-msvc",
+        native_file_name: "fast_react_napi.win32-arm64-msvc.node",
+    },
+    NativeTargetMetadata {
+        native_target: "win32-x64-msvc",
+        platform: "win32",
+        architecture: "x64",
+        libc: None,
+        toolchain: Some("msvc"),
+        optional_package_name: "@fast-react/native-win32-x64-msvc",
+        native_file_name: "fast_react_napi.win32-x64-msvc.node",
+    },
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeBoundaryMetadata {
@@ -55,6 +179,11 @@ impl NativeBoundaryMetadata {
     pub const fn platform_artifact_policy(&self) -> &'static str {
         self.platform_artifact_policy
     }
+
+    #[must_use]
+    pub const fn native_target_count(&self) -> usize {
+        NATIVE_TARGET_MATRIX.len()
+    }
 }
 
 #[must_use]
@@ -72,6 +201,18 @@ pub const fn boundary_metadata() -> NativeBoundaryMetadata {
 #[must_use]
 pub const fn binding_status() -> &'static str {
     NAPI_BOUNDARY_STATUS
+}
+
+#[must_use]
+pub const fn native_target_matrix() -> &'static [NativeTargetMetadata] {
+    NATIVE_TARGET_MATRIX
+}
+
+#[must_use]
+pub fn native_target_metadata(native_target: &str) -> Option<&'static NativeTargetMetadata> {
+    NATIVE_TARGET_MATRIX
+        .iter()
+        .find(|target| target.native_target() == native_target)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,6 +305,7 @@ pub fn native_export_placeholder(export_name: &'static str) -> Result<(), Native
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn native_boundary_is_a_placeholder() {
@@ -179,6 +321,66 @@ mod tests {
                 .platform_artifact_policy()
                 .contains("per-platform optional npm packages")
         );
+        assert_eq!(metadata.native_target_count(), 8);
+    }
+
+    #[test]
+    fn native_target_matrix_is_deterministic() {
+        let targets = native_target_matrix();
+
+        assert_eq!(targets.len(), 8);
+        assert_eq!(targets[0].native_target(), "darwin-arm64");
+        assert_eq!(targets[0].platform(), "darwin");
+        assert_eq!(targets[0].architecture(), "arm64");
+        assert_eq!(targets[0].libc(), None);
+        assert_eq!(targets[0].toolchain(), None);
+        assert_eq!(
+            targets[0].optional_package_name(),
+            "@fast-react/native-darwin-arm64"
+        );
+        assert_eq!(
+            targets[0].native_file_name(),
+            "fast_react_napi.darwin-arm64.node"
+        );
+
+        assert_eq!(targets[1].native_target(), "darwin-x64");
+        assert_eq!(
+            native_target_metadata("linux-arm64-gnu")
+                .expect("linux-arm64-gnu target metadata")
+                .optional_package_name(),
+            "@fast-react/native-linux-arm64-gnu"
+        );
+        assert_eq!(
+            native_target_metadata("linux-arm64-musl")
+                .expect("linux-arm64-musl target metadata")
+                .native_file_name(),
+            "fast_react_napi.linux-arm64-musl.node"
+        );
+        assert_eq!(
+            native_target_metadata("linux-x64-gnu")
+                .expect("linux-x64-gnu target metadata")
+                .libc(),
+            Some("gnu")
+        );
+        assert_eq!(
+            native_target_metadata("linux-x64-musl")
+                .expect("linux-x64-musl target metadata")
+                .libc(),
+            Some("musl")
+        );
+        assert_eq!(
+            native_target_metadata("win32-arm64-msvc")
+                .expect("win32-arm64-msvc target metadata")
+                .toolchain(),
+            Some("msvc")
+        );
+        assert_eq!(
+            native_target_metadata("win32-x64-msvc")
+                .expect("win32-x64-msvc target metadata")
+                .optional_package_name(),
+            "@fast-react/native-win32-x64-msvc"
+        );
+        assert!(native_target_metadata("freebsd-x64").is_none());
     }
 
     #[test]
@@ -198,5 +400,83 @@ mod tests {
 
         assert!(!error.to_string().contains("React behavior"));
         assert_eq!(error.metadata(), boundary_metadata());
+    }
+
+    #[test]
+    fn crate_manifest_has_no_real_native_binding_or_build_dependency() {
+        let manifest = include_str!("../Cargo.toml");
+        let dependency_names = dependency_names_from_manifest(manifest);
+        let forbidden_dependencies = [
+            "napi",
+            "napi-derive",
+            "napi-build",
+            "neon",
+            "node-sys",
+            "v8",
+            "rusty_v8",
+            "libuv",
+            "uv-sys",
+        ];
+
+        for dependency_name in dependency_names {
+            assert!(
+                !forbidden_dependencies.contains(&dependency_name),
+                "{dependency_name} would make the placeholder depend on native Node/V8/libuv binding APIs"
+            );
+        }
+
+        assert!(
+            !manifest
+                .lines()
+                .any(|line| line.trim_start().starts_with("build =")),
+            "the placeholder crate must not run a Cargo build script"
+        );
+        assert!(
+            !Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("build.rs")
+                .exists(),
+            "the placeholder crate must not add build.rs while no N-API binding exists"
+        );
+    }
+
+    fn dependency_names_from_manifest(manifest: &str) -> Vec<&str> {
+        let mut names = Vec::new();
+        let mut in_dependency_section = false;
+
+        for line in manifest.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.starts_with('[') {
+                in_dependency_section = trimmed == "[dependencies]"
+                    || trimmed == "[dev-dependencies]"
+                    || trimmed == "[build-dependencies]"
+                    || trimmed.starts_with("[target.")
+                        && (trimmed.ends_with(".dependencies]")
+                            || trimmed.ends_with(".dev-dependencies]")
+                            || trimmed.ends_with(".build-dependencies]"));
+
+                if let Some(rest) = trimmed.strip_prefix("[dependencies.") {
+                    names.push(rest.trim_end_matches(']'));
+                }
+                if let Some(rest) = trimmed.strip_prefix("[dev-dependencies.") {
+                    names.push(rest.trim_end_matches(']'));
+                }
+                if let Some(rest) = trimmed.strip_prefix("[build-dependencies.") {
+                    names.push(rest.trim_end_matches(']'));
+                }
+
+                continue;
+            }
+
+            if !in_dependency_section || trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+
+            if let Some((name, _value)) = trimmed.split_once('=') {
+                names.push(name.trim().trim_matches('"'));
+            }
+        }
+
+        names
     }
 }

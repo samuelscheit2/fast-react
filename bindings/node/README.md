@@ -19,4 +19,10 @@ those packages yet:
 - `@fast-react/native-win32-arm64-msvc`
 - `@fast-react/native-win32-x64-msvc`
 
+`nativeBindingManifest` exposes the same target matrix, package names, artifact
+filenames, Node-API floor (`8`), and Node engine floor (`>=22.0.0`) for tests and
+future release tooling.
+
 Real N-API dependencies and binary loading remain deliberately unimplemented.
+The package also intentionally has no install lifecycle script, optional native
+dependency, or postinstall download path.
