@@ -8,8 +8,8 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{UnimplementedReactBehavior, unimplemented_behavior};
 use fast_react_host_config::{
-    HostCapability, HostTreeUpdateMode, HostTreeUpdateModeError, MutationRenderer,
-    UnsupportedHostCapability,
+    HostCapability, HostError, HostOperationError, HostTreeUpdateMode, HostTreeUpdateModeError,
+    MutationRenderer, UnsupportedHostCapability,
 };
 
 pub const RENDER_PLACEHOLDER_FEATURE: &str = "Reconciler.render";
@@ -21,6 +21,7 @@ pub type ReconcilerResult<T> = Result<T, ReconcilerError>;
 pub enum ReconcilerError {
     Unimplemented(UnimplementedReactBehavior),
     UnsupportedHostCapability(UnsupportedHostCapability),
+    HostOperation(HostOperationError),
     InvalidHostTreeUpdateMode(HostTreeUpdateModeError),
 }
 
@@ -36,6 +37,7 @@ impl Display for ReconcilerError {
         match self {
             Self::Unimplemented(error) => Display::fmt(error, formatter),
             Self::UnsupportedHostCapability(error) => Display::fmt(error, formatter),
+            Self::HostOperation(error) => Display::fmt(error, formatter),
             Self::InvalidHostTreeUpdateMode(error) => Display::fmt(error, formatter),
         }
     }
@@ -46,6 +48,7 @@ impl Error for ReconcilerError {
         match self {
             Self::Unimplemented(error) => Some(error),
             Self::UnsupportedHostCapability(error) => Some(error),
+            Self::HostOperation(error) => Some(error),
             Self::InvalidHostTreeUpdateMode(error) => Some(error),
         }
     }
@@ -60,6 +63,15 @@ impl From<UnimplementedReactBehavior> for ReconcilerError {
 impl From<UnsupportedHostCapability> for ReconcilerError {
     fn from(error: UnsupportedHostCapability) -> Self {
         Self::UnsupportedHostCapability(error)
+    }
+}
+
+impl From<HostError> for ReconcilerError {
+    fn from(error: HostError) -> Self {
+        match error {
+            HostError::UnsupportedCapability(error) => Self::UnsupportedHostCapability(error),
+            HostError::Operation(error) => Self::HostOperation(error),
+        }
     }
 }
 
@@ -226,12 +238,17 @@ mod tests {
             }
         }
 
-        fn get_public_instance(&self, instance: &Self::Instance) -> Self::PublicInstance {
-            *instance
+        fn get_public_instance(
+            &self,
+            instance: &Self::Instance,
+        ) -> HostResult<Self::PublicInstance> {
+            let _instance = instance;
+            Ok(())
         }
 
-        fn root_host_context(&self, container: &Self::Container) -> Self::HostContext {
-            *container
+        fn root_host_context(&self, container: &Self::Container) -> HostResult<Self::HostContext> {
+            let _container = container;
+            Ok(())
         }
 
         fn child_host_context(
@@ -239,8 +256,9 @@ mod tests {
             parent_context: &Self::HostContext,
             _ty: &Self::Type,
             _props: &Self::Props,
-        ) -> Self::HostContext {
-            *parent_context
+        ) -> HostResult<Self::HostContext> {
+            let _parent_context = parent_context;
+            Ok(())
         }
     }
 
@@ -496,6 +514,20 @@ mod tests {
             error,
             ReconcilerError::InvalidHostTreeUpdateMode(HostTreeUpdateModeError::Conflicting)
         );
+    }
+
+    #[test]
+    fn host_error_conversion_preserves_operation_errors() {
+        let error: HostError = HostOperationError::invalid_handle(
+            "canonical-mutation-test-host",
+            fast_react_host_config::HostHandleKind::Instance,
+        )
+        .into();
+
+        let ReconcilerError::HostOperation(operation) = ReconcilerError::from(error) else {
+            panic!("expected host operation error");
+        };
+        assert_eq!(operation.renderer_name(), "canonical-mutation-test-host");
     }
 
     #[test]

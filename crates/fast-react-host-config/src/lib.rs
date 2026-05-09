@@ -11,9 +11,8 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{UnimplementedReactBehavior, unimplemented_behavior};
 
-/// Result type for host operations that can fail because a capability is not
-/// implemented by the current renderer.
-pub type HostResult<T> = Result<T, UnsupportedHostCapability>;
+/// Result type for host operations that can fail at the renderer boundary.
+pub type HostResult<T> = Result<T, HostError>;
 
 /// Renderer powers that are optional in the React 19 host-config surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -115,7 +114,7 @@ impl HostCapabilitySet {
         if self.supports(capability) {
             Ok(())
         } else {
-            Err(UnsupportedHostCapability::new(renderer_name, capability))
+            Err(UnsupportedHostCapability::new(renderer_name, capability).into())
         }
     }
 
@@ -196,6 +195,285 @@ impl Display for UnsupportedHostCapability {
 
 impl Error for UnsupportedHostCapability {}
 
+/// Top-level host boundary error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HostError {
+    UnsupportedCapability(UnsupportedHostCapability),
+    Operation(HostOperationError),
+}
+
+impl HostError {
+    #[must_use]
+    pub const fn as_unsupported_capability(&self) -> Option<&UnsupportedHostCapability> {
+        match self {
+            Self::UnsupportedCapability(error) => Some(error),
+            Self::Operation(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_operation_error(&self) -> Option<&HostOperationError> {
+        match self {
+            Self::UnsupportedCapability(_) => None,
+            Self::Operation(error) => Some(error),
+        }
+    }
+
+    #[must_use]
+    pub const fn renderer_name(&self) -> &'static str {
+        match self {
+            Self::UnsupportedCapability(error) => error.renderer_name(),
+            Self::Operation(error) => error.renderer_name(),
+        }
+    }
+}
+
+impl Display for HostError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedCapability(error) => Display::fmt(error, formatter),
+            Self::Operation(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for HostError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::UnsupportedCapability(error) => Some(error),
+            Self::Operation(error) => Some(error),
+        }
+    }
+}
+
+impl From<UnsupportedHostCapability> for HostError {
+    fn from(error: UnsupportedHostCapability) -> Self {
+        Self::UnsupportedCapability(error)
+    }
+}
+
+impl From<HostOperationError> for HostError {
+    fn from(error: HostOperationError) -> Self {
+        Self::Operation(error)
+    }
+}
+
+/// Opaque host handle categories used in operation diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostHandleKind {
+    Container,
+    Instance,
+    TextInstance,
+}
+
+impl HostHandleKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Container => "container",
+            Self::Instance => "instance",
+            Self::TextInstance => "text instance",
+        }
+    }
+}
+
+impl Display for HostHandleKind {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Parent categories for host tree mutations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostParentKind {
+    Container,
+    Instance,
+}
+
+impl HostParentKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Container => "container",
+            Self::Instance => "instance",
+        }
+    }
+}
+
+impl Display for HostParentKind {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Child categories for host tree mutations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostChildKind {
+    Instance,
+    TextInstance,
+}
+
+impl HostChildKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Instance => "instance",
+            Self::TextInstance => "text instance",
+        }
+    }
+}
+
+impl Display for HostChildKind {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Why a requested host mutation cannot be represented as a tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostMutationViolation {
+    ChildIsParent,
+    ChildIsAncestorOfParent,
+}
+
+impl HostMutationViolation {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ChildIsParent => "child is the parent",
+            Self::ChildIsAncestorOfParent => "child is an ancestor of the parent",
+        }
+    }
+}
+
+impl Display for HostMutationViolation {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Structured renderer operation failures that are distinct from unsupported
+/// host capabilities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostOperationError {
+    renderer_name: &'static str,
+    kind: HostOperationErrorKind,
+}
+
+impl HostOperationError {
+    #[must_use]
+    pub const fn invalid_handle(renderer_name: &'static str, handle: HostHandleKind) -> Self {
+        Self {
+            renderer_name,
+            kind: HostOperationErrorKind::InvalidHandle { handle },
+        }
+    }
+
+    #[must_use]
+    pub const fn missing_insertion_target(
+        renderer_name: &'static str,
+        parent: HostParentKind,
+        target: HostChildKind,
+    ) -> Self {
+        Self {
+            renderer_name,
+            kind: HostOperationErrorKind::MissingInsertionTarget { parent, target },
+        }
+    }
+
+    #[must_use]
+    pub const fn missing_removal_target(
+        renderer_name: &'static str,
+        parent: HostParentKind,
+        child: HostChildKind,
+    ) -> Self {
+        Self {
+            renderer_name,
+            kind: HostOperationErrorKind::MissingRemovalTarget { parent, child },
+        }
+    }
+
+    #[must_use]
+    pub const fn impossible_mutation(
+        renderer_name: &'static str,
+        parent: HostParentKind,
+        child: HostChildKind,
+        violation: HostMutationViolation,
+    ) -> Self {
+        Self {
+            renderer_name,
+            kind: HostOperationErrorKind::ImpossibleMutation {
+                parent,
+                child,
+                violation,
+            },
+        }
+    }
+
+    #[must_use]
+    pub const fn renderer_name(&self) -> &'static str {
+        self.renderer_name
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> &HostOperationErrorKind {
+        &self.kind
+    }
+}
+
+impl Display for HostOperationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self.kind() {
+            HostOperationErrorKind::InvalidHandle { handle } => write!(
+                formatter,
+                "renderer '{}' received an invalid {} host handle",
+                self.renderer_name, handle
+            ),
+            HostOperationErrorKind::MissingInsertionTarget { parent, target } => write!(
+                formatter,
+                "renderer '{}' cannot insert before missing {} target in {} parent",
+                self.renderer_name, target, parent
+            ),
+            HostOperationErrorKind::MissingRemovalTarget { parent, child } => write!(
+                formatter,
+                "renderer '{}' cannot remove missing {} child from {} parent",
+                self.renderer_name, child, parent
+            ),
+            HostOperationErrorKind::ImpossibleMutation {
+                parent,
+                child,
+                violation,
+            } => write!(
+                formatter,
+                "renderer '{}' cannot attach {} child to {} parent: {}",
+                self.renderer_name, child, parent, violation
+            ),
+        }
+    }
+}
+
+impl Error for HostOperationError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HostOperationErrorKind {
+    InvalidHandle {
+        handle: HostHandleKind,
+    },
+    MissingInsertionTarget {
+        parent: HostParentKind,
+        target: HostChildKind,
+    },
+    MissingRemovalTarget {
+        parent: HostParentKind,
+        child: HostChildKind,
+    },
+    ImpossibleMutation {
+        parent: HostParentKind,
+        child: HostChildKind,
+        violation: HostMutationViolation,
+    },
+}
+
 /// Renderer-owned host types. These must remain opaque to the reconciler.
 pub trait HostTypes {
     type Type;
@@ -246,22 +524,19 @@ pub trait HostIdentityAndContext: HostTypes {
         HostCapabilitySet::EMPTY
     }
 
-    fn get_public_instance(&self, instance: &Self::Instance) -> Self::PublicInstance;
+    fn get_public_instance(&self, instance: &Self::Instance) -> HostResult<Self::PublicInstance>;
 
-    fn root_host_context(&self, container: &Self::Container) -> Self::HostContext;
+    fn root_host_context(&self, container: &Self::Container) -> HostResult<Self::HostContext>;
 
     fn child_host_context(
         &self,
         parent_context: &Self::HostContext,
         ty: &Self::Type,
         props: &Self::Props,
-    ) -> Self::HostContext;
+    ) -> HostResult<Self::HostContext>;
 
     fn unsupported<T>(&self, capability: HostCapability) -> HostResult<T> {
-        Err(UnsupportedHostCapability::new(
-            self.renderer_name(),
-            capability,
-        ))
+        Err(UnsupportedHostCapability::new(self.renderer_name(), capability).into())
     }
 
     fn require_capability(&self, capability: HostCapability) -> HostResult<()> {
@@ -768,9 +1043,11 @@ mod tests {
         let error = HostCapabilitySet::empty()
             .require("minimal-renderer", HostCapability::Hydration)
             .unwrap_err();
+        let unsupported = error.as_unsupported_capability().unwrap();
 
-        assert_eq!(error.renderer_name(), "minimal-renderer");
-        assert_eq!(error.capability(), HostCapability::Hydration);
+        assert_eq!(unsupported.renderer_name(), "minimal-renderer");
+        assert_eq!(unsupported.capability(), HostCapability::Hydration);
+        assert!(error.as_operation_error().is_none());
         assert!(
             error
                 .to_string()
@@ -828,8 +1105,36 @@ mod tests {
         assert_eq!(
             host.require_host_capability(HostCapability::Hydration)
                 .unwrap_err()
+                .as_unsupported_capability()
+                .unwrap()
                 .capability(),
             HostCapability::Hydration
+        );
+    }
+
+    #[test]
+    fn host_operation_errors_are_distinct_from_capability_errors() {
+        let error: HostError = HostOperationError::missing_removal_target(
+            "minimal-renderer",
+            HostParentKind::Instance,
+            HostChildKind::TextInstance,
+        )
+        .into();
+        let operation = error.as_operation_error().unwrap();
+
+        assert!(error.as_unsupported_capability().is_none());
+        assert_eq!(operation.renderer_name(), "minimal-renderer");
+        assert_eq!(
+            operation.kind(),
+            &HostOperationErrorKind::MissingRemovalTarget {
+                parent: HostParentKind::Instance,
+                child: HostChildKind::TextInstance,
+            }
+        );
+        assert!(
+            error
+                .to_string()
+                .contains("cannot remove missing text instance child")
         );
     }
 
@@ -877,12 +1182,17 @@ mod tests {
             HostCapabilitySet::empty().with(HostCapability::Mutation)
         }
 
-        fn get_public_instance(&self, instance: &Self::Instance) -> Self::PublicInstance {
-            *instance
+        fn get_public_instance(
+            &self,
+            instance: &Self::Instance,
+        ) -> HostResult<Self::PublicInstance> {
+            let _instance = instance;
+            Ok(())
         }
 
-        fn root_host_context(&self, container: &Self::Container) -> Self::HostContext {
-            *container
+        fn root_host_context(&self, container: &Self::Container) -> HostResult<Self::HostContext> {
+            let _container = container;
+            Ok(())
         }
 
         fn child_host_context(
@@ -890,8 +1200,9 @@ mod tests {
             parent_context: &Self::HostContext,
             _ty: &Self::Type,
             _props: &Self::Props,
-        ) -> Self::HostContext {
-            *parent_context
+        ) -> HostResult<Self::HostContext> {
+            let _parent_context = parent_context;
+            Ok(())
         }
     }
 
@@ -975,6 +1286,7 @@ mod tests {
         let unsupported = host
             .require_capability(HostCapability::Hydration)
             .unwrap_err();
+        let unsupported = unsupported.as_unsupported_capability().unwrap();
         assert_eq!(unsupported.renderer_name(), "skeleton");
         assert_eq!(unsupported.capability(), HostCapability::Hydration);
     }

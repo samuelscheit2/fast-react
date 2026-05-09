@@ -6,19 +6,35 @@
 //! React components yet; callers drive host operations directly.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use fast_react_host_config::{
-    HostCapability, HostCapabilitySet, HostChild, HostCommit, HostCreation, HostIdentityAndContext,
-    HostResult, HostTypes, InitialChildrenFinalization, MutationHost,
+    HostCapability, HostCapabilitySet, HostChild, HostChildKind, HostCommit, HostCreation,
+    HostError, HostHandleKind, HostIdentityAndContext, HostMutationViolation, HostOperationError,
+    HostParentKind, HostResult, HostTypes, InitialChildrenFinalization, MutationHost,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
 
-#[derive(Debug, Default)]
+static NEXT_RENDERER_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Debug)]
 pub struct TestRenderer {
+    renderer_id: TestRendererId,
     containers: Vec<TestContainerRecord>,
     instances: Vec<TestInstanceRecord>,
     texts: Vec<TestTextRecord>,
+}
+
+impl Default for TestRenderer {
+    fn default() -> Self {
+        Self {
+            renderer_id: TestRendererId(NEXT_RENDERER_ID.fetch_add(1, Ordering::Relaxed)),
+            containers: Vec::new(),
+            instances: Vec::new(),
+            texts: Vec::new(),
+        }
+    }
 }
 
 impl TestRenderer {
@@ -29,29 +45,31 @@ impl TestRenderer {
 
     pub fn create_container(&mut self) -> TestContainer {
         let container = TestContainer {
+            renderer_id: self.renderer_id,
             index: self.containers.len(),
         };
         self.containers.push(TestContainerRecord::default());
         container
     }
 
-    #[must_use]
-    pub fn snapshot_container(&self, container: &TestContainer) -> TestContainerSnapshot {
-        TestContainerSnapshot {
+    pub fn snapshot_container(
+        &self,
+        container: &TestContainer,
+    ) -> HostResult<TestContainerSnapshot> {
+        Ok(TestContainerSnapshot {
             children: self
-                .container_record(*container)
+                .container_record(*container)?
                 .children
                 .iter()
                 .map(|child| self.snapshot_child(*child))
-                .collect(),
-        }
+                .collect::<HostResult<_>>()?,
+        })
     }
 
-    #[must_use]
-    pub fn snapshot_instance(&self, instance: &TestInstance) -> TestElementSnapshot {
-        let record = self.instance_record(*instance);
+    pub fn snapshot_instance(&self, instance: &TestInstance) -> HostResult<TestElementSnapshot> {
+        let record = self.instance_record(*instance)?;
 
-        TestElementSnapshot {
+        Ok(TestElementSnapshot {
             element_type: record.element_type.clone(),
             props: record.props.clone(),
             hidden: record.hidden,
@@ -60,22 +78,22 @@ impl TestRenderer {
                 .children
                 .iter()
                 .map(|child| self.snapshot_child(*child))
-                .collect(),
-        }
+                .collect::<HostResult<_>>()?,
+        })
     }
 
-    #[must_use]
-    pub fn snapshot_text(&self, text: &TestTextInstance) -> TestTextSnapshot {
-        let record = self.text_record(*text);
+    pub fn snapshot_text(&self, text: &TestTextInstance) -> HostResult<TestTextSnapshot> {
+        let record = self.text_record(*text)?;
 
-        TestTextSnapshot {
+        Ok(TestTextSnapshot {
             text: record.text.clone(),
             hidden: record.hidden,
-        }
+        })
     }
 
     fn push_instance(&mut self, element_type: TestElementType, props: TestProps) -> TestInstance {
         let instance = TestInstance {
+            renderer_id: self.renderer_id,
             index: self.instances.len(),
         };
         self.instances.push(TestInstanceRecord {
@@ -90,6 +108,7 @@ impl TestRenderer {
 
     fn push_text(&mut self, text: String) -> TestTextInstance {
         let text_instance = TestTextInstance {
+            renderer_id: self.renderer_id,
             index: self.texts.len(),
         };
         self.texts.push(TestTextRecord {
@@ -99,12 +118,12 @@ impl TestRenderer {
         text_instance
     }
 
-    fn snapshot_child(&self, child: TestChildHandle) -> TestNodeSnapshot {
+    fn snapshot_child(&self, child: TestChildHandle) -> HostResult<TestNodeSnapshot> {
         match child {
-            TestChildHandle::Instance(instance) => {
-                TestNodeSnapshot::Element(self.snapshot_instance(&instance))
-            }
-            TestChildHandle::Text(text) => TestNodeSnapshot::Text(self.snapshot_text(&text)),
+            TestChildHandle::Instance(instance) => Ok(TestNodeSnapshot::Element(
+                self.snapshot_instance(&instance)?,
+            )),
+            TestChildHandle::Text(text) => Ok(TestNodeSnapshot::Text(self.snapshot_text(&text)?)),
         }
     }
 
@@ -127,33 +146,42 @@ impl TestRenderer {
         children: &mut Vec<TestChildHandle>,
         child: TestChildHandle,
         before_child: TestChildHandle,
-    ) {
-        assert!(
-            children.contains(&before_child),
-            "test renderer insert target must already be attached"
-        );
-
+        parent_kind: HostParentKind,
+    ) -> HostResult<()> {
         if child == before_child {
-            return;
+            return Ok(());
         }
 
         if let Some(index) = children.iter().position(|existing| *existing == child) {
             children.remove(index);
         }
 
-        let before_index = children
+        let Some(before_index) = children
             .iter()
             .position(|existing| *existing == before_child)
-            .expect("insert target was validated before child move");
+        else {
+            return Err(Self::missing_insertion_target_error(
+                parent_kind,
+                before_child.kind(),
+            ));
+        };
         children.insert(before_index, child);
+        Ok(())
     }
 
-    fn remove_child_handle(children: &mut Vec<TestChildHandle>, child: TestChildHandle) {
-        let index = children
-            .iter()
-            .position(|existing| *existing == child)
-            .expect("test renderer removal target must already be attached");
+    fn remove_child_handle(
+        children: &mut Vec<TestChildHandle>,
+        child: TestChildHandle,
+        parent_kind: HostParentKind,
+    ) -> HostResult<()> {
+        let Some(index) = children.iter().position(|existing| *existing == child) else {
+            return Err(Self::missing_removal_target_error(
+                parent_kind,
+                child.kind(),
+            ));
+        };
         children.remove(index);
+        Ok(())
     }
 
     fn detach_child_from_all_parents(&mut self, child: TestChildHandle) {
@@ -166,66 +194,192 @@ impl TestRenderer {
         }
     }
 
-    fn validate_child_handle(&self, child: TestChildHandle) {
+    fn validate_child_handle(&self, child: TestChildHandle) -> HostResult<()> {
         match child {
             TestChildHandle::Instance(instance) => {
-                self.instance_record(instance);
+                self.instance_record(instance)?;
             }
             TestChildHandle::Text(text) => {
-                self.text_record(text);
+                self.text_record(text)?;
             }
         }
+        Ok(())
     }
 
-    fn container_record(&self, container: TestContainer) -> &TestContainerRecord {
+    fn container_record(&self, container: TestContainer) -> HostResult<&TestContainerRecord> {
+        if container.renderer_id != self.renderer_id {
+            return Err(Self::invalid_handle_error(HostHandleKind::Container));
+        }
+
         self.containers
             .get(container.index)
-            .expect("test renderer container handle must be valid")
+            .ok_or_else(|| Self::invalid_handle_error(HostHandleKind::Container))
     }
 
-    fn container_record_mut(&mut self, container: TestContainer) -> &mut TestContainerRecord {
+    fn container_record_mut(
+        &mut self,
+        container: TestContainer,
+    ) -> HostResult<&mut TestContainerRecord> {
+        if container.renderer_id != self.renderer_id {
+            return Err(Self::invalid_handle_error(HostHandleKind::Container));
+        }
+
         self.containers
             .get_mut(container.index)
-            .expect("test renderer container handle must be valid")
+            .ok_or_else(|| Self::invalid_handle_error(HostHandleKind::Container))
     }
 
-    fn instance_record(&self, instance: TestInstance) -> &TestInstanceRecord {
+    fn instance_record(&self, instance: TestInstance) -> HostResult<&TestInstanceRecord> {
+        if instance.renderer_id != self.renderer_id {
+            return Err(Self::invalid_handle_error(HostHandleKind::Instance));
+        }
+
         self.instances
             .get(instance.index)
-            .expect("test renderer instance handle must be valid")
+            .ok_or_else(|| Self::invalid_handle_error(HostHandleKind::Instance))
     }
 
-    fn instance_record_mut(&mut self, instance: TestInstance) -> &mut TestInstanceRecord {
+    fn instance_record_mut(
+        &mut self,
+        instance: TestInstance,
+    ) -> HostResult<&mut TestInstanceRecord> {
+        if instance.renderer_id != self.renderer_id {
+            return Err(Self::invalid_handle_error(HostHandleKind::Instance));
+        }
+
         self.instances
             .get_mut(instance.index)
-            .expect("test renderer instance handle must be valid")
+            .ok_or_else(|| Self::invalid_handle_error(HostHandleKind::Instance))
     }
 
-    fn text_record(&self, text: TestTextInstance) -> &TestTextRecord {
+    fn text_record(&self, text: TestTextInstance) -> HostResult<&TestTextRecord> {
+        if text.renderer_id != self.renderer_id {
+            return Err(Self::invalid_handle_error(HostHandleKind::TextInstance));
+        }
+
         self.texts
             .get(text.index)
-            .expect("test renderer text handle must be valid")
+            .ok_or_else(|| Self::invalid_handle_error(HostHandleKind::TextInstance))
     }
 
-    fn text_record_mut(&mut self, text: TestTextInstance) -> &mut TestTextRecord {
+    fn text_record_mut(&mut self, text: TestTextInstance) -> HostResult<&mut TestTextRecord> {
+        if text.renderer_id != self.renderer_id {
+            return Err(Self::invalid_handle_error(HostHandleKind::TextInstance));
+        }
+
         self.texts
             .get_mut(text.index)
-            .expect("test renderer text handle must be valid")
+            .ok_or_else(|| Self::invalid_handle_error(HostHandleKind::TextInstance))
+    }
+
+    fn child_attached_to_parent(
+        &self,
+        parent: TestInstance,
+        child: TestChildHandle,
+    ) -> HostResult<bool> {
+        Ok(self.instance_record(parent)?.children.contains(&child))
+    }
+
+    fn child_attached_to_container(
+        &self,
+        container: TestContainer,
+        child: TestChildHandle,
+    ) -> HostResult<bool> {
+        Ok(self.container_record(container)?.children.contains(&child))
+    }
+
+    fn validate_parent_child_mutation(
+        &self,
+        parent: TestInstance,
+        child: TestChildHandle,
+    ) -> HostResult<()> {
+        self.instance_record(parent)?;
+        self.validate_child_handle(child)?;
+
+        let TestChildHandle::Instance(child_instance) = child else {
+            return Ok(());
+        };
+
+        if child_instance == parent {
+            return Err(Self::impossible_mutation_error(
+                HostParentKind::Instance,
+                HostChildKind::Instance,
+                HostMutationViolation::ChildIsParent,
+            ));
+        }
+
+        if self.instance_contains_descendant(child_instance, parent)? {
+            return Err(Self::impossible_mutation_error(
+                HostParentKind::Instance,
+                HostChildKind::Instance,
+                HostMutationViolation::ChildIsAncestorOfParent,
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn instance_contains_descendant(
+        &self,
+        ancestor: TestInstance,
+        descendant: TestInstance,
+    ) -> HostResult<bool> {
+        let ancestor = self.instance_record(ancestor)?;
+
+        for child in &ancestor.children {
+            if let TestChildHandle::Instance(child_instance) = child {
+                if *child_instance == descendant {
+                    return Ok(true);
+                }
+
+                if self.instance_contains_descendant(*child_instance, descendant)? {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn invalid_handle_error(handle: HostHandleKind) -> HostError {
+        HostOperationError::invalid_handle(TEST_RENDERER_NAME, handle).into()
+    }
+
+    fn missing_insertion_target_error(parent: HostParentKind, target: HostChildKind) -> HostError {
+        HostOperationError::missing_insertion_target(TEST_RENDERER_NAME, parent, target).into()
+    }
+
+    fn missing_removal_target_error(parent: HostParentKind, child: HostChildKind) -> HostError {
+        HostOperationError::missing_removal_target(TEST_RENDERER_NAME, parent, child).into()
+    }
+
+    fn impossible_mutation_error(
+        parent: HostParentKind,
+        child: HostChildKind,
+        violation: HostMutationViolation,
+    ) -> HostError {
+        HostOperationError::impossible_mutation(TEST_RENDERER_NAME, parent, child, violation).into()
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct TestRendererId(u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TestContainer {
+    renderer_id: TestRendererId,
     index: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TestInstance {
+    renderer_id: TestRendererId,
     index: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TestTextInstance {
+    renderer_id: TestRendererId,
     index: usize,
 }
 
@@ -429,6 +583,15 @@ enum TestChildHandle {
     Text(TestTextInstance),
 }
 
+impl TestChildHandle {
+    const fn kind(self) -> HostChildKind {
+        match self {
+            Self::Instance(_) => HostChildKind::Instance,
+            Self::Text(_) => HostChildKind::TextInstance,
+        }
+    }
+}
+
 impl HostTypes for TestRenderer {
     type Type = TestElementType;
     type Props = TestProps;
@@ -475,14 +638,14 @@ impl HostIdentityAndContext for TestRenderer {
         HostCapabilitySet::empty().with(HostCapability::Mutation)
     }
 
-    fn get_public_instance(&self, instance: &Self::Instance) -> Self::PublicInstance {
-        self.instance_record(*instance);
-        *instance
+    fn get_public_instance(&self, instance: &Self::Instance) -> HostResult<Self::PublicInstance> {
+        self.instance_record(*instance)?;
+        Ok(*instance)
     }
 
-    fn root_host_context(&self, container: &Self::Container) -> Self::HostContext {
-        self.container_record(*container);
-        TestHostContext::default()
+    fn root_host_context(&self, container: &Self::Container) -> HostResult<Self::HostContext> {
+        self.container_record(*container)?;
+        Ok(TestHostContext::default())
     }
 
     fn child_host_context(
@@ -490,10 +653,10 @@ impl HostIdentityAndContext for TestRenderer {
         parent_context: &Self::HostContext,
         _ty: &Self::Type,
         _props: &Self::Props,
-    ) -> Self::HostContext {
-        TestHostContext {
+    ) -> HostResult<Self::HostContext> {
+        Ok(TestHostContext {
             depth: parent_context.depth + 1,
-        }
+        })
     }
 }
 
@@ -514,7 +677,7 @@ impl HostCreation for TestRenderer {
         container: &Self::Container,
         _context: &Self::HostContext,
     ) -> HostResult<Self::Instance> {
-        self.container_record(*container);
+        self.container_record(*container)?;
         Ok(self.push_instance(ty.clone(), props.clone()))
     }
 
@@ -524,7 +687,7 @@ impl HostCreation for TestRenderer {
         container: &Self::Container,
         _context: &Self::HostContext,
     ) -> HostResult<Self::TextInstance> {
-        self.container_record(*container);
+        self.container_record(*container)?;
         Ok(self.push_text(text.to_owned()))
     }
 
@@ -534,9 +697,9 @@ impl HostCreation for TestRenderer {
         child: HostChild<'_, Self>,
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
-        self.validate_child_handle(child);
+        self.validate_parent_child_mutation(*parent, child)?;
         self.detach_child_from_all_parents(child);
-        let parent = self.instance_record_mut(*parent);
+        let parent = self.instance_record_mut(*parent)?;
         Self::append_child_handle(&mut parent.children, child);
         Ok(())
     }
@@ -549,8 +712,8 @@ impl HostCreation for TestRenderer {
         container: &Self::Container,
         _context: &Self::HostContext,
     ) -> HostResult<InitialChildrenFinalization> {
-        self.instance_record(*instance);
-        self.container_record(*container);
+        self.instance_record(*instance)?;
+        self.container_record(*container)?;
         Ok(InitialChildrenFinalization::NoCommitMount)
     }
 
@@ -559,13 +722,14 @@ impl HostCreation for TestRenderer {
         instance: &Self::Instance,
         update_payload: Option<&Self::UpdatePayload>,
     ) -> HostResult<Self::Instance> {
-        let mut record = self.instance_record(*instance).clone();
+        let mut record = self.instance_record(*instance)?.clone();
         if let Some(update_payload) = update_payload {
             record.props = update_payload.props.clone();
         }
         record.detached = false;
 
         let cloned = TestInstance {
+            renderer_id: self.renderer_id,
             index: self.instances.len(),
         };
         self.instances.push(record);
@@ -576,8 +740,9 @@ impl HostCreation for TestRenderer {
         &mut self,
         text_instance: &Self::TextInstance,
     ) -> HostResult<Self::TextInstance> {
-        let record = self.text_record(*text_instance).clone();
+        let record = self.text_record(*text_instance)?.clone();
         let cloned = TestTextInstance {
+            renderer_id: self.renderer_id,
             index: self.texts.len(),
         };
         self.texts.push(record);
@@ -587,7 +752,7 @@ impl HostCreation for TestRenderer {
 
 impl HostCommit for TestRenderer {
     fn prepare_for_commit(&mut self, container: &Self::Container) -> HostResult<Self::CommitState> {
-        self.container_record(*container);
+        self.container_record(*container)?;
         Ok(TestCommitState {
             container: *container,
         })
@@ -598,8 +763,8 @@ impl HostCommit for TestRenderer {
         container: &Self::Container,
         commit_state: Self::CommitState,
     ) -> HostResult<()> {
-        self.container_record(*container);
-        self.container_record(commit_state.container);
+        self.container_record(*container)?;
+        self.container_record(commit_state.container)?;
         Ok(())
     }
 
@@ -609,7 +774,7 @@ impl HostCommit for TestRenderer {
         _ty: &Self::Type,
         _props: &Self::Props,
     ) -> HostResult<()> {
-        self.instance_record(*instance);
+        self.instance_record(*instance)?;
         Ok(())
     }
 
@@ -621,7 +786,7 @@ impl HostCommit for TestRenderer {
         _old_props: &Self::Props,
         _new_props: &Self::Props,
     ) -> HostResult<()> {
-        self.instance_record_mut(*instance).props = update_payload.props;
+        self.instance_record_mut(*instance)?.props = update_payload.props;
         Ok(())
     }
 
@@ -631,17 +796,17 @@ impl HostCommit for TestRenderer {
         _old_text: &str,
         new_text: &str,
     ) -> HostResult<()> {
-        self.text_record_mut(*text_instance).text = new_text.to_owned();
+        self.text_record_mut(*text_instance)?.text = new_text.to_owned();
         Ok(())
     }
 
     fn reset_text_content(&mut self, instance: &mut Self::Instance) -> HostResult<()> {
-        self.instance_record_mut(*instance).children.clear();
+        self.instance_record_mut(*instance)?.children.clear();
         Ok(())
     }
 
     fn hide_instance(&mut self, instance: &mut Self::Instance) -> HostResult<()> {
-        self.instance_record_mut(*instance).hidden = true;
+        self.instance_record_mut(*instance)?.hidden = true;
         Ok(())
     }
 
@@ -650,12 +815,12 @@ impl HostCommit for TestRenderer {
         instance: &mut Self::Instance,
         _props: &Self::Props,
     ) -> HostResult<()> {
-        self.instance_record_mut(*instance).hidden = false;
+        self.instance_record_mut(*instance)?.hidden = false;
         Ok(())
     }
 
     fn hide_text_instance(&mut self, text_instance: &mut Self::TextInstance) -> HostResult<()> {
-        self.text_record_mut(*text_instance).hidden = true;
+        self.text_record_mut(*text_instance)?.hidden = true;
         Ok(())
     }
 
@@ -664,12 +829,12 @@ impl HostCommit for TestRenderer {
         text_instance: &mut Self::TextInstance,
         _text: &str,
     ) -> HostResult<()> {
-        self.text_record_mut(*text_instance).hidden = false;
+        self.text_record_mut(*text_instance)?.hidden = false;
         Ok(())
     }
 
     fn detach_deleted_instance(&mut self, instance: Self::Instance) -> HostResult<()> {
-        let record = self.instance_record_mut(instance);
+        let record = self.instance_record_mut(instance)?;
         record.children.clear();
         record.detached = true;
         Ok(())
@@ -683,9 +848,9 @@ impl MutationHost for TestRenderer {
         child: HostChild<'_, Self>,
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
-        self.validate_child_handle(child);
+        self.validate_parent_child_mutation(*parent, child)?;
         self.detach_child_from_all_parents(child);
-        let parent = self.instance_record_mut(*parent);
+        let parent = self.instance_record_mut(*parent)?;
         Self::append_child_handle(&mut parent.children, child);
         Ok(())
     }
@@ -696,9 +861,10 @@ impl MutationHost for TestRenderer {
         child: HostChild<'_, Self>,
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
-        self.validate_child_handle(child);
+        self.container_record(*container)?;
+        self.validate_child_handle(child)?;
         self.detach_child_from_all_parents(child);
-        let container = self.container_record_mut(*container);
+        let container = self.container_record_mut(*container)?;
         Self::append_child_handle(&mut container.children, child);
         Ok(())
     }
@@ -711,14 +877,25 @@ impl MutationHost for TestRenderer {
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
         let before_child = Self::host_child_to_handle(before_child);
-        self.validate_child_handle(child);
-        self.validate_child_handle(before_child);
+        self.validate_parent_child_mutation(*parent, child)?;
+        self.validate_child_handle(before_child)?;
+        if !self.child_attached_to_parent(*parent, before_child)? {
+            return Err(Self::missing_insertion_target_error(
+                HostParentKind::Instance,
+                before_child.kind(),
+            ));
+        }
+
         if child != before_child {
             self.detach_child_from_all_parents(child);
         }
-        let parent = self.instance_record_mut(*parent);
-        Self::insert_child_handle_before(&mut parent.children, child, before_child);
-        Ok(())
+        let parent = self.instance_record_mut(*parent)?;
+        Self::insert_child_handle_before(
+            &mut parent.children,
+            child,
+            before_child,
+            HostParentKind::Instance,
+        )
     }
 
     fn insert_in_container_before(
@@ -729,14 +906,26 @@ impl MutationHost for TestRenderer {
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
         let before_child = Self::host_child_to_handle(before_child);
-        self.validate_child_handle(child);
-        self.validate_child_handle(before_child);
+        self.container_record(*container)?;
+        self.validate_child_handle(child)?;
+        self.validate_child_handle(before_child)?;
+        if !self.child_attached_to_container(*container, before_child)? {
+            return Err(Self::missing_insertion_target_error(
+                HostParentKind::Container,
+                before_child.kind(),
+            ));
+        }
+
         if child != before_child {
             self.detach_child_from_all_parents(child);
         }
-        let container = self.container_record_mut(*container);
-        Self::insert_child_handle_before(&mut container.children, child, before_child);
-        Ok(())
+        let container = self.container_record_mut(*container)?;
+        Self::insert_child_handle_before(
+            &mut container.children,
+            child,
+            before_child,
+            HostParentKind::Container,
+        )
     }
 
     fn remove_child(
@@ -745,10 +934,9 @@ impl MutationHost for TestRenderer {
         child: HostChild<'_, Self>,
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
-        self.validate_child_handle(child);
-        let parent = self.instance_record_mut(*parent);
-        Self::remove_child_handle(&mut parent.children, child);
-        Ok(())
+        self.validate_child_handle(child)?;
+        let parent = self.instance_record_mut(*parent)?;
+        Self::remove_child_handle(&mut parent.children, child, HostParentKind::Instance)
     }
 
     fn remove_child_from_container(
@@ -757,14 +945,13 @@ impl MutationHost for TestRenderer {
         child: HostChild<'_, Self>,
     ) -> HostResult<()> {
         let child = Self::host_child_to_handle(child);
-        self.validate_child_handle(child);
-        let container = self.container_record_mut(*container);
-        Self::remove_child_handle(&mut container.children, child);
-        Ok(())
+        self.validate_child_handle(child)?;
+        let container = self.container_record_mut(*container)?;
+        Self::remove_child_handle(&mut container.children, child, HostParentKind::Container)
     }
 
     fn clear_container(&mut self, container: &mut Self::Container) -> HostResult<()> {
-        self.container_record_mut(*container).children.clear();
+        self.container_record_mut(*container)?.children.clear();
         Ok(())
     }
 }
@@ -772,7 +959,7 @@ impl MutationHost for TestRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fast_react_host_config::{HostTreeUpdateMode, MutationRenderer};
+    use fast_react_host_config::{HostOperationErrorKind, HostTreeUpdateMode, MutationRenderer};
 
     fn element_type(name: &str) -> TestElementType {
         TestElementType::new(name)
@@ -787,7 +974,7 @@ mod tests {
         container: &TestContainer,
         name: &str,
     ) -> TestInstance {
-        let context = renderer.root_host_context(container);
+        let context = renderer.root_host_context(container).unwrap();
         renderer
             .create_instance(&element_type(name), &props(), container, &context)
             .unwrap()
@@ -798,7 +985,7 @@ mod tests {
         container: &TestContainer,
         text: &str,
     ) -> TestTextInstance {
-        let context = renderer.root_host_context(container);
+        let context = renderer.root_host_context(container).unwrap();
         renderer
             .create_text_instance(text, container, &context)
             .unwrap()
@@ -828,6 +1015,14 @@ mod tests {
 
     fn assert_mutation_renderer<T: MutationRenderer>(_renderer: &T) {}
 
+    fn assert_operation_error(error: HostError, expected: HostOperationErrorKind) {
+        let operation = error.as_operation_error().unwrap();
+
+        assert!(error.as_unsupported_capability().is_none());
+        assert_eq!(operation.renderer_name(), TEST_RENDERER_NAME);
+        assert_eq!(operation.kind(), &expected);
+    }
+
     #[test]
     fn reports_mutation_only_capabilities() {
         let renderer = TestRenderer::new();
@@ -851,8 +1046,10 @@ mod tests {
     fn creates_instances_text_and_host_context() {
         let mut renderer = TestRenderer::new();
         let container = renderer.create_container();
-        let context = renderer.root_host_context(&container);
-        let child_context = renderer.child_host_context(&context, &element_type("View"), &props());
+        let context = renderer.root_host_context(&container).unwrap();
+        let child_context = renderer
+            .child_host_context(&context, &element_type("View"), &props())
+            .unwrap();
         let text_props = TestProps::with_text_content("inline");
 
         let instance = renderer
@@ -873,16 +1070,21 @@ mod tests {
         assert_eq!(
             renderer
                 .snapshot_instance(&instance)
+                .unwrap()
                 .element_type()
                 .as_str(),
             "View"
         );
         assert_eq!(
-            renderer.snapshot_instance(&instance).props().attributes()["role"],
+            renderer
+                .snapshot_instance(&instance)
+                .unwrap()
+                .props()
+                .attributes()["role"],
             "main"
         );
-        assert_eq!(renderer.snapshot_text(&text).text(), "hello");
-        assert_eq!(renderer.get_public_instance(&instance), instance);
+        assert_eq!(renderer.snapshot_text(&text).unwrap().text(), "hello");
+        assert_eq!(renderer.get_public_instance(&instance).unwrap(), instance);
     }
 
     #[test]
@@ -901,13 +1103,13 @@ mod tests {
                 &element_type("View"),
                 &props(),
                 &container,
-                &renderer.root_host_context(&container),
+                &renderer.root_host_context(&container).unwrap(),
             )
             .unwrap();
 
         assert_eq!(finalization, InitialChildrenFinalization::NoCommitMount);
         assert_eq!(
-            child_texts(&renderer.snapshot_instance(&parent)),
+            child_texts(&renderer.snapshot_instance(&parent).unwrap()),
             vec!["alpha"]
         );
     }
@@ -930,7 +1132,7 @@ mod tests {
             .append_child_to_container(&mut container, HostChild::Instance(&parent))
             .unwrap();
 
-        let parent_snapshot = renderer.snapshot_instance(&parent);
+        let parent_snapshot = renderer.snapshot_instance(&parent).unwrap();
         assert_eq!(parent_snapshot.children().len(), 2);
         match &parent_snapshot.children()[0] {
             TestNodeSnapshot::Element(element) => {
@@ -945,7 +1147,7 @@ mod tests {
             TestNodeSnapshot::Element(_) => panic!("expected text child"),
         }
         assert_eq!(
-            container_element_names(&renderer.snapshot_container(&container)),
+            container_element_names(&renderer.snapshot_container(&container).unwrap()),
             vec!["View"]
         );
     }
@@ -973,7 +1175,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            child_texts(&renderer.snapshot_instance(&parent)),
+            child_texts(&renderer.snapshot_instance(&parent).unwrap()),
             vec!["b", "a", "c"]
         );
     }
@@ -997,7 +1199,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            container_element_names(&renderer.snapshot_container(&container)),
+            container_element_names(&renderer.snapshot_container(&container).unwrap()),
             vec!["First", "Second"]
         );
     }
@@ -1019,6 +1221,7 @@ mod tests {
         assert!(
             renderer
                 .snapshot_instance(&old_parent)
+                .unwrap()
                 .children()
                 .is_empty()
         );
@@ -1029,11 +1232,12 @@ mod tests {
         assert!(
             renderer
                 .snapshot_container(&container)
+                .unwrap()
                 .children()
                 .is_empty()
         );
         assert_eq!(
-            child_texts(&renderer.snapshot_instance(&new_parent)),
+            child_texts(&renderer.snapshot_instance(&new_parent).unwrap()),
             vec!["move me"]
         );
     }
@@ -1058,14 +1262,21 @@ mod tests {
             .remove_child_from_container(&mut container, HostChild::Instance(&parent))
             .unwrap();
 
-        assert!(renderer.snapshot_instance(&parent).children().is_empty());
         assert!(
             renderer
-                .snapshot_container(&container)
+                .snapshot_instance(&parent)
+                .unwrap()
                 .children()
                 .is_empty()
         );
-        assert_eq!(renderer.snapshot_text(&text).text(), "remove me");
+        assert!(
+            renderer
+                .snapshot_container(&container)
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+        assert_eq!(renderer.snapshot_text(&text).unwrap().text(), "remove me");
     }
 
     #[test]
@@ -1086,6 +1297,7 @@ mod tests {
         assert!(
             renderer
                 .snapshot_container(&container)
+                .unwrap()
                 .children()
                 .is_empty()
         );
@@ -1117,22 +1329,308 @@ mod tests {
             .reset_after_commit(&container, commit_state)
             .unwrap();
 
-        assert!(renderer.snapshot_instance(&instance).is_hidden());
-        assert!(renderer.snapshot_text(&text).is_hidden());
+        assert!(renderer.snapshot_instance(&instance).unwrap().is_hidden());
+        assert!(renderer.snapshot_text(&text).unwrap().is_hidden());
         assert_eq!(
-            renderer.snapshot_instance(&instance).props().attributes()["updated"],
+            renderer
+                .snapshot_instance(&instance)
+                .unwrap()
+                .props()
+                .attributes()["updated"],
             "yes"
         );
-        assert_eq!(renderer.snapshot_text(&text).text(), "new");
+        assert_eq!(renderer.snapshot_text(&text).unwrap().text(), "new");
 
         renderer.unhide_instance(&mut instance, &props()).unwrap();
         renderer.unhide_text_instance(&mut text, "new").unwrap();
         renderer.detach_deleted_instance(instance).unwrap();
 
-        let snapshot = renderer.snapshot_instance(&instance);
+        let snapshot = renderer.snapshot_instance(&instance).unwrap();
         assert!(!snapshot.is_hidden());
         assert!(snapshot.is_detached());
         assert!(snapshot.children().is_empty());
+    }
+
+    #[test]
+    fn invalid_same_renderer_handles_are_structured_operation_errors() {
+        let mut renderer = TestRenderer::new();
+        let mut invalid_container = TestContainer {
+            renderer_id: renderer.renderer_id,
+            index: 0,
+        };
+        let invalid_instance = TestInstance {
+            renderer_id: renderer.renderer_id,
+            index: 0,
+        };
+        let mut invalid_text = TestTextInstance {
+            renderer_id: renderer.renderer_id,
+            index: 0,
+        };
+
+        assert_operation_error(
+            renderer.root_host_context(&invalid_container).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Container,
+            },
+        );
+        assert_operation_error(
+            renderer
+                .create_instance(
+                    &element_type("View"),
+                    &props(),
+                    &invalid_container,
+                    &TestHostContext::default(),
+                )
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Container,
+            },
+        );
+        assert_operation_error(
+            renderer
+                .clear_container(&mut invalid_container)
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Container,
+            },
+        );
+        assert_operation_error(
+            renderer.get_public_instance(&invalid_instance).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Instance,
+            },
+        );
+        assert_operation_error(
+            renderer
+                .commit_text_update(&mut invalid_text, "old", "new")
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::TextInstance,
+            },
+        );
+
+        assert_operation_error(
+            renderer.snapshot_container(&invalid_container).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Container,
+            },
+        );
+        assert_operation_error(
+            renderer.snapshot_instance(&invalid_instance).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Instance,
+            },
+        );
+        assert_operation_error(
+            renderer.snapshot_text(&invalid_text).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::TextInstance,
+            },
+        );
+    }
+
+    #[test]
+    fn cross_renderer_handles_are_rejected_even_with_same_indices() {
+        let mut left = TestRenderer::new();
+        let left_container = left.create_container();
+        let mut right = TestRenderer::new();
+        let right_container = right.create_container();
+        let right_instance = create_instance(&mut right, &right_container, "Foreign");
+        let mut right_text = create_text(&mut right, &right_container, "foreign");
+
+        assert_eq!(left_container.index, right_container.index);
+        assert_eq!(right_instance.index, 0);
+        assert_eq!(right_text.index, 0);
+
+        assert_operation_error(
+            left.root_host_context(&right_container).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Container,
+            },
+        );
+        assert_operation_error(
+            left.get_public_instance(&right_instance).unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::Instance,
+            },
+        );
+        assert_operation_error(
+            left.commit_text_update(&mut right_text, "foreign", "changed")
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidHandle {
+                handle: HostHandleKind::TextInstance,
+            },
+        );
+    }
+
+    #[test]
+    fn missing_insert_targets_return_errors_without_detaching_existing_child() {
+        let mut renderer = TestRenderer::new();
+        let container = renderer.create_container();
+        let mut old_parent = create_instance(&mut renderer, &container, "OldParent");
+        let mut new_parent = create_instance(&mut renderer, &container, "NewParent");
+        let moving = create_text(&mut renderer, &container, "moving");
+        let missing_before = create_text(&mut renderer, &container, "missing");
+
+        renderer
+            .append_child(&mut old_parent, HostChild::Text(&moving))
+            .unwrap();
+
+        assert_operation_error(
+            renderer
+                .insert_before(
+                    &mut new_parent,
+                    HostChild::Text(&moving),
+                    HostChild::Text(&missing_before),
+                )
+                .unwrap_err(),
+            HostOperationErrorKind::MissingInsertionTarget {
+                parent: HostParentKind::Instance,
+                target: HostChildKind::TextInstance,
+            },
+        );
+        assert_eq!(
+            child_texts(&renderer.snapshot_instance(&old_parent).unwrap()),
+            vec!["moving"]
+        );
+        assert!(
+            renderer
+                .snapshot_instance(&new_parent)
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn missing_container_insert_targets_return_errors_without_detaching_child() {
+        let mut renderer = TestRenderer::new();
+        let mut container = renderer.create_container();
+        let mut old_parent = create_instance(&mut renderer, &container, "OldParent");
+        let moving = create_text(&mut renderer, &container, "moving");
+        let missing_before = create_text(&mut renderer, &container, "missing");
+
+        renderer
+            .append_child(&mut old_parent, HostChild::Text(&moving))
+            .unwrap();
+
+        assert_operation_error(
+            renderer
+                .insert_in_container_before(
+                    &mut container,
+                    HostChild::Text(&moving),
+                    HostChild::Text(&missing_before),
+                )
+                .unwrap_err(),
+            HostOperationErrorKind::MissingInsertionTarget {
+                parent: HostParentKind::Container,
+                target: HostChildKind::TextInstance,
+            },
+        );
+        assert_eq!(
+            child_texts(&renderer.snapshot_instance(&old_parent).unwrap()),
+            vec!["moving"]
+        );
+        assert!(
+            renderer
+                .snapshot_container(&container)
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn missing_removal_targets_return_errors_without_changing_tree() {
+        let mut renderer = TestRenderer::new();
+        let mut container = renderer.create_container();
+        let mut parent = create_instance(&mut renderer, &container, "Parent");
+        let attached = create_text(&mut renderer, &container, "attached");
+        let missing = create_text(&mut renderer, &container, "missing");
+
+        renderer
+            .append_child(&mut parent, HostChild::Text(&attached))
+            .unwrap();
+        renderer
+            .append_child_to_container(&mut container, HostChild::Instance(&parent))
+            .unwrap();
+
+        assert_operation_error(
+            renderer
+                .remove_child(&mut parent, HostChild::Text(&missing))
+                .unwrap_err(),
+            HostOperationErrorKind::MissingRemovalTarget {
+                parent: HostParentKind::Instance,
+                child: HostChildKind::TextInstance,
+            },
+        );
+        assert_operation_error(
+            renderer
+                .remove_child_from_container(&mut container, HostChild::Text(&missing))
+                .unwrap_err(),
+            HostOperationErrorKind::MissingRemovalTarget {
+                parent: HostParentKind::Container,
+                child: HostChildKind::TextInstance,
+            },
+        );
+        assert_eq!(
+            child_texts(&renderer.snapshot_instance(&parent).unwrap()),
+            vec!["attached"]
+        );
+        assert_eq!(
+            container_element_names(&renderer.snapshot_container(&container).unwrap()),
+            vec!["Parent"]
+        );
+    }
+
+    #[test]
+    fn impossible_self_and_cycle_mutations_return_operation_errors() {
+        let mut renderer = TestRenderer::new();
+        let container = renderer.create_container();
+        let mut parent = create_instance(&mut renderer, &container, "Parent");
+        let mut child = create_instance(&mut renderer, &container, "Child");
+
+        let same_parent = parent;
+        assert_operation_error(
+            renderer
+                .append_child(&mut parent, HostChild::Instance(&same_parent))
+                .unwrap_err(),
+            HostOperationErrorKind::ImpossibleMutation {
+                parent: HostParentKind::Instance,
+                child: HostChildKind::Instance,
+                violation: HostMutationViolation::ChildIsParent,
+            },
+        );
+
+        renderer
+            .append_child(&mut parent, HostChild::Instance(&child))
+            .unwrap();
+
+        assert_operation_error(
+            renderer
+                .append_child(&mut child, HostChild::Instance(&parent))
+                .unwrap_err(),
+            HostOperationErrorKind::ImpossibleMutation {
+                parent: HostParentKind::Instance,
+                child: HostChildKind::Instance,
+                violation: HostMutationViolation::ChildIsAncestorOfParent,
+            },
+        );
+        assert_eq!(
+            renderer
+                .snapshot_instance(&parent)
+                .unwrap()
+                .children()
+                .len(),
+            1
+        );
+        assert!(
+            renderer
+                .snapshot_instance(&child)
+                .unwrap()
+                .children()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1147,13 +1645,17 @@ mod tests {
             HostCapability::ViewTransitions,
         ] {
             let error = renderer.require_capability(capability).unwrap_err();
-            assert_eq!(error.renderer_name(), TEST_RENDERER_NAME);
-            assert_eq!(error.capability(), capability);
+            let unsupported = error.as_unsupported_capability().unwrap();
+            assert_eq!(unsupported.renderer_name(), TEST_RENDERER_NAME);
+            assert_eq!(unsupported.capability(), capability);
+            assert!(error.as_operation_error().is_none());
         }
 
         let mut form = ();
         let error = renderer.reset_form_instance(&mut form).unwrap_err();
-        assert_eq!(error.renderer_name(), TEST_RENDERER_NAME);
-        assert_eq!(error.capability(), HostCapability::Forms);
+        let unsupported = error.as_unsupported_capability().unwrap();
+        assert_eq!(unsupported.renderer_name(), TEST_RENDERER_NAME);
+        assert_eq!(unsupported.capability(), HostCapability::Forms);
+        assert!(error.as_operation_error().is_none());
     }
 }
