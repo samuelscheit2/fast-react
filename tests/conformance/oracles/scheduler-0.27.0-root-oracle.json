@@ -1,0 +1,5611 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "scheduler-0.27.0-root-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "scheduler 0.27.0 public root entrypoint behavior oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-007-scheduler-fiber.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-034-scheduler-package-inventory.md"
+  ],
+  "generation": {
+    "method": "exact scheduler npm tarball extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per scheduler scenario and mode",
+    "probeTimeoutMs": 15000,
+    "generatedTimestampIncluded": false,
+    "timingNormalization": "raw wall-clock timestamps are omitted; probes record logical ordering, timeout buckets, and boolean didTimeout categories"
+  },
+  "evidenceClaims": {
+    "npmMetadataResolved": true,
+    "tarballDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "schedulerRootBehaviorProbed": true,
+    "nodeSetImmediateTransportObserved": true,
+    "fastReactComparedToScheduler": false
+  },
+  "conformanceClaims": {
+    "realSchedulerBehaviorProbed": true,
+    "fastReactComparedToScheduler": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "schedulerTarget": {
+    "packageName": "scheduler",
+    "version": "0.27.0",
+    "role": "official-public-scheduler-root-target"
+  },
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "reason": "The public scheduler root entrypoint selects cjs/scheduler.development.js when NODE_ENV is not production."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "reason": "The public scheduler root entrypoint selects cjs/scheduler.production.js when NODE_ENV is production."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "scheduler-root-export-shape",
+      "area": "Root exports and constants",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "package identity",
+        "root export key order",
+        "export descriptors",
+        "priority constant values",
+        "function names and lengths",
+        "absence of unstable_NoPriority"
+      ]
+    },
+    {
+      "id": "scheduler-root-task-object-shape",
+      "area": "Scheduled task object shape and timeout categories",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "returned task own-key order",
+        "ready task sortIndex role",
+        "delayed task sortIndex role",
+        "priority timeout buckets",
+        "delayed start bucket",
+        "cancellation tombstone mutation"
+      ]
+    },
+    {
+      "id": "scheduler-root-priority-ordering",
+      "area": "Priority ordering",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "ready callback execution order across all public priorities",
+        "current priority level while each callback executes"
+      ]
+    },
+    {
+      "id": "scheduler-root-equal-priority-fifo",
+      "area": "Equal-priority FIFO",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "same-priority callbacks preserve insertion order",
+        "current priority level for FIFO callbacks"
+      ]
+    },
+    {
+      "id": "scheduler-root-delayed-callbacks",
+      "area": "Delayed callbacks",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "ready work runs before delayed work",
+        "delayed task runs after becoming eligible",
+        "delayed callback didTimeout value",
+        "delayed cancellation prevents callback execution"
+      ]
+    },
+    {
+      "id": "scheduler-root-cancellation",
+      "area": "Cancellation tombstones",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "cancelCallback nulls the task callback",
+        "cancelled ready work is skipped",
+        "remaining ready work preserves order"
+      ]
+    },
+    {
+      "id": "scheduler-root-continuations",
+      "area": "Continuation callbacks",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "callback return function is stored as a continuation",
+        "continuation runs before later same-priority work",
+        "continuation keeps the same current priority level"
+      ]
+    },
+    {
+      "id": "scheduler-root-did-timeout",
+      "area": "didTimeout callback argument",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "Immediate callbacks receive didTimeout true",
+        "UserBlocking callbacks receive didTimeout true after a blocked event loop",
+        "Normal callbacks remain non-timeout under the same generous block"
+      ]
+    },
+    {
+      "id": "scheduler-root-priority-context",
+      "area": "Priority context APIs",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "default current priority",
+        "runWithPriority priority coercion and restoration",
+        "next priority lowering rules",
+        "wrapCallback priority capture",
+        "wrapCallback this, argument, and return forwarding"
+      ]
+    },
+    {
+      "id": "scheduler-root-yield-paint-frame-rate",
+      "area": "Yield, paint, and frame-rate APIs",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "shouldYield inside scheduled work",
+        "requestPaint forces yielding",
+        "requestPaint resets on the next host callback",
+        "forceFrameRate accepts valid values",
+        "forceFrameRate reports invalid values"
+      ]
+    },
+    {
+      "id": "scheduler-root-node-host-transport",
+      "area": "Node host callback transport",
+      "entrypoints": [
+        "scheduler"
+      ],
+      "captures": [
+        "setImmediate is captured before requiring scheduler",
+        "ready work is scheduled through setImmediate in Node",
+        "transport evidence is recorded without temp paths"
+      ]
+    }
+  ],
+  "packages": {
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "official-public-scheduler-root-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null
+      }
+    }
+  },
+  "coverage": {
+    "exportKeys": true,
+    "constants": true,
+    "priorityOrdering": true,
+    "equalPriorityFifo": true,
+    "delayedCallbacks": true,
+    "cancellation": true,
+    "continuations": true,
+    "didTimeout": true,
+    "priorityContextApis": true,
+    "shouldYield": true,
+    "requestPaint": true,
+    "forceFrameRate": true,
+    "nodeHostCallbackTransport": true
+  },
+  "timingCaveats": [
+    "The checked artifact intentionally omits raw times and absolute timestamps.",
+    "The didTimeout scenario blocks the event loop for at least 400ms, comfortably beyond UserBlocking's 250ms timeout and far below Normal's 5000ms timeout.",
+    "Delayed callback probes assert execution order and cancellation behavior, not precise millisecond delivery."
+  ],
+  "schedulerObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "scheduler-root-export-shape",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-export-shape",
+          "result": {
+            "status": "returned",
+            "value": {
+              "packageJson": {
+                "name": "scheduler",
+                "version": "0.27.0",
+                "main": null,
+                "type": null,
+                "exports": null
+              },
+              "exportKeys": [
+                "unstable_now",
+                "unstable_IdlePriority",
+                "unstable_ImmediatePriority",
+                "unstable_LowPriority",
+                "unstable_NormalPriority",
+                "unstable_Profiling",
+                "unstable_UserBlockingPriority",
+                "unstable_cancelCallback",
+                "unstable_forceFrameRate",
+                "unstable_getCurrentPriorityLevel",
+                "unstable_next",
+                "unstable_requestPaint",
+                "unstable_runWithPriority",
+                "unstable_scheduleCallback",
+                "unstable_shouldYield",
+                "unstable_wrapCallback"
+              ],
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "unstable_now"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_IdlePriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_ImmediatePriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_LowPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_NormalPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_Profiling"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_UserBlockingPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_cancelCallback"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_forceFrameRate"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_getCurrentPriorityLevel"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_next"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_requestPaint"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_runWithPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_scheduleCallback"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_shouldYield"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_wrapCallback"
+                }
+              ],
+              "constants": {
+                "unstable_ImmediatePriority": 1,
+                "unstable_UserBlockingPriority": 2,
+                "unstable_NormalPriority": 3,
+                "unstable_LowPriority": 4,
+                "unstable_IdlePriority": 5,
+                "unstable_Profiling": null
+              },
+              "unstableNoPriority": {
+                "hasIn": false,
+                "hasOwn": false
+              },
+              "descriptors": [
+                {
+                  "key": "unstable_now",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_IdlePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 5
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_ImmediatePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_LowPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 4
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_NormalPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_Profiling",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "null"
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_UserBlockingPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_next",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "shouldYieldToHost",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                }
+              ],
+              "functionExports": [
+                {
+                  "key": "unstable_now",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_next",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 2
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 3
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "value": {
+                    "type": "function",
+                    "name": "shouldYieldToHost",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-task-object-shape",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-task-object-shape",
+          "result": {
+            "status": "returned",
+            "value": {
+              "readyTasks": [
+                {
+                  "label": "immediate",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 1
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 1,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "-1ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": false
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 1
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 1,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "-1ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": false
+                  }
+                },
+                {
+                  "label": "user-blocking",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 2
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 2,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "250ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 2
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 2,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "250ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                },
+                {
+                  "label": "normal",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 3
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 3,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "5000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 3
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 3,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "5000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                },
+                {
+                  "label": "low",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 4
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 4,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "10000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 4
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 4,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "10000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                },
+                {
+                  "label": "idle",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 5
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 5,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "1073741823ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 5
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 5,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "1073741823ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                }
+              ],
+              "delayedTask": {
+                "label": "normal-delayed-40ms",
+                "beforeCancel": {
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "id"
+                    },
+                    {
+                      "type": "string",
+                      "value": "callback"
+                    },
+                    {
+                      "type": "string",
+                      "value": "priorityLevel"
+                    },
+                    {
+                      "type": "string",
+                      "value": "startTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "expirationTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "sortIndex"
+                    }
+                  ],
+                  "objectKeys": [
+                    "id",
+                    "callback",
+                    "priorityLevel",
+                    "startTime",
+                    "expirationTime",
+                    "sortIndex"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "id",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "integer": true,
+                          "positive": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "callback",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "function",
+                          "name": "",
+                          "length": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "value": 3
+                        }
+                      }
+                    },
+                    {
+                      "key": "startTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "expirationTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "sortIndex",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    }
+                  ],
+                  "id": {
+                    "isInteger": true,
+                    "isPositive": true
+                  },
+                  "callback": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "priorityLevel": 3,
+                  "startTime": "delayed-future-start",
+                  "expirationDelta": "5000ms",
+                  "sortIndexRole": "startTime",
+                  "expirationTimeAfterStartTime": true
+                },
+                "afterCancel": {
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "id"
+                    },
+                    {
+                      "type": "string",
+                      "value": "callback"
+                    },
+                    {
+                      "type": "string",
+                      "value": "priorityLevel"
+                    },
+                    {
+                      "type": "string",
+                      "value": "startTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "expirationTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "sortIndex"
+                    }
+                  ],
+                  "objectKeys": [
+                    "id",
+                    "callback",
+                    "priorityLevel",
+                    "startTime",
+                    "expirationTime",
+                    "sortIndex"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "id",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "integer": true,
+                          "positive": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "callback",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "value": 3
+                        }
+                      }
+                    },
+                    {
+                      "key": "startTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "expirationTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "sortIndex",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    }
+                  ],
+                  "id": {
+                    "isInteger": true,
+                    "isPositive": true
+                  },
+                  "callback": {
+                    "type": "null"
+                  },
+                  "priorityLevel": 3,
+                  "startTime": "delayed-future-start",
+                  "expirationDelta": "5000ms",
+                  "sortIndexRole": "startTime",
+                  "expirationTimeAfterStartTime": true
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-priority-ordering",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-priority-ordering",
+          "result": {
+            "status": "returned",
+            "value": {
+              "scheduledOrder": [
+                "idle",
+                "low",
+                "normal",
+                "user-blocking",
+                "immediate"
+              ],
+              "runOrder": [
+                "immediate",
+                "user-blocking",
+                "normal",
+                "low",
+                "idle"
+              ],
+              "events": [
+                {
+                  "label": "immediate",
+                  "currentPriorityLevel": 1
+                },
+                {
+                  "label": "user-blocking",
+                  "currentPriorityLevel": 2
+                },
+                {
+                  "label": "normal",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "low",
+                  "currentPriorityLevel": 4
+                },
+                {
+                  "label": "idle",
+                  "currentPriorityLevel": 5
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-equal-priority-fifo",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-equal-priority-fifo",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "first",
+                "second",
+                "third",
+                "fourth"
+              ],
+              "events": [
+                {
+                  "label": "first",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "second",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "third",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "fourth",
+                  "currentPriorityLevel": 3
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-delayed-callbacks",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-delayed-callbacks",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "ready-normal",
+                "delayed-normal"
+              ],
+              "events": [
+                {
+                  "label": "ready-normal",
+                  "didTimeout": "not-captured-for-order"
+                },
+                {
+                  "label": "delayed-normal",
+                  "didTimeout": false
+                }
+              ],
+              "cancelledDelayedCallbackAfterCancel": {
+                "type": "null"
+              },
+              "cancelledDelayedRan": false
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-cancellation",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-cancellation",
+          "result": {
+            "status": "returned",
+            "value": {
+              "beforeCancelCallback": {
+                "type": "function",
+                "name": "",
+                "length": 0
+              },
+              "afterCancelCallback": {
+                "type": "null"
+              },
+              "runOrder": [
+                "first",
+                "third"
+              ],
+              "cancelledTask": {
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "id"
+                  },
+                  {
+                    "type": "string",
+                    "value": "callback"
+                  },
+                  {
+                    "type": "string",
+                    "value": "priorityLevel"
+                  },
+                  {
+                    "type": "string",
+                    "value": "startTime"
+                  },
+                  {
+                    "type": "string",
+                    "value": "expirationTime"
+                  },
+                  {
+                    "type": "string",
+                    "value": "sortIndex"
+                  }
+                ],
+                "objectKeys": [
+                  "id",
+                  "callback",
+                  "priorityLevel",
+                  "startTime",
+                  "expirationTime",
+                  "sortIndex"
+                ],
+                "descriptors": [
+                  {
+                    "key": "id",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "integer": true,
+                        "positive": true
+                      }
+                    }
+                  },
+                  {
+                    "key": "callback",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  {
+                    "key": "priorityLevel",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "value": 3
+                      }
+                    }
+                  },
+                  {
+                    "key": "startTime",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "finite": true
+                      }
+                    }
+                  },
+                  {
+                    "key": "expirationTime",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "finite": true
+                      }
+                    }
+                  },
+                  {
+                    "key": "sortIndex",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "finite": true
+                      }
+                    }
+                  }
+                ],
+                "id": {
+                  "isInteger": true,
+                  "isPositive": true
+                },
+                "callback": {
+                  "type": "null"
+                },
+                "priorityLevel": 3,
+                "startTime": "ready-current-or-future",
+                "expirationDelta": "5000ms",
+                "sortIndexRole": "expirationTime",
+                "expirationTimeAfterStartTime": true
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-continuations",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-continuations",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "first-callback",
+                "first-continuation",
+                "second-callback"
+              ],
+              "events": [
+                {
+                  "label": "first-callback",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "first-continuation",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "second-callback",
+                  "currentPriorityLevel": 3
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-did-timeout",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-did-timeout",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "immediate",
+                "user-blocking-expired",
+                "normal-after-block"
+              ],
+              "didTimeoutByLabel": {
+                "immediate": true,
+                "user-blocking-expired": true,
+                "normal-after-block": false
+              },
+              "blockDurationCategory": ">=400ms-and-<normal-timeout"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-priority-context",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-priority-context",
+          "result": {
+            "status": "returned",
+            "value": {
+              "defaultCurrentPriorityLevel": 3,
+              "runWithPriority": [
+                {
+                  "label": "immediate",
+                  "returnValue": {
+                    "currentPriorityLevel": 1
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "user-blocking",
+                  "returnValue": {
+                    "currentPriorityLevel": 2
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "normal",
+                  "returnValue": {
+                    "currentPriorityLevel": 3
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "low",
+                  "returnValue": {
+                    "currentPriorityLevel": 4
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "idle",
+                  "returnValue": {
+                    "currentPriorityLevel": 5
+                  },
+                  "afterReturnPriorityLevel": 3
+                }
+              ],
+              "invalidRunWithPriority": [
+                {
+                  "input": {
+                    "type": "number",
+                    "value": 0
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "input": {
+                    "type": "number",
+                    "value": 6
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "input": {
+                    "type": "string",
+                    "value": "user-blocking"
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "input": {
+                    "type": "null"
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                }
+              ],
+              "restorationAfterThrow": {
+                "status": "returned",
+                "value": {
+                  "error": {
+                    "name": "Error",
+                    "message": "priority context probe",
+                    "code": null
+                  },
+                  "currentPriorityLevel": 3
+                }
+              },
+              "nextByParent": [
+                {
+                  "parent": "immediate",
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "user-blocking",
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "normal",
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "low",
+                  "currentPriorityLevel": 4,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "idle",
+                  "currentPriorityLevel": 5,
+                  "afterReturnPriorityLevel": 3
+                }
+              ],
+              "wrapCallback": {
+                "beforeCallPriorityLevel": 4,
+                "callResult": {
+                  "thisLabel": "receiver",
+                  "args": [
+                    "alpha",
+                    "beta"
+                  ],
+                  "currentPriorityLevel": 2
+                },
+                "afterCallPriorityLevel": 4,
+                "wrappedFunction": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-yield-paint-frame-rate",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-yield-paint-frame-rate",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "first",
+                "second"
+              ],
+              "events": [
+                {
+                  "label": "first",
+                  "shouldYieldBeforePaint": false,
+                  "shouldYieldAfterTwentyMsAtOneFps": false,
+                  "shouldYieldAfterRequestPaint": true
+                },
+                {
+                  "label": "second",
+                  "shouldYieldAtSecondCallbackStart": false
+                }
+              ],
+              "forceFrameRateConsoleErrors": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                    }
+                  ]
+                },
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-node-host-transport",
+        "packageName": "scheduler",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-node-host-transport",
+          "result": {
+            "status": "returned",
+            "value": {
+              "setImmediateAvailable": true,
+              "transportCalls": [
+                {
+                  "transport": "setImmediate",
+                  "callbackType": "function",
+                  "argumentCount": 0
+                }
+              ],
+              "firstTransport": "setImmediate",
+              "runOrder": [
+                "normal-callback"
+              ],
+              "events": [
+                {
+                  "label": "normal-callback",
+                  "currentPriorityLevel": 3
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "scheduler-root-export-shape",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-export-shape",
+          "result": {
+            "status": "returned",
+            "value": {
+              "packageJson": {
+                "name": "scheduler",
+                "version": "0.27.0",
+                "main": null,
+                "type": null,
+                "exports": null
+              },
+              "exportKeys": [
+                "unstable_now",
+                "unstable_IdlePriority",
+                "unstable_ImmediatePriority",
+                "unstable_LowPriority",
+                "unstable_NormalPriority",
+                "unstable_Profiling",
+                "unstable_UserBlockingPriority",
+                "unstable_cancelCallback",
+                "unstable_forceFrameRate",
+                "unstable_getCurrentPriorityLevel",
+                "unstable_next",
+                "unstable_requestPaint",
+                "unstable_runWithPriority",
+                "unstable_scheduleCallback",
+                "unstable_shouldYield",
+                "unstable_wrapCallback"
+              ],
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "unstable_now"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_IdlePriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_ImmediatePriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_LowPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_NormalPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_Profiling"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_UserBlockingPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_cancelCallback"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_forceFrameRate"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_getCurrentPriorityLevel"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_next"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_requestPaint"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_runWithPriority"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_scheduleCallback"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_shouldYield"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_wrapCallback"
+                }
+              ],
+              "constants": {
+                "unstable_ImmediatePriority": 1,
+                "unstable_UserBlockingPriority": 2,
+                "unstable_NormalPriority": 3,
+                "unstable_LowPriority": 4,
+                "unstable_IdlePriority": 5,
+                "unstable_Profiling": null
+              },
+              "unstableNoPriority": {
+                "hasIn": false,
+                "hasOwn": false
+              },
+              "descriptors": [
+                {
+                  "key": "unstable_now",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_IdlePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 5
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_ImmediatePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_LowPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 4
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_NormalPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_Profiling",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "null"
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_UserBlockingPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_next",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "shouldYieldToHost",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1
+                    }
+                  }
+                }
+              ],
+              "functionExports": [
+                {
+                  "key": "unstable_now",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_next",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 2
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 3
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "value": {
+                    "type": "function",
+                    "name": "shouldYieldToHost",
+                    "length": 0
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "value": {
+                    "type": "function",
+                    "name": "",
+                    "length": 1
+                  },
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-task-object-shape",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-task-object-shape",
+          "result": {
+            "status": "returned",
+            "value": {
+              "readyTasks": [
+                {
+                  "label": "immediate",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 1
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 1,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "-1ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": false
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 1
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 1,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "-1ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": false
+                  }
+                },
+                {
+                  "label": "user-blocking",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 2
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 2,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "250ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 2
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 2,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "250ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                },
+                {
+                  "label": "normal",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 3
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 3,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "5000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 3
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 3,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "5000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                },
+                {
+                  "label": "low",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 4
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 4,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "10000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 4
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 4,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "10000ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                },
+                {
+                  "label": "idle",
+                  "beforeCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "function",
+                            "name": "",
+                            "length": 0
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 5
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0
+                    },
+                    "priorityLevel": 5,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "1073741823ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  },
+                  "afterCancel": {
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "id"
+                      },
+                      {
+                        "type": "string",
+                        "value": "callback"
+                      },
+                      {
+                        "type": "string",
+                        "value": "priorityLevel"
+                      },
+                      {
+                        "type": "string",
+                        "value": "startTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "expirationTime"
+                      },
+                      {
+                        "type": "string",
+                        "value": "sortIndex"
+                      }
+                    ],
+                    "objectKeys": [
+                      "id",
+                      "callback",
+                      "priorityLevel",
+                      "startTime",
+                      "expirationTime",
+                      "sortIndex"
+                    ],
+                    "descriptors": [
+                      {
+                        "key": "id",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "integer": true,
+                            "positive": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "callback",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "key": "priorityLevel",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "value": 5
+                          }
+                        }
+                      },
+                      {
+                        "key": "startTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "expirationTime",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      },
+                      {
+                        "key": "sortIndex",
+                        "descriptor": {
+                          "configurable": true,
+                          "enumerable": true,
+                          "writable": true,
+                          "valueType": {
+                            "type": "number",
+                            "finite": true
+                          }
+                        }
+                      }
+                    ],
+                    "id": {
+                      "isInteger": true,
+                      "isPositive": true
+                    },
+                    "callback": {
+                      "type": "null"
+                    },
+                    "priorityLevel": 5,
+                    "startTime": "ready-current-or-future",
+                    "expirationDelta": "1073741823ms",
+                    "sortIndexRole": "expirationTime",
+                    "expirationTimeAfterStartTime": true
+                  }
+                }
+              ],
+              "delayedTask": {
+                "label": "normal-delayed-40ms",
+                "beforeCancel": {
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "id"
+                    },
+                    {
+                      "type": "string",
+                      "value": "callback"
+                    },
+                    {
+                      "type": "string",
+                      "value": "priorityLevel"
+                    },
+                    {
+                      "type": "string",
+                      "value": "startTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "expirationTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "sortIndex"
+                    }
+                  ],
+                  "objectKeys": [
+                    "id",
+                    "callback",
+                    "priorityLevel",
+                    "startTime",
+                    "expirationTime",
+                    "sortIndex"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "id",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "integer": true,
+                          "positive": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "callback",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "function",
+                          "name": "",
+                          "length": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "value": 3
+                        }
+                      }
+                    },
+                    {
+                      "key": "startTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "expirationTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "sortIndex",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    }
+                  ],
+                  "id": {
+                    "isInteger": true,
+                    "isPositive": true
+                  },
+                  "callback": {
+                    "type": "function",
+                    "name": "",
+                    "length": 0
+                  },
+                  "priorityLevel": 3,
+                  "startTime": "delayed-future-start",
+                  "expirationDelta": "5000ms",
+                  "sortIndexRole": "startTime",
+                  "expirationTimeAfterStartTime": true
+                },
+                "afterCancel": {
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "id"
+                    },
+                    {
+                      "type": "string",
+                      "value": "callback"
+                    },
+                    {
+                      "type": "string",
+                      "value": "priorityLevel"
+                    },
+                    {
+                      "type": "string",
+                      "value": "startTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "expirationTime"
+                    },
+                    {
+                      "type": "string",
+                      "value": "sortIndex"
+                    }
+                  ],
+                  "objectKeys": [
+                    "id",
+                    "callback",
+                    "priorityLevel",
+                    "startTime",
+                    "expirationTime",
+                    "sortIndex"
+                  ],
+                  "descriptors": [
+                    {
+                      "key": "id",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "integer": true,
+                          "positive": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "callback",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "key": "priorityLevel",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "value": 3
+                        }
+                      }
+                    },
+                    {
+                      "key": "startTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "expirationTime",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    },
+                    {
+                      "key": "sortIndex",
+                      "descriptor": {
+                        "configurable": true,
+                        "enumerable": true,
+                        "writable": true,
+                        "valueType": {
+                          "type": "number",
+                          "finite": true
+                        }
+                      }
+                    }
+                  ],
+                  "id": {
+                    "isInteger": true,
+                    "isPositive": true
+                  },
+                  "callback": {
+                    "type": "null"
+                  },
+                  "priorityLevel": 3,
+                  "startTime": "delayed-future-start",
+                  "expirationDelta": "5000ms",
+                  "sortIndexRole": "startTime",
+                  "expirationTimeAfterStartTime": true
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-priority-ordering",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-priority-ordering",
+          "result": {
+            "status": "returned",
+            "value": {
+              "scheduledOrder": [
+                "idle",
+                "low",
+                "normal",
+                "user-blocking",
+                "immediate"
+              ],
+              "runOrder": [
+                "immediate",
+                "user-blocking",
+                "normal",
+                "low",
+                "idle"
+              ],
+              "events": [
+                {
+                  "label": "immediate",
+                  "currentPriorityLevel": 1
+                },
+                {
+                  "label": "user-blocking",
+                  "currentPriorityLevel": 2
+                },
+                {
+                  "label": "normal",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "low",
+                  "currentPriorityLevel": 4
+                },
+                {
+                  "label": "idle",
+                  "currentPriorityLevel": 5
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-equal-priority-fifo",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-equal-priority-fifo",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "first",
+                "second",
+                "third",
+                "fourth"
+              ],
+              "events": [
+                {
+                  "label": "first",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "second",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "third",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "fourth",
+                  "currentPriorityLevel": 3
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-delayed-callbacks",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-delayed-callbacks",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "ready-normal",
+                "delayed-normal"
+              ],
+              "events": [
+                {
+                  "label": "ready-normal",
+                  "didTimeout": "not-captured-for-order"
+                },
+                {
+                  "label": "delayed-normal",
+                  "didTimeout": false
+                }
+              ],
+              "cancelledDelayedCallbackAfterCancel": {
+                "type": "null"
+              },
+              "cancelledDelayedRan": false
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-cancellation",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-cancellation",
+          "result": {
+            "status": "returned",
+            "value": {
+              "beforeCancelCallback": {
+                "type": "function",
+                "name": "",
+                "length": 0
+              },
+              "afterCancelCallback": {
+                "type": "null"
+              },
+              "runOrder": [
+                "first",
+                "third"
+              ],
+              "cancelledTask": {
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "id"
+                  },
+                  {
+                    "type": "string",
+                    "value": "callback"
+                  },
+                  {
+                    "type": "string",
+                    "value": "priorityLevel"
+                  },
+                  {
+                    "type": "string",
+                    "value": "startTime"
+                  },
+                  {
+                    "type": "string",
+                    "value": "expirationTime"
+                  },
+                  {
+                    "type": "string",
+                    "value": "sortIndex"
+                  }
+                ],
+                "objectKeys": [
+                  "id",
+                  "callback",
+                  "priorityLevel",
+                  "startTime",
+                  "expirationTime",
+                  "sortIndex"
+                ],
+                "descriptors": [
+                  {
+                    "key": "id",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "integer": true,
+                        "positive": true
+                      }
+                    }
+                  },
+                  {
+                    "key": "callback",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  {
+                    "key": "priorityLevel",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "value": 3
+                      }
+                    }
+                  },
+                  {
+                    "key": "startTime",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "finite": true
+                      }
+                    }
+                  },
+                  {
+                    "key": "expirationTime",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "finite": true
+                      }
+                    }
+                  },
+                  {
+                    "key": "sortIndex",
+                    "descriptor": {
+                      "configurable": true,
+                      "enumerable": true,
+                      "writable": true,
+                      "valueType": {
+                        "type": "number",
+                        "finite": true
+                      }
+                    }
+                  }
+                ],
+                "id": {
+                  "isInteger": true,
+                  "isPositive": true
+                },
+                "callback": {
+                  "type": "null"
+                },
+                "priorityLevel": 3,
+                "startTime": "ready-current-or-future",
+                "expirationDelta": "5000ms",
+                "sortIndexRole": "expirationTime",
+                "expirationTimeAfterStartTime": true
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-continuations",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-continuations",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "first-callback",
+                "first-continuation",
+                "second-callback"
+              ],
+              "events": [
+                {
+                  "label": "first-callback",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "first-continuation",
+                  "currentPriorityLevel": 3
+                },
+                {
+                  "label": "second-callback",
+                  "currentPriorityLevel": 3
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-did-timeout",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-did-timeout",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "immediate",
+                "user-blocking-expired",
+                "normal-after-block"
+              ],
+              "didTimeoutByLabel": {
+                "immediate": true,
+                "user-blocking-expired": true,
+                "normal-after-block": false
+              },
+              "blockDurationCategory": ">=400ms-and-<normal-timeout"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-priority-context",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-priority-context",
+          "result": {
+            "status": "returned",
+            "value": {
+              "defaultCurrentPriorityLevel": 3,
+              "runWithPriority": [
+                {
+                  "label": "immediate",
+                  "returnValue": {
+                    "currentPriorityLevel": 1
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "user-blocking",
+                  "returnValue": {
+                    "currentPriorityLevel": 2
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "normal",
+                  "returnValue": {
+                    "currentPriorityLevel": 3
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "low",
+                  "returnValue": {
+                    "currentPriorityLevel": 4
+                  },
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "label": "idle",
+                  "returnValue": {
+                    "currentPriorityLevel": 5
+                  },
+                  "afterReturnPriorityLevel": 3
+                }
+              ],
+              "invalidRunWithPriority": [
+                {
+                  "input": {
+                    "type": "number",
+                    "value": 0
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "input": {
+                    "type": "number",
+                    "value": 6
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "input": {
+                    "type": "string",
+                    "value": "user-blocking"
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "input": {
+                    "type": "null"
+                  },
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                }
+              ],
+              "restorationAfterThrow": {
+                "status": "returned",
+                "value": {
+                  "error": {
+                    "name": "Error",
+                    "message": "priority context probe",
+                    "code": null
+                  },
+                  "currentPriorityLevel": 3
+                }
+              },
+              "nextByParent": [
+                {
+                  "parent": "immediate",
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "user-blocking",
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "normal",
+                  "currentPriorityLevel": 3,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "low",
+                  "currentPriorityLevel": 4,
+                  "afterReturnPriorityLevel": 3
+                },
+                {
+                  "parent": "idle",
+                  "currentPriorityLevel": 5,
+                  "afterReturnPriorityLevel": 3
+                }
+              ],
+              "wrapCallback": {
+                "beforeCallPriorityLevel": 4,
+                "callResult": {
+                  "thisLabel": "receiver",
+                  "args": [
+                    "alpha",
+                    "beta"
+                  ],
+                  "currentPriorityLevel": 2
+                },
+                "afterCallPriorityLevel": 4,
+                "wrappedFunction": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-yield-paint-frame-rate",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-yield-paint-frame-rate",
+          "result": {
+            "status": "returned",
+            "value": {
+              "runOrder": [
+                "first",
+                "second"
+              ],
+              "events": [
+                {
+                  "label": "first",
+                  "shouldYieldBeforePaint": false,
+                  "shouldYieldAfterTwentyMsAtOneFps": false,
+                  "shouldYieldAfterRequestPaint": true
+                },
+                {
+                  "label": "second",
+                  "shouldYieldAtSecondCallbackStart": false
+                }
+              ],
+              "forceFrameRateConsoleErrors": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                    }
+                  ]
+                },
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "scheduler-root-node-host-transport",
+        "packageName": "scheduler",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "scheduler",
+          "scenarioId": "scheduler-root-node-host-transport",
+          "result": {
+            "status": "returned",
+            "value": {
+              "setImmediateAvailable": true,
+              "transportCalls": [
+                {
+                  "transport": "setImmediate",
+                  "callbackType": "function",
+                  "argumentCount": 0
+                }
+              ],
+              "firstTransport": "setImmediate",
+              "runOrder": [
+                "normal-callback"
+              ],
+              "events": [
+                {
+                  "label": "normal-callback",
+                  "currentPriorityLevel": 3
+                }
+              ]
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ]
+  }
+}
