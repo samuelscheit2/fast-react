@@ -54,3 +54,6 @@ Last updated: 2026-05-10
 - Merged worker 119 core fiber topology foundation; verified with
   `cargo fmt --all --check`, full and targeted `fast-react-core` tests,
   `fast-react-core` clippy, and `git diff --check`.
+- Merged worker 120 scheduler mock source implementation; verified with
+  scheduler mock `node --check`, oracle regeneration/test, `npm run check:js`,
+  and `git diff --check`.
