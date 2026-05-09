@@ -12,16 +12,11 @@ const {
   isValidElement
 } = require('./element-factory.js');
 const { createRef } = require('./ref-object.js');
+const { createChildrenHelpers } = require('./children-helper.js');
 
 const entrypoint = 'react';
 
-const Children = Object.freeze({
-  count: createUnimplementedFunction(entrypoint, 'Children.count'),
-  forEach: createUnimplementedFunction(entrypoint, 'Children.forEach'),
-  map: createUnimplementedFunction(entrypoint, 'Children.map'),
-  only: createUnimplementedFunction(entrypoint, 'Children.only'),
-  toArray: createUnimplementedFunction(entrypoint, 'Children.toArray')
-});
+const Children = createChildrenHelpers({ reactServer: true });
 
 exports.Children = Children;
 exports.Fragment = Symbol.for('react.fragment');

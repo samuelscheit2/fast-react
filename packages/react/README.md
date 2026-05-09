@@ -14,7 +14,9 @@ scaffold:
 Exports import successfully for smoke checks. The element factory APIs covered
 by the React 19.2.6 element-object oracle now construct JavaScript element
 objects. Direct `createRef()` calls covered by the React 19.2.6 ref-object
-oracle now return React-shaped ref objects. Unsupported React behavior still
+oracle now return React-shaped ref objects. Direct `React.Children` helper
+behavior covered by the React 19.2.6 children-helper oracle now matches for
+default and `react-server` root entrypoints. Unsupported React behavior still
 throws an explicit unimplemented error until conformance-backed implementations
 are added.
 

@@ -5,6 +5,9 @@
   "description": "Deterministic runtime/package inventory and behavior-oracle generation for pinned React targets.",
   "type": "module",
   "scripts": {
+    "children-helper:generate": "node scripts/generate-children-helper-oracle.mjs --write",
+    "children-helper:print": "node scripts/print-children-helper-oracle.mjs --format=json",
+    "children-helper:print:markdown": "node scripts/print-children-helper-oracle.mjs --format=markdown",
     "element-object:generate": "node scripts/generate-element-object-oracle.mjs --write",
     "element-object:print": "node scripts/print-element-object-oracle.mjs --format=json",
     "element-object:print:markdown": "node scripts/print-element-object-oracle.mjs --format=markdown",

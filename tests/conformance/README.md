@@ -28,6 +28,7 @@ Checked-in generated artifact:
 - `inventory/react-19.2.6-runtime-package-inventory.json`
 - `oracles/react-19.2.6-element-object-oracle.json`
 - `oracles/react-19.2.6-ref-object-oracle.json`
+- `oracles/react-19.2.6-children-helper-oracle.json`
 
 Commands:
 
@@ -41,6 +42,9 @@ npm run element-object:print:markdown --workspace @fast-react/conformance
 npm run ref-object:generate --workspace @fast-react/conformance
 npm run ref-object:print --workspace @fast-react/conformance
 npm run ref-object:print:markdown --workspace @fast-react/conformance
+npm run children-helper:generate --workspace @fast-react/conformance
+npm run children-helper:print --workspace @fast-react/conformance
+npm run children-helper:print:markdown --workspace @fast-react/conformance
 npm test --workspace @fast-react/conformance
 ```
 
@@ -108,3 +112,28 @@ Ref-object oracle strategy:
 The ref-object oracle intentionally excludes render-time ref attachment,
 callback refs, string refs, `forwardRef`, `useRef`, owner stacks, and renderer
 commit behavior.
+
+Children helper oracle strategy:
+
+1. Resolve exact `react@19.2.6` npm metadata.
+2. Download the exact React tarball into a temporary directory.
+3. Verify tarball integrity from `dist.integrity`.
+4. Extract React and copy the local `@fast-react/react` package into a
+   temporary `node_modules` tree.
+5. Run one isolated Node child process per target, scenario, and mode. Modes
+   cover default Node and `--conditions=react-server`, each in development and
+   production.
+6. Capture normalized JSON for direct `React.Children` helper behavior,
+   including helper descriptors, nullish/scalar/boolean/array traversal, nested
+   arrays, elements and fragments as leaves, portal-shaped objects as direct
+   leaves, iterables, callback arguments and `thisArg`, callback return
+   handling, key synthesis and escaping, direct thenable handling, Map
+   warnings, and thrown helper errors.
+7. Compare local Fast React observations against the React oracle as explicit
+   `matched-but-compatibility-not-claimed`, `known-mismatch`, or
+   `unsupported-placeholder` statuses.
+
+The Children helper oracle intentionally excludes renderer traversal, owner
+stacks, rendering fragments into their children, real portal creation from
+renderers, and `lazy` behavior before `lazy` itself has conformance-backed
+support.
