@@ -107,10 +107,19 @@ M0: Orchestration Foundation.
 | worker-042-react-dom-server-fizz-plan | merged | Produce a report-only React DOM server/static Fizz compatibility plan | `worker-progress/worker-042-react-dom-server-fizz-plan.md` |
 | worker-043-react-dom-hydration-plan | merged | Produce a report-only hydration model and marker compatibility plan | `worker-progress/worker-043-react-dom-hydration-plan.md` |
 | worker-044-react-dom-client-roots-plan | merged | Produce a report-only client roots, update priority, and root object behavior plan | `worker-progress/worker-044-react-dom-client-roots-plan.md` |
+| worker-045-scheduler-root-implementation | queued | Implement public `scheduler@0.27.0` root placeholder behavior against the checked root oracle | `../fast-react-worker-045-scheduler-root-implementation/worker-progress/worker-045-scheduler-root-implementation.md` |
+| worker-046-react-dom-client-root-oracle | queued | Add deterministic React DOM client root public behavior oracle files | `../fast-react-worker-046-react-dom-client-root-oracle/worker-progress/worker-046-react-dom-client-root-oracle.md` |
+| worker-047-core-root-lane-bookkeeping | queued | Implement first core root lane bookkeeping helpers beyond the lane bitset primitives | `../fast-react-worker-047-core-root-lane-bookkeeping/worker-progress/worker-047-core-root-lane-bookkeeping.md` |
+| worker-048-react-dom-event-priority-oracle | queued | Add deterministic React DOM event-name/update-priority oracle files | `../fast-react-worker-048-react-dom-event-priority-oracle/worker-progress/worker-048-react-dom-event-priority-oracle.md` |
+| worker-049-react-dom-hydration-marker-oracle | queued | Add deterministic React DOM hydration marker and mismatch evidence oracle files | `../fast-react-worker-049-react-dom-hydration-marker-oracle/worker-progress/worker-049-react-dom-hydration-marker-oracle.md` |
+| worker-050-react-dom-server-static-oracle | queued | Add deterministic React DOM server/static surface behavior oracle files | `../fast-react-worker-050-react-dom-server-static-oracle/worker-progress/worker-050-react-dom-server-static-oracle.md` |
+| worker-051-dom-host-token-boundary | queued | Add first DOM host token boundary types to host-config without DOM implementation behavior | `../fast-react-worker-051-dom-host-token-boundary/worker-progress/worker-051-dom-host-token-boundary.md` |
+| worker-052-scheduler-mock-oracle | queued | Add deterministic `scheduler/unstable_mock` behavior oracle files | `../fast-react-worker-052-scheduler-mock-oracle/worker-progress/worker-052-scheduler-mock-oracle.md` |
+| worker-053-react-dom-types-policy | queued | Produce a report-only React DOM TypeScript declaration shipping policy | `../fast-react-worker-053-react-dom-types-policy/worker-progress/worker-053-react-dom-types-policy.md` |
 
 ## Next Actions
 
-1. Launch workers 035-044 as a parallel non-overlapping tranche and audit/merge them only after their scoped reports, tests, and status are clean.
+1. Launch workers 045-053 as a parallel non-overlapping tranche and audit/merge them only after their scoped reports, tests, and status are clean.
 2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
@@ -251,3 +260,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-035 package surface scaffolds in commit `fe7016d` via merge commit `10583b3` on `main`. Verified in the worker worktree with `npm run check:js`, `npm ci --ignore-scripts --dry-run`, package metadata probes, scoped no concrete local path leak checks, no trailing whitespace, conflict-marker checks, and `git diff --check`.
 - 2026-05-09: Verified merged `main` after worker-035 with `npm run check:js`; the smoke checks passed across `@fast-react/react`, `@fast-react/react-dom`, `scheduler`, native, and 121 conformance tests.
 - 2026-05-09: Closed the worker-035 tmux session and removed its clean worktree after merge.
+- 2026-05-09: Queued workers 045-053 as a parallel non-overlapping tranche: scheduler root implementation, React DOM client-root oracle, core root lane bookkeeping, React DOM event-priority oracle, React DOM hydration-marker oracle, React DOM server/static oracle, DOM host token boundary, scheduler mock oracle, and React DOM TypeScript declaration policy.
