@@ -208,3 +208,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Closed the worker-029 tmux session and removed the clean worker-029 worktree after merge.
 - 2026-05-09: Accepted and merged worker-030 core lane model in commit `49e1270` via merge commit `5c14147` on `main`. Verified in the worker worktree with `cargo fmt --all --check`, `cargo test -p fast-react-core --all-features`, `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`, and scoped `git diff --check`.
 - 2026-05-09: Verified merged `main` after worker-030 with `cargo fmt --all --check`, `cargo test -p fast-react-core --all-features`, and `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`. Root `Cargo.lock` files remain untracked regenerable artifacts by policy.
+- 2026-05-09: Closed the worker-030 tmux session and removed the accepted worker-030 worktree; its only remaining untracked file was a regenerable `Cargo.lock`.
