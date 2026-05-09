@@ -6,7 +6,7 @@ It should be fast, customizable and generic that means usable (api compatible) f
 
 ## General guidelines
 
-Always use gpt-5.5 xhigh fast. Ignore usage exhaustions errors. Use --yolo for codex.
+Always use gpt-5.5 xhigh fast. Ignore usage exhaustions errors and retry. Use --yolo for codex.
 Question your own assumptions and decisions and don't follow something blindly, e.g. change something if it turns out its better differently.
 Use workers to do research and gather evidence for your decisions.
 
