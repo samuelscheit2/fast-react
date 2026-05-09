@@ -20,7 +20,7 @@ Breaking changes are allowed when they remove root causes or enable a sound arch
 - Workers own implementation or research tasks in isolated scopes.
 - Workers read `WORKER_BRIEF.md`; `ORCHESTRATOR.md` is orchestrator-only.
 - Workers must record progress in `worker-progress/<worker-id>.md`.
-- Top-level workers are real Codex subprocesses launched in tmux by the orchestrator.
+- Top-level workers are real Codex subprocesses launched in tmux by the orchestrator. New and relaunched workers should use the interactive Codex TUI wrapped by `script -q -F` so the tmux pane is readable while logs are captured.
 - Top-level tmux workers may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside their sessions when useful for hypothesis testing or verification. Nested managed agents do not count against the orchestrator's 30 top-level tmux worker limit and may push the aggregate agent/process count above 30.
 - Code work should happen in Git worktrees whenever possible.
 - Workers must review their changes for quality, maintainability, performance, and security before reporting completion.

@@ -37,7 +37,9 @@ Subagent policy from the orchestrator:
 - If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
 "
 
-script -q "$log_file" codex \
+# Use the interactive TUI, not `codex exec`, so the tmux pane remains readable
+# (including "Pursuing goal") while `script` also records the session log.
+script -q -F "$log_file" codex \
   --yolo \
   --no-alt-screen \
   --search \

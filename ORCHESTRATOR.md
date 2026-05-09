@@ -22,6 +22,7 @@ You should not do any tasks yourself and instead delegate them to subprocesses c
 To create a new worker spawn a new codex subprocesses in tmux.
 You are allowed to spawn a maximum amount of 30 concurrent top-level tmux workers.
 Workers may spawn their own managed subagents or explorers internally to test hypotheses. Those nested agents are allowed, may push total agent/process count above 30, and do not count against the 30 top-level tmux worker limit.
+Prefer launching workers as interactive Codex TUI sessions, not `codex exec`, so the tmux pane remains inspectable. Wrap the TUI command with `script -q -F "$log_file" codex --yolo --no-alt-screen ... "$prompt_text"` so output is visible in tmux and also logged. Do not redirect stdout/stderr away from tmux for normal worker launches. Use `tmux capture-pane -pt <session>` to inspect live status such as `Pursuing goal`. In a never-seen directory the TUI may ask whether to trust the directory; actual Fast React worktrees under `/Users/user/Developer/Developer` should be trusted, but if a trust prompt appears, explicitly send Enter after confirming the prompt.
 You should provide all necessary information in prompt to the worker for them to work independently.
 Make sure that the work doesn't directly overlap with other tasks (if they do, you need to create a merge worker), to prevent conflicts use git worktrees.
 
