@@ -13,6 +13,7 @@ const {
   isValidElement
 } = require('./element-factory.js');
 const { createRef } = require('./ref-object.js');
+const { createContext } = require('./context-object.js');
 const { createChildrenHelpers } = require('./children-helper.js');
 const { forwardRef, lazy, memo } = require('./wrapper-object.js');
 
@@ -71,7 +72,7 @@ exports.captureOwnerStack = createUnimplementedFunction(
   'captureOwnerStack'
 );
 exports.cloneElement = cloneElement;
-exports.createContext = createUnimplementedFunction(entrypoint, 'createContext');
+exports.createContext = createContext;
 exports.createElement = createElement;
 exports.createRef = createRef;
 exports.forwardRef = forwardRef;

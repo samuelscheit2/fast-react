@@ -176,6 +176,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/jsx-runtime.react-server.js',
   '@fast-react/react/jsx-dev-runtime.react-server.js',
   '@fast-react/react/children-helper.js',
+  '@fast-react/react/context-object.js',
   '@fast-react/react/element-factory.js',
   '@fast-react/react/ref-object.js',
   '@fast-react/react/wrapper-object.js',
@@ -370,6 +371,97 @@ function assertCreateRefBehavior(react, label, options = {}) {
 
   const fromNew = new react.createRef();
   assert.deepEqual(Object.keys(fromNew), ['current'], `${label}.new result`);
+}
+
+function assertCreateContextBehavior(react, label, options = {}) {
+  const development = options.development !== false;
+  const descriptor = Object.getOwnPropertyDescriptor(react, 'createContext');
+  assert.equal(descriptor.enumerable, true, `${label}.createContext enumerable`);
+  assert.equal(
+    descriptor.configurable,
+    true,
+    `${label}.createContext configurable`
+  );
+  assert.equal(descriptor.writable, true, `${label}.createContext writable`);
+  assert.equal(typeof react.createContext, 'function');
+  assert.equal(react.createContext.name, '', `${label}.createContext name`);
+  assert.equal(react.createContext.length, 1, `${label}.createContext length`);
+
+  const objectDefault = { label: 'context-default' };
+  const context = react.createContext(objectDefault, 'ignored-extra');
+  const expectedKeys = development
+    ? [
+        '$$typeof',
+        '_currentValue',
+        '_currentValue2',
+        '_threadCount',
+        'Provider',
+        'Consumer',
+        '_currentRenderer',
+        '_currentRenderer2'
+      ]
+    : [
+        '$$typeof',
+        '_currentValue',
+        '_currentValue2',
+        '_threadCount',
+        'Provider',
+        'Consumer'
+      ];
+
+  assert.deepEqual(Object.keys(context), expectedKeys, `${label}.context keys`);
+  assert.deepEqual(
+    Reflect.ownKeys(context),
+    expectedKeys,
+    `${label}.context ownKeys`
+  );
+  assert.equal(context.$$typeof, Symbol.for('react.context'), label);
+  assert.equal(context._currentValue, objectDefault, label);
+  assert.equal(context._currentValue2, objectDefault, label);
+  assert.equal(context._threadCount, 0, label);
+  assert.equal(context.Provider, context, `${label}.Provider identity`);
+  assert.notEqual(context.Consumer, context, `${label}.Consumer identity`);
+  assert.equal(context.Consumer.$$typeof, Symbol.for('react.consumer'), label);
+  assert.equal(context.Consumer._context, context, `${label}.Consumer._context`);
+  assert.deepEqual(Object.keys(context.Consumer), ['$$typeof', '_context']);
+  assert.equal(Object.isExtensible(context), true, `${label}.context extensible`);
+  assert.equal(Object.isSealed(context), false, `${label}.context sealed`);
+  assert.equal(Object.isFrozen(context), false, `${label}.context frozen`);
+  assert.equal(
+    Object.getPrototypeOf(context),
+    Object.prototype,
+    `${label}.context prototype`
+  );
+
+  if (development) {
+    assert.equal(context._currentRenderer, null, label);
+    assert.equal(context._currentRenderer2, null, label);
+  } else {
+    assert.equal(Object.hasOwn(context, '_currentRenderer'), false, label);
+    assert.equal(Object.hasOwn(context, '_currentRenderer2'), false, label);
+  }
+
+  context.displayName = 'Ctx';
+  assert.equal(context.displayName, 'Ctx', label);
+  assert.equal(context.Provider.displayName, 'Ctx', label);
+  assert.equal(context.Consumer.displayName, undefined, label);
+  context.Consumer.displayName = 'ConsumerName';
+  assert.equal(context.Consumer.displayName, 'ConsumerName', label);
+
+  context._currentValue = 'current-one';
+  context._currentValue2 = 'current-two';
+  context._threadCount = 7;
+  context._currentRenderer = 'renderer-one';
+  assert.equal(context.Provider._currentValue, 'current-one', label);
+  assert.equal(context._currentValue2, 'current-two', label);
+  assert.equal(context._threadCount, 7, label);
+  assert.equal(context._currentRenderer, 'renderer-one', label);
+
+  const fromCall = react.createContext.call({ untouched: true }, null);
+  assert.equal(fromCall._currentValue, null, `${label}.call default`);
+  const fromNew = new react.createContext(Symbol.for('context-symbol'));
+  assert.equal(fromNew instanceof react.createContext, false, label);
+  assert.equal(fromNew._currentValue, Symbol.for('context-symbol'), label);
 }
 
 function assertChildrenBehavior(react, label, options = {}) {
@@ -734,6 +826,11 @@ function assertReactPlaceholderBehavior(react, label, options = {}) {
   assert.equal(react.version, '0.0.0-fast-react-placeholder');
   assert.equal(typeof react.createElement, 'function');
   assertReactElementBehavior(react, label);
+  if (Object.hasOwn(react, 'createContext')) {
+    assertCreateContextBehavior(react, label, options);
+  } else {
+    assert.equal(react.createContext, undefined, `${label}.createContext`);
+  }
   assertCreateRefBehavior(react, label);
   assertChildrenBehavior(react, label, options);
   assertWrapperObjectBehavior(react, label, options);
@@ -842,6 +939,44 @@ async function assertProductionJsxDevUndefined() {
     assert.equal(reactServerJsxRuntime.jsxDEV, undefined);
 
     for (const [label, React] of [['react', react], ['react-server', reactServer]]) {
+      if (label === 'react') {
+        assert.equal(React.createContext.name, '', label);
+        assert.equal(React.createContext.length, 1, label);
+        const context = React.createContext({ label: 'prod-default' });
+        assert.deepEqual(Object.keys(context), [
+          '$$typeof',
+          '_currentValue',
+          '_currentValue2',
+          '_threadCount',
+          'Provider',
+          'Consumer'
+        ], label);
+        assert.deepEqual(Reflect.ownKeys(context), [
+          '$$typeof',
+          '_currentValue',
+          '_currentValue2',
+          '_threadCount',
+          'Provider',
+          'Consumer'
+        ], label);
+        assert.equal(context.$$typeof, Symbol.for('react.context'), label);
+        assert.equal(context.Provider, context, label);
+        assert.equal(context.Consumer.$$typeof, Symbol.for('react.consumer'), label);
+        assert.equal(context.Consumer._context, context, label);
+        assert.equal(Object.hasOwn(context, '_currentRenderer'), false, label);
+        assert.equal(Object.hasOwn(context, '_currentRenderer2'), false, label);
+        context.displayName = 'ProdContext';
+        assert.equal(context.Provider.displayName, 'ProdContext', label);
+        context.Consumer.displayName = 'ProdConsumer';
+        assert.equal(context.Consumer.displayName, 'ProdConsumer', label);
+        const constructed = new React.createContext(Symbol.for('prod-context'));
+        assert.equal(constructed instanceof React.createContext, false, label);
+        assert.equal(constructed._currentValue, Symbol.for('prod-context'), label);
+      } else {
+        assert.equal(Object.hasOwn(React, 'createContext'), false, label);
+        assert.equal(React.createContext, undefined, label);
+      }
+
       assert.equal(React.createRef.name, '', label);
       assert.equal(React.createRef.length, 0, label);
       const ref = React.createRef('ignored');
@@ -1114,6 +1249,32 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
       );
     }
 
+    function assertDevContext(moduleExports, label) {
+      assert.equal(moduleExports.createContext.name, '', label);
+      assert.equal(moduleExports.createContext.length, 1, label);
+      const objectDefault = { label: 'dev-context' };
+      const context = moduleExports.createContext(objectDefault);
+      assert.deepEqual(Object.keys(context), [
+        '$$typeof',
+        '_currentValue',
+        '_currentValue2',
+        '_threadCount',
+        'Provider',
+        'Consumer',
+        '_currentRenderer',
+        '_currentRenderer2'
+      ], label);
+      assert.equal(context.$$typeof, Symbol.for('react.context'), label);
+      assert.equal(context._currentValue, objectDefault, label);
+      assert.equal(context._currentValue2, objectDefault, label);
+      assert.equal(context._threadCount, 0, label);
+      assert.equal(context.Provider, context, label);
+      assert.equal(context.Consumer.$$typeof, Symbol.for('react.consumer'), label);
+      assert.equal(context.Consumer._context, context, label);
+      assert.equal(context._currentRenderer, null, label);
+      assert.equal(context._currentRenderer2, null, label);
+    }
+
     (async () => {
       for (const { keys, resolvedFileName, specifier } of entrypoints) {
         assert.equal(
@@ -1131,6 +1292,11 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
         const cjsModule = require(specifier);
         assertInventoryKeys(cjsModule, keys, specifier);
         if (specifier === '@fast-react/react') {
+          if (Object.hasOwn(cjsModule, 'createContext')) {
+            assertDevContext(cjsModule, specifier);
+          } else {
+            assert.equal(cjsModule.createContext, undefined, specifier);
+          }
           assertDevCreateRef(cjsModule, specifier);
           assertDevChildren(cjsModule, specifier);
           assertDevWrappers(cjsModule, specifier);
@@ -1176,4 +1342,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element/ref/Children/memo/lazy/forwardRef smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/context/ref/Children/memo/lazy/forwardRef smoke checks.');
