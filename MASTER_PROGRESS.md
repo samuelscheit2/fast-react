@@ -86,10 +86,11 @@ M0: Orchestration Foundation.
 | worker-025-children-helpers | merged | Add a deterministic `Children` helper oracle and implement covered JS facade behavior | `worker-progress/worker-025-children-helpers.md` |
 | worker-026-memo-lazy-behavior | merged | Add a deterministic `memo`/`lazy` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-026-memo-lazy-behavior.md` |
 | worker-027-forward-ref-behavior | merged | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-027-forward-ref-behavior.md` |
+| worker-028-create-context-behavior | queued | Add a deterministic `createContext` object oracle and implement covered default-root JS facade behavior | `worker-progress/worker-028-create-context-behavior.md` |
 
 ## Next Actions
 
-1. Queue the next conformance-backed slice from the remaining React root API placeholders, prioritizing behavior that can be proven by deterministic React 19.2.6 probes without renderer integration.
+1. Launch worker 028 as a real tmux Codex process for deterministic `createContext` direct object behavior.
 2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
@@ -185,3 +186,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched worker-027 as a real `codex --yolo` tmux process in `../fast-react-worker-027-forward-ref-behavior`.
 - 2026-05-09: Accepted and merged worker-027 forwardRef wrapper behavior in commit `2b798a3` via merge commit `2f97ca8` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, forward-ref oracle regeneration byte-compare, element-object oracle regeneration byte-compare, forward-ref and element oracle temp/local path leak guards, scoped `git diff --check`, and explicit oracle status count checks.
 - 2026-05-09: Verified merged `main` after worker-027 with `npm run check:js`; 61 conformance tests passed through the workspace check. Closed the worker-027 tmux session and removed the clean worker-027 worktree. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
+- 2026-05-09: Queued worker-028 to add a deterministic React 19.2.6 `createContext` object oracle and implement covered default-root direct JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
