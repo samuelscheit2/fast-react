@@ -3,14 +3,41 @@
 //! Real reconciliation is intentionally absent from the scaffold. The module
 //! layout reserves the boundary where lane/update/hook semantics will be built.
 
+mod fiber_root;
+mod fiber_store;
+mod host_tokens;
+mod root_config;
+#[cfg(test)]
+mod test_support;
+mod work_in_progress;
+
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{UnimplementedReactBehavior, unimplemented_behavior};
+use fast_react_core::{FiberTopologyError, UnimplementedReactBehavior, unimplemented_behavior};
 use fast_react_host_config::{
     HostCapability, HostError, HostOperationError, HostTreeUpdateMode, HostTreeUpdateModeError,
     MutationRenderer, UnsupportedHostCapability,
 };
+
+pub use fiber_root::{
+    FiberRoot, HostRootHydrationState, HostRootState, HostRootStateStore, HostRootStateStoreError,
+    RootSchedulingState, create_host_root_current_fiber,
+};
+pub use fiber_store::{FiberRootId, FiberRootStore, FiberRootStoreError};
+pub use host_tokens::{
+    HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
+    HostFiberTokenValidationError,
+};
+pub use root_config::{
+    PendingChildrenHandle, PendingCommitCancelHandle, PendingCommitHandle, PendingPassiveState,
+    RootCacheHandle, RootCallbackPriority, RootContextHandle, RootDefaultTransitionIndicatorHandle,
+    RootElementHandle, RootErrorCallbackHandle, RootFormStateHandle, RootHydrationCallbacksHandle,
+    RootKind, RootLifecycleState, RootOptions, RootRecoverableErrorCallbackHandle,
+    RootRenderExitStatus, RootSchedulerCallbackHandle, RootSuspenseBoundarySetHandle, RootTag,
+    RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
+};
+pub use work_in_progress::{WorkInProgressError, create_host_root_work_in_progress};
 
 pub const RENDER_PLACEHOLDER_FEATURE: &str = "Reconciler.render";
 pub const MUTATION_RENDER_PLACEHOLDER_FEATURE: &str = "Reconciler.render.mutation";
@@ -23,6 +50,11 @@ pub enum ReconcilerError {
     UnsupportedHostCapability(UnsupportedHostCapability),
     HostOperation(HostOperationError),
     InvalidHostTreeUpdateMode(HostTreeUpdateModeError),
+    FiberTopology(FiberTopologyError),
+    FiberRootStore(FiberRootStoreError),
+    HostRootStateStore(HostRootStateStoreError),
+    HostFiberToken(HostFiberTokenValidationError),
+    WorkInProgress(WorkInProgressError),
 }
 
 impl ReconcilerError {
@@ -39,6 +71,11 @@ impl Display for ReconcilerError {
             Self::UnsupportedHostCapability(error) => Display::fmt(error, formatter),
             Self::HostOperation(error) => Display::fmt(error, formatter),
             Self::InvalidHostTreeUpdateMode(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::HostRootStateStore(error) => Display::fmt(error, formatter),
+            Self::HostFiberToken(error) => Display::fmt(error, formatter),
+            Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -50,6 +87,11 @@ impl Error for ReconcilerError {
             Self::UnsupportedHostCapability(error) => Some(error),
             Self::HostOperation(error) => Some(error),
             Self::InvalidHostTreeUpdateMode(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::FiberRootStore(error) => Some(error),
+            Self::HostRootStateStore(error) => Some(error),
+            Self::HostFiberToken(error) => Some(error),
+            Self::WorkInProgress(error) => Some(error),
         }
     }
 }
@@ -78,6 +120,36 @@ impl From<HostError> for ReconcilerError {
 impl From<HostTreeUpdateModeError> for ReconcilerError {
     fn from(error: HostTreeUpdateModeError) -> Self {
         Self::InvalidHostTreeUpdateMode(error)
+    }
+}
+
+impl From<FiberTopologyError> for ReconcilerError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+impl From<FiberRootStoreError> for ReconcilerError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+impl From<HostRootStateStoreError> for ReconcilerError {
+    fn from(error: HostRootStateStoreError) -> Self {
+        Self::HostRootStateStore(error)
+    }
+}
+
+impl From<HostFiberTokenValidationError> for ReconcilerError {
+    fn from(error: HostFiberTokenValidationError) -> Self {
+        Self::HostFiberToken(error)
+    }
+}
+
+impl From<WorkInProgressError> for ReconcilerError {
+    fn from(error: WorkInProgressError) -> Self {
+        Self::WorkInProgress(error)
     }
 }
 
