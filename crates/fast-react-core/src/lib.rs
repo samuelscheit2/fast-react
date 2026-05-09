@@ -7,6 +7,8 @@
 mod compatibility;
 mod element;
 mod event_priority;
+mod fiber_flags;
+mod hook_effect_flags;
 mod lane;
 mod root_lanes;
 mod symbols;
@@ -24,6 +26,11 @@ pub use event_priority::{
     EventPriority, event_priority_to_lane, higher_event_priority, is_higher_event_priority,
     lanes_to_event_priority, lower_event_priority,
 };
+pub use fiber_flags::{
+    FiberFlags, REACT_19_2_6_ENABLE_CREATE_EVENT_HANDLE_API,
+    REACT_19_2_6_ENABLE_USE_EFFECT_EVENT_HOOK, VALID_FIBER_FLAG_BITS,
+};
+pub use hook_effect_flags::{HookEffectFlags, VALID_HOOK_EFFECT_FLAG_BITS};
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
     LaneClaimers, LaneTimestamp, NO_TIMESTAMP, RETRY_LANE_EXPIRATION_MS, RootFinishedLanes,
