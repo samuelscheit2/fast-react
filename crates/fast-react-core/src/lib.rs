@@ -6,6 +6,8 @@
 
 mod compatibility;
 mod element;
+mod fiber_flags;
+mod hook_effect_flags;
 mod lane;
 mod symbols;
 
@@ -18,6 +20,11 @@ pub use compatibility::{
     TYPES_REACT_COMPATIBILITY_TARGET, TYPES_REACT_PACKAGE_TARGET,
 };
 pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
+pub use fiber_flags::{
+    FiberFlags, REACT_19_2_6_ENABLE_CREATE_EVENT_HANDLE_API,
+    REACT_19_2_6_ENABLE_USE_EFFECT_EVENT_HOOK, VALID_FIBER_FLAG_BITS,
+};
+pub use hook_effect_flags::{HookEffectFlags, VALID_HOOK_EFFECT_FLAG_BITS};
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use symbols::ReactSymbolTag;
 
