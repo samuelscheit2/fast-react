@@ -271,6 +271,9 @@ Dependencies: M8.
 | worker-093-root-render-integration-plan | Produce a report-only plan for root.render integration with HostRoot updates and scheduling | `worker-progress/worker-093-root-render-integration-plan.md` | workers 044,055,080,081,092 | running |
 | worker-094-root-unmount-flushsync-plan | Produce a report-only plan for root.unmount and flushSync integration | `worker-progress/worker-094-root-unmount-flushsync-plan.md` | workers 044,055,058,081,092 | running |
 | worker-095-hydrate-root-facade-plan | Produce a report-only plan for hydrateRoot public facade, hydration root state, and replay hooks | `worker-progress/worker-095-hydrate-root-facade-plan.md` | workers 043,049,055,088,089 | running |
+| worker-096-native-root-boundary-plan | Produce a report-only plan for private native root handles and JS callback lifetime boundaries | `worker-progress/worker-096-native-root-boundary-plan.md` | workers 006,015,032,055,079 | running |
+| worker-097-react-act-oracle | Add deterministic React public act behavior oracle files | `tests/conformance/src/react-act-*.mjs`, `tests/conformance/scripts/*react-act*.mjs`, `tests/conformance/test/react-act-oracle.test.mjs`, `tests/conformance/oracles/react-19.2.6-react-act-oracle.json`, `worker-progress/worker-097-react-act-oracle.md` | workers 017,025,067,073,086 | running |
+| worker-098-dom-event-plugin-extraction-plan | Produce a report-only plan for DOM event plugin extraction, priority, batching, and controlled restore | `worker-progress/worker-098-dom-event-plugin-extraction-plan.md` | workers 041,048,065,089 | running |
 
 ## Merge Policy
 
