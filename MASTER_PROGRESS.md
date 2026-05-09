@@ -89,12 +89,18 @@ M0: Orchestration Foundation.
 | worker-027-forward-ref-behavior | merged | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-027-forward-ref-behavior.md` |
 | worker-028-create-context-behavior | merged | Add a deterministic `createContext` object oracle and implement covered default-root JS facade behavior | `worker-progress/worker-028-create-context-behavior.md` |
 | worker-029-component-class-behavior | running in tmux worktree; nested subagents allowed | Add a deterministic `Component`/`PureComponent` class oracle and implement covered default-root JS facade behavior | `../fast-react-worker-029-component-class-behavior/worker-progress/worker-029-component-class-behavior.md` |
+| worker-030-core-lane-model | queued | Implement first React 19.2.6 lane bitset primitives in the Rust core | `../fast-react-worker-030-core-lane-model/worker-progress/worker-030-core-lane-model.md` |
+| worker-031-host-capability-diagnostics | queued | Improve host-config capability-set diagnostics and tests | `../fast-react-worker-031-host-capability-diagnostics/worker-progress/worker-031-host-capability-diagnostics.md` |
+| worker-032-native-boundary-guardrails | queued | Tighten native binding placeholder guardrails and platform target checks | `../fast-react-worker-032-native-boundary-guardrails/worker-progress/worker-032-native-boundary-guardrails.md` |
+| worker-033-react-dom-inventory | queued | Build a report-only React DOM 19.2.6 package and behavior inventory | `../fast-react-worker-033-react-dom-inventory/worker-progress/worker-033-react-dom-inventory.md` |
+| worker-034-scheduler-package-inventory | queued | Build a report-only public scheduler package behavior inventory | `../fast-react-worker-034-scheduler-package-inventory/worker-progress/worker-034-scheduler-package-inventory.md` |
 
 ## Next Actions
 
-1. Monitor worker 029 and audit/merge it only after it checks a deterministic `Component`/`PureComponent` class oracle and keeps broader compatibility claims false.
-2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
-3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
+1. Audit/merge completed worker 029 only after independently checking its deterministic `Component`/`PureComponent` class oracle and broader compatibility claims.
+2. Launch workers 030-034 as real tmux Codex processes because their write scopes are disjoint from worker 029 and from each other.
+3. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
+4. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
 ## Risks And Open Questions
 
@@ -194,3 +200,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Verified merged `main` after worker-028 with `npm run check:js`; 71 conformance tests passed through the workspace check. Closed the worker-028 tmux session and removed the clean worker-028 worktree. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
 - 2026-05-09: Queued worker-029 to add a deterministic React 19.2.6 `Component`/`PureComponent` class oracle and implement covered default-root direct JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
 - 2026-05-09: Launched worker-029 as a real `codex --yolo` tmux process in `../fast-react-worker-029-component-class-behavior`.
+- 2026-05-09: Queued workers 030-034 as a parallel non-overlapping tranche: Rust core lane primitives, host-config capability diagnostics, native boundary guardrails, React DOM inventory, and public scheduler package inventory.
