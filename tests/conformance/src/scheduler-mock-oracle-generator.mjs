@@ -94,21 +94,21 @@ export async function generateSchedulerMockOracle() {
       sources: SCHEDULER_MOCK_SOURCE_DOCUMENTS,
       generation: {
         method:
-          "exact scheduler npm tarball plus local scheduler placeholder copied under an isolated alias into a temporary node_modules tree",
+          "exact scheduler npm tarball plus local scheduler implementation copied under an isolated alias into a temporary node_modules tree",
         lifecycleScriptsExecuted: false,
         rootManifestsOrLockfilesMutated: false,
         probeIsolation: "one Node child process per target, scenario, and mode",
         probeTimeoutMs: PROBE_TIMEOUT_MS,
         generatedTimestampIncluded: false,
         timingNormalization:
-          "scheduler/unstable_mock virtual time is recorded directly; raw wall-clock timestamps and local filesystem paths are omitted"
+          "scheduler/unstable_mock virtual time is recorded directly; raw wall-clock timestamps and local filesystem paths are omitted; local package metadata is observed but omitted from behavior comparison"
       },
       evidenceClaims: {
         npmMetadataResolved: true,
         tarballDownloaded: true,
         tarballIntegrityVerified: true,
         schedulerMockBehaviorProbed: true,
-        fastReactPlaceholderComparedToScheduler: true,
+        fastReactImplementationComparedToScheduler: true,
         fastReactBehaviorCompatible: false
       },
       conformanceClaims: {
@@ -119,9 +119,9 @@ export async function generateSchedulerMockOracle() {
         compatibilityClaimed: false
       },
       implementationComparison: {
-        currentFastReactPlaceholder: {
+        afterWorker120: {
           source:
-            "packages/scheduler/unstable_mock.js and cjs/scheduler-unstable_mock.* are copied under fast-react-scheduler for comparison",
+            "packages/scheduler/unstable_mock.js and cjs/scheduler-unstable_mock.* are copied under fast-react-scheduler for behavior comparison",
           generatedProbe: true,
           statusCounts: fastReactStatusCounts,
           compatibilityClaimed: false
@@ -139,7 +139,7 @@ export async function generateSchedulerMockOracle() {
             SCHEDULER_MOCK_FAST_REACT_TARGET.sourcePackageName,
           version: SCHEDULER_MOCK_FAST_REACT_TARGET.version,
           role: SCHEDULER_MOCK_FAST_REACT_TARGET.role,
-          source: "local packages/scheduler copied for placeholder comparison",
+          source: "local packages/scheduler copied for behavior comparison",
           behaviorCompatibilityClaimed: false
         }
       },
@@ -158,13 +158,12 @@ export async function generateSchedulerMockOracle() {
         continuations: true,
         paintYielding: true,
         resets: true,
-        fastReactPlaceholderBoundaries: true
+        localPackageMetadataExcludedFromBehaviorComparison: true
       },
       implementationRisks: [
-        "The local scheduler package still exposes structured placeholders for mock behavior; compatibility remains false until scheduler/unstable_mock is implemented.",
-        "The export-shape comparison can produce a known mismatch without invoking placeholder functions because local package metadata and function names differ before behavior is implemented.",
+        "The local scheduler package metadata intentionally remains workspace-specific and is excluded from scheduler/unstable_mock behavior comparisons.",
         "The oracle intentionally covers the mock scheduler only; root scheduler, post-task, native, reconciler lane scheduling, and renderer behavior remain separate compatibility surfaces.",
-        "Future upstream React-style tests depend on this mock scheduler being deterministic across reset, virtual time, yielded logs, pending work, and continuation boundaries."
+        "Future upstream React-style tests still depend on harness aliasing and environment setup outside this public scheduler mock behavior surface."
       ],
       schedulerObservations,
       fastReactObservations,
@@ -356,7 +355,7 @@ function compareFastReactToScheduler({
     status: fastReactUnsupported
       ? "unsupported-placeholder"
       : equal
-        ? "unexpected-match-compatibility-not-claimed"
+        ? "matched-but-compatibility-not-claimed"
         : "known-mismatch",
     compatibilityClaimed: false,
     firstDifferencePath,
@@ -365,7 +364,7 @@ function compareFastReactToScheduler({
     reason: fastReactUnsupported
       ? "Fast React currently throws structured placeholder errors for this scheduler/unstable_mock behavior."
       : equal
-        ? "Normalized observations matched, but this oracle does not claim Fast React scheduler mock compatibility."
+        ? "Normalized behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
         : "Fast React normalized observation differs from the scheduler@0.27.0 mock oracle."
   };
 }
@@ -382,6 +381,13 @@ function countComparisonStatuses(comparisonsByMode) {
 
 function comparableProbeResult(result) {
   const { targetPackage: _targetPackage, ...behaviorResult } = result;
+  if (behaviorResult.result?.value?.packageJson) {
+    const { packageJson: _packageJson, ...value } = behaviorResult.result.value;
+    behaviorResult.result = {
+      ...behaviorResult.result,
+      value
+    };
+  }
   return behaviorResult;
 }
 

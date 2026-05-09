@@ -18,8 +18,8 @@ export const SCHEDULER_MOCK_FAST_REACT_TARGET = {
   entrypoint: "fast-react-scheduler/unstable_mock",
   sourceEntrypoint: "scheduler/unstable_mock",
   version: "0.27.0",
-  role: "local-fast-react-scheduler-placeholder",
-  targetStatus: "local-workspace-placeholder-copied-under-isolated-alias"
+  role: "local-fast-react-scheduler-implementation",
+  targetStatus: "local-workspace-implementation-copied-under-isolated-alias"
 };
 
 export const SCHEDULER_MOCK_PROBE_MODES = [

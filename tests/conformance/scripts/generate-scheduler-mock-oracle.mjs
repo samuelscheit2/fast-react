@@ -13,9 +13,9 @@ if (args.has("--help") || args.has("-h")) {
   process.stdout.write(`Usage: node scripts/generate-scheduler-mock-oracle.mjs [--write]
 
 Generate the pinned scheduler@0.27.0 scheduler/unstable_mock behavior oracle
-from exact npm package artifacts and the current local scheduler placeholder.
+from exact npm package artifacts and the current local scheduler implementation.
 Generation uses temporary directories, does not run lifecycle scripts, omits
-local filesystem paths, and does not claim Fast React scheduler compatibility.
+local filesystem paths, and does not claim broad Fast React scheduler compatibility.
 
 Without --write, the generated JSON is printed to stdout.
 With --write, ${SCHEDULER_MOCK_ORACLE_ARTIFACT_PATH} is refreshed.

@@ -41,7 +41,7 @@ export function formatSchedulerMockOracleAsMarkdown(oracle) {
   return [
     "# Scheduler Mock Oracle",
     "",
-    "Generated from exact scheduler@0.27.0 artifacts and the current local scheduler placeholder. This oracle records deterministic scheduler/unstable_mock behavior and keeps Fast React compatibility claims false.",
+    "Generated from exact scheduler@0.27.0 artifacts and the current local scheduler implementation. This oracle records deterministic scheduler/unstable_mock behavior and keeps broad Fast React compatibility claims false.",
     "",
     "## Scenarios",
     "",
