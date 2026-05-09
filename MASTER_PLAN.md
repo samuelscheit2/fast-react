@@ -33,7 +33,7 @@ published behavior claims.
   do not count against the cap.
 - Workers read `WORKER_BRIEF.md`, set a goal first, stay within write scope,
   and report evidence in `worker-progress/<worker-id>.md`.
-- `MASTER_PLAN.md` stays compact. Detailed historical evidence belongs in git
+- Coordination docs stay compact. Detailed historical evidence belongs in git
   history and `worker-progress/*.md`.
 
 ## Architecture Direction
@@ -88,14 +88,16 @@ Source/oracle workers ready for audit and merge:
 - Core source primitives: workers 047, 075, 076.
 - React test renderer and `act` oracles: workers 083-087, 097.
 
-Report-only implementation planning workers:
+Merged implementation plans:
 
-- Root/reconciler/DOM/test sequencing: workers 104-117.
-- Some workers may need continuation if their tmux pane shows usage limits or
-  no report.
+- Root/reconciler/DOM/test sequencing reports from workers 104-117 define the
+  next conflict-safe implementation queue.
+- Use worker 117's sequencing plan to order follow-up source workers after the
+  prerequisite source/oracle slices are accepted.
 
-When these are accepted, update this plan with only durable decisions and the
-next active queue. Do not re-add a full historical worker roster.
+When new implementation workers are queued or accepted, update this plan with
+only durable decisions and the next active queue. Do not re-add a full
+historical worker roster.
 
 ## Merge Policy
 

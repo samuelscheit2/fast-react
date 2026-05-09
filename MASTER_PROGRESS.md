@@ -12,8 +12,8 @@ Last updated: 2026-05-10
 - Local React reference source clone:
   `/Users/user/Developer/Developer/react-reference` at `facebook/react`
   `v19.2.6`, commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`.
-- Main worktree currently has only an untracked regenerable root `Cargo.lock`
-  outside committed changes.
+- Report-only implementation planning workers 104-117 are merged; their tmux
+  sessions and worktrees are closed.
 
 ## Durable Decisions
 
@@ -28,8 +28,9 @@ Last updated: 2026-05-10
   tarball/runtime oracles for published behavior claims.
 - Regenerable `node_modules/`, `target/`, and root `Cargo.lock` do not need
   cleanup merely because they exist.
-- Keep `MASTER_PLAN.md` and `MASTER_PROGRESS.md` compact. Detailed history lives
-  in git log and `worker-progress/*.md`.
+- Keep `ORCHESTRATOR.md`, `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and
+  `MASTER_PROGRESS.md` compact. Detailed history lives in git log and
+  `worker-progress/*.md`.
 
 ## Accepted Direction Summary
 
@@ -48,7 +49,7 @@ Last updated: 2026-05-10
 
 ## Current Worker Snapshot
 
-Top-level tmux worker count should stay at or below 30.
+Top-level tmux worker count should stay at or below 30. Current live count: 16.
 
 Ready for audit/merge based on latest pane checks:
 
@@ -56,11 +57,6 @@ Ready for audit/merge based on latest pane checks:
 - React DOM root export implementation: 054.
 - Core source primitives: 047, 075, 076.
 - React test renderer and React `act` oracles: 083, 084, 085, 086, 087, 097.
-- Report-only planning: 104, 105, 106, 107, 111.
-
-Running or needs continuation/relaunch:
-
-- 108, 109, 110, 112, 113, 114, 115, 116, 117.
 
 Use live `tmux capture-pane` and worktree status as the source of truth before
 accepting any worker; this snapshot is only a routing aid.
@@ -71,16 +67,20 @@ accepting any worker; this snapshot is only a routing aid.
   095, 098, 099, 100, 101, 102, and 103.
 - Queued implementation-planning workers 104-117 to decompose the first root
   render milestone into conflict-safe slices.
+- Merged report-only implementation planning workers 104-117 and closed their
+  accepted tmux sessions/worktrees.
 - Added and documented the local React reference source clone.
 
 ## Next Actions
 
-1. Audit and merge completed report-only workers 104, 105, 106, 107, and 111.
-2. Continue or relaunch usage-limited planning workers 108, 109, 110, 112, 113,
-   115, 116, and 117.
-3. Audit oracle workers in focused batches with their targeted Node tests.
-4. Audit source workers 047, 075, and 076 with `cargo fmt`, targeted tests, and
+1. Audit source workers 047, 075, and 076 with `cargo fmt`, targeted tests, and
    clippy before merge.
+2. Audit React DOM/client root workers 046, 049, 054, 060, 064, 088, and 089
+   with their targeted Node tests.
+3. Audit React test renderer and React `act` workers 083, 084, 085, 086, 087,
+   and 097 with targeted conformance checks.
+4. Launch the next conflict-safe implementation workers from the merged
+   104-117 plans once prerequisite source/oracle slices are accepted.
 5. After each accepted batch, update this file with only the durable delta and
    prune obsolete status lines.
 
