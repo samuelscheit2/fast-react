@@ -97,7 +97,7 @@ M0: Orchestration Foundation.
 | worker-032-native-boundary-guardrails | merged | Tighten native binding placeholder guardrails and platform target checks | `worker-progress/worker-032-native-boundary-guardrails.md` |
 | worker-033-react-dom-inventory | merged | Build a report-only React DOM 19.2.6 package and behavior inventory | `worker-progress/worker-033-react-dom-inventory.md` |
 | worker-034-scheduler-package-inventory | merged | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` |
-| worker-035-package-surface-scaffolds | running in tmux worktree; nested subagents allowed | Add loud-placeholder package scaffolds for React DOM and scheduler surfaces without behavior implementation | `../fast-react-worker-035-package-surface-scaffolds/worker-progress/worker-035-package-surface-scaffolds.md` |
+| worker-035-package-surface-scaffolds | merged | Add loud-placeholder package scaffolds for React DOM and scheduler surfaces without behavior implementation | `worker-progress/worker-035-package-surface-scaffolds.md` |
 | worker-036-react-dom-export-oracle | merged | Add deterministic React DOM runtime export, descriptor, condition, and blocked-subpath oracle files | `worker-progress/worker-036-react-dom-export-oracle.md` |
 | worker-037-react-dom-type-inventory | merged | Add deterministic React DOM declaration/runtime type-gap inventory files | `worker-progress/worker-037-react-dom-type-inventory.md` |
 | worker-038-scheduler-root-oracle | merged | Add deterministic public `scheduler@0.27.0` root behavior oracle files | `worker-progress/worker-038-scheduler-root-oracle.md` |
@@ -248,3 +248,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-039 scheduler variant oracle in commit `5acdb01` via merge commit `c10a578` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance` (91 tests), scoped no concrete local path leak checks, no trailing whitespace, and `git diff --check`.
 - 2026-05-09: Verified merged `main` after worker-039 with `npm test --workspace @fast-react/conformance`; 121 tests passed.
 - 2026-05-09: Closed the worker-039 tmux session and removed its clean worktree after merge.
+- 2026-05-09: Accepted and merged worker-035 package surface scaffolds in commit `fe7016d` via merge commit `10583b3` on `main`. Verified in the worker worktree with `npm run check:js`, `npm ci --ignore-scripts --dry-run`, package metadata probes, scoped no concrete local path leak checks, no trailing whitespace, conflict-marker checks, and `git diff --check`.
+- 2026-05-09: Verified merged `main` after worker-035 with `npm run check:js`; the smoke checks passed across `@fast-react/react`, `@fast-react/react-dom`, `scheduler`, native, and 121 conformance tests.
+- 2026-05-09: Closed the worker-035 tmux session and removed its clean worktree after merge.
