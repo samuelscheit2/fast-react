@@ -89,11 +89,11 @@ M0: Orchestration Foundation.
 | worker-027-forward-ref-behavior | merged | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-027-forward-ref-behavior.md` |
 | worker-028-create-context-behavior | merged | Add a deterministic `createContext` object oracle and implement covered default-root JS facade behavior | `worker-progress/worker-028-create-context-behavior.md` |
 | worker-029-component-class-behavior | running in tmux worktree; nested subagents allowed | Add a deterministic `Component`/`PureComponent` class oracle and implement covered default-root JS facade behavior | `../fast-react-worker-029-component-class-behavior/worker-progress/worker-029-component-class-behavior.md` |
-| worker-030-core-lane-model | queued | Implement first React 19.2.6 lane bitset primitives in the Rust core | `../fast-react-worker-030-core-lane-model/worker-progress/worker-030-core-lane-model.md` |
-| worker-031-host-capability-diagnostics | queued | Improve host-config capability-set diagnostics and tests | `../fast-react-worker-031-host-capability-diagnostics/worker-progress/worker-031-host-capability-diagnostics.md` |
-| worker-032-native-boundary-guardrails | queued | Tighten native binding placeholder guardrails and platform target checks | `../fast-react-worker-032-native-boundary-guardrails/worker-progress/worker-032-native-boundary-guardrails.md` |
-| worker-033-react-dom-inventory | queued | Build a report-only React DOM 19.2.6 package and behavior inventory | `../fast-react-worker-033-react-dom-inventory/worker-progress/worker-033-react-dom-inventory.md` |
-| worker-034-scheduler-package-inventory | queued | Build a report-only public scheduler package behavior inventory | `../fast-react-worker-034-scheduler-package-inventory/worker-progress/worker-034-scheduler-package-inventory.md` |
+| worker-030-core-lane-model | running in tmux worktree; nested subagents allowed | Implement first React 19.2.6 lane bitset primitives in the Rust core | `../fast-react-worker-030-core-lane-model/worker-progress/worker-030-core-lane-model.md` |
+| worker-031-host-capability-diagnostics | running in tmux worktree; nested subagents allowed | Improve host-config capability-set diagnostics and tests | `../fast-react-worker-031-host-capability-diagnostics/worker-progress/worker-031-host-capability-diagnostics.md` |
+| worker-032-native-boundary-guardrails | running in tmux worktree; nested subagents allowed | Tighten native binding placeholder guardrails and platform target checks | `../fast-react-worker-032-native-boundary-guardrails/worker-progress/worker-032-native-boundary-guardrails.md` |
+| worker-033-react-dom-inventory | running in tmux worktree; nested subagents allowed | Build a report-only React DOM 19.2.6 package and behavior inventory | `../fast-react-worker-033-react-dom-inventory/worker-progress/worker-033-react-dom-inventory.md` |
+| worker-034-scheduler-package-inventory | running in tmux worktree; nested subagents allowed | Build a report-only public scheduler package behavior inventory | `../fast-react-worker-034-scheduler-package-inventory/worker-progress/worker-034-scheduler-package-inventory.md` |
 
 ## Next Actions
 
@@ -201,3 +201,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Queued worker-029 to add a deterministic React 19.2.6 `Component`/`PureComponent` class oracle and implement covered default-root direct JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
 - 2026-05-09: Launched worker-029 as a real `codex --yolo` tmux process in `../fast-react-worker-029-component-class-behavior`.
 - 2026-05-09: Queued workers 030-034 as a parallel non-overlapping tranche: Rust core lane primitives, host-config capability diagnostics, native boundary guardrails, React DOM inventory, and public scheduler package inventory.
+- 2026-05-09: Launched workers 030-034 as real `codex --yolo` tmux processes in isolated worktrees.

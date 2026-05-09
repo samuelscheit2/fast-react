@@ -205,11 +205,11 @@ Dependencies: M8.
 | worker-027-forward-ref-behavior | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-027-forward-ref-behavior.md` | workers 014,017,021,023,024,026 | merged |
 | worker-028-create-context-behavior | Add a deterministic `createContext` object oracle and implement covered default-root JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-028-create-context-behavior.md` | workers 014,017,021,023,024,025,026,027 | merged |
 | worker-029-component-class-behavior | Add a deterministic `Component`/`PureComponent` class oracle and implement covered default-root JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-029-component-class-behavior.md` | workers 014,017,021,023,028 | running |
-| worker-030-core-lane-model | Implement first React 19.2.6 lane bitset primitives in the Rust core | `crates/fast-react-core/**`, `worker-progress/worker-030-core-lane-model.md` | workers 007,011 | queued |
-| worker-031-host-capability-diagnostics | Improve host-config capability-set diagnostics and tests | `crates/fast-react-host-config/**`, `worker-progress/worker-031-host-capability-diagnostics.md` | workers 008,012,022 | queued |
-| worker-032-native-boundary-guardrails | Tighten native binding placeholder guardrails and platform target checks | `bindings/node/**`, `crates/fast-react-napi/**`, `worker-progress/worker-032-native-boundary-guardrails.md` | workers 006,015 | queued |
-| worker-033-react-dom-inventory | Build a report-only React DOM 19.2.6 package and behavior inventory | `worker-progress/worker-033-react-dom-inventory.md` | workers 004,005,008,017 | queued |
-| worker-034-scheduler-package-inventory | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` | workers 007,017 | queued |
+| worker-030-core-lane-model | Implement first React 19.2.6 lane bitset primitives in the Rust core | `crates/fast-react-core/**`, `worker-progress/worker-030-core-lane-model.md` | workers 007,011 | running |
+| worker-031-host-capability-diagnostics | Improve host-config capability-set diagnostics and tests | `crates/fast-react-host-config/**`, `worker-progress/worker-031-host-capability-diagnostics.md` | workers 008,012,022 | running |
+| worker-032-native-boundary-guardrails | Tighten native binding placeholder guardrails and platform target checks | `bindings/node/**`, `crates/fast-react-napi/**`, `worker-progress/worker-032-native-boundary-guardrails.md` | workers 006,015 | running |
+| worker-033-react-dom-inventory | Build a report-only React DOM 19.2.6 package and behavior inventory | `worker-progress/worker-033-react-dom-inventory.md` | workers 004,005,008,017 | running |
+| worker-034-scheduler-package-inventory | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` | workers 007,017 | running |
 
 ## Merge Policy
 
