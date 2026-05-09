@@ -1,8 +1,8 @@
 You are a worker for the Fast React project.
 
-First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
 After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-034-scheduler-package-inventory.md, worker-progress/worker-039-scheduler-variant-oracles.md, worker-progress/worker-045-scheduler-root-implementation.md, and worker-progress/worker-052-scheduler-mock-oracle.md. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
-If you need to create subtasks, call create_goal again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
+If you need to create subtasks, use `/goal` (create_goal) again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 Objective:
 Produce a report-only implementation plan for `scheduler/unstable_mock` compatibility, including virtual time, deterministic flushing helpers, priority/log behavior, integration boundaries with the root scheduler package, and the conformance gates needed before upstream-style React scheduler tests can rely on it.

@@ -1,8 +1,8 @@
 # worker-092-react-dom-create-root-facade-plan
 
-First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
 After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-036-react-dom-export-oracle.md, worker-progress/worker-044-react-dom-client-roots-plan.md, worker-progress/worker-055-react-dom-client-roots-implementation-plan.md, worker-progress/worker-088-dom-container-root-markers-oracle.md if it exists, and worker-progress/worker-089-dom-root-listener-installation-oracle.md if it exists. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
-If you need to create subtasks, call create_goal again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
+If you need to create subtasks, use `/goal` (create_goal) again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 ## Objective
 

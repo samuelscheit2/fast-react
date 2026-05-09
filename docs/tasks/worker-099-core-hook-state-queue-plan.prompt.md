@@ -1,8 +1,8 @@
 # worker-099-core-hook-state-queue-plan
 
-First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
 After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-007-scheduler-fiber.md, worker-progress/worker-070-core-update-queue-plan.md, and worker-progress/worker-078-hook-effect-ring-plan.md. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
-If you need to create subtasks, call create_goal again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
+If you need to create subtasks, use `/goal` (create_goal) again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 ## Objective
 

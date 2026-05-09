@@ -1,8 +1,8 @@
 You are worker-011-core-element-model for the Fast React project.
 
-First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
 After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-001-architecture.md`, `worker-progress/worker-004-api-inventory.md`, and `worker-progress/worker-010-initial-scaffold.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+If you create subtasks, use `/goal` (`create_goal`) again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Implement the first Rust core data model primitives needed for React 19.2.6 element compatibility. Focus only on renderer-agnostic core types: compatibility targets, React symbol tags, keys/refs as explicit data, placeholder element records, and loud unimplemented behavior for semantics that still require JS conformance.

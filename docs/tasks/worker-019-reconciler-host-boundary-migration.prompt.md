@@ -1,8 +1,8 @@
 You are worker-019-reconciler-host-boundary-migration for the Fast React project.
 
-First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
 After setting the goal, read `WORKER_BRIEF.md`, `MASTER_PLAN.md`, `MASTER_PROGRESS.md`, `worker-progress/worker-007-scheduler-fiber.md`, `worker-progress/worker-008-renderer-host-config.md`, `worker-progress/worker-010-initial-scaffold.md`, and `worker-progress/worker-012-host-config-traits.md`. Do not read `ORCHESTRATOR.md`; it is for the orchestrator role, not workers.
-If you create subtasks, call `create_goal` again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
+If you create subtasks, use `/goal` (`create_goal`) again for each subtask with context about the parent task. Do not call `update_goal(status: "complete")` until the whole worker task is complete.
 
 Objective:
 Move the reconciler placeholder API toward the canonical host-config traits. The reconciler should stop depending on the legacy `HostConfig` shim where feasible and should expose clear mutation-renderer entry points or blockers for the next reconciliation implementation step.

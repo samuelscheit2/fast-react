@@ -1,8 +1,8 @@
 # worker-101-test-renderer-root-api-plan
 
-First action: call create_goal for this worker task using the Objective below, before research, file reads, implementation, or verification.
+First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
 After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-018-test-renderer-mutation-host.md, worker-progress/worker-022-host-operation-errors.md, worker-progress/worker-073-test-renderer-update-model-plan.md, worker-progress/worker-081-reconciler-root-scheduler-act-plan.md, and worker-progress/worker-096-native-root-boundary-plan.md. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
-If you need to create subtasks, call create_goal again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
+If you need to create subtasks, use `/goal` (create_goal) again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 ## Objective
 

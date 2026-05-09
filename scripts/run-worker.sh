@@ -25,9 +25,10 @@ fi
 prompt_text="$(cat "$prompt_file")
 
 Goal policy from the orchestrator:
-- Your first action must be to call create_goal for this worker task using the Objective in the assigned prompt.
+- Your first action must be to use /goal, the Codex create_goal tool, for this worker task using the Objective in the assigned prompt.
 - Do that before research, file reads, implementation, or verification.
-- On continuation, call create_goal again if the active goal is not already set for this exact worker task.
+- On continuation, use /goal / create_goal again if the active goal is not already set for this exact worker task.
+- Record in your progress report whether goal setup happened before other work, or explicitly state if the goal command/tool was unavailable.
 
 Subagent policy from the orchestrator:
 - You are running as a real Codex process in a tmux worker session.

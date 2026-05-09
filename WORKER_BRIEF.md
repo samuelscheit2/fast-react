@@ -14,7 +14,8 @@ Current compatibility target checked on 2026-05-09:
 
 ## Worker Rules
 
-- Immediately call `create_goal` for your assigned worker task using the objective in your `docs/tasks/worker-*.prompt.md`, before research, file reads, implementation, or verification. On continuation, call `create_goal` again if the active goal is not already set for this exact worker task.
+- Immediately use `/goal` (the Codex `create_goal` tool) for your assigned worker task using the objective in your `docs/tasks/worker-*.prompt.md`, before research, file reads, implementation, or verification. On continuation, use `/goal` / `create_goal` again if the active goal is not already set for this exact worker task.
+- In your progress report, record whether goal setup happened before other work. If the goal command/tool is unavailable, say that explicitly before continuing.
 - Work only on your assigned objective.
 - Modify only the files in your write scope.
 - Record progress in your assigned `worker-progress/<worker-id>.md` file.
