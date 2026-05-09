@@ -1,0 +1,2257 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-dom-container-root-markers-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 createRoot container validation and root marker oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-044-react-dom-client-roots-plan.md",
+    "worker-progress/worker-055-react-dom-client-roots-implementation-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "generation": {
+    "method": "checked runtime inventory plus exact npm tarballs extracted into a temporary node_modules tree and probed through a deterministic minimal DOM host",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per React DOM container root marker mode",
+    "probeTimeoutMs": 15000,
+    "generatedTimestampIncluded": false,
+    "pathNormalization": "temporary roots, package roots, workspace paths, and randomized React container marker suffixes are normalized before artifact serialization"
+  },
+  "evidenceClaims": {
+    "checkedRuntimeInventoryRead": true,
+    "checkedRuntimeInventoryMatched": true,
+    "exactTarballUrlsFromInventory": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListsMatchedInventory": true,
+    "reactDomClientCreateRootProbed": true,
+    "containerValidationProbed": true,
+    "duplicateRootWarningProbed": true,
+    "legacyRootWarningProbed": true,
+    "markerCleanupAfterUnmountProbed": true,
+    "noDirectDomChildMutationBeforeRenderProbed": true,
+    "deterministicMinimalDomUsed": true,
+    "deterministicPathNormalizationApplied": true,
+    "randomizedReactMarkerSuffixesSerialized": false,
+    "fastReactComparedToReactDom": false
+  },
+  "conformanceClaims": {
+    "realReactDomBehaviorProbed": true,
+    "fastReactComparedToReactDom": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomClientRuntimeExportMatched": true
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-container-root-marker-target"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-dom-peer-needed-for-create-root-probes"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-create-root-probes"
+    }
+  ],
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "reason": "Default Node development probes createRoot validation, marker cleanup, and duplicate-root diagnostics with development warnings enabled."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "reason": "Default Node production probes createRoot validation and marker cleanup without development-only diagnostics."
+    }
+  ],
+  "validContainerCases": [
+    {
+      "id": "element",
+      "nodeType": 1,
+      "reason": "Element nodes are valid createRoot containers."
+    },
+    {
+      "id": "document",
+      "nodeType": 9,
+      "reason": "Document nodes are valid createRoot containers."
+    },
+    {
+      "id": "document-fragment",
+      "nodeType": 11,
+      "reason": "DocumentFragment nodes are valid createRoot containers."
+    }
+  ],
+  "invalidContainerCases": [
+    {
+      "id": "null",
+      "nodeType": null,
+      "reason": "Null is rejected before any root marker side effect."
+    },
+    {
+      "id": "undefined",
+      "nodeType": null,
+      "reason": "Undefined is rejected before any root marker side effect."
+    },
+    {
+      "id": "plain-object",
+      "nodeType": null,
+      "reason": "Plain objects without a valid DOM nodeType are rejected."
+    },
+    {
+      "id": "text-node",
+      "nodeType": 3,
+      "reason": "Text nodes are not valid createRoot containers."
+    },
+    {
+      "id": "comment-mount-point",
+      "nodeType": 8,
+      "reason": "The stable 19.2.6 package rejects comment mount-point containers because comments-as-DOM-containers are disabled."
+    },
+    {
+      "id": "comment-other",
+      "nodeType": 8,
+      "reason": "Non-mount-point comments are rejected createRoot containers."
+    }
+  ],
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react-dom.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./client",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./client.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./client.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "bun"
+              ],
+              "target": "./server.bun.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./server.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.bun",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.bun.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./static.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./profiling",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./profiling.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./profiling.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./test-utils",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./test-utils.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ]
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": {
+          "node": ">=0.10.0"
+        }
+      },
+      "publicSubpaths": [
+        ".",
+        "./package.json",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-dev-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-dev-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-dev-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./compiler-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./compiler-runtime.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./compiler-runtime.js"
+            }
+          ]
+        }
+      ]
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-artifact-probes",
+      "targetStatus": "supporting-package-not-official-react-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null
+      },
+      "publicSubpaths": [],
+      "runtimeSubpaths": [],
+      "exportMapRows": []
+    }
+  },
+  "containerRootMarkerObservations": {
+    "default-node-development": {
+      "packageName": "react-dom",
+      "nodeEnv": "development",
+      "condition": "default",
+      "result": {
+        "action": "container-root-markers",
+        "targetPackage": "react-dom",
+        "reactDomClientVersion": "19.2.6",
+        "fakeDomSubstrate": {
+          "kind": "deterministic-minimal-dom",
+          "browserNativeDom": false,
+          "records": [
+            "appendChild, insertBefore, removeChild, and textContent writes",
+            "createRoot root marker property counts with randomized suffixes removed",
+            "console.error and console.warn diagnostics"
+          ],
+          "limitations": [
+            "no browser parser, layout, focus, selection, accessibility, or custom element lifecycle behavior",
+            "delegated listener installation details are intentionally left to the root-listener oracle track",
+            "root.render DOM commits, hydration, resources, and event dispatch are outside this oracle"
+          ]
+        },
+        "containerValidation": [
+          {
+            "caseId": "element",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 1,
+              "nodeName": "DIV",
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "ok",
+                "label": "createRoot element"
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 1,
+              "nullCount": 0,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "truthy",
+                  "valueType": "object",
+                  "valueTag": "[object Object]"
+                }
+              ]
+            },
+            "unmount": {
+              "status": "ok",
+              "label": "unmount element",
+              "consoleCalls": []
+            },
+            "afterUnmountMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 0,
+              "nullCount": 1,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "null",
+                  "valueType": "null",
+                  "valueTag": null
+                }
+              ]
+            },
+            "unmountMutations": [
+              {
+                "type": "setTextContent",
+                "target": "DIV",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "caseId": "document",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 9,
+              "nodeName": "#document",
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "ok",
+                "label": "createRoot document"
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 1,
+              "nullCount": 0,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "truthy",
+                  "valueType": "object",
+                  "valueTag": "[object Object]"
+                }
+              ]
+            },
+            "unmount": {
+              "status": "ok",
+              "label": "unmount document",
+              "consoleCalls": []
+            },
+            "afterUnmountMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 0,
+              "nullCount": 1,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "null",
+                  "valueType": "null",
+                  "valueTag": null
+                }
+              ]
+            },
+            "unmountMutations": []
+          },
+          {
+            "caseId": "document-fragment",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 11,
+              "nodeName": "#document-fragment",
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "ok",
+                "label": "createRoot document-fragment"
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 1,
+              "nullCount": 0,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "truthy",
+                  "valueType": "object",
+                  "valueTag": "[object Object]"
+                }
+              ]
+            },
+            "unmount": {
+              "status": "ok",
+              "label": "unmount document-fragment",
+              "consoleCalls": []
+            },
+            "afterUnmountMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 0,
+              "nullCount": 1,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "null",
+                  "valueType": "null",
+                  "valueTag": null
+                }
+              ]
+            },
+            "unmountMutations": []
+          },
+          {
+            "caseId": "null",
+            "nodeSummary": {
+              "kind": "null",
+              "nodeType": null,
+              "nodeName": null
+            },
+            "beforeMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot null",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Target container is not a DOM element."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "undefined",
+            "nodeSummary": {
+              "kind": "undefined",
+              "nodeType": null,
+              "nodeName": null
+            },
+            "beforeMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot undefined",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Target container is not a DOM element."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "plain-object",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": null,
+              "nodeName": null,
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot plain-object",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Target container is not a DOM element."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "text-node",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "text"
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot text-node",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Target container is not a DOM element."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "comment-mount-point",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 8,
+              "nodeName": "#comment",
+              "nodeValue": " react-mount-point-unstable "
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot comment-mount-point",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Target container is not a DOM element."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "comment-other",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 8,
+              "nodeName": "#comment",
+              "nodeValue": "not a mount point"
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot comment-other",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Target container is not a DOM element."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          }
+        ],
+        "duplicateRootWarning": {
+          "firstCreate": {
+            "result": {
+              "status": "ok",
+              "label": "first createRoot"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterFirstMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          },
+          "secondCreate": {
+            "result": {
+              "status": "ok",
+              "label": "second createRoot"
+            },
+            "consoleCalls": [
+              {
+                "method": "error",
+                "args": [
+                  {
+                    "type": "string",
+                    "value": "You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it."
+                  }
+                ]
+              }
+            ],
+            "mutations": []
+          },
+          "afterSecondMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        },
+        "legacyDuplicateRootWarning": {
+          "firstCreate": {
+            "result": {
+              "status": "ok",
+              "label": "first createRoot"
+            },
+            "consoleCalls": []
+          },
+          "legacyMarkerInjected": true,
+          "markerBeforeSecondCreate": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          },
+          "secondCreate": {
+            "result": {
+              "status": "ok",
+              "label": "second createRoot with legacy marker"
+            },
+            "consoleCalls": [
+              {
+                "method": "error",
+                "args": [
+                  {
+                    "type": "string",
+                    "value": "You are calling ReactDOMClient.createRoot() on a container that was previously passed to ReactDOM.render(). This is not supported."
+                  }
+                ]
+              }
+            ],
+            "mutations": []
+          },
+          "markerAfterSecondCreate": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        },
+        "unmountMarkerCleanup": {
+          "firstCreate": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot before unmount"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterCreateMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          },
+          "unmount": {
+            "result": {
+              "status": "ok",
+              "label": "root.unmount"
+            },
+            "consoleCalls": [],
+            "mutations": [
+              {
+                "type": "setTextContent",
+                "target": "DIV",
+                "value": ""
+              }
+            ]
+          },
+          "afterUnmountMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 0,
+            "nullCount": 1,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "null",
+                "valueType": "null",
+                "valueTag": null
+              }
+            ]
+          },
+          "recreate": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot after unmount"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterRecreateMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        },
+        "noRenderSideEffects": {
+          "createRoot": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot no render"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "beforeTree": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "children": [
+              {
+                "nodeType": 3,
+                "nodeName": "#text",
+                "text": "preserved"
+              }
+            ]
+          },
+          "afterTree": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "children": [
+              {
+                "nodeType": 3,
+                "nodeName": "#text",
+                "text": "preserved"
+              }
+            ]
+          },
+          "afterCreateMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "default-node-production": {
+      "packageName": "react-dom",
+      "nodeEnv": "production",
+      "condition": "default",
+      "result": {
+        "action": "container-root-markers",
+        "targetPackage": "react-dom",
+        "reactDomClientVersion": "19.2.6",
+        "fakeDomSubstrate": {
+          "kind": "deterministic-minimal-dom",
+          "browserNativeDom": false,
+          "records": [
+            "appendChild, insertBefore, removeChild, and textContent writes",
+            "createRoot root marker property counts with randomized suffixes removed",
+            "console.error and console.warn diagnostics"
+          ],
+          "limitations": [
+            "no browser parser, layout, focus, selection, accessibility, or custom element lifecycle behavior",
+            "delegated listener installation details are intentionally left to the root-listener oracle track",
+            "root.render DOM commits, hydration, resources, and event dispatch are outside this oracle"
+          ]
+        },
+        "containerValidation": [
+          {
+            "caseId": "element",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 1,
+              "nodeName": "DIV",
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "ok",
+                "label": "createRoot element"
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 1,
+              "nullCount": 0,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "truthy",
+                  "valueType": "object",
+                  "valueTag": "[object Object]"
+                }
+              ]
+            },
+            "unmount": {
+              "status": "ok",
+              "label": "unmount element",
+              "consoleCalls": []
+            },
+            "afterUnmountMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 0,
+              "nullCount": 1,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "null",
+                  "valueType": "null",
+                  "valueTag": null
+                }
+              ]
+            },
+            "unmountMutations": [
+              {
+                "type": "setTextContent",
+                "target": "DIV",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "caseId": "document",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 9,
+              "nodeName": "#document",
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "ok",
+                "label": "createRoot document"
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 1,
+              "nullCount": 0,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "truthy",
+                  "valueType": "object",
+                  "valueTag": "[object Object]"
+                }
+              ]
+            },
+            "unmount": {
+              "status": "ok",
+              "label": "unmount document",
+              "consoleCalls": []
+            },
+            "afterUnmountMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 0,
+              "nullCount": 1,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "null",
+                  "valueType": "null",
+                  "valueTag": null
+                }
+              ]
+            },
+            "unmountMutations": []
+          },
+          {
+            "caseId": "document-fragment",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 11,
+              "nodeName": "#document-fragment",
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "ok",
+                "label": "createRoot document-fragment"
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 1,
+              "nullCount": 0,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "truthy",
+                  "valueType": "object",
+                  "valueTag": "[object Object]"
+                }
+              ]
+            },
+            "unmount": {
+              "status": "ok",
+              "label": "unmount document-fragment",
+              "consoleCalls": []
+            },
+            "afterUnmountMarker": {
+              "inspectable": true,
+              "propertyCount": 1,
+              "truthyCount": 0,
+              "nullCount": 1,
+              "sanitizedProperties": [
+                {
+                  "keyPrefix": "__reactContainer$",
+                  "enumerable": true,
+                  "valueState": "null",
+                  "valueType": "null",
+                  "valueTag": null
+                }
+              ]
+            },
+            "unmountMutations": []
+          },
+          {
+            "caseId": "null",
+            "nodeSummary": {
+              "kind": "null",
+              "nodeType": null,
+              "nodeName": null
+            },
+            "beforeMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot null",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "undefined",
+            "nodeSummary": {
+              "kind": "undefined",
+              "nodeType": null,
+              "nodeName": null
+            },
+            "beforeMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot undefined",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": false,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "plain-object",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": null,
+              "nodeName": null,
+              "nodeValue": null
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot plain-object",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "text-node",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 3,
+              "nodeName": "#text",
+              "nodeValue": "text"
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot text-node",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "comment-mount-point",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 8,
+              "nodeName": "#comment",
+              "nodeValue": " react-mount-point-unstable "
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot comment-mount-point",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          },
+          {
+            "caseId": "comment-other",
+            "nodeSummary": {
+              "kind": "object",
+              "nodeType": 8,
+              "nodeName": "#comment",
+              "nodeValue": "not a mount point"
+            },
+            "beforeMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "createRoot": {
+              "result": {
+                "status": "throws",
+                "label": "createRoot comment-other",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+                }
+              },
+              "consoleCalls": [],
+              "mutations": []
+            },
+            "afterCreateMarker": {
+              "inspectable": true,
+              "propertyCount": 0,
+              "truthyCount": 0,
+              "nullCount": 0,
+              "sanitizedProperties": []
+            },
+            "unmount": null,
+            "afterUnmountMarker": null,
+            "unmountMutations": []
+          }
+        ],
+        "duplicateRootWarning": {
+          "firstCreate": {
+            "result": {
+              "status": "ok",
+              "label": "first createRoot"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterFirstMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          },
+          "secondCreate": {
+            "result": {
+              "status": "ok",
+              "label": "second createRoot"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterSecondMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        },
+        "legacyDuplicateRootWarning": {
+          "firstCreate": {
+            "result": {
+              "status": "ok",
+              "label": "first createRoot"
+            },
+            "consoleCalls": []
+          },
+          "legacyMarkerInjected": true,
+          "markerBeforeSecondCreate": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          },
+          "secondCreate": {
+            "result": {
+              "status": "ok",
+              "label": "second createRoot with legacy marker"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "markerAfterSecondCreate": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        },
+        "unmountMarkerCleanup": {
+          "firstCreate": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot before unmount"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterCreateMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          },
+          "unmount": {
+            "result": {
+              "status": "ok",
+              "label": "root.unmount"
+            },
+            "consoleCalls": [],
+            "mutations": [
+              {
+                "type": "setTextContent",
+                "target": "DIV",
+                "value": ""
+              }
+            ]
+          },
+          "afterUnmountMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 0,
+            "nullCount": 1,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "null",
+                "valueType": "null",
+                "valueTag": null
+              }
+            ]
+          },
+          "recreate": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot after unmount"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "afterRecreateMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        },
+        "noRenderSideEffects": {
+          "createRoot": {
+            "result": {
+              "status": "ok",
+              "label": "createRoot no render"
+            },
+            "consoleCalls": [],
+            "mutations": []
+          },
+          "beforeTree": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "children": [
+              {
+                "nodeType": 3,
+                "nodeName": "#text",
+                "text": "preserved"
+              }
+            ]
+          },
+          "afterTree": {
+            "nodeType": 1,
+            "nodeName": "DIV",
+            "children": [
+              {
+                "nodeType": 3,
+                "nodeName": "#text",
+                "text": "preserved"
+              }
+            ]
+          },
+          "afterCreateMarker": {
+            "inspectable": true,
+            "propertyCount": 1,
+            "truthyCount": 1,
+            "nullCount": 0,
+            "sanitizedProperties": [
+              {
+                "keyPrefix": "__reactContainer$",
+                "enumerable": true,
+                "valueState": "truthy",
+                "valueType": "object",
+                "valueTag": "[object Object]"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "coverage": {
+    "validContainerCaseCount": 3,
+    "invalidContainerCaseCount": 6,
+    "duplicateRootWarningProbe": true,
+    "legacyRootWarningProbe": true,
+    "unmountMarkerCleanupProbe": true,
+    "createRootNoRenderMutationProbe": true,
+    "privateRootMarkerPresenceSummarized": true,
+    "privateRootMarkerSuffixesOmitted": true
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-react-dom-comparison",
+      "reason": "This oracle records pinned React DOM 19.2.6 behavior only; Fast React DOM root implementation work is outside this worker scope."
+    },
+    {
+      "id": "minimal-dom-host-not-browser-matrix",
+      "reason": "The probe host implements deterministic DOM APIs needed for createRoot validation, marker writes, unmount cleanup, and listener installation side effects. Browser layout, parser, focus, selection, custom elements, and accessibility behavior are outside this oracle."
+    },
+    {
+      "id": "listener-installation-not-asserted",
+      "reason": "createRoot necessarily installs delegated listeners, but exact listener registration behavior belongs to the separate root-listener oracle track."
+    },
+    {
+      "id": "no-render-or-hydration-claim",
+      "reason": "The oracle probes createRoot before any root.render call and root.unmount after an empty root only; DOM commits, hydration, resources, forms, and event dispatch are separate React DOM surfaces."
+    }
+  ]
+}
