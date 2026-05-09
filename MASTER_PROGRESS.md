@@ -49,6 +49,7 @@ M0: Orchestration Foundation.
 - Accepted runtime inventory generation from worker-017: the conformance workspace now generates and checks a deterministic React 19.2.6 runtime/package inventory from exact npm metadata and integrity-verified tarballs, with runtime export probes, condition-resolution evidence, no temp path leaks, and explicit false Fast React behavior conformance claims.
 - Accepted structured host operation errors from worker-022: `HostResult<T>` now carries a top-level `HostError`, unsupported capabilities remain inspectable as a distinct variant, the in-memory test renderer returns structured operation errors for invalid handles, missing insert/remove targets, cross-renderer handles, and impossible self/cycle mutations, and failed insert/remove paths preserve the existing tree.
 - Accepted element-object oracle from worker-021: the conformance workspace now has a deterministic React 19.2.6 element-object oracle covering 22 scenarios across default and `react-server` development/production modes, with checked Fast React observations recorded only as known mismatches or unsupported placeholders and all compatibility claims kept false.
+- Accepted JS element factory from worker-023: `@fast-react/react` now implements the oracle-covered `createElement`, `cloneElement`, `isValidElement`, `jsx`, `jsxs`, and `jsxDEV` behavior in a shared JS facade module. The regenerated oracle records 84 exact normalized Fast React behavior matches, 4 intentional entrypoint-surface mismatches, 0 unsupported placeholders, and still keeps package-wide compatibility claims false.
 
 ## Worker Roster
 
@@ -76,12 +77,12 @@ M0: Orchestration Foundation.
 | worker-020-element-object-conformance-probes | merged | Probe React 19.2.6 element object behavior and plan safe implementation | `worker-progress/worker-020-element-object-conformance-probes.md` |
 | worker-021-element-object-oracle | merged | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `worker-progress/worker-021-element-object-oracle.md` |
 | worker-022-host-operation-errors | merged | Add structured host operation errors for invalid test-renderer operations | `worker-progress/worker-022-host-operation-errors.md` |
-| worker-023-js-element-factory | running in tmux worktree; nested subagents allowed | Implement conformance-backed JS element factory behavior from the checked oracle | `../fast-react-worker-023-js-element-factory/worker-progress/worker-023-js-element-factory.md` |
+| worker-023-js-element-factory | merged | Implement conformance-backed JS element factory behavior from the checked oracle | `worker-progress/worker-023-js-element-factory.md` |
 
 ## Next Actions
 
-1. Monitor worker 023 and audit/merge it after it regenerates the element-object oracle and updates comparison statuses without claiming full compatibility.
-2. Keep follow-up package behavior work paused until worker 023 no longer has a moving Fast React target.
+1. Queue the next conformance-backed package behavior slice, prioritizing `createRef`/refs or `Children` helpers before hooks and context.
+2. Keep package-wide React compatibility claims false until entrypoint-surface mismatches and broader behavior slices are closed by checked oracles.
 
 ## Risks And Open Questions
 
@@ -156,3 +157,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Verified merged `main` after workers 021 and 022 with `npm run check:js`, `cargo fmt --all --check`, `cargo test --workspace --all-features`, `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`, and `cargo clippy -p fast-react-test-renderer --all-targets --all-features -- -D warnings`. Root `Cargo.lock` remains an untracked regenerable artifact.
 - 2026-05-09: Queued worker-023 to implement the first JS element factory behavior from the checked element-object oracle, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
 - 2026-05-09: Launched worker-023 as a real `codex --yolo` tmux process in `../fast-react-worker-023-js-element-factory`.
+- 2026-05-09: Accepted and merged worker-023 JS element factory in commit `ad6fc89`. Closed the worker-023 tmux session after merge. Verified post-rebase with `npm test --workspace @fast-react/conformance`, `npm run check:js`, element oracle regeneration byte-compare, and the temp/local path leak guard.
+- 2026-05-09: Verified merged `main` after worker-023 with `npm run check:js`; 18 conformance tests passed through the workspace check.
