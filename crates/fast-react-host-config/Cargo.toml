@@ -1,0 +1,12 @@
+[package]
+name = "fast-react-host-config"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fast-react-core.workspace = true
+
+[lib]
+path = "src/lib.rs"

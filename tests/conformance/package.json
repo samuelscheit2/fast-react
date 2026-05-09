@@ -1,0 +1,13 @@
+{
+  "name": "@fast-react/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Placeholder for the future Fast React dual-run conformance harness.",
+  "type": "module",
+  "scripts": {
+    "test": "node -e \"console.log('Fast React conformance placeholder: future dual-run React oracle harness is not implemented yet.')\""
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}

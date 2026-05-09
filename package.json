@@ -1,0 +1,25 @@
+{
+  "name": "fast-react-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Workspace scaffold for the Fast React Rust implementation.",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/*",
+    "bindings/*",
+    "tests/*"
+  ],
+  "scripts": {
+    "check": "npm run check:rust && npm run check:js",
+    "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets --all-features -- -D warnings",
+    "check:js": "node tests/smoke/import-entrypoints.mjs && npm run check --workspaces --if-present",
+    "test": "cargo test --workspace --all-features && npm test --workspaces --if-present",
+    "test:smoke": "node tests/smoke/import-entrypoints.mjs",
+    "test:conformance": "npm test --workspace @fast-react/conformance",
+    "build:native": "npm run build --workspace @fast-react/native"
+  },
+  "engines": {
+    "node": ">=26.0.0",
+    "npm": ">=11.0.0"
+  }
+}
