@@ -28,8 +28,6 @@ codex \
   --yolo \
   --no-alt-screen \
   --search \
-  -a never \
-  -s danger-full-access \
   -m gpt-5.5 \
   -c model_reasoning_effort=\"xhigh\" \
   -C "$repo_root" \
