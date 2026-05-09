@@ -1,10 +1,11 @@
 'use strict';
 
 const {
+  createBatchedUpdates,
   createPrivateInternalsPlaceholder,
   createUnsupportedFunction,
   definePlaceholderMetadata,
-  placeholderVersion
+  reactDomVersion
 } = require('./placeholder-utils.js');
 
 const entrypoint = 'react-dom/profiling';
@@ -12,28 +13,39 @@ const entrypoint = 'react-dom/profiling';
 exports.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE =
   createPrivateInternalsPlaceholder(
     entrypoint,
-    '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE'
+    '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
+    'react-dom-export-oracle-shape'
   );
-exports.createPortal = createUnsupportedFunction(entrypoint, 'createPortal');
-exports.createRoot = createUnsupportedFunction(entrypoint, 'createRoot');
-exports.flushSync = createUnsupportedFunction(entrypoint, 'flushSync');
-exports.hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot');
-exports.preconnect = createUnsupportedFunction(entrypoint, 'preconnect');
-exports.prefetchDNS = createUnsupportedFunction(entrypoint, 'prefetchDNS');
-exports.preinit = createUnsupportedFunction(entrypoint, 'preinit');
-exports.preinitModule = createUnsupportedFunction(entrypoint, 'preinitModule');
-exports.preload = createUnsupportedFunction(entrypoint, 'preload');
-exports.preloadModule = createUnsupportedFunction(entrypoint, 'preloadModule');
+exports.createPortal = createUnsupportedFunction(entrypoint, 'createPortal', 2);
+exports.createRoot = createUnsupportedFunction(entrypoint, 'createRoot', 2);
+exports.flushSync = createUnsupportedFunction(entrypoint, 'flushSync', 1);
+exports.hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot', 3);
+exports.preconnect = createUnsupportedFunction(entrypoint, 'preconnect', 2);
+exports.prefetchDNS = createUnsupportedFunction(entrypoint, 'prefetchDNS', 1);
+exports.preinit = createUnsupportedFunction(entrypoint, 'preinit', 2);
+exports.preinitModule = createUnsupportedFunction(
+  entrypoint,
+  'preinitModule',
+  2
+);
+exports.preload = createUnsupportedFunction(entrypoint, 'preload', 2);
+exports.preloadModule = createUnsupportedFunction(
+  entrypoint,
+  'preloadModule',
+  2
+);
 exports.requestFormReset = createUnsupportedFunction(
   entrypoint,
-  'requestFormReset'
+  'requestFormReset',
+  1
 );
-exports.unstable_batchedUpdates = createUnsupportedFunction(
+exports.unstable_batchedUpdates = createBatchedUpdates();
+exports.useFormState = createUnsupportedFunction(entrypoint, 'useFormState', 3);
+exports.useFormStatus = createUnsupportedFunction(
   entrypoint,
-  'unstable_batchedUpdates'
+  'useFormStatus',
+  0
 );
-exports.useFormState = createUnsupportedFunction(entrypoint, 'useFormState');
-exports.useFormStatus = createUnsupportedFunction(entrypoint, 'useFormStatus');
-exports.version = placeholderVersion;
+exports.version = reactDomVersion;
 
 definePlaceholderMetadata(module.exports, entrypoint);

@@ -257,6 +257,8 @@ const reactDomStaticBrowserKeys = [
   'prerender',
   'resumeAndPrerender'
 ];
+const reactDomPlaceholderVersion = '0.0.0-fast-react-dom-placeholder';
+const reactDomImplementedVersion = '19.2.6';
 const reactDomProfilingKeys = [
   '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
   'createPortal',
@@ -280,6 +282,7 @@ const reactDomTestUtilsKeys = ['act'];
 const reactDomDefaultEntrypoints = [
   {
     fileName: 'index.js',
+    expectedVersion: reactDomImplementedVersion,
     keys: defaultReactDomKeys,
     resolvedFileName: 'index.js',
     specifier: '@fast-react/react-dom',
@@ -357,6 +360,7 @@ const reactDomDefaultEntrypoints = [
   },
   {
     fileName: 'profiling.js',
+    expectedVersion: reactDomImplementedVersion,
     keys: reactDomProfilingKeys,
     resolvedFileName: 'profiling.js',
     specifier: '@fast-react/react-dom/profiling',
@@ -1746,7 +1750,10 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
   const cjsModule = require(absolutePath);
   assertReactDomInventoryKeys(cjsModule, entrypoint.keys, `${labelPrefix} CJS`);
   if (Object.hasOwn(cjsModule, 'version')) {
-    assert.equal(cjsModule.version, '0.0.0-fast-react-dom-placeholder');
+    assert.equal(
+      cjsModule.version,
+      entrypoint.expectedVersion ?? reactDomPlaceholderVersion
+    );
   }
   assertReactDomUnimplemented(
     () => cjsModule[entrypoint.unsupportedExport](),
@@ -2314,7 +2321,14 @@ async function runReactDomPackageProbe(
 
     const entrypoints = ${JSON.stringify(
       entrypoints.map(
-        ({ keys, resolvedFileName, specifier, unsupportedExport }) => ({
+        ({
+          expectedVersion,
+          keys,
+          resolvedFileName,
+          specifier,
+          unsupportedExport
+        }) => ({
+          expectedVersion,
           keys,
           resolvedFileName,
           specifier,
@@ -2326,6 +2340,7 @@ async function runReactDomPackageProbe(
     const blockedExtensionSubpaths = ${JSON.stringify(
       blockedReactDomExtensionSubpaths
     )};
+    const placeholderVersion = ${JSON.stringify(reactDomPlaceholderVersion)};
 
     function assertInventoryKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
@@ -2372,7 +2387,7 @@ async function runReactDomPackageProbe(
     }
 
     (async () => {
-      for (const { keys, resolvedFileName, specifier, unsupportedExport } of entrypoints) {
+      for (const { expectedVersion, keys, resolvedFileName, specifier, unsupportedExport } of entrypoints) {
         assert.equal(
           require.resolve(specifier),
           path.join(
@@ -2388,7 +2403,7 @@ async function runReactDomPackageProbe(
         const cjsModule = require(specifier);
         assertInventoryKeys(cjsModule, keys, specifier);
         if (Object.hasOwn(cjsModule, 'version')) {
-          assert.equal(cjsModule.version, '0.0.0-fast-react-dom-placeholder');
+          assert.equal(cjsModule.version, expectedVersion ?? placeholderVersion);
         }
         if (specifier === '@fast-react/react-dom/server.bun') {
           assert.equal(cjsModule.resume, undefined, specifier);

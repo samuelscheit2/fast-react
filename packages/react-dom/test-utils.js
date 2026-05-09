@@ -7,6 +7,6 @@ const {
 
 const entrypoint = 'react-dom/test-utils';
 
-exports.act = createUnsupportedFunction(entrypoint, 'act');
+exports.act = createUnsupportedFunction(entrypoint, 'act', 1);
 
 definePlaceholderMetadata(module.exports, entrypoint);
