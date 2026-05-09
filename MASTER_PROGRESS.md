@@ -5,7 +5,7 @@ Last updated: 2026-05-09
 ## Current State
 
 - Repository initialized locally on branch `main`.
-- No implementation code exists yet.
+- Initial scaffold and first placeholder implementation slices are merged.
 - Orchestrator instructions loaded from `ORCHESTRATOR.md`.
 - Worker-facing role contract added in `WORKER_BRIEF.md` so workers do not read orchestrator-only instructions.
 - Current npm compatibility target checked on 2026-05-09:
@@ -64,10 +64,14 @@ M0: Orchestration Foundation.
 | worker-014-react-entrypoint-placeholders | merged | Improve React package placeholders and smoke tests from API inventory | `worker-progress/worker-014-react-entrypoint-placeholders.md` |
 | worker-015-native-loader-boundary | merged | Improve native loader and Rust N-API boundary placeholders | `worker-progress/worker-015-native-loader-boundary.md` |
 | worker-016-root-lockfile-sync | merged | Synchronize root `package-lock.json` after package metadata changes | `worker-progress/worker-016-root-lockfile-sync.md` |
+| worker-017-runtime-inventory-generation | queued | Generate deterministic React 19.2.6 runtime/package inventory artifacts | `../fast-react-worker-017-runtime-inventory-generation/worker-progress/worker-017-runtime-inventory-generation.md` |
+| worker-018-test-renderer-mutation-host | queued | Implement minimal canonical mutation test renderer | `../fast-react-worker-018-test-renderer-mutation-host/worker-progress/worker-018-test-renderer-mutation-host.md` |
+| worker-019-reconciler-host-boundary-migration | queued | Move reconciler placeholder API toward canonical host trait bounds | `../fast-react-worker-019-reconciler-host-boundary-migration/worker-progress/worker-019-reconciler-host-boundary-migration.md` |
+| worker-020-element-object-conformance-probes | queued | Probe React 19.2.6 element object behavior and plan safe implementation | `../fast-react-worker-020-element-object-conformance-probes/worker-progress/worker-020-element-object-conformance-probes.md` |
 
 ## Next Actions
 
-1. Plan the next implementation tranche from accepted follow-up recommendations.
+1. Launch queued workers 017-020 in disjoint worktrees.
 2. Launch merge workers if host/core/test changes require integration fixes.
 
 ## Risks And Open Questions
@@ -126,3 +130,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-014 React entrypoint placeholders in commit `d929916`. Closed the worker-014 tmux session after merge.
 - 2026-05-09: Verified merged JS/native/Rust checks on `main` with `npm run check`.
 - 2026-05-09: Accepted and merged worker-016 root lockfile sync in commit `8489b58`. Closed the worker-016 tmux session after merge.
+- 2026-05-09: Queued workers 017-020 as the next disjoint tranche: generated runtime inventory, canonical mutation test renderer, reconciler host-boundary migration, and element object conformance probes.
