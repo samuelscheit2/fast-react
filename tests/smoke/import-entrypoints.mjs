@@ -488,7 +488,26 @@ const blockedReactDomExtensionSubpaths = [
   '@fast-react/react-dom/placeholder-utils.js'
 ];
 
-const schedulerRootKeys = [
+const schedulerImplementedRootKeys = [
+  'unstable_now',
+  'unstable_IdlePriority',
+  'unstable_ImmediatePriority',
+  'unstable_LowPriority',
+  'unstable_NormalPriority',
+  'unstable_Profiling',
+  'unstable_UserBlockingPriority',
+  'unstable_cancelCallback',
+  'unstable_forceFrameRate',
+  'unstable_getCurrentPriorityLevel',
+  'unstable_next',
+  'unstable_requestPaint',
+  'unstable_runWithPriority',
+  'unstable_scheduleCallback',
+  'unstable_shouldYield',
+  'unstable_wrapCallback'
+];
+
+const schedulerPlaceholderRootKeys = [
   'unstable_scheduleCallback',
   'unstable_cancelCallback',
   'unstable_shouldYield',
@@ -508,7 +527,7 @@ const schedulerRootKeys = [
 ];
 
 const schedulerMockKeys = [
-  ...schedulerRootKeys,
+  ...schedulerPlaceholderRootKeys,
   'log',
   'reset',
   'unstable_advanceTime',
@@ -524,10 +543,10 @@ const schedulerMockKeys = [
 
 const schedulerEntrypoints = [
   {
-    keys: schedulerRootKeys,
+    implementedRoot: true,
+    keys: schedulerImplementedRootKeys,
     resolvedFileName: 'index.js',
-    specifier: 'scheduler',
-    unsupportedExport: 'unstable_scheduleCallback'
+    specifier: 'scheduler'
   },
   {
     keys: schedulerMockKeys,
@@ -536,37 +555,37 @@ const schedulerEntrypoints = [
     unsupportedExport: 'unstable_flushAll'
   },
   {
-    keys: schedulerRootKeys,
+    keys: schedulerPlaceholderRootKeys,
     resolvedFileName: 'unstable_post_task.js',
     specifier: 'scheduler/unstable_post_task',
     unsupportedExport: 'unstable_scheduleCallback'
   },
   {
-    keys: schedulerRootKeys,
+    keys: schedulerPlaceholderRootKeys,
     resolvedFileName: 'index.native.js',
     specifier: 'scheduler/index.native.js',
     unsupportedExport: 'unstable_runWithPriority'
   },
   {
-    keys: schedulerRootKeys,
+    implementedRoot: true,
+    keys: schedulerImplementedRootKeys,
     resolvedFileName: path.join('cjs', 'scheduler.development.js'),
-    specifier: 'scheduler/cjs/scheduler.development.js',
-    unsupportedExport: 'unstable_cancelCallback'
+    specifier: 'scheduler/cjs/scheduler.development.js'
   },
   {
-    keys: schedulerRootKeys,
+    implementedRoot: true,
+    keys: schedulerImplementedRootKeys,
     resolvedFileName: path.join('cjs', 'scheduler.production.js'),
-    specifier: 'scheduler/cjs/scheduler.production.js',
-    unsupportedExport: 'unstable_shouldYield'
+    specifier: 'scheduler/cjs/scheduler.production.js'
   },
   {
-    keys: schedulerRootKeys,
+    keys: schedulerPlaceholderRootKeys,
     resolvedFileName: path.join('cjs', 'scheduler.native.development.js'),
     specifier: 'scheduler/cjs/scheduler.native.development.js',
     unsupportedExport: 'unstable_next'
   },
   {
-    keys: schedulerRootKeys,
+    keys: schedulerPlaceholderRootKeys,
     resolvedFileName: path.join('cjs', 'scheduler.native.production.js'),
     specifier: 'scheduler/cjs/scheduler.native.production.js',
     unsupportedExport: 'unstable_wrapCallback'
@@ -590,7 +609,7 @@ const schedulerEntrypoints = [
     unsupportedExport: 'unstable_flushExpired'
   },
   {
-    keys: schedulerRootKeys,
+    keys: schedulerPlaceholderRootKeys,
     resolvedFileName: path.join(
       'cjs',
       'scheduler-unstable_post_task.development.js'
@@ -599,7 +618,7 @@ const schedulerEntrypoints = [
     unsupportedExport: 'unstable_forceFrameRate'
   },
   {
-    keys: schedulerRootKeys,
+    keys: schedulerPlaceholderRootKeys,
     resolvedFileName: path.join(
       'cjs',
       'scheduler-unstable_post_task.production.js'
@@ -749,6 +768,125 @@ function assertSchedulerPlaceholderMetadata(moduleExports, label) {
 function assertSchedulerInventoryKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
   assertSchedulerPlaceholderMetadata(moduleExports, label);
+}
+
+function assertSchedulerImplementedRootKeys(moduleExports, expectedKeys, label) {
+  assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assert.equal(
+    Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
+    false,
+    `${label} should not expose placeholder metadata`
+  );
+  assert.equal(
+    Object.hasOwn(moduleExports, 'compatibilityTarget'),
+    false,
+    `${label} should not expose placeholder compatibility metadata`
+  );
+}
+
+function assertSchedulerImplementedRootBehavior(moduleExports, label) {
+  assert.equal(
+    typeof moduleExports.unstable_now,
+    'function',
+    `${label}.unstable_now`
+  );
+  assert.equal(
+    moduleExports.unstable_getCurrentPriorityLevel(),
+    moduleExports.unstable_NormalPriority,
+    `${label} default priority`
+  );
+
+  const userBlockingPriority = moduleExports.unstable_runWithPriority(
+    moduleExports.unstable_UserBlockingPriority,
+    () => moduleExports.unstable_getCurrentPriorityLevel()
+  );
+  assert.equal(
+    userBlockingPriority,
+    moduleExports.unstable_UserBlockingPriority,
+    `${label}.unstable_runWithPriority`
+  );
+  assert.equal(
+    moduleExports.unstable_getCurrentPriorityLevel(),
+    moduleExports.unstable_NormalPriority,
+    `${label} priority restoration`
+  );
+
+  const nextFromImmediate = moduleExports.unstable_runWithPriority(
+    moduleExports.unstable_ImmediatePriority,
+    () =>
+      moduleExports.unstable_next(() =>
+        moduleExports.unstable_getCurrentPriorityLevel()
+      )
+  );
+  assert.equal(
+    nextFromImmediate,
+    moduleExports.unstable_NormalPriority,
+    `${label}.unstable_next`
+  );
+
+  const wrapped = moduleExports.unstable_runWithPriority(
+    moduleExports.unstable_UserBlockingPriority,
+    () =>
+      moduleExports.unstable_wrapCallback(function schedulerSmokeWrapped(
+        first,
+        second
+      ) {
+        return {
+          args: [first, second],
+          priority: moduleExports.unstable_getCurrentPriorityLevel(),
+          receiver: this.receiver
+        };
+      })
+  );
+  const wrappedResult = moduleExports.unstable_runWithPriority(
+    moduleExports.unstable_LowPriority,
+    () => wrapped.call({ receiver: 'root-smoke' }, 'a', 'b')
+  );
+  assert.deepEqual(
+    wrappedResult,
+    {
+      args: ['a', 'b'],
+      priority: moduleExports.unstable_UserBlockingPriority,
+      receiver: 'root-smoke'
+    },
+    `${label}.unstable_wrapCallback`
+  );
+
+  const beforeNow = moduleExports.unstable_now();
+  const task = moduleExports.unstable_scheduleCallback(
+    moduleExports.unstable_NormalPriority,
+    () => {}
+  );
+  assert.deepEqual(
+    Object.keys(task),
+    [
+      'id',
+      'callback',
+      'priorityLevel',
+      'startTime',
+      'expirationTime',
+      'sortIndex'
+    ],
+    `${label} task shape`
+  );
+  assert.equal(task.priorityLevel, moduleExports.unstable_NormalPriority);
+  assert.equal(typeof task.callback, 'function', `${label} task callback`);
+  assert.equal(task.sortIndex, task.expirationTime, `${label} ready sortIndex`);
+  assert.equal(task.startTime >= beforeNow, true, `${label} startTime`);
+  moduleExports.unstable_cancelCallback(task);
+  assert.equal(task.callback, null, `${label}.unstable_cancelCallback`);
+
+  const delayedTask = moduleExports.unstable_scheduleCallback(
+    moduleExports.unstable_NormalPriority,
+    () => {},
+    { delay: 40 }
+  );
+  assert.equal(
+    delayedTask.sortIndex,
+    delayedTask.startTime,
+    `${label} delayed sortIndex`
+  );
+  moduleExports.unstable_cancelCallback(delayedTask);
 }
 
 function assertSchedulerUnimplemented(callback, label) {
@@ -1634,17 +1772,29 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
 async function assertSchedulerFileEntrypoint(entrypoint, labelPrefix) {
   const absolutePath = path.join(schedulerPackageRoot, entrypoint.resolvedFileName);
   const cjsModule = require(absolutePath);
-  assertSchedulerInventoryKeys(cjsModule, entrypoint.keys, `${labelPrefix} CJS`);
+  if (entrypoint.implementedRoot) {
+    assertSchedulerImplementedRootKeys(
+      cjsModule,
+      entrypoint.keys,
+      `${labelPrefix} CJS`
+    );
+  } else {
+    assertSchedulerInventoryKeys(cjsModule, entrypoint.keys, `${labelPrefix} CJS`);
+  }
   assert.equal(cjsModule.unstable_ImmediatePriority, 1, labelPrefix);
   assert.equal(cjsModule.unstable_UserBlockingPriority, 2, labelPrefix);
   assert.equal(cjsModule.unstable_NormalPriority, 3, labelPrefix);
   assert.equal(cjsModule.unstable_LowPriority, 4, labelPrefix);
   assert.equal(cjsModule.unstable_IdlePriority, 5, labelPrefix);
   assert.equal(cjsModule.unstable_Profiling, null, labelPrefix);
-  assertSchedulerUnimplemented(
-    () => cjsModule[entrypoint.unsupportedExport](),
-    `${labelPrefix}.${entrypoint.unsupportedExport}`
-  );
+  if (entrypoint.implementedRoot) {
+    assertSchedulerImplementedRootBehavior(cjsModule, labelPrefix);
+  } else {
+    assertSchedulerUnimplemented(
+      () => cjsModule[entrypoint.unsupportedExport](),
+      `${labelPrefix}.${entrypoint.unsupportedExport}`
+    );
+  }
 
   const esmModule = await import(pathToFileURL(absolutePath).href);
   assert.equal(esmModule.default, cjsModule, `${labelPrefix} ESM default`);
@@ -2381,6 +2531,113 @@ async function runSchedulerPackageProbe(tempRoot) {
       );
     }
 
+    function assertImplementedRootKeys(moduleExports, expectedKeys, label) {
+      assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assert.equal(
+        Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
+        false,
+        label
+      );
+      assert.equal(
+        Object.hasOwn(moduleExports, 'compatibilityTarget'),
+        false,
+        label
+      );
+    }
+
+    function assertImplementedRootBehavior(moduleExports, label) {
+      assert.equal(typeof moduleExports.unstable_now, 'function', label);
+      assert.equal(
+        moduleExports.unstable_getCurrentPriorityLevel(),
+        moduleExports.unstable_NormalPriority,
+        label
+      );
+
+      const userBlockingPriority = moduleExports.unstable_runWithPriority(
+        moduleExports.unstable_UserBlockingPriority,
+        () => moduleExports.unstable_getCurrentPriorityLevel()
+      );
+      assert.equal(
+        userBlockingPriority,
+        moduleExports.unstable_UserBlockingPriority,
+        label
+      );
+      assert.equal(
+        moduleExports.unstable_getCurrentPriorityLevel(),
+        moduleExports.unstable_NormalPriority,
+        label
+      );
+
+      const nextFromImmediate = moduleExports.unstable_runWithPriority(
+        moduleExports.unstable_ImmediatePriority,
+        () =>
+          moduleExports.unstable_next(() =>
+            moduleExports.unstable_getCurrentPriorityLevel()
+          )
+      );
+      assert.equal(nextFromImmediate, moduleExports.unstable_NormalPriority, label);
+
+      const wrapped = moduleExports.unstable_runWithPriority(
+        moduleExports.unstable_UserBlockingPriority,
+        () =>
+          moduleExports.unstable_wrapCallback(function schedulerSmokeWrapped(
+            first,
+            second
+          ) {
+            return {
+              args: [first, second],
+              priority: moduleExports.unstable_getCurrentPriorityLevel(),
+              receiver: this.receiver
+            };
+          })
+      );
+      const wrappedResult = moduleExports.unstable_runWithPriority(
+        moduleExports.unstable_LowPriority,
+        () => wrapped.call({ receiver: 'root-smoke' }, 'a', 'b')
+      );
+      assert.deepEqual(
+        wrappedResult,
+        {
+          args: ['a', 'b'],
+          priority: moduleExports.unstable_UserBlockingPriority,
+          receiver: 'root-smoke'
+        },
+        label
+      );
+
+      const beforeNow = moduleExports.unstable_now();
+      const task = moduleExports.unstable_scheduleCallback(
+        moduleExports.unstable_NormalPriority,
+        () => {}
+      );
+      assert.deepEqual(
+        Object.keys(task),
+        [
+          'id',
+          'callback',
+          'priorityLevel',
+          'startTime',
+          'expirationTime',
+          'sortIndex'
+        ],
+        label
+      );
+      assert.equal(task.priorityLevel, moduleExports.unstable_NormalPriority);
+      assert.equal(typeof task.callback, 'function', label);
+      assert.equal(task.sortIndex, task.expirationTime, label);
+      assert.equal(task.startTime >= beforeNow, true, label);
+      moduleExports.unstable_cancelCallback(task);
+      assert.equal(task.callback, null, label);
+
+      const delayedTask = moduleExports.unstable_scheduleCallback(
+        moduleExports.unstable_NormalPriority,
+        () => {},
+        { delay: 40 }
+      );
+      assert.equal(delayedTask.sortIndex, delayedTask.startTime, label);
+      moduleExports.unstable_cancelCallback(delayedTask);
+    }
+
     function assertUnimplemented(callback, label) {
       assert.throws(
         callback,
@@ -2406,7 +2663,13 @@ async function runSchedulerPackageProbe(tempRoot) {
         path.join(process.cwd(), 'node_modules', 'scheduler', 'package.json')
       );
 
-      for (const { keys, resolvedFileName, specifier, unsupportedExport } of entrypoints) {
+      for (const {
+        implementedRoot,
+        keys,
+        resolvedFileName,
+        specifier,
+        unsupportedExport
+      } of entrypoints) {
         assert.equal(
           require.resolve(specifier),
           path.join(process.cwd(), 'node_modules', 'scheduler', resolvedFileName),
@@ -2414,17 +2677,25 @@ async function runSchedulerPackageProbe(tempRoot) {
         );
 
         const cjsModule = require(specifier);
-        assertInventoryKeys(cjsModule, keys, specifier);
+        if (implementedRoot) {
+          assertImplementedRootKeys(cjsModule, keys, specifier);
+        } else {
+          assertInventoryKeys(cjsModule, keys, specifier);
+        }
         assert.equal(cjsModule.unstable_ImmediatePriority, 1, specifier);
         assert.equal(cjsModule.unstable_UserBlockingPriority, 2, specifier);
         assert.equal(cjsModule.unstable_NormalPriority, 3, specifier);
         assert.equal(cjsModule.unstable_LowPriority, 4, specifier);
         assert.equal(cjsModule.unstable_IdlePriority, 5, specifier);
         assert.equal(cjsModule.unstable_Profiling, null, specifier);
-        assertUnimplemented(
-          () => cjsModule[unsupportedExport](),
-          specifier + ' ' + unsupportedExport
-        );
+        if (implementedRoot) {
+          assertImplementedRootBehavior(cjsModule, specifier);
+        } else {
+          assertUnimplemented(
+            () => cjsModule[unsupportedExport](),
+            specifier + ' ' + unsupportedExport
+          );
+        }
 
         if (
           specifier === 'scheduler/unstable_mock' ||
