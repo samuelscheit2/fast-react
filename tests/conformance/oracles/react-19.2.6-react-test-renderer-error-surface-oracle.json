@@ -1,0 +1,867 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-test-renderer-error-surface-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React 19.2.6 react-test-renderer public error surface oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-022-host-operation-errors.md",
+    "worker-progress/worker-073-test-renderer-update-model-plan.md"
+  ],
+  "generation": {
+    "method": "exact npm tarballs extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per scenario and mode",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false,
+    "pathNormalization": "temporary roots, package roots, file URLs, stack paths, and local workspace paths are normalized before artifact serialization",
+    "actEnvironment": "probes set IS_REACT_ACT_ENVIRONMENT and wrap create/update/unmount work in react-test-renderer act()"
+  },
+  "evidenceClaims": {
+    "npmMetadataResolved": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "packageDependencyGraphVerified": true,
+    "testInstanceQueryErrorsProbed": true,
+    "unmountedRootAccessProbed": true,
+    "invalidCreateUpdateInputsProbed": true,
+    "shallowRemovalProbed": true,
+    "unsupportedUseMessageProbed": true,
+    "deterministicPathNormalizationApplied": true,
+    "fastReactComparedToReactTestRenderer": false
+  },
+  "conformanceClaims": {
+    "realReactTestRendererBehaviorProbed": true,
+    "fastReactComparedToReactTestRenderer": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "reactTestRendererTarget": {
+    "packageName": "react-test-renderer",
+    "version": "19.2.6",
+    "role": "official-react-test-renderer-public-error-surface-target",
+    "expectedDistIntegrity": "sha512-GbS6V23YduFTPiWJ5xICbKEjRcqx1Z90js/V5miqhz7qp/d6xSe9Dd6NjSQODFRdzdsqRMPW82E/sFpPRbY5Mw==",
+    "expectedDistShasum": "42e9f9fcc4fe11d4bbf7acff536a2e5b8a8cfd45"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-peer-needed-for-test-renderer-probes",
+      "expectedDistIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+      "expectedDistShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-test-renderer-runtime-dependency-needed-for-probes",
+      "expectedDistIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+      "expectedDistShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
+    },
+    {
+      "packageName": "react-is",
+      "version": "19.2.6",
+      "role": "react-test-renderer-runtime-dependency-needed-for-probes",
+      "expectedDistIntegrity": "sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==",
+      "expectedDistShasum": "aeee6159b159eb7f520d672cffcc69e7052d288f"
+    }
+  ],
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "actWrapped": true,
+      "reason": "Default Node development with act() captures flushed public error messages, deprecation warnings, and removed shallow behavior."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "test-instance-query-errors",
+      "area": "TestInstance queries",
+      "entrypoints": [
+        "react-test-renderer"
+      ],
+      "captures": [
+        "find(predicate) no-match message",
+        "find(predicate) multiple-match message",
+        "findByType no-match and multiple-match messages",
+        "findByProps no-match and multiple-match messages",
+        "findAll zero and multiple counts as non-throwing query baselines"
+      ]
+    },
+    {
+      "id": "unmounted-root-access-errors",
+      "area": "unmounted renderer access",
+      "entrypoints": [
+        "react-test-renderer"
+      ],
+      "captures": [
+        "renderer.root after unmount",
+        "retained TestInstance props, children, and query access after unmount",
+        "non-throwing toJSON, toTree, getInstance, repeat update, and repeat unmount behavior"
+      ]
+    },
+    {
+      "id": "invalid-create-update-inputs",
+      "area": "invalid root inputs",
+      "entrypoints": [
+        "react-test-renderer"
+      ],
+      "captures": [
+        "create with plain object child",
+        "create with invalid undefined and null element types",
+        "update with plain object child",
+        "update with invalid undefined and null element types"
+      ]
+    },
+    {
+      "id": "shallow-removal-error",
+      "area": "removed shallow renderer",
+      "entrypoints": [
+        "react-test-renderer/shallow"
+      ],
+      "captures": [
+        "shallow subpath export shape",
+        "calling removed shallow renderer",
+        "constructing removed shallow renderer"
+      ]
+    },
+    {
+      "id": "unsupported-use-error",
+      "area": "unsupported renderer/runtime messages",
+      "entrypoints": [
+        "react-test-renderer"
+      ],
+      "captures": [
+        "component calling React.use with a plain object",
+        "unsupported use() error message"
+      ]
+    }
+  ],
+  "packages": {
+    "react-test-renderer": {
+      "packageName": "react-test-renderer",
+      "version": "19.2.6",
+      "role": "official-react-test-renderer-public-error-surface-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-test-renderer/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-test-renderer/-/react-test-renderer-19.2.6.tgz",
+        "distIntegrity": "sha512-GbS6V23YduFTPiWJ5xICbKEjRcqx1Z90js/V5miqhz7qp/d6xSe9Dd6NjSQODFRdzdsqRMPW82E/sFpPRbY5Mw==",
+        "distShasum": "42e9f9fcc4fe11d4bbf7acff536a2e5b8a8cfd45",
+        "unpackedSize": 987992
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "GbS6V23YduFTPiWJ5xICbKEjRcqx1Z90js/V5miqhz7qp/d6xSe9Dd6NjSQODFRdzdsqRMPW82E/sFpPRbY5Mw==",
+        "integrityVerified": true,
+        "fileCount": 7,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-test-renderer.development.js",
+          "cjs/react-test-renderer.production.js",
+          "index.js",
+          "package.json",
+          "shallow.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-test-renderer",
+        "version": "19.2.6",
+        "description": "React package for snapshot testing.",
+        "main": "index.js",
+        "exports": null,
+        "dependencies": {
+          "react-is": "^19.2.6",
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "license": "MIT",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "shallow.js",
+          "cjs/"
+        ]
+      }
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-peer-needed-for-test-renderer-probes",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "description": "React is a JavaScript library for building user interfaces.",
+        "main": "index.js",
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "dependencies": null,
+        "peerDependencies": null,
+        "license": "MIT",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ]
+      }
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-test-renderer-runtime-dependency-needed-for-probes",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "description": "Cooperative scheduler for the browser environment.",
+        "main": null,
+        "exports": null,
+        "dependencies": null,
+        "peerDependencies": null,
+        "license": "MIT",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ]
+      }
+    },
+    "react-is": {
+      "packageName": "react-is",
+      "version": "19.2.6",
+      "role": "react-test-renderer-runtime-dependency-needed-for-probes",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-is/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-is/-/react-is-19.2.6.tgz",
+        "distIntegrity": "sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==",
+        "distShasum": "aeee6159b159eb7f520d672cffcc69e7052d288f",
+        "unpackedSize": 13532
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==",
+        "integrityVerified": true,
+        "fileCount": 6,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-is.development.js",
+          "cjs/react-is.production.js",
+          "index.js",
+          "package.json"
+        ]
+      },
+      "packageJson": {
+        "name": "react-is",
+        "version": "19.2.6",
+        "description": "Brand checking of React Elements.",
+        "main": "index.js",
+        "exports": null,
+        "dependencies": null,
+        "peerDependencies": null,
+        "license": "MIT",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/"
+        ]
+      }
+    }
+  },
+  "coverage": {
+    "invalidFindAndFindByResults": true,
+    "unmountedRootAccess": true,
+    "retainedUnmountedTestInstanceAccess": true,
+    "invalidCreateInputs": true,
+    "invalidUpdateInputs": true,
+    "shallowRemoval": true,
+    "unsupportedMessages": true,
+    "consoleWarningCapture": true,
+    "productionBehavior": false,
+    "fastReactComparison": false
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-test-renderer-comparison",
+      "reason": "This oracle records pinned React test renderer public error messages only; Fast React test-renderer JS facade work is outside this worker scope."
+    },
+    {
+      "id": "development-act-flushed-public-errors",
+      "reason": "React 19.2.6 production react-test-renderer omits public act(), so this oracle uses development act()-flushed behavior for deterministic public error surfaces."
+    },
+    {
+      "id": "no-renderer-implementation-claim",
+      "reason": "The oracle covers public thrown messages and console calls, not reconciler correctness, scheduler timing, tree serialization, or host mutation implementation."
+    }
+  ],
+  "reactTestRendererErrorSurfaceObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "test-instance-query-errors",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react-test-renderer",
+          "scenarioId": "test-instance-query-errors",
+          "result": {
+            "label": "test-instance-query-errors",
+            "status": "ok",
+            "value": {
+              "rootSummary": {
+                "kind": "ReactTestInstance",
+                "type": {
+                  "kind": "host",
+                  "value": "main"
+                },
+                "props": {
+                  "children": {
+                    "kind": "array",
+                    "length": 3,
+                    "elementTypes": [
+                      {
+                        "kind": "host",
+                        "value": "section"
+                      },
+                      {
+                        "kind": "host",
+                        "value": "section"
+                      },
+                      {
+                        "kind": "host",
+                        "value": "article"
+                      }
+                    ]
+                  },
+                  "id": {
+                    "type": "string",
+                    "value": "root"
+                  }
+                },
+                "childCount": 3
+              },
+              "noMatchPredicate": {
+                "label": "root.find(matchesNothing)",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "No instances found matching custom predicate: function matchesNothing(instance) { return instance.props.id === \"missing\"; }",
+                "code": null,
+                "errors": null
+              },
+              "multiMatchPredicate": {
+                "label": "root.find(matchesDuplicateRole)",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Expected 1 but found 2 instances matching custom predicate: function matchesDuplicateRole(instance) { return instance.props.role === \"dup\"; }",
+                "code": null,
+                "errors": null
+              },
+              "noMatchByType": {
+                "label": "root.findByType(\"aside\")",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "No instances found with node type: \"aside\"",
+                "code": null,
+                "errors": null
+              },
+              "multiMatchByType": {
+                "label": "root.findByType(\"section\")",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Expected 1 but found 2 instances with node type: \"section\"",
+                "code": null,
+                "errors": null
+              },
+              "noMatchByProps": {
+                "label": "root.findByProps({ id: \"missing\" })",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "No instances found with props: {\"id\":\"missing\"}",
+                "code": null,
+                "errors": null
+              },
+              "multiMatchByProps": {
+                "label": "root.findByProps({ role: \"dup\" })",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Expected 1 but found 2 instances with props: {\"role\":\"dup\"}",
+                "code": null,
+                "errors": null
+              },
+              "findAllNoMatchCount": 0,
+              "findAllDuplicateRoleCount": 2
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "unmounted-root-access-errors",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react-test-renderer",
+          "scenarioId": "unmounted-root-access-errors",
+          "result": {
+            "label": "unmounted-root-access-errors",
+            "status": "ok",
+            "value": {
+              "rendererRoot": {
+                "label": "renderer.root after unmount",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Can't access .root on unmounted test renderer",
+                "code": null,
+                "errors": null
+              },
+              "rendererToJSON": {
+                "label": "renderer.toJSON() after unmount",
+                "status": "ok",
+                "value": {
+                  "type": "null"
+                }
+              },
+              "rendererToTree": {
+                "label": "renderer.toTree() after unmount",
+                "status": "ok",
+                "value": {
+                  "type": "null"
+                }
+              },
+              "rendererGetInstance": {
+                "label": "renderer.getInstance() after unmount",
+                "status": "ok",
+                "value": {
+                  "type": "null"
+                }
+              },
+              "rendererUpdateAgain": {
+                "label": "renderer.update(<main />) after unmount",
+                "status": "ok",
+                "value": {
+                  "type": "null"
+                }
+              },
+              "rendererUnmountAgain": {
+                "label": "renderer.unmount() twice",
+                "status": "ok",
+                "value": {
+                  "type": "string",
+                  "value": "done"
+                }
+              },
+              "retainedRootType": {
+                "label": "retainedRoot.type",
+                "status": "ok",
+                "value": {
+                  "type": "string",
+                  "value": "main"
+                }
+              },
+              "retainedRootProps": {
+                "label": "retainedRoot.props",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Unable to find node on an unmounted component.",
+                "code": null,
+                "errors": null
+              },
+              "retainedRootChildren": {
+                "label": "retainedRoot.children",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Unable to find node on an unmounted component.",
+                "code": null,
+                "errors": null
+              },
+              "retainedRootFindAll": {
+                "label": "retainedRoot.findAll(matchesEverything)",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Unable to find node on an unmounted component.",
+                "code": null,
+                "errors": null
+              },
+              "retainedChildType": {
+                "label": "retainedChild.type",
+                "status": "ok",
+                "value": {
+                  "type": "string",
+                  "value": "section"
+                }
+              },
+              "retainedChildProps": {
+                "label": "retainedChild.props",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Unable to find node on an unmounted component.",
+                "code": null,
+                "errors": null
+              },
+              "retainedChildParent": {
+                "label": "retainedChild.parent",
+                "status": "ok",
+                "value": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "invalid-create-update-inputs",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react-test-renderer",
+          "scenarioId": "invalid-create-update-inputs",
+          "result": {
+            "label": "invalid-create-update-inputs",
+            "status": "ok",
+            "value": {
+              "createPlainObjectChild": {
+                "label": "create({ foo: \"bar\" })",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Objects are not valid as a React child (found: object with keys {foo}). If you meant to render a collection of children, use an array instead.",
+                "code": null,
+                "errors": null
+              },
+              "createInvalidUndefinedType": {
+                "label": "create(React.createElement(undefined))",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.",
+                "code": null,
+                "errors": null
+              },
+              "createInvalidNullType": {
+                "label": "create(React.createElement(null))",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: null.",
+                "code": null,
+                "errors": null
+              },
+              "updatePlainObjectChild": {
+                "label": "update({ foo: \"bar\" })",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Objects are not valid as a React child (found: object with keys {foo}). If you meant to render a collection of children, use an array instead.",
+                "code": null,
+                "errors": null
+              },
+              "updateInvalidUndefinedType": {
+                "label": "update(React.createElement(undefined))",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.",
+                "code": null,
+                "errors": null
+              },
+              "updateInvalidNullType": {
+                "label": "update(React.createElement(null))",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: null.",
+                "code": null,
+                "errors": null
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            },
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "shallow-removal-error",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react-test-renderer",
+          "scenarioId": "shallow-removal-error",
+          "result": {
+            "label": "shallow-removal-error",
+            "status": "ok",
+            "value": {
+              "exportShape": {
+                "type": "function",
+                "name": "ReactShallowRenderer",
+                "length": 0,
+                "ownPropertyNames": [
+                  "length",
+                  "name",
+                  "prototype"
+                ],
+                "hasOwnPrototype": true
+              },
+              "call": {
+                "label": "ReactShallowRenderer()",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "react-test-renderer/shallow has been removed. See https://react.dev/warnings/react-test-renderer.",
+                "code": null,
+                "errors": null
+              },
+              "construct": {
+                "label": "new ReactShallowRenderer()",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "react-test-renderer/shallow has been removed. See https://react.dev/warnings/react-test-renderer.",
+                "code": null,
+                "errors": null
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "unsupported-use-error",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react-test-renderer",
+          "scenarioId": "unsupported-use-error",
+          "result": {
+            "label": "unsupported-use-error",
+            "status": "ok",
+            "value": {
+              "createUnsupportedUse": {
+                "label": "create(<UsesUnsupportedObject />)",
+                "status": "throws",
+                "name": "Error",
+                "constructorName": "Error",
+                "message": "An unsupported type was passed to use(): [object Object]",
+                "code": null,
+                "errors": null
+              }
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
