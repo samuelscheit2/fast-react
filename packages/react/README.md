@@ -13,3 +13,9 @@ scaffold:
 
 Exports import successfully for smoke checks. Any React behavior throws an
 explicit unimplemented error until conformance-backed implementations are added.
+
+The enumerable runtime keys are intentionally aligned with the accepted
+`react@19.2.6` inventory for the default Node condition and the `react-server`
+condition. Scaffold metadata such as `__FAST_REACT_PLACEHOLDER__` remains
+available as non-enumerable debug metadata so it does not mask export-surface
+divergences.

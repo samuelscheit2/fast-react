@@ -1,11 +1,12 @@
 'use strict';
 
-function c() {
-  throw new Error(
-    '[fast-react] compiler-runtime.c is not implemented in the initial scaffold.'
-  );
-}
+const {
+  createUnimplementedFunction,
+  definePlaceholderMetadata
+} = require('./placeholder-utils.js');
 
-module.exports = {
-  c
-};
+const entrypoint = 'react/compiler-runtime';
+
+exports.c = createUnimplementedFunction(entrypoint, 'c');
+
+definePlaceholderMetadata(module.exports, entrypoint);

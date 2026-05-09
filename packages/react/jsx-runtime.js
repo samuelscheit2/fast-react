@@ -1,17 +1,15 @@
 'use strict';
 
+const {
+  createUnimplementedFunction,
+  definePlaceholderMetadata
+} = require('./placeholder-utils.js');
+
+const entrypoint = 'react/jsx-runtime';
 const Fragment = Symbol.for('react.fragment');
 
-function unimplemented(feature) {
-  return function fastReactUnimplementedJsxRuntime() {
-    throw new Error(
-      `[fast-react] ${feature} is not implemented in the initial scaffold.`
-    );
-  };
-}
+exports.Fragment = Fragment;
+exports.jsx = createUnimplementedFunction(entrypoint, 'jsx');
+exports.jsxs = createUnimplementedFunction(entrypoint, 'jsxs');
 
-module.exports = {
-  Fragment,
-  jsx: unimplemented('jsx-runtime.jsx'),
-  jsxs: unimplemented('jsx-runtime.jsxs')
-};
+definePlaceholderMetadata(module.exports, entrypoint);
