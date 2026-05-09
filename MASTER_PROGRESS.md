@@ -35,6 +35,7 @@ M0: Orchestration Foundation.
 - Accepted benchmark direction from worker-009: benchmarks must be admitted only through a manifest tied to green conformance scenario IDs, with pinned React 19.2.6 baselines, native-boundary overhead diagnostics, profiler artifacts, and no headline speed claims for semantically incomplete paths.
 - Accepted upstream-test direction from worker-005: upstream React tests should seed and trace scenarios, but not be used as a drop-in suite. Fast React needs adapters for React's Jest harness contracts, feature gates, Scheduler mocks, noop renderer behavior, and source-only internals.
 - Accepted scheduler/fiber direction from worker-007: model lane bitsets, root lane bookkeeping, Scheduler heaps, double-buffered fiber arenas, circular/rebased update queues, and flags/subtreeFlags commit traversal directly. Flat priority enums, FIFO queues, or a global effect list are root-cause mismatches.
+- Accepted API inventory direction from worker-004: inventory package subpaths, runtime exports, type declarations, and environment conditions from pinned tarballs and isolated probes. `@types/react-dom@19.2.3` needs an explicit target decision before TypeScript compatibility claims include `react-dom`.
 
 ## Worker Roster
 
@@ -43,7 +44,7 @@ M0: Orchestration Foundation.
 | worker-001-architecture | merged | Test Rust core and renderer-boundary architecture hypotheses | `worker-progress/worker-001-architecture.md` |
 | worker-002-conformance | merged | Design React 19.2.6 compatibility inventory and test strategy | `worker-progress/worker-002-conformance.md` |
 | worker-003-scaffold | merged | Propose Cargo workspace, JS package scaffold, and worktree task split | `worker-progress/worker-003-scaffold.md` |
-| worker-004-api-inventory | running in tmux worktree; nested subagents allowed | Build exact public API, runtime export, subpath, and type inventory | `../fast-react-worker-004-api-inventory/worker-progress/worker-004-api-inventory.md` |
+| worker-004-api-inventory | merged | Build exact public API, runtime export, subpath, and type inventory | `worker-progress/worker-004-api-inventory.md` |
 | worker-005-upstream-tests | merged | Assess upstream React 19.2.6 test reuse and harness requirements | `worker-progress/worker-005-upstream-tests.md` |
 | worker-006-binding-strategy | merged | Design JS-to-Rust binding and package artifact strategy | `worker-progress/worker-006-binding-strategy.md` |
 | worker-007-scheduler-fiber | merged | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `worker-progress/worker-007-scheduler-fiber.md` |
@@ -53,9 +54,9 @@ M0: Orchestration Foundation.
 
 ## Next Actions
 
-1. Collect the active API inventory worker's progress file and final recommendation.
-2. Collect the scaffold implementation worker's changes and verification results.
-3. Update the master plan with accepted findings from workers 004 and 010.
+1. Collect the scaffold implementation worker's changes and verification results.
+2. Update the master plan with accepted findings from worker-010.
+3. Launch the next implementation workers from the merged scaffold.
 
 ## Risks And Open Questions
 
@@ -98,3 +99,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-009 benchmark strategy report in commit `0c154d5`. Closed the worker-009 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-005 upstream test reuse report in commit `cc825bf`. Closed the worker-005 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-007 scheduler/fiber report in commit `b63b8c7`. Closed the worker-007 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-004 API inventory report in commit `772447d`. Closed the worker-004 tmux session after merge.
