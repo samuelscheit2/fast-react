@@ -81,14 +81,14 @@ test("checked scheduler mock oracle artifact has the expected schema and targets
   assert.equal(oracle.deterministic, true);
   assert.deepEqual(oracle.generation, {
     method:
-      "exact scheduler npm tarball plus local scheduler placeholder copied under an isolated alias into a temporary node_modules tree",
+      "exact scheduler npm tarball plus local scheduler implementation copied under an isolated alias into a temporary node_modules tree",
     lifecycleScriptsExecuted: false,
     rootManifestsOrLockfilesMutated: false,
     probeIsolation: "one Node child process per target, scenario, and mode",
     probeTimeoutMs: 10000,
     generatedTimestampIncluded: false,
     timingNormalization:
-      "scheduler/unstable_mock virtual time is recorded directly; raw wall-clock timestamps and local filesystem paths are omitted"
+      "scheduler/unstable_mock virtual time is recorded directly; raw wall-clock timestamps and local filesystem paths are omitted; local package metadata is observed but omitted from behavior comparison"
   });
 
   assert.deepEqual(oracle.schedulerTarget, SCHEDULER_MOCK_TARGET);
@@ -108,7 +108,7 @@ test("scheduler mock oracle keeps Fast React compatibility claims false", () => 
     tarballDownloaded: true,
     tarballIntegrityVerified: true,
     schedulerMockBehaviorProbed: true,
-    fastReactPlaceholderComparedToScheduler: true,
+    fastReactImplementationComparedToScheduler: true,
     fastReactBehaviorCompatible: false
   });
   assert.deepEqual(oracle.conformanceClaims, {
@@ -133,13 +133,12 @@ test("scheduler mock oracle keeps Fast React compatibility claims false", () => 
     continuations: true,
     paintYielding: true,
     resets: true,
-    fastReactPlaceholderBoundaries: true
+    localPackageMetadataExcludedFromBehaviorComparison: true
   });
   assert.deepEqual(
-    oracle.implementationComparison.currentFastReactPlaceholder.statusCounts,
+    oracle.implementationComparison.afterWorker120.statusCounts,
     {
-      "known-mismatch": 2,
-      "unsupported-placeholder": 16
+      "matched-but-compatibility-not-claimed": 18
     }
   );
 });
@@ -482,24 +481,18 @@ test("scheduler mock oracle captures continuations, paint yielding, and reset gu
   }
 });
 
-test("scheduler mock oracle records current Fast React placeholder boundaries", () => {
+test("scheduler mock oracle records matching Fast React mock behavior without claiming broad compatibility", () => {
   for (const mode of SCHEDULER_MOCK_PROBE_MODES) {
-    const exportComparison = comparison(
-      mode.id,
-      "scheduler-mock-export-shape"
-    );
-    assert.equal(exportComparison.status, "known-mismatch");
-    assert.equal(
-      exportComparison.firstDifferencePath,
-      "$.result.value.packageJson.description"
-    );
-
-    for (const scenarioId of SCHEDULER_MOCK_SCENARIO_IDS.filter(
-      (id) => id !== "scheduler-mock-export-shape"
-    )) {
+    for (const scenarioId of SCHEDULER_MOCK_SCENARIO_IDS) {
       const scenarioComparison = comparison(mode.id, scenarioId);
-      assert.equal(scenarioComparison.status, "unsupported-placeholder");
-      assert.equal(scenarioComparison.fastReactResultStatus, "throws");
+      assert.equal(
+        scenarioComparison.status,
+        "matched-but-compatibility-not-claimed"
+      );
+      assert.equal(scenarioComparison.compatibilityClaimed, false);
+      assert.equal(scenarioComparison.firstDifferencePath, null);
+      assert.equal(scenarioComparison.schedulerResultStatus, "returned");
+      assert.equal(scenarioComparison.fastReactResultStatus, "returned");
     }
   }
 });
