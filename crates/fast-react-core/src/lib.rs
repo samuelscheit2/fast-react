@@ -6,6 +6,7 @@
 
 mod compatibility;
 mod element;
+mod event_priority;
 mod lane;
 mod root_lanes;
 mod symbols;
@@ -19,6 +20,10 @@ pub use compatibility::{
     TYPES_REACT_COMPATIBILITY_TARGET, TYPES_REACT_PACKAGE_TARGET,
 };
 pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
+pub use event_priority::{
+    EventPriority, event_priority_to_lane, higher_event_priority, is_higher_event_priority,
+    lanes_to_event_priority, lower_event_priority,
+};
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
     LaneClaimers, LaneTimestamp, NO_TIMESTAMP, RETRY_LANE_EXPIRATION_MS, RootFinishedLanes,
