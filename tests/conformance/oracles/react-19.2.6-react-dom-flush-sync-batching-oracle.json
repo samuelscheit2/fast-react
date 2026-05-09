@@ -1,0 +1,6093 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-dom-flush-sync-batching-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 flushSync and unstable_batchedUpdates public behavior oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-036-react-dom-export-oracle.md",
+    "worker-progress/worker-041-dom-events-priority-plan.md",
+    "worker-progress/worker-044-react-dom-client-roots-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "generation": {
+    "method": "checked runtime inventory plus exact npm tarballs extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per React DOM entrypoint, scenario, condition, and mode",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false,
+    "pathNormalization": "temporary extraction roots and local workspace paths are normalized before artifact write"
+  },
+  "evidenceClaims": {
+    "checkedRuntimeInventoryRead": true,
+    "checkedRuntimeInventoryMatched": true,
+    "exactTarballUrlsFromInventory": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListsMatchedInventory": true,
+    "flushSyncBehaviorProbed": true,
+    "unstableBatchedUpdatesBehaviorProbed": true,
+    "callableShapeProbed": true,
+    "returnValuesProbed": true,
+    "errorPropagationProbed": true,
+    "nestedCallsProbed": true,
+    "rootlessBehaviorProbed": true,
+    "publicSchedulerPriorityProbed": true,
+    "privateReactDomInternalsRead": false,
+    "fastReactComparedToReactDom": false
+  },
+  "conformanceClaims": {
+    "realReactDomBehaviorProbed": true,
+    "fastReactComparedToReactDom": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomEntrypointsMatched": true,
+    "supportingPackagesMatched": true
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-runtime-target"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-dom-peer-needed-for-flush-sync-batching-probes"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-public-priority-observation"
+    }
+  ],
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "reason": "Default Node development captures callable shape, diagnostics, and rootless behavior for the development bundles."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "reason": "Default Node production captures callable shape and behavior for the production bundles."
+    },
+    {
+      "id": "react-server-development",
+      "nodeArgs": [
+        "--conditions=react-server"
+      ],
+      "nodeEnv": "development",
+      "condition": "react-server",
+      "reason": "The react-server condition records public absence or unsupported entrypoint loading for these client-only APIs."
+    },
+    {
+      "id": "react-server-production",
+      "nodeArgs": [
+        "--conditions=react-server"
+      ],
+      "nodeEnv": "production",
+      "condition": "react-server",
+      "reason": "Production react-server behavior is checked separately because it loads production condition branches."
+    }
+  ],
+  "entrypoints": [
+    {
+      "id": "root",
+      "subpath": ".",
+      "publicSpecifier": "react-dom",
+      "reason": "The root React DOM facade publicly exports flushSync and unstable_batchedUpdates in default Node modes."
+    },
+    {
+      "id": "profiling",
+      "subpath": "./profiling",
+      "publicSpecifier": "react-dom/profiling",
+      "reason": "The profiling facade re-exports the same public flushSync and unstable_batchedUpdates functions while also exposing client root APIs."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "react-dom-flush-sync-batching-export-shape",
+      "area": "Public export callable shape",
+      "entrypoints": [
+        "react-dom",
+        "react-dom/profiling"
+      ],
+      "captures": [
+        "module load status under default and react-server conditions",
+        "flushSync and unstable_batchedUpdates own export presence",
+        "export descriptors",
+        "function names, lengths, and own-key order"
+      ]
+    },
+    {
+      "id": "react-dom-flush-sync-batching-callback-contracts",
+      "area": "Callback return and argument contracts",
+      "entrypoints": [
+        "react-dom",
+        "react-dom/profiling"
+      ],
+      "captures": [
+        "flushSync callback return forwarding",
+        "flushSync callback this value and ignored extra arguments",
+        "unstable_batchedUpdates callback return forwarding",
+        "unstable_batchedUpdates first-argument forwarding and ignored extra arguments"
+      ]
+    },
+    {
+      "id": "react-dom-flush-sync-batching-rootless-inputs",
+      "area": "Rootless and no-DOM behavior",
+      "entrypoints": [
+        "react-dom",
+        "react-dom/profiling"
+      ],
+      "captures": [
+        "behavior without a DOM root",
+        "behavior without global window or document",
+        "flushSync missing and falsy callback behavior",
+        "unstable_batchedUpdates missing and non-callable callback errors"
+      ]
+    },
+    {
+      "id": "react-dom-flush-sync-batching-error-propagation",
+      "area": "Error propagation and restoration",
+      "entrypoints": [
+        "react-dom",
+        "react-dom/profiling"
+      ],
+      "captures": [
+        "callback errors thrown through flushSync",
+        "callback errors thrown through unstable_batchedUpdates",
+        "subsequent calls still work after thrown callbacks",
+        "public scheduler priority remains restored after thrown callbacks"
+      ]
+    },
+    {
+      "id": "react-dom-flush-sync-batching-nested-calls",
+      "area": "Nested calls",
+      "entrypoints": [
+        "react-dom",
+        "react-dom/profiling"
+      ],
+      "captures": [
+        "nested flushSync call order and return values",
+        "nested unstable_batchedUpdates call order and return values",
+        "flushSync inside unstable_batchedUpdates",
+        "unstable_batchedUpdates inside flushSync"
+      ]
+    },
+    {
+      "id": "react-dom-flush-sync-batching-public-scheduler-priority",
+      "area": "Public scheduler priority observation",
+      "entrypoints": [
+        "react-dom",
+        "react-dom/profiling"
+      ],
+      "captures": [
+        "Scheduler.unstable_getCurrentPriorityLevel before, inside, and after flushSync",
+        "Scheduler.unstable_getCurrentPriorityLevel before, inside, and after unstable_batchedUpdates",
+        "runWithPriority contexts observed through public Scheduler APIs",
+        "no private React DOM internals read for priority evidence"
+      ]
+    }
+  ],
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react-dom.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./client",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./client.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./client.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "bun"
+              ],
+              "target": "./server.bun.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./server.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.bun",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.bun.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./static.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./profiling",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./profiling.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./profiling.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./test-utils",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./test-utils.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ]
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": {
+          "node": ">=0.10.0"
+        }
+      },
+      "publicSubpaths": [
+        ".",
+        "./package.json",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-dev-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-dev-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-dev-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./compiler-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./compiler-runtime.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./compiler-runtime.js"
+            }
+          ]
+        }
+      ]
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-artifact-probes",
+      "targetStatus": "supporting-package-not-official-react-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null
+      },
+      "publicSubpaths": [],
+      "runtimeSubpaths": [],
+      "exportMapRows": []
+    }
+  },
+  "coverage": {
+    "callableShape": true,
+    "callbackReturnValues": true,
+    "callbackArgumentForwarding": true,
+    "errorPropagationAndRestoration": true,
+    "nestedCalls": true,
+    "rootlessBehavior": true,
+    "reactServerAbsence": true,
+    "profilingEntrypoint": true,
+    "publicSchedulerPriorityObservation": true,
+    "privateInternalsAvoided": true
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-react-dom-comparison",
+      "reason": "This oracle records pinned React DOM behavior only; Fast React React DOM implementation work is owned by separate workers."
+    },
+    {
+      "id": "no-private-update-priority-reads",
+      "reason": "The priority probe uses only the public scheduler package and callback ordering. It does not read ReactDOMSharedInternals, lanes, or current update priority internals."
+    },
+    {
+      "id": "no-dom-root-commit-timing",
+      "reason": "This worker keeps the oracle rootless because the conformance workspace has no checked DOM implementation dependency; createRoot, hydration, and DOM commit behavior are covered by dedicated client-root and DOM workers."
+    }
+  ],
+  "reactDomObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "moduleLoad": {
+            "status": "ok"
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "createPortal",
+            "flushSync",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "requestFormReset",
+            "unstable_batchedUpdates",
+            "useFormState",
+            "useFormStatus",
+            "version"
+          ],
+          "ownKeys": [
+            {
+              "type": "string",
+              "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+            },
+            {
+              "type": "string",
+              "value": "createPortal"
+            },
+            {
+              "type": "string",
+              "value": "flushSync"
+            },
+            {
+              "type": "string",
+              "value": "preconnect"
+            },
+            {
+              "type": "string",
+              "value": "prefetchDNS"
+            },
+            {
+              "type": "string",
+              "value": "preinit"
+            },
+            {
+              "type": "string",
+              "value": "preinitModule"
+            },
+            {
+              "type": "string",
+              "value": "preload"
+            },
+            {
+              "type": "string",
+              "value": "preloadModule"
+            },
+            {
+              "type": "string",
+              "value": "requestFormReset"
+            },
+            {
+              "type": "string",
+              "value": "unstable_batchedUpdates"
+            },
+            {
+              "type": "string",
+              "value": "useFormState"
+            },
+            {
+              "type": "string",
+              "value": "useFormStatus"
+            },
+            {
+              "type": "string",
+              "value": "version"
+            }
+          ],
+          "flushSync": {
+            "key": "flushSync",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 1,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          },
+          "unstable_batchedUpdates": {
+            "key": "unstable_batchedUpdates",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 2,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "flushSync": {
+            "label": "flushSync(callback, extra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [],
+              "callbackArgCount": 0,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "flush-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          },
+          "unstable_batchedUpdates": {
+            "label": "unstable_batchedUpdates(callback, firstArg, ignoredExtra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [
+                {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "isArray": false,
+                  "isExtensible": true,
+                  "objectKeys": [
+                    "marker"
+                  ],
+                  "ownPropertyNames": [
+                    "marker"
+                  ],
+                  "ownSymbolKeys": [],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "marker"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "marker"
+                      },
+                      "descriptor": {
+                        "kind": "data",
+                        "enumerable": true,
+                        "configurable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "string",
+                          "value": "first-batched-argument"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "callbackArgCount": 1,
+              "firstArgumentSameObject": true,
+              "ignoredExtraArgumentReceived": false,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "batched-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "beforeGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "flushSyncNoCallback": {
+            "label": "flushSync()",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncUndefinedCallback": {
+            "label": "flushSync(undefined)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncNullCallback": {
+            "label": "flushSync(null)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncFalseCallback": {
+            "label": "flushSync(false)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncTruthyNonFunction": {
+            "label": "flushSync({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNoCallback": {
+            "label": "unstable_batchedUpdates()",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNullCallback": {
+            "label": "unstable_batchedUpdates(null)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesTruthyNonFunction": {
+            "label": "unstable_batchedUpdates({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesUndefinedArg": {
+            "label": "unstable_batchedUpdates(callback, undefined)",
+            "status": "ok",
+            "value": {
+              "callbackArgs": [
+                {
+                  "type": "undefined"
+                }
+              ],
+              "returned": {
+                "type": "string",
+                "value": "batched-undefined-arg-return"
+              }
+            }
+          },
+          "afterGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "domGlobalsUnchanged": true
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "schedulerPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncThrowsCallbackError": {
+            "label": "flushSync(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "Error",
+              "message": "flushSync sentinel error",
+              "code": "FLUSH_SYNC_SENTINEL",
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "flushSync sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "FLUSH_SYNC_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncAfterThrow": {
+            "label": "flushSync(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "flush-after-throw"
+            }
+          },
+          "batchedUpdatesThrowsCallbackError": {
+            "label": "unstable_batchedUpdates(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "batchedUpdates sentinel error",
+              "code": "BATCHED_UPDATES_SENTINEL",
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "batchedUpdates sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "BATCHED_UPDATES_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesAfterThrow": {
+            "label": "unstable_batchedUpdates(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "batched-after-throw:ok"
+            }
+          },
+          "schedulerPriorityAfter": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "nestedFlushSync": {
+            "label": "nested flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-outer-start",
+                "flush-inner",
+                "flush-inner-return:flush-inner-return",
+                "flush-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-outer-return"
+              }
+            }
+          },
+          "nestedBatchedUpdates": {
+            "label": "nested unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-outer-start:outer-arg",
+                "batch-inner:inner-arg",
+                "batch-inner-return:batch-inner-return",
+                "batch-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-outer-return"
+              }
+            }
+          },
+          "flushInsideBatchedUpdates": {
+            "label": "flushSync inside unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-before-flush:batch-arg",
+                "flush-inside-batch",
+                "flush-return:flush-inside-batch-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-containing-flush-return"
+              }
+            }
+          },
+          "batchedUpdatesInsideFlushSync": {
+            "label": "unstable_batchedUpdates inside flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-before-batch",
+                "batch-inside-flush:batch-arg",
+                "batch-return:batch-inside-flush-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-containing-batch-return"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "defaultPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncDefaultPriority": {
+            "label": "flushSync observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncInsideUserBlockingPriority": {
+            "label": "Scheduler.runWithPriority(UserBlocking, flushSync)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "returnedPriority": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "afterFlush": {
+                "level": 2,
+                "label": "UserBlocking"
+              }
+            }
+          },
+          "priorityAfterUserBlockingFlushSync": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "batchedUpdatesDefaultPriority": {
+            "label": "unstable_batchedUpdates observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesInsideLowPriority": {
+            "label": "Scheduler.runWithPriority(Low, unstable_batchedUpdates)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 4,
+                "label": "Low"
+              },
+              "returnedPriority": {
+                "level": 4,
+                "label": "Low"
+              },
+              "afterBatchedUpdates": {
+                "level": 4,
+                "label": "Low"
+              }
+            }
+          },
+          "priorityAfterLowPriorityBatchedUpdates": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "moduleLoad": {
+            "status": "ok"
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "createPortal",
+            "createRoot",
+            "flushSync",
+            "hydrateRoot",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "requestFormReset",
+            "unstable_batchedUpdates",
+            "useFormState",
+            "useFormStatus",
+            "version"
+          ],
+          "ownKeys": [
+            {
+              "type": "string",
+              "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+            },
+            {
+              "type": "string",
+              "value": "createPortal"
+            },
+            {
+              "type": "string",
+              "value": "createRoot"
+            },
+            {
+              "type": "string",
+              "value": "flushSync"
+            },
+            {
+              "type": "string",
+              "value": "hydrateRoot"
+            },
+            {
+              "type": "string",
+              "value": "preconnect"
+            },
+            {
+              "type": "string",
+              "value": "prefetchDNS"
+            },
+            {
+              "type": "string",
+              "value": "preinit"
+            },
+            {
+              "type": "string",
+              "value": "preinitModule"
+            },
+            {
+              "type": "string",
+              "value": "preload"
+            },
+            {
+              "type": "string",
+              "value": "preloadModule"
+            },
+            {
+              "type": "string",
+              "value": "requestFormReset"
+            },
+            {
+              "type": "string",
+              "value": "unstable_batchedUpdates"
+            },
+            {
+              "type": "string",
+              "value": "useFormState"
+            },
+            {
+              "type": "string",
+              "value": "useFormStatus"
+            },
+            {
+              "type": "string",
+              "value": "version"
+            }
+          ],
+          "flushSync": {
+            "key": "flushSync",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 1,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          },
+          "unstable_batchedUpdates": {
+            "key": "unstable_batchedUpdates",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 2,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "flushSync": {
+            "label": "flushSync(callback, extra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [],
+              "callbackArgCount": 0,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "flush-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          },
+          "unstable_batchedUpdates": {
+            "label": "unstable_batchedUpdates(callback, firstArg, ignoredExtra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [
+                {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "isArray": false,
+                  "isExtensible": true,
+                  "objectKeys": [
+                    "marker"
+                  ],
+                  "ownPropertyNames": [
+                    "marker"
+                  ],
+                  "ownSymbolKeys": [],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "marker"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "marker"
+                      },
+                      "descriptor": {
+                        "kind": "data",
+                        "enumerable": true,
+                        "configurable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "string",
+                          "value": "first-batched-argument"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "callbackArgCount": 1,
+              "firstArgumentSameObject": true,
+              "ignoredExtraArgumentReceived": false,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "batched-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "beforeGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "flushSyncNoCallback": {
+            "label": "flushSync()",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncUndefinedCallback": {
+            "label": "flushSync(undefined)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncNullCallback": {
+            "label": "flushSync(null)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncFalseCallback": {
+            "label": "flushSync(false)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncTruthyNonFunction": {
+            "label": "flushSync({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNoCallback": {
+            "label": "unstable_batchedUpdates()",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNullCallback": {
+            "label": "unstable_batchedUpdates(null)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesTruthyNonFunction": {
+            "label": "unstable_batchedUpdates({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesUndefinedArg": {
+            "label": "unstable_batchedUpdates(callback, undefined)",
+            "status": "ok",
+            "value": {
+              "callbackArgs": [
+                {
+                  "type": "undefined"
+                }
+              ],
+              "returned": {
+                "type": "string",
+                "value": "batched-undefined-arg-return"
+              }
+            }
+          },
+          "afterGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "domGlobalsUnchanged": true
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "schedulerPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncThrowsCallbackError": {
+            "label": "flushSync(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "Error",
+              "message": "flushSync sentinel error",
+              "code": "FLUSH_SYNC_SENTINEL",
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "flushSync sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "FLUSH_SYNC_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncAfterThrow": {
+            "label": "flushSync(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "flush-after-throw"
+            }
+          },
+          "batchedUpdatesThrowsCallbackError": {
+            "label": "unstable_batchedUpdates(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "batchedUpdates sentinel error",
+              "code": "BATCHED_UPDATES_SENTINEL",
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "batchedUpdates sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "BATCHED_UPDATES_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesAfterThrow": {
+            "label": "unstable_batchedUpdates(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "batched-after-throw:ok"
+            }
+          },
+          "schedulerPriorityAfter": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "nestedFlushSync": {
+            "label": "nested flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-outer-start",
+                "flush-inner",
+                "flush-inner-return:flush-inner-return",
+                "flush-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-outer-return"
+              }
+            }
+          },
+          "nestedBatchedUpdates": {
+            "label": "nested unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-outer-start:outer-arg",
+                "batch-inner:inner-arg",
+                "batch-inner-return:batch-inner-return",
+                "batch-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-outer-return"
+              }
+            }
+          },
+          "flushInsideBatchedUpdates": {
+            "label": "flushSync inside unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-before-flush:batch-arg",
+                "flush-inside-batch",
+                "flush-return:flush-inside-batch-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-containing-flush-return"
+              }
+            }
+          },
+          "batchedUpdatesInsideFlushSync": {
+            "label": "unstable_batchedUpdates inside flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-before-batch",
+                "batch-inside-flush:batch-arg",
+                "batch-return:batch-inside-flush-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-containing-batch-return"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "defaultPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncDefaultPriority": {
+            "label": "flushSync observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncInsideUserBlockingPriority": {
+            "label": "Scheduler.runWithPriority(UserBlocking, flushSync)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "returnedPriority": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "afterFlush": {
+                "level": 2,
+                "label": "UserBlocking"
+              }
+            }
+          },
+          "priorityAfterUserBlockingFlushSync": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "batchedUpdatesDefaultPriority": {
+            "label": "unstable_batchedUpdates observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesInsideLowPriority": {
+            "label": "Scheduler.runWithPriority(Low, unstable_batchedUpdates)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 4,
+                "label": "Low"
+              },
+              "returnedPriority": {
+                "level": 4,
+                "label": "Low"
+              },
+              "afterBatchedUpdates": {
+                "level": 4,
+                "label": "Low"
+              }
+            }
+          },
+          "priorityAfterLowPriorityBatchedUpdates": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "moduleLoad": {
+            "status": "ok"
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "createPortal",
+            "flushSync",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "requestFormReset",
+            "unstable_batchedUpdates",
+            "useFormState",
+            "useFormStatus",
+            "version"
+          ],
+          "ownKeys": [
+            {
+              "type": "string",
+              "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+            },
+            {
+              "type": "string",
+              "value": "createPortal"
+            },
+            {
+              "type": "string",
+              "value": "flushSync"
+            },
+            {
+              "type": "string",
+              "value": "preconnect"
+            },
+            {
+              "type": "string",
+              "value": "prefetchDNS"
+            },
+            {
+              "type": "string",
+              "value": "preinit"
+            },
+            {
+              "type": "string",
+              "value": "preinitModule"
+            },
+            {
+              "type": "string",
+              "value": "preload"
+            },
+            {
+              "type": "string",
+              "value": "preloadModule"
+            },
+            {
+              "type": "string",
+              "value": "requestFormReset"
+            },
+            {
+              "type": "string",
+              "value": "unstable_batchedUpdates"
+            },
+            {
+              "type": "string",
+              "value": "useFormState"
+            },
+            {
+              "type": "string",
+              "value": "useFormStatus"
+            },
+            {
+              "type": "string",
+              "value": "version"
+            }
+          ],
+          "flushSync": {
+            "key": "flushSync",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 1,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          },
+          "unstable_batchedUpdates": {
+            "key": "unstable_batchedUpdates",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 2,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "flushSync": {
+            "label": "flushSync(callback, extra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [],
+              "callbackArgCount": 0,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "flush-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          },
+          "unstable_batchedUpdates": {
+            "label": "unstable_batchedUpdates(callback, firstArg, ignoredExtra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [
+                {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "isArray": false,
+                  "isExtensible": true,
+                  "objectKeys": [
+                    "marker"
+                  ],
+                  "ownPropertyNames": [
+                    "marker"
+                  ],
+                  "ownSymbolKeys": [],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "marker"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "marker"
+                      },
+                      "descriptor": {
+                        "kind": "data",
+                        "enumerable": true,
+                        "configurable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "string",
+                          "value": "first-batched-argument"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "callbackArgCount": 1,
+              "firstArgumentSameObject": true,
+              "ignoredExtraArgumentReceived": false,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "batched-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "beforeGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "flushSyncNoCallback": {
+            "label": "flushSync()",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncUndefinedCallback": {
+            "label": "flushSync(undefined)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncNullCallback": {
+            "label": "flushSync(null)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncFalseCallback": {
+            "label": "flushSync(false)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncTruthyNonFunction": {
+            "label": "flushSync({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNoCallback": {
+            "label": "unstable_batchedUpdates()",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNullCallback": {
+            "label": "unstable_batchedUpdates(null)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesTruthyNonFunction": {
+            "label": "unstable_batchedUpdates({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesUndefinedArg": {
+            "label": "unstable_batchedUpdates(callback, undefined)",
+            "status": "ok",
+            "value": {
+              "callbackArgs": [
+                {
+                  "type": "undefined"
+                }
+              ],
+              "returned": {
+                "type": "string",
+                "value": "batched-undefined-arg-return"
+              }
+            }
+          },
+          "afterGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "domGlobalsUnchanged": true
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "schedulerPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncThrowsCallbackError": {
+            "label": "flushSync(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "Error",
+              "message": "flushSync sentinel error",
+              "code": "FLUSH_SYNC_SENTINEL",
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "flushSync sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "FLUSH_SYNC_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncAfterThrow": {
+            "label": "flushSync(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "flush-after-throw"
+            }
+          },
+          "batchedUpdatesThrowsCallbackError": {
+            "label": "unstable_batchedUpdates(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "batchedUpdates sentinel error",
+              "code": "BATCHED_UPDATES_SENTINEL",
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "batchedUpdates sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "BATCHED_UPDATES_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesAfterThrow": {
+            "label": "unstable_batchedUpdates(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "batched-after-throw:ok"
+            }
+          },
+          "schedulerPriorityAfter": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "nestedFlushSync": {
+            "label": "nested flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-outer-start",
+                "flush-inner",
+                "flush-inner-return:flush-inner-return",
+                "flush-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-outer-return"
+              }
+            }
+          },
+          "nestedBatchedUpdates": {
+            "label": "nested unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-outer-start:outer-arg",
+                "batch-inner:inner-arg",
+                "batch-inner-return:batch-inner-return",
+                "batch-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-outer-return"
+              }
+            }
+          },
+          "flushInsideBatchedUpdates": {
+            "label": "flushSync inside unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-before-flush:batch-arg",
+                "flush-inside-batch",
+                "flush-return:flush-inside-batch-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-containing-flush-return"
+              }
+            }
+          },
+          "batchedUpdatesInsideFlushSync": {
+            "label": "unstable_batchedUpdates inside flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-before-batch",
+                "batch-inside-flush:batch-arg",
+                "batch-return:batch-inside-flush-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-containing-batch-return"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "defaultPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncDefaultPriority": {
+            "label": "flushSync observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncInsideUserBlockingPriority": {
+            "label": "Scheduler.runWithPriority(UserBlocking, flushSync)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "returnedPriority": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "afterFlush": {
+                "level": 2,
+                "label": "UserBlocking"
+              }
+            }
+          },
+          "priorityAfterUserBlockingFlushSync": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "batchedUpdatesDefaultPriority": {
+            "label": "unstable_batchedUpdates observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesInsideLowPriority": {
+            "label": "Scheduler.runWithPriority(Low, unstable_batchedUpdates)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 4,
+                "label": "Low"
+              },
+              "returnedPriority": {
+                "level": 4,
+                "label": "Low"
+              },
+              "afterBatchedUpdates": {
+                "level": 4,
+                "label": "Low"
+              }
+            }
+          },
+          "priorityAfterLowPriorityBatchedUpdates": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "moduleLoad": {
+            "status": "ok"
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "createPortal",
+            "createRoot",
+            "flushSync",
+            "hydrateRoot",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "requestFormReset",
+            "unstable_batchedUpdates",
+            "useFormState",
+            "useFormStatus",
+            "version"
+          ],
+          "ownKeys": [
+            {
+              "type": "string",
+              "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+            },
+            {
+              "type": "string",
+              "value": "createPortal"
+            },
+            {
+              "type": "string",
+              "value": "createRoot"
+            },
+            {
+              "type": "string",
+              "value": "flushSync"
+            },
+            {
+              "type": "string",
+              "value": "hydrateRoot"
+            },
+            {
+              "type": "string",
+              "value": "preconnect"
+            },
+            {
+              "type": "string",
+              "value": "prefetchDNS"
+            },
+            {
+              "type": "string",
+              "value": "preinit"
+            },
+            {
+              "type": "string",
+              "value": "preinitModule"
+            },
+            {
+              "type": "string",
+              "value": "preload"
+            },
+            {
+              "type": "string",
+              "value": "preloadModule"
+            },
+            {
+              "type": "string",
+              "value": "requestFormReset"
+            },
+            {
+              "type": "string",
+              "value": "unstable_batchedUpdates"
+            },
+            {
+              "type": "string",
+              "value": "useFormState"
+            },
+            {
+              "type": "string",
+              "value": "useFormStatus"
+            },
+            {
+              "type": "string",
+              "value": "version"
+            }
+          ],
+          "flushSync": {
+            "key": "flushSync",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 1,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          },
+          "unstable_batchedUpdates": {
+            "key": "unstable_batchedUpdates",
+            "hasOwn": true,
+            "hasIn": true,
+            "descriptor": {
+              "kind": "data",
+              "enumerable": true,
+              "configurable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2,
+                "isAsync": false,
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ]
+              }
+            },
+            "value": {
+              "type": "function",
+              "name": "",
+              "length": 2,
+              "isAsync": false,
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "length"
+                },
+                {
+                  "type": "string",
+                  "value": "name"
+                },
+                {
+                  "type": "string",
+                  "value": "prototype"
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "flushSync": {
+            "label": "flushSync(callback, extra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [],
+              "callbackArgCount": 0,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "flush-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          },
+          "unstable_batchedUpdates": {
+            "label": "unstable_batchedUpdates(callback, firstArg, ignoredExtra)",
+            "status": "ok",
+            "value": {
+              "callbackThis": {
+                "type": "undefined"
+              },
+              "callbackArgs": [
+                {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "isArray": false,
+                  "isExtensible": true,
+                  "objectKeys": [
+                    "marker"
+                  ],
+                  "ownPropertyNames": [
+                    "marker"
+                  ],
+                  "ownSymbolKeys": [],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "marker"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "marker"
+                      },
+                      "descriptor": {
+                        "kind": "data",
+                        "enumerable": true,
+                        "configurable": true,
+                        "writable": true,
+                        "value": {
+                          "type": "string",
+                          "value": "first-batched-argument"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "callbackArgCount": 1,
+              "firstArgumentSameObject": true,
+              "ignoredExtraArgumentReceived": false,
+              "returned": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isArray": false,
+                "isExtensible": true,
+                "objectKeys": [
+                  "marker"
+                ],
+                "ownPropertyNames": [
+                  "marker"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "marker"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "marker"
+                    },
+                    "descriptor": {
+                      "kind": "data",
+                      "enumerable": true,
+                      "configurable": true,
+                      "writable": true,
+                      "value": {
+                        "type": "string",
+                        "value": "batched-return-object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "returnedSameObject": true
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "beforeGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "flushSyncNoCallback": {
+            "label": "flushSync()",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncUndefinedCallback": {
+            "label": "flushSync(undefined)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncNullCallback": {
+            "label": "flushSync(null)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncFalseCallback": {
+            "label": "flushSync(false)",
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "flushSyncTruthyNonFunction": {
+            "label": "flushSync({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNoCallback": {
+            "label": "unstable_batchedUpdates()",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesNullCallback": {
+            "label": "unstable_batchedUpdates(null)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesTruthyNonFunction": {
+            "label": "unstable_batchedUpdates({})",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "fn is not a function",
+              "code": null,
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "fn is not a function"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesUndefinedArg": {
+            "label": "unstable_batchedUpdates(callback, undefined)",
+            "status": "ok",
+            "value": {
+              "callbackArgs": [
+                {
+                  "type": "undefined"
+                }
+              ],
+              "returned": {
+                "type": "string",
+                "value": "batched-undefined-arg-return"
+              }
+            }
+          },
+          "afterGlobals": {
+            "hasWindow": false,
+            "hasDocument": false,
+            "hasHTMLElement": false,
+            "hasNode": false
+          },
+          "domGlobalsUnchanged": true
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "schedulerPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncThrowsCallbackError": {
+            "label": "flushSync(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "Error",
+              "message": "flushSync sentinel error",
+              "code": "FLUSH_SYNC_SENTINEL",
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "flushSync sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "FLUSH_SYNC_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncAfterThrow": {
+            "label": "flushSync(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "flush-after-throw"
+            }
+          },
+          "batchedUpdatesThrowsCallbackError": {
+            "label": "unstable_batchedUpdates(callback throws)",
+            "status": "throws",
+            "error": {
+              "status": "throws",
+              "name": "TypeError",
+              "message": "batchedUpdates sentinel error",
+              "code": "BATCHED_UPDATES_SENTINEL",
+              "constructorName": "TypeError",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                },
+                {
+                  "type": "string",
+                  "value": "code"
+                },
+                {
+                  "type": "string",
+                  "value": "detail"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "batchedUpdates sentinel error"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "BATCHED_UPDATES_SENTINEL"
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "detail"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "callback-error"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesAfterThrow": {
+            "label": "unstable_batchedUpdates(after throw)",
+            "status": "ok",
+            "value": {
+              "type": "string",
+              "value": "batched-after-throw:ok"
+            }
+          },
+          "schedulerPriorityAfter": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "nestedFlushSync": {
+            "label": "nested flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-outer-start",
+                "flush-inner",
+                "flush-inner-return:flush-inner-return",
+                "flush-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-outer-return"
+              }
+            }
+          },
+          "nestedBatchedUpdates": {
+            "label": "nested unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-outer-start:outer-arg",
+                "batch-inner:inner-arg",
+                "batch-inner-return:batch-inner-return",
+                "batch-outer-end"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-outer-return"
+              }
+            }
+          },
+          "flushInsideBatchedUpdates": {
+            "label": "flushSync inside unstable_batchedUpdates",
+            "status": "ok",
+            "value": {
+              "events": [
+                "batch-before-flush:batch-arg",
+                "flush-inside-batch",
+                "flush-return:flush-inside-batch-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "batch-containing-flush-return"
+              }
+            }
+          },
+          "batchedUpdatesInsideFlushSync": {
+            "label": "unstable_batchedUpdates inside flushSync",
+            "status": "ok",
+            "value": {
+              "events": [
+                "flush-before-batch",
+                "batch-inside-flush:batch-arg",
+                "batch-return:batch-inside-flush-return"
+              ],
+              "outerReturn": {
+                "type": "string",
+                "value": "flush-containing-batch-return"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "availability": {
+            "status": "available"
+          },
+          "defaultPriorityBefore": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "flushSyncDefaultPriority": {
+            "label": "flushSync observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-flushSync",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "flushSyncInsideUserBlockingPriority": {
+            "label": "Scheduler.runWithPriority(UserBlocking, flushSync)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "returnedPriority": {
+                "level": 2,
+                "label": "UserBlocking"
+              },
+              "afterFlush": {
+                "level": 2,
+                "label": "UserBlocking"
+              }
+            }
+          },
+          "priorityAfterUserBlockingFlushSync": {
+            "level": 3,
+            "label": "Normal"
+          },
+          "batchedUpdatesDefaultPriority": {
+            "label": "unstable_batchedUpdates observes public scheduler priority",
+            "status": "ok",
+            "value": {
+              "returnedPriority": {
+                "level": 3,
+                "label": "Normal"
+              },
+              "events": [
+                {
+                  "label": "inside-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                },
+                {
+                  "label": "after-batchedUpdates",
+                  "priority": {
+                    "level": 3,
+                    "label": "Normal"
+                  }
+                }
+              ]
+            }
+          },
+          "batchedUpdatesInsideLowPriority": {
+            "label": "Scheduler.runWithPriority(Low, unstable_batchedUpdates)",
+            "status": "ok",
+            "value": {
+              "before": {
+                "level": 4,
+                "label": "Low"
+              },
+              "returnedPriority": {
+                "level": 4,
+                "label": "Low"
+              },
+              "afterBatchedUpdates": {
+                "level": 4,
+                "label": "Low"
+              }
+            }
+          },
+          "priorityAfterLowPriorityBatchedUpdates": {
+            "level": 3,
+            "label": "Normal"
+          }
+        },
+        "consoleCalls": []
+      }
+    ],
+    "react-server-development": [
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "moduleLoad": {
+            "status": "ok"
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "version"
+          ],
+          "ownKeys": [
+            {
+              "type": "string",
+              "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+            },
+            {
+              "type": "string",
+              "value": "preconnect"
+            },
+            {
+              "type": "string",
+              "value": "prefetchDNS"
+            },
+            {
+              "type": "string",
+              "value": "preinit"
+            },
+            {
+              "type": "string",
+              "value": "preinitModule"
+            },
+            {
+              "type": "string",
+              "value": "preload"
+            },
+            {
+              "type": "string",
+              "value": "preloadModule"
+            },
+            {
+              "type": "string",
+              "value": "version"
+            }
+          ],
+          "flushSync": {
+            "key": "flushSync",
+            "hasOwn": false,
+            "hasIn": false,
+            "descriptor": null,
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "unstable_batchedUpdates": {
+            "key": "unstable_batchedUpdates",
+            "hasOwn": false,
+            "hasIn": false,
+            "descriptor": null,
+            "value": {
+              "type": "undefined"
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "moduleLoad": {
+            "status": "throws",
+            "name": "Error",
+            "message": "react-dom/profiling is not supported in React Server Components.",
+            "code": null,
+            "constructorName": "Error",
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "message"
+              }
+            ],
+            "ownProperties": [
+              {
+                "key": {
+                  "type": "string",
+                  "value": "message"
+                },
+                "value": {
+                  "type": "string",
+                  "value": "react-dom/profiling is not supported in React Server Components."
+                }
+              }
+            ]
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exports": null
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      }
+    ],
+    "react-server-production": [
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "moduleLoad": {
+            "status": "ok"
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "version"
+          ],
+          "ownKeys": [
+            {
+              "type": "string",
+              "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+            },
+            {
+              "type": "string",
+              "value": "preconnect"
+            },
+            {
+              "type": "string",
+              "value": "prefetchDNS"
+            },
+            {
+              "type": "string",
+              "value": "preinit"
+            },
+            {
+              "type": "string",
+              "value": "preinitModule"
+            },
+            {
+              "type": "string",
+              "value": "preload"
+            },
+            {
+              "type": "string",
+              "value": "preloadModule"
+            },
+            {
+              "type": "string",
+              "value": "version"
+            }
+          ],
+          "flushSync": {
+            "key": "flushSync",
+            "hasOwn": false,
+            "hasIn": false,
+            "descriptor": null,
+            "value": {
+              "type": "undefined"
+            }
+          },
+          "unstable_batchedUpdates": {
+            "key": "unstable_batchedUpdates",
+            "hasOwn": false,
+            "hasIn": false,
+            "descriptor": null,
+            "value": {
+              "type": "undefined"
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "root",
+        "entrypointSubpath": ".",
+        "specifier": "react-dom",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "missing-required-functions",
+            "moduleLoad": {
+              "status": "ok"
+            },
+            "flushSync": {
+              "key": "flushSync",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            },
+            "unstable_batchedUpdates": {
+              "key": "unstable_batchedUpdates",
+              "hasOwn": false,
+              "hasIn": false,
+              "descriptor": null,
+              "value": {
+                "type": "undefined"
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-export-shape",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "moduleLoad": {
+            "status": "throws",
+            "name": "Error",
+            "message": "react-dom/profiling is not supported in React Server Components.",
+            "code": null,
+            "constructorName": "Error",
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "message"
+              }
+            ],
+            "ownProperties": [
+              {
+                "key": {
+                  "type": "string",
+                  "value": "message"
+                },
+                "value": {
+                  "type": "string",
+                  "value": "react-dom/profiling is not supported in React Server Components."
+                }
+              }
+            ]
+          },
+          "packageJson": {
+            "label": "react-dom/package.json",
+            "status": "ok",
+            "value": {
+              "name": "react-dom",
+              "version": "19.2.6",
+              "main": "index.js",
+              "exports": {
+                ".": {
+                  "react-server": "./react-dom.react-server.js",
+                  "default": "./index.js"
+                },
+                "./client": {
+                  "react-server": "./client.react-server.js",
+                  "default": "./client.js"
+                },
+                "./server": {
+                  "react-server": "./server.react-server.js",
+                  "workerd": "./server.edge.js",
+                  "bun": "./server.bun.js",
+                  "deno": "./server.browser.js",
+                  "worker": "./server.browser.js",
+                  "node": "./server.node.js",
+                  "edge-light": "./server.edge.js",
+                  "browser": "./server.browser.js",
+                  "default": "./server.node.js"
+                },
+                "./server.browser": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.browser.js"
+                },
+                "./server.bun": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.bun.js"
+                },
+                "./server.edge": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.edge.js"
+                },
+                "./server.node": {
+                  "react-server": "./server.react-server.js",
+                  "default": "./server.node.js"
+                },
+                "./static": {
+                  "react-server": "./static.react-server.js",
+                  "workerd": "./static.edge.js",
+                  "deno": "./static.browser.js",
+                  "worker": "./static.browser.js",
+                  "node": "./static.node.js",
+                  "edge-light": "./static.edge.js",
+                  "browser": "./static.browser.js",
+                  "default": "./static.node.js"
+                },
+                "./static.browser": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.browser.js"
+                },
+                "./static.edge": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.edge.js"
+                },
+                "./static.node": {
+                  "react-server": "./static.react-server.js",
+                  "default": "./static.node.js"
+                },
+                "./profiling": {
+                  "react-server": "./profiling.react-server.js",
+                  "default": "./profiling.js"
+                },
+                "./test-utils": "./test-utils.js",
+                "./package.json": "./package.json"
+              }
+            }
+          },
+          "exports": null
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-callback-contracts",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-rootless-inputs",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-error-propagation",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-nested-calls",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "react-dom-flush-sync-batching-public-scheduler-priority",
+        "entrypointId": "profiling",
+        "entrypointSubpath": "./profiling",
+        "specifier": "react-dom/profiling",
+        "packageName": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "availability": {
+            "status": "module-load-throws",
+            "moduleLoad": {
+              "status": "throws",
+              "name": "Error",
+              "message": "react-dom/profiling is not supported in React Server Components.",
+              "code": null,
+              "constructorName": "Error",
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "message"
+                }
+              ],
+              "ownProperties": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "message"
+                  },
+                  "value": {
+                    "type": "string",
+                    "value": "react-dom/profiling is not supported in React Server Components."
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      }
+    ]
+  }
+}
