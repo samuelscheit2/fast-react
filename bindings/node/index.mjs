@@ -1,15 +1,17 @@
-export const bindingStatus = 'placeholder';
-export const packageName = '@fast-react/native';
+import cjsBinding from './index.cjs';
 
-export class FastReactNativeBindingUnavailableError extends Error {
-  constructor() {
-    super(
-      '[fast-react] Native binding is not implemented in the initial scaffold.'
-    );
-    this.name = 'FastReactNativeBindingUnavailableError';
-  }
-}
+export const {
+  FastReactNativeBindingUnavailableError,
+  bindingStatus,
+  getNativeBindingLoadPlan,
+  loadNativeBinding,
+  nativeAddonName,
+  nodeApiVersionFloor,
+  packageName,
+  platformPackages,
+  supportedNativeTargets,
+  supportedNodeEngineRange,
+  unavailableErrorCode
+} = cjsBinding;
 
-export function loadNativeBinding() {
-  throw new FastReactNativeBindingUnavailableError();
-}
+export default cjsBinding;
