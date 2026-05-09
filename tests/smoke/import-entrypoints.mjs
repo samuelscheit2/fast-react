@@ -176,6 +176,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/jsx-runtime.react-server.js',
   '@fast-react/react/jsx-dev-runtime.react-server.js',
   '@fast-react/react/element-factory.js',
+  '@fast-react/react/ref-object.js',
   '@fast-react/react/placeholder-utils.js'
 ];
 
@@ -299,6 +300,76 @@ function assertReactElementBehavior(react, label) {
   assert.equal(clone.props.a, 'new-a');
 }
 
+function assertCreateRefBehavior(react, label, options = {}) {
+  const development = options.development !== false;
+  const descriptor = Object.getOwnPropertyDescriptor(react, 'createRef');
+  assert.equal(descriptor.enumerable, true, `${label}.createRef enumerable`);
+  assert.equal(descriptor.configurable, true, `${label}.createRef configurable`);
+  assert.equal(descriptor.writable, true, `${label}.createRef writable`);
+  assert.equal(typeof react.createRef, 'function');
+  assert.equal(react.createRef.name, '', `${label}.createRef name`);
+  assert.equal(react.createRef.length, 0, `${label}.createRef length`);
+
+  const first = react.createRef('ignored argument');
+  const second = react.createRef();
+  assert.notEqual(first, second, `${label}.createRef should return new objects`);
+  assert.deepEqual(Object.keys(first), ['current'], `${label}.ref keys`);
+  assert.deepEqual(Reflect.ownKeys(first), ['current'], `${label}.ref ownKeys`);
+  assert.equal(
+    Object.getPrototypeOf(first),
+    Object.prototype,
+    `${label}.ref prototype`
+  );
+  assert.equal(first.current, null, `${label}.ref initial current`);
+  assert.equal(Object.isFrozen(first), false, `${label}.ref not frozen`);
+  assert.equal(Object.isSealed(first), development, `${label}.ref sealed`);
+  assert.equal(
+    Object.isExtensible(first),
+    !development,
+    `${label}.ref extensible`
+  );
+
+  const currentDescriptor = Object.getOwnPropertyDescriptor(first, 'current');
+  assert.deepEqual(currentDescriptor, {
+    configurable: !development,
+    enumerable: true,
+    value: null,
+    writable: true
+  });
+
+  first.current = 'next-current';
+  assert.equal(first.current, 'next-current', `${label}.ref current mutable`);
+
+  assert.equal(
+    Reflect.set(first, 'extra', 42),
+    !development,
+    `${label}.ref extra property addability`
+  );
+  assert.equal(
+    Object.hasOwn(first, 'extra'),
+    !development,
+    `${label}.ref extra property presence`
+  );
+  assert.equal(
+    Reflect.deleteProperty(first, 'extra'),
+    true,
+    `${label}.ref extra property deletion`
+  );
+  assert.equal(
+    Reflect.deleteProperty(first, 'current'),
+    !development,
+    `${label}.ref current configurability`
+  );
+
+  const thisArg = { untouched: true };
+  const fromCall = react.createRef.call(thisArg);
+  assert.deepEqual(thisArg, { untouched: true }, `${label}.createRef this`);
+  assert.deepEqual(Object.keys(fromCall), ['current'], `${label}.call result`);
+
+  const fromNew = new react.createRef();
+  assert.deepEqual(Object.keys(fromNew), ['current'], `${label}.new result`);
+}
+
 function assertJsxRuntimeBehavior(runtime, label) {
   const config = { children: 'child' };
   const element = runtime.jsx('div', config);
@@ -351,7 +422,13 @@ function assertReactPlaceholderBehavior(react, label) {
   assert.equal(react.version, '0.0.0-fast-react-placeholder');
   assert.equal(typeof react.createElement, 'function');
   assertReactElementBehavior(react, label);
+  assertCreateRefBehavior(react, label);
   assertUnimplemented(() => react.Children.count([]), `${label}.Children.count`);
+  assertUnimplemented(() => react.forwardRef(() => null), `${label}.forwardRef`);
+
+  if (Object.hasOwn(react, 'useRef')) {
+    assertUnimplemented(() => react.useRef(null), `${label}.useRef`);
+  }
 
   if (Object.hasOwn(react, 'Component')) {
     assertUnimplemented(() => new react.Component(), `${label}.Component`);
@@ -432,6 +509,12 @@ async function assertProductionJsxDevUndefined() {
   const probeSource = `
     'use strict';
     const assert = require('node:assert/strict');
+    const react = require(${JSON.stringify(
+      path.join(reactPackageRoot, 'index.js')
+    )});
+    const reactServer = require(${JSON.stringify(
+      path.join(reactPackageRoot, 'react.react-server.js')
+    )});
     const jsxDevRuntime = require(${JSON.stringify(
       path.join(reactPackageRoot, 'jsx-dev-runtime.js')
     )});
@@ -442,6 +525,28 @@ async function assertProductionJsxDevUndefined() {
     assert.equal(jsxDevRuntime.jsxDEV, undefined);
     assert.equal(Object.hasOwn(reactServerJsxRuntime, 'jsxDEV'), true);
     assert.equal(reactServerJsxRuntime.jsxDEV, undefined);
+
+    for (const [label, React] of [['react', react], ['react-server', reactServer]]) {
+      assert.equal(React.createRef.name, '', label);
+      assert.equal(React.createRef.length, 0, label);
+      const ref = React.createRef('ignored');
+      assert.deepEqual(Object.keys(ref), ['current'], label);
+      assert.equal(Object.isSealed(ref), false, label);
+      assert.equal(Object.isExtensible(ref), true, label);
+      assert.deepEqual(Object.getOwnPropertyDescriptor(ref, 'current'), {
+        configurable: true,
+        enumerable: true,
+        value: null,
+        writable: true
+      });
+      ref.current = 'next';
+      ref.extra = 42;
+      assert.equal(ref.current, 'next', label);
+      assert.equal(ref.extra, 42, label);
+      assert.equal(delete ref.extra, true, label);
+      assert.equal(delete ref.current, true, label);
+      assert.deepEqual(Object.keys(new React.createRef()), ['current'], label);
+    }
   `;
 
   const result = spawnSync(process.execPath, ['-e', probeSource], {
@@ -523,6 +628,25 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
       );
     }
 
+    function assertDevCreateRef(moduleExports, label) {
+      assert.equal(moduleExports.createRef.name, '', label);
+      assert.equal(moduleExports.createRef.length, 0, label);
+      const ref = moduleExports.createRef('ignored');
+      assert.deepEqual(Object.keys(ref), ['current'], label);
+      assert.equal(Object.isSealed(ref), true, label);
+      assert.equal(Object.isExtensible(ref), false, label);
+      assert.deepEqual(Object.getOwnPropertyDescriptor(ref, 'current'), {
+        configurable: false,
+        enumerable: true,
+        value: null,
+        writable: true
+      });
+      ref.current = 'next';
+      assert.equal(ref.current, 'next', label);
+      assert.equal(Reflect.set(ref, 'extra', 42), false, label);
+      assert.equal(Reflect.deleteProperty(ref, 'current'), false, label);
+    }
+
     (async () => {
       for (const { keys, resolvedFileName, specifier } of entrypoints) {
         assert.equal(
@@ -539,6 +663,9 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
 
         const cjsModule = require(specifier);
         assertInventoryKeys(cjsModule, keys, specifier);
+        if (specifier === '@fast-react/react') {
+          assertDevCreateRef(cjsModule, specifier);
+        }
 
         const esmModule = await import(specifier);
         assert.equal(esmModule.default, cjsModule, specifier);
@@ -580,4 +707,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/ref smoke checks.');

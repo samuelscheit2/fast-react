@@ -12,6 +12,7 @@ const {
   createElement,
   isValidElement
 } = require('./element-factory.js');
+const { createRef } = require('./ref-object.js');
 
 const entrypoint = 'react';
 
@@ -76,7 +77,7 @@ exports.captureOwnerStack = createUnimplementedFunction(
 exports.cloneElement = cloneElement;
 exports.createContext = createUnimplementedFunction(entrypoint, 'createContext');
 exports.createElement = createElement;
-exports.createRef = createUnimplementedFunction(entrypoint, 'createRef');
+exports.createRef = createRef;
 exports.forwardRef = createUnimplementedFunction(entrypoint, 'forwardRef');
 exports.isValidElement = isValidElement;
 exports.lazy = createUnimplementedFunction(entrypoint, 'lazy');
