@@ -85,8 +85,12 @@ Source/oracle workers ready for audit and merge:
 
 - React DOM/client-root oracles and implementation: workers 046, 049, 054, 060,
   064, 088, 089.
-- Core source primitives: workers 047, 075, 076.
 - React test renderer and `act` oracles: workers 083-087, 097.
+
+Merged core primitives:
+
+- Workers 047, 075, and 076 added root lane bookkeeping, event priority,
+  fiber flags, and hook effect flags to `fast-react-core`.
 
 Merged implementation plans:
 

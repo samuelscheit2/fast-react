@@ -14,6 +14,9 @@ Last updated: 2026-05-10
   `v19.2.6`, commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`.
 - Report-only implementation planning workers 104-117 are merged; their tmux
   sessions and worktrees are closed.
+- Core source workers 047, 075, and 076 are merged; root lane bookkeeping,
+  event priority, fiber flags, and hook effect flags are now in
+  `fast-react-core`.
 
 ## Durable Decisions
 
@@ -44,18 +47,17 @@ Last updated: 2026-05-10
   refs, children helpers, memo/lazy, forwardRef, context object creation, and
   component class basics.
 - React DOM, test renderer, scheduler, and root render work are currently driven
-  by oracles plus report-only implementation plans before source slices are
+  by oracles plus merged implementation plans before larger source slices are
   accepted.
 
 ## Current Worker Snapshot
 
-Top-level tmux worker count should stay at or below 30. Current live count: 16.
+Top-level tmux worker count should stay at or below 30. Current live count: 13.
 
 Ready for audit/merge based on latest pane checks:
 
 - React DOM/client root and DOM behavior oracles: 046, 049, 060, 064, 088, 089.
 - React DOM root export implementation: 054.
-- Core source primitives: 047, 075, 076.
 - React test renderer and React `act` oracles: 083, 084, 085, 086, 087, 097.
 
 Use live `tmux capture-pane` and worktree status as the source of truth before
@@ -69,19 +71,20 @@ accepting any worker; this snapshot is only a routing aid.
   render milestone into conflict-safe slices.
 - Merged report-only implementation planning workers 104-117 and closed their
   accepted tmux sessions/worktrees.
+- Merged core source workers 047, 075, and 076; verified with
+  `cargo fmt --all --check`, `cargo test -p fast-react-core --all-features`,
+  and `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`.
 - Added and documented the local React reference source clone.
 
 ## Next Actions
 
-1. Audit source workers 047, 075, and 076 with `cargo fmt`, targeted tests, and
-   clippy before merge.
-2. Audit React DOM/client root workers 046, 049, 054, 060, 064, 088, and 089
+1. Audit React DOM/client root workers 046, 049, 054, 060, 064, 088, and 089
    with their targeted Node tests.
-3. Audit React test renderer and React `act` workers 083, 084, 085, 086, 087,
+2. Audit React test renderer and React `act` workers 083, 084, 085, 086, 087,
    and 097 with targeted conformance checks.
-4. Launch the next conflict-safe implementation workers from the merged
+3. Launch the next conflict-safe implementation workers from the merged
    104-117 plans once prerequisite source/oracle slices are accepted.
-5. After each accepted batch, update this file with only the durable delta and
+4. After each accepted batch, update this file with only the durable delta and
    prune obsolete status lines.
 
 ## Verification Notes
