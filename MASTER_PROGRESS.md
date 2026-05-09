@@ -24,6 +24,7 @@ M0: Orchestration Foundation.
 - Use `worker-progress/<worker-id>.md` for each worker's progress.
 - Workers should read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
+- Worker runner requests `gpt-5.5` with `model_reasoning_effort="xhigh"` and uses the local yolo-equivalent Codex flag.
 
 ## Worker Roster
 
@@ -57,3 +58,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: `cargo --version` returned `cargo 1.95.0`.
 - 2026-05-09: `rustc --version` returned `rustc 1.95.0`.
 - 2026-05-09: Initial tmux worker launch failed before doing work because `codex exec` rejected `--search`. Relaunch will omit `--search`.
+- 2026-05-09: Second tmux worker launch failed before doing work because this `codex exec` build rejected `-a`. Runner now uses `--dangerously-bypass-approvals-and-sandbox` instead.
+- 2026-05-09: `ORCHESTRATOR.md` was updated to move model/yolo guidance into a general guideline section. Worker brief now carries only worker-safe assumption-checking guidance.

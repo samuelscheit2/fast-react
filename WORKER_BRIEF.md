@@ -20,6 +20,7 @@ Current compatibility target checked on 2026-05-09:
 - Plan and research before implementing.
 - Find root causes; do not patch symptoms.
 - Breaking changes are allowed when necessary, but document the reason and tradeoff.
+- Question your own assumptions and decisions; change course when evidence shows a better path.
 - Do not take over orchestration, worker assignment, merge policy, or project-wide planning unless your task explicitly asks for a recommendation.
 - Do not call `update_goal(status: "complete")` for intermediate phases. If goal tools are available, call it only once after the whole worker task is complete.
 

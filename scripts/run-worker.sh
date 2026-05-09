@@ -20,7 +20,12 @@ if [ ! -f "$prompt_file" ]; then
   exit 2
 fi
 
-codex exec -s danger-full-access -a never -C "$repo_root" - < "$prompt_file" > "$log_file" 2>&1
+codex exec \
+  --dangerously-bypass-approvals-and-sandbox \
+  -m gpt-5.5 \
+  -c model_reasoning_effort=\"xhigh\" \
+  -C "$repo_root" \
+  - < "$prompt_file" > "$log_file" 2>&1
 status="$?"
 echo "$status" > "$exit_file"
 exit "$status"
