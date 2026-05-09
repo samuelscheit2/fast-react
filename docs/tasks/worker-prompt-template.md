@@ -17,6 +17,7 @@ Write scope:
 Constraints:
 - Do not modify files outside your write scope.
 - Do not overlap with other workers.
+- Do not spawn managed Codex subagents, explorers, nested agents, or parallel agent tools. You are already a tmux worker; request separate tmux workers in your report if needed.
 - Find root causes; do not patch symptoms.
 - Introduce breaking changes if necessary, but document why.
 - Record progress in worker-progress/<worker-id>.md.

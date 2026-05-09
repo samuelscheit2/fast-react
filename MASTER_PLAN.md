@@ -20,6 +20,7 @@ Breaking changes are allowed when they remove root causes or enable a sound arch
 - Workers own implementation or research tasks in isolated scopes.
 - Workers read `WORKER_BRIEF.md`; `ORCHESTRATOR.md` is orchestrator-only.
 - Workers must record progress in `worker-progress/<worker-id>.md`.
+- Workers are real Codex subprocesses launched in tmux by the orchestrator. A worker must not spawn managed Codex subagents, explorers, nested agents, or parallel agent tools from inside its own session.
 - Code work should happen in Git worktrees whenever possible.
 - Workers must review their changes for quality, maintainability, performance, and security before reporting completion.
 - Workers should call `create_goal` when starting their assigned task. They should call `update_goal(status: "complete")` only after the whole worker task is complete.

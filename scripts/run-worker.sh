@@ -22,7 +22,13 @@ if [ ! -f "$prompt_file" ]; then
   exit 2
 fi
 
-prompt_text="$(cat "$prompt_file")"
+prompt_text="$(cat "$prompt_file")
+
+Hard guard from the orchestrator:
+- You are running as a real Codex process in a tmux worker session.
+- Do not spawn managed Codex subagents, explorers, nested agents, or parallel agent tools from inside this worker.
+- If you need independent hypothesis testing, write the requested follow-up in your report so the orchestrator can launch another real tmux worker.
+"
 
 script -q "$log_file" codex \
   --yolo \
