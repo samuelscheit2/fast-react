@@ -14,6 +14,7 @@ Constraints:
 - Do not implement project code.
 - Do not overlap with other workers.
 - You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses. Summarize delegated checks and results in your report.
+- Worker-internal nested agents are allowed even if they make the aggregate agent/process count exceed the orchestrator's 30 top-level tmux worker limit.
 - Find root causes; do not patch symptoms.
 - Introduce breaking changes if necessary, but document why.
 - Before finishing, review your findings for quality, maintainability, performance, and security implications.

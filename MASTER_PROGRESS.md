@@ -24,7 +24,7 @@ M0: Orchestration Foundation.
 - Use `worker-progress/<worker-id>.md` for each worker's progress.
 - Workers should read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
 - Top-level workers are real Codex subprocesses launched in tmux.
-- Top-level tmux workers may spawn managed Codex subagents/explorers internally when useful. Those nested agents do not count against the 30 top-level tmux worker limit.
+- Top-level tmux workers may spawn managed Codex subagents/explorers internally when useful. Those nested agents do not count against the 30 top-level tmux worker limit and may push the aggregate agent/process count above 30.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
 - Worker runner requests `gpt-5.5` with `model_reasoning_effort="xhigh"` and uses the local yolo-equivalent Codex flag.
 - Accepted architecture direction from worker-001: Rust should own renderer-agnostic React semantics behind arena/generational handles, use a capability-grouped host-config boundary, and expose a JS-compatible package facade through N-API first. WASM and third-party `react-reconciler` compatibility are deferred until conformance evidence justifies them.
@@ -39,7 +39,10 @@ M0: Orchestration Foundation.
 - Accepted scaffold implementation from worker-010: root Cargo/npm workspaces, placeholder Rust crates, placeholder React/native packages, conformance/smoke placeholders, and CI skeleton are merged. Real React behavior remains explicitly unimplemented and gated by future conformance-backed workers.
 - Accepted conformance inventory tooling from worker-013: the conformance workspace now has deterministic pinned target metadata and tests that explicitly keep all real conformance claims false until tarball/runtime/type inventory generation exists.
 - Accepted native loader boundary from worker-015: native loading remains loudly unavailable, but CJS/ESM loader metadata now exposes future platform package names, Node `>=22.0.0`, N-API floor 8, and native-specific Rust boundary errors without adding N-API dependencies.
-- Root lockfile sync is pending after package metadata changes. `npm ci --ignore-scripts --dry-run` passes, but `package-lock.json` still records older workspace metadata for `bindings/node`; update it after the remaining package-facing worker completes.
+- Accepted host-config trait skeleton from worker-012: `fast-react-host-config` now exposes opaque host types, explicit capability sets and errors, capability-grouped host traits, and a temporary legacy `HostConfig` bridge for current scaffold crates.
+- Accepted core element model primitives from worker-011: `fast-react-core` now records compatibility targets, React 19.2.6 symbol tags, normalized key/ref/owner slots, placeholder element records, and typed loud-unimplemented JS conformance gaps.
+- Accepted React entrypoint placeholders from worker-014: `@fast-react/react` now has inventory-aligned default and `react-server` placeholder surfaces, structured unimplemented errors, hidden scaffold metadata, and package-surface smoke tests.
+- Accepted root lockfile sync from worker-016: `package-lock.json` now records `bindings/node` Node engine metadata as `>=22.0.0`; `npm ci --ignore-scripts --dry-run` passes.
 
 ## Worker Roster
 
@@ -55,18 +58,17 @@ M0: Orchestration Foundation.
 | worker-008-renderer-host-config | merged | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` |
 | worker-009-benchmark-strategy | merged | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` |
 | worker-010-initial-scaffold | merged | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `worker-progress/worker-010-initial-scaffold.md` |
-| worker-011-core-element-model | running in tmux worktree; nested subagents allowed | Implement first Rust core element/model primitives | `../fast-react-worker-011-core-element-model/worker-progress/worker-011-core-element-model.md` |
-| worker-012-host-config-traits | running in tmux worktree; nested subagents allowed | Implement first capability-grouped host-config trait skeleton | `../fast-react-worker-012-host-config-traits/worker-progress/worker-012-host-config-traits.md` |
+| worker-011-core-element-model | merged | Implement first Rust core element/model primitives | `worker-progress/worker-011-core-element-model.md` |
+| worker-012-host-config-traits | merged | Implement first capability-grouped host-config trait skeleton | `worker-progress/worker-012-host-config-traits.md` |
 | worker-013-conformance-inventory-tooling | merged | Implement initial conformance inventory tooling placeholder | `worker-progress/worker-013-conformance-inventory-tooling.md` |
-| worker-014-react-entrypoint-placeholders | running in tmux worktree; nested subagents allowed | Improve React package placeholders and smoke tests from API inventory | `../fast-react-worker-014-react-entrypoint-placeholders/worker-progress/worker-014-react-entrypoint-placeholders.md` |
+| worker-014-react-entrypoint-placeholders | merged | Improve React package placeholders and smoke tests from API inventory | `worker-progress/worker-014-react-entrypoint-placeholders.md` |
 | worker-015-native-loader-boundary | merged | Improve native loader and Rust N-API boundary placeholders | `worker-progress/worker-015-native-loader-boundary.md` |
-| worker-016-root-lockfile-sync | pending | Synchronize root `package-lock.json` after package metadata changes | `../fast-react-worker-016-root-lockfile-sync/worker-progress/worker-016-root-lockfile-sync.md` |
+| worker-016-root-lockfile-sync | merged | Synchronize root `package-lock.json` after package metadata changes | `worker-progress/worker-016-root-lockfile-sync.md` |
 
 ## Next Actions
 
-1. Collect and merge workers 011, 012, and 014 with verification evidence.
-2. Launch worker-016 to synchronize `package-lock.json` after worker-014 package changes are accepted.
-3. Launch merge workers if host/core/test changes require integration fixes.
+1. Plan the next implementation tranche from accepted follow-up recommendations.
+2. Launch merge workers if host/core/test changes require integration fixes.
 
 ## Risks And Open Questions
 
@@ -97,6 +99,8 @@ M0: Orchestration Foundation.
 - 2026-05-09: Updated `WORKER_BRIEF.md`, task prompts, prompt template, and `scripts/run-worker.sh` to explicitly forbid managed Codex subagents/explorers inside worker sessions. Independent hypothesis tests must be requested in reports and launched by the orchestrator as separate tmux workers.
 - 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with the explicit managed-subagent prohibition included in both worker files and the launcher prompt.
 - 2026-05-09: Policy corrected: top-level workers still launch as real tmux Codex processes, but workers may spawn managed internal subagents/explorers for their own hypothesis testing. Those nested agents do not count against the 30 top-level tmux worker cap.
+- 2026-05-09: Clarified that worker-internal nested agents may push the aggregate agent/process count above 30; the limit applies only to orchestrator-launched top-level tmux workers.
+- 2026-05-09: Cleanup policy clarified: regenerable artifacts such as `node_modules/`, `target/`, and root `Cargo.lock` do not need removal merely because they exist; remove or document them only when stale, ambiguous, or polluting scoped status.
 - 2026-05-09: Stopped the three workers before accepting reports written under the superseded managed-subagent prohibition.
 - 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with nested managed subagents allowed.
 - 2026-05-09: Added six more non-overlapping research workers: public API inventory, upstream test reuse, binding strategy, scheduler/fiber model, renderer host config, and benchmark strategy.
@@ -116,3 +120,9 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-013 conformance inventory tooling in commit `d990db5`. Closed the worker-013 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-015 native loader boundary in commit `09e6b3f`. Closed the worker-015 tmux session after merge.
 - 2026-05-09: Checked `npm ci --ignore-scripts --dry-run` on main after worker-015; it passes. `package-lock.json` metadata still needs sync for the changed native package engine, so worker-016 is pending.
+- 2026-05-09: Accepted and merged worker-012 host-config trait skeleton in commit `52d0763`. Closed the worker-012 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-011 core element model primitives in commit `24bcd4c`. Closed the worker-011 tmux session after merge.
+- 2026-05-09: Verified merged Rust crates on `main` with `cargo test --workspace --all-features`.
+- 2026-05-09: Accepted and merged worker-014 React entrypoint placeholders in commit `d929916`. Closed the worker-014 tmux session after merge.
+- 2026-05-09: Verified merged JS/native/Rust checks on `main` with `npm run check`.
+- 2026-05-09: Accepted and merged worker-016 root lockfile sync in commit `8489b58`. Closed the worker-016 tmux session after merge.

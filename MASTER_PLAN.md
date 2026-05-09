@@ -21,7 +21,7 @@ Breaking changes are allowed when they remove root causes or enable a sound arch
 - Workers read `WORKER_BRIEF.md`; `ORCHESTRATOR.md` is orchestrator-only.
 - Workers must record progress in `worker-progress/<worker-id>.md`.
 - Top-level workers are real Codex subprocesses launched in tmux by the orchestrator.
-- Top-level tmux workers may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside their sessions when useful for hypothesis testing or verification. Nested managed agents do not count against the orchestrator's 30 top-level tmux worker limit.
+- Top-level tmux workers may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside their sessions when useful for hypothesis testing or verification. Nested managed agents do not count against the orchestrator's 30 top-level tmux worker limit and may push the aggregate agent/process count above 30.
 - Code work should happen in Git worktrees whenever possible.
 - Workers must review their changes for quality, maintainability, performance, and security before reporting completion.
 - Workers should call `create_goal` when starting their assigned task. They should call `update_goal(status: "complete")` only after the whole worker task is complete.
@@ -186,12 +186,12 @@ Dependencies: M8.
 | worker-008-renderer-host-config | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` | M0 | merged |
 | worker-009-benchmark-strategy | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` | M0 | merged |
 | worker-010-initial-scaffold | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | root scaffold paths plus `worker-progress/worker-010-initial-scaffold.md` | workers 001-003 | merged |
-| worker-011-core-element-model | Implement first Rust core element/model primitives | `crates/fast-react-core/**`, `worker-progress/worker-011-core-element-model.md` | workers 001,004,010 | queued |
-| worker-012-host-config-traits | Implement first capability-grouped host-config trait skeleton | `crates/fast-react-host-config/**`, `worker-progress/worker-012-host-config-traits.md` | workers 008,010 | queued |
+| worker-011-core-element-model | Implement first Rust core element/model primitives | `crates/fast-react-core/**`, `worker-progress/worker-011-core-element-model.md` | workers 001,004,010 | merged |
+| worker-012-host-config-traits | Implement first capability-grouped host-config trait skeleton | `crates/fast-react-host-config/**`, `worker-progress/worker-012-host-config-traits.md` | workers 008,010 | merged |
 | worker-013-conformance-inventory-tooling | Implement initial conformance inventory tooling placeholder | `tests/conformance/**`, `worker-progress/worker-013-conformance-inventory-tooling.md` | workers 002,004,010 | merged |
-| worker-014-react-entrypoint-placeholders | Improve React package placeholders and smoke tests from API inventory | `packages/react/**`, `tests/smoke/**`, `worker-progress/worker-014-react-entrypoint-placeholders.md` | workers 004,010 | queued |
+| worker-014-react-entrypoint-placeholders | Improve React package placeholders and smoke tests from API inventory | `packages/react/**`, `tests/smoke/**`, `worker-progress/worker-014-react-entrypoint-placeholders.md` | workers 004,010 | merged |
 | worker-015-native-loader-boundary | Improve native loader and Rust N-API boundary placeholders | `bindings/node/**`, `crates/fast-react-napi/**`, `worker-progress/worker-015-native-loader-boundary.md` | workers 006,010 | merged |
-| worker-016-root-lockfile-sync | Synchronize root `package-lock.json` after package metadata changes | `package-lock.json`, `worker-progress/worker-016-root-lockfile-sync.md` | workers 013,014,015 | pending |
+| worker-016-root-lockfile-sync | Synchronize root `package-lock.json` after package metadata changes | `package-lock.json`, `worker-progress/worker-016-root-lockfile-sync.md` | workers 013,014,015 | merged |
 
 ## Merge Policy
 

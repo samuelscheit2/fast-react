@@ -27,7 +27,7 @@ prompt_text="$(cat "$prompt_file")
 Subagent policy from the orchestrator:
 - You are running as a real Codex process in a tmux worker session.
 - You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses or verify work.
-- Nested managed agents spawned inside this worker do not count against the orchestrator's 30 top-level tmux worker limit.
+- Nested managed agents spawned inside this worker do not count against the orchestrator's 30 top-level tmux worker limit, and may make the aggregate agent/process count exceed 30.
 - If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
 "
 

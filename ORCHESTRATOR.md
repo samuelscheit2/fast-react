@@ -21,7 +21,7 @@ Save the project plan in a markdown file called `MASTER_PLAN.md` and the overall
 You should not do any tasks yourself and instead delegate them to subprocesses codexes called worker.
 To create a new worker spawn a new codex subprocesses in tmux.
 You are allowed to spawn a maximum amount of 30 concurrent top-level tmux workers.
-Workers may spawn their own managed subagents or explorers internally to test hypotheses. Those nested agents are allowed and do not count against the 30 top-level tmux worker limit.
+Workers may spawn their own managed subagents or explorers internally to test hypotheses. Those nested agents are allowed, may push total agent/process count above 30, and do not count against the 30 top-level tmux worker limit.
 You should provide all necessary information in prompt to the worker for them to work independently.
 Make sure that the work doesn't directly overlap with other tasks (if they do, you need to create a merge worker), to prevent conflicts use git worktrees.
 
@@ -40,8 +40,9 @@ Regarding code work:
 ## Cleanup and hygiene
 
 Cleaning up is part of orchestration, not optional follow-up work.
-Before accepting or merging a worker, verify its worktree status and make sure generated or temporary artifacts are either intentionally tracked or removed.
-Workers should clean up artifacts such as `target/`, `node_modules/`, transient lockfiles outside their write scope, temporary logs, scratch files, and failed experiment output before reporting completion.
+Before accepting or merging a worker, verify its worktree status and make sure scoped source/report changes are intentional.
+Regenerable generated artifacts such as `node_modules/`, `target/`, and root `Cargo.lock` do not need to be removed merely because they exist. Only remove or document them when they are stale, ambiguous, user-owned, or would pollute the scoped diff/status.
+Workers should clean up temporary logs, scratch files, and failed experiment output before reporting completion.
 After a worker is accepted and merged, close its tmux session and remove or prune worktrees that are no longer needed, unless keeping the worktree is useful for immediate follow-up inspection.
 Regularly check for stale tmux sessions, leftover worker processes, abandoned worktrees, ignored build outputs, and untracked files in both main and worker worktrees.
 Do not delete or reset user changes. If cleanup would remove ambiguous or user-owned files, document the issue and decide explicitly before proceeding.
