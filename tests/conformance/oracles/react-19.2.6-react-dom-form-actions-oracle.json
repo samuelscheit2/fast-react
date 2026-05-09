@@ -1,0 +1,4668 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-dom-form-actions-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 form actions oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-036-react-dom-export-oracle.md",
+    "worker-progress/worker-040-dom-mutation-renderer-plan.md",
+    "worker-progress/worker-041-dom-events-priority-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "generation": {
+    "method": "checked runtime inventory plus exact npm tarballs extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per scenario and mode",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false
+  },
+  "evidenceClaims": {
+    "checkedRuntimeInventoryRead": true,
+    "checkedRuntimeInventoryMatched": true,
+    "exactTarballUrlsFromInventory": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListsMatchedInventory": true,
+    "rootFormApiDescriptorsProbed": true,
+    "requestFormResetPublicErrorsProbed": true,
+    "hookBoundaryErrorsProbed": true,
+    "serverRenderHookReturnShapesProbed": true,
+    "domFormReplayBoundaryProbed": true,
+    "reactServerConditionAbsenceProbed": true,
+    "fastReactComparedToReactDom": false
+  },
+  "conformanceClaims": {
+    "realReactDomBehaviorProbed": true,
+    "fastReactComparedToReactDom": false,
+    "fastReactBehaviorCompatible": false,
+    "fullClientFormActionOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomRootRuntimeProbeMatched": true
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-form-actions-target"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-dom-peer-needed-for-form-action-probes"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-form-action-probes"
+    }
+  ],
+  "runtimeSubpath": ".",
+  "runtimeProbeId": "react-dom:.",
+  "apiNames": [
+    "requestFormReset",
+    "useFormState",
+    "useFormStatus"
+  ],
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "reason": "Default Node development records public errors and development-only diagnostics."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "reason": "Default Node production records minified public errors and production return shapes."
+    },
+    {
+      "id": "react-server-development",
+      "nodeArgs": [
+        "--conditions=react-server"
+      ],
+      "nodeEnv": "development",
+      "condition": "react-server",
+      "reason": "The react-server condition removes the form-action root APIs and makes server rendering unavailable."
+    },
+    {
+      "id": "react-server-production",
+      "nodeArgs": [
+        "--conditions=react-server"
+      ],
+      "nodeEnv": "production",
+      "condition": "react-server",
+      "reason": "Production react-server behavior is recorded separately for condition-specific absence and throws."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "root-api-descriptors",
+      "area": "public-root-api-shape",
+      "APIs": [
+        "requestFormReset",
+        "useFormState",
+        "useFormStatus"
+      ],
+      "expectedBoundary": "Default React DOM exposes form APIs as writable enumerable functions; the react-server condition omits them."
+    },
+    {
+      "id": "request-form-reset-invalid-inputs",
+      "area": "requestFormReset-public-errors",
+      "APIs": [
+        "requestFormReset"
+      ],
+      "expectedBoundary": "Rootless and non-React-owned form-like values all throw the public invalid-form error instead of silently resetting."
+    },
+    {
+      "id": "hook-calls-outside-render",
+      "area": "hook-boundary-errors",
+      "APIs": [
+        "useFormStatus",
+        "useFormState"
+      ],
+      "expectedBoundary": "Calling form hooks outside render throws through the null hook dispatcher; development also emits the invalid-hook diagnostic."
+    },
+    {
+      "id": "server-render-use-form-status",
+      "area": "server-render-return-shape",
+      "APIs": [
+        "useFormStatus"
+      ],
+      "expectedBoundary": "Server rendering exposes the non-pending form status object shape without exercising client form submission."
+    },
+    {
+      "id": "server-render-use-form-state",
+      "area": "server-render-return-shape",
+      "APIs": [
+        "useFormState"
+      ],
+      "expectedBoundary": "Server rendering exposes the action-state tuple shape without dispatching an action."
+    },
+    {
+      "id": "server-render-function-form-action-boundary",
+      "area": "dom-form-dependency-boundary",
+      "APIs": [
+        "useFormStatus"
+      ],
+      "expectedBoundary": "Server rendering a function form action emits React's submit-replay boundary while status remains not pending."
+    }
+  ],
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react-dom.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./client",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./client.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./client.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "bun"
+              ],
+              "target": "./server.bun.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./server.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.bun",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.bun.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./static.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./profiling",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./profiling.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./profiling.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./test-utils",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./test-utils.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ]
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": {
+          "node": ">=0.10.0"
+        }
+      },
+      "publicSubpaths": [
+        ".",
+        "./package.json",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./jsx-dev-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./jsx-dev-runtime.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./jsx-dev-runtime.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./compiler-runtime",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./compiler-runtime.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./compiler-runtime.js"
+            }
+          ]
+        }
+      ]
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-artifact-probes",
+      "targetStatus": "supporting-package-not-official-react-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null
+      },
+      "publicSubpaths": [],
+      "runtimeSubpaths": [],
+      "exportMapRows": []
+    }
+  },
+  "observations": {
+    "default-node-development": [
+      {
+        "scenarioId": "root-api-descriptors",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "label": "describe react-dom root form API descriptors",
+          "status": "ok",
+          "value": {
+            "module": {
+              "objectTag": "[object Object]",
+              "isExtensible": true,
+              "exportKeys": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "createPortal",
+                "flushSync",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "requestFormReset",
+                "unstable_batchedUpdates",
+                "useFormState",
+                "useFormStatus",
+                "version"
+              ],
+              "ownPropertyNames": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "createPortal",
+                "flushSync",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "requestFormReset",
+                "unstable_batchedUpdates",
+                "useFormState",
+                "useFormStatus",
+                "version"
+              ],
+              "ownSymbolKeys": [],
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                },
+                {
+                  "type": "string",
+                  "value": "createPortal"
+                },
+                {
+                  "type": "string",
+                  "value": "flushSync"
+                },
+                {
+                  "type": "string",
+                  "value": "preconnect"
+                },
+                {
+                  "type": "string",
+                  "value": "prefetchDNS"
+                },
+                {
+                  "type": "string",
+                  "value": "preinit"
+                },
+                {
+                  "type": "string",
+                  "value": "preinitModule"
+                },
+                {
+                  "type": "string",
+                  "value": "preload"
+                },
+                {
+                  "type": "string",
+                  "value": "preloadModule"
+                },
+                {
+                  "type": "string",
+                  "value": "requestFormReset"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_batchedUpdates"
+                },
+                {
+                  "type": "string",
+                  "value": "useFormState"
+                },
+                {
+                  "type": "string",
+                  "value": "useFormStatus"
+                },
+                {
+                  "type": "string",
+                  "value": "version"
+                }
+              ],
+              "selectedDescriptors": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "isExtensible": true,
+                      "ownPropertyNames": [
+                        "d",
+                        "p",
+                        "findDOMNode"
+                      ],
+                      "ownSymbolKeys": [],
+                      "ownKeys": [
+                        {
+                          "type": "string",
+                          "value": "d"
+                        },
+                        {
+                          "type": "string",
+                          "value": "p"
+                        },
+                        {
+                          "type": "string",
+                          "value": "findDOMNode"
+                        }
+                      ],
+                      "entries": {
+                        "d": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "isExtensible": true,
+                          "ownPropertyNames": [
+                            "f",
+                            "r",
+                            "D",
+                            "C",
+                            "L",
+                            "m",
+                            "X",
+                            "S",
+                            "M"
+                          ],
+                          "ownSymbolKeys": [],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "f"
+                            },
+                            {
+                              "type": "string",
+                              "value": "r"
+                            },
+                            {
+                              "type": "string",
+                              "value": "D"
+                            },
+                            {
+                              "type": "string",
+                              "value": "C"
+                            },
+                            {
+                              "type": "string",
+                              "value": "L"
+                            },
+                            {
+                              "type": "string",
+                              "value": "m"
+                            },
+                            {
+                              "type": "string",
+                              "value": "X"
+                            },
+                            {
+                              "type": "string",
+                              "value": "S"
+                            },
+                            {
+                              "type": "string",
+                              "value": "M"
+                            }
+                          ],
+                          "entries": {
+                            "f": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "r": {
+                              "type": "function",
+                              "name": "r",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "D": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "C": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "L": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "m": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "X": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "S": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "M": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            }
+                          }
+                        },
+                        "p": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "findDOMNode": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "createPortal"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "flushSync"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preconnect"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "prefetchDNS"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinit"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinitModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preload"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preloadModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "requestFormReset"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "unstable_batchedUpdates"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "useFormState"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 3,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "useFormStatus"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "version"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "string",
+                      "value": "19.2.6"
+                    }
+                  }
+                }
+              ]
+            },
+            "selectedAPIs": {
+              "requestFormReset": {
+                "kind": "data",
+                "enumerable": true,
+                "configurable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isAsync": false,
+                  "ownPropertyNames": [
+                    "length",
+                    "name",
+                    "prototype"
+                  ]
+                }
+              },
+              "useFormState": {
+                "kind": "data",
+                "enumerable": true,
+                "configurable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 3,
+                  "isAsync": false,
+                  "ownPropertyNames": [
+                    "length",
+                    "name",
+                    "prototype"
+                  ]
+                }
+              },
+              "useFormStatus": {
+                "kind": "data",
+                "enumerable": true,
+                "configurable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0,
+                  "isAsync": false,
+                  "ownPropertyNames": [
+                    "length",
+                    "name",
+                    "prototype"
+                  ]
+                }
+              }
+            },
+            "domInternals": {
+              "keys": [
+                "d",
+                "p",
+                "findDOMNode"
+              ],
+              "findDOMNode": {
+                "type": "null"
+              },
+              "priority": {
+                "type": "number",
+                "value": 0
+              },
+              "dispatcher": {
+                "keys": [
+                  "f",
+                  "r",
+                  "D",
+                  "C",
+                  "L",
+                  "m",
+                  "X",
+                  "S",
+                  "M"
+                ],
+                "methods": {
+                  "f": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "r": {
+                    "type": "function",
+                    "name": "r",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "D": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "C": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "L": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "m": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "X": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "S": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "M": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "request-form-reset-invalid-inputs",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": [
+          {
+            "id": "no-argument",
+            "operation": {
+              "label": "requestFormReset no-argument",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Invalid form element. requestFormReset must be passed a form that was rendered by React."
+            }
+          },
+          {
+            "id": "undefined",
+            "operation": {
+              "label": "requestFormReset undefined",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Invalid form element. requestFormReset must be passed a form that was rendered by React."
+            }
+          },
+          {
+            "id": "null",
+            "operation": {
+              "label": "requestFormReset null",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Invalid form element. requestFormReset must be passed a form that was rendered by React."
+            }
+          },
+          {
+            "id": "plain-object",
+            "operation": {
+              "label": "requestFormReset plain-object",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Invalid form element. requestFormReset must be passed a form that was rendered by React."
+            }
+          },
+          {
+            "id": "form-like-tagName",
+            "operation": {
+              "label": "requestFormReset form-like-tagName",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Invalid form element. requestFormReset must be passed a form that was rendered by React."
+            }
+          },
+          {
+            "id": "non-form-like-tagName",
+            "operation": {
+              "label": "requestFormReset non-form-like-tagName",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Invalid form element. requestFormReset must be passed a form that was rendered by React."
+            }
+          }
+        ],
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "hook-calls-outside-render",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "useFormStatus": {
+            "label": "useFormStatus outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "Cannot read properties of null (reading 'useHostTransitionStatus')"
+          },
+          "useFormState": {
+            "label": "useFormState outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "Cannot read properties of null (reading 'useFormState')"
+          }
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              {
+                "type": "string",
+                "value": "Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:\n1. You might have mismatching versions of React and the renderer (such as React DOM)\n2. You might be breaking the Rules of Hooks\n3. You might have more than one copy of React in the same app\nSee https://react.dev/link/invalid-hook-call for tips about how to debug and fix this problem."
+              }
+            ]
+          },
+          {
+            "method": "error",
+            "args": [
+              {
+                "type": "string",
+                "value": "Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:\n1. You might have mismatching versions of React and the renderer (such as React DOM)\n2. You might be breaking the Rules of Hooks\n3. You might have more than one copy of React in the same app\nSee https://react.dev/link/invalid-hook-call for tips about how to debug and fix this problem."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "server-render-use-form-status",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "label": "server render useFormStatus",
+          "status": "ok",
+          "value": {
+            "status": {
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isExtensible": false,
+                "ownPropertyNames": [
+                  "pending",
+                  "data",
+                  "method",
+                  "action"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "pending"
+                  },
+                  {
+                    "type": "string",
+                    "value": "data"
+                  },
+                  {
+                    "type": "string",
+                    "value": "method"
+                  },
+                  {
+                    "type": "string",
+                    "value": "action"
+                  }
+                ],
+                "entries": {
+                  "pending": {
+                    "type": "boolean",
+                    "value": false
+                  },
+                  "data": {
+                    "type": "null"
+                  },
+                  "method": {
+                    "type": "null"
+                  },
+                  "action": {
+                    "type": "null"
+                  }
+                }
+              },
+              "objectKeys": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "ownPropertyNames": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "pending": {
+                "type": "boolean",
+                "value": false
+              },
+              "data": {
+                "type": "null"
+              },
+              "method": {
+                "type": "null"
+              },
+              "action": {
+                "type": "null"
+              }
+            },
+            "html": {
+              "value": "<output data-pending=\"false\">not-pending</output>",
+              "length": 49,
+              "startsWith": "<output data-pending=\"false\">not-pending</output>",
+              "includesUnexpectedSubmitMessage": false,
+              "includesReactFormReplayMarker": false,
+              "includesSubmitListener": false,
+              "includesJavascriptThrowAction": false
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-state",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "label": "server render useFormState",
+          "status": "ok",
+          "value": {
+            "tuple": {
+              "value": {
+                "type": "array",
+                "objectTag": "[object Array]",
+                "length": 3,
+                "values": [
+                  {
+                    "type": "string",
+                    "value": "initial-state"
+                  },
+                  {
+                    "type": "function",
+                    "name": "",
+                    "length": 1,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  {
+                    "type": "boolean",
+                    "value": false
+                  }
+                ],
+                "ownPropertyNames": [
+                  "0",
+                  "1",
+                  "2",
+                  "length"
+                ]
+              },
+              "isArray": true,
+              "length": 3,
+              "state": {
+                "type": "string",
+                "value": "initial-state"
+              },
+              "dispatch": {
+                "type": "function",
+                "name": "",
+                "length": 1,
+                "isAsync": false,
+                "ownPropertyNames": [
+                  "length",
+                  "name",
+                  "prototype"
+                ]
+              },
+              "pending": {
+                "type": "boolean",
+                "value": false
+              }
+            },
+            "html": {
+              "value": "<output>initial-state</output>",
+              "length": 30,
+              "startsWith": "<output>initial-state</output>",
+              "includesUnexpectedSubmitMessage": false,
+              "includesReactFormReplayMarker": false,
+              "includesSubmitListener": false,
+              "includesJavascriptThrowAction": false
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-function-form-action-boundary",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "label": "server render function form action boundary",
+          "status": "ok",
+          "value": {
+            "status": {
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isExtensible": false,
+                "ownPropertyNames": [
+                  "pending",
+                  "data",
+                  "method",
+                  "action"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "pending"
+                  },
+                  {
+                    "type": "string",
+                    "value": "data"
+                  },
+                  {
+                    "type": "string",
+                    "value": "method"
+                  },
+                  {
+                    "type": "string",
+                    "value": "action"
+                  }
+                ],
+                "entries": {
+                  "pending": {
+                    "type": "boolean",
+                    "value": false
+                  },
+                  "data": {
+                    "type": "null"
+                  },
+                  "method": {
+                    "type": "null"
+                  },
+                  "action": {
+                    "type": "null"
+                  }
+                }
+              },
+              "objectKeys": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "ownPropertyNames": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "pending": {
+                "type": "boolean",
+                "value": false
+              },
+              "data": {
+                "type": "null"
+              },
+              "method": {
+                "type": "null"
+              },
+              "action": {
+                "type": "null"
+              }
+            },
+            "html": {
+              "value": "<form action=\"javascript:throw new Error(&#x27;React form unexpectedly submitted.&#x27;)\"><button type=\"submit\" value=\"save\" name=\"intent\">save</button></form><script>addEventListener(\"submit\",function(a){if(!a.defaultPrevented){var c=a.target,d=a.submitter,e=c.action,b=d;if(d){var f=d.getAttribute(\"formAction\");null!=f&&(e=f,b=null)}\"javascript:throw new Error('React form unexpectedly submitted.')\"===e&&(a.preventDefault(),b?(a=document.createElement(\"input\"),a.name=b.name,a.value=b.value,b.parentNode.insertBefore(a,b),b=new FormData(c),a.parentNode.removeChild(a)):b=new FormData(c),a=c.ownerDocument||c,(a.$$reactFormReplay=a.$$reactFormReplay||[]).push(c,d,b))}});</script>",
+              "length": 683,
+              "startsWith": "<form action=\"javascript:throw new Error(&#x27;React form unexpectedly submitted.&#x27;)\"><button type=\"submit\" value=\"s",
+              "includesUnexpectedSubmitMessage": true,
+              "includesReactFormReplayMarker": true,
+              "includesSubmitListener": true,
+              "includesJavascriptThrowAction": true
+            },
+            "formBoundary": {
+              "hasUnexpectedSubmitAction": true,
+              "hasSubmitReplayScript": true,
+              "hasSubmitListener": true,
+              "hasFormDataCapture": true
+            }
+          }
+        },
+        "consoleCalls": []
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "root-api-descriptors",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "label": "describe react-dom root form API descriptors",
+          "status": "ok",
+          "value": {
+            "module": {
+              "objectTag": "[object Object]",
+              "isExtensible": true,
+              "exportKeys": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "createPortal",
+                "flushSync",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "requestFormReset",
+                "unstable_batchedUpdates",
+                "useFormState",
+                "useFormStatus",
+                "version"
+              ],
+              "ownPropertyNames": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "createPortal",
+                "flushSync",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "requestFormReset",
+                "unstable_batchedUpdates",
+                "useFormState",
+                "useFormStatus",
+                "version"
+              ],
+              "ownSymbolKeys": [],
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                },
+                {
+                  "type": "string",
+                  "value": "createPortal"
+                },
+                {
+                  "type": "string",
+                  "value": "flushSync"
+                },
+                {
+                  "type": "string",
+                  "value": "preconnect"
+                },
+                {
+                  "type": "string",
+                  "value": "prefetchDNS"
+                },
+                {
+                  "type": "string",
+                  "value": "preinit"
+                },
+                {
+                  "type": "string",
+                  "value": "preinitModule"
+                },
+                {
+                  "type": "string",
+                  "value": "preload"
+                },
+                {
+                  "type": "string",
+                  "value": "preloadModule"
+                },
+                {
+                  "type": "string",
+                  "value": "requestFormReset"
+                },
+                {
+                  "type": "string",
+                  "value": "unstable_batchedUpdates"
+                },
+                {
+                  "type": "string",
+                  "value": "useFormState"
+                },
+                {
+                  "type": "string",
+                  "value": "useFormStatus"
+                },
+                {
+                  "type": "string",
+                  "value": "version"
+                }
+              ],
+              "selectedDescriptors": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "isExtensible": true,
+                      "ownPropertyNames": [
+                        "d",
+                        "p",
+                        "findDOMNode"
+                      ],
+                      "ownSymbolKeys": [],
+                      "ownKeys": [
+                        {
+                          "type": "string",
+                          "value": "d"
+                        },
+                        {
+                          "type": "string",
+                          "value": "p"
+                        },
+                        {
+                          "type": "string",
+                          "value": "findDOMNode"
+                        }
+                      ],
+                      "entries": {
+                        "d": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "isExtensible": true,
+                          "ownPropertyNames": [
+                            "f",
+                            "r",
+                            "D",
+                            "C",
+                            "L",
+                            "m",
+                            "X",
+                            "S",
+                            "M"
+                          ],
+                          "ownSymbolKeys": [],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "f"
+                            },
+                            {
+                              "type": "string",
+                              "value": "r"
+                            },
+                            {
+                              "type": "string",
+                              "value": "D"
+                            },
+                            {
+                              "type": "string",
+                              "value": "C"
+                            },
+                            {
+                              "type": "string",
+                              "value": "L"
+                            },
+                            {
+                              "type": "string",
+                              "value": "m"
+                            },
+                            {
+                              "type": "string",
+                              "value": "X"
+                            },
+                            {
+                              "type": "string",
+                              "value": "S"
+                            },
+                            {
+                              "type": "string",
+                              "value": "M"
+                            }
+                          ],
+                          "entries": {
+                            "f": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "r": {
+                              "type": "function",
+                              "name": "r",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "D": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "C": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "L": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "m": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "X": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "S": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "M": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            }
+                          }
+                        },
+                        "p": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "findDOMNode": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "createPortal"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "flushSync"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preconnect"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "prefetchDNS"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinit"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinitModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preload"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preloadModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "requestFormReset"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "unstable_batchedUpdates"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "useFormState"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 3,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "useFormStatus"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 0,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "version"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "string",
+                      "value": "19.2.6"
+                    }
+                  }
+                }
+              ]
+            },
+            "selectedAPIs": {
+              "requestFormReset": {
+                "kind": "data",
+                "enumerable": true,
+                "configurable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isAsync": false,
+                  "ownPropertyNames": [
+                    "length",
+                    "name",
+                    "prototype"
+                  ]
+                }
+              },
+              "useFormState": {
+                "kind": "data",
+                "enumerable": true,
+                "configurable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 3,
+                  "isAsync": false,
+                  "ownPropertyNames": [
+                    "length",
+                    "name",
+                    "prototype"
+                  ]
+                }
+              },
+              "useFormStatus": {
+                "kind": "data",
+                "enumerable": true,
+                "configurable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 0,
+                  "isAsync": false,
+                  "ownPropertyNames": [
+                    "length",
+                    "name",
+                    "prototype"
+                  ]
+                }
+              }
+            },
+            "domInternals": {
+              "keys": [
+                "d",
+                "p",
+                "findDOMNode"
+              ],
+              "findDOMNode": {
+                "type": "null"
+              },
+              "priority": {
+                "type": "number",
+                "value": 0
+              },
+              "dispatcher": {
+                "keys": [
+                  "f",
+                  "r",
+                  "D",
+                  "C",
+                  "L",
+                  "m",
+                  "X",
+                  "S",
+                  "M"
+                ],
+                "methods": {
+                  "f": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "r": {
+                    "type": "function",
+                    "name": "r",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "D": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "C": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "L": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "m": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "X": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "S": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "M": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "request-form-reset-invalid-inputs",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": [
+          {
+            "id": "no-argument",
+            "operation": {
+              "label": "requestFormReset no-argument",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Minified React error #522; visit https://react.dev/errors/522 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+            }
+          },
+          {
+            "id": "undefined",
+            "operation": {
+              "label": "requestFormReset undefined",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Minified React error #522; visit https://react.dev/errors/522 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+            }
+          },
+          {
+            "id": "null",
+            "operation": {
+              "label": "requestFormReset null",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Minified React error #522; visit https://react.dev/errors/522 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+            }
+          },
+          {
+            "id": "plain-object",
+            "operation": {
+              "label": "requestFormReset plain-object",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Minified React error #522; visit https://react.dev/errors/522 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+            }
+          },
+          {
+            "id": "form-like-tagName",
+            "operation": {
+              "label": "requestFormReset form-like-tagName",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Minified React error #522; visit https://react.dev/errors/522 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+            }
+          },
+          {
+            "id": "non-form-like-tagName",
+            "operation": {
+              "label": "requestFormReset non-form-like-tagName",
+              "status": "throws",
+              "name": "Error",
+              "code": null,
+              "message": "Minified React error #522; visit https://react.dev/errors/522 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+            }
+          }
+        ],
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "hook-calls-outside-render",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "useFormStatus": {
+            "label": "useFormStatus outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "Cannot read properties of null (reading 'useHostTransitionStatus')"
+          },
+          "useFormState": {
+            "label": "useFormState outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "Cannot read properties of null (reading 'useFormState')"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-status",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "label": "server render useFormStatus",
+          "status": "ok",
+          "value": {
+            "status": {
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isExtensible": true,
+                "ownPropertyNames": [
+                  "pending",
+                  "data",
+                  "method",
+                  "action"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "pending"
+                  },
+                  {
+                    "type": "string",
+                    "value": "data"
+                  },
+                  {
+                    "type": "string",
+                    "value": "method"
+                  },
+                  {
+                    "type": "string",
+                    "value": "action"
+                  }
+                ],
+                "entries": {
+                  "pending": {
+                    "type": "boolean",
+                    "value": false
+                  },
+                  "data": {
+                    "type": "null"
+                  },
+                  "method": {
+                    "type": "null"
+                  },
+                  "action": {
+                    "type": "null"
+                  }
+                }
+              },
+              "objectKeys": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "ownPropertyNames": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "pending": {
+                "type": "boolean",
+                "value": false
+              },
+              "data": {
+                "type": "null"
+              },
+              "method": {
+                "type": "null"
+              },
+              "action": {
+                "type": "null"
+              }
+            },
+            "html": {
+              "value": "<output data-pending=\"false\">not-pending</output>",
+              "length": 49,
+              "startsWith": "<output data-pending=\"false\">not-pending</output>",
+              "includesUnexpectedSubmitMessage": false,
+              "includesReactFormReplayMarker": false,
+              "includesSubmitListener": false,
+              "includesJavascriptThrowAction": false
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-state",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "label": "server render useFormState",
+          "status": "ok",
+          "value": {
+            "tuple": {
+              "value": {
+                "type": "array",
+                "objectTag": "[object Array]",
+                "length": 3,
+                "values": [
+                  {
+                    "type": "string",
+                    "value": "initial-state"
+                  },
+                  {
+                    "type": "function",
+                    "name": "",
+                    "length": 1,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  {
+                    "type": "boolean",
+                    "value": false
+                  }
+                ],
+                "ownPropertyNames": [
+                  "0",
+                  "1",
+                  "2",
+                  "length"
+                ]
+              },
+              "isArray": true,
+              "length": 3,
+              "state": {
+                "type": "string",
+                "value": "initial-state"
+              },
+              "dispatch": {
+                "type": "function",
+                "name": "",
+                "length": 1,
+                "isAsync": false,
+                "ownPropertyNames": [
+                  "length",
+                  "name",
+                  "prototype"
+                ]
+              },
+              "pending": {
+                "type": "boolean",
+                "value": false
+              }
+            },
+            "html": {
+              "value": "<output>initial-state</output>",
+              "length": 30,
+              "startsWith": "<output>initial-state</output>",
+              "includesUnexpectedSubmitMessage": false,
+              "includesReactFormReplayMarker": false,
+              "includesSubmitListener": false,
+              "includesJavascriptThrowAction": false
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-function-form-action-boundary",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "label": "server render function form action boundary",
+          "status": "ok",
+          "value": {
+            "status": {
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]",
+                "isExtensible": true,
+                "ownPropertyNames": [
+                  "pending",
+                  "data",
+                  "method",
+                  "action"
+                ],
+                "ownSymbolKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "pending"
+                  },
+                  {
+                    "type": "string",
+                    "value": "data"
+                  },
+                  {
+                    "type": "string",
+                    "value": "method"
+                  },
+                  {
+                    "type": "string",
+                    "value": "action"
+                  }
+                ],
+                "entries": {
+                  "pending": {
+                    "type": "boolean",
+                    "value": false
+                  },
+                  "data": {
+                    "type": "null"
+                  },
+                  "method": {
+                    "type": "null"
+                  },
+                  "action": {
+                    "type": "null"
+                  }
+                }
+              },
+              "objectKeys": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "ownPropertyNames": [
+                "pending",
+                "data",
+                "method",
+                "action"
+              ],
+              "pending": {
+                "type": "boolean",
+                "value": false
+              },
+              "data": {
+                "type": "null"
+              },
+              "method": {
+                "type": "null"
+              },
+              "action": {
+                "type": "null"
+              }
+            },
+            "html": {
+              "value": "<form action=\"javascript:throw new Error(&#x27;React form unexpectedly submitted.&#x27;)\"><button type=\"submit\" value=\"save\" name=\"intent\">save</button></form><script>addEventListener(\"submit\",function(a){if(!a.defaultPrevented){var c=a.target,d=a.submitter,e=c.action,b=d;if(d){var f=d.getAttribute(\"formAction\");null!=f&&(e=f,b=null)}\"javascript:throw new Error('React form unexpectedly submitted.')\"===e&&(a.preventDefault(),b?(a=document.createElement(\"input\"),a.name=b.name,a.value=b.value,b.parentNode.insertBefore(a,b),b=new FormData(c),a.parentNode.removeChild(a)):b=new FormData(c),a=c.ownerDocument||c,(a.$$reactFormReplay=a.$$reactFormReplay||[]).push(c,d,b))}});</script>",
+              "length": 683,
+              "startsWith": "<form action=\"javascript:throw new Error(&#x27;React form unexpectedly submitted.&#x27;)\"><button type=\"submit\" value=\"s",
+              "includesUnexpectedSubmitMessage": true,
+              "includesReactFormReplayMarker": true,
+              "includesSubmitListener": true,
+              "includesJavascriptThrowAction": true
+            },
+            "formBoundary": {
+              "hasUnexpectedSubmitAction": true,
+              "hasSubmitReplayScript": true,
+              "hasSubmitListener": true,
+              "hasFormDataCapture": true
+            }
+          }
+        },
+        "consoleCalls": []
+      }
+    ],
+    "react-server-development": [
+      {
+        "scenarioId": "root-api-descriptors",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "label": "describe react-dom root form API descriptors",
+          "status": "ok",
+          "value": {
+            "module": {
+              "objectTag": "[object Object]",
+              "isExtensible": true,
+              "exportKeys": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "version"
+              ],
+              "ownPropertyNames": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "version"
+              ],
+              "ownSymbolKeys": [],
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                },
+                {
+                  "type": "string",
+                  "value": "preconnect"
+                },
+                {
+                  "type": "string",
+                  "value": "prefetchDNS"
+                },
+                {
+                  "type": "string",
+                  "value": "preinit"
+                },
+                {
+                  "type": "string",
+                  "value": "preinitModule"
+                },
+                {
+                  "type": "string",
+                  "value": "preload"
+                },
+                {
+                  "type": "string",
+                  "value": "preloadModule"
+                },
+                {
+                  "type": "string",
+                  "value": "version"
+                }
+              ],
+              "selectedDescriptors": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "isExtensible": true,
+                      "ownPropertyNames": [
+                        "d",
+                        "p",
+                        "findDOMNode"
+                      ],
+                      "ownSymbolKeys": [],
+                      "ownKeys": [
+                        {
+                          "type": "string",
+                          "value": "d"
+                        },
+                        {
+                          "type": "string",
+                          "value": "p"
+                        },
+                        {
+                          "type": "string",
+                          "value": "findDOMNode"
+                        }
+                      ],
+                      "entries": {
+                        "d": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "isExtensible": true,
+                          "ownPropertyNames": [
+                            "f",
+                            "r",
+                            "D",
+                            "C",
+                            "L",
+                            "m",
+                            "X",
+                            "S",
+                            "M"
+                          ],
+                          "ownSymbolKeys": [],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "f"
+                            },
+                            {
+                              "type": "string",
+                              "value": "r"
+                            },
+                            {
+                              "type": "string",
+                              "value": "D"
+                            },
+                            {
+                              "type": "string",
+                              "value": "C"
+                            },
+                            {
+                              "type": "string",
+                              "value": "L"
+                            },
+                            {
+                              "type": "string",
+                              "value": "m"
+                            },
+                            {
+                              "type": "string",
+                              "value": "X"
+                            },
+                            {
+                              "type": "string",
+                              "value": "S"
+                            },
+                            {
+                              "type": "string",
+                              "value": "M"
+                            }
+                          ],
+                          "entries": {
+                            "f": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "r": {
+                              "type": "function",
+                              "name": "r",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "D": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "C": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "L": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "m": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "X": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "S": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "M": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            }
+                          }
+                        },
+                        "p": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "findDOMNode": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preconnect"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "prefetchDNS"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinit"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinitModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preload"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preloadModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "version"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "string",
+                      "value": "19.2.6"
+                    }
+                  }
+                }
+              ]
+            },
+            "selectedAPIs": {
+              "requestFormReset": null,
+              "useFormState": null,
+              "useFormStatus": null
+            },
+            "domInternals": {
+              "keys": [
+                "d",
+                "p",
+                "findDOMNode"
+              ],
+              "findDOMNode": {
+                "type": "null"
+              },
+              "priority": {
+                "type": "number",
+                "value": 0
+              },
+              "dispatcher": {
+                "keys": [
+                  "f",
+                  "r",
+                  "D",
+                  "C",
+                  "L",
+                  "m",
+                  "X",
+                  "S",
+                  "M"
+                ],
+                "methods": {
+                  "f": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "r": {
+                    "type": "function",
+                    "name": "r",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "D": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "C": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "L": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "m": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "X": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "S": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "M": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "request-form-reset-invalid-inputs",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": [
+          {
+            "id": "no-argument",
+            "operation": {
+              "label": "requestFormReset no-argument",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "undefined",
+            "operation": {
+              "label": "requestFormReset undefined",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "null",
+            "operation": {
+              "label": "requestFormReset null",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "plain-object",
+            "operation": {
+              "label": "requestFormReset plain-object",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "form-like-tagName",
+            "operation": {
+              "label": "requestFormReset form-like-tagName",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "non-form-like-tagName",
+            "operation": {
+              "label": "requestFormReset non-form-like-tagName",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          }
+        ],
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "hook-calls-outside-render",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "useFormStatus": {
+            "label": "useFormStatus outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "ReactDOM.useFormStatus is not a function"
+          },
+          "useFormState": {
+            "label": "useFormState outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "ReactDOM.useFormState is not a function"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-status",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "label": "server render useFormStatus",
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-state",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "label": "server render useFormState",
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-function-form-action-boundary",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "label": "server render function form action boundary",
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        },
+        "consoleCalls": []
+      }
+    ],
+    "react-server-production": [
+      {
+        "scenarioId": "root-api-descriptors",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "label": "describe react-dom root form API descriptors",
+          "status": "ok",
+          "value": {
+            "module": {
+              "objectTag": "[object Object]",
+              "isExtensible": true,
+              "exportKeys": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "version"
+              ],
+              "ownPropertyNames": [
+                "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+                "preconnect",
+                "prefetchDNS",
+                "preinit",
+                "preinitModule",
+                "preload",
+                "preloadModule",
+                "version"
+              ],
+              "ownSymbolKeys": [],
+              "ownKeys": [
+                {
+                  "type": "string",
+                  "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                },
+                {
+                  "type": "string",
+                  "value": "preconnect"
+                },
+                {
+                  "type": "string",
+                  "value": "prefetchDNS"
+                },
+                {
+                  "type": "string",
+                  "value": "preinit"
+                },
+                {
+                  "type": "string",
+                  "value": "preinitModule"
+                },
+                {
+                  "type": "string",
+                  "value": "preload"
+                },
+                {
+                  "type": "string",
+                  "value": "preloadModule"
+                },
+                {
+                  "type": "string",
+                  "value": "version"
+                }
+              ],
+              "selectedDescriptors": [
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "isExtensible": true,
+                      "ownPropertyNames": [
+                        "d",
+                        "p",
+                        "findDOMNode"
+                      ],
+                      "ownSymbolKeys": [],
+                      "ownKeys": [
+                        {
+                          "type": "string",
+                          "value": "d"
+                        },
+                        {
+                          "type": "string",
+                          "value": "p"
+                        },
+                        {
+                          "type": "string",
+                          "value": "findDOMNode"
+                        }
+                      ],
+                      "entries": {
+                        "d": {
+                          "type": "object",
+                          "objectTag": "[object Object]",
+                          "isExtensible": true,
+                          "ownPropertyNames": [
+                            "f",
+                            "r",
+                            "D",
+                            "C",
+                            "L",
+                            "m",
+                            "X",
+                            "S",
+                            "M"
+                          ],
+                          "ownSymbolKeys": [],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "f"
+                            },
+                            {
+                              "type": "string",
+                              "value": "r"
+                            },
+                            {
+                              "type": "string",
+                              "value": "D"
+                            },
+                            {
+                              "type": "string",
+                              "value": "C"
+                            },
+                            {
+                              "type": "string",
+                              "value": "L"
+                            },
+                            {
+                              "type": "string",
+                              "value": "m"
+                            },
+                            {
+                              "type": "string",
+                              "value": "X"
+                            },
+                            {
+                              "type": "string",
+                              "value": "S"
+                            },
+                            {
+                              "type": "string",
+                              "value": "M"
+                            }
+                          ],
+                          "entries": {
+                            "f": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "r": {
+                              "type": "function",
+                              "name": "r",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "D": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "C": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "L": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "m": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "X": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "S": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            },
+                            "M": {
+                              "type": "function",
+                              "name": "noop",
+                              "length": 0,
+                              "isAsync": false,
+                              "ownPropertyNames": [
+                                "length",
+                                "name",
+                                "prototype"
+                              ]
+                            }
+                          }
+                        },
+                        "p": {
+                          "type": "number",
+                          "value": 0
+                        },
+                        "findDOMNode": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preconnect"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "prefetchDNS"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 1,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinit"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preinitModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preload"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "preloadModule"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "",
+                      "length": 2,
+                      "isAsync": false,
+                      "ownPropertyNames": [
+                        "length",
+                        "name",
+                        "prototype"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": {
+                    "type": "string",
+                    "value": "version"
+                  },
+                  "descriptor": {
+                    "kind": "data",
+                    "enumerable": true,
+                    "configurable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "string",
+                      "value": "19.2.6"
+                    }
+                  }
+                }
+              ]
+            },
+            "selectedAPIs": {
+              "requestFormReset": null,
+              "useFormState": null,
+              "useFormStatus": null
+            },
+            "domInternals": {
+              "keys": [
+                "d",
+                "p",
+                "findDOMNode"
+              ],
+              "findDOMNode": {
+                "type": "null"
+              },
+              "priority": {
+                "type": "number",
+                "value": 0
+              },
+              "dispatcher": {
+                "keys": [
+                  "f",
+                  "r",
+                  "D",
+                  "C",
+                  "L",
+                  "m",
+                  "X",
+                  "S",
+                  "M"
+                ],
+                "methods": {
+                  "f": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "r": {
+                    "type": "function",
+                    "name": "r",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "D": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "C": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "L": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "m": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "X": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "S": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  },
+                  "M": {
+                    "type": "function",
+                    "name": "noop",
+                    "length": 0,
+                    "isAsync": false,
+                    "ownPropertyNames": [
+                      "length",
+                      "name",
+                      "prototype"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "request-form-reset-invalid-inputs",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": [
+          {
+            "id": "no-argument",
+            "operation": {
+              "label": "requestFormReset no-argument",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "undefined",
+            "operation": {
+              "label": "requestFormReset undefined",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "null",
+            "operation": {
+              "label": "requestFormReset null",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "plain-object",
+            "operation": {
+              "label": "requestFormReset plain-object",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "form-like-tagName",
+            "operation": {
+              "label": "requestFormReset form-like-tagName",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          },
+          {
+            "id": "non-form-like-tagName",
+            "operation": {
+              "label": "requestFormReset non-form-like-tagName",
+              "status": "throws",
+              "name": "TypeError",
+              "code": null,
+              "message": "ReactDOM.requestFormReset is not a function"
+            }
+          }
+        ],
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "hook-calls-outside-render",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "useFormStatus": {
+            "label": "useFormStatus outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "ReactDOM.useFormStatus is not a function"
+          },
+          "useFormState": {
+            "label": "useFormState outside render",
+            "status": "throws",
+            "name": "TypeError",
+            "code": null,
+            "message": "ReactDOM.useFormState is not a function"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-status",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "label": "server render useFormStatus",
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-use-form-state",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "label": "server render useFormState",
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "server-render-function-form-action-boundary",
+        "packageName": "react-dom",
+        "specifier": "react-dom",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "label": "server render function form action boundary",
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        },
+        "consoleCalls": []
+      }
+    ]
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-react-dom-comparison",
+      "reason": "This oracle records pinned React DOM behavior only; Fast React React DOM placeholders and implementation are owned by separate workers."
+    },
+    {
+      "id": "no-client-rendered-react-owned-form-success-path",
+      "reason": "requestFormReset success requires a React-owned live DOM form, reconciler host instances, and client commit state. This oracle intentionally covers rootless and non-React-owned invalid inputs only."
+    },
+    {
+      "id": "no-browser-form-submission-or-pending-transition-flow",
+      "reason": "The probes do not dispatch browser submit/reset events, mutate real FormData, or observe a pending host transition. They only capture server-render output and non-pending hook shapes."
+    },
+    {
+      "id": "no-profiling-entrypoint-behavior-probe",
+      "reason": "The checked React DOM export oracle already records that profiling exposes these APIs. This oracle focuses on the root form API behavior surface."
+    }
+  ]
+}
