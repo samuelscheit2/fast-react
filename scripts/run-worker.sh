@@ -28,7 +28,7 @@ Goal policy from the orchestrator:
 - Your first action must be to use /goal, the Codex create_goal tool, for this worker task using the Objective in the assigned prompt.
 - Do that before research, file reads, implementation, or verification.
 - On continuation, use /goal / create_goal again if the active goal is not already set for this exact worker task.
-- Record in your progress report whether goal setup happened before other work, or explicitly state if the goal command/tool was unavailable.
+- After goal setup, call get_goal if available and record the active goal status/objective in your progress report, or explicitly state if the goal command/tool or get_goal was unavailable.
 
 Subagent policy from the orchestrator:
 - You are running as a real Codex process in a tmux worker session.

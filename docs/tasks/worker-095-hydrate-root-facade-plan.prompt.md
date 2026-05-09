@@ -1,7 +1,7 @@
 # worker-095-hydrate-root-facade-plan
 
 First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
-After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-043-react-dom-hydration-plan.md, worker-progress/worker-049-react-dom-hydration-marker-oracle.md if it exists, worker-progress/worker-055-react-dom-client-roots-implementation-plan.md, worker-progress/worker-088-dom-container-root-markers-oracle.md if it exists, and worker-progress/worker-089-dom-root-listener-installation-oracle.md if it exists. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
+After setting the goal, call get_goal if available and record the active goal status/objective in your report, then read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-043-react-dom-hydration-plan.md, worker-progress/worker-049-react-dom-hydration-marker-oracle.md if it exists, worker-progress/worker-055-react-dom-client-roots-implementation-plan.md, worker-progress/worker-088-dom-container-root-markers-oracle.md if it exists, and worker-progress/worker-089-dom-root-listener-installation-oracle.md if it exists. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
 If you need to create subtasks, use `/goal` (create_goal) again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 ## Objective

@@ -1,7 +1,7 @@
 # worker-086-react-test-renderer-act-oracle
 
 First action: use `/goal` (create_goal) for this worker task using the Objective below, before research, file reads, implementation, or verification.
-After setting the goal, read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-017-runtime-inventory-generation.md, worker-progress/worker-041-dom-events-priority-plan.md, worker-progress/worker-073-test-renderer-update-model-plan.md, and worker-progress/worker-083-react-test-renderer-export-oracle.md if it exists. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
+After setting the goal, call get_goal if available and record the active goal status/objective in your report, then read WORKER_BRIEF.md, MASTER_PLAN.md, MASTER_PROGRESS.md, worker-progress/worker-017-runtime-inventory-generation.md, worker-progress/worker-041-dom-events-priority-plan.md, worker-progress/worker-073-test-renderer-update-model-plan.md, and worker-progress/worker-083-react-test-renderer-export-oracle.md if it exists. Do not read ORCHESTRATOR.md unless explicitly asked by the orchestrator.
 If you need to create subtasks, use `/goal` (create_goal) again for each subtask with all context about the parent task. Do not call update_goal(status: "complete") until the whole worker task is complete.
 
 ## Objective
