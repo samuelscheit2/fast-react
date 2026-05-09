@@ -18,6 +18,8 @@ oracle now return React-shaped ref objects. Direct `React.Children` helper
 behavior covered by the React 19.2.6 children-helper oracle now matches for
 default and `react-server` root entrypoints. Direct `memo` and `lazy`
 wrapper-object behavior covered by the React 19.2.6 wrapper-object oracle now
+matches for default and `react-server` root entrypoints. Direct `forwardRef`
+wrapper-object behavior covered by the React 19.2.6 forward-ref oracle now
 matches for default and `react-server` root entrypoints. Unsupported React
 behavior still throws an explicit unimplemented error until conformance-backed
 implementations are added.

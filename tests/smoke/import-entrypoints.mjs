@@ -589,6 +589,99 @@ function assertWrapperObjectBehavior(react, label, options = {}) {
   assert.equal(pending._payload._status, 0);
 }
 
+function assertForwardRefBehavior(react, label, options = {}) {
+  const development = options.development !== false;
+
+  assert.equal(react.forwardRef.name, '', `${label}.forwardRef name`);
+  assert.equal(react.forwardRef.length, 1, `${label}.forwardRef length`);
+
+  function Render(_props, _ref) {}
+  const forwardRef = react.forwardRef(Render, 'ignored-extra');
+  assert.deepEqual(Object.keys(forwardRef), ['$$typeof', 'render'], label);
+  assert.deepEqual(
+    Reflect.ownKeys(forwardRef),
+    development
+      ? ['$$typeof', 'render', 'displayName']
+      : ['$$typeof', 'render'],
+    label
+  );
+  assert.equal(forwardRef.$$typeof, Symbol.for('react.forward_ref'), label);
+  assert.equal(forwardRef.render, Render, label);
+  assert.equal(Object.isExtensible(forwardRef), true, label);
+  assert.equal(Object.isSealed(forwardRef), false, label);
+  assert.equal(Object.isFrozen(forwardRef), false, label);
+
+  const thisArg = { untouched: true };
+  const fromCall = react.forwardRef.call(thisArg, Render);
+  assert.equal(fromCall.render, Render, `${label}.forwardRef call`);
+  assert.deepEqual(thisArg, { untouched: true }, `${label}.forwardRef this`);
+
+  const fromNew = new react.forwardRef(Render);
+  assert.equal(fromNew.render, Render, `${label}.new forwardRef render`);
+  assert.equal(
+    fromNew instanceof react.forwardRef,
+    false,
+    `${label}.new forwardRef instance`
+  );
+
+  if (development) {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => {
+      errors.push(args);
+    };
+    try {
+      function MissingRef(_props) {}
+      function TooMany(_props, _ref, _extra) {}
+      function WithDefaultProps(_props, _ref) {}
+      WithDefaultProps.defaultProps = { label: 'default' };
+      react.forwardRef(MissingRef);
+      react.forwardRef(TooMany);
+      react.forwardRef(WithDefaultProps);
+      react.forwardRef(null);
+      react.forwardRef(react.memo(Render));
+    } finally {
+      console.error = originalError;
+    }
+    assert.deepEqual(errors, [
+      [
+        'forwardRef render functions accept exactly two parameters: props and ref. %s',
+        'Did you forget to use the ref parameter?'
+      ],
+      [
+        'forwardRef render functions accept exactly two parameters: props and ref. %s',
+        'Any additional parameter will be undefined.'
+      ],
+      [
+        'forwardRef render functions do not support defaultProps. Did you accidentally pass a React component?'
+      ],
+      ['forwardRef requires a render function but was given %s.', 'null'],
+      [
+        'forwardRef requires a render function but received a `memo` component. Instead of forwardRef(memo(...)), use memo(forwardRef(...)).'
+      ]
+    ]);
+
+    const anonymous = function () {};
+    Object.defineProperty(anonymous, 'name', {
+      configurable: true,
+      value: ''
+    });
+    const namedForwardRef = react.forwardRef(anonymous);
+    namedForwardRef.displayName = 'Shown';
+    assert.equal(namedForwardRef.displayName, 'Shown');
+    assert.equal(anonymous.name, 'Shown');
+    assert.equal(anonymous.displayName, 'Shown');
+  } else {
+    forwardRef.displayName = 'Shown';
+    assert.equal(forwardRef.displayName, 'Shown');
+    assert.deepEqual(Object.keys(forwardRef), [
+      '$$typeof',
+      'render',
+      'displayName'
+    ]);
+  }
+}
+
 function assertJsxRuntimeBehavior(runtime, label) {
   const config = { children: 'child' };
   const element = runtime.jsx('div', config);
@@ -644,7 +737,7 @@ function assertReactPlaceholderBehavior(react, label, options = {}) {
   assertCreateRefBehavior(react, label);
   assertChildrenBehavior(react, label, options);
   assertWrapperObjectBehavior(react, label, options);
-  assertUnimplemented(() => react.forwardRef(() => null), `${label}.forwardRef`);
+  assertForwardRefBehavior(react, label, options);
 
   if (Object.hasOwn(react, 'useRef')) {
     assertUnimplemented(() => react.useRef(null), `${label}.useRef`);
@@ -835,6 +928,21 @@ async function assertProductionJsxDevUndefined() {
       const pending = React.lazy(() => ({ then() {} }));
       assert.throws(() => pending._init(pending._payload), /\\[object Object\\]/, label);
       assert.equal(pending._payload._status, 0, label);
+
+      const forwardRef = React.forwardRef(Component, 'ignored-extra');
+      assert.deepEqual(Object.keys(forwardRef), ['$$typeof', 'render'], label);
+      assert.deepEqual(Reflect.ownKeys(forwardRef), ['$$typeof', 'render'], label);
+      assert.equal(forwardRef.$$typeof, Symbol.for('react.forward_ref'), label);
+      assert.equal(forwardRef.render, Component, label);
+      assert.equal(Object.isExtensible(forwardRef), true, label);
+      assert.equal(Object.isSealed(forwardRef), false, label);
+      assert.equal(Object.isFrozen(forwardRef), false, label);
+      forwardRef.displayName = 'Shown';
+      assert.equal(forwardRef.displayName, 'Shown', label);
+      assert.deepEqual(Object.keys(forwardRef), ['$$typeof', 'render', 'displayName'], label);
+      const forwardRefFromNew = new React.forwardRef(Component);
+      assert.equal(forwardRefFromNew.render, Component, label);
+      assert.equal(forwardRefFromNew instanceof React.forwardRef, false, label);
     }
   `;
 
@@ -988,6 +1096,22 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
       );
       assert.equal(lazy.$$typeof, Symbol.for('react.lazy'), label);
       assert.equal(lazy._init(lazy._payload), Component, label);
+
+      const forwardRef = moduleExports.forwardRef(Component);
+      assert.deepEqual(Object.keys(forwardRef), ['$$typeof', 'render'], label);
+      assert.deepEqual(
+        Reflect.ownKeys(forwardRef),
+        ['$$typeof', 'render', 'displayName'],
+        label
+      );
+      assert.equal(forwardRef.$$typeof, Symbol.for('react.forward_ref'), label);
+      assert.equal(forwardRef.render, Component, label);
+      assert.equal(
+        new moduleExports.forwardRef(Component) instanceof
+          moduleExports.forwardRef,
+        false,
+        label
+      );
     }
 
     (async () => {
@@ -1052,4 +1176,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element/ref/Children/memo/lazy smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/ref/Children/memo/lazy/forwardRef smoke checks.');
