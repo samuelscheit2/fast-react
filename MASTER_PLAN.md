@@ -274,6 +274,9 @@ Dependencies: M8.
 | worker-096-native-root-boundary-plan | Produce a report-only plan for private native root handles and JS callback lifetime boundaries | `worker-progress/worker-096-native-root-boundary-plan.md` | workers 006,015,032,055,079 | merged |
 | worker-097-react-act-oracle | Add deterministic React public act behavior oracle files | `tests/conformance/src/react-act-*.mjs`, `tests/conformance/scripts/*react-act*.mjs`, `tests/conformance/test/react-act-oracle.test.mjs`, `tests/conformance/oracles/react-19.2.6-react-act-oracle.json`, `worker-progress/worker-097-react-act-oracle.md` | workers 017,025,067,073,086 | running |
 | worker-098-dom-event-plugin-extraction-plan | Produce a report-only plan for DOM event plugin extraction, priority, batching, and controlled restore | `worker-progress/worker-098-dom-event-plugin-extraction-plan.md` | workers 041,048,065,089 | running |
+| worker-099-core-hook-state-queue-plan | Produce a report-only plan for hook state queues, eager state, render-phase updates, and optimistic updates | `worker-progress/worker-099-core-hook-state-queue-plan.md` | workers 007,070,078 | running |
+| worker-100-reconciler-function-component-render-plan | Produce a report-only plan for function component rendering, hooks dispatcher state, and bailout boundaries | `worker-progress/worker-100-reconciler-function-component-render-plan.md` | workers 007,070,071,078,081,099 | running |
+| worker-101-test-renderer-root-api-plan | Produce a report-only plan for Rust test-renderer root API create/update/unmount integration | `worker-progress/worker-101-test-renderer-root-api-plan.md` | workers 018,022,073,081,096 | running |
 
 ## Merge Policy
 
