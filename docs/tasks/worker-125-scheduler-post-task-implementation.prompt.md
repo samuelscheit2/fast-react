@@ -18,6 +18,7 @@ Write scope:
 - `tests/conformance/scripts/print-scheduler-post-task-oracle.mjs`
 - `tests/conformance/test/scheduler-post-task-oracle.test.mjs`
 - `tests/conformance/oracles/scheduler-0.27.0-post-task-oracle.json`
+- `tests/smoke/import-entrypoints.mjs`
 - `worker-progress/worker-125-scheduler-post-task-implementation.md`
 
 Do not modify:
@@ -29,7 +30,7 @@ Do not modify:
 - `packages/scheduler/index.native.js`
 - `packages/scheduler/unstable_mock.js`
 - `packages/scheduler/package.json`
-- `tests/smoke/**`
+- other `tests/smoke/**` files
 - any `scheduler-native-entry-*`, `scheduler-mock-*`, or `scheduler-root-*` conformance files
 - `crates/**`, `packages/react-dom/**`, `packages/react/**`
 - `Cargo.lock`, `package-lock.json`, `node_modules/**`, `target/**`, or generated build output
@@ -51,6 +52,7 @@ Constraints:
 - Keep public Scheduler priorities separate from React lane and event-priority internals.
 - Preserve the local root scheduler and mock scheduler behavior accepted by previous workers.
 - Update only the post-task oracle/comparison files needed to compare Fast React against the checked `scheduler@0.27.0/unstable_post_task` behavior. Do not claim broader scheduler package compatibility.
+- If the broad JS smoke gate assumes `scheduler/unstable_post_task` imports successfully in plain Node, update `tests/smoke/import-entrypoints.mjs` narrowly to assert the upstream unsupported import behavior for that entrypoint. Do not weaken the postTask implementation or oracle to satisfy smoke.
 - You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses. Summarize delegated checks and results in your report.
 - Worker-internal nested agents are allowed even if they make the aggregate agent/process count exceed the orchestrator's 30 top-level tmux worker limit.
 - Find root causes; do not patch symptoms.
