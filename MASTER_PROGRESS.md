@@ -78,11 +78,12 @@ M0: Orchestration Foundation.
 | worker-021-element-object-oracle | merged | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `worker-progress/worker-021-element-object-oracle.md` |
 | worker-022-host-operation-errors | merged | Add structured host operation errors for invalid test-renderer operations | `worker-progress/worker-022-host-operation-errors.md` |
 | worker-023-js-element-factory | merged | Implement conformance-backed JS element factory behavior from the checked oracle | `worker-progress/worker-023-js-element-factory.md` |
+| worker-024-create-ref-behavior | queued | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `worker-progress/worker-024-create-ref-behavior.md` |
 
 ## Next Actions
 
-1. Queue the next conformance-backed package behavior slice, prioritizing `createRef`/refs or `Children` helpers before hooks and context.
-2. Keep package-wide React compatibility claims false until entrypoint-surface mismatches and broader behavior slices are closed by checked oracles.
+1. Launch worker 024 as a real `codex --yolo` tmux process in its own worktree.
+2. Audit and merge worker 024 after it checks a deterministic `createRef` oracle, implements only covered direct ref-object behavior, and keeps broader refs compatibility claims false.
 
 ## Risks And Open Questions
 
@@ -159,3 +160,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched worker-023 as a real `codex --yolo` tmux process in `../fast-react-worker-023-js-element-factory`.
 - 2026-05-09: Accepted and merged worker-023 JS element factory in commit `ad6fc89`. Closed the worker-023 tmux session after merge. Verified post-rebase with `npm test --workspace @fast-react/conformance`, `npm run check:js`, element oracle regeneration byte-compare, and the temp/local path leak guard.
 - 2026-05-09: Verified merged `main` after worker-023 with `npm run check:js`; 18 conformance tests passed through the workspace check.
+- 2026-05-09: Removed clean merged worktrees `../fast-react-worker-021-element-object-oracle` and `../fast-react-worker-023-js-element-factory`; left `../fast-react-worker-022-host-operation-errors` because its only remaining change is an untracked regenerable `Cargo.lock`.
+- 2026-05-09: Queued worker-024 to add a deterministic React 19.2.6 `createRef` oracle and implement the covered JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
