@@ -44,12 +44,13 @@ M0: Orchestration Foundation.
 | worker-007-scheduler-fiber | running in tmux worktree; nested subagents allowed | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `../fast-react-worker-007-scheduler-fiber/worker-progress/worker-007-scheduler-fiber.md` |
 | worker-008-renderer-host-config | running in tmux worktree; nested subagents allowed | Define renderer host-config boundary across DOM, native, hydration, and portals | `../fast-react-worker-008-renderer-host-config/worker-progress/worker-008-renderer-host-config.md` |
 | worker-009-benchmark-strategy | running in tmux worktree; nested subagents allowed | Design conformance-gated benchmark and profiling strategy | `../fast-react-worker-009-benchmark-strategy/worker-progress/worker-009-benchmark-strategy.md` |
+| worker-010-initial-scaffold | running in tmux worktree; nested subagents allowed | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `../fast-react-worker-010-initial-scaffold/worker-progress/worker-010-initial-scaffold.md` |
 
 ## Next Actions
 
 1. Collect the six active research workers' progress files and final recommendations.
-2. Launch the scaffold implementation worker with ownership of root manifests, initial crates, package wrappers, and smoke/conformance placeholders.
-3. Update the master plan with accepted findings from workers 004-009.
+2. Collect the scaffold implementation worker's changes and verification results.
+3. Update the master plan with accepted findings from workers 004-010.
 
 ## Risks And Open Questions
 
@@ -86,3 +87,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-001 architecture report in commit `b5a0da1`. Closed the worker-001 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-002 conformance report in commit `a468c5f`. Closed the worker-002 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-003 scaffold report in commit `93dfe83`. Closed the worker-003 tmux session after merge.
+- 2026-05-09: Queued worker-010 to implement the accepted initial scaffold after workers 001-003 were merged.

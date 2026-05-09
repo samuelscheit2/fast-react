@@ -185,6 +185,7 @@ Dependencies: M8.
 | worker-007-scheduler-fiber | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `worker-progress/worker-007-scheduler-fiber.md` | M0 | running |
 | worker-008-renderer-host-config | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` | M0 | running |
 | worker-009-benchmark-strategy | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` | M0 | running |
+| worker-010-initial-scaffold | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | root scaffold paths plus `worker-progress/worker-010-initial-scaffold.md` | workers 001-003 | queued |
 
 ## Merge Policy
 
