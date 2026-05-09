@@ -53,6 +53,7 @@ M0: Orchestration Foundation.
 - Accepted createRef behavior from worker-024: `@fast-react/react` now implements direct `createRef()` behavior for default and `react-server` root entrypoints. The new deterministic ref-object oracle records 16 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; broader refs behavior remains explicitly unsupported.
 - Accepted Children helper behavior from worker-025: `@fast-react/react` now implements the oracle-covered `Children.map`, `Children.forEach`, `Children.count`, `Children.toArray`, and `Children.only` behavior for default and `react-server` root entrypoints. The deterministic Children oracle records 40 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; renderer traversal, lazy traversal, portals, refs lifecycle, hooks/context, and private internals remain explicitly unsupported.
 - Accepted memo/lazy wrapper behavior from worker-026: `@fast-react/react` now implements direct `memo` and `lazy` wrapper-object behavior for default and `react-server` root entrypoints. The deterministic wrapper-object oracle records 20 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; rendering, Suspense resolution through a renderer, memo bailout and compare invocation, hooks/context, refs lifecycle, owner stacks, and private internals remain explicitly unsupported.
+- Accepted forwardRef wrapper behavior from worker-027: `@fast-react/react` now implements direct `forwardRef` wrapper-object behavior for default and `react-server` root entrypoints. The deterministic forward-ref oracle records 16 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; render-time ref attachment, callback refs, string refs, `useRef`, refs lifecycle, owner stacks, hooks/context, renderer integration, and private internals remain explicitly unsupported.
 
 ## Worker Roster
 
@@ -84,11 +85,11 @@ M0: Orchestration Foundation.
 | worker-024-create-ref-behavior | merged | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `worker-progress/worker-024-create-ref-behavior.md` |
 | worker-025-children-helpers | merged | Add a deterministic `Children` helper oracle and implement covered JS facade behavior | `worker-progress/worker-025-children-helpers.md` |
 | worker-026-memo-lazy-behavior | merged | Add a deterministic `memo`/`lazy` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-026-memo-lazy-behavior.md` |
-| worker-027-forward-ref-behavior | running in tmux worktree; nested subagents allowed | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `../fast-react-worker-027-forward-ref-behavior/worker-progress/worker-027-forward-ref-behavior.md` |
+| worker-027-forward-ref-behavior | merged | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `worker-progress/worker-027-forward-ref-behavior.md` |
 
 ## Next Actions
 
-1. Monitor worker 027 and audit/merge it only after it checks a deterministic `forwardRef` wrapper-object oracle and keeps broader compatibility claims false.
+1. Queue the next conformance-backed slice from the remaining React root API placeholders, prioritizing behavior that can be proven by deterministic React 19.2.6 probes without renderer integration.
 2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
@@ -182,3 +183,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Verified merged `main` after worker-026 with `npm run check:js`; 51 conformance tests passed through the workspace check. Closed the worker-026 tmux session and removed the clean worker-026 worktree. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
 - 2026-05-09: Queued worker-027 to add a deterministic React 19.2.6 `forwardRef` wrapper-object oracle and implement covered direct JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
 - 2026-05-09: Launched worker-027 as a real `codex --yolo` tmux process in `../fast-react-worker-027-forward-ref-behavior`.
+- 2026-05-09: Accepted and merged worker-027 forwardRef wrapper behavior in commit `2b798a3` via merge commit `2f97ca8` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, forward-ref oracle regeneration byte-compare, element-object oracle regeneration byte-compare, forward-ref and element oracle temp/local path leak guards, scoped `git diff --check`, and explicit oracle status count checks.
+- 2026-05-09: Verified merged `main` after worker-027 with `npm run check:js`; 61 conformance tests passed through the workspace check. Closed the worker-027 tmux session and removed the clean worker-027 worktree. The root `Cargo.lock` remains an untracked regenerable artifact by policy.
