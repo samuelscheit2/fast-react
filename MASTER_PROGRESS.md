@@ -72,13 +72,13 @@ M0: Orchestration Foundation.
 | worker-018-test-renderer-mutation-host | merged | Implement minimal canonical mutation test renderer | `worker-progress/worker-018-test-renderer-mutation-host.md` |
 | worker-019-reconciler-host-boundary-migration | merged | Move reconciler placeholder API toward canonical host trait bounds | `worker-progress/worker-019-reconciler-host-boundary-migration.md` |
 | worker-020-element-object-conformance-probes | merged | Probe React 19.2.6 element object behavior and plan safe implementation | `worker-progress/worker-020-element-object-conformance-probes.md` |
-| worker-021-element-object-oracle | queued | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `../fast-react-worker-021-element-object-oracle/worker-progress/worker-021-element-object-oracle.md` |
-| worker-022-host-operation-errors | queued | Add structured host operation errors for invalid test-renderer operations | `../fast-react-worker-022-host-operation-errors/worker-progress/worker-022-host-operation-errors.md` |
+| worker-021-element-object-oracle | running in tmux worktree; nested subagents allowed | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `../fast-react-worker-021-element-object-oracle/worker-progress/worker-021-element-object-oracle.md` |
+| worker-022-host-operation-errors | running in tmux worktree; nested subagents allowed | Add structured host operation errors for invalid test-renderer operations | `../fast-react-worker-022-host-operation-errors/worker-progress/worker-022-host-operation-errors.md` |
 
 ## Next Actions
 
-1. Launch workers 021 and 022 as real tmux Codex processes in disjoint worktrees.
-2. Monitor workers 021 and 022 and merge completed work after audit.
+1. Monitor workers 021 and 022 and merge completed work after audit.
+2. Launch follow-up package behavior workers only after the element-object oracle no longer has a moving Fast React target.
 
 ## Risks And Open Questions
 
@@ -147,3 +147,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Verified merged runtime inventory generation on `main` with `npm run check:js`; verified the merged Rust crates with `cargo test --workspace --all-features`.
 - 2026-05-09: Pruned merged Fast React worker worktrees 001-020 after confirming no scoped uncommitted source changes remained. A regenerable untracked `Cargo.lock` in worker-018 was discarded as part of removing the accepted worker worktree.
 - 2026-05-09: Queued workers 021-022 as the next non-overlapping tranche: element-object conformance oracle and structured host operation errors.
+- 2026-05-09: Launched workers 021-022 as real `codex --yolo` tmux processes in disjoint worktrees.
