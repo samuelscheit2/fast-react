@@ -140,7 +140,7 @@ M0: Orchestration Foundation.
 
 ## Next Actions
 
-1. Monitor workers 045-074 as the active 30-worker parallel pool and audit/merge them only after their scoped reports, tests, and status are clean.
+1. Monitor the remaining active workers from the 045-074 tranche and audit/merge them only after their scoped reports, tests, and status are clean.
 2. Relaunch usage-limit exits in place, using continuation prompts whenever scoped partial changes are present.
 3. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 4. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
@@ -291,3 +291,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-074 React DOM benchmark baseline plan in commit `116915e` via merge commit on `main`. Verified report-only scope, no concrete local path leaks, no trailing whitespace, no-index diff whitespace check, and completion checklist coverage. No source tests were run because the task changed only the report.
 - 2026-05-09: Accepted and merged worker-056 React DOM server/static implementation plan in commit `0bae3f0` via merge commit on `main`. Verified report-only scope, no concrete local path leaks, no trailing whitespace, and no-index diff whitespace check. No source tests were run because the task changed only the report.
 - 2026-05-09: Accepted and merged worker-051 host token boundary in commit `2e68d03` via merge commit on `main`. Verified in the worker worktree with `git diff --check`, `cargo fmt --all --check`, `cargo test -p fast-react-host-config --all-features`, and `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`; verified merged `main` with the same focused host-config checks. The worker worktree only retained an untracked regenerable `Cargo.lock`.
+- 2026-05-09: Removed accepted worktrees for workers 051, 056, 073, and 074. After refilling usage-limit exits, all remaining unmerged worker worktrees from the 045-074 tranche were running; active top-level worker count was 26.
