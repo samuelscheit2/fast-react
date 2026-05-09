@@ -200,6 +200,7 @@ Dependencies: M8.
 | worker-022-host-operation-errors | Add structured host operation errors for invalid test-renderer operations | `crates/fast-react-host-config/**`, `crates/fast-react-test-renderer/**`, optional compile-only `crates/fast-react-reconciler/**`, `worker-progress/worker-022-host-operation-errors.md` | workers 018,019 | merged |
 | worker-023-js-element-factory | Implement conformance-backed JS element factory behavior from the checked oracle | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-023-js-element-factory.md` | workers 014,020,021 | merged |
 | worker-024-create-ref-behavior | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-024-create-ref-behavior.md` | workers 014,017,023 | merged |
+| worker-025-children-helpers | Add a deterministic `Children` helper oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-025-children-helpers.md` | workers 014,017,023,024 | queued |
 
 ## Merge Policy
 
