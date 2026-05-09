@@ -1,0 +1,2983 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-test-renderer-serialization-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React 19.2.6 react-test-renderer toJSON, toTree, and TestInstance serialization oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-073-test-renderer-update-model-plan.md"
+  ],
+  "generation": {
+    "method": "exact npm tarballs extracted into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per react-test-renderer scenario and mode",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false,
+    "pathNormalization": "temporary extraction roots and local workspace paths are normalized before artifact write"
+  },
+  "evidenceClaims": {
+    "exactTarballUrlsPinned": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballPackageJsonMatchedTargets": true,
+    "hostNodeSerializationProbed": true,
+    "textNodeSerializationProbed": true,
+    "emptyRootSerializationProbed": true,
+    "hiddenOutputSerializationProbed": true,
+    "propsWithoutChildrenProbed": true,
+    "compositeToTreeProbed": true,
+    "testInstanceFindBasicsProbed": true,
+    "privateReactTestRendererInternalsRead": false,
+    "fastReactComparedToReactTestRenderer": false
+  },
+  "conformanceClaims": {
+    "realReactTestRendererBehaviorProbed": true,
+    "fastReactComparedToReactTestRenderer": false,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "reactTestRendererTarget": {
+    "packageName": "react-test-renderer",
+    "version": "19.2.6",
+    "role": "official-react-test-renderer-runtime-target",
+    "registry": {
+      "distTarball": "https://registry.npmjs.org/react-test-renderer/-/react-test-renderer-19.2.6.tgz",
+      "distIntegrity": "sha512-GbS6V23YduFTPiWJ5xICbKEjRcqx1Z90js/V5miqhz7qp/d6xSe9Dd6NjSQODFRdzdsqRMPW82E/sFpPRbY5Mw=="
+    }
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-test-renderer-peer-needed-for-serialization-probes",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q=="
+      }
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-test-renderer-runtime-dependency",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q=="
+      }
+    },
+    {
+      "packageName": "react-is",
+      "version": "19.2.6",
+      "role": "react-test-renderer-runtime-dependency",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/react-is/-/react-is-19.2.6.tgz",
+        "distIntegrity": "sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw=="
+      }
+    }
+  ],
+  "localFastReactStatus": {
+    "packageName": "@fast-react/react-test-renderer",
+    "status": "not-present-in-workspace",
+    "comparedToReactTestRenderer": false,
+    "behaviorCompatibilityClaimed": false,
+    "reason": "The current workspace has Rust fast-react-test-renderer host crates but no local JS react-test-renderer compatibility package to execute in this conformance oracle."
+  },
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "mountStrategy": "act-create",
+      "reason": "Development probes can mount through public react-test-renderer act and capture deprecation diagnostics."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "mountStrategy": "create-null-then-unstable-flush-sync-update",
+      "reason": "Production react-test-renderer does not expose a callable act export, so probes mount by updating a null renderer inside the public unstable_flushSync method."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "host-tree-json-and-tree",
+      "area": "Host node serialization",
+      "captures": [
+        "toJSON host element shape and react.test.json branding",
+        "toJSON props excluding children",
+        "text child serialization",
+        "nested host child serialization",
+        "toTree host node rendered children"
+      ]
+    },
+    {
+      "id": "text-root-json-and-tree",
+      "area": "Text root serialization",
+      "captures": [
+        "toJSON string output",
+        "toTree string output",
+        "root getter returning a string for a text-only root"
+      ]
+    },
+    {
+      "id": "empty-root-nullish-output",
+      "area": "Empty and nullish root serialization",
+      "captures": [
+        "null root toJSON and toTree",
+        "false root toJSON and toTree",
+        ".root access error for empty committed output"
+      ]
+    },
+    {
+      "id": "array-root-json-and-tree",
+      "area": "Multiple root child serialization",
+      "captures": [
+        "toJSON array output for multiple root children",
+        "toTree array output for multiple root children",
+        "root TestInstance type and props for fragment-like roots"
+      ]
+    },
+    {
+      "id": "activity-hidden-json-and-tree",
+      "area": "Hidden output serialization",
+      "captures": [
+        "React Activity hidden host output omitted from toJSON",
+        "visible Activity host output retained in toJSON",
+        "toTree public error for Activity fiber tag",
+        "TestInstance queries still seeing hidden host instances"
+      ]
+    },
+    {
+      "id": "composite-to-tree",
+      "area": "Composite toTree serialization",
+      "captures": [
+        "function component toTree nodeType",
+        "composite props",
+        "rendered host subtree",
+        "root TestInstance children through the composite boundary"
+      ]
+    },
+    {
+      "id": "test-instance-find-basics",
+      "area": "TestInstance query basics",
+      "captures": [
+        "find and findAll predicate behavior",
+        "findByType and findAllByType behavior",
+        "findByProps and findAllByProps behavior",
+        "zero-match and multiple-match public error messages"
+      ]
+    }
+  ],
+  "packages": {
+    "react-test-renderer": {
+      "packageName": "react-test-renderer",
+      "version": "19.2.6",
+      "role": "official-react-test-renderer-runtime-target",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/react-test-renderer/-/react-test-renderer-19.2.6.tgz",
+        "distIntegrity": "sha512-GbS6V23YduFTPiWJ5xICbKEjRcqx1Z90js/V5miqhz7qp/d6xSe9Dd6NjSQODFRdzdsqRMPW82E/sFpPRbY5Mw=="
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "GbS6V23YduFTPiWJ5xICbKEjRcqx1Z90js/V5miqhz7qp/d6xSe9Dd6NjSQODFRdzdsqRMPW82E/sFpPRbY5Mw==",
+        "sha256": "838a12edf43329391d1f1693d9675c5b6c6a566177e8a6191f2127f71599d743",
+        "fileCount": 7,
+        "filesSha256": "ceb9ec33756a2b6216b5d60ed1cd0b77c7cab59d32b29fe8c2ef1814f821fcc3",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-test-renderer.development.js",
+          "cjs/react-test-renderer.production.js",
+          "index.js",
+          "package.json",
+          "shallow.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-test-renderer",
+        "version": "19.2.6",
+        "main": "index.js",
+        "exports": null,
+        "dependencies": {
+          "react-is": "^19.2.6",
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        }
+      }
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-test-renderer-peer-needed-for-serialization-probes",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q=="
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "sha256": "3869e1f44439eadc02e9570135b594715702374a0d8a30c7771b853698422283",
+        "fileCount": 27,
+        "filesSha256": "b3490b2091abba1697ad4e7e9c0a934c1d97a1e4ca6a7b82af9d5923c547278b",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "dependencies": {},
+        "peerDependencies": {}
+      }
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-test-renderer-runtime-dependency",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q=="
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "sha256": "ab26ce35ce4032f04b78cfc5bbb4cfe13358e9fe7a5433a8aa6315c3debc5095",
+        "fileCount": 15,
+        "filesSha256": "f516ae0bbe4e6c828300582985424831567fef565d60148302ac07ebec576085",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "exports": null,
+        "dependencies": {},
+        "peerDependencies": {}
+      }
+    },
+    "react-is": {
+      "packageName": "react-is",
+      "version": "19.2.6",
+      "role": "react-test-renderer-runtime-dependency",
+      "registry": {
+        "distTarball": "https://registry.npmjs.org/react-is/-/react-is-19.2.6.tgz",
+        "distIntegrity": "sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw=="
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==",
+        "sha256": "b376bfc951a20c8af7b0c6d420e354c795139718770e43a1e220f7ac827c8a44",
+        "fileCount": 6,
+        "filesSha256": "06a6c3e9c9288967f414c6d513c6eefec433261e32277c0c2a6ecbca911d2f0d",
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-is.development.js",
+          "cjs/react-is.production.js",
+          "index.js",
+          "package.json"
+        ]
+      },
+      "packageJson": {
+        "name": "react-is",
+        "version": "19.2.6",
+        "main": "index.js",
+        "exports": null,
+        "dependencies": {},
+        "peerDependencies": {}
+      }
+    }
+  },
+  "coverage": {
+    "toJSONHostNodes": true,
+    "toJSONTextNodes": true,
+    "toJSONEmptyRoots": true,
+    "toJSONHiddenActivityOutput": true,
+    "toJSONPropsExcludeChildren": true,
+    "toTreeHostNodes": true,
+    "toTreeTextNodes": true,
+    "toTreeCompositeNodes": true,
+    "toTreeActivityPublicError": true,
+    "testInstanceRootGetter": true,
+    "testInstanceFindAndFindAll": true,
+    "testInstanceFindByType": true,
+    "testInstanceFindByProps": true,
+    "developmentActMount": true,
+    "productionFlushSyncMount": true,
+    "privateInternalsAvoided": true
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-fast-react-test-renderer-comparison",
+      "reason": "This oracle records pinned react-test-renderer behavior only; Fast React test-renderer implementation work is owned by separate workers."
+    },
+    {
+      "id": "no-private-fiber-reads",
+      "reason": "The probe uses only public react-test-renderer exports, renderer object methods, and TestInstance methods. It does not read private Fiber fields."
+    },
+    {
+      "id": "no-react-server-serialization-mode",
+      "reason": "react-test-renderer is a client renderer surface and does not provide deterministic mounted serialization behavior under the react-server condition."
+    },
+    {
+      "id": "no-effect-or-suspense-scheduling-claims",
+      "reason": "This oracle is scoped to deterministic serialization and TestInstance query behavior. act scheduling, Suspense pinging, and error surfaces are covered by dedicated workers."
+    }
+  ],
+  "observations": {
+    "default-node-development": [
+      {
+        "scenarioId": "host-tree-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": {
+                "type": "div",
+                "props": {
+                  "id": "host-root",
+                  "foo": "bar"
+                },
+                "children": [
+                  "hello",
+                  {
+                    "type": "span",
+                    "props": {
+                      "className": "nested"
+                    },
+                    "children": [
+                      "world"
+                    ]
+                  }
+                ]
+              }
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": {
+                "nodeType": "host",
+                "type": "div",
+                "props": {
+                  "id": "host-root",
+                  "foo": "bar",
+                  "children": [
+                    "hello",
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "span",
+                      "key": null,
+                      "props": {
+                        "className": "nested",
+                        "children": "world"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  ]
+                },
+                "instance": null,
+                "rendered": [
+                  "hello",
+                  {
+                    "nodeType": "host",
+                    "type": "span",
+                    "props": {
+                      "className": "nested",
+                      "children": "world"
+                    },
+                    "instance": null,
+                    "rendered": [
+                      "world"
+                    ]
+                  }
+                ]
+              }
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "jsonOwnKeys": [
+            {
+              "kind": "string",
+              "value": "type"
+            },
+            {
+              "kind": "string",
+              "value": "props"
+            },
+            {
+              "kind": "string",
+              "value": "children"
+            },
+            {
+              "kind": "string",
+              "value": "$$typeof"
+            }
+          ],
+          "jsonBrand": {
+            "kind": "symbol",
+            "key": "react.test.json",
+            "description": "react.test.json",
+            "string": "Symbol(react.test.json)"
+          },
+          "jsonPropsOwnKeys": [
+            "id",
+            "foo"
+          ],
+          "jsonPropsHasChildren": false,
+          "rootSummary": {
+            "label": "root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": "div",
+              "props": {
+                "id": "host-root",
+                "foo": "bar",
+                "children": [
+                  "hello",
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "span",
+                    "key": null,
+                    "props": {
+                      "className": "nested",
+                      "children": "world"
+                    },
+                    "_owner": null,
+                    "_store": {}
+                  }
+                ]
+              },
+              "parent": null,
+              "children": [
+                "hello",
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "span",
+                  "props": {
+                    "className": "nested",
+                    "children": "world"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "text-root-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": "hello text root"
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": "hello text root"
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": {
+                "text": "hello text root",
+                "isHidden": false,
+                "tag": "TEXT"
+              }
+            }
+          },
+          "rootValue": {
+            "label": "root",
+            "status": "ok",
+            "value": "hello text root"
+          }
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "empty-root-nullish-output",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "nullRoot": {
+            "serialization": {
+              "rendererOwnKeys": [
+                "_Scheduler",
+                "root",
+                "toJSON",
+                "toTree",
+                "update",
+                "unmount",
+                "getInstance",
+                "unstable_flushSync"
+              ],
+              "toJSON": {
+                "label": "toJSON",
+                "status": "ok",
+                "value": null
+              },
+              "toTree": {
+                "label": "toTree",
+                "status": "ok",
+                "value": null
+              },
+              "getInstance": {
+                "label": "getInstance",
+                "status": "ok",
+                "value": null
+              }
+            },
+            "rootAccess": {
+              "label": "root",
+              "status": "throws",
+              "error": {
+                "name": "Error",
+                "message": "Can't access .root on unmounted test renderer",
+                "code": null
+              }
+            }
+          },
+          "falseRoot": {
+            "serialization": {
+              "rendererOwnKeys": [
+                "_Scheduler",
+                "root",
+                "toJSON",
+                "toTree",
+                "update",
+                "unmount",
+                "getInstance",
+                "unstable_flushSync"
+              ],
+              "toJSON": {
+                "label": "toJSON",
+                "status": "ok",
+                "value": null
+              },
+              "toTree": {
+                "label": "toTree",
+                "status": "ok",
+                "value": null
+              },
+              "getInstance": {
+                "label": "getInstance",
+                "status": "ok",
+                "value": null
+              }
+            },
+            "rootAccess": {
+              "label": "root",
+              "status": "throws",
+              "error": {
+                "name": "Error",
+                "message": "Can't access .root on unmounted test renderer",
+                "code": null
+              }
+            }
+          }
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          },
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "array-root-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": [
+                {
+                  "type": "a",
+                  "props": {
+                    "href": "#a"
+                  },
+                  "children": [
+                    "A"
+                  ]
+                },
+                "plain text",
+                {
+                  "type": "b",
+                  "props": {},
+                  "children": [
+                    "B"
+                  ]
+                }
+              ]
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": [
+                {
+                  "nodeType": "host",
+                  "type": "a",
+                  "props": {
+                    "href": "#a",
+                    "children": "A"
+                  },
+                  "instance": null,
+                  "rendered": [
+                    "A"
+                  ]
+                },
+                "plain text",
+                {
+                  "nodeType": "host",
+                  "type": "b",
+                  "props": {
+                    "children": "B"
+                  },
+                  "instance": null,
+                  "rendered": [
+                    "B"
+                  ]
+                }
+              ]
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "rootSummary": {
+            "label": "root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": null,
+              "props": null,
+              "parent": null,
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "a",
+                  "props": {
+                    "href": "#a",
+                    "children": "A"
+                  }
+                },
+                "plain text",
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "b",
+                  "props": {
+                    "children": "B"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "activity-hidden-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": {
+                "type": "main",
+                "props": {},
+                "children": [
+                  {
+                    "type": "span",
+                    "props": {
+                      "id": "visible-child"
+                    },
+                    "children": [
+                      "visible"
+                    ]
+                  }
+                ]
+              }
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "throws",
+              "error": {
+                "name": "Error",
+                "message": "toTree() does not yet know how to handle nodes with tag=31",
+                "code": null
+              }
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "hiddenMatches": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "span",
+              "props": {
+                "id": "hidden-child",
+                "children": "hidden"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "main",
+                "props": {
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "symbol",
+                        "key": "react.activity",
+                        "description": "react.activity",
+                        "string": "Symbol(react.activity)"
+                      },
+                      "key": null,
+                      "props": {
+                        "mode": "hidden",
+                        "children": {
+                          "$$typeof": {
+                            "kind": "symbol",
+                            "key": "react.transitional.element",
+                            "description": "react.transitional.element",
+                            "string": "Symbol(react.transitional.element)"
+                          },
+                          "type": "span",
+                          "key": null,
+                          "props": {
+                            "id": "hidden-child",
+                            "children": "hidden"
+                          },
+                          "_owner": null,
+                          "_store": {}
+                        }
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "symbol",
+                        "key": "react.activity",
+                        "description": "react.activity",
+                        "string": "Symbol(react.activity)"
+                      },
+                      "key": null,
+                      "props": {
+                        "mode": "visible",
+                        "children": {
+                          "$$typeof": {
+                            "kind": "symbol",
+                            "key": "react.transitional.element",
+                            "description": "react.transitional.element",
+                            "string": "Symbol(react.transitional.element)"
+                          },
+                          "type": "span",
+                          "key": null,
+                          "props": {
+                            "id": "visible-child",
+                            "children": "visible"
+                          },
+                          "_owner": null,
+                          "_store": {}
+                        }
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  ]
+                }
+              },
+              "children": [
+                "hidden"
+              ]
+            }
+          ],
+          "visibleMatches": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "span",
+              "props": {
+                "id": "visible-child",
+                "children": "visible"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "main",
+                "props": {
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "symbol",
+                        "key": "react.activity",
+                        "description": "react.activity",
+                        "string": "Symbol(react.activity)"
+                      },
+                      "key": null,
+                      "props": {
+                        "mode": "hidden",
+                        "children": {
+                          "$$typeof": {
+                            "kind": "symbol",
+                            "key": "react.transitional.element",
+                            "description": "react.transitional.element",
+                            "string": "Symbol(react.transitional.element)"
+                          },
+                          "type": "span",
+                          "key": null,
+                          "props": {
+                            "id": "hidden-child",
+                            "children": "hidden"
+                          },
+                          "_owner": null,
+                          "_store": {}
+                        }
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "symbol",
+                        "key": "react.activity",
+                        "description": "react.activity",
+                        "string": "Symbol(react.activity)"
+                      },
+                      "key": null,
+                      "props": {
+                        "mode": "visible",
+                        "children": {
+                          "$$typeof": {
+                            "kind": "symbol",
+                            "key": "react.transitional.element",
+                            "description": "react.transitional.element",
+                            "string": "Symbol(react.transitional.element)"
+                          },
+                          "type": "span",
+                          "key": null,
+                          "props": {
+                            "id": "visible-child",
+                            "children": "visible"
+                          },
+                          "_owner": null,
+                          "_store": {}
+                        }
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  ]
+                }
+              },
+              "children": [
+                "visible"
+              ]
+            }
+          ],
+          "rootChildren": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "span",
+              "props": {
+                "id": "hidden-child",
+                "children": "hidden"
+              }
+            },
+            {
+              "kind": "ReactTestInstance",
+              "type": "span",
+              "props": {
+                "id": "visible-child",
+                "children": "visible"
+              }
+            }
+          ]
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "composite-to-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": {
+                "type": "section",
+                "props": {
+                  "id": "composite-output"
+                },
+                "children": [
+                  {
+                    "type": "strong",
+                    "props": {},
+                    "children": [
+                      "child"
+                    ]
+                  }
+                ]
+              }
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": {
+                "nodeType": "component",
+                "type": {
+                  "kind": "function",
+                  "name": "FunctionComposite",
+                  "displayName": null,
+                  "length": 1
+                },
+                "props": {
+                  "label": "composite-label",
+                  "children": {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "strong",
+                    "key": null,
+                    "props": {
+                      "children": "child"
+                    },
+                    "_owner": null,
+                    "_store": {}
+                  }
+                },
+                "instance": null,
+                "rendered": {
+                  "nodeType": "host",
+                  "type": "section",
+                  "props": {
+                    "id": "composite-output",
+                    "children": {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "strong",
+                      "key": null,
+                      "props": {
+                        "children": "child"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  },
+                  "instance": null,
+                  "rendered": [
+                    {
+                      "nodeType": "host",
+                      "type": "strong",
+                      "props": {
+                        "children": "child"
+                      },
+                      "instance": null,
+                      "rendered": [
+                        "child"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "rootSummary": {
+            "label": "root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": {
+                "kind": "function",
+                "name": "FunctionComposite",
+                "displayName": null,
+                "length": 1
+              },
+              "props": {
+                "label": "composite-label",
+                "children": {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "strong",
+                  "key": null,
+                  "props": {
+                    "children": "child"
+                  },
+                  "_owner": null,
+                  "_store": {}
+                }
+              },
+              "parent": null,
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "section",
+                  "props": {
+                    "id": "composite-output",
+                    "children": {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "strong",
+                      "key": null,
+                      "props": {
+                        "children": "child"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "sectionMatches": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "section",
+              "props": {
+                "id": "composite-output",
+                "children": {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "strong",
+                  "key": null,
+                  "props": {
+                    "children": "child"
+                  },
+                  "_owner": null,
+                  "_store": {}
+                }
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": {
+                  "kind": "function",
+                  "name": "FunctionComposite",
+                  "displayName": null,
+                  "length": 1
+                },
+                "props": {
+                  "label": "composite-label",
+                  "children": {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "strong",
+                    "key": null,
+                    "props": {
+                      "children": "child"
+                    },
+                    "_owner": null,
+                    "_store": {}
+                  }
+                }
+              },
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "strong",
+                  "props": {
+                    "children": "child"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      },
+      {
+        "scenarioId": "test-instance-find-basics",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "development",
+        "condition": "default",
+        "mountStrategy": "act-create",
+        "result": {
+          "mountStrategy": "act-create",
+          "rootSummary": {
+            "kind": "ReactTestInstance",
+            "type": "ul",
+            "props": {
+              "id": "list-root",
+              "children": [
+                {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": {
+                    "kind": "function",
+                    "name": "Item",
+                    "displayName": null,
+                    "length": 1
+                  },
+                  "key": null,
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  },
+                  "_owner": null,
+                  "_store": {}
+                },
+                {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "li",
+                  "key": null,
+                  "props": {
+                    "kind": "other",
+                    "children": "B"
+                  },
+                  "_owner": null,
+                  "_store": {}
+                },
+                {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "li",
+                  "key": null,
+                  "props": {
+                    "kind": "other",
+                    "children": "C"
+                  },
+                  "_owner": null,
+                  "_store": {}
+                }
+              ]
+            },
+            "parent": null,
+            "children": [
+              {
+                "kind": "ReactTestInstance",
+                "type": {
+                  "kind": "function",
+                  "name": "Item",
+                  "displayName": null,
+                  "length": 1
+                },
+                "props": {
+                  "kind": "target",
+                  "children": "A"
+                }
+              },
+              {
+                "kind": "ReactTestInstance",
+                "type": "li",
+                "props": {
+                  "kind": "other",
+                  "children": "B"
+                }
+              },
+              {
+                "kind": "ReactTestInstance",
+                "type": "li",
+                "props": {
+                  "kind": "other",
+                  "children": "C"
+                }
+              }
+            ]
+          },
+          "findTarget": {
+            "label": "find target",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": {
+                "kind": "function",
+                "name": "Item",
+                "displayName": null,
+                "length": 1
+              },
+              "props": {
+                "kind": "target",
+                "children": "A"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "ul",
+                "props": {
+                  "id": "list-root",
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "function",
+                        "name": "Item",
+                        "displayName": null,
+                        "length": 1
+                      },
+                      "key": null,
+                      "props": {
+                        "kind": "target",
+                        "children": "A"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "B"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "C"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                }
+              ]
+            }
+          },
+          "findZero": {
+            "label": "find zero",
+            "status": "throws",
+            "error": {
+              "name": "Error",
+              "message": "No instances found matching custom predicate: (node) => node.props.kind === \"missing\"",
+              "code": null
+            }
+          },
+          "findMultiple": {
+            "label": "find multiple",
+            "status": "throws",
+            "error": {
+              "name": "Error",
+              "message": "Expected 1 but found 3 instances matching custom predicate: (node) => node.type === \"li\"",
+              "code": null
+            }
+          },
+          "findAllLiKinds": [
+            "target",
+            "other",
+            "other"
+          ],
+          "findAllLiDeepFalseKinds": [
+            "target",
+            "other",
+            "other"
+          ],
+          "findByTypeItem": {
+            "label": "findByType Item",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": {
+                "kind": "function",
+                "name": "Item",
+                "displayName": null,
+                "length": 1
+              },
+              "props": {
+                "kind": "target",
+                "children": "A"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "ul",
+                "props": {
+                  "id": "list-root",
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "function",
+                        "name": "Item",
+                        "displayName": null,
+                        "length": 1
+                      },
+                      "key": null,
+                      "props": {
+                        "kind": "target",
+                        "children": "A"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "B"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "C"
+                      },
+                      "_owner": null,
+                      "_store": {}
+                    }
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                }
+              ]
+            }
+          },
+          "findAllByTypeLiCount": 3,
+          "findByPropsRoot": {
+            "label": "findByProps root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": "ul",
+              "props": {
+                "id": "list-root",
+                "children": [
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": {
+                      "kind": "function",
+                      "name": "Item",
+                      "displayName": null,
+                      "length": 1
+                    },
+                    "key": null,
+                    "props": {
+                      "kind": "target",
+                      "children": "A"
+                    },
+                    "_owner": null,
+                    "_store": {}
+                  },
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "li",
+                    "key": null,
+                    "props": {
+                      "kind": "other",
+                      "children": "B"
+                    },
+                    "_owner": null,
+                    "_store": {}
+                  },
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "li",
+                    "key": null,
+                    "props": {
+                      "kind": "other",
+                      "children": "C"
+                    },
+                    "_owner": null,
+                    "_store": {}
+                  }
+                ]
+              },
+              "parent": null,
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": {
+                    "kind": "function",
+                    "name": "Item",
+                    "displayName": null,
+                    "length": 1
+                  },
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                },
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "other",
+                    "children": "B"
+                  }
+                },
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "other",
+                    "children": "C"
+                  }
+                }
+              ]
+            }
+          },
+          "findAllByPropsOtherCount": 2,
+          "findByPropsOtherMultiple": {
+            "label": "findByProps multiple",
+            "status": "throws",
+            "error": {
+              "name": "Error",
+              "message": "Expected 1 but found 2 instances with props: {\"kind\":\"other\"}",
+              "code": null
+            }
+          }
+        },
+        "consoleCalls": [
+          {
+            "method": "error",
+            "args": [
+              "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer"
+            ]
+          }
+        ]
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "host-tree-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": {
+                "type": "div",
+                "props": {
+                  "id": "host-root",
+                  "foo": "bar"
+                },
+                "children": [
+                  "hello",
+                  {
+                    "type": "span",
+                    "props": {
+                      "className": "nested"
+                    },
+                    "children": [
+                      "world"
+                    ]
+                  }
+                ]
+              }
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": {
+                "nodeType": "host",
+                "type": "div",
+                "props": {
+                  "id": "host-root",
+                  "foo": "bar",
+                  "children": [
+                    "hello",
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "span",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "className": "nested",
+                        "children": "world"
+                      }
+                    }
+                  ]
+                },
+                "instance": null,
+                "rendered": [
+                  "hello",
+                  {
+                    "nodeType": "host",
+                    "type": "span",
+                    "props": {
+                      "className": "nested",
+                      "children": "world"
+                    },
+                    "instance": null,
+                    "rendered": [
+                      "world"
+                    ]
+                  }
+                ]
+              }
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "jsonOwnKeys": [
+            {
+              "kind": "string",
+              "value": "type"
+            },
+            {
+              "kind": "string",
+              "value": "props"
+            },
+            {
+              "kind": "string",
+              "value": "children"
+            },
+            {
+              "kind": "string",
+              "value": "$$typeof"
+            }
+          ],
+          "jsonBrand": {
+            "kind": "symbol",
+            "key": "react.test.json",
+            "description": "react.test.json",
+            "string": "Symbol(react.test.json)"
+          },
+          "jsonPropsOwnKeys": [
+            "id",
+            "foo"
+          ],
+          "jsonPropsHasChildren": false,
+          "rootSummary": {
+            "label": "root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": "div",
+              "props": {
+                "id": "host-root",
+                "foo": "bar",
+                "children": [
+                  "hello",
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "span",
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "className": "nested",
+                      "children": "world"
+                    }
+                  }
+                ]
+              },
+              "parent": null,
+              "children": [
+                "hello",
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "span",
+                  "props": {
+                    "className": "nested",
+                    "children": "world"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "text-root-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": "hello text root"
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": "hello text root"
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": {
+                "text": "hello text root",
+                "isHidden": false,
+                "tag": "TEXT"
+              }
+            }
+          },
+          "rootValue": {
+            "label": "root",
+            "status": "ok",
+            "value": "hello text root"
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "empty-root-nullish-output",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "nullRoot": {
+            "serialization": {
+              "rendererOwnKeys": [
+                "_Scheduler",
+                "root",
+                "toJSON",
+                "toTree",
+                "update",
+                "unmount",
+                "getInstance",
+                "unstable_flushSync"
+              ],
+              "toJSON": {
+                "label": "toJSON",
+                "status": "ok",
+                "value": null
+              },
+              "toTree": {
+                "label": "toTree",
+                "status": "ok",
+                "value": null
+              },
+              "getInstance": {
+                "label": "getInstance",
+                "status": "ok",
+                "value": null
+              }
+            },
+            "rootAccess": {
+              "label": "root",
+              "status": "throws",
+              "error": {
+                "name": "Error",
+                "message": "Can't access .root on unmounted test renderer",
+                "code": null
+              }
+            }
+          },
+          "falseRoot": {
+            "serialization": {
+              "rendererOwnKeys": [
+                "_Scheduler",
+                "root",
+                "toJSON",
+                "toTree",
+                "update",
+                "unmount",
+                "getInstance",
+                "unstable_flushSync"
+              ],
+              "toJSON": {
+                "label": "toJSON",
+                "status": "ok",
+                "value": null
+              },
+              "toTree": {
+                "label": "toTree",
+                "status": "ok",
+                "value": null
+              },
+              "getInstance": {
+                "label": "getInstance",
+                "status": "ok",
+                "value": null
+              }
+            },
+            "rootAccess": {
+              "label": "root",
+              "status": "throws",
+              "error": {
+                "name": "Error",
+                "message": "Can't access .root on unmounted test renderer",
+                "code": null
+              }
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "array-root-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": [
+                {
+                  "type": "a",
+                  "props": {
+                    "href": "#a"
+                  },
+                  "children": [
+                    "A"
+                  ]
+                },
+                "plain text",
+                {
+                  "type": "b",
+                  "props": {},
+                  "children": [
+                    "B"
+                  ]
+                }
+              ]
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": [
+                {
+                  "nodeType": "host",
+                  "type": "a",
+                  "props": {
+                    "href": "#a",
+                    "children": "A"
+                  },
+                  "instance": null,
+                  "rendered": [
+                    "A"
+                  ]
+                },
+                "plain text",
+                {
+                  "nodeType": "host",
+                  "type": "b",
+                  "props": {
+                    "children": "B"
+                  },
+                  "instance": null,
+                  "rendered": [
+                    "B"
+                  ]
+                }
+              ]
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "rootSummary": {
+            "label": "root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": null,
+              "props": null,
+              "parent": null,
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "a",
+                  "props": {
+                    "href": "#a",
+                    "children": "A"
+                  }
+                },
+                "plain text",
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "b",
+                  "props": {
+                    "children": "B"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "activity-hidden-json-and-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": {
+                "type": "main",
+                "props": {},
+                "children": [
+                  {
+                    "type": "span",
+                    "props": {
+                      "id": "visible-child"
+                    },
+                    "children": [
+                      "visible"
+                    ]
+                  }
+                ]
+              }
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "throws",
+              "error": {
+                "name": "Error",
+                "message": "toTree() does not yet know how to handle nodes with tag=31",
+                "code": null
+              }
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "hiddenMatches": [],
+          "visibleMatches": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "span",
+              "props": {
+                "id": "visible-child",
+                "children": "visible"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "main",
+                "props": {
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "symbol",
+                        "key": "react.activity",
+                        "description": "react.activity",
+                        "string": "Symbol(react.activity)"
+                      },
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "mode": "hidden",
+                        "children": {
+                          "$$typeof": {
+                            "kind": "symbol",
+                            "key": "react.transitional.element",
+                            "description": "react.transitional.element",
+                            "string": "Symbol(react.transitional.element)"
+                          },
+                          "type": "span",
+                          "key": null,
+                          "ref": null,
+                          "props": {
+                            "id": "hidden-child",
+                            "children": "hidden"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "symbol",
+                        "key": "react.activity",
+                        "description": "react.activity",
+                        "string": "Symbol(react.activity)"
+                      },
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "mode": "visible",
+                        "children": {
+                          "$$typeof": {
+                            "kind": "symbol",
+                            "key": "react.transitional.element",
+                            "description": "react.transitional.element",
+                            "string": "Symbol(react.transitional.element)"
+                          },
+                          "type": "span",
+                          "key": null,
+                          "ref": null,
+                          "props": {
+                            "id": "visible-child",
+                            "children": "visible"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "children": [
+                "visible"
+              ]
+            }
+          ],
+          "rootChildren": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "span",
+              "props": {
+                "id": "visible-child",
+                "children": "visible"
+              }
+            }
+          ]
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "composite-to-tree",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "serialization": {
+            "rendererOwnKeys": [
+              "_Scheduler",
+              "root",
+              "toJSON",
+              "toTree",
+              "update",
+              "unmount",
+              "getInstance",
+              "unstable_flushSync"
+            ],
+            "toJSON": {
+              "label": "toJSON",
+              "status": "ok",
+              "value": {
+                "type": "section",
+                "props": {
+                  "id": "composite-output"
+                },
+                "children": [
+                  {
+                    "type": "strong",
+                    "props": {},
+                    "children": [
+                      "child"
+                    ]
+                  }
+                ]
+              }
+            },
+            "toTree": {
+              "label": "toTree",
+              "status": "ok",
+              "value": {
+                "nodeType": "component",
+                "type": {
+                  "kind": "function",
+                  "name": "FunctionComposite",
+                  "displayName": null,
+                  "length": 1
+                },
+                "props": {
+                  "label": "composite-label",
+                  "children": {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "strong",
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "children": "child"
+                    }
+                  }
+                },
+                "instance": null,
+                "rendered": {
+                  "nodeType": "host",
+                  "type": "section",
+                  "props": {
+                    "id": "composite-output",
+                    "children": {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "strong",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "children": "child"
+                      }
+                    }
+                  },
+                  "instance": null,
+                  "rendered": [
+                    {
+                      "nodeType": "host",
+                      "type": "strong",
+                      "props": {
+                        "children": "child"
+                      },
+                      "instance": null,
+                      "rendered": [
+                        "child"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "getInstance": {
+              "label": "getInstance",
+              "status": "ok",
+              "value": null
+            }
+          },
+          "rootSummary": {
+            "label": "root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": {
+                "kind": "function",
+                "name": "FunctionComposite",
+                "displayName": null,
+                "length": 1
+              },
+              "props": {
+                "label": "composite-label",
+                "children": {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "strong",
+                  "key": null,
+                  "ref": null,
+                  "props": {
+                    "children": "child"
+                  }
+                }
+              },
+              "parent": null,
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "section",
+                  "props": {
+                    "id": "composite-output",
+                    "children": {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "strong",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "children": "child"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "sectionMatches": [
+            {
+              "kind": "ReactTestInstance",
+              "type": "section",
+              "props": {
+                "id": "composite-output",
+                "children": {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "strong",
+                  "key": null,
+                  "ref": null,
+                  "props": {
+                    "children": "child"
+                  }
+                }
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": {
+                  "kind": "function",
+                  "name": "FunctionComposite",
+                  "displayName": null,
+                  "length": 1
+                },
+                "props": {
+                  "label": "composite-label",
+                  "children": {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "strong",
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "children": "child"
+                    }
+                  }
+                }
+              },
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "strong",
+                  "props": {
+                    "children": "child"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "consoleCalls": []
+      },
+      {
+        "scenarioId": "test-instance-find-basics",
+        "packageName": "react-test-renderer",
+        "nodeEnv": "production",
+        "condition": "default",
+        "mountStrategy": "create-null-then-unstable-flush-sync-update",
+        "result": {
+          "mountStrategy": "create-null-then-unstable-flush-sync-update",
+          "rootSummary": {
+            "kind": "ReactTestInstance",
+            "type": "ul",
+            "props": {
+              "id": "list-root",
+              "children": [
+                {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": {
+                    "kind": "function",
+                    "name": "Item",
+                    "displayName": null,
+                    "length": 1
+                  },
+                  "key": null,
+                  "ref": null,
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                },
+                {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "li",
+                  "key": null,
+                  "ref": null,
+                  "props": {
+                    "kind": "other",
+                    "children": "B"
+                  }
+                },
+                {
+                  "$$typeof": {
+                    "kind": "symbol",
+                    "key": "react.transitional.element",
+                    "description": "react.transitional.element",
+                    "string": "Symbol(react.transitional.element)"
+                  },
+                  "type": "li",
+                  "key": null,
+                  "ref": null,
+                  "props": {
+                    "kind": "other",
+                    "children": "C"
+                  }
+                }
+              ]
+            },
+            "parent": null,
+            "children": [
+              {
+                "kind": "ReactTestInstance",
+                "type": {
+                  "kind": "function",
+                  "name": "Item",
+                  "displayName": null,
+                  "length": 1
+                },
+                "props": {
+                  "kind": "target",
+                  "children": "A"
+                }
+              },
+              {
+                "kind": "ReactTestInstance",
+                "type": "li",
+                "props": {
+                  "kind": "other",
+                  "children": "B"
+                }
+              },
+              {
+                "kind": "ReactTestInstance",
+                "type": "li",
+                "props": {
+                  "kind": "other",
+                  "children": "C"
+                }
+              }
+            ]
+          },
+          "findTarget": {
+            "label": "find target",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": {
+                "kind": "function",
+                "name": "Item",
+                "displayName": null,
+                "length": 1
+              },
+              "props": {
+                "kind": "target",
+                "children": "A"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "ul",
+                "props": {
+                  "id": "list-root",
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "function",
+                        "name": "Item",
+                        "displayName": null,
+                        "length": 1
+                      },
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "kind": "target",
+                        "children": "A"
+                      }
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "B"
+                      }
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "C"
+                      }
+                    }
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                }
+              ]
+            }
+          },
+          "findZero": {
+            "label": "find zero",
+            "status": "throws",
+            "error": {
+              "name": "Error",
+              "message": "No instances found matching custom predicate: (node) => node.props.kind === \"missing\"",
+              "code": null
+            }
+          },
+          "findMultiple": {
+            "label": "find multiple",
+            "status": "throws",
+            "error": {
+              "name": "Error",
+              "message": "Expected 1 but found 3 instances matching custom predicate: (node) => node.type === \"li\"",
+              "code": null
+            }
+          },
+          "findAllLiKinds": [
+            "target",
+            "other",
+            "other"
+          ],
+          "findAllLiDeepFalseKinds": [
+            "target",
+            "other",
+            "other"
+          ],
+          "findByTypeItem": {
+            "label": "findByType Item",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": {
+                "kind": "function",
+                "name": "Item",
+                "displayName": null,
+                "length": 1
+              },
+              "props": {
+                "kind": "target",
+                "children": "A"
+              },
+              "parent": {
+                "kind": "ReactTestInstance",
+                "type": "ul",
+                "props": {
+                  "id": "list-root",
+                  "children": [
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": {
+                        "kind": "function",
+                        "name": "Item",
+                        "displayName": null,
+                        "length": 1
+                      },
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "kind": "target",
+                        "children": "A"
+                      }
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "B"
+                      }
+                    },
+                    {
+                      "$$typeof": {
+                        "kind": "symbol",
+                        "key": "react.transitional.element",
+                        "description": "react.transitional.element",
+                        "string": "Symbol(react.transitional.element)"
+                      },
+                      "type": "li",
+                      "key": null,
+                      "ref": null,
+                      "props": {
+                        "kind": "other",
+                        "children": "C"
+                      }
+                    }
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                }
+              ]
+            }
+          },
+          "findAllByTypeLiCount": 3,
+          "findByPropsRoot": {
+            "label": "findByProps root",
+            "status": "ok",
+            "value": {
+              "kind": "ReactTestInstance",
+              "type": "ul",
+              "props": {
+                "id": "list-root",
+                "children": [
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": {
+                      "kind": "function",
+                      "name": "Item",
+                      "displayName": null,
+                      "length": 1
+                    },
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "kind": "target",
+                      "children": "A"
+                    }
+                  },
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "li",
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "kind": "other",
+                      "children": "B"
+                    }
+                  },
+                  {
+                    "$$typeof": {
+                      "kind": "symbol",
+                      "key": "react.transitional.element",
+                      "description": "react.transitional.element",
+                      "string": "Symbol(react.transitional.element)"
+                    },
+                    "type": "li",
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "kind": "other",
+                      "children": "C"
+                    }
+                  }
+                ]
+              },
+              "parent": null,
+              "children": [
+                {
+                  "kind": "ReactTestInstance",
+                  "type": {
+                    "kind": "function",
+                    "name": "Item",
+                    "displayName": null,
+                    "length": 1
+                  },
+                  "props": {
+                    "kind": "target",
+                    "children": "A"
+                  }
+                },
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "other",
+                    "children": "B"
+                  }
+                },
+                {
+                  "kind": "ReactTestInstance",
+                  "type": "li",
+                  "props": {
+                    "kind": "other",
+                    "children": "C"
+                  }
+                }
+              ]
+            }
+          },
+          "findAllByPropsOtherCount": 2,
+          "findByPropsOtherMultiple": {
+            "label": "findByProps multiple",
+            "status": "throws",
+            "error": {
+              "name": "Error",
+              "message": "Expected 1 but found 2 instances with props: {\"kind\":\"other\"}",
+              "code": null
+            }
+          }
+        },
+        "consoleCalls": []
+      }
+    ]
+  }
+}
