@@ -48,6 +48,7 @@ M0: Orchestration Foundation.
 - Accepted element-object conformance probes from worker-020: React 19.2.6 element object behavior is documented from real tarball probes, including JS property descriptors, key/ref semantics, dev/prod and `react-server` differences, warning behavior, and a layer plan that keeps final public object construction in the JS facade until an oracle proves conformance.
 - Accepted runtime inventory generation from worker-017: the conformance workspace now generates and checks a deterministic React 19.2.6 runtime/package inventory from exact npm metadata and integrity-verified tarballs, with runtime export probes, condition-resolution evidence, no temp path leaks, and explicit false Fast React behavior conformance claims.
 - Accepted structured host operation errors from worker-022: `HostResult<T>` now carries a top-level `HostError`, unsupported capabilities remain inspectable as a distinct variant, the in-memory test renderer returns structured operation errors for invalid handles, missing insert/remove targets, cross-renderer handles, and impossible self/cycle mutations, and failed insert/remove paths preserve the existing tree.
+- Accepted element-object oracle from worker-021: the conformance workspace now has a deterministic React 19.2.6 element-object oracle covering 22 scenarios across default and `react-server` development/production modes, with checked Fast React observations recorded only as known mismatches or unsupported placeholders and all compatibility claims kept false.
 
 ## Worker Roster
 
@@ -73,13 +74,13 @@ M0: Orchestration Foundation.
 | worker-018-test-renderer-mutation-host | merged | Implement minimal canonical mutation test renderer | `worker-progress/worker-018-test-renderer-mutation-host.md` |
 | worker-019-reconciler-host-boundary-migration | merged | Move reconciler placeholder API toward canonical host trait bounds | `worker-progress/worker-019-reconciler-host-boundary-migration.md` |
 | worker-020-element-object-conformance-probes | merged | Probe React 19.2.6 element object behavior and plan safe implementation | `worker-progress/worker-020-element-object-conformance-probes.md` |
-| worker-021-element-object-oracle | running in tmux worktree; nested subagents allowed | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `../fast-react-worker-021-element-object-oracle/worker-progress/worker-021-element-object-oracle.md` |
+| worker-021-element-object-oracle | merged | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `worker-progress/worker-021-element-object-oracle.md` |
 | worker-022-host-operation-errors | merged | Add structured host operation errors for invalid test-renderer operations | `worker-progress/worker-022-host-operation-errors.md` |
 
 ## Next Actions
 
-1. Monitor worker 021 and merge completed work after audit.
-2. Launch follow-up package behavior workers only after the element-object oracle no longer has a moving Fast React target.
+1. Launch follow-up package behavior workers now that the element-object oracle is checked in.
+2. Use the checked oracle to drive the first JS facade element factory implementation without claiming compatibility until comparison statuses turn green.
 
 ## Risks And Open Questions
 
@@ -150,3 +151,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Queued workers 021-022 as the next non-overlapping tranche: element-object conformance oracle and structured host operation errors.
 - 2026-05-09: Launched workers 021-022 as real `codex --yolo` tmux processes in disjoint worktrees.
 - 2026-05-09: Accepted and merged worker-022 structured host operation errors in commit `4ee4c4a`. Closed the worker-022 tmux session after merge. Verified post-rebase with `cargo fmt --all --check`, `cargo test --workspace --all-features`, `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`, and `cargo clippy -p fast-react-test-renderer --all-targets --all-features -- -D warnings`. Regenerable root `Cargo.lock` files remain untracked where Cargo produced them.
+- 2026-05-09: Accepted and merged worker-021 deterministic element-object oracle in commit `d62d912`. Closed the worker-021 tmux session after merge. Verified post-rebase with `npm test --workspace @fast-react/conformance`, `npm run check:js`, element oracle regeneration byte-compare, and the temp/local path leak guard.
+- 2026-05-09: Verified merged `main` after workers 021 and 022 with `npm run check:js`, `cargo fmt --all --check`, `cargo test --workspace --all-features`, `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`, and `cargo clippy -p fast-react-test-renderer --all-targets --all-features -- -D warnings`. Root `Cargo.lock` remains an untracked regenerable artifact.
