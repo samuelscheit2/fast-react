@@ -277,6 +277,7 @@ Dependencies: M8.
 | worker-099-core-hook-state-queue-plan | Produce a report-only plan for hook state queues, eager state, render-phase updates, and optimistic updates | `worker-progress/worker-099-core-hook-state-queue-plan.md` | workers 007,070,078 | running |
 | worker-100-reconciler-function-component-render-plan | Produce a report-only plan for function component rendering, hooks dispatcher state, and bailout boundaries | `worker-progress/worker-100-reconciler-function-component-render-plan.md` | workers 007,070,071,078,081,099 | running |
 | worker-101-test-renderer-root-api-plan | Produce a report-only plan for Rust test-renderer root API create/update/unmount integration | `worker-progress/worker-101-test-renderer-root-api-plan.md` | workers 018,022,073,081,096 | running |
+| worker-102-test-renderer-serialization-plan | Produce a report-only plan for test-renderer toJSON/toTree/TestInstance serialization over committed fibers | `worker-progress/worker-102-test-renderer-serialization-plan.md` | workers 018,022,073,085,101 | running |
 
 ## Merge Policy
 
