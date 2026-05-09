@@ -47,6 +47,7 @@ M0: Orchestration Foundation.
 - Accepted canonical mutation test renderer from worker-018: `fast-react-test-renderer` now implements the canonical host-config traits with opaque handles, in-memory container/instance/text storage, mutation operations, single-parent move behavior, snapshots, and explicit unsupported capability errors without depending on the legacy `HostConfig` shim or reconciler placeholder.
 - Accepted element-object conformance probes from worker-020: React 19.2.6 element object behavior is documented from real tarball probes, including JS property descriptors, key/ref semantics, dev/prod and `react-server` differences, warning behavior, and a layer plan that keeps final public object construction in the JS facade until an oracle proves conformance.
 - Accepted runtime inventory generation from worker-017: the conformance workspace now generates and checks a deterministic React 19.2.6 runtime/package inventory from exact npm metadata and integrity-verified tarballs, with runtime export probes, condition-resolution evidence, no temp path leaks, and explicit false Fast React behavior conformance claims.
+- Accepted structured host operation errors from worker-022: `HostResult<T>` now carries a top-level `HostError`, unsupported capabilities remain inspectable as a distinct variant, the in-memory test renderer returns structured operation errors for invalid handles, missing insert/remove targets, cross-renderer handles, and impossible self/cycle mutations, and failed insert/remove paths preserve the existing tree.
 
 ## Worker Roster
 
@@ -73,11 +74,11 @@ M0: Orchestration Foundation.
 | worker-019-reconciler-host-boundary-migration | merged | Move reconciler placeholder API toward canonical host trait bounds | `worker-progress/worker-019-reconciler-host-boundary-migration.md` |
 | worker-020-element-object-conformance-probes | merged | Probe React 19.2.6 element object behavior and plan safe implementation | `worker-progress/worker-020-element-object-conformance-probes.md` |
 | worker-021-element-object-oracle | running in tmux worktree; nested subagents allowed | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `../fast-react-worker-021-element-object-oracle/worker-progress/worker-021-element-object-oracle.md` |
-| worker-022-host-operation-errors | running in tmux worktree; nested subagents allowed | Add structured host operation errors for invalid test-renderer operations | `../fast-react-worker-022-host-operation-errors/worker-progress/worker-022-host-operation-errors.md` |
+| worker-022-host-operation-errors | merged | Add structured host operation errors for invalid test-renderer operations | `worker-progress/worker-022-host-operation-errors.md` |
 
 ## Next Actions
 
-1. Monitor workers 021 and 022 and merge completed work after audit.
+1. Monitor worker 021 and merge completed work after audit.
 2. Launch follow-up package behavior workers only after the element-object oracle no longer has a moving Fast React target.
 
 ## Risks And Open Questions
@@ -148,3 +149,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Pruned merged Fast React worker worktrees 001-020 after confirming no scoped uncommitted source changes remained. A regenerable untracked `Cargo.lock` in worker-018 was discarded as part of removing the accepted worker worktree.
 - 2026-05-09: Queued workers 021-022 as the next non-overlapping tranche: element-object conformance oracle and structured host operation errors.
 - 2026-05-09: Launched workers 021-022 as real `codex --yolo` tmux processes in disjoint worktrees.
+- 2026-05-09: Accepted and merged worker-022 structured host operation errors in commit `4ee4c4a`. Closed the worker-022 tmux session after merge. Verified post-rebase with `cargo fmt --all --check`, `cargo test --workspace --all-features`, `cargo clippy -p fast-react-host-config --all-targets --all-features -- -D warnings`, and `cargo clippy -p fast-react-test-renderer --all-targets --all-features -- -D warnings`. Regenerable root `Cargo.lock` files remain untracked where Cargo produced them.
