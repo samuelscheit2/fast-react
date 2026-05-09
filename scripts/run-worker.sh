@@ -24,10 +24,11 @@ fi
 
 prompt_text="$(cat "$prompt_file")
 
-Hard guard from the orchestrator:
+Subagent policy from the orchestrator:
 - You are running as a real Codex process in a tmux worker session.
-- Do not spawn managed Codex subagents, explorers, nested agents, or parallel agent tools from inside this worker.
-- If you need independent hypothesis testing, write the requested follow-up in your report so the orchestrator can launch another real tmux worker.
+- You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses or verify work.
+- Nested managed agents spawned inside this worker do not count against the orchestrator's 30 top-level tmux worker limit.
+- If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
 "
 
 script -q "$log_file" codex \

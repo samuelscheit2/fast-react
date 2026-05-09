@@ -23,7 +23,8 @@ M0: Orchestration Foundation.
 - Use `MASTER_PROGRESS.md` for project-wide progress and decisions.
 - Use `worker-progress/<worker-id>.md` for each worker's progress.
 - Workers should read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
-- Workers are real Codex subprocesses launched in tmux. Managed Codex subagents/explorers inside worker sessions are not valid worker output.
+- Top-level workers are real Codex subprocesses launched in tmux.
+- Top-level tmux workers may spawn managed Codex subagents/explorers internally when useful. Those nested agents do not count against the 30 top-level tmux worker limit.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
 - Worker runner requests `gpt-5.5` with `model_reasoning_effort="xhigh"` and uses the local yolo-equivalent Codex flag.
 
@@ -31,9 +32,9 @@ M0: Orchestration Foundation.
 
 | Worker | Status | Assignment | Progress File |
 | --- | --- | --- | --- |
-| worker-001-architecture | running in tmux worktree with managed-subagent prohibition | Test Rust core and renderer-boundary architecture hypotheses | `../fast-react-worker-001-architecture/worker-progress/worker-001-architecture.md` |
-| worker-002-conformance | running in tmux worktree with managed-subagent prohibition | Design React 19.2.6 compatibility inventory and test strategy | `../fast-react-worker-002-conformance/worker-progress/worker-002-conformance.md` |
-| worker-003-scaffold | running in tmux worktree with managed-subagent prohibition | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
+| worker-001-architecture | running in tmux worktree; nested subagents allowed | Test Rust core and renderer-boundary architecture hypotheses | `../fast-react-worker-001-architecture/worker-progress/worker-001-architecture.md` |
+| worker-002-conformance | running in tmux worktree; nested subagents allowed | Design React 19.2.6 compatibility inventory and test strategy | `../fast-react-worker-002-conformance/worker-progress/worker-002-conformance.md` |
+| worker-003-scaffold | running in tmux worktree; nested subagents allowed | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
 
 ## Next Actions
 
@@ -69,3 +70,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Stopped tmux workers 001, 002, and 003 after observing managed internal explorer/subagent use inside their tmux Codex sessions. No canonical worker reports had been written.
 - 2026-05-09: Updated `WORKER_BRIEF.md`, task prompts, prompt template, and `scripts/run-worker.sh` to explicitly forbid managed Codex subagents/explorers inside worker sessions. Independent hypothesis tests must be requested in reports and launched by the orchestrator as separate tmux workers.
 - 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with the explicit managed-subagent prohibition included in both worker files and the launcher prompt.
+- 2026-05-09: Policy corrected: top-level workers still launch as real tmux Codex processes, but workers may spawn managed internal subagents/explorers for their own hypothesis testing. Those nested agents do not count against the 30 top-level tmux worker cap.
+- 2026-05-09: Stopped the three workers before accepting reports written under the superseded managed-subagent prohibition.
+- 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with nested managed subagents allowed.
