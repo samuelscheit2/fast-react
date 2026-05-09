@@ -1,0 +1,385 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import test from "node:test";
+
+import {
+  REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET,
+  REACT_DOM_ROOT_RENDER_E2E_ORACLE_ARTIFACT_PATH,
+  REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES,
+  REACT_DOM_ROOT_RENDER_E2E_SUPPORTING_TARGETS,
+  REACT_DOM_ROOT_RENDER_E2E_TARGET
+} from "../src/react-dom-root-render-e2e-targets.mjs";
+import {
+  REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS,
+  REACT_DOM_ROOT_RENDER_E2E_SCENARIOS
+} from "../src/react-dom-root-render-e2e-scenarios.mjs";
+import {
+  findReactDomRootRenderE2EObservation,
+  readCheckedReactDomRootRenderE2EOracle,
+  readCheckedReactDomRootRenderE2EOracleText
+} from "../src/react-dom-root-render-e2e-oracle.mjs";
+
+const oracle = readCheckedReactDomRootRenderE2EOracle();
+
+test("checked React DOM root render e2e oracle artifact has expected schema and targets", () => {
+  assert.equal(
+    REACT_DOM_ROOT_RENDER_E2E_ORACLE_ARTIFACT_PATH,
+    "oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json"
+  );
+  assert.equal(oracle.schemaVersion, 1);
+  assert.equal(
+    oracle.oracleKind,
+    "react-19.2.6-react-dom-root-render-e2e-oracle"
+  );
+  assert.equal(oracle.generatedArtifacts, true);
+  assert.equal(oracle.deterministic, true);
+  assert.equal(oracle.generation.generatedTimestampIncluded, false);
+  assert.equal(oracle.generation.lifecycleScriptsExecuted, false);
+  assert.equal(oracle.generation.rootManifestsOrLockfilesMutated, false);
+  assert.deepEqual(oracle.reactDomTarget, REACT_DOM_ROOT_RENDER_E2E_TARGET);
+  assert.deepEqual(
+    oracle.supportingRuntimePackages,
+    REACT_DOM_ROOT_RENDER_E2E_SUPPORTING_TARGETS
+  );
+  assert.deepEqual(
+    oracle.fastReactTarget,
+    REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET
+  );
+  assert.equal(oracle.packages["react-dom"].version, "19.2.6");
+  assert.equal(oracle.packages.react.version, "19.2.6");
+  assert.equal(oracle.packages.scheduler.version, "0.27.0");
+  assert.equal(oracle.packages["@fast-react/react-dom"].version, "0.0.0");
+  assert.equal(
+    oracle.sourceInventory.inventoryKind,
+    "react-19.2.6-runtime-package-inventory"
+  );
+});
+
+test("React DOM root render e2e oracle keeps Fast React compatibility claims false", () => {
+  assert.deepEqual(oracle.conformanceClaims, {
+    realReactDomBehaviorCompared: true,
+    fastReactComparedToReactDom: true,
+    fastReactBehaviorCompatible: false,
+    fullDualRunOracleExists: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(
+    oracle.packages["@fast-react/react-dom"].behaviorCompatibilityClaimed,
+    false
+  );
+  assert.equal(oracle.evidenceClaims.fastReactComparedToReactDom, true);
+});
+
+test("React DOM root render e2e oracle covers every scenario in every probe mode", () => {
+  assert.deepEqual(oracle.probeModes, REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES);
+  assert.deepEqual(oracle.scenarios, REACT_DOM_ROOT_RENDER_E2E_SCENARIOS);
+
+  const areas = new Set(oracle.scenarios.map((scenario) => scenario.area));
+  for (const requiredArea of [
+    "Root creation",
+    "Initial render",
+    "Update render",
+    "Replacement render",
+    "Render null",
+    "Unmount",
+    "Unmount error",
+    "flushSync",
+    "Warnings"
+  ]) {
+    assert.ok(areas.has(requiredArea), `missing scenario area ${requiredArea}`);
+  }
+
+  for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+    assert.equal(
+      oracle.reactDomObservations[mode.id].length,
+      REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length
+    );
+    assert.equal(
+      oracle.fastReactObservations[mode.id].length,
+      REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length
+    );
+    assert.equal(
+      oracle.fastReactComparisons[mode.id].length,
+      REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length
+    );
+
+    assert.deepEqual(
+      oracle.reactDomObservations[mode.id].map((observation) =>
+        observation.scenarioId
+      ),
+      REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS
+    );
+
+    for (const scenarioId of REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS) {
+      assert.equal(reactObservation(mode.id, scenarioId).scenarioId, scenarioId);
+      assert.equal(fastReactObservation(mode.id, scenarioId).scenarioId, scenarioId);
+      assert.equal(
+        reactObservation(mode.id, scenarioId).result.result.status,
+        "ok"
+      );
+    }
+  }
+});
+
+test("React DOM createRoot no-render side effects are recorded without child mutation", () => {
+  const value = reactValue(
+    "default-node-development",
+    "create-root-no-render"
+  );
+  assert.equal(value.createRoot.status, "ok");
+  assert.equal(value.createRoot.value.ownPropertyNames[0], "_internalRoot");
+  assert.equal(value.createRoot.value.prototype.constructorName, "ReactDOMRoot");
+  assert.equal(value.beforeTree.textContent, "preserved");
+  assert.equal(value.afterTree.textContent, "preserved");
+  assert.equal(value.createRootMutations.length, 0);
+  assert.deepEqual(value.afterMarker.reactContainerMarkerValueStates, ["object"]);
+  assert.deepEqual(value.afterMarker.reactListeningMarkerValueStates, [
+    "boolean:true"
+  ]);
+  assert.equal(value.listenerSummary.listenerCount, 138);
+  assert.equal(value.ownerDocumentListenerSummary.listenerCount, 1);
+});
+
+test("React DOM initial render and update return undefined and mutate host output", () => {
+  const initial = reactValue("default-node-development", "initial-host-render");
+  assert.deepEqual(initial.renderReturn, { type: "undefined" });
+  assert.deepEqual(initial.flushSync.value, { type: "undefined" });
+  assert.equal(initial.afterTree.childCount, 1);
+  assert.equal(initial.afterTree.children[0].nodeName, "DIV");
+  assert.equal(initial.afterTree.children[0].textContent, "hello");
+  assert.deepEqual(
+    attrMap(initial.afterTree.children[0]),
+    {
+      class: "root-card",
+      "data-phase": "initial",
+      id: "message",
+      title: "initial title"
+    }
+  );
+  assert.ok(
+    initial.renderMutations.some(
+      (mutation) =>
+        mutation.type === "insertBefore" && mutation.child?.id === "message"
+    )
+  );
+
+  const update = reactValue("default-node-development", "update-host-render");
+  assert.deepEqual(update.updateReturn, { type: "undefined" });
+  assert.deepEqual(update.updateFlushSync.value, { type: "undefined" });
+  assert.equal(update.treeAfterUpdate.children[0].textContent, "goodbye");
+  assert.deepEqual(
+    attrMap(update.treeAfterUpdate.children[0]),
+    {
+      class: "root-card updated",
+      "data-phase": "updated",
+      id: "message",
+      title: "updated title"
+    }
+  );
+  assert.ok(
+    update.updateMutations.some(
+      (mutation) =>
+        mutation.type === "setNodeValue" && mutation.value === "goodbye"
+    )
+  );
+});
+
+test("React DOM replacement, render-null, unmount, and double-unmount cleanup are recorded", () => {
+  const replace = reactValue("default-node-development", "replace-host-tree");
+  assert.equal(replace.treeAfterInitialRender.children[0].nodeName, "SPAN");
+  assert.equal(replace.treeAfterReplace.children[0].nodeName, "SECTION");
+  assert.equal(replace.treeAfterReplace.children[0].children[0].nodeName, "B");
+  assert.ok(
+    replace.replaceMutations.some(
+      (mutation) =>
+        mutation.type === "removeChild" && mutation.child?.id === "replace-before"
+    )
+  );
+  assert.ok(
+    replace.replaceMutations.some(
+      (mutation) =>
+        mutation.type === "insertBefore" && mutation.child?.id === "replace-after"
+    )
+  );
+
+  const renderNull = reactValue(
+    "default-node-development",
+    "render-null-clears-container"
+  );
+  assert.deepEqual(renderNull.renderNullReturn, { type: "undefined" });
+  assert.equal(renderNull.treeAfterRenderNull.childCount, 0);
+  assert.deepEqual(
+    renderNull.markerAfterRenderNull.reactContainerMarkerValueStates,
+    ["object"]
+  );
+  assert.deepEqual(
+    renderNull.rootAfterRenderNull.internalRootSlot.value.type,
+    "object"
+  );
+
+  const unmount = reactValue("default-node-development", "root-unmount");
+  assert.deepEqual(unmount.unmount.value, { type: "undefined" });
+  assert.equal(unmount.treeAfterUnmount.childCount, 0);
+  assert.deepEqual(unmount.markerAfterUnmount.reactContainerMarkerValueStates, [
+    "null"
+  ]);
+  assert.deepEqual(unmount.rootAfterUnmount.internalRootSlot.value, {
+    type: "null"
+  });
+
+  const doubleUnmount = reactValue("default-node-development", "double-unmount");
+  assert.deepEqual(doubleUnmount.secondUnmount.value, { type: "undefined" });
+  assert.deepEqual(doubleUnmount.secondUnmountMutations, []);
+  assert.deepEqual(doubleUnmount.afterSecond.marker.reactContainerMarkerValueStates, [
+    "null"
+  ]);
+});
+
+test("React DOM render-after-unmount and flushSync multi-root behavior are recorded", () => {
+  const stale = reactValue("default-node-development", "render-after-unmount");
+  assert.equal(stale.renderAfterUnmount.status, "throws");
+  assert.equal(
+    stale.renderAfterUnmount.thrown.message,
+    "Cannot update an unmounted root."
+  );
+  assert.deepEqual(stale.renderAfterUnmountMutations, []);
+
+  const crossRoot = reactValue(
+    "default-node-development",
+    "flush-sync-cross-root-render"
+  );
+  assert.deepEqual(crossRoot.firstRenderReturn, { type: "undefined" });
+  assert.deepEqual(crossRoot.secondRenderReturn, { type: "undefined" });
+  assert.deepEqual(crossRoot.flushSync.value, {
+    type: "string",
+    value: "two-root-flush-complete"
+  });
+  assert.equal(crossRoot.firstTreeAfterFlush.textContent, "A");
+  assert.equal(crossRoot.secondTreeAfterFlush.textContent, "B");
+  assert.ok(
+    crossRoot.mutations.some(
+      (mutation) =>
+        mutation.type === "insertBefore" && mutation.child?.id === "cross-a"
+    )
+  );
+  assert.ok(
+    crossRoot.mutations.some(
+      (mutation) =>
+        mutation.type === "insertBefore" && mutation.child?.id === "cross-b"
+    )
+  );
+});
+
+test("React DOM focused warning boundaries are development-only", () => {
+  const development = reactValue(
+    "default-node-development",
+    "development-warning-boundaries"
+  );
+  assert.match(
+    firstConsoleString(development.callbackSecondArg),
+    /second callback argument/u
+  );
+  assert.match(
+    firstConsoleString(development.containerSecondArg),
+    /passed a container/u
+  );
+  assert.match(
+    firstConsoleString(development.genericSecondArg),
+    /only accepts one argument/u
+  );
+  assert.match(
+    firstConsoleString(development.unmountCallback),
+    /callback argument/u
+  );
+  assert.match(
+    firstConsoleString(development.duplicateSecond),
+    /already been passed to createRoot/u
+  );
+
+  const production = reactValue(
+    "default-node-production",
+    "development-warning-boundaries"
+  );
+  assert.equal(production.callbackSecondArg.consoleCalls.length, 0);
+  assert.equal(production.containerSecondArg.consoleCalls.length, 0);
+  assert.equal(production.genericSecondArg.consoleCalls.length, 0);
+  assert.equal(production.unmountCallback.consoleCalls.length, 0);
+  assert.equal(production.duplicateSecond.consoleCalls.length, 0);
+});
+
+test("Fast React root render e2e comparisons stay explicit and non-compatible", () => {
+  for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+    const comparisons = oracle.fastReactComparisons[mode.id];
+    assert.equal(comparisons.length, REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length);
+    for (const comparison of comparisons) {
+      assert.equal(comparison.status, "unsupported-placeholder");
+      assert.equal(comparison.compatibilityClaimed, false);
+      assert.notEqual(comparison.firstDifferencePath, null);
+      assert.equal(comparison.fastReactResultStatus, "ok");
+    }
+  }
+});
+
+test("React DOM root render e2e oracle artifact does not leak paths or randomized markers", () => {
+  const oracleText = readCheckedReactDomRootRenderE2EOracleText();
+  assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
+  assert.doesNotMatch(oracleText, /\/var\/folders/u);
+  assert.doesNotMatch(oracleText, /\/tmp\//u);
+  assert.doesNotMatch(
+    oracleText,
+    /fast-react-react-dom-root-render-e2e-oracle-[A-Za-z0-9]/u
+  );
+  assert.doesNotMatch(oracleText, /Users\/user/u);
+  assert.doesNotMatch(oracleText, /Developer\/Developer/u);
+  assert.doesNotMatch(oracleText, /__react(?:Container|Fiber|Props|Events)\$/u);
+  assert.doesNotMatch(oracleText, /_reactListening[A-Za-z0-9]/u);
+});
+
+test("print React DOM root render e2e oracle CLI emits the checked-in artifact", () => {
+  const checkedText = readCheckedReactDomRootRenderE2EOracleText();
+  const output = execFileSync(
+    process.execPath,
+    ["scripts/print-react-dom-root-render-e2e-oracle.mjs", "--format=json"],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+      maxBuffer: checkedText.length + 1024
+    }
+  );
+
+  assert.equal(output, checkedText);
+});
+
+function reactObservation(modeId, scenarioId) {
+  return findReactDomRootRenderE2EObservation(
+    oracle,
+    modeId,
+    oracle.reactDomTarget.packageName,
+    scenarioId
+  );
+}
+
+function fastReactObservation(modeId, scenarioId) {
+  return findReactDomRootRenderE2EObservation(
+    oracle,
+    modeId,
+    oracle.fastReactTarget.packageName,
+    scenarioId
+  );
+}
+
+function reactValue(modeId, scenarioId) {
+  const result = reactObservation(modeId, scenarioId).result.result;
+  assert.equal(result.status, "ok", `${modeId}:${scenarioId} should be ok`);
+  return result.value;
+}
+
+function attrMap(node) {
+  return Object.fromEntries(node.attributes);
+}
+
+function firstConsoleString(operation) {
+  const firstArg = operation.consoleCalls[0]?.args[0];
+  assert.equal(firstArg?.type, "string");
+  return firstArg.value;
+}
