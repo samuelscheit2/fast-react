@@ -101,12 +101,12 @@ Merged implementation plans:
 
 Next queue:
 
-- Slice 0 host-token compile alignment is the next serial Rust source task.
-- Remaining Slice 1 core topology modules can be split into non-overlapping
-  workers, but `fast-react-core/src/lib.rs` export edits must be serialized.
-- Scheduler mock source implementation may run in parallel because it owns
-  package-level scheduler files and must stay isolated from root scheduler
-  state.
+- Worker 118 is running Slice 0 host-token compile alignment.
+- Worker 119 is running Slice 1 core fiber identity/topology foundation and owns
+  `fast-react-core/src/lib.rs` for that tranche.
+- Worker 120 is running scheduler mock source implementation in package-level
+  scheduler files, isolated from root scheduler state.
+- Worker 121 is running the React DOM root render/update/unmount e2e oracle.
 
 When new implementation workers are queued or accepted, update this plan with
 only durable decisions and the next active queue. Do not re-add a full

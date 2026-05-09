@@ -55,15 +55,16 @@ Last updated: 2026-05-10
 
 ## Current Worker Snapshot
 
-Top-level tmux worker count should stay at or below 30. Current live count: 0.
+Top-level tmux worker count should stay at or below 30. Current live count: 4.
 
-Ready to queue:
+Running:
 
-- Slice 0 host-token compile alignment.
-- Follow-up core topology modules from Slice 1 that were not covered by
-  workers 047, 075, and 076.
-- Scheduler mock source implementation can run in parallel because it owns
-  package-level scheduler files.
+- 118: Slice 0 host-token compile alignment.
+- 119: Slice 1 core fiber identity/topology foundation; owns
+  `fast-react-core/src/lib.rs` for this tranche.
+- 120: Scheduler mock source implementation, isolated from root scheduler
+  mutable state.
+- 121: React DOM root render/update/unmount e2e oracle.
 
 Use live `tmux capture-pane` and worktree status as the source of truth before
 accepting any worker; this snapshot is only a routing aid.
@@ -94,7 +95,9 @@ accepting any worker; this snapshot is only a routing aid.
    ownership and serialized `fast-react-core/src/lib.rs` exports.
 3. Launch scheduler mock source implementation in parallel if it stays isolated
    from root scheduler state.
-4. After each accepted batch, update this file with only the durable delta and
+4. Audit workers 118-121 when they report `Goal achieved`; run their scoped
+   Rust/JS gates before merge.
+5. After each accepted batch, update this file with only the durable delta and
    prune obsolete status lines.
 
 ## Verification Notes
