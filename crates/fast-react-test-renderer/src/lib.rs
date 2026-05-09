@@ -10,8 +10,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use fast_react_host_config::{
     HostCapability, HostCapabilitySet, HostChild, HostChildKind, HostCommit, HostCreation,
-    HostError, HostHandleKind, HostIdentityAndContext, HostMutationViolation, HostOperationError,
-    HostParentKind, HostResult, HostTypes, InitialChildrenFinalization, MutationHost,
+    HostError, HostFiberTokenPhase, HostFiberTokenRef, HostFiberTokenTarget,
+    HostFiberTokenViolation, HostHandleKind, HostIdentityAndContext, HostMutationViolation,
+    HostOperationError, HostParentKind, HostResult, HostTypes, InitialChildrenFinalization,
+    MutationHost,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
@@ -360,10 +362,46 @@ impl TestRenderer {
     ) -> HostError {
         HostOperationError::impossible_mutation(TEST_RENDERER_NAME, parent, child, violation).into()
     }
+
+    fn invalid_fiber_token_error(
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+        violation: HostFiberTokenViolation,
+    ) -> HostError {
+        HostOperationError::invalid_fiber_token(TEST_RENDERER_NAME, phase, target, violation).into()
+    }
+
+    fn validate_fiber_token(
+        &self,
+        token: HostFiberTokenRef<'_, Self>,
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+    ) -> HostResult<()> {
+        if token.phase() != phase {
+            return Err(Self::invalid_fiber_token_error(
+                token.phase(),
+                token.target(),
+                HostFiberTokenViolation::WrongPhase,
+            ));
+        }
+
+        if token.target() != target {
+            return Err(Self::invalid_fiber_token_error(
+                token.phase(),
+                token.target(),
+                HostFiberTokenViolation::WrongTarget,
+            ));
+        }
+
+        let _opaque_token = token.token();
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct TestRendererId(u64);
+
+pub type TestHostFiberToken = u64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TestContainer {
@@ -593,6 +631,7 @@ impl TestChildHandle {
 }
 
 impl HostTypes for TestRenderer {
+    type HostFiberToken = TestHostFiberToken;
     type Type = TestElementType;
     type Props = TestProps;
     type Container = TestContainer;
@@ -672,21 +711,33 @@ impl HostCreation for TestRenderer {
 
     fn create_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         ty: &Self::Type,
         props: &Self::Props,
         container: &Self::Container,
         _context: &Self::HostContext,
     ) -> HostResult<Self::Instance> {
+        self.validate_fiber_token(
+            token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        )?;
         self.container_record(*container)?;
         Ok(self.push_instance(ty.clone(), props.clone()))
     }
 
     fn create_text_instance(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         text: &str,
         container: &Self::Container,
         _context: &Self::HostContext,
     ) -> HostResult<Self::TextInstance> {
+        self.validate_fiber_token(
+            token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        )?;
         self.container_record(*container)?;
         Ok(self.push_text(text.to_owned()))
     }
@@ -770,22 +821,34 @@ impl HostCommit for TestRenderer {
 
     fn commit_mount(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         instance: &mut Self::Instance,
         _ty: &Self::Type,
         _props: &Self::Props,
     ) -> HostResult<()> {
+        self.validate_fiber_token(
+            token,
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::Instance,
+        )?;
         self.instance_record(*instance)?;
         Ok(())
     }
 
     fn commit_update(
         &mut self,
+        token: HostFiberTokenRef<'_, Self>,
         instance: &mut Self::Instance,
         update_payload: Self::UpdatePayload,
         _ty: &Self::Type,
         _old_props: &Self::Props,
         _new_props: &Self::Props,
     ) -> HostResult<()> {
+        self.validate_fiber_token(
+            token,
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::Instance,
+        )?;
         self.instance_record_mut(*instance)?.props = update_payload.props;
         Ok(())
     }
@@ -833,7 +896,16 @@ impl HostCommit for TestRenderer {
         Ok(())
     }
 
-    fn detach_deleted_instance(&mut self, instance: Self::Instance) -> HostResult<()> {
+    fn detach_deleted_instance(
+        &mut self,
+        token: HostFiberTokenRef<'_, Self>,
+        instance: Self::Instance,
+    ) -> HostResult<()> {
+        self.validate_fiber_token(
+            token,
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::Instance,
+        )?;
         let record = self.instance_record_mut(instance)?;
         record.children.clear();
         record.detached = true;
@@ -961,12 +1033,46 @@ mod tests {
     use super::*;
     use fast_react_host_config::{HostOperationErrorKind, HostTreeUpdateMode, MutationRenderer};
 
+    static TEST_HOST_FIBER_TOKEN: TestHostFiberToken = 1;
+
     fn element_type(name: &str) -> TestElementType {
         TestElementType::new(name)
     }
 
     fn props() -> TestProps {
         TestProps::new()
+    }
+
+    fn host_fiber_token(
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+    ) -> HostFiberTokenRef<'static, TestRenderer> {
+        HostFiberTokenRef::new(&TEST_HOST_FIBER_TOKEN, phase, target)
+    }
+
+    fn creation_instance_token() -> HostFiberTokenRef<'static, TestRenderer> {
+        host_fiber_token(
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        )
+    }
+
+    fn creation_text_token() -> HostFiberTokenRef<'static, TestRenderer> {
+        host_fiber_token(
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        )
+    }
+
+    fn commit_instance_token() -> HostFiberTokenRef<'static, TestRenderer> {
+        host_fiber_token(HostFiberTokenPhase::Commit, HostFiberTokenTarget::Instance)
+    }
+
+    fn deletion_instance_token() -> HostFiberTokenRef<'static, TestRenderer> {
+        host_fiber_token(
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::Instance,
+        )
     }
 
     fn create_instance(
@@ -976,7 +1082,13 @@ mod tests {
     ) -> TestInstance {
         let context = renderer.root_host_context(container).unwrap();
         renderer
-            .create_instance(&element_type(name), &props(), container, &context)
+            .create_instance(
+                creation_instance_token(),
+                &element_type(name),
+                &props(),
+                container,
+                &context,
+            )
             .unwrap()
     }
 
@@ -987,7 +1099,7 @@ mod tests {
     ) -> TestTextInstance {
         let context = renderer.root_host_context(container).unwrap();
         renderer
-            .create_text_instance(text, container, &context)
+            .create_text_instance(creation_text_token(), text, container, &context)
             .unwrap()
     }
 
@@ -1054,6 +1166,7 @@ mod tests {
 
         let instance = renderer
             .create_instance(
+                creation_instance_token(),
                 &element_type("View"),
                 &props().with_attribute("role", "main"),
                 &container,
@@ -1061,7 +1174,7 @@ mod tests {
             )
             .unwrap();
         let text = renderer
-            .create_text_instance("hello", &container, &context)
+            .create_text_instance(creation_text_token(), "hello", &container, &context)
             .unwrap();
 
         assert_eq!(context.depth(), 0);
@@ -1313,6 +1426,7 @@ mod tests {
 
         renderer
             .commit_update(
+                commit_instance_token(),
                 &mut instance,
                 TestUpdatePayload::replace_props(props().with_attribute("updated", "yes")),
                 &element_type("View"),
@@ -1343,12 +1457,99 @@ mod tests {
 
         renderer.unhide_instance(&mut instance, &props()).unwrap();
         renderer.unhide_text_instance(&mut text, "new").unwrap();
-        renderer.detach_deleted_instance(instance).unwrap();
+        renderer
+            .detach_deleted_instance(deletion_instance_token(), instance)
+            .unwrap();
 
         let snapshot = renderer.snapshot_instance(&instance).unwrap();
         assert!(!snapshot.is_hidden());
         assert!(snapshot.is_detached());
         assert!(snapshot.children().is_empty());
+    }
+
+    #[test]
+    fn lifecycle_hooks_reject_wrong_fiber_token_phase_or_target() {
+        let mut renderer = TestRenderer::new();
+        let container = renderer.create_container();
+        let context = renderer.root_host_context(&container).unwrap();
+        let mut instance = create_instance(&mut renderer, &container, "View");
+
+        assert_operation_error(
+            renderer
+                .create_instance(
+                    commit_instance_token(),
+                    &element_type("View"),
+                    &props(),
+                    &container,
+                    &context,
+                )
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidFiberToken {
+                phase: HostFiberTokenPhase::Commit,
+                target: HostFiberTokenTarget::Instance,
+                violation: HostFiberTokenViolation::WrongPhase,
+            },
+        );
+
+        assert_operation_error(
+            renderer
+                .create_text_instance(creation_instance_token(), "text", &container, &context)
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidFiberToken {
+                phase: HostFiberTokenPhase::Creation,
+                target: HostFiberTokenTarget::Instance,
+                violation: HostFiberTokenViolation::WrongTarget,
+            },
+        );
+
+        assert_operation_error(
+            renderer
+                .commit_mount(
+                    creation_instance_token(),
+                    &mut instance,
+                    &element_type("View"),
+                    &props(),
+                )
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidFiberToken {
+                phase: HostFiberTokenPhase::Creation,
+                target: HostFiberTokenTarget::Instance,
+                violation: HostFiberTokenViolation::WrongPhase,
+            },
+        );
+
+        assert_operation_error(
+            renderer
+                .commit_update(
+                    creation_instance_token(),
+                    &mut instance,
+                    TestUpdatePayload::replace_props(props().with_attribute("updated", "no")),
+                    &element_type("View"),
+                    &props(),
+                    &props().with_attribute("updated", "no"),
+                )
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidFiberToken {
+                phase: HostFiberTokenPhase::Creation,
+                target: HostFiberTokenTarget::Instance,
+                violation: HostFiberTokenViolation::WrongPhase,
+            },
+        );
+
+        assert_operation_error(
+            renderer
+                .detach_deleted_instance(commit_instance_token(), instance)
+                .unwrap_err(),
+            HostOperationErrorKind::InvalidFiberToken {
+                phase: HostFiberTokenPhase::Commit,
+                target: HostFiberTokenTarget::Instance,
+                violation: HostFiberTokenViolation::WrongPhase,
+            },
+        );
+
+        let snapshot = renderer.snapshot_instance(&instance).unwrap();
+        assert!(!snapshot.is_detached());
+        assert!(snapshot.props().attributes().is_empty());
     }
 
     #[test]
@@ -1376,6 +1577,7 @@ mod tests {
         assert_operation_error(
             renderer
                 .create_instance(
+                    creation_instance_token(),
                     &element_type("View"),
                     &props(),
                     &invalid_container,
