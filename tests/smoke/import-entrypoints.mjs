@@ -176,6 +176,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/jsx-runtime.react-server.js',
   '@fast-react/react/jsx-dev-runtime.react-server.js',
   '@fast-react/react/children-helper.js',
+  '@fast-react/react/component-class.js',
   '@fast-react/react/context-object.js',
   '@fast-react/react/element-factory.js',
   '@fast-react/react/ref-object.js',
@@ -774,6 +775,243 @@ function assertForwardRefBehavior(react, label, options = {}) {
   }
 }
 
+function assertComponentClassBehavior(react, label, options = {}) {
+  const development = options.development !== false;
+
+  for (const exportName of ['Component', 'PureComponent']) {
+    const descriptor = Object.getOwnPropertyDescriptor(react, exportName);
+    assert.equal(descriptor.enumerable, true, `${label}.${exportName}`);
+    assert.equal(descriptor.configurable, true, `${label}.${exportName}`);
+    assert.equal(descriptor.writable, true, `${label}.${exportName}`);
+    assert.equal(typeof react[exportName], 'function', `${label}.${exportName}`);
+    assert.equal(react[exportName].name, exportName, `${label}.${exportName}`);
+    assert.equal(react[exportName].length, 3, `${label}.${exportName}`);
+    assert.deepEqual(Reflect.ownKeys(react[exportName]), [
+      'length',
+      'name',
+      'prototype'
+    ]);
+  }
+
+  assert.deepEqual(
+    Reflect.ownKeys(react.Component.prototype),
+    development
+      ? [
+          'constructor',
+          'isReactComponent',
+          'setState',
+          'forceUpdate',
+          'isMounted',
+          'replaceState'
+        ]
+      : ['constructor', 'isReactComponent', 'setState', 'forceUpdate'],
+    `${label}.Component.prototype ownKeys`
+  );
+  assert.deepEqual(Object.keys(react.Component.prototype), [
+    'isReactComponent',
+    'setState',
+    'forceUpdate'
+  ]);
+  assert.deepEqual(Object.keys(react.PureComponent.prototype), [
+    'constructor',
+    'isReactComponent',
+    'setState',
+    'forceUpdate',
+    'isPureReactComponent'
+  ]);
+  assert.equal(
+    Object.getPrototypeOf(react.PureComponent.prototype),
+    react.Component.prototype,
+    `${label}.PureComponent prototype chain`
+  );
+  assert.equal(
+    react.PureComponent.prototype.setState,
+    react.Component.prototype.setState,
+    `${label}.setState identity`
+  );
+  assert.equal(
+    react.PureComponent.prototype.forceUpdate,
+    react.Component.prototype.forceUpdate,
+    `${label}.forceUpdate identity`
+  );
+  assert.equal(
+    react.PureComponent.prototype.isReactComponent,
+    react.Component.prototype.isReactComponent,
+    `${label}.isReactComponent identity`
+  );
+  assert.equal(react.PureComponent.prototype.isPureReactComponent, true, label);
+  assert.equal(react.Component.prototype.setState.name, '', label);
+  assert.equal(react.Component.prototype.setState.length, 2, label);
+  assert.equal(react.Component.prototype.forceUpdate.name, '', label);
+  assert.equal(react.Component.prototype.forceUpdate.length, 1, label);
+
+  const props = { label: 'props' };
+  const context = { label: 'context' };
+  const updaterCalls = [];
+  const updater = {
+    enqueueSetState() {
+      updaterCalls.push(['setState', ...arguments]);
+      return 'ignored-return';
+    },
+    enqueueForceUpdate() {
+      updaterCalls.push(['forceUpdate', ...arguments]);
+      return 'ignored-return';
+    }
+  };
+  const component = new react.Component(props, context, updater, 'ignored');
+  const pureComponent = new react.PureComponent(
+    props,
+    context,
+    updater,
+    'ignored'
+  );
+
+  assert.deepEqual(Object.keys(component), [
+    'props',
+    'context',
+    'refs',
+    'updater'
+  ]);
+  assert.deepEqual(Object.keys(pureComponent), [
+    'props',
+    'context',
+    'refs',
+    'updater'
+  ]);
+  assert.equal(component.props, props, `${label}.props identity`);
+  assert.equal(component.context, context, `${label}.context identity`);
+  assert.equal(component.updater, updater, `${label}.updater identity`);
+  assert.equal(pureComponent.props, props, `${label}.pure props identity`);
+  assert.equal(pureComponent.context, context, `${label}.pure context identity`);
+  assert.equal(pureComponent.updater, updater, `${label}.pure updater identity`);
+  assert.equal(component instanceof react.Component, true, label);
+  assert.equal(pureComponent instanceof react.PureComponent, true, label);
+  assert.equal(pureComponent instanceof react.Component, true, label);
+  assert.equal(component.refs, pureComponent.refs, `${label}.refs shared`);
+
+  const defaultComponent = new react.Component('default-props', 'default-ctx');
+  const secondDefault = new react.Component('second-props', 'second-ctx');
+  const defaultPure = new react.PureComponent('pure-props', 'pure-ctx');
+  assert.equal(defaultComponent.refs, secondDefault.refs, label);
+  assert.equal(defaultComponent.refs, defaultPure.refs, label);
+  assert.equal(defaultComponent.updater, secondDefault.updater, label);
+  assert.equal(defaultComponent.updater, defaultPure.updater, label);
+  assert.deepEqual(Object.keys(defaultComponent.refs), [], label);
+  assert.equal(Object.isFrozen(defaultComponent.refs), development, label);
+  assert.equal(Object.isSealed(defaultComponent.refs), development, label);
+  assert.equal(Object.isExtensible(defaultComponent.refs), !development, label);
+  assert.deepEqual(Object.keys(defaultComponent.updater), [
+    'isMounted',
+    'enqueueForceUpdate',
+    'enqueueReplaceState',
+    'enqueueSetState'
+  ]);
+  assert.equal(defaultComponent.updater.isMounted(), false, label);
+  assert.equal(
+    defaultComponent.updater.enqueueSetState.length,
+    development ? 1 : 0,
+    label
+  );
+  assert.equal(
+    defaultComponent.updater.enqueueForceUpdate.length,
+    development ? 1 : 0,
+    label
+  );
+
+  const callback = function callback() {
+    throw new Error('callback should not be called by Component directly');
+  };
+  assert.equal(component.setState({ next: true }, callback), undefined, label);
+  assert.equal(component.forceUpdate(callback), undefined, label);
+  assert.equal(pureComponent.setState(null, 'string-callback'), undefined, label);
+  assert.equal(updaterCalls.length, 3, `${label}.custom updater calls`);
+  assert.equal(updaterCalls[0][0], 'setState', label);
+  assert.equal(updaterCalls[0][1], component, label);
+  assert.deepEqual(updaterCalls[0][4], 'setState', label);
+  assert.equal(updaterCalls[1][0], 'forceUpdate', label);
+  assert.equal(updaterCalls[1][1], component, label);
+  assert.equal(updaterCalls[1][3], 'forceUpdate', label);
+  assert.equal(updaterCalls[2][0], 'setState', label);
+  assert.equal(updaterCalls[2][1], pureComponent, label);
+
+  assert.throws(
+    () => defaultComponent.setState('bad'),
+    /takes an object of state variables/,
+    `${label}.invalid setState`
+  );
+
+  const callTarget = { existing: true };
+  assert.equal(
+    react.Component.call(callTarget, 'call-props', 'call-context'),
+    undefined,
+    label
+  );
+  assert.equal(callTarget.props, 'call-props', label);
+  assert.equal(callTarget.context, 'call-context', label);
+  assert.equal(Object.getPrototypeOf(callTarget), Object.prototype, label);
+  assert.equal(callTarget instanceof react.Component, false, label);
+  assert.throws(() => {
+    const Component = react.Component;
+    Component('var-props', 'var-context');
+  }, /Cannot set properties of undefined/);
+  assert.throws(
+    () => react.Component.call(null, 'null-props', 'null-context'),
+    /Cannot set properties of null/
+  );
+  const boundTarget = { existing: true };
+  const BoundComponent = react.Component.bind(boundTarget);
+  assert.equal(BoundComponent.name, 'bound Component', label);
+  assert.equal(BoundComponent('bound-props', 'bound-context'), undefined, label);
+  assert.equal(boundTarget.props, 'bound-props', label);
+  const boundInstance = new BoundComponent('new-props', 'new-context');
+  assert.equal(boundInstance instanceof react.Component, true, label);
+  assert.equal(boundInstance instanceof BoundComponent, true, label);
+  assert.equal(boundInstance.props, 'new-props', label);
+
+  if (development) {
+    const errors = [];
+    const warns = [];
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    console.error = (...args) => {
+      errors.push(args);
+    };
+    console.warn = (...args) => {
+      warns.push(args);
+    };
+    try {
+      const noopComponent = new react.Component('noop-props', 'noop-context');
+      const noopPure = new react.PureComponent('pure-props', 'pure-context');
+      assert.equal(noopComponent.setState({ value: 1 }), undefined, label);
+      assert.equal(noopComponent.setState({ value: 2 }), undefined, label);
+      assert.equal(noopComponent.forceUpdate(), undefined, label);
+      assert.equal(noopComponent.forceUpdate(), undefined, label);
+      assert.equal(noopPure.setState({ pure: true }), undefined, label);
+      assert.equal(noopPure.forceUpdate(), undefined, label);
+      assert.equal(noopComponent.isMounted, undefined, label);
+      assert.equal(noopComponent.replaceState, undefined, label);
+    } finally {
+      console.error = originalError;
+      console.warn = originalWarn;
+    }
+    assert.deepEqual(
+      errors.map((args) => args.slice(1)),
+      [
+        ['setState', 'Component'],
+        ['forceUpdate', 'Component'],
+        ['setState', 'PureComponent'],
+        ['forceUpdate', 'PureComponent']
+      ],
+      `${label}.noop warnings`
+    );
+    assert.deepEqual(
+      warns.map((args) => args[1]),
+      ['isMounted', 'replaceState'],
+      `${label}.deprecated warnings`
+    );
+  }
+}
+
 function assertJsxRuntimeBehavior(runtime, label) {
   const config = { children: 'child' };
   const element = runtime.jsx('div', config);
@@ -836,12 +1074,15 @@ function assertReactPlaceholderBehavior(react, label, options = {}) {
   assertWrapperObjectBehavior(react, label, options);
   assertForwardRefBehavior(react, label, options);
 
-  if (Object.hasOwn(react, 'useRef')) {
-    assertUnimplemented(() => react.useRef(null), `${label}.useRef`);
+  if (Object.hasOwn(react, 'Component')) {
+    assertComponentClassBehavior(react, label, options);
+  } else {
+    assert.equal(react.Component, undefined, `${label}.Component`);
+    assert.equal(react.PureComponent, undefined, `${label}.PureComponent`);
   }
 
-  if (Object.hasOwn(react, 'Component')) {
-    assertUnimplemented(() => new react.Component(), `${label}.Component`);
+  if (Object.hasOwn(react, 'useRef')) {
+    assertUnimplemented(() => react.useRef(null), `${label}.useRef`);
   }
 
   const privateInternals =
@@ -1078,6 +1319,104 @@ async function assertProductionJsxDevUndefined() {
       const forwardRefFromNew = new React.forwardRef(Component);
       assert.equal(forwardRefFromNew.render, Component, label);
       assert.equal(forwardRefFromNew instanceof React.forwardRef, false, label);
+
+      if (label === 'react') {
+        assert.equal(React.Component.name, 'Component', label);
+        assert.equal(React.Component.length, 3, label);
+        assert.equal(React.PureComponent.name, 'PureComponent', label);
+        assert.equal(React.PureComponent.length, 3, label);
+        assert.deepEqual(Reflect.ownKeys(React.Component.prototype), [
+          'constructor',
+          'isReactComponent',
+          'setState',
+          'forceUpdate'
+        ], label);
+        assert.deepEqual(Object.keys(React.PureComponent.prototype), [
+          'constructor',
+          'isReactComponent',
+          'setState',
+          'forceUpdate',
+          'isPureReactComponent'
+        ], label);
+        assert.equal(
+          Object.getPrototypeOf(React.PureComponent.prototype),
+          React.Component.prototype,
+          label
+        );
+        const props = { label: 'prod-props' };
+        const context = { label: 'prod-context' };
+        const calls = [];
+        const updater = {
+          enqueueSetState() {
+            calls.push(['setState', ...arguments]);
+          },
+          enqueueForceUpdate() {
+            calls.push(['forceUpdate', ...arguments]);
+          }
+        };
+        const component = new React.Component(props, context, updater, 'ignored');
+        const pure = new React.PureComponent(props, context, updater, 'ignored');
+        assert.deepEqual(Object.keys(component), [
+          'props',
+          'context',
+          'refs',
+          'updater'
+        ], label);
+        assert.equal(component.props, props, label);
+        assert.equal(component.context, context, label);
+        assert.equal(component.updater, updater, label);
+        assert.equal(component.refs, pure.refs, label);
+        assert.equal(pure instanceof React.PureComponent, true, label);
+        assert.equal(pure instanceof React.Component, true, label);
+        const defaultComponent = new React.Component('props', 'context');
+        const secondDefault = new React.Component('props2', 'context2');
+        assert.equal(defaultComponent.refs, secondDefault.refs, label);
+        assert.equal(Object.isFrozen(defaultComponent.refs), false, label);
+        assert.equal(Object.isSealed(defaultComponent.refs), false, label);
+        assert.equal(Object.isExtensible(defaultComponent.refs), true, label);
+        assert.deepEqual(Object.keys(defaultComponent.updater), [
+          'isMounted',
+          'enqueueForceUpdate',
+          'enqueueReplaceState',
+          'enqueueSetState'
+        ], label);
+        assert.equal(defaultComponent.updater.enqueueSetState.length, 0, label);
+        assert.equal(defaultComponent.updater.enqueueForceUpdate.length, 0, label);
+        assert.equal(defaultComponent.setState({ value: 1 }), undefined, label);
+        assert.equal(defaultComponent.forceUpdate(), undefined, label);
+        assert.equal(component.setState({ next: true }, 'callback'), undefined, label);
+        assert.equal(component.forceUpdate('callback'), undefined, label);
+        assert.equal(calls.length, 2, label);
+        assert.equal(calls[0][0], 'setState', label);
+        assert.equal(calls[0][1], component, label);
+        assert.equal(calls[0].at(-1), 'setState', label);
+        assert.equal(calls[1][0], 'forceUpdate', label);
+        assert.equal(calls[1][1], component, label);
+        assert.equal(calls[1].at(-1), 'forceUpdate', label);
+        assert.throws(
+          () => defaultComponent.setState('bad'),
+          /takes an object of state variables/,
+          label
+        );
+        const callTarget = {};
+        assert.equal(
+          React.Component.call(callTarget, 'call-props', 'call-context'),
+          undefined,
+          label
+        );
+        assert.equal(callTarget.props, 'call-props', label);
+        const BoundComponent = React.Component.bind({});
+        const boundInstance = new BoundComponent('bound-props', 'bound-context');
+        assert.equal(boundInstance instanceof React.Component, true, label);
+        assert.equal(boundInstance instanceof BoundComponent, true, label);
+        assert.equal(defaultComponent.isMounted, undefined, label);
+        assert.equal(defaultComponent.replaceState, undefined, label);
+      } else {
+        assert.equal(Object.hasOwn(React, 'Component'), false, label);
+        assert.equal(Object.hasOwn(React, 'PureComponent'), false, label);
+        assert.equal(React.Component, undefined, label);
+        assert.equal(React.PureComponent, undefined, label);
+      }
     }
   `;
 
@@ -1275,6 +1614,90 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
       assert.equal(context._currentRenderer2, null, label);
     }
 
+    function assertDevComponentClasses(moduleExports, label) {
+      assert.equal(moduleExports.Component.name, 'Component', label);
+      assert.equal(moduleExports.Component.length, 3, label);
+      assert.equal(moduleExports.PureComponent.name, 'PureComponent', label);
+      assert.equal(moduleExports.PureComponent.length, 3, label);
+      assert.deepEqual(Reflect.ownKeys(moduleExports.Component.prototype), [
+        'constructor',
+        'isReactComponent',
+        'setState',
+        'forceUpdate',
+        'isMounted',
+        'replaceState'
+      ], label);
+      assert.deepEqual(Object.keys(moduleExports.PureComponent.prototype), [
+        'constructor',
+        'isReactComponent',
+        'setState',
+        'forceUpdate',
+        'isPureReactComponent'
+      ], label);
+      assert.equal(
+        Object.getPrototypeOf(moduleExports.PureComponent.prototype),
+        moduleExports.Component.prototype,
+        label
+      );
+      const props = { label: 'dev-props' };
+      const context = { label: 'dev-context' };
+      const calls = [];
+      const updater = {
+        enqueueSetState() {
+          calls.push(['setState', ...arguments]);
+        },
+        enqueueForceUpdate() {
+          calls.push(['forceUpdate', ...arguments]);
+        }
+      };
+      const component = new moduleExports.Component(
+        props,
+        context,
+        updater,
+        'ignored'
+      );
+      const pure = new moduleExports.PureComponent(
+        props,
+        context,
+        updater,
+        'ignored'
+      );
+      assert.deepEqual(Object.keys(component), [
+        'props',
+        'context',
+        'refs',
+        'updater'
+      ], label);
+      assert.equal(component.props, props, label);
+      assert.equal(component.context, context, label);
+      assert.equal(component.updater, updater, label);
+      assert.equal(component.refs, pure.refs, label);
+      assert.equal(pure instanceof moduleExports.PureComponent, true, label);
+      assert.equal(pure instanceof moduleExports.Component, true, label);
+      const defaultComponent = new moduleExports.Component('props', 'context');
+      const secondDefault = new moduleExports.Component('props2', 'context2');
+      assert.equal(defaultComponent.refs, secondDefault.refs, label);
+      assert.equal(Object.isFrozen(defaultComponent.refs), true, label);
+      assert.equal(Object.isSealed(defaultComponent.refs), true, label);
+      assert.equal(Object.isExtensible(defaultComponent.refs), false, label);
+      assert.deepEqual(Object.keys(defaultComponent.updater), [
+        'isMounted',
+        'enqueueForceUpdate',
+        'enqueueReplaceState',
+        'enqueueSetState'
+      ], label);
+      assert.equal(defaultComponent.updater.enqueueSetState.length, 1, label);
+      assert.equal(component.setState({ next: true }, 'callback'), undefined, label);
+      assert.equal(component.forceUpdate('callback'), undefined, label);
+      assert.equal(calls.length, 2, label);
+      assert.equal(calls[0][0], 'setState', label);
+      assert.equal(calls[0][1], component, label);
+      assert.equal(calls[0].at(-1), 'setState', label);
+      assert.equal(calls[1][0], 'forceUpdate', label);
+      assert.equal(calls[1][1], component, label);
+      assert.equal(calls[1].at(-1), 'forceUpdate', label);
+    }
+
     (async () => {
       for (const { keys, resolvedFileName, specifier } of entrypoints) {
         assert.equal(
@@ -1300,6 +1723,12 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
           assertDevCreateRef(cjsModule, specifier);
           assertDevChildren(cjsModule, specifier);
           assertDevWrappers(cjsModule, specifier);
+          if (Object.hasOwn(cjsModule, 'Component')) {
+            assertDevComponentClasses(cjsModule, specifier);
+          } else {
+            assert.equal(cjsModule.Component, undefined, specifier);
+            assert.equal(cjsModule.PureComponent, undefined, specifier);
+          }
         }
 
         const esmModule = await import(specifier);
@@ -1342,4 +1771,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element/context/ref/Children/memo/lazy/forwardRef smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/context/ref/Children/memo/lazy/forwardRef/component-class smoke checks.');

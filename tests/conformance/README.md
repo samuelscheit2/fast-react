@@ -32,6 +32,7 @@ Checked-in generated artifact:
 - `oracles/react-19.2.6-wrapper-object-oracle.json`
 - `oracles/react-19.2.6-forward-ref-oracle.json`
 - `oracles/react-19.2.6-context-object-oracle.json`
+- `oracles/react-19.2.6-component-class-oracle.json`
 
 Commands:
 
@@ -48,6 +49,9 @@ npm run ref-object:print:markdown --workspace @fast-react/conformance
 npm run children-helper:generate --workspace @fast-react/conformance
 npm run children-helper:print --workspace @fast-react/conformance
 npm run children-helper:print:markdown --workspace @fast-react/conformance
+npm run component-class:generate --workspace @fast-react/conformance
+npm run component-class:print --workspace @fast-react/conformance
+npm run component-class:print:markdown --workspace @fast-react/conformance
 npm run wrapper-object:generate --workspace @fast-react/conformance
 npm run wrapper-object:print --workspace @fast-react/conformance
 npm run wrapper-object:print:markdown --workspace @fast-react/conformance
@@ -219,3 +223,28 @@ Context object oracle strategy:
 The context object oracle intentionally excludes `useContext`, provider and
 consumer rendering semantics, context propagation, subscriptions, owner stacks,
 hooks, renderer integration, and private internals.
+
+Component class oracle strategy:
+
+1. Resolve exact `react@19.2.6` npm metadata.
+2. Download the exact React tarball into a temporary directory.
+3. Verify tarball integrity from `dist.integrity`.
+4. Extract React and copy the local `@fast-react/react` package into a
+   temporary `node_modules` tree.
+5. Run one isolated Node child process per target, scenario, and mode. Modes
+   cover default Node and `--conditions=react-server`, each in development and
+   production.
+6. Capture normalized JSON for direct `Component` and `PureComponent` behavior,
+   including root export descriptors, `react-server` export absence, function
+   descriptors, prototype descriptors, instance construction, default refs and
+   updater object state, call/apply/bind/new behavior, custom updater
+   forwarding, no-op updater validation, warnings, callback non-invocation, and
+   development-only deprecated accessors.
+7. Compare local Fast React observations against the React oracle as explicit
+   `matched-but-compatibility-not-claimed`, `known-mismatch`, or
+   `unsupported-placeholder` statuses.
+
+The component class oracle intentionally excludes rendering, lifecycle method
+invocation, reconciliation, state updates through a real renderer, refs
+lifecycle, context propagation, owner stacks, hooks, renderer integration,
+server components, and private internals.

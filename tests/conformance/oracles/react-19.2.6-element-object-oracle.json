@@ -46624,7 +46624,7 @@
                     "value": {
                       "type": "function",
                       "name": "Component",
-                      "length": 0,
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -46672,7 +46672,7 @@
                     "value": {
                       "type": "function",
                       "name": "PureComponent",
-                      "length": 0,
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -60869,7 +60869,7 @@
                     "value": {
                       "type": "function",
                       "name": "Component",
-                      "length": 0,
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -60917,7 +60917,7 @@
                     "value": {
                       "type": "function",
                       "name": "PureComponent",
-                      "length": 0,
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
