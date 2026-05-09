@@ -279,6 +279,9 @@ Dependencies: M8.
 | worker-101-test-renderer-root-api-plan | Produce a report-only plan for Rust test-renderer root API create/update/unmount integration | `worker-progress/worker-101-test-renderer-root-api-plan.md` | workers 018,022,073,081,096 | running |
 | worker-102-test-renderer-serialization-plan | Produce a report-only plan for test-renderer toJSON/toTree/TestInstance serialization over committed fibers | `worker-progress/worker-102-test-renderer-serialization-plan.md` | workers 018,022,073,085,101 | running |
 | worker-103-scheduler-mock-implementation-plan | Produce a report-only plan for `scheduler/unstable_mock` compatibility and implementation gates | `worker-progress/worker-103-scheduler-mock-implementation-plan.md` | workers 034,039,045,052 | running |
+| worker-104-reconciler-root-model-implementation-plan | Produce a report-only implementation plan for the first reconciler FiberRoot/HostRoot data model slice | `worker-progress/worker-104-reconciler-root-model-implementation-plan.md` | workers 019,044,055,072,079,081,082,090,094,096 | running |
+| worker-105-dom-mutation-host-implementation-plan | Produce a report-only implementation plan for the first minimal DOM mutation host slice | `worker-progress/worker-105-dom-mutation-host-implementation-plan.md` | workers 040,051,055,061,062,063,090,091 | running |
+| worker-106-root-render-e2e-test-plan | Produce a report-only test plan for the first end-to-end root render/update/unmount path | `worker-progress/worker-106-root-render-e2e-test-plan.md` | workers 044,055,058,061,062,063,072,079,081,082,090,091,094 | running |
 
 ## Merge Policy
 
