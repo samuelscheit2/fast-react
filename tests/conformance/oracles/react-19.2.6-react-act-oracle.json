@@ -1,0 +1,3298 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-act-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React 19.2.6 public React.act behavior oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-025-children-helpers.md",
+    "worker-progress/worker-067-react-dom-test-utils-act-oracle.md (not present in this worktree)",
+    "worker-progress/worker-073-test-renderer-update-model-plan.md",
+    "worker-progress/worker-086-react-test-renderer-act-oracle.md (not present in this worktree)"
+  ],
+  "generation": {
+    "method": "exact react npm tarball plus local Fast React package copied into a temporary node_modules tree",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "probeIsolation": "one Node child process per target, scenario, and mode",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false,
+    "pathNormalization": "temporary extraction roots and local workspace paths are normalized before artifact write"
+  },
+  "evidenceClaims": {
+    "npmMetadataResolved": true,
+    "tarballDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "reactPublicActBehaviorProbed": true,
+    "rendererBackedFlushingProbed": false,
+    "fastReactComparedToReact": true,
+    "fastReactBehaviorCompatible": false
+  },
+  "conformanceClaims": {
+    "realReactBehaviorCompared": true,
+    "fastReactComparedToReact": true,
+    "fastReactBehaviorCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "implementationComparison": {
+    "worker097Checked": {
+      "source": "generated fastReactComparisons in this oracle artifact; default Fast React act is still a placeholder and react-server act is absent",
+      "generatedProbe": true,
+      "statusCounts": {
+        "known-mismatch": 2,
+        "unsupported-placeholder": 10,
+        "matched-but-compatibility-not-claimed": 12
+      },
+      "compatibilityClaimed": false
+    }
+  },
+  "reactTarget": {
+    "packageName": "react",
+    "version": "19.2.6",
+    "role": "official-react-runtime-target"
+  },
+  "fastReactTarget": {
+    "packageName": "@fast-react/react",
+    "version": "0.0.0",
+    "role": "workspace-fast-react-js-react-act",
+    "expectedStatus": "unsupported-or-known-mismatch-without-compatibility-claim"
+  },
+  "probeModes": [
+    {
+      "id": "default-node-development",
+      "nodeArgs": [],
+      "nodeEnv": "development",
+      "condition": "default",
+      "reason": "Default Node development is the only React root mode with callable public act behavior."
+    },
+    {
+      "id": "default-node-production",
+      "nodeArgs": [],
+      "nodeEnv": "production",
+      "condition": "default",
+      "reason": "Default Node production records public act absence on the CommonJS root facade."
+    },
+    {
+      "id": "react-server-development",
+      "nodeArgs": [
+        "--conditions=react-server"
+      ],
+      "nodeEnv": "development",
+      "condition": "react-server",
+      "reason": "The react-server condition records public act absence on the server-safe React root facade."
+    },
+    {
+      "id": "react-server-production",
+      "nodeArgs": [
+        "--conditions=react-server"
+      ],
+      "nodeEnv": "production",
+      "condition": "react-server",
+      "reason": "Production react-server behavior is checked separately because it loads production condition branches."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "react-act-export-shape",
+      "area": "React.act export",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "root export own-property presence",
+        "Object.keys inclusion",
+        "export descriptor",
+        "function name, length, and own-key order when callable"
+      ]
+    },
+    {
+      "id": "react-act-sync-callback-behavior",
+      "area": "Synchronous callback behavior",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "callback call count, this value, and argument count",
+        "synchronous callback return forwarding through the act thenable",
+        "returned thenable shape",
+        "no warning for unawaited rootless sync act"
+      ]
+    },
+    {
+      "id": "react-act-async-callback-behavior",
+      "area": "Asynchronous callback behavior",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "async callback order around microtasks",
+        "awaited async act return forwarding",
+        "returned thenable shape",
+        "no no-await warning when the act thenable is awaited"
+      ]
+    },
+    {
+      "id": "react-act-unawaited-async-warning",
+      "area": "Unawaited async act warning",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "development warning for unawaited async act",
+        "warning deduplication within a loaded React module",
+        "absence behavior in production and react-server modes"
+      ]
+    },
+    {
+      "id": "react-act-error-propagation",
+      "area": "Thrown and rejected errors",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "synchronous callback throw propagation",
+        "subsequent call behavior after synchronous throw",
+        "awaited async rejection propagation",
+        "custom thenable rejection propagation"
+      ]
+    },
+    {
+      "id": "react-act-thenable-handling",
+      "area": "Thenable handling",
+      "entrypoints": [
+        "react"
+      ],
+      "captures": [
+        "custom object thenable resolution",
+        "then callback argument types",
+        "non-callable then property handling",
+        "function values with callable then properties forwarded as sync return values"
+      ]
+    }
+  ],
+  "packages": {
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d"
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        }
+      }
+    },
+    "@fast-react/react": {
+      "packageName": "@fast-react/react",
+      "version": "0.0.0",
+      "role": "workspace-fast-react-js-react-act",
+      "source": "local workspace package copied for public React.act behavior comparison",
+      "behaviorCompatibilityClaimed": false
+    }
+  },
+  "coverage": {
+    "exportDescriptors": true,
+    "developmentAvailability": true,
+    "productionAvailability": true,
+    "reactServerAbsence": true,
+    "syncCallbackBehavior": true,
+    "asyncCallbackBehavior": true,
+    "noAwaitWarnings": true,
+    "thrownAndRejectedErrors": true,
+    "deterministicThenableHandling": true,
+    "rendererBackedFlushing": false
+  },
+  "intentionalGaps": [
+    {
+      "id": "no-renderer-backed-flushing",
+      "reason": "React DOM test-utils and react-test-renderer wrappers own renderer-backed act queue flushing evidence."
+    },
+    {
+      "id": "no-private-internals-reads",
+      "reason": "The probe uses only the public React root export and does not inspect ReactSharedInternals.actQueue."
+    },
+    {
+      "id": "no-compatibility-claim",
+      "reason": "Local Fast React comparisons are recorded only as unsupported, known mismatch, or matched-without-claim evidence."
+    }
+  ],
+  "reactObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "exportKeysInclude": true,
+              "descriptor": {
+                "key": {
+                  "type": "string",
+                  "value": "act"
+                },
+                "enumerable": true,
+                "configurable": true,
+                "kind": "data",
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "functionObject": {
+                "summary": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                },
+                "objectKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    "enumerable": false,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": false,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    "enumerable": false,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": false,
+                    "value": {
+                      "type": "string",
+                      "value": ""
+                    }
+                  },
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "prototype"
+                    },
+                    "enumerable": false,
+                    "configurable": false,
+                    "kind": "data",
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    }
+                  }
+                ],
+                "state": {
+                  "frozen": false,
+                  "sealed": false,
+                  "extensible": true,
+                  "objectTag": "[object Function]",
+                  "prototype": "Function.prototype"
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "events": [
+                {
+                  "phase": "callback",
+                  "thisValue": {
+                    "type": "undefined"
+                  },
+                  "argCount": 0
+                },
+                {
+                  "phase": "after-act-call"
+                },
+                {
+                  "phase": "after-await"
+                }
+              ],
+              "returnShape": {
+                "summary": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "prototype": "Object.prototype"
+                },
+                "thenDescriptor": {
+                  "key": {
+                    "type": "string",
+                    "value": "then"
+                  },
+                  "enumerable": true,
+                  "configurable": true,
+                  "kind": "data",
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "then",
+                    "length": 2,
+                    "isReactWarning": false
+                  }
+                },
+                "object": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "objectKeys": [
+                    "then"
+                  ],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "then"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "then"
+                      },
+                      "enumerable": true,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "function",
+                        "name": "then",
+                        "length": 2,
+                        "isReactWarning": false
+                      }
+                    }
+                  ],
+                  "state": {
+                    "frozen": false,
+                    "sealed": false,
+                    "extensible": true,
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  }
+                }
+              },
+              "awaitedValue": {
+                "type": "string",
+                "value": "sync-return"
+              },
+              "unawaitedSyncReturnShape": {
+                "summary": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "prototype": "Object.prototype"
+                },
+                "thenDescriptor": {
+                  "key": {
+                    "type": "string",
+                    "value": "then"
+                  },
+                  "enumerable": true,
+                  "configurable": true,
+                  "kind": "data",
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "then",
+                    "length": 2,
+                    "isReactWarning": false
+                  }
+                },
+                "object": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "objectKeys": [
+                    "then"
+                  ],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "then"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "then"
+                      },
+                      "enumerable": true,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "function",
+                        "name": "then",
+                        "length": 2,
+                        "isReactWarning": false
+                      }
+                    }
+                  ],
+                  "state": {
+                    "frozen": false,
+                    "sealed": false,
+                    "extensible": true,
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  }
+                }
+              },
+              "unawaitedSyncConsoleCalls": []
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "events": [
+                {
+                  "phase": "callback-start",
+                  "thisValue": {
+                    "type": "undefined"
+                  },
+                  "argCount": 0
+                },
+                {
+                  "phase": "after-act-call"
+                },
+                {
+                  "phase": "callback-after-microtask"
+                },
+                {
+                  "phase": "after-await"
+                }
+              ],
+              "returnShape": {
+                "summary": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "prototype": "Object.prototype"
+                },
+                "thenDescriptor": {
+                  "key": {
+                    "type": "string",
+                    "value": "then"
+                  },
+                  "enumerable": true,
+                  "configurable": true,
+                  "kind": "data",
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "then",
+                    "length": 2,
+                    "isReactWarning": false
+                  }
+                },
+                "object": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "objectKeys": [
+                    "then"
+                  ],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "then"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "then"
+                      },
+                      "enumerable": true,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "function",
+                        "name": "then",
+                        "length": 2,
+                        "isReactWarning": false
+                      }
+                    }
+                  ],
+                  "state": {
+                    "frozen": false,
+                    "sealed": false,
+                    "extensible": true,
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  }
+                }
+              },
+              "awaitedValue": {
+                "type": "string",
+                "value": "async-return"
+              },
+              "consoleCallsDuringScenario": []
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "firstReturnShape": {
+                "summary": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "prototype": "Object.prototype"
+                },
+                "thenDescriptor": {
+                  "key": {
+                    "type": "string",
+                    "value": "then"
+                  },
+                  "enumerable": true,
+                  "configurable": true,
+                  "kind": "data",
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "then",
+                    "length": 2,
+                    "isReactWarning": false
+                  }
+                },
+                "object": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "objectKeys": [
+                    "then"
+                  ],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "then"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "then"
+                      },
+                      "enumerable": true,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "function",
+                        "name": "then",
+                        "length": 2,
+                        "isReactWarning": false
+                      }
+                    }
+                  ],
+                  "state": {
+                    "frozen": false,
+                    "sealed": false,
+                    "extensible": true,
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  }
+                }
+              },
+              "secondReturnShape": {
+                "summary": {
+                  "type": "object",
+                  "objectTag": "[object Object]",
+                  "prototype": "Object.prototype"
+                },
+                "thenDescriptor": {
+                  "key": {
+                    "type": "string",
+                    "value": "then"
+                  },
+                  "enumerable": true,
+                  "configurable": true,
+                  "kind": "data",
+                  "writable": true,
+                  "value": {
+                    "type": "function",
+                    "name": "then",
+                    "length": 2,
+                    "isReactWarning": false
+                  }
+                },
+                "object": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "objectKeys": [
+                    "then"
+                  ],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "then"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "then"
+                      },
+                      "enumerable": true,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "function",
+                        "name": "then",
+                        "length": 2,
+                        "isReactWarning": false
+                      }
+                    }
+                  ],
+                  "state": {
+                    "frozen": false,
+                    "sealed": false,
+                    "extensible": true,
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  }
+                }
+              },
+              "consoleCallsAfterFirst": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "You called act(async () => ...) without await. This could lead to unexpected testing behaviour, interleaving multiple act calls and mixing their scopes. You should - await act(async () => ...);"
+                    }
+                  ]
+                }
+              ],
+              "consoleCallsAfterSecond": [
+                {
+                  "method": "error",
+                  "args": [
+                    {
+                      "type": "string",
+                      "value": "You called act(async () => ...) without await. This could lead to unexpected testing behaviour, interleaving multiple act calls and mixing their scopes. You should - await act(async () => ...);"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "consoleCalls": [
+            {
+              "method": "error",
+              "args": [
+                {
+                  "type": "string",
+                  "value": "You called act(async () => ...) without await. This could lead to unexpected testing behaviour, interleaving multiple act calls and mixing their scopes. You should - await act(async () => ...);"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "syncThrow": {
+                "label": "sync callback throws",
+                "status": "throws",
+                "error": {
+                  "name": "Error",
+                  "code": null,
+                  "message": "sync act failure",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              },
+              "afterSyncThrow": {
+                "label": "subsequent sync act after throw",
+                "status": "ok",
+                "value": {
+                  "type": "string",
+                  "value": "after-sync-throw"
+                }
+              },
+              "asyncReject": {
+                "label": "async callback rejects",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "async act rejection",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              },
+              "customThenableReject": {
+                "label": "custom thenable rejects",
+                "status": "throws",
+                "error": {
+                  "name": "RangeError",
+                  "code": null,
+                  "message": "custom act thenable rejection",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "",
+                  "length": 1,
+                  "isReactWarning": false
+                }
+              },
+              "customThenable": {
+                "actReturnShape": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "thenDescriptor": {
+                    "key": {
+                      "type": "string",
+                      "value": "then"
+                    },
+                    "enumerable": true,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "then",
+                      "length": 2,
+                      "isReactWarning": false
+                    }
+                  },
+                  "object": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    },
+                    "objectKeys": [
+                      "then"
+                    ],
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "then"
+                      }
+                    ],
+                    "descriptors": [
+                      {
+                        "key": {
+                          "type": "string",
+                          "value": "then"
+                        },
+                        "enumerable": true,
+                        "configurable": true,
+                        "kind": "data",
+                        "writable": true,
+                        "value": {
+                          "type": "function",
+                          "name": "then",
+                          "length": 2,
+                          "isReactWarning": false
+                        }
+                      }
+                    ],
+                    "state": {
+                      "frozen": false,
+                      "sealed": false,
+                      "extensible": true,
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    }
+                  }
+                },
+                "resolution": {
+                  "thenCall": {
+                    "label": "direct then invocation",
+                    "status": "ok"
+                  },
+                  "settlement": {
+                    "status": "fulfilled",
+                    "value": {
+                      "type": "string",
+                      "value": "custom-thenable-resolution"
+                    }
+                  }
+                },
+                "thenCalls": [
+                  {
+                    "thisMatchesThenable": true,
+                    "resolveType": "function",
+                    "rejectType": "function"
+                  }
+                ]
+              },
+              "nonCallableThenObject": {
+                "actReturnShape": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "thenDescriptor": {
+                    "key": {
+                      "type": "string",
+                      "value": "then"
+                    },
+                    "enumerable": true,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "then",
+                      "length": 2,
+                      "isReactWarning": false
+                    }
+                  },
+                  "object": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    },
+                    "objectKeys": [
+                      "then"
+                    ],
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "then"
+                      }
+                    ],
+                    "descriptors": [
+                      {
+                        "key": {
+                          "type": "string",
+                          "value": "then"
+                        },
+                        "enumerable": true,
+                        "configurable": true,
+                        "kind": "data",
+                        "writable": true,
+                        "value": {
+                          "type": "function",
+                          "name": "then",
+                          "length": 2,
+                          "isReactWarning": false
+                        }
+                      }
+                    ],
+                    "state": {
+                      "frozen": false,
+                      "sealed": false,
+                      "extensible": true,
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    }
+                  }
+                },
+                "resolution": {
+                  "thenCall": {
+                    "label": "direct then invocation",
+                    "status": "ok"
+                  },
+                  "settlement": {
+                    "status": "fulfilled",
+                    "value": {
+                      "value": {
+                        "object": {
+                          "summary": {
+                            "type": "object",
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          },
+                          "objectKeys": [
+                            "label",
+                            "then"
+                          ],
+                          "ownKeys": [
+                            {
+                              "type": "string",
+                              "value": "label"
+                            },
+                            {
+                              "type": "string",
+                              "value": "then"
+                            }
+                          ],
+                          "descriptors": [
+                            {
+                              "key": {
+                                "type": "string",
+                                "value": "label"
+                              },
+                              "enumerable": true,
+                              "configurable": true,
+                              "kind": "data",
+                              "writable": true,
+                              "value": {
+                                "type": "string",
+                                "value": "non-callable-then"
+                              }
+                            },
+                            {
+                              "key": {
+                                "type": "string",
+                                "value": "then"
+                              },
+                              "enumerable": true,
+                              "configurable": true,
+                              "kind": "data",
+                              "writable": true,
+                              "value": {
+                                "type": "string",
+                                "value": "not-a-function"
+                              }
+                            }
+                          ],
+                          "state": {
+                            "frozen": false,
+                            "sealed": false,
+                            "extensible": true,
+                            "objectTag": "[object Object]",
+                            "prototype": "Object.prototype"
+                          }
+                        },
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "value": "non-callable-then"
+                          },
+                          "then": {
+                            "type": "string",
+                            "value": "not-a-function"
+                          }
+                        }
+                      },
+                      "sameObject": true
+                    }
+                  }
+                }
+              },
+              "functionWithThenProperty": {
+                "actReturnShape": {
+                  "summary": {
+                    "type": "object",
+                    "objectTag": "[object Object]",
+                    "prototype": "Object.prototype"
+                  },
+                  "thenDescriptor": {
+                    "key": {
+                      "type": "string",
+                      "value": "then"
+                    },
+                    "enumerable": true,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "then",
+                      "length": 2,
+                      "isReactWarning": false
+                    }
+                  },
+                  "object": {
+                    "summary": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    },
+                    "objectKeys": [
+                      "then"
+                    ],
+                    "ownKeys": [
+                      {
+                        "type": "string",
+                        "value": "then"
+                      }
+                    ],
+                    "descriptors": [
+                      {
+                        "key": {
+                          "type": "string",
+                          "value": "then"
+                        },
+                        "enumerable": true,
+                        "configurable": true,
+                        "kind": "data",
+                        "writable": true,
+                        "value": {
+                          "type": "function",
+                          "name": "then",
+                          "length": 2,
+                          "isReactWarning": false
+                        }
+                      }
+                    ],
+                    "state": {
+                      "frozen": false,
+                      "sealed": false,
+                      "extensible": true,
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    }
+                  }
+                },
+                "resolution": {
+                  "thenCall": {
+                    "label": "direct then invocation",
+                    "status": "ok"
+                  },
+                  "settlement": {
+                    "status": "fulfilled",
+                    "value": {
+                      "value": {
+                        "type": "function",
+                        "name": "functionWithThenProperty",
+                        "length": 0,
+                        "isReactWarning": false
+                      },
+                      "sameFunction": true
+                    }
+                  }
+                },
+                "functionObject": {
+                  "summary": {
+                    "type": "function",
+                    "name": "functionWithThenProperty",
+                    "length": 0,
+                    "isReactWarning": false
+                  },
+                  "objectKeys": [
+                    "then"
+                  ],
+                  "ownKeys": [
+                    {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    {
+                      "type": "string",
+                      "value": "prototype"
+                    },
+                    {
+                      "type": "string",
+                      "value": "then"
+                    }
+                  ],
+                  "descriptors": [
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "length"
+                      },
+                      "enumerable": false,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": false,
+                      "value": {
+                        "type": "number",
+                        "value": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "name"
+                      },
+                      "enumerable": false,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": false,
+                      "value": {
+                        "type": "string",
+                        "value": "functionWithThenProperty"
+                      }
+                    },
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "prototype"
+                      },
+                      "enumerable": false,
+                      "configurable": false,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "object",
+                        "objectTag": "[object Object]",
+                        "prototype": "Object.prototype"
+                      }
+                    },
+                    {
+                      "key": {
+                        "type": "string",
+                        "value": "then"
+                      },
+                      "enumerable": true,
+                      "configurable": true,
+                      "kind": "data",
+                      "writable": true,
+                      "value": {
+                        "type": "function",
+                        "name": "thenProperty",
+                        "length": 0,
+                        "isReactWarning": false
+                      }
+                    }
+                  ],
+                  "state": {
+                    "frozen": false,
+                    "sealed": false,
+                    "extensible": true,
+                    "objectTag": "[object Function]",
+                    "prototype": "Function.prototype"
+                  }
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "exportKeysInclude": false,
+              "descriptor": null,
+              "functionObject": {
+                "type": "undefined"
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: sync callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: unawaited async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: error propagation",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: thenable handling",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "react-server-development": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "exportKeysInclude": false,
+              "descriptor": null,
+              "functionObject": {
+                "type": "undefined"
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: sync callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: unawaited async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: error propagation",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: thenable handling",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "react-server-production": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "exportKeysInclude": false,
+              "descriptor": null,
+              "functionObject": {
+                "type": "undefined"
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: sync callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: unawaited async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: error propagation",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: thenable handling",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ]
+  },
+  "fastReactObservations": {
+    "default-node-development": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                }
+              },
+              "exportKeysInclude": true,
+              "descriptor": {
+                "key": {
+                  "type": "string",
+                  "value": "act"
+                },
+                "enumerable": true,
+                "configurable": true,
+                "kind": "data",
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                }
+              },
+              "functionObject": {
+                "summary": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                },
+                "objectKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    "enumerable": false,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": false,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    "enumerable": false,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": false,
+                    "value": {
+                      "type": "string",
+                      "value": "act"
+                    }
+                  },
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "prototype"
+                    },
+                    "enumerable": false,
+                    "configurable": false,
+                    "kind": "data",
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    }
+                  }
+                ],
+                "state": {
+                  "frozen": false,
+                  "sealed": false,
+                  "extensible": true,
+                  "objectTag": "[object Function]",
+                  "prototype": "Function.prototype"
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                }
+              },
+              "syncThrow": {
+                "label": "sync callback throws",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              },
+              "afterSyncThrow": {
+                "label": "subsequent sync act after throw",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              },
+              "asyncReject": {
+                "label": "async callback rejects",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              },
+              "customThenableReject": {
+                "label": "custom thenable rejects",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                }
+              },
+              "exportKeysInclude": true,
+              "descriptor": {
+                "key": {
+                  "type": "string",
+                  "value": "act"
+                },
+                "enumerable": true,
+                "configurable": true,
+                "kind": "data",
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                }
+              },
+              "functionObject": {
+                "summary": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                },
+                "objectKeys": [],
+                "ownKeys": [
+                  {
+                    "type": "string",
+                    "value": "length"
+                  },
+                  {
+                    "type": "string",
+                    "value": "name"
+                  },
+                  {
+                    "type": "string",
+                    "value": "prototype"
+                  }
+                ],
+                "descriptors": [
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "length"
+                    },
+                    "enumerable": false,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": false,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "name"
+                    },
+                    "enumerable": false,
+                    "configurable": true,
+                    "kind": "data",
+                    "writable": false,
+                    "value": {
+                      "type": "string",
+                      "value": "act"
+                    }
+                  },
+                  {
+                    "key": {
+                      "type": "string",
+                      "value": "prototype"
+                    },
+                    "enumerable": false,
+                    "configurable": false,
+                    "kind": "data",
+                    "writable": true,
+                    "value": {
+                      "type": "object",
+                      "objectTag": "[object Object]",
+                      "prototype": "Object.prototype"
+                    }
+                  }
+                ],
+                "state": {
+                  "frozen": false,
+                  "sealed": false,
+                  "extensible": true,
+                  "objectTag": "[object Function]",
+                  "prototype": "Function.prototype"
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "available",
+                "hasOwn": true,
+                "exportKeysInclude": true,
+                "value": {
+                  "type": "function",
+                  "name": "act",
+                  "length": 0,
+                  "isReactWarning": false
+                }
+              },
+              "syncThrow": {
+                "label": "sync callback throws",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              },
+              "afterSyncThrow": {
+                "label": "subsequent sync act after throw",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              },
+              "asyncReject": {
+                "label": "async callback rejects",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              },
+              "customThenableReject": {
+                "label": "custom thenable rejects",
+                "status": "throws",
+                "error": {
+                  "name": "FastReactUnimplementedError",
+                  "code": "FAST_REACT_UNIMPLEMENTED",
+                  "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+                  "entrypoint": "react",
+                  "exportName": "act"
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "default",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "throws",
+            "error": {
+              "name": "FastReactUnimplementedError",
+              "code": "FAST_REACT_UNIMPLEMENTED",
+              "message": "[fast-react] react.act was called, but this placeholder has no React behavior implementation yet. It exists to track the accepted react@19.2.6 runtime export inventory; do not treat it as React-compatible behavior.",
+              "entrypoint": "react",
+              "exportName": "act"
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "react-server-development": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "exportKeysInclude": false,
+              "descriptor": null,
+              "functionObject": {
+                "type": "undefined"
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: sync callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: unawaited async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: error propagation",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: thenable handling",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ],
+    "react-server-production": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-export-shape",
+          "result": {
+            "label": "react-act-export-shape",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "exportKeysInclude": false,
+              "descriptor": null,
+              "functionObject": {
+                "type": "undefined"
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-sync-callback-behavior",
+          "result": {
+            "label": "react-act-sync-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: sync callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-async-callback-behavior",
+          "result": {
+            "label": "react-act-async-callback-behavior",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-unawaited-async-warning",
+          "result": {
+            "label": "react-act-unawaited-async-warning",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: unawaited async callback",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-error-propagation",
+          "result": {
+            "label": "react-act-error-propagation",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: error propagation",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "packageName": "@fast-react/react",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "result": {
+          "targetPackage": "@fast-react/react",
+          "scenarioId": "react-act-thenable-handling",
+          "result": {
+            "label": "react-act-thenable-handling",
+            "status": "ok",
+            "value": {
+              "availability": {
+                "status": "unavailable",
+                "hasOwn": false,
+                "exportKeysInclude": false,
+                "value": {
+                  "type": "undefined"
+                }
+              },
+              "callAttempt": {
+                "label": "React.act unavailable: thenable handling",
+                "status": "throws",
+                "error": {
+                  "name": "TypeError",
+                  "code": null,
+                  "message": "React.act is not a function",
+                  "entrypoint": null,
+                  "exportName": null
+                }
+              }
+            }
+          },
+          "consoleCalls": []
+        }
+      }
+    ]
+  },
+  "fastReactComparisons": {
+    "default-node-development": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "known-mismatch",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.value.availability.value.name",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Fast React normalized observation differs from the React 19.2.6 public React.act oracle."
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.value.availability.value.name",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "nodeEnv": "development",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      }
+    ],
+    "default-node-production": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "known-mismatch",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.value.availability.status",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Fast React normalized observation differs from the React 19.2.6 public React.act oracle."
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.value.keys",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "nodeEnv": "production",
+        "condition": "default",
+        "status": "unsupported-placeholder",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": "$.result.keys[2]",
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "throws",
+        "reason": "Fast React currently throws structured placeholder errors for this public React.act behavior."
+      }
+    ],
+    "react-server-development": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "nodeEnv": "development",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      }
+    ],
+    "react-server-production": [
+      {
+        "scenarioId": "react-act-export-shape",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-sync-callback-behavior",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-async-callback-behavior",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-unawaited-async-warning",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-error-propagation",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      },
+      {
+        "scenarioId": "react-act-thenable-handling",
+        "nodeEnv": "production",
+        "condition": "react-server",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "reactResultStatus": "ok",
+        "fastReactResultStatus": "ok",
+        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+      }
+    ]
+  }
+}
