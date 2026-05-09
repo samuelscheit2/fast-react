@@ -20,9 +20,11 @@ default and `react-server` root entrypoints. Direct `memo` and `lazy`
 wrapper-object behavior covered by the React 19.2.6 wrapper-object oracle now
 matches for default and `react-server` root entrypoints. Direct `forwardRef`
 wrapper-object behavior covered by the React 19.2.6 forward-ref oracle now
-matches for default and `react-server` root entrypoints. Unsupported React
-behavior still throws an explicit unimplemented error until conformance-backed
-implementations are added.
+matches for default and `react-server` root entrypoints. Direct default-root
+`createContext` object behavior covered by the React 19.2.6 context-object
+oracle now matches; `react-server` still does not export `createContext`.
+Unsupported React behavior still throws an explicit unimplemented error until
+conformance-backed implementations are added.
 
 The enumerable runtime keys are intentionally aligned with the accepted
 `react@19.2.6` inventory for the default Node condition and the `react-server`
