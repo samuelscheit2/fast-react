@@ -2,7 +2,6 @@
 
 const {
   createPrivateInternalsPlaceholder,
-  createUnimplementedError,
   createUnimplementedFunction,
   definePlaceholderMetadata,
   placeholderVersion
@@ -16,30 +15,11 @@ const { createRef } = require('./ref-object.js');
 const { createContext } = require('./context-object.js');
 const { createChildrenHelpers } = require('./children-helper.js');
 const { forwardRef, lazy, memo } = require('./wrapper-object.js');
+const { Component, PureComponent } = require('./component-class.js');
 
 const entrypoint = 'react';
 
 const Children = createChildrenHelpers();
-
-class Component {
-  constructor() {
-    throw createUnimplementedError(entrypoint, 'Component', 'was constructed');
-  }
-}
-
-class PureComponent extends Component {
-  constructor() {
-    try {
-      super();
-    } catch (_error) {
-      throw createUnimplementedError(
-        entrypoint,
-        'PureComponent',
-        'was constructed'
-      );
-    }
-  }
-}
 
 const Fragment = Symbol.for('react.fragment');
 const StrictMode = Symbol.for('react.strict_mode');

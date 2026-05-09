@@ -23,6 +23,9 @@ wrapper-object behavior covered by the React 19.2.6 forward-ref oracle now
 matches for default and `react-server` root entrypoints. Direct default-root
 `createContext` object behavior covered by the React 19.2.6 context-object
 oracle now matches; `react-server` still does not export `createContext`.
+Direct default-root `Component` and `PureComponent` constructor/prototype/
+instance/no-op updater behavior covered by the React 19.2.6 component-class
+oracle now matches; `react-server` still does not export either class.
 Unsupported React behavior still throws an explicit unimplemented error until
 conformance-backed implementations are added.
 
