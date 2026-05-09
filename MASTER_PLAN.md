@@ -1,6 +1,6 @@
 # Fast React Master Plan
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 ## Mission
 
@@ -254,7 +254,7 @@ Dependencies: M8.
 | worker-076-core-fiber-flags | Implement core fiber and hook effect flag bitsets | `crates/fast-react-core/src/fiber_flags.rs`, `crates/fast-react-core/src/hook_effect_flags.rs`, `crates/fast-react-core/src/lib.rs`, `worker-progress/worker-076-core-fiber-flags.md` | workers 007,030,071,072 | running |
 | worker-077-core-fiber-topology-plan | Produce a report-only plan for core fiber topology, IDs, alternates, and deletion storage | `worker-progress/worker-077-core-fiber-topology-plan.md` | workers 007,030,071,072 | running |
 | worker-078-hook-effect-ring-plan | Produce a report-only plan for per-fiber hook effect rings and effect callback storage | `worker-progress/worker-078-hook-effect-ring-plan.md` | workers 007,071,073 | merged |
-| worker-079-reconciler-fiber-root-model-plan | Produce a report-only plan for reconciler FiberRoot and HostRoot records | `worker-progress/worker-079-reconciler-fiber-root-model-plan.md` | workers 019,044,055,072,073 | running |
+| worker-079-reconciler-fiber-root-model-plan | Produce a report-only plan for reconciler FiberRoot and HostRoot records | `worker-progress/worker-079-reconciler-fiber-root-model-plan.md` | workers 019,044,055,072,073 | merged |
 | worker-080-reconciler-host-root-update-queue-plan | Produce a report-only plan for HostRoot update queues and update_container APIs | `worker-progress/worker-080-reconciler-host-root-update-queue-plan.md` | workers 007,044,055,070,072,073 | running |
 | worker-081-reconciler-root-scheduler-act-plan | Produce a report-only plan for root scheduling, sync flushing, and act queue routing | `worker-progress/worker-081-reconciler-root-scheduler-act-plan.md` | workers 007,041,044,055,072,073 | merged |
 | worker-082-reconciler-commit-ordering-plan | Produce a report-only plan for commit ordering, host mutation phase calls, and root.current switching | `worker-progress/worker-082-reconciler-commit-ordering-plan.md` | workers 018,019,022,071,072,073 | merged |
@@ -266,10 +266,10 @@ Dependencies: M8.
 | worker-088-dom-container-root-markers-oracle | Add deterministic React DOM container validation and root marker oracle files | `tests/conformance/src/react-dom-container-root-markers-*.mjs`, `tests/conformance/scripts/*react-dom-container-root-markers*.mjs`, `tests/conformance/test/react-dom-container-root-markers-oracle.test.mjs`, `tests/conformance/oracles/react-19.2.6-react-dom-container-root-markers-oracle.json`, `worker-progress/worker-088-dom-container-root-markers-oracle.md` | workers 033,044,055 | running |
 | worker-089-dom-root-listener-installation-oracle | Add deterministic React DOM root and portal listener installation oracle files | `tests/conformance/src/react-dom-root-listener-installation-*.mjs`, `tests/conformance/scripts/*react-dom-root-listener-installation*.mjs`, `tests/conformance/test/react-dom-root-listener-installation-oracle.test.mjs`, `tests/conformance/oracles/react-19.2.6-react-dom-root-listener-installation-oracle.json`, `worker-progress/worker-089-dom-root-listener-installation-oracle.md` | workers 041,044,055,065 | running |
 | worker-090-dom-node-map-public-instance-plan | Produce a report-only plan for DOM node maps, public instance lookup, and cleanup | `worker-progress/worker-090-dom-node-map-public-instance-plan.md` | workers 040,041,044,051,055,072 | merged |
-| worker-091-dom-mutation-minimum-plan | Produce a report-only plan for minimal DOM mutation host creation, context, and mutation operations | `worker-progress/worker-091-dom-mutation-minimum-plan.md` | workers 040,051,055,061,062,063 | running |
+| worker-091-dom-mutation-minimum-plan | Produce a report-only plan for minimal DOM mutation host creation, context, and mutation operations | `worker-progress/worker-091-dom-mutation-minimum-plan.md` | workers 040,051,055,061,062,063 | merged |
 | worker-092-react-dom-create-root-facade-plan | Produce a report-only plan for the React DOM createRoot public facade and root object | `worker-progress/worker-092-react-dom-create-root-facade-plan.md` | workers 036,044,055,088,089 | running |
 | worker-093-root-render-integration-plan | Produce a report-only plan for root.render integration with HostRoot updates and scheduling | `worker-progress/worker-093-root-render-integration-plan.md` | workers 044,055,080,081,092 | running |
-| worker-094-root-unmount-flushsync-plan | Produce a report-only plan for root.unmount and flushSync integration | `worker-progress/worker-094-root-unmount-flushsync-plan.md` | workers 044,055,058,081,092 | running |
+| worker-094-root-unmount-flushsync-plan | Produce a report-only plan for root.unmount and flushSync integration | `worker-progress/worker-094-root-unmount-flushsync-plan.md` | workers 044,055,058,081,092 | merged |
 | worker-095-hydrate-root-facade-plan | Produce a report-only plan for hydrateRoot public facade, hydration root state, and replay hooks | `worker-progress/worker-095-hydrate-root-facade-plan.md` | workers 043,049,055,088,089 | running |
 | worker-096-native-root-boundary-plan | Produce a report-only plan for private native root handles and JS callback lifetime boundaries | `worker-progress/worker-096-native-root-boundary-plan.md` | workers 006,015,032,055,079 | merged |
 | worker-097-react-act-oracle | Add deterministic React public act behavior oracle files | `tests/conformance/src/react-act-*.mjs`, `tests/conformance/scripts/*react-act*.mjs`, `tests/conformance/test/react-act-oracle.test.mjs`, `tests/conformance/oracles/react-19.2.6-react-act-oracle.json`, `worker-progress/worker-097-react-act-oracle.md` | workers 017,025,067,073,086 | running |

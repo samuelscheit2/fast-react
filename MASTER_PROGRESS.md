@@ -1,6 +1,6 @@
 # Fast React Master Progress
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 ## Current State
 
@@ -15,7 +15,7 @@ Last updated: 2026-05-09
 
 ## Active Milestone
 
-M0: Orchestration Foundation.
+M4-M8: Root, reconciler, DOM, test-renderer, and conformance closure toward a minimal end-to-end render/update/unmount path.
 
 ## Decisions
 
@@ -142,7 +142,7 @@ M0: Orchestration Foundation.
 | worker-076-core-fiber-flags | running in tmux worktree; nested subagents allowed | Implement core fiber and hook effect flag bitsets | `../fast-react-worker-076-core-fiber-flags/worker-progress/worker-076-core-fiber-flags.md` |
 | worker-077-core-fiber-topology-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for core fiber topology, IDs, alternates, and deletion storage | `../fast-react-worker-077-core-fiber-topology-plan/worker-progress/worker-077-core-fiber-topology-plan.md` |
 | worker-078-hook-effect-ring-plan | merged | Produce a report-only plan for per-fiber hook effect rings and effect callback storage | `worker-progress/worker-078-hook-effect-ring-plan.md` |
-| worker-079-reconciler-fiber-root-model-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for reconciler FiberRoot and HostRoot records | `../fast-react-worker-079-reconciler-fiber-root-model-plan/worker-progress/worker-079-reconciler-fiber-root-model-plan.md` |
+| worker-079-reconciler-fiber-root-model-plan | merged | Produce a report-only plan for reconciler FiberRoot and HostRoot records | `worker-progress/worker-079-reconciler-fiber-root-model-plan.md` |
 | worker-080-reconciler-host-root-update-queue-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for HostRoot update queues and update_container APIs | `../fast-react-worker-080-reconciler-host-root-update-queue-plan/worker-progress/worker-080-reconciler-host-root-update-queue-plan.md` |
 | worker-081-reconciler-root-scheduler-act-plan | merged | Produce a report-only plan for root scheduling, sync flushing, and act queue routing | `worker-progress/worker-081-reconciler-root-scheduler-act-plan.md` |
 | worker-082-reconciler-commit-ordering-plan | merged | Produce a report-only plan for commit ordering, host mutation phase calls, and root.current switching | `worker-progress/worker-082-reconciler-commit-ordering-plan.md` |
@@ -154,10 +154,10 @@ M0: Orchestration Foundation.
 | worker-088-dom-container-root-markers-oracle | running in tmux worktree; nested subagents allowed | Add deterministic React DOM container validation and root marker oracle files | `../fast-react-worker-088-dom-container-root-markers-oracle/worker-progress/worker-088-dom-container-root-markers-oracle.md` |
 | worker-089-dom-root-listener-installation-oracle | running in tmux worktree; nested subagents allowed | Add deterministic React DOM root and portal listener installation oracle files | `../fast-react-worker-089-dom-root-listener-installation-oracle/worker-progress/worker-089-dom-root-listener-installation-oracle.md` |
 | worker-090-dom-node-map-public-instance-plan | merged | Produce a report-only plan for DOM node maps, public instance lookup, and cleanup | `worker-progress/worker-090-dom-node-map-public-instance-plan.md` |
-| worker-091-dom-mutation-minimum-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for minimal DOM mutation host creation, context, and mutation operations | `../fast-react-worker-091-dom-mutation-minimum-plan/worker-progress/worker-091-dom-mutation-minimum-plan.md` |
+| worker-091-dom-mutation-minimum-plan | merged | Produce a report-only plan for minimal DOM mutation host creation, context, and mutation operations | `worker-progress/worker-091-dom-mutation-minimum-plan.md` |
 | worker-092-react-dom-create-root-facade-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for the React DOM createRoot public facade and root object | `../fast-react-worker-092-react-dom-create-root-facade-plan/worker-progress/worker-092-react-dom-create-root-facade-plan.md` |
 | worker-093-root-render-integration-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for root.render integration with HostRoot updates and scheduling | `../fast-react-worker-093-root-render-integration-plan/worker-progress/worker-093-root-render-integration-plan.md` |
-| worker-094-root-unmount-flushsync-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for root.unmount and flushSync integration | `../fast-react-worker-094-root-unmount-flushsync-plan/worker-progress/worker-094-root-unmount-flushsync-plan.md` |
+| worker-094-root-unmount-flushsync-plan | merged | Produce a report-only plan for root.unmount and flushSync integration | `worker-progress/worker-094-root-unmount-flushsync-plan.md` |
 | worker-095-hydrate-root-facade-plan | running in tmux worktree; nested subagents allowed | Produce a report-only plan for hydrateRoot public facade, hydration root state, and replay hooks | `../fast-react-worker-095-hydrate-root-facade-plan/worker-progress/worker-095-hydrate-root-facade-plan.md` |
 | worker-096-native-root-boundary-plan | merged | Produce a report-only plan for private native root handles and JS callback lifetime boundaries | `worker-progress/worker-096-native-root-boundary-plan.md` |
 | worker-097-react-act-oracle | running in tmux worktree; nested subagents allowed | Add deterministic React public act behavior oracle files | `../fast-react-worker-097-react-act-oracle/worker-progress/worker-097-react-act-oracle.md` |
@@ -360,3 +360,6 @@ M0: Orchestration Foundation.
 - 2026-05-10: Tightened worker goal policy again after usage-limit evidence review: prompts and worker-facing docs now name the CLI-visible `/goal` command as well as `create_goal`, and workers must record whether goal setup happened before other work. Usage-limit messages were observed in several `codex exec` logs despite goal-first prompts, especially around nested agent operations, so `/goal` is required as setup evidence but not treated as a quota bypass.
 - 2026-05-10: Ran controlled tmux `codex exec --yolo -m gpt-5.5 -c model_reasoning_effort="xhigh"` goal probes in `/tmp/fast-react-goal-probe-*`. A prompt that explicitly asked for `create_goal` reported `GOAL_PROBE_BEFORE status=null` then `GOAL_PROBE_AFTER status=active` with the requested objective. A prompt that asked for `/goal` also reported `GOAL_PROBE_AFTER status=active`. Conclusion: both phrasings can set an active goal in tmux Codex subprocesses, but logs do not expose structured tool-call proof unless the subprocess reports `get_goal` output, so worker reports and continuations now require `get_goal` status/objective evidence.
 - 2026-05-10: Ran a controlled interactive TUI launch probe with `script -q -F <log> codex --yolo --no-alt-screen ...` in tmux. After accepting the trust prompt in a fresh `/tmp` directory, `tmux capture-pane` showed the live Codex TUI and footer state including `Pursuing goal`; the `script` log captured the same output with terminal escape sequences. A second probe in an existing Fast React worker worktree did not show a trust prompt. Updated `scripts/run-worker.sh`, `ORCHESTRATOR.md`, and `MASTER_PLAN.md` so future worker launches prefer interactive TUI sessions wrapped by `script -q -F` instead of `codex exec` stdout redirection.
+- 2026-05-10: Accepted and merged worker-079 reconciler FiberRoot/HostRoot model plan in commit `547677e` via merge commit `08d51aa`. Verified report-only scope, goal setup evidence, no concrete local path leaks, no trailing whitespace or conflict markers, and scoped `git diff --check`. No source tests were run because the task changed only the report. The worker worktree retained only an untracked regenerable `Cargo.lock` outside the accepted report.
+- 2026-05-10: Accepted and merged worker-091 minimal DOM mutation host plan in commit `5caa319` via merge commit `8eb38c2`. Verified report-only scope, goal setup evidence, no concrete local path leaks, no trailing whitespace or conflict markers, and scoped `git diff --check`. No source tests were run because the task changed only the report. The worker worktree retained only an untracked regenerable `Cargo.lock` outside the accepted report.
+- 2026-05-10: Accepted and merged worker-094 root unmount/flushSync plan in commit `d67dfba` via merge commit `d935657`. Verified report-only scope, goal setup evidence, no concrete local path leaks, no trailing whitespace or conflict markers, and scoped `git diff --check`. No source tests were run by the orchestrator because the task changed only the report; the worker recorded its own targeted flushSync oracle run.
