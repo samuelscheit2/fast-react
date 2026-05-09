@@ -37,14 +37,14 @@ The orchestrator goal is continuous. Do not call
 
 ## Goal Policy
 
-- Worker prompts and continuation prompts must require `/goal` or
-  `create_goal` as the first worker action, before research, file reads,
+- Worker prompts and continuation prompts must require `create_goal` as the
+  first worker action, before research, file reads,
   implementation, or verification.
 - Workers must call `get_goal` after setup and record active goal
   status/objective in their report, or explicitly say the goal tools were
   unavailable.
 - Treat missing worker goal evidence as an audit risk before accepting work.
-- Workers may use `/goal` or `create_goal` again for worker-internal subtasks.
+- Workers may use `create_goal` again for worker-internal subtasks.
 - Workers should call `update_goal(status: "complete")` only after the whole
   assigned worker task is complete.
 
@@ -59,6 +59,11 @@ The orchestrator goal is continuous. Do not call
   obsolete status history after it is no longer useful for current decisions.
 - Use git history and `worker-progress/*.md` as the detailed archive; do not
   duplicate that archive in the master docs.
+- When coordination docs drift, run the same cleanup pass across
+  `ORCHESTRATOR.md`, `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and
+  `MASTER_PROGRESS.md`: delete duplicated or unnecessary policy text, collapse
+  stale history into current-state summaries, and keep durable rules in the
+  single document where workers or the orchestrator actually need them.
 - Update the master docs after each merge batch, queue change, or material
   policy decision.
 

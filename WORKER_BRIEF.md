@@ -26,7 +26,7 @@ for published package behavior and exact runtime output.
 
 ## Worker Rules
 
-- First action: use `/goal` or `create_goal` for your assigned objective before
+- First action: use `create_goal` for your assigned objective before
   research, file reads, implementation, or verification.
 - After goal setup, call `get_goal` if available and record active
   status/objective in your progress report. If unavailable, state that

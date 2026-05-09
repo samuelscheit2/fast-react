@@ -18,7 +18,7 @@ Last updated: 2026-05-10
 ## Durable Decisions
 
 - Workers read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
-- Workers must set `/goal` or `create_goal` first and record `get_goal`
+- Workers must set `create_goal` first and record `get_goal`
   evidence.
 - Top-level workers are real tmux Codex processes; preferred launch is
   interactive TUI wrapped by `script -q -F`.
