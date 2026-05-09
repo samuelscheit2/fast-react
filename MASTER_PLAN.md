@@ -248,8 +248,8 @@ Dependencies: M8.
 | worker-070-core-update-queue-plan | Produce a report-only implementation plan for React-compatible update queue data structures in Rust core | `worker-progress/worker-070-core-update-queue-plan.md` | workers 007,030 | running |
 | worker-071-core-fiber-flags-effect-plan | Produce a report-only implementation plan for Rust core fiber flags, effect lists, and commit phase metadata | `worker-progress/worker-071-core-fiber-flags-effect-plan.md` | workers 007,030 | running |
 | worker-072-reconciler-root-work-loop-plan | Produce a report-only implementation plan for reconciler root work loop, scheduling, and host commit integration | `worker-progress/worker-072-reconciler-root-work-loop-plan.md` | workers 007,008,019,030,040,044 | running |
-| worker-073-test-renderer-update-model-plan | Produce a report-only implementation plan for test-renderer updates, act integration, and tree serialization | `worker-progress/worker-073-test-renderer-update-model-plan.md` | workers 018,022,044 | running |
-| worker-074-benchmark-react-dom-baseline-plan | Produce a report-only benchmark plan for React DOM compatibility and performance baselines | `worker-progress/worker-074-benchmark-react-dom-baseline-plan.md` | workers 009,033,040,044 | running |
+| worker-073-test-renderer-update-model-plan | Produce a report-only implementation plan for test-renderer updates, act integration, and tree serialization | `worker-progress/worker-073-test-renderer-update-model-plan.md` | workers 018,022,044 | merged |
+| worker-074-benchmark-react-dom-baseline-plan | Produce a report-only benchmark plan for React DOM compatibility and performance baselines | `worker-progress/worker-074-benchmark-react-dom-baseline-plan.md` | workers 009,033,040,044 | merged |
 
 ## Merge Policy
 
