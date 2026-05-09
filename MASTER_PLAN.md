@@ -287,6 +287,12 @@ Dependencies: M8.
 | worker-109-reconciler-commit-minimum-implementation-plan | Produce a report-only implementation plan for the minimal reconciler commit slice | `worker-progress/worker-109-reconciler-commit-minimum-implementation-plan.md` | workers 018,019,022,040,051,071,072,073,077,079,080,082,091,093 | running |
 | worker-110-dom-text-content-host-plan | Produce a report-only plan for DOM text-content host behavior and tests | `worker-progress/worker-110-dom-text-content-host-plan.md` | workers 040,051,055,061,062,063,091 | running |
 | worker-111-reconciler-sync-flush-act-plan | Produce a report-only implementation plan for reconciler sync flushing and act integration | `worker-progress/worker-111-reconciler-sync-flush-act-plan.md` | workers 007,041,044,055,058,067,073,080,081,094 | running |
+| worker-112-core-hook-queue-implementation-plan | Produce a report-only implementation plan for first core hook state queues | `worker-progress/worker-112-core-hook-queue-implementation-plan.md` | workers 007,070,078,099,100 | running |
+| worker-113-function-component-implementation-plan | Produce a report-only implementation plan for first function component rendering | `worker-progress/worker-113-function-component-implementation-plan.md` | workers 007,070,071,078,081,099,100 | running |
+| worker-114-test-renderer-implementation-plan | Produce a report-only implementation plan for test-renderer root and serialization behavior | `worker-progress/worker-114-test-renderer-implementation-plan.md` | workers 018,022,073,083,084,085,086,101,102 | running |
+| worker-115-scheduler-mock-source-plan | Produce a report-only source implementation plan for `scheduler/unstable_mock` | `worker-progress/worker-115-scheduler-mock-source-plan.md` | workers 034,038,039,045,052,068,069,103 | running |
+| worker-116-dom-event-plugin-implementation-plan | Produce a report-only implementation plan for the first DOM event plugin extraction slice | `worker-progress/worker-116-dom-event-plugin-implementation-plan.md` | workers 041,048,065,090,098 | running |
+| worker-117-root-render-implementation-sequencing-plan | Produce a report-only implementation sequencing plan for the first real root render milestone | `worker-progress/worker-117-root-render-implementation-sequencing-plan.md` | workers 077,079,080,091,092,093,094,095,098,099,100,101,102,103 | running |
 
 ## Merge Policy
 
