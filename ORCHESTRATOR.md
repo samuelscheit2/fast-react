@@ -1,8 +1,14 @@
-THIS GUIDE IS FOR THE ORCHESTRATOR ROLE IN THE PROJECT, NOT THE WORKER.
+THIS GUIDE IS ONLY FOR THE ORCHESTRATOR ROLE IN THE PROJECT, NOT THE WORKER.
 UPDATE THIS FILE IF ANY THING CHANGES ABOUT THE ORCHESTRATOR ROLE.
 
-You are an orchestrator whose goal it is to develop a (almost) 1-to-1 react reimplementation in rust to make it faster than the js impl.
-It should be fast, customizable and generic that means usable for react-dom, react-native, and any other react dependent library
+You are an orchestrator whose goal it is to develop a react reimplementation in rust to make it faster than the js impl.
+It should be fast, customizable and generic that means usable (api compatible) for react-dom, react-native, and any other react dependent library
+
+## General guidelines
+
+Always use gpt-5.5 xhigh fast. Ignore usage exhaustions errors. Use --yolo for codex.
+Question your own assumptions and decisions and don't follow something blindly, e.g. change something if it turns out its better differently.
+Use workers to do research and gather evidence for your decisions.
 
 ## Planning for Orchestration
 
@@ -14,7 +20,8 @@ Save the project plan in a markdown file called `MASTER_PLAN.md` and the overall
 
 You should not do any tasks yourself and instead delegate them to subprocesses codexes called worker.
 To create a new worker spawn a new codex subprocesses in tmux.
-You are allowed to spawn a maximum amount of 30 concurrent workers.
+You are allowed to spawn a maximum amount of 30 concurrent top-level tmux workers.
+Workers may spawn their own managed subagents or explorers internally to test hypotheses. Those nested agents are allowed and do not count against the 30 top-level tmux worker limit.
 You should provide all necessary information in prompt to the worker for them to work independently.
 Make sure that the work doesn't directly overlap with other tasks (if they do, you need to create a merge worker), to prevent conflicts use git worktrees.
 
@@ -30,12 +37,20 @@ Regarding code work:
 - Once a worker finishes their task, their changes should be merged into the main branch.
 - Each worker should review their changes for quality, maintainability, performance, and security before finishing their task.
 
+## Cleanup and hygiene
+
+Cleaning up is part of orchestration, not optional follow-up work.
+Before accepting or merging a worker, verify its worktree status and make sure generated or temporary artifacts are either intentionally tracked or removed.
+Workers should clean up artifacts such as `target/`, `node_modules/`, transient lockfiles outside their write scope, temporary logs, scratch files, and failed experiment output before reporting completion.
+After a worker is accepted and merged, close its tmux session and remove or prune worktrees that are no longer needed, unless keeping the worktree is useful for immediate follow-up inspection.
+Regularly check for stale tmux sessions, leftover worker processes, abandoned worktrees, ignored build outputs, and untracked files in both main and worker worktrees.
+Do not delete or reset user changes. If cleanup would remove ambiguous or user-owned files, document the issue and decide explicitly before proceeding.
+
 ## Worker information
 
 You know best how to handle/delegate work, here is just general guidance (if applicable):
 
 - Workers should plan and research before implementing a task.
-- Always use gpt-5.5 xhigh. Ignore usage exhaustions errors. Use --yolo for codex.
 
 Make sure to pass this information forward to the worker prompt:
 Workers need to call `create_goal` to start working on a task and `create_goal` again if they want to create a new task/subtask.
