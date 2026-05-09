@@ -1,0 +1,1803 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-dom-event-priority-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 event-name and update-priority oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-002-conformance.md",
+    "worker-progress/worker-007-scheduler-fiber.md",
+    "worker-progress/worker-017-runtime-inventory-generation.md",
+    "worker-progress/worker-030-core-lane-model.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-041-dom-events-priority-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "sourceFileTargets": [
+    "ReactVersions.js",
+    "packages/react-dom-bindings/src/events/ReactDOMEventListener.js",
+    "packages/react-dom-bindings/src/events/DOMEventNames.js",
+    "packages/react-dom-bindings/src/client/ReactDOMUpdatePriority.js",
+    "packages/react-reconciler/src/ReactEventPriorities.js",
+    "packages/react-reconciler/src/ReactFiberLane.js"
+  ],
+  "generation": {
+    "method": "pinned React source files plus checked runtime inventory tarballs and local Fast React placeholder probes",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "sourceFetch": "raw GitHub files fetched by immutable React source commit",
+    "packageEvidence": "exact npm tarballs from checked runtime inventory with integrity and file-list validation",
+    "probeIsolation": "one Node child process probing copied local Fast React React DOM and scheduler placeholders",
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false,
+    "timingNormalization": "no wall-clock timings are recorded; message priority rows are source-derived Scheduler priority cases"
+  },
+  "evidenceClaims": {
+    "worker041PlanUsed": true,
+    "checkedRuntimeInventoryRead": true,
+    "checkedRuntimeInventoryMatched": true,
+    "reactSourceCommitFetched": true,
+    "reactSourceEventPriorityParsed": true,
+    "reactSourceUpdatePriorityParsed": true,
+    "exactTarballUrlsFromInventory": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListsMatchedInventory": true,
+    "compiledReactDomPackageChecked": true,
+    "fastReactPlaceholderBoundariesProbed": true
+  },
+  "conformanceClaims": {
+    "realReactDomSourceMapped": true,
+    "realReactDomPackageEvidenceChecked": true,
+    "fastReactComparedToReactDom": false,
+    "fastReactBehaviorCompatible": false,
+    "domEventImplementationExists": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomPackageMatched": true,
+    "schedulerPackageMatched": true,
+    "reactPackageMatched": true
+  },
+  "reactSourceTarget": {
+    "repository": "facebook/react",
+    "tag": "v19.2.6",
+    "tagObjectSha": "2fcbe419ed90f863e6f67ce5b9738f38dbec640b",
+    "commit": "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+    "role": "pinned-react-source-target"
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-runtime-target"
+  },
+  "supportingRuntimePackages": [
+    {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "react-dom-peer-needed-for-package-evidence"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-and-message-priority-evidence"
+    }
+  ],
+  "fastReactTargets": [
+    {
+      "packageName": "@fast-react/react-dom",
+      "version": "0.0.0",
+      "role": "workspace-fast-react-react-dom-placeholder"
+    },
+    {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "workspace-fast-react-scheduler-placeholder"
+    }
+  ],
+  "sourceEvidence": {
+    "ReactVersions.js": {
+      "sourcePath": "ReactVersions.js",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/ReactVersions.js",
+      "sha256": "16ef805e114d914075af4bbcee67f9954b6d02c8cd450e685cc1b81af258550c",
+      "lineCount": 65,
+      "versionChecks": {
+        "react": true,
+        "reactDom": true,
+        "scheduler": true
+      }
+    },
+    "ReactDOMEventListener.js": {
+      "sourcePath": "packages/react-dom-bindings/src/events/ReactDOMEventListener.js",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/events/ReactDOMEventListener.js",
+      "sha256": "543a3eccad6ad6ece54dce2ae640a80b34d126cccadf454792025bc74ef1d369",
+      "lineCount": 416
+    },
+    "DOMEventNames.js": {
+      "sourcePath": "packages/react-dom-bindings/src/events/DOMEventNames.js",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/events/DOMEventNames.js",
+      "sha256": "279e927f4963df3c654becab695d084f9d829a6eeec58ab1f1d79d49b2b84337",
+      "lineCount": 132
+    },
+    "ReactDOMUpdatePriority.js": {
+      "sourcePath": "packages/react-dom-bindings/src/client/ReactDOMUpdatePriority.js",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/client/ReactDOMUpdatePriority.js",
+      "sha256": "5833519b79d071935009df9d4096966a67ad0ebceafee45377962d2e8ebb86cf",
+      "lineCount": 56
+    },
+    "ReactEventPriorities.js": {
+      "sourcePath": "packages/react-reconciler/src/ReactEventPriorities.js",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-reconciler/src/ReactEventPriorities.js",
+      "sha256": "d4a85dc77527db6e1baff3a0893922f02d2007f6d2d42c32658de04022cdd35c",
+      "lineCount": 68
+    },
+    "ReactFiberLane.js": {
+      "sourcePath": "packages/react-reconciler/src/ReactFiberLane.js",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-reconciler/src/ReactFiberLane.js",
+      "sha256": "ae32e4b8c75c1054ad24700794760ce44a2e38c3675584d28ba75db3cdf07b49",
+      "lineCount": 1303
+    }
+  },
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ]
+    },
+    "react": {
+      "packageName": "react",
+      "version": "19.2.6",
+      "role": "official-react-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+        "distIntegrity": "sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "distShasum": "3dadb8e12b2a7934c1d5317973e5dce1301f9a4d",
+        "unpackedSize": 171604
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==",
+        "integrityVerified": true,
+        "fileCount": 27,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-compiler-runtime.development.js",
+          "cjs/react-compiler-runtime.production.js",
+          "cjs/react-compiler-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.development.js",
+          "cjs/react-jsx-dev-runtime.production.js",
+          "cjs/react-jsx-dev-runtime.profiling.js",
+          "cjs/react-jsx-dev-runtime.react-server.development.js",
+          "cjs/react-jsx-dev-runtime.react-server.production.js",
+          "cjs/react-jsx-runtime.development.js",
+          "cjs/react-jsx-runtime.production.js",
+          "cjs/react-jsx-runtime.profiling.js",
+          "cjs/react-jsx-runtime.react-server.development.js",
+          "cjs/react-jsx-runtime.react-server.production.js",
+          "cjs/react.development.js",
+          "cjs/react.production.js",
+          "cjs/react.react-server.development.js",
+          "cjs/react.react-server.production.js",
+          "compiler-runtime.js",
+          "index.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "package.json",
+          "react.react-server.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./package.json": "./package.json",
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          }
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "cjs/",
+          "compiler-runtime.js",
+          "jsx-runtime.js",
+          "jsx-runtime.react-server.js",
+          "jsx-dev-runtime.js",
+          "jsx-dev-runtime.react-server.js",
+          "react.react-server.js"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": {
+          "node": ">=0.10.0"
+        }
+      },
+      "publicSubpaths": [
+        ".",
+        "./package.json",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./jsx-runtime",
+        "./jsx-dev-runtime",
+        "./compiler-runtime"
+      ]
+    },
+    "scheduler": {
+      "packageName": "scheduler",
+      "version": "0.27.0",
+      "role": "react-dom-runtime-dependency-needed-for-artifact-probes",
+      "targetStatus": "supporting-package-not-official-react-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/scheduler/0.27.0",
+        "distTarball": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+        "distIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "distShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd",
+        "unpackedSize": 82665
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+        "integrityVerified": true,
+        "fileCount": 15,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/scheduler-unstable_mock.development.js",
+          "cjs/scheduler-unstable_mock.production.js",
+          "cjs/scheduler-unstable_post_task.development.js",
+          "cjs/scheduler-unstable_post_task.production.js",
+          "cjs/scheduler.development.js",
+          "cjs/scheduler.native.development.js",
+          "cjs/scheduler.native.production.js",
+          "cjs/scheduler.production.js",
+          "index.js",
+          "index.native.js",
+          "package.json",
+          "unstable_mock.js",
+          "unstable_post_task.js"
+        ]
+      },
+      "packageJson": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "main": null,
+        "type": null,
+        "exports": null,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "index.js",
+          "index.native.js",
+          "unstable_mock.js",
+          "unstable_post_task.js",
+          "cjs/"
+        ],
+        "dependencies": null,
+        "peerDependencies": null,
+        "engines": null
+      },
+      "publicSubpaths": [],
+      "runtimeSubpaths": []
+    }
+  },
+  "compiledPackageEvidence": {
+    "cjs/react-dom-client.development.js": {
+      "sha256": "d27de6648360d44909aca6a3a93b9d306e6cad2d23913caf1b10cc39c896225b",
+      "lineCount": 28122,
+      "containsGetEventPriority": true,
+      "containsResolveUpdatePriority": true,
+      "containsMessagePriorityBridge": true,
+      "containsReactDomSharedInternalsPrioritySlot": true
+    },
+    "cjs/react-dom-client.production.js": {
+      "sha256": "e7e8275ddedd11991183aec736095ba33e90fd4ce04a8dbb413efce1dae6050b",
+      "lineCount": 16050,
+      "containsGetEventPriority": true,
+      "containsResolveUpdatePriority": true,
+      "containsMessagePriorityBridge": true,
+      "containsReactDomSharedInternalsPrioritySlot": true
+    }
+  },
+  "scenarios": [
+    {
+      "id": "react-dom-event-priority-event-name-table",
+      "area": "DOM event name to lane-backed event priority mapping",
+      "sourceFiles": [
+        "packages/react-dom-bindings/src/events/ReactDOMEventListener.js",
+        "packages/react-dom-bindings/src/events/DOMEventNames.js"
+      ],
+      "captures": [
+        "discrete getEventPriority cases",
+        "continuous getEventPriority cases",
+        "DOMEventName union members that fall through to default",
+        "unknown event fallback to default"
+      ]
+    },
+    {
+      "id": "react-dom-event-priority-message-scheduler-bridge",
+      "area": "message event Scheduler priority bridge",
+      "sourceFiles": [
+        "packages/react-dom-bindings/src/events/ReactDOMEventListener.js"
+      ],
+      "captures": [
+        "Immediate Scheduler priority maps to discrete event priority",
+        "UserBlocking Scheduler priority maps to continuous event priority",
+        "Normal and Low Scheduler priorities map to default event priority",
+        "Idle Scheduler priority maps to idle event priority",
+        "unknown Scheduler priority maps to default event priority"
+      ]
+    },
+    {
+      "id": "react-dom-event-priority-lane-backed-constants",
+      "area": "ReactEventPriorities lane backing",
+      "sourceFiles": [
+        "packages/react-reconciler/src/ReactEventPriorities.js",
+        "packages/react-reconciler/src/ReactFiberLane.js"
+      ],
+      "captures": [
+        "NoEventPriority equals NoLane",
+        "DiscreteEventPriority equals SyncLane",
+        "ContinuousEventPriority equals InputContinuousLane",
+        "DefaultEventPriority equals DefaultLane",
+        "IdleEventPriority equals IdleLane",
+        "eventPriorityToLane returns the lane-backed priority"
+      ]
+    },
+    {
+      "id": "react-dom-event-priority-resolve-update-priority",
+      "area": "ReactDOMUpdatePriority resolveUpdatePriority fallback order",
+      "sourceFiles": [
+        "packages/react-dom-bindings/src/client/ReactDOMUpdatePriority.js",
+        "packages/react-dom-bindings/src/events/ReactDOMEventListener.js"
+      ],
+      "captures": [
+        "stored current update priority wins",
+        "undefined window.event returns default priority",
+        "window.event.type maps through getEventPriority"
+      ]
+    },
+    {
+      "id": "react-dom-event-priority-fast-react-placeholder-boundary",
+      "area": "Current Fast React placeholder comparison boundary",
+      "sourceFiles": [
+        "packages/react-dom/index.js",
+        "packages/react-dom/client.js",
+        "packages/scheduler/cjs/scheduler.development.js"
+      ],
+      "captures": [
+        "React DOM public entrypoints are placeholders",
+        "event/update priority internals are not exported by Fast React",
+        "scheduler priority constants are readable but priority context functions throw placeholders"
+      ]
+    }
+  ],
+  "priorityConstants": {
+    "eventPriorities": {
+      "NoEventPriority": {
+        "priorityName": "NoEventPriority",
+        "label": "none",
+        "laneName": "NoLane",
+        "value": 0,
+        "binary": "0b0000000000000000000000000000000"
+      },
+      "DiscreteEventPriority": {
+        "priorityName": "DiscreteEventPriority",
+        "label": "discrete",
+        "laneName": "SyncLane",
+        "value": 2,
+        "binary": "0b0000000000000000000000000000010"
+      },
+      "ContinuousEventPriority": {
+        "priorityName": "ContinuousEventPriority",
+        "label": "continuous",
+        "laneName": "InputContinuousLane",
+        "value": 8,
+        "binary": "0b0000000000000000000000000001000"
+      },
+      "DefaultEventPriority": {
+        "priorityName": "DefaultEventPriority",
+        "label": "default",
+        "laneName": "DefaultLane",
+        "value": 32,
+        "binary": "0b0000000000000000000000000100000"
+      },
+      "IdleEventPriority": {
+        "priorityName": "IdleEventPriority",
+        "label": "idle",
+        "laneName": "IdleLane",
+        "value": 268435456,
+        "binary": "0b0010000000000000000000000000000"
+      }
+    },
+    "schedulerPriorities": {
+      "ImmediateSchedulerPriority": 1,
+      "UserBlockingSchedulerPriority": 2,
+      "NormalSchedulerPriority": 3,
+      "LowSchedulerPriority": 4,
+      "IdleSchedulerPriority": 5,
+      "UnknownSchedulerPriority": null
+    },
+    "eventPriorityToLaneIdentity": true
+  },
+  "eventPriorityTable": {
+    "sourceFiles": [
+      "packages/react-dom-bindings/src/events/ReactDOMEventListener.js",
+      "packages/react-dom-bindings/src/events/DOMEventNames.js"
+    ],
+    "extractedFrom": "getEventPriority(domEventName)",
+    "domEventNameUnion": [
+      "abort",
+      "afterblur",
+      "beforeblur",
+      "beforeinput",
+      "beforetoggle",
+      "blur",
+      "canplay",
+      "canplaythrough",
+      "cancel",
+      "change",
+      "click",
+      "close",
+      "compositionend",
+      "compositionstart",
+      "compositionupdate",
+      "contextmenu",
+      "copy",
+      "cut",
+      "dblclick",
+      "auxclick",
+      "drag",
+      "dragend",
+      "dragenter",
+      "dragexit",
+      "dragleave",
+      "dragover",
+      "dragstart",
+      "drop",
+      "durationchange",
+      "emptied",
+      "encrypted",
+      "ended",
+      "error",
+      "focus",
+      "focusin",
+      "focusout",
+      "fullscreenchange",
+      "gotpointercapture",
+      "hashchange",
+      "input",
+      "invalid",
+      "keydown",
+      "keypress",
+      "keyup",
+      "load",
+      "loadstart",
+      "loadeddata",
+      "loadedmetadata",
+      "lostpointercapture",
+      "message",
+      "mousedown",
+      "mouseenter",
+      "mouseleave",
+      "mousemove",
+      "mouseout",
+      "mouseover",
+      "mouseup",
+      "paste",
+      "pause",
+      "play",
+      "playing",
+      "pointercancel",
+      "pointerdown",
+      "pointerenter",
+      "pointerleave",
+      "pointermove",
+      "pointerout",
+      "pointerover",
+      "pointerup",
+      "popstate",
+      "progress",
+      "ratechange",
+      "reset",
+      "resize",
+      "scroll",
+      "scrollend",
+      "seeked",
+      "seeking",
+      "select",
+      "selectstart",
+      "selectionchange",
+      "stalled",
+      "submit",
+      "suspend",
+      "textInput",
+      "timeupdate",
+      "toggle",
+      "touchcancel",
+      "touchend",
+      "touchmove",
+      "touchstart",
+      "volumechange",
+      "waiting",
+      "wheel"
+    ],
+    "buckets": {
+      "discrete": [
+        {
+          "eventName": "beforetoggle",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 0
+        },
+        {
+          "eventName": "cancel",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 1
+        },
+        {
+          "eventName": "click",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 2
+        },
+        {
+          "eventName": "close",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 3
+        },
+        {
+          "eventName": "contextmenu",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 4
+        },
+        {
+          "eventName": "copy",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 5
+        },
+        {
+          "eventName": "cut",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 6
+        },
+        {
+          "eventName": "auxclick",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 7
+        },
+        {
+          "eventName": "dblclick",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 8
+        },
+        {
+          "eventName": "dragend",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 9
+        },
+        {
+          "eventName": "dragstart",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 10
+        },
+        {
+          "eventName": "drop",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 11
+        },
+        {
+          "eventName": "focusin",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 12
+        },
+        {
+          "eventName": "focusout",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 13
+        },
+        {
+          "eventName": "input",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 14
+        },
+        {
+          "eventName": "invalid",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 15
+        },
+        {
+          "eventName": "keydown",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 16
+        },
+        {
+          "eventName": "keypress",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 17
+        },
+        {
+          "eventName": "keyup",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 18
+        },
+        {
+          "eventName": "mousedown",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 19
+        },
+        {
+          "eventName": "mouseup",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 20
+        },
+        {
+          "eventName": "paste",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 21
+        },
+        {
+          "eventName": "pause",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 22
+        },
+        {
+          "eventName": "play",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 23
+        },
+        {
+          "eventName": "pointercancel",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 24
+        },
+        {
+          "eventName": "pointerdown",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 25
+        },
+        {
+          "eventName": "pointerup",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 26
+        },
+        {
+          "eventName": "ratechange",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 27
+        },
+        {
+          "eventName": "reset",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 28
+        },
+        {
+          "eventName": "resize",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 29
+        },
+        {
+          "eventName": "seeked",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 30
+        },
+        {
+          "eventName": "submit",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 31
+        },
+        {
+          "eventName": "toggle",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 32
+        },
+        {
+          "eventName": "touchcancel",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 33
+        },
+        {
+          "eventName": "touchend",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 34
+        },
+        {
+          "eventName": "touchstart",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 35
+        },
+        {
+          "eventName": "volumechange",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 36
+        },
+        {
+          "eventName": "change",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 37
+        },
+        {
+          "eventName": "selectionchange",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 38
+        },
+        {
+          "eventName": "textInput",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 39
+        },
+        {
+          "eventName": "compositionstart",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 40
+        },
+        {
+          "eventName": "compositionend",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 41
+        },
+        {
+          "eventName": "compositionupdate",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 42
+        },
+        {
+          "eventName": "beforeblur",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 43
+        },
+        {
+          "eventName": "afterblur",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 44
+        },
+        {
+          "eventName": "beforeinput",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 45
+        },
+        {
+          "eventName": "blur",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 46
+        },
+        {
+          "eventName": "fullscreenchange",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 47
+        },
+        {
+          "eventName": "focus",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 48
+        },
+        {
+          "eventName": "hashchange",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 49
+        },
+        {
+          "eventName": "popstate",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 50
+        },
+        {
+          "eventName": "select",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 51
+        },
+        {
+          "eventName": "selectstart",
+          "priorityName": "DiscreteEventPriority",
+          "priorityLabel": "discrete",
+          "priorityValue": 2,
+          "laneName": "SyncLane",
+          "sourceCaseIndex": 52
+        }
+      ],
+      "continuous": [
+        {
+          "eventName": "drag",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 0
+        },
+        {
+          "eventName": "dragenter",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 1
+        },
+        {
+          "eventName": "dragexit",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 2
+        },
+        {
+          "eventName": "dragleave",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 3
+        },
+        {
+          "eventName": "dragover",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 4
+        },
+        {
+          "eventName": "mousemove",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 5
+        },
+        {
+          "eventName": "mouseout",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 6
+        },
+        {
+          "eventName": "mouseover",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 7
+        },
+        {
+          "eventName": "pointermove",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 8
+        },
+        {
+          "eventName": "pointerout",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 9
+        },
+        {
+          "eventName": "pointerover",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 10
+        },
+        {
+          "eventName": "scroll",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 11
+        },
+        {
+          "eventName": "touchmove",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 12
+        },
+        {
+          "eventName": "wheel",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 13
+        },
+        {
+          "eventName": "mouseenter",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 14
+        },
+        {
+          "eventName": "mouseleave",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 15
+        },
+        {
+          "eventName": "pointerenter",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 16
+        },
+        {
+          "eventName": "pointerleave",
+          "priorityName": "ContinuousEventPriority",
+          "priorityLabel": "continuous",
+          "priorityValue": 8,
+          "laneName": "InputContinuousLane",
+          "sourceCaseIndex": 17
+        }
+      ],
+      "default": [
+        {
+          "eventName": "abort",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 0
+        },
+        {
+          "eventName": "canplay",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 1
+        },
+        {
+          "eventName": "canplaythrough",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 2
+        },
+        {
+          "eventName": "durationchange",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 3
+        },
+        {
+          "eventName": "emptied",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 4
+        },
+        {
+          "eventName": "encrypted",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 5
+        },
+        {
+          "eventName": "ended",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 6
+        },
+        {
+          "eventName": "error",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 7
+        },
+        {
+          "eventName": "gotpointercapture",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 8
+        },
+        {
+          "eventName": "load",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 9
+        },
+        {
+          "eventName": "loadstart",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 10
+        },
+        {
+          "eventName": "loadeddata",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 11
+        },
+        {
+          "eventName": "loadedmetadata",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 12
+        },
+        {
+          "eventName": "lostpointercapture",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 13
+        },
+        {
+          "eventName": "playing",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 14
+        },
+        {
+          "eventName": "progress",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 15
+        },
+        {
+          "eventName": "scrollend",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 16
+        },
+        {
+          "eventName": "seeking",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 17
+        },
+        {
+          "eventName": "stalled",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 18
+        },
+        {
+          "eventName": "suspend",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 19
+        },
+        {
+          "eventName": "timeupdate",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 20
+        },
+        {
+          "eventName": "waiting",
+          "priorityName": "DefaultEventPriority",
+          "priorityLabel": "default",
+          "priorityValue": 32,
+          "laneName": "DefaultLane",
+          "sourceCaseIndex": 21
+        }
+      ]
+    },
+    "specialCases": {
+      "message": {
+        "eventName": "message",
+        "prioritySource": "getCurrentSchedulerPriorityLevel() switch inside getEventPriority",
+        "mappingsRecordedIn": "messageSchedulerPriorityMapping"
+      },
+      "unknownEventFallback": {
+        "eventName": "unknown-fast-react-probe-event",
+        "priorityName": "DefaultEventPriority",
+        "priorityValue": 32,
+        "laneName": "DefaultLane",
+        "source": "default branch of getEventPriority"
+      }
+    }
+  },
+  "messageSchedulerPriorityMapping": [
+    {
+      "schedulerPriorityName": "ImmediateSchedulerPriority",
+      "schedulerPublicConstant": "unstable_ImmediatePriority",
+      "schedulerValue": 1,
+      "eventPriorityName": "DiscreteEventPriority",
+      "eventName": "message",
+      "eventPriorityValue": 2,
+      "eventPriorityLabel": "discrete",
+      "laneName": "SyncLane",
+      "source": "ReactDOMEventListener.getEventPriority maps message through current Scheduler priority"
+    },
+    {
+      "schedulerPriorityName": "UserBlockingSchedulerPriority",
+      "schedulerPublicConstant": "unstable_UserBlockingPriority",
+      "schedulerValue": 2,
+      "eventPriorityName": "ContinuousEventPriority",
+      "eventName": "message",
+      "eventPriorityValue": 8,
+      "eventPriorityLabel": "continuous",
+      "laneName": "InputContinuousLane",
+      "source": "ReactDOMEventListener.getEventPriority maps message through current Scheduler priority"
+    },
+    {
+      "schedulerPriorityName": "NormalSchedulerPriority",
+      "schedulerPublicConstant": "unstable_NormalPriority",
+      "schedulerValue": 3,
+      "eventPriorityName": "DefaultEventPriority",
+      "eventName": "message",
+      "eventPriorityValue": 32,
+      "eventPriorityLabel": "default",
+      "laneName": "DefaultLane",
+      "source": "ReactDOMEventListener.getEventPriority maps message through current Scheduler priority"
+    },
+    {
+      "schedulerPriorityName": "LowSchedulerPriority",
+      "schedulerPublicConstant": "unstable_LowPriority",
+      "schedulerValue": 4,
+      "eventPriorityName": "DefaultEventPriority",
+      "eventName": "message",
+      "eventPriorityValue": 32,
+      "eventPriorityLabel": "default",
+      "laneName": "DefaultLane",
+      "source": "ReactDOMEventListener.getEventPriority maps message through current Scheduler priority"
+    },
+    {
+      "schedulerPriorityName": "IdleSchedulerPriority",
+      "schedulerPublicConstant": "unstable_IdlePriority",
+      "schedulerValue": 5,
+      "eventPriorityName": "IdleEventPriority",
+      "eventName": "message",
+      "eventPriorityValue": 268435456,
+      "eventPriorityLabel": "idle",
+      "laneName": "IdleLane",
+      "source": "ReactDOMEventListener.getEventPriority maps message through current Scheduler priority"
+    },
+    {
+      "schedulerPriorityName": "UnknownSchedulerPriority",
+      "schedulerPublicConstant": null,
+      "schedulerValue": null,
+      "eventPriorityName": "DefaultEventPriority",
+      "eventName": "message",
+      "eventPriorityValue": 32,
+      "eventPriorityLabel": "default",
+      "laneName": "DefaultLane",
+      "source": "ReactDOMEventListener.getEventPriority maps message through current Scheduler priority"
+    }
+  ],
+  "resolveUpdatePriority": {
+    "sourceFile": "packages/react-dom-bindings/src/client/ReactDOMUpdatePriority.js",
+    "storage": {
+      "internalField": "ReactDOMSharedInternals.p /* currentUpdatePriority */",
+      "initialPriorityName": "NoEventPriority",
+      "initialPriorityValue": 0
+    },
+    "fallbackOrder": [
+      "return stored current update priority when it is not NoEventPriority",
+      "otherwise read window.event",
+      "return DefaultEventPriority when window.event is undefined",
+      "otherwise map window.event.type through getEventPriority"
+    ],
+    "runWithPriorityRestoresPreviousPriority": true,
+    "cases": [
+      {
+        "id": "stored-current-update-priority-wins",
+        "storedPriorityName": "ContinuousEventPriority",
+        "windowEventType": "click",
+        "expectedPriorityName": "ContinuousEventPriority",
+        "reason": "resolveUpdatePriority returns ReactDOMSharedInternals.p when it is not NoEventPriority.",
+        "expectedPriorityValue": 8,
+        "expectedLaneName": "InputContinuousLane"
+      },
+      {
+        "id": "no-current-priority-and-no-window-event-defaults",
+        "storedPriorityName": "NoEventPriority",
+        "windowEventType": null,
+        "expectedPriorityName": "DefaultEventPriority",
+        "reason": "resolveUpdatePriority returns DefaultEventPriority when window.event is undefined.",
+        "expectedPriorityValue": 32,
+        "expectedLaneName": "DefaultLane"
+      },
+      {
+        "id": "window-event-click-maps-discrete",
+        "storedPriorityName": "NoEventPriority",
+        "windowEventType": "click",
+        "expectedPriorityName": "DiscreteEventPriority",
+        "reason": "resolveUpdatePriority maps window.event.type through getEventPriority when no current update priority is set.",
+        "expectedPriorityValue": 2,
+        "expectedLaneName": "SyncLane"
+      },
+      {
+        "id": "window-event-wheel-maps-continuous",
+        "storedPriorityName": "NoEventPriority",
+        "windowEventType": "wheel",
+        "expectedPriorityName": "ContinuousEventPriority",
+        "reason": "Continuous DOM events are observed through the same getEventPriority fallback.",
+        "expectedPriorityValue": 8,
+        "expectedLaneName": "InputContinuousLane"
+      },
+      {
+        "id": "window-event-unknown-maps-default",
+        "storedPriorityName": "NoEventPriority",
+        "windowEventType": "unknown-fast-react-probe-event",
+        "expectedPriorityName": "DefaultEventPriority",
+        "reason": "Event names not handled by ReactDOMEventListener.getEventPriority fall through to DefaultEventPriority.",
+        "expectedPriorityValue": 32,
+        "expectedLaneName": "DefaultLane"
+      }
+    ]
+  },
+  "fastReactComparisonBoundaries": [
+    {
+      "id": "fast-react-react-dom-root-placeholder",
+      "packageName": "@fast-react/react-dom",
+      "entrypoint": "react-dom",
+      "status": "unsupported-placeholder",
+      "placeholder": true,
+      "compatibilityTarget": "react-dom@19.2.6",
+      "eventPriorityInternalsExported": false,
+      "updatePriorityInternalsExported": false,
+      "exportKeys": [
+        "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+        "createPortal",
+        "flushSync",
+        "preconnect",
+        "prefetchDNS",
+        "preinit",
+        "preinitModule",
+        "preload",
+        "preloadModule",
+        "requestFormReset",
+        "unstable_batchedUpdates",
+        "useFormState",
+        "useFormStatus",
+        "version"
+      ],
+      "probes": {
+        "flushSyncCall": {
+          "status": "throws",
+          "error": {
+            "name": "FastReactDomUnimplementedError",
+            "code": "FAST_REACT_UNIMPLEMENTED",
+            "entrypoint": "react-dom",
+            "exportName": "flushSync",
+            "compatibilityTarget": "react-dom@19.2.6",
+            "message": "[fast-react] react-dom.flushSync was called, but this placeholder has no React DOM behavior implementation yet. It exists to track the accepted react-dom@19.2.6 package surface; do not treat it as React DOM-compatible behavior."
+          }
+        },
+        "internalsPriorityAccess": {
+          "status": "throws",
+          "error": {
+            "name": "FastReactDomUnimplementedError",
+            "code": "FAST_REACT_UNIMPLEMENTED",
+            "entrypoint": "react-dom",
+            "exportName": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.p",
+            "compatibilityTarget": "react-dom@19.2.6",
+            "message": "[fast-react] react-dom.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.p was accessed, but this placeholder has no React DOM behavior implementation yet. It exists to track the accepted react-dom@19.2.6 package surface; do not treat it as React DOM-compatible behavior. The private React DOM internals shape is intentionally pending conformance-backed investigation."
+          }
+        }
+      },
+      "reason": "The public React DOM root package is a package-surface placeholder and exposes no event priority or current update priority implementation."
+    },
+    {
+      "id": "fast-react-react-dom-client-placeholder",
+      "packageName": "@fast-react/react-dom",
+      "entrypoint": "react-dom/client",
+      "status": "unsupported-placeholder",
+      "placeholder": true,
+      "compatibilityTarget": "react-dom@19.2.6",
+      "eventPriorityInternalsExported": false,
+      "updatePriorityInternalsExported": false,
+      "exportKeys": [
+        "createRoot",
+        "hydrateRoot",
+        "version"
+      ],
+      "probes": {
+        "createRootCall": {
+          "status": "throws",
+          "error": {
+            "name": "FastReactDomUnimplementedError",
+            "code": "FAST_REACT_UNIMPLEMENTED",
+            "entrypoint": "react-dom/client",
+            "exportName": "createRoot",
+            "compatibilityTarget": "react-dom@19.2.6",
+            "message": "[fast-react] react-dom/client.createRoot was called, but this placeholder has no React DOM behavior implementation yet. It exists to track the accepted react-dom@19.2.6 package surface; do not treat it as React DOM-compatible behavior."
+          }
+        },
+        "hydrateRootCall": {
+          "status": "throws",
+          "error": {
+            "name": "FastReactDomUnimplementedError",
+            "code": "FAST_REACT_UNIMPLEMENTED",
+            "entrypoint": "react-dom/client",
+            "exportName": "hydrateRoot",
+            "compatibilityTarget": "react-dom@19.2.6",
+            "message": "[fast-react] react-dom/client.hydrateRoot was called, but this placeholder has no React DOM behavior implementation yet. It exists to track the accepted react-dom@19.2.6 package surface; do not treat it as React DOM-compatible behavior."
+          }
+        }
+      },
+      "reason": "Client roots are placeholders, so there is no DOM listener, dispatch wrapper, or resolveUpdatePriority behavior to compare yet."
+    },
+    {
+      "id": "fast-react-scheduler-placeholder-priority-context",
+      "packageName": "scheduler",
+      "entrypoint": "scheduler",
+      "status": "unsupported-placeholder",
+      "placeholder": true,
+      "compatibilityTarget": "scheduler@0.27.0",
+      "constants": {
+        "unstable_ImmediatePriority": 1,
+        "unstable_UserBlockingPriority": 2,
+        "unstable_NormalPriority": 3,
+        "unstable_LowPriority": 4,
+        "unstable_IdlePriority": 5
+      },
+      "probes": {
+        "getCurrentPriorityLevelCall": {
+          "status": "throws",
+          "error": {
+            "name": "FastReactSchedulerUnimplementedError",
+            "code": "FAST_REACT_UNIMPLEMENTED",
+            "entrypoint": "scheduler",
+            "exportName": "unstable_getCurrentPriorityLevel",
+            "compatibilityTarget": "scheduler@0.27.0",
+            "message": "[fast-react] scheduler.unstable_getCurrentPriorityLevel was called, but this placeholder has no scheduler behavior implementation yet. It exists to track the accepted scheduler@0.27.0 package surface; do not treat it as scheduler-compatible behavior."
+          }
+        },
+        "runWithPriorityCall": {
+          "status": "throws",
+          "error": {
+            "name": "FastReactSchedulerUnimplementedError",
+            "code": "FAST_REACT_UNIMPLEMENTED",
+            "entrypoint": "scheduler",
+            "exportName": "unstable_runWithPriority",
+            "compatibilityTarget": "scheduler@0.27.0",
+            "message": "[fast-react] scheduler.unstable_runWithPriority was called, but this placeholder has no scheduler behavior implementation yet. It exists to track the accepted scheduler@0.27.0 package surface; do not treat it as scheduler-compatible behavior."
+          }
+        }
+      },
+      "reason": "The current Fast React scheduler exposes public numeric constants but priority context APIs still throw placeholders, so message priority behavior cannot be behavior-compared."
+    }
+  ],
+  "coverage": {
+    "discreteEventNames": true,
+    "continuousEventNames": true,
+    "defaultEventNames": true,
+    "unknownEventFallback": true,
+    "messageSchedulerPriorityBridge": true,
+    "idlePriorityViaMessageSchedulerPriority": true,
+    "laneBackedEventPriorityConstants": true,
+    "resolveUpdatePriorityFallbackOrder": true,
+    "fastReactPlaceholderComparisonBoundaries": true
+  },
+  "intentionalGaps": [
+    {
+      "id": "source-derived-private-internals",
+      "reason": "React DOM event priority and resolveUpdatePriority are private internals, so this oracle derives their behavior from pinned React 19.2.6 source instead of public runtime exports."
+    },
+    {
+      "id": "no-dom-event-implementation",
+      "reason": "This worker only records oracle evidence; it does not implement root listeners, plugin dispatch, hydration replay, or update scheduling in Fast React."
+    },
+    {
+      "id": "fast-react-placeholders-not-dual-run-compatible",
+      "reason": "Current Fast React React DOM and scheduler packages expose placeholder surfaces, so the oracle records comparison boundaries without claiming behavior compatibility."
+    }
+  ]
+}
