@@ -202,6 +202,7 @@ Dependencies: M8.
 | worker-024-create-ref-behavior | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-024-create-ref-behavior.md` | workers 014,017,023 | merged |
 | worker-025-children-helpers | Add a deterministic `Children` helper oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-025-children-helpers.md` | workers 014,017,023,024 | merged |
 | worker-026-memo-lazy-behavior | Add a deterministic `memo`/`lazy` wrapper-object oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-026-memo-lazy-behavior.md` | workers 014,017,021,023,025 | merged |
+| worker-027-forward-ref-behavior | Add a deterministic `forwardRef` wrapper-object oracle and implement covered JS facade behavior | `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, `worker-progress/worker-027-forward-ref-behavior.md` | workers 014,017,021,023,024,026 | queued |
 
 ## Merge Policy
 
