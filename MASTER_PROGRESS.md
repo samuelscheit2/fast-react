@@ -61,3 +61,6 @@ Last updated: 2026-05-10
   with oracle generation, focused oracle test, deterministic byte-compare,
   worker-branch conformance, combined `main` conformance with 413 tests, and
   `git diff --check`.
+- Merged worker 122 React DOM container marker and root listener shell
+  internals; verified with module syntax checks, focused private smoke,
+  root-marker/listener oracle tests, `npm run test:smoke`, and `git diff --check`.
