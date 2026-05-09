@@ -1,0 +1,234 @@
+const FUTURE_INVENTORY_STAGES = [
+  {
+    id: "npm-metadata",
+    description:
+      "Resolve exact package metadata, tarball URL, integrity, dependencies, peer dependencies, and package exports from npm.",
+    status: "not-generated"
+  },
+  {
+    id: "tarball-file-list",
+    description:
+      "Download exact tarballs into a temporary directory and record their file lists without mutating the repository.",
+    status: "not-generated"
+  },
+  {
+    id: "package-export-map",
+    description:
+      "Parse package.json exports into public subpath and condition rows.",
+    status: "not-generated"
+  },
+  {
+    id: "runtime-default-node",
+    description:
+      "Probe runtime entrypoints in isolated Node child processes under default Node conditions.",
+    status: "not-generated"
+  },
+  {
+    id: "runtime-react-server",
+    description:
+      "Probe runtime entrypoints in isolated Node child processes with the react-server condition enabled.",
+    status: "not-generated"
+  },
+  {
+    id: "type-declarations",
+    description:
+      "Parse declaration packages with the TypeScript compiler API and record value/type export surfaces.",
+    status: "not-generated"
+  }
+];
+
+const COMPATIBILITY_TARGETS = [
+  {
+    packageName: "@types/react",
+    version: "19.2.14",
+    packageKind: "types",
+    role: "official-react-declaration-target",
+    npmTarball: "https://registry.npmjs.org/@types/react/-/react-19.2.14.tgz",
+    publicSubpaths: [
+      ".",
+      "./canary",
+      "./compiler-runtime",
+      "./experimental",
+      "./jsx-dev-runtime",
+      "./jsx-runtime",
+      "./package.json"
+    ],
+    futureInventoryStageIds: [
+      "npm-metadata",
+      "tarball-file-list",
+      "package-export-map",
+      "type-declarations"
+    ]
+  },
+  {
+    packageName: "react",
+    version: "19.2.6",
+    packageKind: "runtime",
+    role: "official-react-runtime-target",
+    npmTarball: "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+    publicSubpaths: [
+      ".",
+      "./compiler-runtime",
+      "./jsx-dev-runtime",
+      "./jsx-runtime",
+      "./package.json"
+    ],
+    futureInventoryStageIds: [
+      "npm-metadata",
+      "tarball-file-list",
+      "package-export-map",
+      "runtime-default-node",
+      "runtime-react-server"
+    ]
+  },
+  {
+    packageName: "react-dom",
+    version: "19.2.6",
+    packageKind: "runtime",
+    role: "official-react-dom-runtime-target",
+    npmTarball: "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+    publicSubpaths: [
+      ".",
+      "./client",
+      "./package.json",
+      "./profiling",
+      "./server",
+      "./server.browser",
+      "./server.bun",
+      "./server.edge",
+      "./server.node",
+      "./static",
+      "./static.browser",
+      "./static.edge",
+      "./static.node",
+      "./test-utils"
+    ],
+    futureInventoryStageIds: [
+      "npm-metadata",
+      "tarball-file-list",
+      "package-export-map",
+      "runtime-default-node",
+      "runtime-react-server"
+    ]
+  }
+];
+
+const SUPPORTING_TARGETS = [
+  {
+    packageName: "@types/react-dom",
+    version: "19.2.3",
+    packageKind: "types",
+    role: "react-dom-declaration-package-recommended-by-worker-004",
+    targetStatus: "requires-project-target-decision",
+    npmTarball:
+      "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.2.3.tgz",
+    publicSubpaths: [
+      ".",
+      "./canary",
+      "./client",
+      "./experimental",
+      "./package.json",
+      "./server",
+      "./server.browser",
+      "./server.bun",
+      "./server.edge",
+      "./server.node",
+      "./static",
+      "./static.browser",
+      "./static.edge",
+      "./static.node",
+      "./test-utils"
+    ],
+    futureInventoryStageIds: [
+      "npm-metadata",
+      "tarball-file-list",
+      "package-export-map",
+      "type-declarations"
+    ]
+  },
+  {
+    packageName: "scheduler",
+    version: "0.27.0",
+    packageKind: "runtime",
+    role: "react-dom-runtime-dependency-recommended-by-worker-002",
+    targetStatus: "supporting-package-not-official-react-target",
+    npmTarball: "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+    publicSubpaths: [".", "./unstable_mock", "./unstable_post_task"],
+    futureInventoryStageIds: [
+      "npm-metadata",
+      "tarball-file-list",
+      "package-export-map",
+      "runtime-default-node"
+    ]
+  }
+];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+export function createInventoryPlaceholder() {
+  return {
+    schemaVersion: 1,
+    inventoryKind: "react-19.2.6-target-placeholder",
+    deterministic: true,
+    generatedArtifacts: false,
+    compatibilityLabel: "React 19.2.6 package targets",
+    sources: [
+      "WORKER_BRIEF.md",
+      "MASTER_PLAN.md",
+      "worker-progress/worker-002-conformance.md",
+      "worker-progress/worker-004-api-inventory.md",
+      "worker-progress/worker-010-initial-scaffold.md"
+    ],
+    conformanceClaims: {
+      realReactBehaviorCompared: false,
+      tarballsDownloaded: false,
+      runtimeExportsProbed: false,
+      typeDeclarationsParsed: false,
+      fastReactComparedToReact: false
+    },
+    futureInventoryStages: clone(FUTURE_INVENTORY_STAGES),
+    compatibilityTargets: clone(COMPATIBILITY_TARGETS),
+    supportingTargets: clone(SUPPORTING_TARGETS)
+  };
+}
+
+export function stringifyInventoryPlaceholder(
+  inventory = createInventoryPlaceholder()
+) {
+  return `${JSON.stringify(inventory, null, 2)}\n`;
+}
+
+export function formatInventoryPlaceholderAsMarkdown(
+  inventory = createInventoryPlaceholder()
+) {
+  const lines = [
+    "# Fast React Conformance Inventory Placeholder",
+    "",
+    "This is a deterministic target description only. It does not claim React conformance.",
+    "",
+    "## Compatibility Targets",
+    "",
+    ...inventory.compatibilityTargets.map(
+      (target) =>
+        `- ${target.packageName}@${target.version}: ${target.role}; subpaths: ${target.publicSubpaths.join(", ")}`
+    ),
+    "",
+    "## Supporting Targets",
+    "",
+    ...inventory.supportingTargets.map(
+      (target) =>
+        `- ${target.packageName}@${target.version}: ${target.role}; status: ${target.targetStatus}`
+    ),
+    "",
+    "## Future Inventory Stages",
+    "",
+    ...inventory.futureInventoryStages.map(
+      (stage) => `- ${stage.id}: ${stage.status}`
+    ),
+    ""
+  ];
+
+  return lines.join("\n");
+}
