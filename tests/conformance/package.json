@@ -17,6 +17,9 @@
     "ref-object:generate": "node scripts/generate-ref-object-oracle.mjs --write",
     "ref-object:print": "node scripts/print-ref-object-oracle.mjs --format=json",
     "ref-object:print:markdown": "node scripts/print-ref-object-oracle.mjs --format=markdown",
+    "wrapper-object:generate": "node scripts/generate-wrapper-object-oracle.mjs --write",
+    "wrapper-object:print": "node scripts/print-wrapper-object-oracle.mjs --format=json",
+    "wrapper-object:print:markdown": "node scripts/print-wrapper-object-oracle.mjs --format=markdown",
     "check": "npm test",
     "test": "node --test test/*.test.mjs"
   },
