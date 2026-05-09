@@ -9,6 +9,7 @@ First action: use `/goal` (create_goal) for this worker task using the Objective
 After setting the goal, call get_goal if available and record the active goal status/objective in your report, then read WORKER_BRIEF.md, MASTER_PLAN.md, and MASTER_PROGRESS.md. Do not read ORCHESTRATOR.md unless the orchestrator explicitly asks you to inspect it; it is for the orchestrator role, not workers.
 If you need to create subtasks, use `/goal` (create_goal) again for each subtask, but with all context about the parent task.
 Do not call update_goal(status: "complete") until the whole worker task is complete.
+When reference source is useful, inspect the local React source clone at `/Users/user/Developer/Developer/react-reference` (`facebook/react` tag `v19.2.6`, commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`). Use npm tarball/runtime oracles for published package behavior claims.
 
 Objective:
 <objective>
