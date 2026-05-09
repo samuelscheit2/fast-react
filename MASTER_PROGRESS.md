@@ -101,7 +101,7 @@ M0: Orchestration Foundation.
 | worker-036-react-dom-export-oracle | merged | Add deterministic React DOM runtime export, descriptor, condition, and blocked-subpath oracle files | `worker-progress/worker-036-react-dom-export-oracle.md` |
 | worker-037-react-dom-type-inventory | merged | Add deterministic React DOM declaration/runtime type-gap inventory files | `worker-progress/worker-037-react-dom-type-inventory.md` |
 | worker-038-scheduler-root-oracle | merged | Add deterministic public `scheduler@0.27.0` root behavior oracle files | `worker-progress/worker-038-scheduler-root-oracle.md` |
-| worker-039-scheduler-variant-oracles | running in tmux worktree; nested subagents allowed | Add deterministic scheduler variant/deep-import inventory and oracle files | `../fast-react-worker-039-scheduler-variant-oracles/worker-progress/worker-039-scheduler-variant-oracles.md` |
+| worker-039-scheduler-variant-oracles | merged | Add deterministic scheduler variant/deep-import inventory and oracle files | `worker-progress/worker-039-scheduler-variant-oracles.md` |
 | worker-040-dom-mutation-renderer-plan | merged | Produce a report-only DOM mutation host implementation plan | `worker-progress/worker-040-dom-mutation-renderer-plan.md` |
 | worker-041-dom-events-priority-plan | merged | Produce a report-only DOM events, event priority, and hydration replay plan | `worker-progress/worker-041-dom-events-priority-plan.md` |
 | worker-042-react-dom-server-fizz-plan | merged | Produce a report-only React DOM server/static Fizz compatibility plan | `worker-progress/worker-042-react-dom-server-fizz-plan.md` |
@@ -245,3 +245,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-043 React DOM hydration plan in commit `81c7f95` via merge commit `b024a2c` on `main`. Verified the report-only change with scoped status, no concrete local path leak checks, no trailing whitespace, and no-index diff whitespace check. No source tests were run because the task changed only the report.
 - 2026-05-09: Verified merged `main` after workers 036, 040, 042, and 043 with `npm test --workspace @fast-react/conformance`; 111 tests passed.
 - 2026-05-09: Closed the worker-036, worker-040, worker-042, and worker-043 tmux sessions and removed their clean worktrees after merge.
+- 2026-05-09: Accepted and merged worker-039 scheduler variant oracle in commit `5acdb01` via merge commit `c10a578` on `main`. Verified in the worker worktree with `npm test --workspace @fast-react/conformance` (91 tests), scoped no concrete local path leak checks, no trailing whitespace, and `git diff --check`.
+- 2026-05-09: Verified merged `main` after worker-039 with `npm test --workspace @fast-react/conformance`; 121 tests passed.
+- 2026-05-09: Closed the worker-039 tmux session and removed its clean worktree after merge.
