@@ -12,6 +12,10 @@ Last updated: 2026-05-10
   - `react` 19.2.6
   - `react-dom` 19.2.6
   - `@types/react` 19.2.14
+- Local React source reference clone added on 2026-05-10:
+  - `/Users/user/Developer/Developer/react-reference`
+  - upstream `facebook/react` tag `v19.2.6`
+  - commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
 
 ## Active Milestone
 
@@ -26,6 +30,7 @@ M4-M8: Root, reconciler, DOM, test-renderer, and conformance closure toward a mi
 - Workers must use `/goal` (the Codex `create_goal` tool) immediately at task start using the objective in their assigned prompt, before research, file reads, implementation, or verification. Worker prompts, the prompt template, the worker brief, and the launcher policy all carry this requirement, and new/continued reports should record goal setup explicitly.
 - Top-level workers are real Codex subprocesses launched in tmux. Future launches/relaunches should use the interactive Codex TUI wrapped by `script -q -F`, not `codex exec`, so `tmux capture-pane` can show live state such as `Pursuing goal` while logs are still captured.
 - Top-level tmux workers may spawn managed Codex subagents/explorers internally when useful. Those nested agents do not count against the 30 top-level tmux worker limit and may push the aggregate agent/process count above 30.
+- Workers should inspect `/Users/user/Developer/Developer/react-reference` when they need reference source for React internals, React DOM, Scheduler, or react-test-renderer. Published npm package behavior still needs tarball/runtime oracle evidence before compatibility claims.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
 - Worker runner requests `gpt-5.5` with `model_reasoning_effort="xhigh"` and uses the local yolo-equivalent Codex flag.
 - Accepted architecture direction from worker-001: Rust should own renderer-agnostic React semantics behind arena/generational handles, use a capability-grouped host-config boundary, and expose a JS-compatible package facade through N-API first. WASM and third-party `react-reconciler` compatibility are deferred until conformance evidence justifies them.
@@ -391,3 +396,4 @@ M4-M8: Root, reconciler, DOM, test-renderer, and conformance closure toward a mi
 - 2026-05-10: Accepted and merged worker-102 test-renderer serialization plan in commit `5d562aa` via merge commit `d1b0d3f`. Verified report-only scope, goal setup evidence, no concrete local path leaks, no trailing whitespace or conflict markers, and no-index `git diff --check`. The worker recorded a prerequisite `cargo test -p fast-react-test-renderer --all-features` failure due host-token migration, which is tracked as implementation risk rather than a report acceptance failure.
 - 2026-05-10: Accepted and merged worker-103 scheduler mock implementation plan in commit `5ba4010` via merge commit `d508f31`. Verified report-only scope, goal setup evidence, no concrete local path leaks, no trailing whitespace or conflict markers, and no-index `git diff --check`. The worker recorded passing scheduler mock oracle, smoke entrypoint, and conformance suite checks.
 - 2026-05-10: Removed accepted worktrees and closed tmux sessions for workers 098-103, then queued workers 112-117 to refill top-level capacity with disjoint report-only planning for hook queues, function components, test-renderer implementation, scheduler mock source implementation, DOM event plugin implementation, and root render milestone sequencing. Prompts carry the goal-first, worker-brief, nested-agent, and regenerable-artifact policies.
+- 2026-05-10: Added a local React reference source clone at `/Users/user/Developer/Developer/react-reference`, checked out to upstream `facebook/react` tag `v19.2.6` at commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`. Updated orchestrator and worker docs so future source-level investigations use this clone while published behavior claims continue to rely on npm tarballs and runtime oracles.

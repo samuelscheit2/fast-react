@@ -12,6 +12,17 @@ Current compatibility target checked on 2026-05-09:
 - `react-dom` 19.2.6
 - `@types/react` 19.2.14
 
+Local React reference source clone:
+
+- `/Users/user/Developer/Developer/react-reference`
+- Upstream tag: `v19.2.6`
+- Commit: `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
+
+Use that clone when you need to inspect the reference JavaScript
+implementation, Fiber/reconciler internals, Scheduler, React DOM, or
+react-test-renderer source. Use the existing npm tarball/oracle probes for
+published package behavior and exact runtime output.
+
 ## Worker Rules
 
 - Immediately use `/goal` (the Codex `create_goal` tool) for your assigned worker task using the objective in your `docs/tasks/worker-*.prompt.md`, before research, file reads, implementation, or verification. On continuation, use `/goal` / `create_goal` again if the active goal is not already set for this exact worker task.

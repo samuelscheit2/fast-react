@@ -64,3 +64,15 @@ Do not call `update_goal(status: "complete")` for intermediate phases. Call it o
 ## Fast-React project information
 
 Feel free to create a github repository, subfolders, and files as needed.
+
+Local React reference source clone:
+
+- `/Users/user/Developer/Developer/react-reference`
+- Checked out to upstream `facebook/react` tag `v19.2.6`
+- Commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
+
+Use this source tree when workers need to inspect the reference JavaScript
+implementation, Fiber/reconciler internals, Scheduler, React DOM, or
+react-test-renderer source. Keep npm tarball/oracle probes as the authority for
+published package behavior and runtime output, because source shape and
+published artifacts are not always identical.

@@ -12,6 +12,12 @@ Current compatibility target discovered from npm on 2026-05-09:
 - `react-dom`: 19.2.6
 - `@types/react`: 19.2.14
 
+Local source reference clone:
+
+- `/Users/user/Developer/Developer/react-reference`
+- Upstream `facebook/react` tag `v19.2.6`
+- Commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
+
 Breaking changes are allowed when they remove root causes or enable a sound architecture. Compatibility gaps must be explicit, tested, and tracked.
 
 ## Operating Model
@@ -33,6 +39,7 @@ Breaking changes are allowed when they remove root causes or enable a sound arch
 3. The first public integration should be a JS package that can run React-compatible tests through Node, likely using N-API first and WASM only if the benchmark or deployment constraints justify it.
 4. Conformance should be anchored on observed React 19.2.6 behavior, not inferred API names.
 5. Performance work should wait until correctness and representative benchmarks exist; otherwise speedups may only measure missing semantics.
+6. Reference-source investigations should use the local `react-reference` clone, while conformance claims should still be backed by published package tarballs and runtime oracles.
 
 ## Milestones
 
