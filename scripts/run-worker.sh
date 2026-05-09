@@ -13,6 +13,7 @@ log_file="$repo_root/worker-progress/${worker_id}.codex.log"
 exit_file="$repo_root/worker-progress/${worker_id}.exitcode"
 
 cd "$repo_root" || exit 2
+rm -f "$log_file" "$exit_file"
 
 if [ ! -f "$prompt_file" ]; then
   echo "missing prompt file: $prompt_file" > "$log_file"

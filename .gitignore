@@ -1,0 +1,15 @@
+.DS_Store
+
+# Worker run artifacts
+worker-progress/*.codex.log
+worker-progress/*.exitcode
+
+# Rust
+target/
+
+# JavaScript package managers and build output
+node_modules/
+dist/
+coverage/
+.turbo/
+.vite/
