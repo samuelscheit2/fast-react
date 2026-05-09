@@ -41,7 +41,7 @@ export function formatElementObjectOracleAsMarkdown(oracle) {
   return [
     "# Fast React Element Object Oracle",
     "",
-    "Generated from exact React 19.2.6 artifacts with local Fast React placeholder comparisons. This artifact does not claim Fast React behavior compatibility.",
+    "Generated from exact React 19.2.6 artifacts with local Fast React behavior comparisons. This artifact does not claim Fast React behavior compatibility.",
     "",
     "## Scenarios",
     "",

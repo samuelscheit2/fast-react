@@ -284,9 +284,13 @@ function compareFastReactToReact({
   reactObservation,
   scenarioId
 }) {
-  const firstDifferencePath = findFirstDifferencePath(
-    reactObservation.result,
+  const reactComparableResult = comparableProbeResult(reactObservation.result);
+  const fastReactComparableResult = comparableProbeResult(
     fastReactObservation.result
+  );
+  const firstDifferencePath = findFirstDifferencePath(
+    reactComparableResult,
+    fastReactComparableResult
   );
   const equal = firstDifferencePath === null;
   const fastReactUnsupported = containsFastReactUnimplemented(
@@ -312,6 +316,11 @@ function compareFastReactToReact({
         ? "Normalized observations matched, but this oracle does not claim Fast React compatibility."
         : "Fast React normalized observation differs from the React 19.2.6 oracle."
   };
+}
+
+function comparableProbeResult(result) {
+  const { targetPackage: _targetPackage, ...behaviorResult } = result;
+  return behaviorResult;
 }
 
 function containsFastReactUnimplemented(value) {

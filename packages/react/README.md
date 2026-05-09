@@ -1,6 +1,6 @@
 # @fast-react/react
 
-Placeholder React compatibility package for Fast React.
+Early React compatibility package for Fast React.
 
 The package exposes the initial `react@19.2.6` subpaths accepted for the
 scaffold:
@@ -11,8 +11,10 @@ scaffold:
 - `./compiler-runtime`
 - `./package.json`
 
-Exports import successfully for smoke checks. Any React behavior throws an
-explicit unimplemented error until conformance-backed implementations are added.
+Exports import successfully for smoke checks. The element factory APIs covered
+by the React 19.2.6 element-object oracle now construct JavaScript element
+objects; unsupported React behavior still throws an explicit unimplemented
+error until conformance-backed implementations are added.
 
 The enumerable runtime keys are intentionally aligned with the accepted
 `react@19.2.6` inventory for the default Node condition and the `react-server`

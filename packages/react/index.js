@@ -7,6 +7,11 @@ const {
   definePlaceholderMetadata,
   placeholderVersion
 } = require('./placeholder-utils.js');
+const {
+  cloneElement,
+  createElement,
+  isValidElement
+} = require('./element-factory.js');
 
 const entrypoint = 'react';
 
@@ -68,15 +73,12 @@ exports.captureOwnerStack = createUnimplementedFunction(
   entrypoint,
   'captureOwnerStack'
 );
-exports.cloneElement = createUnimplementedFunction(entrypoint, 'cloneElement');
+exports.cloneElement = cloneElement;
 exports.createContext = createUnimplementedFunction(entrypoint, 'createContext');
-exports.createElement = createUnimplementedFunction(entrypoint, 'createElement');
+exports.createElement = createElement;
 exports.createRef = createUnimplementedFunction(entrypoint, 'createRef');
 exports.forwardRef = createUnimplementedFunction(entrypoint, 'forwardRef');
-exports.isValidElement = createUnimplementedFunction(
-  entrypoint,
-  'isValidElement'
-);
+exports.isValidElement = isValidElement;
 exports.lazy = createUnimplementedFunction(entrypoint, 'lazy');
 exports.memo = createUnimplementedFunction(entrypoint, 'memo');
 exports.startTransition = createUnimplementedFunction(

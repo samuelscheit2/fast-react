@@ -1,15 +1,12 @@
 'use strict';
 
-const {
-  createUnimplementedFunction,
-  definePlaceholderMetadata
-} = require('./placeholder-utils.js');
+const { definePlaceholderMetadata } = require('./placeholder-utils.js');
+const { Fragment, jsx, jsxs } = require('./element-factory.js');
 
 const entrypoint = 'react/jsx-runtime';
-const Fragment = Symbol.for('react.fragment');
 
 exports.Fragment = Fragment;
-exports.jsx = createUnimplementedFunction(entrypoint, 'jsx');
-exports.jsxs = createUnimplementedFunction(entrypoint, 'jsxs');
+exports.jsx = jsx;
+exports.jsxs = jsxs;
 
 definePlaceholderMetadata(module.exports, entrypoint);

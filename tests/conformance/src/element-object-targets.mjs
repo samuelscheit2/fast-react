@@ -10,8 +10,8 @@ export const ELEMENT_OBJECT_REACT_TARGET = {
 export const ELEMENT_OBJECT_FAST_REACT_TARGET = {
   packageName: "@fast-react/react",
   version: "0.0.0",
-  role: "workspace-fast-react-placeholder",
-  expectedStatus: "known-mismatch"
+  role: "workspace-fast-react-js-element-factory",
+  expectedStatus: "matches-or-known-mismatch-without-compatibility-claim"
 };
 
 export const ELEMENT_OBJECT_PROBE_MODES = [

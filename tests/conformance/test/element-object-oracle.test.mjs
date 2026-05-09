@@ -224,8 +224,12 @@ test("React oracle captures JSX runtime identity, child-array, and jsxDEV condit
   ]);
 });
 
-test("Fast React comparisons remain explicit mismatches or unsupported placeholders", () => {
-  const allowedStatuses = new Set(["known-mismatch", "unsupported-placeholder"]);
+test("Fast React comparisons distinguish exact normalized matches from compatibility claims", () => {
+  const allowedStatuses = new Set([
+    "known-mismatch",
+    "unexpected-match-compatibility-not-claimed",
+    "unsupported-placeholder"
+  ]);
 
   for (const mode of ELEMENT_OBJECT_PROBE_MODES) {
     for (const comparison of oracle.fastReactComparisons[mode.id]) {
@@ -234,8 +238,38 @@ test("Fast React comparisons remain explicit mismatches or unsupported placehold
         allowedStatuses.has(comparison.status),
         `${mode.id}:${comparison.scenarioId} had unexpected status ${comparison.status}`
       );
-      assert.notEqual(comparison.firstDifferencePath, null);
+      if (comparison.status === "unexpected-match-compatibility-not-claimed") {
+        assert.equal(comparison.firstDifferencePath, null);
+      } else {
+        assert.notEqual(comparison.firstDifferencePath, null);
+      }
     }
+  }
+});
+
+test("Fast React comparison status counts stay focused on matched element behavior", () => {
+  const totalCounts = countFastReactComparisonStatuses(
+    Object.values(oracle.fastReactComparisons).flat()
+  );
+  assert.deepEqual(totalCounts, {
+    "known-mismatch": 4,
+    "unexpected-match-compatibility-not-claimed": 84,
+    "unsupported-placeholder": 0
+  });
+
+  for (const mode of ELEMENT_OBJECT_PROBE_MODES) {
+    const modeCounts = countFastReactComparisonStatuses(
+      oracle.fastReactComparisons[mode.id]
+    );
+    assert.deepEqual(
+      modeCounts,
+      {
+        "known-mismatch": 1,
+        "unexpected-match-compatibility-not-claimed": 21,
+        "unsupported-placeholder": 0
+      },
+      mode.id
+    );
   }
 });
 
@@ -314,4 +348,18 @@ function descriptorFor(descriptors, key) {
   );
   assert.ok(descriptor, `missing descriptor ${key}`);
   return descriptor;
+}
+
+function countFastReactComparisonStatuses(comparisons) {
+  return comparisons.reduce(
+    (counts, comparison) => {
+      counts[comparison.status] += 1;
+      return counts;
+    },
+    {
+      "known-mismatch": 0,
+      "unexpected-match-compatibility-not-claimed": 0,
+      "unsupported-placeholder": 0
+    }
+  );
 }

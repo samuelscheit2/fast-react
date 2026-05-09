@@ -14,6 +14,8 @@ const repoRoot = path.resolve(
 );
 const reactPackageRoot = path.join(repoRoot, 'packages', 'react');
 
+process.env.NODE_ENV = 'development';
+
 const defaultReactKeys = [
   'Activity',
   'Children',
@@ -173,6 +175,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/react.react-server.js',
   '@fast-react/react/jsx-runtime.react-server.js',
   '@fast-react/react/jsx-dev-runtime.react-server.js',
+  '@fast-react/react/element-factory.js',
   '@fast-react/react/placeholder-utils.js'
 ];
 
@@ -218,6 +221,115 @@ function assertUnimplemented(callback, label) {
   );
 }
 
+function assertDevElement(element, label) {
+  assert.equal(
+    element.$$typeof,
+    Symbol.for('react.transitional.element'),
+    `${label} should use the React 19 transitional element brand`
+  );
+  assert.deepEqual(
+    Object.keys(element),
+    ['$$typeof', 'type', 'key', 'props', '_owner', '_store'],
+    `${label} development element keys`
+  );
+  assert.deepEqual(
+    Reflect.ownKeys(element),
+    [
+      '$$typeof',
+      'type',
+      'key',
+      'props',
+      '_owner',
+      'ref',
+      '_store',
+      '_debugInfo',
+      '_debugStack',
+      '_debugTask'
+    ],
+    `${label} development own keys`
+  );
+  assert.equal(Object.isFrozen(element), true, `${label} element frozen`);
+  assert.equal(Object.isFrozen(element.props), true, `${label} props frozen`);
+  assert.equal(element._owner, null, `${label} direct owner placeholder`);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(element, 'ref').enumerable,
+    false,
+    `${label} ref descriptor should be non-enumerable in development`
+  );
+}
+
+function assertReactElementBehavior(react, label) {
+  function WithDefaults() {}
+  WithDefaults.defaultProps = { a: 'default-a' };
+
+  const ref = function ref() {};
+  const element = react.createElement(
+    WithDefaults,
+    { key: 7, ref, a: undefined },
+    'first',
+    'second'
+  );
+  assertDevElement(element, `${label}.createElement`);
+  assert.equal(element.type, WithDefaults);
+  assert.equal(element.key, '7');
+  assert.equal(element.props.a, 'default-a');
+  assert.equal(element.props.ref, ref);
+  assert.deepEqual(element.props.children, ['first', 'second']);
+  assert.equal(Object.isFrozen(element.props.children), true);
+  assert.equal(react.isValidElement(element), true);
+  assert.equal(
+    react.isValidElement({
+      $$typeof: Symbol.for('react.transitional.element')
+    }),
+    true
+  );
+  assert.equal(
+    react.isValidElement({ $$typeof: Symbol.for('react.element') }),
+    false
+  );
+
+  const clone = react.cloneElement(element, {
+    key: undefined,
+    ref: undefined,
+    a: 'new-a'
+  });
+  assertDevElement(clone, `${label}.cloneElement`);
+  assert.equal(clone.key, '7');
+  assert.equal(clone.props.ref, ref);
+  assert.equal(clone.props.a, 'new-a');
+}
+
+function assertJsxRuntimeBehavior(runtime, label) {
+  const config = { children: 'child' };
+  const element = runtime.jsx('div', config);
+  assertDevElement(element, `${label}.jsx`);
+  assert.equal(element.type, 'div');
+  assert.equal(element.key, null);
+  assert.equal(element.props, config, `${label}.jsx should reuse keyless config`);
+  assert.equal(Object.isFrozen(config), true);
+
+  const children = ['first', 'second'];
+  const staticElement = runtime.jsxs('div', { children });
+  assertDevElement(staticElement, `${label}.jsxs`);
+  assert.equal(staticElement.props.children, children);
+  assert.equal(Object.isFrozen(children), true);
+}
+
+function assertJsxDevRuntimeBehavior(runtime, label) {
+  const element = runtime.jsxDEV(
+    'div',
+    { id: 'dev-id' },
+    'dev-key',
+    false,
+    { fileName: 'source.js', lineNumber: 1, columnNumber: 1 },
+    undefined
+  );
+  assertDevElement(element, `${label}.jsxDEV`);
+  assert.equal(element.type, 'div');
+  assert.equal(element.key, 'dev-key');
+  assert.equal(element.props.id, 'dev-id');
+}
+
 async function assertFileEntrypoint(entrypoint, labelPrefix) {
   const absolutePath = path.join(reactPackageRoot, entrypoint.fileName);
   const cjsModule = require(absolutePath);
@@ -238,7 +350,7 @@ async function assertFileEntrypoint(entrypoint, labelPrefix) {
 function assertReactPlaceholderBehavior(react, label) {
   assert.equal(react.version, '0.0.0-fast-react-placeholder');
   assert.equal(typeof react.createElement, 'function');
-  assertUnimplemented(() => react.createElement('div'), `${label}.createElement`);
+  assertReactElementBehavior(react, label);
   assertUnimplemented(() => react.Children.count([]), `${label}.Children.count`);
 
   if (Object.hasOwn(react, 'Component')) {
@@ -278,23 +390,75 @@ async function assertDirectFileEntrypoints() {
   assertReactPlaceholderBehavior(reactServer, 'react react-server');
 
   const jsxRuntime = require(path.join(reactPackageRoot, 'jsx-runtime.js'));
-  assertUnimplemented(
-    () => jsxRuntime.jsx('div', {}),
-    'react/jsx-runtime.jsx'
-  );
+  assertJsxRuntimeBehavior(jsxRuntime, 'react/jsx-runtime');
 
   const jsxDevRuntime = require(
     path.join(reactPackageRoot, 'jsx-dev-runtime.js')
   );
-  assertUnimplemented(
-    () => jsxDevRuntime.jsxDEV('div', {}),
-    'react/jsx-dev-runtime.jsxDEV'
+  assertJsxDevRuntimeBehavior(jsxDevRuntime, 'react/jsx-dev-runtime');
+
+  const reactServerJsxRuntime = require(
+    path.join(reactPackageRoot, 'jsx-runtime.react-server.js')
+  );
+  assertJsxRuntimeBehavior(
+    reactServerJsxRuntime,
+    'react-server react/jsx-runtime'
+  );
+  assertJsxDevRuntimeBehavior(
+    reactServerJsxRuntime,
+    'react-server react/jsx-runtime'
+  );
+
+  const reactServerJsxDevRuntime = require(
+    path.join(reactPackageRoot, 'jsx-dev-runtime.react-server.js')
+  );
+  assertJsxRuntimeBehavior(
+    reactServerJsxDevRuntime,
+    'react-server react/jsx-dev-runtime'
+  );
+  assertJsxDevRuntimeBehavior(
+    reactServerJsxDevRuntime,
+    'react-server react/jsx-dev-runtime'
   );
 
   const compilerRuntime = require(
     path.join(reactPackageRoot, 'compiler-runtime.js')
   );
   assertUnimplemented(() => compilerRuntime.c(0), 'react/compiler-runtime.c');
+  await assertProductionJsxDevUndefined();
+}
+
+async function assertProductionJsxDevUndefined() {
+  const probeSource = `
+    'use strict';
+    const assert = require('node:assert/strict');
+    const jsxDevRuntime = require(${JSON.stringify(
+      path.join(reactPackageRoot, 'jsx-dev-runtime.js')
+    )});
+    const reactServerJsxRuntime = require(${JSON.stringify(
+      path.join(reactPackageRoot, 'jsx-runtime.react-server.js')
+    )});
+    assert.equal(Object.hasOwn(jsxDevRuntime, 'jsxDEV'), true);
+    assert.equal(jsxDevRuntime.jsxDEV, undefined);
+    assert.equal(Object.hasOwn(reactServerJsxRuntime, 'jsxDEV'), true);
+    assert.equal(reactServerJsxRuntime.jsxDEV, undefined);
+  `;
+
+  const result = spawnSync(process.execPath, ['-e', probeSource], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      NODE_ENV: 'production'
+    },
+    stdio: 'pipe'
+  });
+
+  assert.equal(
+    result.status,
+    0,
+    `production jsxDEV probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
 }
 
 async function assertPackageMetadata() {
@@ -416,4 +580,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React placeholder entrypoints match the accepted inventory.');
+console.log('Fast React entrypoints match the accepted inventory and element smoke checks.');

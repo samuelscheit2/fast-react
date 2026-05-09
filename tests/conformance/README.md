@@ -75,7 +75,8 @@ Element-object oracle strategy:
    state, child-array identity/freeze behavior, warnings, thrown errors, and
    brand checks.
 7. Compare local Fast React observations against the React oracle as explicit
-   `known-mismatch` or `unsupported-placeholder` statuses only.
+   `unexpected-match-compatibility-not-claimed`, `known-mismatch`, or
+   `unsupported-placeholder` statuses.
 
 The element-object oracle is the first behavior oracle. It compares local Fast
 React package entrypoints, but it still explicitly does not claim Fast React
