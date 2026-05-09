@@ -95,12 +95,22 @@ M0: Orchestration Foundation.
 | worker-030-core-lane-model | merged | Implement first React 19.2.6 lane bitset primitives in the Rust core | `worker-progress/worker-030-core-lane-model.md` |
 | worker-031-host-capability-diagnostics | merged | Improve host-config capability-set diagnostics and tests | `worker-progress/worker-031-host-capability-diagnostics.md` |
 | worker-032-native-boundary-guardrails | merged | Tighten native binding placeholder guardrails and platform target checks | `worker-progress/worker-032-native-boundary-guardrails.md` |
-| worker-033-react-dom-inventory | running in tmux worktree; nested subagents allowed | Build a report-only React DOM 19.2.6 package and behavior inventory | `../fast-react-worker-033-react-dom-inventory/worker-progress/worker-033-react-dom-inventory.md` |
+| worker-033-react-dom-inventory | merged | Build a report-only React DOM 19.2.6 package and behavior inventory | `worker-progress/worker-033-react-dom-inventory.md` |
 | worker-034-scheduler-package-inventory | merged | Build a report-only public scheduler package behavior inventory | `worker-progress/worker-034-scheduler-package-inventory.md` |
+| worker-035-package-surface-scaffolds | queued | Add loud-placeholder package scaffolds for React DOM and scheduler surfaces without behavior implementation | `../fast-react-worker-035-package-surface-scaffolds/worker-progress/worker-035-package-surface-scaffolds.md` |
+| worker-036-react-dom-export-oracle | queued | Add deterministic React DOM runtime export, descriptor, condition, and blocked-subpath oracle files | `../fast-react-worker-036-react-dom-export-oracle/worker-progress/worker-036-react-dom-export-oracle.md` |
+| worker-037-react-dom-type-inventory | queued | Add deterministic React DOM declaration/runtime type-gap inventory files | `../fast-react-worker-037-react-dom-type-inventory/worker-progress/worker-037-react-dom-type-inventory.md` |
+| worker-038-scheduler-root-oracle | queued | Add deterministic public `scheduler@0.27.0` root behavior oracle files | `../fast-react-worker-038-scheduler-root-oracle/worker-progress/worker-038-scheduler-root-oracle.md` |
+| worker-039-scheduler-variant-oracles | queued | Add deterministic scheduler variant/deep-import inventory and oracle files | `../fast-react-worker-039-scheduler-variant-oracles/worker-progress/worker-039-scheduler-variant-oracles.md` |
+| worker-040-dom-mutation-renderer-plan | queued | Produce a report-only DOM mutation host implementation plan | `../fast-react-worker-040-dom-mutation-renderer-plan/worker-progress/worker-040-dom-mutation-renderer-plan.md` |
+| worker-041-dom-events-priority-plan | queued | Produce a report-only DOM events, event priority, and hydration replay plan | `../fast-react-worker-041-dom-events-priority-plan/worker-progress/worker-041-dom-events-priority-plan.md` |
+| worker-042-react-dom-server-fizz-plan | queued | Produce a report-only React DOM server/static Fizz compatibility plan | `../fast-react-worker-042-react-dom-server-fizz-plan/worker-progress/worker-042-react-dom-server-fizz-plan.md` |
+| worker-043-react-dom-hydration-plan | queued | Produce a report-only hydration model and marker compatibility plan | `../fast-react-worker-043-react-dom-hydration-plan/worker-progress/worker-043-react-dom-hydration-plan.md` |
+| worker-044-react-dom-client-roots-plan | queued | Produce a report-only client roots, update priority, and root object behavior plan | `../fast-react-worker-044-react-dom-client-roots-plan/worker-progress/worker-044-react-dom-client-roots-plan.md` |
 
 ## Next Actions
 
-1. Monitor workers 030-034 and audit/merge them only after their scoped reports, tests, and status are clean.
+1. Launch workers 035-044 as a parallel non-overlapping tranche and audit/merge them only after their scoped reports, tests, and status are clean.
 2. Keep future top-level workers in real tmux Codex processes, with worker-internal nested agents allowed for hypothesis testing and not counted against the 30 top-level worker cap.
 3. Leave regenerable `node_modules/`, `target/`, and root `Cargo.lock` outputs alone unless they directly block a command or make scoped status ambiguous.
 
@@ -218,3 +228,6 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-032 native boundary guardrails in commit `523ccc3` via merge commit `4fa8336` on `main`. Verified in the worker worktree with `npm run check --workspace @fast-react/native`, `cargo fmt --all --check`, `cargo test -p fast-react-napi --all-features`, `node bindings/node/test/native-no-load-guard.test.cjs`, `cargo clippy -p fast-react-napi --all-targets --all-features -- -D warnings`, and scoped `git diff --check`.
 - 2026-05-09: Verified merged `main` after worker-032 with `npm run check --workspace @fast-react/native`, `cargo fmt --all --check`, `cargo test -p fast-react-napi --all-features`, and `cargo clippy -p fast-react-napi --all-targets --all-features -- -D warnings`. Root `Cargo.lock` files remain untracked regenerable artifacts by policy.
 - 2026-05-09: Closed the worker-032 tmux session and removed the accepted worker-032 worktree; its only remaining untracked file was a regenerable `Cargo.lock`.
+- 2026-05-09: Accepted and merged worker-033 React DOM inventory in commit `b01c084` via merge commit `b7d1423` on `main`. Verified the report-only change with scoped status, no concrete local path leak checks, no trailing whitespace, no-index diff whitespace check for the untracked report, and required section checks. No source tests were run because the task changed only the report.
+- 2026-05-09: Closed the worker-033 tmux session and removed the clean worker-033 worktree after merge.
+- 2026-05-09: Queued workers 035-044 as a parallel non-overlapping tranche: combined package surface scaffolds, React DOM export oracle, React DOM type inventory, scheduler root oracle, scheduler variant oracles, DOM mutation renderer plan, DOM events priority plan, React DOM server/Fizz plan, React DOM hydration plan, and React DOM client roots plan.
