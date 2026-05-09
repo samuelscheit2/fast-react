@@ -79,27 +79,7 @@ The current project push is a minimal real root render/update/unmount path:
 5. End-to-end gates: dual-run conformance tests and focused Rust tests before
    any compatibility claim.
 
-## Active Or Recently Queued Workstreams
-
-Recently merged source/oracle workers:
-
-- React DOM/client-root, form/control, root marker/listener, and root export
-  work: workers 046, 049, 054, 060, 064, 088, and 089.
-- React test renderer and React `act` oracles: workers 083-087 and 097.
-
-Merged core primitives:
-
-- Workers 047, 075, and 076 added root lane bookkeeping, event priority,
-  fiber flags, and hook effect flags to `fast-react-core`.
-
-Merged implementation plans:
-
-- Root/reconciler/DOM/test sequencing reports from workers 104-117 define the
-  next conflict-safe implementation queue.
-- Use worker 117's sequencing plan to order follow-up source workers after the
-  prerequisite source/oracle slices are accepted.
-
-Next queue:
+## Current Queue
 
 - Worker 118 is running Slice 0 host-token compile alignment.
 - Worker 119 is running Slice 1 core fiber identity/topology foundation and owns
@@ -108,9 +88,22 @@ Next queue:
   scheduler files, isolated from root scheduler state.
 - Worker 121 is running the React DOM root render/update/unmount e2e oracle.
 
-When new implementation workers are queued or accepted, update this plan with
-only durable decisions and the next active queue. Do not re-add a full
-historical worker roster.
+## Near-Term Plan
+
+1. Audit worker 118 first because its latest pane state showed a usage-limit
+   stop; either resume it with its original goal or replace the slice before
+   stacking dependent root work on top of it.
+2. Keep worker 119 serialized around `fast-react-core/src/lib.rs`; do not queue
+   another core-export tranche until its topology foundation is accepted or
+   intentionally abandoned.
+3. Let workers 120 and 121 continue in parallel because their write scopes are
+   isolated from the core topology tranche.
+4. After accepting any of workers 118-121, run the worker's scoped checks, merge
+   with a no-fast-forward commit, then update this file with the next active
+   queue and move completed facts to `MASTER_PROGRESS.md`.
+5. Queue follow-up source slices from the accepted root/reconciler/DOM/test
+   renderer sequencing reports only when their write scopes do not overlap with
+   live workers.
 
 ## Merge Policy
 

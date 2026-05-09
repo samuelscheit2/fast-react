@@ -50,20 +50,24 @@ The orchestrator goal is continuous. Do not call
 
 ## Planning And Progress Docs
 
-- `MASTER_PLAN.md` is the compact project plan: mission, milestones, current
-  workstreams, dependencies, and merge policy.
-- `MASTER_PROGRESS.md` is the compact current progress snapshot: active
-  milestone, durable decisions, current worker state, recent merge batches, and
-  next actions.
+- `MASTER_PLAN.md` owns the present/future plan: mission, milestones, current
+  queue, dependencies, near-term sequencing, and merge policy.
+- `MASTER_PROGRESS.md` owns completed history only: accepted work, past merge
+  batches, completed verification, and accepted architectural direction.
+- Do not duplicate live worker queues, next actions, or future sequencing in
+  `MASTER_PROGRESS.md`.
+- Do not duplicate detailed past merge history in `MASTER_PLAN.md`; move
+  completed facts to `MASTER_PROGRESS.md` when work is accepted.
 - Keep both files concise. Remove stale rosters, duplicated policy text, and
   obsolete status history after it is no longer useful for current decisions.
 - Use git history and `worker-progress/*.md` as the detailed archive; do not
   duplicate that archive in the master docs.
 - When coordination docs drift, run the same cleanup pass across
   `ORCHESTRATOR.md`, `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and
-  `MASTER_PROGRESS.md`: delete duplicated or unnecessary policy text, collapse
-  stale history into current-state summaries, and keep durable rules in the
-  single document where workers or the orchestrator actually need them.
+  `MASTER_PROGRESS.md`: delete duplicated or unnecessary policy text, move
+  current/future work to `MASTER_PLAN.md`, move accepted history to
+  `MASTER_PROGRESS.md`, and keep durable rules in the single document where
+  workers or the orchestrator actually need them.
 - Update the master docs after each merge batch, queue change, or material
   policy decision.
 

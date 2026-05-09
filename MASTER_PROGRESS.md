@@ -2,43 +2,23 @@
 
 Last updated: 2026-05-10
 
-## Current State
+## Completed State
 
-- Branch: `main`.
 - Scaffold, package placeholders, conformance harness, and initial React facade
   behavior slices are merged.
-- Active milestone: M4-M8 closure toward a minimal end-to-end
-  root render/update/unmount path.
-- Local React reference source clone:
-  `/Users/user/Developer/Developer/react-reference` at `facebook/react`
+- Local React reference source clone was added at
+  `/Users/user/Developer/Developer/react-reference` for `facebook/react`
   `v19.2.6`, commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`.
-- Report-only implementation planning workers 104-117 are merged; their tmux
-  sessions and worktrees are closed.
-- Core source workers 047, 075, and 076 are merged; root lane bookkeeping,
-  event priority, fiber flags, and hook effect flags are now in
+- Report-only implementation planning workers 104-117 were merged; their tmux
+  sessions and worktrees were closed.
+- Core source workers 047, 075, and 076 were merged, adding root lane
+  bookkeeping, event priority, fiber flags, and hook effect flags to
   `fast-react-core`.
 - React DOM root/form/control oracles, React DOM root export implementation,
   react-test-renderer oracles, and React `act` oracle workers 046, 049, 054,
-  060, 064, 083, 084, 085, 086, 087, 088, 089, and 097 are merged.
+  060, 064, 083, 084, 085, 086, 087, 088, 089, and 097 were merged.
 
-## Durable Decisions
-
-- Workers read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
-- Workers must set `create_goal` first and record `get_goal`
-  evidence.
-- Top-level workers are real tmux Codex processes; preferred launch is
-  interactive TUI wrapped by `script -q -F`.
-- Worker-internal nested agents are allowed and do not count against the
-  30-top-level-worker cap.
-- Use the React source clone for readable internals research; use npm
-  tarball/runtime oracles for published behavior claims.
-- Regenerable `node_modules/`, `target/`, and root `Cargo.lock` do not need
-  cleanup merely because they exist.
-- Keep `ORCHESTRATOR.md`, `WORKER_BRIEF.md`, `MASTER_PLAN.md`, and
-  `MASTER_PROGRESS.md` compact. Detailed history lives in git log and
-  `worker-progress/*.md`.
-
-## Accepted Direction Summary
+## Accepted Direction
 
 - Rust core should own renderer-agnostic React semantics using explicit lanes,
   fibers, update queues, hooks/effects, and root scheduling state.
@@ -49,25 +29,8 @@ Last updated: 2026-05-10
 - Existing direct React facade behavior has conformance coverage for elements,
   refs, children helpers, memo/lazy, forwardRef, context object creation, and
   component class basics.
-- React DOM, test renderer, scheduler, and root render work are currently driven
-  by oracles plus merged implementation plans before larger source slices are
-  accepted.
-
-## Current Worker Snapshot
-
-Top-level tmux worker count should stay at or below 30. Current live count: 4.
-
-Running:
-
-- 118: Slice 0 host-token compile alignment.
-- 119: Slice 1 core fiber identity/topology foundation; owns
-  `fast-react-core/src/lib.rs` for this tranche.
-- 120: Scheduler mock source implementation, isolated from root scheduler
-  mutable state.
-- 121: React DOM root render/update/unmount e2e oracle.
-
-Use live `tmux capture-pane` and worktree status as the source of truth before
-accepting any worker; this snapshot is only a routing aid.
+- React DOM, test renderer, scheduler, and root render implementation order was
+  decomposed by merged planning reports before larger source slices were queued.
 
 ## Recent Merge Batches
 
@@ -85,26 +48,3 @@ accepting any worker; this snapshot is only a routing aid.
   oracle workers 083, 084, 085, 086, 087, and 097. Final merged JS check:
   `npm run check:js` passed with 402 conformance tests.
 - Added and documented the local React reference source clone.
-
-## Next Actions
-
-1. Launch Slice 0 host-token compile alignment to restore a trustworthy Rust
-   baseline before root implementation workers stack on top of current
-   host-config/reconciler/test-renderer drift.
-2. Launch remaining Slice 1 core topology workers with non-overlapping module
-   ownership and serialized `fast-react-core/src/lib.rs` exports.
-3. Launch scheduler mock source implementation in parallel if it stays isolated
-   from root scheduler state.
-4. Audit workers 118-121 when they report `Goal achieved`; run their scoped
-   Rust/JS gates before merge.
-5. After each accepted batch, update this file with only the durable delta and
-   prune obsolete status lines.
-
-## Verification Notes
-
-- Report-only merges require scoped status, path-leak scan, trailing/conflict
-  scan, and `git diff --check`.
-- Oracle merges require targeted `node --test` coverage plus conformance
-  workspace checks when a tranche lands.
-- Rust source merges require `cargo fmt --all --check`, targeted tests, and
-  clippy for touched crates.
