@@ -6,6 +6,7 @@
 
 mod compatibility;
 mod element;
+mod lane;
 mod symbols;
 
 use std::error::Error;
@@ -17,6 +18,7 @@ pub use compatibility::{
     TYPES_REACT_COMPATIBILITY_TARGET, TYPES_REACT_PACKAGE_TARGET,
 };
 pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
+pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use symbols::ReactSymbolTag;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
