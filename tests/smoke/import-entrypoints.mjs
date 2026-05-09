@@ -175,6 +175,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/react.react-server.js',
   '@fast-react/react/jsx-runtime.react-server.js',
   '@fast-react/react/jsx-dev-runtime.react-server.js',
+  '@fast-react/react/children-helper.js',
   '@fast-react/react/element-factory.js',
   '@fast-react/react/ref-object.js',
   '@fast-react/react/placeholder-utils.js'
@@ -370,6 +371,124 @@ function assertCreateRefBehavior(react, label, options = {}) {
   assert.deepEqual(Object.keys(fromNew), ['current'], `${label}.new result`);
 }
 
+function assertChildrenBehavior(react, label, options = {}) {
+  const reactServerProduction = options.reactServerProduction === true;
+  const expectMapWarning =
+    options.expectMapWarning ?? options.development !== false;
+
+  assert.deepEqual(Object.keys(react.Children), [
+    'map',
+    'forEach',
+    'count',
+    'toArray',
+    'only'
+  ]);
+  assert.equal(Object.isFrozen(react.Children), false);
+  assert.equal(Object.isExtensible(react.Children), true);
+  assert.equal(react.Children.map.name, 'mapChildren');
+  assert.equal(react.Children.map.length, 3);
+  assert.equal(react.Children.forEach.length, 3);
+  assert.equal(react.Children.count.length, 1);
+  assert.equal(react.Children.toArray.length, 1);
+  assert.equal(react.Children.only.length, 1);
+
+  assert.equal(react.Children.count(null), 0, `${label}.count null`);
+  assert.equal(react.Children.map(null, () => 'ignored'), null);
+  assert.deepEqual(react.Children.toArray(undefined), []);
+  assert.equal(react.Children.count([false, , 'text']), 3);
+
+  const callbackCalls = [];
+  const context = { marker: 'children-context' };
+  const forEachResult = react.Children.forEach(
+    [false, , 'text'],
+    function (child, index) {
+      callbackCalls.push({
+        child,
+        index,
+        thisMatches: this === context
+      });
+    },
+    context
+  );
+  assert.equal(forEachResult, undefined);
+  assert.deepEqual(callbackCalls, [
+    { child: null, index: 0, thisMatches: true },
+    { child: null, index: 1, thisMatches: true },
+    { child: 'text', index: 2, thisMatches: true }
+  ]);
+
+  const keyed = react.createElement('span', { key: 'a:b=c' });
+  const unkeyed = react.createElement('span', null);
+  const nested = [keyed, [unkeyed, 'text'], false];
+  const array = react.Children.toArray(nested);
+  assert.deepEqual(
+    array.map((child) =>
+      react.isValidElement(child) ? child.key : child
+    ),
+    ['.$a=2b=0c', '.1:0', 'text']
+  );
+  assert.notEqual(array[0], keyed, `${label}.toArray clones keyed element`);
+
+  const mapped = react.Children.map([keyed, unkeyed], (_child, index) =>
+    react.createElement('b', { key: `mapped/key${index}` })
+  );
+  assert.deepEqual(
+    mapped.map((child) => child.key),
+    ['mapped//key0/.$a=2b=0c', 'mapped//key1/.1']
+  );
+
+  const fragment = react.createElement(
+    react.Fragment,
+    null,
+    react.createElement('i', null, 'inside')
+  );
+  assert.equal(react.Children.count(fragment), 1);
+  assert.equal(react.Children.only(fragment), fragment);
+  assert.throws(
+    () => react.Children.only([fragment]),
+    /React.Children.only expected|Minified React error #143/,
+    `${label}.only array`
+  );
+
+  assert.throws(
+    () => react.Children.count({ plain: true }),
+    reactServerProduction
+      ? /Minified React error #31/
+      : /Objects are not valid as a React child/,
+    `${label}.invalid object`
+  );
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    warnings.push(args);
+  };
+  try {
+    const mappedEntries = react.Children.toArray(
+      new Map([
+        ['map-key', react.createElement('span', { key: 'value-key' })]
+      ])
+    );
+    assert.deepEqual(
+      mappedEntries.map((child) =>
+        react.isValidElement(child) ? child.key : child
+      ),
+      ['map-key', '.0:$value-key']
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+  if (expectMapWarning) {
+    assert.deepEqual(warnings, [
+      [
+        'Using Maps as children is not supported. Use an array of keyed ReactElements instead.'
+      ]
+    ]);
+  } else {
+    assert.deepEqual(warnings, []);
+  }
+}
+
 function assertJsxRuntimeBehavior(runtime, label) {
   const config = { children: 'child' };
   const element = runtime.jsx('div', config);
@@ -418,12 +537,12 @@ async function assertFileEntrypoint(entrypoint, labelPrefix) {
   }
 }
 
-function assertReactPlaceholderBehavior(react, label) {
+function assertReactPlaceholderBehavior(react, label, options = {}) {
   assert.equal(react.version, '0.0.0-fast-react-placeholder');
   assert.equal(typeof react.createElement, 'function');
   assertReactElementBehavior(react, label);
   assertCreateRefBehavior(react, label);
-  assertUnimplemented(() => react.Children.count([]), `${label}.Children.count`);
+  assertChildrenBehavior(react, label, options);
   assertUnimplemented(() => react.forwardRef(() => null), `${label}.forwardRef`);
 
   if (Object.hasOwn(react, 'useRef')) {
@@ -464,7 +583,9 @@ async function assertDirectFileEntrypoints() {
   const reactServer = require(
     path.join(reactPackageRoot, 'react.react-server.js')
   );
-  assertReactPlaceholderBehavior(reactServer, 'react react-server');
+  assertReactPlaceholderBehavior(reactServer, 'react react-server', {
+    expectMapWarning: false
+  });
 
   const jsxRuntime = require(path.join(reactPackageRoot, 'jsx-runtime.js'));
   assertJsxRuntimeBehavior(jsxRuntime, 'react/jsx-runtime');
@@ -546,6 +667,46 @@ async function assertProductionJsxDevUndefined() {
       assert.equal(delete ref.extra, true, label);
       assert.equal(delete ref.current, true, label);
       assert.deepEqual(Object.keys(new React.createRef()), ['current'], label);
+
+      assert.deepEqual(Object.keys(React.Children), [
+        'map',
+        'forEach',
+        'count',
+        'toArray',
+        'only'
+      ]);
+      assert.equal(React.Children.map.name, 'mapChildren', label);
+      assert.equal(React.Children.map.length, 3, label);
+      assert.equal(React.Children.count([false, , 'text']), 3, label);
+      const childCalls = [];
+      React.Children.forEach([false, , 'text'], (child, index) => {
+        childCalls.push([child, index]);
+      });
+      assert.deepEqual(childCalls, [[null, 0], [null, 1], ['text', 2]], label);
+      const keyed = React.createElement('span', { key: 'a:b=c' });
+      const unkeyed = React.createElement('span', null);
+      assert.deepEqual(
+        React.Children.toArray([keyed, [unkeyed], false]).map((child) =>
+          React.isValidElement(child) ? child.key : child
+        ),
+        ['.$a=2b=0c', '.1:0'],
+        label
+      );
+      const mapped = React.Children.map([keyed, unkeyed], (_child, index) =>
+        React.createElement('b', { key: 'mapped/key' + index })
+      );
+      assert.deepEqual(
+        mapped.map((child) => child.key),
+        ['mapped//key0/.$a=2b=0c', 'mapped//key1/.1'],
+        label
+      );
+      assert.throws(
+        () => React.Children.count({ plain: true }),
+        label === 'react-server'
+          ? /Minified React error #31/
+          : /Objects are not valid as a React child/,
+        label
+      );
     }
   `;
 
@@ -647,6 +808,28 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
       assert.equal(Reflect.deleteProperty(ref, 'current'), false, label);
     }
 
+    function assertDevChildren(moduleExports, label) {
+      assert.deepEqual(Object.keys(moduleExports.Children), [
+        'map',
+        'forEach',
+        'count',
+        'toArray',
+        'only'
+      ]);
+      assert.equal(moduleExports.Children.map.name, 'mapChildren', label);
+      assert.equal(moduleExports.Children.map.length, 3, label);
+      assert.equal(moduleExports.Children.count([false, , 'text']), 3, label);
+      const keyed = moduleExports.createElement('span', { key: 'a:b=c' });
+      const unkeyed = moduleExports.createElement('span', null);
+      assert.deepEqual(
+        moduleExports.Children.toArray([keyed, [unkeyed], false]).map((child) =>
+          moduleExports.isValidElement(child) ? child.key : child
+        ),
+        ['.$a=2b=0c', '.1:0'],
+        label
+      );
+    }
+
     (async () => {
       for (const { keys, resolvedFileName, specifier } of entrypoints) {
         assert.equal(
@@ -665,6 +848,7 @@ async function runPackageProbe(tempRoot, nodeArgs, entrypoints) {
         assertInventoryKeys(cjsModule, keys, specifier);
         if (specifier === '@fast-react/react') {
           assertDevCreateRef(cjsModule, specifier);
+          assertDevChildren(cjsModule, specifier);
         }
 
         const esmModule = await import(specifier);
@@ -707,4 +891,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element/ref smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/ref/Children smoke checks.');

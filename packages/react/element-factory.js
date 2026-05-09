@@ -252,6 +252,23 @@ function cloneElementImpl(element, config, args, options) {
   return cloned;
 }
 
+function cloneAndReplaceKey(oldElement, newKey) {
+  const cloned = createElementObject({
+    type: oldElement.type,
+    key: newKey,
+    props: oldElement.props,
+    owner: oldElement._owner,
+    debugStack: oldElement._debugStack,
+    debugTask: oldElement._debugTask
+  });
+
+  if (isDevelopment && oldElement._store && cloned._store) {
+    cloned._store.validated = oldElement._store.validated;
+  }
+
+  return cloned;
+}
+
 function jsxDEVImpl(
   type,
   config,
@@ -619,6 +636,7 @@ function getComponentNameFromType(type) {
 module.exports = {
   Fragment: REACT_FRAGMENT_TYPE,
   REACT_ELEMENT_TYPE,
+  cloneAndReplaceKey,
   createElement: makeCreateElement(),
   cloneElement: makeCloneElement(),
   cloneElementReactServer: makeCloneElement({ reactServer: true }),
