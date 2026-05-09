@@ -44,6 +44,7 @@ M0: Orchestration Foundation.
 - Accepted React entrypoint placeholders from worker-014: `@fast-react/react` now has inventory-aligned default and `react-server` placeholder surfaces, structured unimplemented errors, hidden scaffold metadata, and package-surface smoke tests.
 - Accepted root lockfile sync from worker-016: `package-lock.json` now records `bindings/node` Node engine metadata as `>=22.0.0`; `npm ci --ignore-scripts --dry-run` passes.
 - Accepted reconciler host-boundary migration from worker-019: `fast-react-reconciler` now exposes a canonical `MutationRenderer`-bounded placeholder entry point, validates mutation tree-update capability failures explicitly, keeps the legacy render placeholder only as a compatibility shim, and no longer imports the legacy `HostConfig` shim in implementation code.
+- Accepted canonical mutation test renderer from worker-018: `fast-react-test-renderer` now implements the canonical host-config traits with opaque handles, in-memory container/instance/text storage, mutation operations, single-parent move behavior, snapshots, and explicit unsupported capability errors without depending on the legacy `HostConfig` shim or reconciler placeholder.
 
 ## Worker Roster
 
@@ -66,13 +67,13 @@ M0: Orchestration Foundation.
 | worker-015-native-loader-boundary | merged | Improve native loader and Rust N-API boundary placeholders | `worker-progress/worker-015-native-loader-boundary.md` |
 | worker-016-root-lockfile-sync | merged | Synchronize root `package-lock.json` after package metadata changes | `worker-progress/worker-016-root-lockfile-sync.md` |
 | worker-017-runtime-inventory-generation | running in tmux worktree; nested subagents allowed | Generate deterministic React 19.2.6 runtime/package inventory artifacts | `../fast-react-worker-017-runtime-inventory-generation/worker-progress/worker-017-runtime-inventory-generation.md` |
-| worker-018-test-renderer-mutation-host | running in tmux worktree; nested subagents allowed | Implement minimal canonical mutation test renderer | `../fast-react-worker-018-test-renderer-mutation-host/worker-progress/worker-018-test-renderer-mutation-host.md` |
+| worker-018-test-renderer-mutation-host | merged | Implement minimal canonical mutation test renderer | `worker-progress/worker-018-test-renderer-mutation-host.md` |
 | worker-019-reconciler-host-boundary-migration | merged | Move reconciler placeholder API toward canonical host trait bounds | `worker-progress/worker-019-reconciler-host-boundary-migration.md` |
 | worker-020-element-object-conformance-probes | running in tmux worktree; nested subagents allowed | Probe React 19.2.6 element object behavior and plan safe implementation | `../fast-react-worker-020-element-object-conformance-probes/worker-progress/worker-020-element-object-conformance-probes.md` |
 
 ## Next Actions
 
-1. Monitor running workers 017, 018, and 020 and merge completed work after audit.
+1. Monitor running workers 017 and 020 and merge completed work after audit.
 2. Launch merge workers if host/core/test changes require integration fixes.
 
 ## Risks And Open Questions
@@ -135,3 +136,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Launched workers 017-020 as real `codex --yolo` tmux processes in disjoint worktrees.
 - 2026-05-09: Accepted and merged worker-019 reconciler host-boundary migration in commit `54d2ab1`. Closed the worker-019 tmux session after merge.
 - 2026-05-09: Verified merged reconciler host-boundary migration on `main` with `cargo test --workspace --all-features`; 33 unit tests and 1 compile-fail doctest passed.
+- 2026-05-09: Accepted and merged worker-018 canonical mutation test renderer in commit `1212991`. Closed the worker-018 tmux session after merge.
+- 2026-05-09: Verified merged canonical mutation test renderer on `main` with `cargo test --workspace --all-features`; 42 unit tests and 1 compile-fail doctest passed.
