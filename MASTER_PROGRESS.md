@@ -31,16 +31,15 @@ M0: Orchestration Foundation.
 
 | Worker | Status | Assignment | Progress File |
 | --- | --- | --- | --- |
-| worker-001-architecture | stopped; invalid run because managed internal agents were used | Test Rust core and renderer-boundary architecture hypotheses | `../fast-react-worker-001-architecture/worker-progress/worker-001-architecture.md` |
-| worker-002-conformance | stopped; invalid run because managed internal agents were used | Design React 19.2.6 compatibility inventory and test strategy | `../fast-react-worker-002-conformance/worker-progress/worker-002-conformance.md` |
-| worker-003-scaffold | stopped; invalid run because managed internal agents were used | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
+| worker-001-architecture | running in tmux worktree with managed-subagent prohibition | Test Rust core and renderer-boundary architecture hypotheses | `../fast-react-worker-001-architecture/worker-progress/worker-001-architecture.md` |
+| worker-002-conformance | running in tmux worktree with managed-subagent prohibition | Design React 19.2.6 compatibility inventory and test strategy | `../fast-react-worker-002-conformance/worker-progress/worker-002-conformance.md` |
+| worker-003-scaffold | running in tmux worktree with managed-subagent prohibition | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
 
 ## Next Actions
 
-1. Relaunch the three initial workers as clean real Codex processes in tmux with explicit managed-subagent prohibition.
-2. Collect their progress files and final recommendations.
-3. Update the master plan with accepted architecture and scaffold decisions.
-4. Create implementation worktrees from the accepted scaffold plan.
+1. Collect the three active workers' progress files and final recommendations.
+2. Update the master plan with accepted architecture and scaffold decisions.
+3. Create implementation worktrees from the accepted scaffold plan.
 
 ## Risks And Open Questions
 
@@ -69,3 +68,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` processes inside tmux, using `script` to provide a TTY and capture logs.
 - 2026-05-09: Stopped tmux workers 001, 002, and 003 after observing managed internal explorer/subagent use inside their tmux Codex sessions. No canonical worker reports had been written.
 - 2026-05-09: Updated `WORKER_BRIEF.md`, task prompts, prompt template, and `scripts/run-worker.sh` to explicitly forbid managed Codex subagents/explorers inside worker sessions. Independent hypothesis tests must be requested in reports and launched by the orchestrator as separate tmux workers.
+- 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with the explicit managed-subagent prohibition included in both worker files and the launcher prompt.
