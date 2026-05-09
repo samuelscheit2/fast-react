@@ -27,6 +27,7 @@ Checked-in generated artifact:
 
 - `inventory/react-19.2.6-runtime-package-inventory.json`
 - `oracles/react-19.2.6-element-object-oracle.json`
+- `oracles/react-19.2.6-ref-object-oracle.json`
 
 Commands:
 
@@ -37,6 +38,9 @@ npm run inventory:print:markdown --workspace @fast-react/conformance
 npm run element-object:generate --workspace @fast-react/conformance
 npm run element-object:print --workspace @fast-react/conformance
 npm run element-object:print:markdown --workspace @fast-react/conformance
+npm run ref-object:generate --workspace @fast-react/conformance
+npm run ref-object:print --workspace @fast-react/conformance
+npm run ref-object:print:markdown --workspace @fast-react/conformance
 npm test --workspace @fast-react/conformance
 ```
 
@@ -81,3 +85,26 @@ Element-object oracle strategy:
 The element-object oracle is the first behavior oracle. It compares local Fast
 React package entrypoints, but it still explicitly does not claim Fast React
 behavior compatibility.
+
+Ref-object oracle strategy:
+
+1. Resolve exact `react@19.2.6` npm metadata.
+2. Download the exact React tarball into a temporary directory.
+3. Verify tarball integrity from `dist.integrity`.
+4. Extract React and copy the local `@fast-react/react` package into a
+   temporary `node_modules` tree.
+5. Run one isolated Node child process per target, scenario, and mode. Modes
+   cover default Node and `--conditions=react-server`, each in development and
+   production.
+6. Capture normalized JSON for direct `createRef` behavior, including export
+   presence and descriptors, function descriptors, call result own keys,
+   `current` descriptors, prototype, freeze/seal/extensible state, initial
+   `current`, per-call identity, argument and `this` handling, constructor
+   calls, mutability, and add/delete behavior.
+7. Compare local Fast React observations against the React oracle as explicit
+   `matched-but-compatibility-not-claimed`, `known-mismatch`, or
+   `unsupported-placeholder` statuses.
+
+The ref-object oracle intentionally excludes render-time ref attachment,
+callback refs, string refs, `forwardRef`, `useRef`, owner stacks, and renderer
+commit behavior.

@@ -13,8 +13,10 @@ scaffold:
 
 Exports import successfully for smoke checks. The element factory APIs covered
 by the React 19.2.6 element-object oracle now construct JavaScript element
-objects; unsupported React behavior still throws an explicit unimplemented
-error until conformance-backed implementations are added.
+objects. Direct `createRef()` calls covered by the React 19.2.6 ref-object
+oracle now return React-shaped ref objects. Unsupported React behavior still
+throws an explicit unimplemented error until conformance-backed implementations
+are added.
 
 The enumerable runtime keys are intentionally aligned with the accepted
 `react@19.2.6` inventory for the default Node condition and the `react-server`

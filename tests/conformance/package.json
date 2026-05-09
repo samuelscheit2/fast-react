@@ -11,6 +11,9 @@
     "inventory:generate": "node scripts/generate-runtime-inventory.mjs --write",
     "inventory:print": "node scripts/print-inventory.mjs --format=json",
     "inventory:print:markdown": "node scripts/print-inventory.mjs --format=markdown",
+    "ref-object:generate": "node scripts/generate-ref-object-oracle.mjs --write",
+    "ref-object:print": "node scripts/print-ref-object-oracle.mjs --format=json",
+    "ref-object:print:markdown": "node scripts/print-ref-object-oracle.mjs --format=markdown",
     "check": "npm test",
     "test": "node --test test/*.test.mjs"
   },
