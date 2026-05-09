@@ -1,0 +1,3691 @@
+{
+  "schemaVersion": 1,
+  "inventoryKind": "react-19.2.6-react-dom-type-inventory",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "@types/react-dom 19.2.3 declaration inventory against React DOM 19.2.6 runtime subpaths",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json"
+  ],
+  "generation": {
+    "method": "checked React DOM runtime inventory plus exact @types tarballs parsed with deterministic structured declaration parsing",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "runtimePackageCodeExecutedByThisGenerator": false,
+    "runtimePackageEvidenceSource": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+    "declarationParsing": "structured export-map and declaration export parser; TypeScript compiler API not required",
+    "typescriptCompilerApiUsed": false,
+    "probeTimeoutMs": 10000,
+    "generatedTimestampIncluded": false
+  },
+  "evidenceClaims": {
+    "runtimePackageInventoryRead": true,
+    "npmMetadataResolved": true,
+    "tarballsDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "declarationExportMapParsed": true,
+    "declarationFilesParsed": true,
+    "runtimeDeclarationsCompared": true,
+    "runtimePackageCompatibilitySeparatedFromTypeScriptDeclarations": true,
+    "fastReactComparedToReact": false
+  },
+  "conformanceClaims": {
+    "realReactRuntimeComparedToDeclarations": true,
+    "fastReactComparedToReact": false,
+    "fastReactRuntimeCompatible": false,
+    "fastReactTypeDeclarationsCompatible": false,
+    "compatibilityClaimed": false
+  },
+  "compatibilityPolicy": {
+    "runtimePackageCompatibility": "Runtime package compatibility is checked against the published react-dom@19.2.6 package exports and runtime probes.",
+    "typescriptDeclarationCompatibility": "TypeScript declaration compatibility is checked separately against @types/react-dom@19.2.3 plus the pinned @types/react@19.2.14 peer evidence.",
+    "recommendedFastReactPolicy": [
+      "Do not infer runtime support from @types/react-dom declarations, and do not infer TypeScript support from runtime export keys.",
+      "Ship or reference React DOM declarations as an explicit TypeScript compatibility product with tracked gaps.",
+      "Treat react-server condition declarations as unresolved until Fast React has condition-specific declaration policy.",
+      "Do not claim profiling, server/static resume, or client-root declaration parity until missing declaration exports are resolved or documented as intentional."
+    ]
+  },
+  "targets": {
+    "runtime": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target"
+    },
+    "reactDomDeclarations": {
+      "packageName": "@types/react-dom",
+      "version": "19.2.3",
+      "role": "react-dom-declaration-compatibility-target"
+    },
+    "reactDeclarations": {
+      "packageName": "@types/react",
+      "version": "19.2.14",
+      "role": "react-peer-declaration-compatibility-target"
+    }
+  },
+  "packages": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "sourceInventoryKind": "react-19.2.6-runtime-package-inventory",
+      "sourceInventorySchemaVersion": 2,
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ],
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "exportMapRows": [
+        {
+          "subpath": ".",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./react-dom.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./index.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./client",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./client.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./client.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "bun"
+              ],
+              "target": "./server.bun.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./server.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./server.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./server.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.bun",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.bun.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./server.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./server.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./server.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "workerd"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "deno"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "worker"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "node"
+              ],
+              "target": "./static.node.js"
+            },
+            {
+              "conditionPath": [
+                "edge-light"
+              ],
+              "target": "./static.edge.js"
+            },
+            {
+              "conditionPath": [
+                "browser"
+              ],
+              "target": "./static.browser.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.browser",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.browser.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.edge",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.edge.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./static.node",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./static.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./static.node.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./profiling",
+          "conditions": [
+            {
+              "conditionPath": [
+                "react-server"
+              ],
+              "target": "./profiling.react-server.js"
+            },
+            {
+              "conditionPath": [
+                "default"
+              ],
+              "target": "./profiling.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./test-utils",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./test-utils.js"
+            }
+          ]
+        },
+        {
+          "subpath": "./package.json",
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ]
+    },
+    "@types/react-dom": {
+      "packageName": "@types/react-dom",
+      "version": "19.2.3",
+      "role": "react-dom-declaration-compatibility-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/%40types%2Freact-dom/19.2.3",
+        "distTarball": "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.2.3.tgz",
+        "distIntegrity": "sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==",
+        "distShasum": "c1e305d15a52a3e508d54dca770d202cb63abf2c",
+        "unpackedSize": 30063
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==",
+        "integrityVerified": true,
+        "fileCount": 18,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "canary.d.ts",
+          "client.d.ts",
+          "experimental.d.ts",
+          "index.d.ts",
+          "package.json",
+          "server.browser.d.ts",
+          "server.bun.d.ts",
+          "server.d.ts",
+          "server.edge.d.ts",
+          "server.node.d.ts",
+          "static.browser.d.ts",
+          "static.d.ts",
+          "static.edge.d.ts",
+          "static.node.d.ts",
+          "test-utils/",
+          "test-utils/index.d.ts"
+        ]
+      },
+      "packageJson": {
+        "name": "@types/react-dom",
+        "version": "19.2.3",
+        "main": "",
+        "types": "index.d.ts",
+        "typings": null,
+        "exports": {
+          ".": {
+            "types": {
+              "default": "./index.d.ts"
+            }
+          },
+          "./client": {
+            "types": {
+              "default": "./client.d.ts"
+            }
+          },
+          "./canary": {
+            "types": {
+              "default": "./canary.d.ts"
+            }
+          },
+          "./server": {
+            "types": {
+              "default": "./server.d.ts"
+            }
+          },
+          "./server.browser": {
+            "types": {
+              "default": "./server.browser.d.ts"
+            }
+          },
+          "./server.bun": {
+            "types": {
+              "default": "./server.bun.d.ts"
+            }
+          },
+          "./server.edge": {
+            "types": {
+              "default": "./server.edge.d.ts"
+            }
+          },
+          "./server.node": {
+            "types": {
+              "default": "./server.node.d.ts"
+            }
+          },
+          "./static": {
+            "types": {
+              "default": "./static.d.ts"
+            }
+          },
+          "./static.browser": {
+            "types": {
+              "default": "./static.browser.d.ts"
+            }
+          },
+          "./static.edge": {
+            "types": {
+              "default": "./static.edge.d.ts"
+            }
+          },
+          "./static.node": {
+            "types": {
+              "default": "./static.node.d.ts"
+            }
+          },
+          "./experimental": {
+            "types": {
+              "default": "./experimental.d.ts"
+            }
+          },
+          "./test-utils": {
+            "types": {
+              "default": "./test-utils/index.d.ts"
+            }
+          },
+          "./package.json": "./package.json"
+        },
+        "dependencies": {},
+        "peerDependencies": {
+          "@types/react": "^19.2.0"
+        },
+        "typeScriptVersion": "5.2",
+        "typesPublisherContentHash": "6f16aac4f50b7ebe3201fdac53a58874d2899d6108894538ade2d61fbb99f8c5"
+      },
+      "declarationRows": [
+        {
+          "subpath": ".",
+          "target": "./index.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "index.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./index.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [
+              "createPortal",
+              "flushSync",
+              "preconnect",
+              "prefetchDNS",
+              "preinit",
+              "preinitModule",
+              "preload",
+              "preloadModule",
+              "requestFormReset",
+              "unstable_batchedUpdates",
+              "useFormState",
+              "useFormStatus",
+              "version"
+            ],
+            "directTypeExportNames": [
+              "FormStatus",
+              "FormStatusNotPending",
+              "FormStatusPending",
+              "PreconnectOptions",
+              "PreinitAs",
+              "PreinitModuleAs",
+              "PreinitModuleOptions",
+              "PreinitOptions",
+              "PreloadAs",
+              "PreloadModuleAs",
+              "PreloadModuleOptions",
+              "PreloadOptions"
+            ],
+            "globalNamespaceExports": [
+              "ReactDOM"
+            ],
+            "importSources": [
+              "react"
+            ],
+            "namedReexports": []
+          },
+          "resolved": {
+            "declarationFile": "index.d.ts",
+            "sourceSubpath": ".",
+            "allExportNames": [
+              "createPortal",
+              "flushSync",
+              "FormStatus",
+              "FormStatusNotPending",
+              "FormStatusPending",
+              "preconnect",
+              "PreconnectOptions",
+              "prefetchDNS",
+              "preinit",
+              "PreinitAs",
+              "preinitModule",
+              "PreinitModuleAs",
+              "PreinitModuleOptions",
+              "PreinitOptions",
+              "preload",
+              "PreloadAs",
+              "preloadModule",
+              "PreloadModuleAs",
+              "PreloadModuleOptions",
+              "PreloadOptions",
+              "requestFormReset",
+              "unstable_batchedUpdates",
+              "useFormState",
+              "useFormStatus",
+              "version"
+            ],
+            "valueExportNames": [
+              "createPortal",
+              "flushSync",
+              "preconnect",
+              "prefetchDNS",
+              "preinit",
+              "preinitModule",
+              "preload",
+              "preloadModule",
+              "requestFormReset",
+              "unstable_batchedUpdates",
+              "useFormState",
+              "useFormStatus",
+              "version"
+            ],
+            "typeExportNames": [
+              "FormStatus",
+              "FormStatusNotPending",
+              "FormStatusPending",
+              "PreconnectOptions",
+              "PreinitAs",
+              "PreinitModuleAs",
+              "PreinitModuleOptions",
+              "PreinitOptions",
+              "PreloadAs",
+              "PreloadModuleAs",
+              "PreloadModuleOptions",
+              "PreloadOptions"
+            ],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./canary",
+          "target": "./canary.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "canary.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./canary.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": []
+          },
+          "resolved": {
+            "declarationFile": "canary.d.ts",
+            "sourceSubpath": "./canary",
+            "allExportNames": [],
+            "valueExportNames": [],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./client",
+          "target": "./client.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "client.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./client.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [
+              "createRoot",
+              "hydrateRoot"
+            ],
+            "directTypeExportNames": [
+              "Container",
+              "DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS",
+              "ErrorInfo",
+              "HydrationOptions",
+              "ReactFormState",
+              "Root",
+              "RootOptions"
+            ],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": []
+          },
+          "resolved": {
+            "declarationFile": "client.d.ts",
+            "sourceSubpath": "./client",
+            "allExportNames": [
+              "Container",
+              "createRoot",
+              "DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS",
+              "ErrorInfo",
+              "hydrateRoot",
+              "HydrationOptions",
+              "ReactFormState",
+              "Root",
+              "RootOptions"
+            ],
+            "valueExportNames": [
+              "createRoot",
+              "hydrateRoot"
+            ],
+            "typeExportNames": [
+              "Container",
+              "DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS",
+              "ErrorInfo",
+              "HydrationOptions",
+              "ReactFormState",
+              "Root",
+              "RootOptions"
+            ],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./experimental",
+          "target": "./experimental.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "experimental.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./experimental.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": []
+          },
+          "resolved": {
+            "declarationFile": "experimental.d.ts",
+            "sourceSubpath": "./experimental",
+            "allExportNames": [],
+            "valueExportNames": [],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./server",
+          "target": "./server.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "server.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./server.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [
+              "renderToPipeableStream",
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume",
+              "resumeToPipeableStream",
+              "version"
+            ],
+            "directTypeExportNames": [
+              "BootstrapScriptDescriptor",
+              "PipeableStream",
+              "ReactDOMServerReadableStream",
+              "ReactImportMap",
+              "RenderToPipeableStreamOptions",
+              "RenderToReadableStreamOptions",
+              "ServerOptions"
+            ],
+            "globalNamespaceExports": [
+              "ReactDOMServer"
+            ],
+            "importSources": [
+              "./client",
+              "./static",
+              "react"
+            ],
+            "namedReexports": [
+              {
+                "importedName": "ResumeOptions",
+                "exportedName": "ResumeOptions",
+                "source": null,
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "server.d.ts",
+            "sourceSubpath": "./server",
+            "allExportNames": [
+              "BootstrapScriptDescriptor",
+              "PipeableStream",
+              "ReactDOMServerReadableStream",
+              "ReactImportMap",
+              "renderToPipeableStream",
+              "RenderToPipeableStreamOptions",
+              "renderToReadableStream",
+              "RenderToReadableStreamOptions",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume",
+              "ResumeOptions",
+              "resumeToPipeableStream",
+              "ServerOptions",
+              "version"
+            ],
+            "valueExportNames": [
+              "renderToPipeableStream",
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume",
+              "resumeToPipeableStream",
+              "version"
+            ],
+            "typeExportNames": [
+              "BootstrapScriptDescriptor",
+              "PipeableStream",
+              "ReactDOMServerReadableStream",
+              "ReactImportMap",
+              "RenderToPipeableStreamOptions",
+              "RenderToReadableStreamOptions",
+              "ResumeOptions",
+              "ServerOptions"
+            ],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./server.browser",
+          "target": "./server.browser.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "server.browser.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./server.browser.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "renderToReadableStream",
+                "exportedName": "renderToReadableStream",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToStaticMarkup",
+                "exportedName": "renderToStaticMarkup",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToString",
+                "exportedName": "renderToString",
+                "source": "./server",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "server.browser.d.ts",
+            "sourceSubpath": "./server.browser",
+            "allExportNames": [
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString"
+            ],
+            "valueExportNames": [
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./server.bun",
+          "target": "./server.bun.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "server.bun.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./server.bun.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "renderToReadableStream",
+                "exportedName": "renderToReadableStream",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToStaticMarkup",
+                "exportedName": "renderToStaticMarkup",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToString",
+                "exportedName": "renderToString",
+                "source": "./server",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "server.bun.d.ts",
+            "sourceSubpath": "./server.bun",
+            "allExportNames": [
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString"
+            ],
+            "valueExportNames": [
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./server.edge",
+          "target": "./server.edge.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "server.edge.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./server.edge.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "renderToReadableStream",
+                "exportedName": "renderToReadableStream",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToStaticMarkup",
+                "exportedName": "renderToStaticMarkup",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToString",
+                "exportedName": "renderToString",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "resume",
+                "exportedName": "resume",
+                "source": "./server",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "server.edge.d.ts",
+            "sourceSubpath": "./server.edge",
+            "allExportNames": [
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume"
+            ],
+            "valueExportNames": [
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./server.node",
+          "target": "./server.node.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "server.node.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./server.node.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "renderToPipeableStream",
+                "exportedName": "renderToPipeableStream",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToReadableStream",
+                "exportedName": "renderToReadableStream",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToStaticMarkup",
+                "exportedName": "renderToStaticMarkup",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "renderToString",
+                "exportedName": "renderToString",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "resume",
+                "exportedName": "resume",
+                "source": "./server",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "resumeToPipeableStream",
+                "exportedName": "resumeToPipeableStream",
+                "source": "./server",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "server.node.d.ts",
+            "sourceSubpath": "./server.node",
+            "allExportNames": [
+              "renderToPipeableStream",
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume",
+              "resumeToPipeableStream"
+            ],
+            "valueExportNames": [
+              "renderToPipeableStream",
+              "renderToReadableStream",
+              "renderToStaticMarkup",
+              "renderToString",
+              "resume",
+              "resumeToPipeableStream"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./static",
+          "target": "./static.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "static.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./static.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [
+              "prerender",
+              "prerenderToNodeStream",
+              "resumeAndPrerender",
+              "resumeAndPrerenderToNodeStream",
+              "version"
+            ],
+            "directTypeExportNames": [
+              "BootstrapScriptDescriptor",
+              "PostponedState",
+              "PrerenderOptions",
+              "PrerenderResult",
+              "PrerenderToNodeStreamResult",
+              "ReactImportMap",
+              "ResumeOptions"
+            ],
+            "globalNamespaceExports": [],
+            "importSources": [
+              "./client",
+              "react"
+            ],
+            "namedReexports": []
+          },
+          "resolved": {
+            "declarationFile": "static.d.ts",
+            "sourceSubpath": "./static",
+            "allExportNames": [
+              "BootstrapScriptDescriptor",
+              "PostponedState",
+              "prerender",
+              "PrerenderOptions",
+              "PrerenderResult",
+              "prerenderToNodeStream",
+              "PrerenderToNodeStreamResult",
+              "ReactImportMap",
+              "resumeAndPrerender",
+              "resumeAndPrerenderToNodeStream",
+              "ResumeOptions",
+              "version"
+            ],
+            "valueExportNames": [
+              "prerender",
+              "prerenderToNodeStream",
+              "resumeAndPrerender",
+              "resumeAndPrerenderToNodeStream",
+              "version"
+            ],
+            "typeExportNames": [
+              "BootstrapScriptDescriptor",
+              "PostponedState",
+              "PrerenderOptions",
+              "PrerenderResult",
+              "PrerenderToNodeStreamResult",
+              "ReactImportMap",
+              "ResumeOptions"
+            ],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./static.browser",
+          "target": "./static.browser.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "static.browser.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./static.browser.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "prerender",
+                "exportedName": "prerender",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "version",
+                "exportedName": "version",
+                "source": "./static",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "static.browser.d.ts",
+            "sourceSubpath": "./static.browser",
+            "allExportNames": [
+              "prerender",
+              "version"
+            ],
+            "valueExportNames": [
+              "prerender",
+              "version"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./static.edge",
+          "target": "./static.edge.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "static.edge.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./static.edge.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "prerender",
+                "exportedName": "prerender",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "resumeAndPrerender",
+                "exportedName": "resumeAndPrerender",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "version",
+                "exportedName": "version",
+                "source": "./static",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "static.edge.d.ts",
+            "sourceSubpath": "./static.edge",
+            "allExportNames": [
+              "prerender",
+              "resumeAndPrerender",
+              "version"
+            ],
+            "valueExportNames": [
+              "prerender",
+              "resumeAndPrerender",
+              "version"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./static.node",
+          "target": "./static.node.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "static.node.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./static.node.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "prerender",
+                "exportedName": "prerender",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "prerenderToNodeStream",
+                "exportedName": "prerenderToNodeStream",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "resumeAndPrerender",
+                "exportedName": "resumeAndPrerender",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "resumeAndPrerenderToNodeStream",
+                "exportedName": "resumeAndPrerenderToNodeStream",
+                "source": "./static",
+                "kind": "unknown"
+              },
+              {
+                "importedName": "version",
+                "exportedName": "version",
+                "source": "./static",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "static.node.d.ts",
+            "sourceSubpath": "./static.node",
+            "allExportNames": [
+              "prerender",
+              "prerenderToNodeStream",
+              "resumeAndPrerender",
+              "resumeAndPrerenderToNodeStream",
+              "version"
+            ],
+            "valueExportNames": [
+              "prerender",
+              "prerenderToNodeStream",
+              "resumeAndPrerender",
+              "resumeAndPrerenderToNodeStream",
+              "version"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./test-utils",
+          "target": "./test-utils/index.d.ts",
+          "targetKind": "declaration-file",
+          "declarationFile": "test-utils/index.d.ts",
+          "conditions": [
+            {
+              "conditionPath": [
+                "types",
+                "default"
+              ],
+              "target": "./test-utils/index.d.ts"
+            }
+          ],
+          "parsed": {
+            "directValueExportNames": [],
+            "directTypeExportNames": [],
+            "globalNamespaceExports": [],
+            "importSources": [],
+            "namedReexports": [
+              {
+                "importedName": "act",
+                "exportedName": "act",
+                "source": "react",
+                "kind": "unknown"
+              }
+            ]
+          },
+          "resolved": {
+            "declarationFile": "test-utils/index.d.ts",
+            "sourceSubpath": "./test-utils",
+            "allExportNames": [
+              "act"
+            ],
+            "valueExportNames": [
+              "act"
+            ],
+            "typeExportNames": [],
+            "unknownExportNames": []
+          }
+        },
+        {
+          "subpath": "./package.json",
+          "target": "./package.json",
+          "targetKind": "package-json",
+          "declarationFile": null,
+          "conditions": [
+            {
+              "conditionPath": [],
+              "target": "./package.json"
+            }
+          ]
+        }
+      ],
+      "publicSubpaths": [
+        ".",
+        "./canary",
+        "./client",
+        "./experimental",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./test-utils",
+        "./package.json"
+      ],
+      "declarationSubpaths": [
+        ".",
+        "./canary",
+        "./client",
+        "./experimental",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./test-utils"
+      ]
+    },
+    "@types/react": {
+      "packageName": "@types/react",
+      "version": "19.2.14",
+      "role": "react-peer-declaration-compatibility-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/%40types%2Freact/19.2.14",
+        "distTarball": "https://registry.npmjs.org/@types/react/-/react-19.2.14.tgz",
+        "distIntegrity": "sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==",
+        "distShasum": "39604929b5e3957e3a6fa0001dafb17c7af70bad",
+        "unpackedSize": 410399
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==",
+        "integrityVerified": true,
+        "fileCount": 17,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "canary.d.ts",
+          "compiler-runtime.d.ts",
+          "experimental.d.ts",
+          "global.d.ts",
+          "index.d.ts",
+          "jsx-dev-runtime.d.ts",
+          "jsx-runtime.d.ts",
+          "package.json",
+          "ts5.0/",
+          "ts5.0/canary.d.ts",
+          "ts5.0/experimental.d.ts",
+          "ts5.0/global.d.ts",
+          "ts5.0/index.d.ts",
+          "ts5.0/jsx-dev-runtime.d.ts",
+          "ts5.0/jsx-runtime.d.ts"
+        ]
+      },
+      "packageJson": {
+        "name": "@types/react",
+        "version": "19.2.14",
+        "main": "",
+        "types": "index.d.ts",
+        "typings": null,
+        "exports": {
+          ".": {
+            "types@<=5.0": {
+              "default": "./ts5.0/index.d.ts"
+            },
+            "types": {
+              "default": "./index.d.ts"
+            }
+          },
+          "./canary": {
+            "types@<=5.0": {
+              "default": "./ts5.0/canary.d.ts"
+            },
+            "types": {
+              "default": "./canary.d.ts"
+            }
+          },
+          "./compiler-runtime": {
+            "types": {
+              "default": "./compiler-runtime.d.ts"
+            }
+          },
+          "./experimental": {
+            "types@<=5.0": {
+              "default": "./ts5.0/experimental.d.ts"
+            },
+            "types": {
+              "default": "./experimental.d.ts"
+            }
+          },
+          "./jsx-runtime": {
+            "types@<=5.0": {
+              "default": "./ts5.0/jsx-runtime.d.ts"
+            },
+            "types": {
+              "default": "./jsx-runtime.d.ts"
+            }
+          },
+          "./jsx-dev-runtime": {
+            "types@<=5.0": {
+              "default": "./ts5.0/jsx-dev-runtime.d.ts"
+            },
+            "types": {
+              "default": "./jsx-dev-runtime.d.ts"
+            }
+          },
+          "./package.json": "./package.json"
+        },
+        "dependencies": {
+          "csstype": "^3.2.2"
+        },
+        "peerDependencies": {},
+        "typeScriptVersion": "5.2",
+        "typesPublisherContentHash": "daae8d23e06b3d45da3803abb3f0bad661cffb4c40282d6886d8dfde7d5eea01"
+      }
+    }
+  },
+  "subpathComparisons": [
+    {
+      "subpath": ".",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "createPortal",
+            "flushSync",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "requestFormReset",
+            "unstable_batchedUpdates",
+            "useFormState",
+            "useFormStatus",
+            "version"
+          ],
+          "exportDetails": [
+            {
+              "key": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]"
+              }
+            },
+            {
+              "key": "createPortal",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "flushSync",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "preconnect",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "prefetchDNS",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "preinit",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preinitModule",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preload",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preloadModule",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "requestFormReset",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "unstable_batchedUpdates",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "useFormState",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "useFormStatus",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 0
+              }
+            },
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "version"
+          ],
+          "exportDetails": [
+            {
+              "key": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]"
+              }
+            },
+            {
+              "key": "preconnect",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "prefetchDNS",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "preinit",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preinitModule",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preload",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preloadModule",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            }
+          ]
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "index.d.ts",
+        "valueExportNames": [
+          "createPortal",
+          "flushSync",
+          "preconnect",
+          "prefetchDNS",
+          "preinit",
+          "preinitModule",
+          "preload",
+          "preloadModule",
+          "requestFormReset",
+          "unstable_batchedUpdates",
+          "useFormState",
+          "useFormStatus",
+          "version"
+        ],
+        "typeExportNames": [
+          "FormStatus",
+          "FormStatusNotPending",
+          "FormStatusPending",
+          "PreconnectOptions",
+          "PreinitAs",
+          "PreinitModuleAs",
+          "PreinitModuleOptions",
+          "PreinitOptions",
+          "PreloadAs",
+          "PreloadModuleAs",
+          "PreloadModuleOptions",
+          "PreloadOptions"
+        ],
+        "allExportNames": [
+          "createPortal",
+          "flushSync",
+          "FormStatus",
+          "FormStatusNotPending",
+          "FormStatusPending",
+          "preconnect",
+          "PreconnectOptions",
+          "prefetchDNS",
+          "preinit",
+          "PreinitAs",
+          "preinitModule",
+          "PreinitModuleAs",
+          "PreinitModuleOptions",
+          "PreinitOptions",
+          "preload",
+          "PreloadAs",
+          "preloadModule",
+          "PreloadModuleAs",
+          "PreloadModuleOptions",
+          "PreloadOptions",
+          "requestFormReset",
+          "unstable_batchedUpdates",
+          "useFormState",
+          "useFormStatus",
+          "version"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [
+          "ReactDOM"
+        ],
+        "importSources": [
+          "react"
+        ]
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "runtimeValue": {
+            "type": "object",
+            "objectTag": "[object Object]"
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./canary",
+      "status": "declaration-only-subpath",
+      "runtime": {
+        "publicSubpath": false,
+        "executableSubpath": false,
+        "defaultProbe": null,
+        "reactServerProbe": null
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "canary.d.ts",
+        "valueExportNames": [],
+        "typeExportNames": [],
+        "allExportNames": [],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./client",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "createRoot",
+            "hydrateRoot",
+            "version"
+          ],
+          "exportDetails": [
+            {
+              "key": "createRoot",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "hydrateRoot",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/client is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "client.d.ts",
+        "valueExportNames": [
+          "createRoot",
+          "hydrateRoot"
+        ],
+        "typeExportNames": [
+          "Container",
+          "DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS",
+          "ErrorInfo",
+          "HydrationOptions",
+          "ReactFormState",
+          "Root",
+          "RootOptions"
+        ],
+        "allExportNames": [
+          "Container",
+          "createRoot",
+          "DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS",
+          "ErrorInfo",
+          "hydrateRoot",
+          "HydrationOptions",
+          "ReactFormState",
+          "Root",
+          "RootOptions"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "version",
+          "runtimeValue": {
+            "type": "string",
+            "value": "19.2.6"
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./experimental",
+      "status": "declaration-only-subpath",
+      "runtime": {
+        "publicSubpath": false,
+        "executableSubpath": false,
+        "defaultProbe": null,
+        "reactServerProbe": null
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "experimental.d.ts",
+        "valueExportNames": [],
+        "typeExportNames": [],
+        "allExportNames": [],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./profiling",
+      "status": "runtime-subpath-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+            "createPortal",
+            "createRoot",
+            "flushSync",
+            "hydrateRoot",
+            "preconnect",
+            "prefetchDNS",
+            "preinit",
+            "preinitModule",
+            "preload",
+            "preloadModule",
+            "requestFormReset",
+            "unstable_batchedUpdates",
+            "useFormState",
+            "useFormStatus",
+            "version"
+          ],
+          "exportDetails": [
+            {
+              "key": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+              "value": {
+                "type": "object",
+                "objectTag": "[object Object]"
+              }
+            },
+            {
+              "key": "createPortal",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "createRoot",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "flushSync",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "hydrateRoot",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "preconnect",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "prefetchDNS",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "preinit",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preinitModule",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preload",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "preloadModule",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "requestFormReset",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            },
+            {
+              "key": "unstable_batchedUpdates",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "useFormState",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "useFormStatus",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 0
+              }
+            },
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/profiling is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": false,
+        "targetKind": "missing",
+        "declarationFile": null,
+        "valueExportNames": [],
+        "typeExportNames": [],
+        "allExportNames": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "runtimeValue": {
+            "type": "object",
+            "objectTag": "[object Object]"
+          }
+        },
+        {
+          "exportName": "createPortal",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "createRoot",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "flushSync",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 1
+          }
+        },
+        {
+          "exportName": "hydrateRoot",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 3
+          }
+        },
+        {
+          "exportName": "preconnect",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "prefetchDNS",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 1
+          }
+        },
+        {
+          "exportName": "preinit",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "preinitModule",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "preload",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "preloadModule",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "requestFormReset",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 1
+          }
+        },
+        {
+          "exportName": "unstable_batchedUpdates",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 2
+          }
+        },
+        {
+          "exportName": "useFormState",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 3
+          }
+        },
+        {
+          "exportName": "useFormStatus",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 0
+          }
+        },
+        {
+          "exportName": "version",
+          "runtimeValue": {
+            "type": "string",
+            "value": "19.2.6"
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./server",
+      "status": "runtime-and-declarations-covered",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "renderToString",
+            "renderToStaticMarkup",
+            "renderToPipeableStream",
+            "renderToReadableStream",
+            "resumeToPipeableStream",
+            "resume"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "renderToString",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToStaticMarkup",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToPipeableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToReadableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resumeToPipeableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "resume",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "server.d.ts",
+        "valueExportNames": [
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "resumeToPipeableStream",
+          "version"
+        ],
+        "typeExportNames": [
+          "BootstrapScriptDescriptor",
+          "PipeableStream",
+          "ReactDOMServerReadableStream",
+          "ReactImportMap",
+          "RenderToPipeableStreamOptions",
+          "RenderToReadableStreamOptions",
+          "ResumeOptions",
+          "ServerOptions"
+        ],
+        "allExportNames": [
+          "BootstrapScriptDescriptor",
+          "PipeableStream",
+          "ReactDOMServerReadableStream",
+          "ReactImportMap",
+          "renderToPipeableStream",
+          "RenderToPipeableStreamOptions",
+          "renderToReadableStream",
+          "RenderToReadableStreamOptions",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "ResumeOptions",
+          "resumeToPipeableStream",
+          "ServerOptions",
+          "version"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [
+          "ReactDOMServer"
+        ],
+        "importSources": [
+          "./client",
+          "./static",
+          "react"
+        ]
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./server.browser",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "renderToString",
+            "renderToStaticMarkup",
+            "renderToReadableStream",
+            "resume"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "renderToString",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToStaticMarkup",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToReadableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resume",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "server.browser.d.ts",
+        "valueExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "version",
+          "runtimeValue": {
+            "type": "string",
+            "value": "19.2.6"
+          }
+        },
+        {
+          "exportName": "resume",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 3
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./server.bun",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "renderToReadableStream",
+            "resume",
+            "renderToString",
+            "renderToStaticMarkup"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "renderToReadableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resume",
+              "value": {
+                "type": "undefined"
+              }
+            },
+            {
+              "key": "renderToString",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToStaticMarkup",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "server.bun.d.ts",
+        "valueExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "version",
+          "runtimeValue": {
+            "type": "string",
+            "value": "19.2.6"
+          }
+        },
+        {
+          "exportName": "resume",
+          "runtimeValue": {
+            "type": "undefined"
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./server.edge",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "renderToReadableStream",
+            "renderToString",
+            "renderToStaticMarkup",
+            "resume"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "renderToReadableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToString",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToStaticMarkup",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resume",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "server.edge.d.ts",
+        "valueExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "version",
+          "runtimeValue": {
+            "type": "string",
+            "value": "19.2.6"
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./server.node",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "renderToString",
+            "renderToStaticMarkup",
+            "renderToPipeableStream",
+            "renderToReadableStream",
+            "resumeToPipeableStream",
+            "resume"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "renderToString",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToStaticMarkup",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToPipeableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "renderToReadableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resumeToPipeableStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "resume",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/server is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "server.node.d.ts",
+        "valueExportNames": [
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "resumeToPipeableStream"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "resumeToPipeableStream"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "version",
+          "runtimeValue": {
+            "type": "string",
+            "value": "19.2.6"
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./static",
+      "status": "runtime-and-declarations-covered",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "prerenderToNodeStream",
+            "prerender",
+            "resumeAndPrerenderToNodeStream",
+            "resumeAndPrerender"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "prerenderToNodeStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "prerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resumeAndPrerenderToNodeStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "resumeAndPrerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/static is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "static.d.ts",
+        "valueExportNames": [
+          "prerender",
+          "prerenderToNodeStream",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "version"
+        ],
+        "typeExportNames": [
+          "BootstrapScriptDescriptor",
+          "PostponedState",
+          "PrerenderOptions",
+          "PrerenderResult",
+          "PrerenderToNodeStreamResult",
+          "ReactImportMap",
+          "ResumeOptions"
+        ],
+        "allExportNames": [
+          "BootstrapScriptDescriptor",
+          "PostponedState",
+          "prerender",
+          "PrerenderOptions",
+          "PrerenderResult",
+          "prerenderToNodeStream",
+          "PrerenderToNodeStreamResult",
+          "ReactImportMap",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "ResumeOptions",
+          "version"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": [
+          "./client",
+          "react"
+        ]
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./static.browser",
+      "status": "runtime-exports-missing-declarations",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "prerender",
+            "resumeAndPrerender"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "prerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resumeAndPrerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/static is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "static.browser.d.ts",
+        "valueExportNames": [
+          "prerender",
+          "version"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "prerender",
+          "version"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [
+        {
+          "exportName": "resumeAndPrerender",
+          "runtimeValue": {
+            "type": "function",
+            "name": "",
+            "length": 3
+          }
+        }
+      ],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./static.edge",
+      "status": "runtime-and-declarations-covered",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "prerender",
+            "resumeAndPrerender"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "prerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resumeAndPrerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/static is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "static.edge.d.ts",
+        "valueExportNames": [
+          "prerender",
+          "resumeAndPrerender",
+          "version"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "prerender",
+          "resumeAndPrerender",
+          "version"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./static.node",
+      "status": "runtime-and-declarations-covered",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "version",
+            "prerenderToNodeStream",
+            "prerender",
+            "resumeAndPrerenderToNodeStream",
+            "resumeAndPrerender"
+          ],
+          "exportDetails": [
+            {
+              "key": "version",
+              "value": {
+                "type": "string",
+                "value": "19.2.6"
+              }
+            },
+            {
+              "key": "prerenderToNodeStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "prerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 2
+              }
+            },
+            {
+              "key": "resumeAndPrerenderToNodeStream",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            },
+            {
+              "key": "resumeAndPrerender",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 3
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "throws",
+          "name": "Error",
+          "code": null,
+          "message": "react-dom/static is not supported in React Server Components."
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "static.node.d.ts",
+        "valueExportNames": [
+          "prerender",
+          "prerenderToNodeStream",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "version"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "prerender",
+          "prerenderToNodeStream",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "version"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./test-utils",
+      "status": "runtime-and-declarations-covered",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": true,
+        "defaultProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "act"
+          ],
+          "exportDetails": [
+            {
+              "key": "act",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            }
+          ]
+        },
+        "reactServerProbe": {
+          "status": "ok",
+          "exportKeys": [
+            "act"
+          ],
+          "exportDetails": [
+            {
+              "key": "act",
+              "value": {
+                "type": "function",
+                "name": "",
+                "length": 1
+              }
+            }
+          ]
+        }
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "declaration-file",
+        "declarationFile": "test-utils/index.d.ts",
+        "valueExportNames": [
+          "act"
+        ],
+        "typeExportNames": [],
+        "allExportNames": [
+          "act"
+        ],
+        "unknownExportNames": [],
+        "globalNamespaceExports": [],
+        "importSources": []
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    },
+    {
+      "subpath": "./package.json",
+      "status": "metadata-subpath",
+      "runtime": {
+        "publicSubpath": true,
+        "executableSubpath": false,
+        "defaultProbe": null,
+        "reactServerProbe": null
+      },
+      "declarations": {
+        "publicSubpath": true,
+        "targetKind": "package-json",
+        "declarationFile": null,
+        "valueExportNames": [],
+        "typeExportNames": [],
+        "allExportNames": []
+      },
+      "missingDeclarationExports": [],
+      "declarationValueExportsWithoutRuntime": []
+    }
+  ],
+  "gaps": {
+    "runtimeOnlySubpaths": [
+      "./profiling"
+    ],
+    "declarationOnlySubpaths": [
+      "./canary",
+      "./experimental"
+    ],
+    "missingRuntimeDeclarations": [
+      {
+        "subpath": ".",
+        "exportName": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+        "runtimeValue": {
+          "type": "object",
+          "objectTag": "[object Object]"
+        },
+        "note": null
+      },
+      {
+        "subpath": "./client",
+        "exportName": "version",
+        "runtimeValue": {
+          "type": "string",
+          "value": "19.2.6"
+        },
+        "note": "runtime exports version but this declaration subpath omits it"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+        "runtimeValue": {
+          "type": "object",
+          "objectTag": "[object Object]"
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "createPortal",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "createRoot",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "flushSync",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 1
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "hydrateRoot",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 3
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "preconnect",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "prefetchDNS",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 1
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "preinit",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "preinitModule",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "preload",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "preloadModule",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "requestFormReset",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 1
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "unstable_batchedUpdates",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 2
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "useFormState",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 3
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "useFormStatus",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 0
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./profiling",
+        "exportName": "version",
+        "runtimeValue": {
+          "type": "string",
+          "value": "19.2.6"
+        },
+        "note": "react-dom/profiling is a public runtime subpath with no @types/react-dom declaration subpath"
+      },
+      {
+        "subpath": "./server.browser",
+        "exportName": "version",
+        "runtimeValue": {
+          "type": "string",
+          "value": "19.2.6"
+        },
+        "note": "runtime exports version but this declaration subpath omits it"
+      },
+      {
+        "subpath": "./server.browser",
+        "exportName": "resume",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 3
+        },
+        "note": "runtime exports resume but this declaration subpath omits it"
+      },
+      {
+        "subpath": "./server.bun",
+        "exportName": "version",
+        "runtimeValue": {
+          "type": "string",
+          "value": "19.2.6"
+        },
+        "note": "runtime exports version but this declaration subpath omits it"
+      },
+      {
+        "subpath": "./server.bun",
+        "exportName": "resume",
+        "runtimeValue": {
+          "type": "undefined"
+        },
+        "note": "runtime key exists with undefined value in the Bun wrapper"
+      },
+      {
+        "subpath": "./server.edge",
+        "exportName": "version",
+        "runtimeValue": {
+          "type": "string",
+          "value": "19.2.6"
+        },
+        "note": "runtime exports version but this declaration subpath omits it"
+      },
+      {
+        "subpath": "./server.node",
+        "exportName": "version",
+        "runtimeValue": {
+          "type": "string",
+          "value": "19.2.6"
+        },
+        "note": "runtime exports version but this declaration subpath omits it"
+      },
+      {
+        "subpath": "./static.browser",
+        "exportName": "resumeAndPrerender",
+        "runtimeValue": {
+          "type": "function",
+          "name": "",
+          "length": 3
+        },
+        "note": "runtime exports resumeAndPrerender but this declaration subpath omits it"
+      }
+    ],
+    "reactServerConditionGaps": [
+      {
+        "subpath": ".",
+        "status": "react-server-root-narrower-than-default-declarations",
+        "defaultRuntimeExportKeys": [
+          "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "createPortal",
+          "flushSync",
+          "preconnect",
+          "prefetchDNS",
+          "preinit",
+          "preinitModule",
+          "preload",
+          "preloadModule",
+          "requestFormReset",
+          "unstable_batchedUpdates",
+          "useFormState",
+          "useFormStatus",
+          "version"
+        ],
+        "reactServerRuntimeExportKeys": [
+          "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+          "preconnect",
+          "prefetchDNS",
+          "preinit",
+          "preinitModule",
+          "preload",
+          "preloadModule",
+          "version"
+        ],
+        "declaredButAbsentInReactServer": [
+          "createPortal",
+          "flushSync",
+          "requestFormReset",
+          "unstable_batchedUpdates",
+          "useFormState",
+          "useFormStatus"
+        ]
+      },
+      {
+        "subpath": "./client",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/client is not supported in React Server Components.",
+        "declarationFile": "client.d.ts",
+        "declarationValueExportNames": [
+          "createRoot",
+          "hydrateRoot"
+        ]
+      },
+      {
+        "subpath": "./profiling",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/profiling is not supported in React Server Components.",
+        "declarationFile": null,
+        "declarationValueExportNames": []
+      },
+      {
+        "subpath": "./server",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/server is not supported in React Server Components.",
+        "declarationFile": "server.d.ts",
+        "declarationValueExportNames": [
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "resumeToPipeableStream",
+          "version"
+        ]
+      },
+      {
+        "subpath": "./server.browser",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/server is not supported in React Server Components.",
+        "declarationFile": "server.browser.d.ts",
+        "declarationValueExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString"
+        ]
+      },
+      {
+        "subpath": "./server.bun",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/server is not supported in React Server Components.",
+        "declarationFile": "server.bun.d.ts",
+        "declarationValueExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString"
+        ]
+      },
+      {
+        "subpath": "./server.edge",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/server is not supported in React Server Components.",
+        "declarationFile": "server.edge.d.ts",
+        "declarationValueExportNames": [
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume"
+        ]
+      },
+      {
+        "subpath": "./server.node",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/server is not supported in React Server Components.",
+        "declarationFile": "server.node.d.ts",
+        "declarationValueExportNames": [
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToString",
+          "resume",
+          "resumeToPipeableStream"
+        ]
+      },
+      {
+        "subpath": "./static",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/static is not supported in React Server Components.",
+        "declarationFile": "static.d.ts",
+        "declarationValueExportNames": [
+          "prerender",
+          "prerenderToNodeStream",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "version"
+        ]
+      },
+      {
+        "subpath": "./static.browser",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/static is not supported in React Server Components.",
+        "declarationFile": "static.browser.d.ts",
+        "declarationValueExportNames": [
+          "prerender",
+          "version"
+        ]
+      },
+      {
+        "subpath": "./static.edge",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/static is not supported in React Server Components.",
+        "declarationFile": "static.edge.d.ts",
+        "declarationValueExportNames": [
+          "prerender",
+          "resumeAndPrerender",
+          "version"
+        ]
+      },
+      {
+        "subpath": "./static.node",
+        "status": "react-server-runtime-throws-but-declarations-are-default",
+        "runtimeMessage": "react-dom/static is not supported in React Server Components.",
+        "declarationFile": "static.node.d.ts",
+        "declarationValueExportNames": [
+          "prerender",
+          "prerenderToNodeStream",
+          "resumeAndPrerender",
+          "resumeAndPrerenderToNodeStream",
+          "version"
+        ]
+      }
+    ],
+    "compatibilitySummary": {
+      "runtimePackageCompatibility": "React DOM runtime package surface comes from react-dom@19.2.6.",
+      "typescriptDeclarationCompatibility": "@types/react-dom@19.2.3 is not a complete runtime export mirror and must be tracked separately.",
+      "recommendedDeclarationPolicy": "Fast React should either reference @types/react-dom with explicit known gaps or ship declarations with separate conformance checks; runtime placeholder scaffolds must not claim TypeScript declaration parity."
+    }
+  }
+}
