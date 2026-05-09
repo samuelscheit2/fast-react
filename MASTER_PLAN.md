@@ -18,6 +18,7 @@ Breaking changes are allowed when they remove root causes or enable a sound arch
 
 - Orchestrator owns planning, task decomposition, worker routing, merge decisions, and progress tracking.
 - Workers own implementation or research tasks in isolated scopes.
+- Workers read `WORKER_BRIEF.md`; `ORCHESTRATOR.md` is orchestrator-only.
 - Workers must record progress in `worker-progress/<worker-id>.md`.
 - Code work should happen in Git worktrees whenever possible.
 - Workers must review their changes for quality, maintainability, performance, and security before reporting completion.
@@ -41,6 +42,7 @@ Deliverables:
 
 - `MASTER_PLAN.md`
 - `MASTER_PROGRESS.md`
+- `WORKER_BRIEF.md`
 - Worker progress convention in `worker-progress/`
 - Initial Git repository and worktree strategy
 - First worker research reports for architecture, conformance, and scaffold strategy

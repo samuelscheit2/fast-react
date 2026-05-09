@@ -7,6 +7,7 @@ Last updated: 2026-05-09
 - Repository initialized locally on branch `main`.
 - No implementation code exists yet.
 - Orchestrator instructions loaded from `ORCHESTRATOR.md`.
+- Worker-facing role contract added in `WORKER_BRIEF.md` so workers do not read orchestrator-only instructions.
 - Current npm compatibility target checked on 2026-05-09:
   - `react` 19.2.6
   - `react-dom` 19.2.6
@@ -21,6 +22,7 @@ M0: Orchestration Foundation.
 - Use `MASTER_PLAN.md` for project plan and task dependencies.
 - Use `MASTER_PROGRESS.md` for project-wide progress and decisions.
 - Use `worker-progress/<worker-id>.md` for each worker's progress.
+- Workers should read `WORKER_BRIEF.md`, not `ORCHESTRATOR.md`.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
 
 ## Worker Roster
@@ -54,3 +56,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: `codex --version` returned `codex-cli 0.0.0`.
 - 2026-05-09: `cargo --version` returned `cargo 1.95.0`.
 - 2026-05-09: `rustc --version` returned `rustc 1.95.0`.
+- 2026-05-09: Initial tmux worker launch failed before doing work because `codex exec` rejected `--search`. Relaunch will omit `--search`.
