@@ -81,8 +81,8 @@ The current project push is a minimal real root render/update/unmount path:
 
 ## Current Queue
 
-- Worker 123 is running the reconciler FiberRoot/HostRoot internal model slice
-  and owns `crates/fast-react-reconciler/src/lib.rs` for that tranche.
+- Worker 124 is running the reconciler HostRoot update queue and
+  `update_container` internal slice.
 - Worker 125 is running the independent `scheduler/unstable_post_task`
   implementation slice.
 - Worker 126 is running the independent scheduler native entrypoint
@@ -90,16 +90,16 @@ The current project push is a minimal real root render/update/unmount path:
 
 ## Near-Term Plan
 
-1. Keep worker 123 running while it shows active `Working` or
+1. Keep live workers running while their panes show active `Working` or
    `Pursuing goal` state; ignore stale usage-limit text in pane scrollback
    unless the worker process is actually stopped or blocked at a prompt.
-2. Keep worker 123 serialized around `crates/fast-react-reconciler/src/lib.rs`;
-   do not launch dependent HostRoot update, scheduler, work-loop, commit,
-   DOM event-dispatch, or React DOM facade source slices until its root model is
-   accepted or intentionally abandoned.
+2. Keep worker 124 serialized around `crates/fast-react-reconciler/src/lib.rs`;
+   do not launch dependent root scheduler, work-loop, commit, DOM
+   event-dispatch, or React DOM facade source slices until its queue/API model
+   is accepted or intentionally abandoned.
 3. Keep workers 125 and 126 independent from root/reconciler work and from each
    other; accept them through their scheduler post-task/native oracle gates.
-4. After accepting worker 123, run the worker's scoped checks, merge
+4. After accepting each live worker, run its scoped checks, merge
    with a no-fast-forward commit, then update this file with the next active
    queue and move completed facts to `MASTER_PROGRESS.md`.
 5. Queue follow-up source slices from the accepted root/reconciler/DOM/test

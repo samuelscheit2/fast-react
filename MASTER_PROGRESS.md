@@ -64,3 +64,7 @@ Last updated: 2026-05-10
 - Merged worker 122 React DOM container marker and root listener shell
   internals; verified with module syntax checks, focused private smoke,
   root-marker/listener oracle tests, `npm run test:smoke`, and `git diff --check`.
+- Merged worker 123 reconciler FiberRoot/HostRoot internal model; verified on
+  `main` with `cargo fmt --all --check`, focused `root_config`, `fiber_root`,
+  `host_tokens`, and `work_in_progress` tests, full `fast-react-reconciler`
+  tests, reconciler clippy, and `git diff --check`.
