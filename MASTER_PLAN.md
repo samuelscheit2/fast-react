@@ -180,9 +180,9 @@ Dependencies: M8.
 | worker-002-conformance | Design the conformance inventory and test harness strategy | `worker-progress/worker-002-conformance.md` | M0 | merged |
 | worker-003-scaffold | Propose initial Cargo and package scaffold with worktree-safe task splits | `worker-progress/worker-003-scaffold.md` | M0 | merged |
 | worker-004-api-inventory | Build exact public API, runtime export, subpath, and type inventory | `worker-progress/worker-004-api-inventory.md` | M0 | running |
-| worker-005-upstream-tests | Assess upstream React 19.2.6 test reuse and harness requirements | `worker-progress/worker-005-upstream-tests.md` | M0 | running |
+| worker-005-upstream-tests | Assess upstream React 19.2.6 test reuse and harness requirements | `worker-progress/worker-005-upstream-tests.md` | M0 | merged |
 | worker-006-binding-strategy | Design JS-to-Rust binding and package artifact strategy | `worker-progress/worker-006-binding-strategy.md` | M0 | merged |
-| worker-007-scheduler-fiber | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `worker-progress/worker-007-scheduler-fiber.md` | M0 | running |
+| worker-007-scheduler-fiber | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `worker-progress/worker-007-scheduler-fiber.md` | M0 | merged |
 | worker-008-renderer-host-config | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` | M0 | merged |
 | worker-009-benchmark-strategy | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` | M0 | merged |
 | worker-010-initial-scaffold | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | root scaffold paths plus `worker-progress/worker-010-initial-scaffold.md` | workers 001-003 | queued |

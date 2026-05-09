@@ -33,6 +33,8 @@ M0: Orchestration Foundation.
 - Accepted renderer boundary direction from worker-008: Fast React should use opaque host handles and explicit capability traits. Mutation mode is the first implementation target, while persistence and hydration must be designed up front; DOM resources, singletons, events, and security-sensitive behavior stay in DOM adapters, not the core.
 - Accepted binding direction from worker-006: use Node-API through napi-rs behind a JS-owned React compatibility facade, support Node 22+, start conservatively with N-API 8 unless evidence requires newer APIs, avoid postinstall binary downloads, and benchmark native-boundary overhead before moving hot public APIs into Rust.
 - Accepted benchmark direction from worker-009: benchmarks must be admitted only through a manifest tied to green conformance scenario IDs, with pinned React 19.2.6 baselines, native-boundary overhead diagnostics, profiler artifacts, and no headline speed claims for semantically incomplete paths.
+- Accepted upstream-test direction from worker-005: upstream React tests should seed and trace scenarios, but not be used as a drop-in suite. Fast React needs adapters for React's Jest harness contracts, feature gates, Scheduler mocks, noop renderer behavior, and source-only internals.
+- Accepted scheduler/fiber direction from worker-007: model lane bitsets, root lane bookkeeping, Scheduler heaps, double-buffered fiber arenas, circular/rebased update queues, and flags/subtreeFlags commit traversal directly. Flat priority enums, FIFO queues, or a global effect list are root-cause mismatches.
 
 ## Worker Roster
 
@@ -42,18 +44,18 @@ M0: Orchestration Foundation.
 | worker-002-conformance | merged | Design React 19.2.6 compatibility inventory and test strategy | `worker-progress/worker-002-conformance.md` |
 | worker-003-scaffold | merged | Propose Cargo workspace, JS package scaffold, and worktree task split | `worker-progress/worker-003-scaffold.md` |
 | worker-004-api-inventory | running in tmux worktree; nested subagents allowed | Build exact public API, runtime export, subpath, and type inventory | `../fast-react-worker-004-api-inventory/worker-progress/worker-004-api-inventory.md` |
-| worker-005-upstream-tests | running in tmux worktree; nested subagents allowed | Assess upstream React 19.2.6 test reuse and harness requirements | `../fast-react-worker-005-upstream-tests/worker-progress/worker-005-upstream-tests.md` |
+| worker-005-upstream-tests | merged | Assess upstream React 19.2.6 test reuse and harness requirements | `worker-progress/worker-005-upstream-tests.md` |
 | worker-006-binding-strategy | merged | Design JS-to-Rust binding and package artifact strategy | `worker-progress/worker-006-binding-strategy.md` |
-| worker-007-scheduler-fiber | running in tmux worktree; nested subagents allowed | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `../fast-react-worker-007-scheduler-fiber/worker-progress/worker-007-scheduler-fiber.md` |
+| worker-007-scheduler-fiber | merged | Investigate scheduler, lanes, fiber, update queue, and effect semantics | `worker-progress/worker-007-scheduler-fiber.md` |
 | worker-008-renderer-host-config | merged | Define renderer host-config boundary across DOM, native, hydration, and portals | `worker-progress/worker-008-renderer-host-config.md` |
 | worker-009-benchmark-strategy | merged | Design conformance-gated benchmark and profiling strategy | `worker-progress/worker-009-benchmark-strategy.md` |
 | worker-010-initial-scaffold | running in tmux worktree; nested subagents allowed | Implement initial Cargo/npm workspace, placeholder crates/packages, smoke checks, and CI skeleton | `../fast-react-worker-010-initial-scaffold/worker-progress/worker-010-initial-scaffold.md` |
 
 ## Next Actions
 
-1. Collect the three active research workers' progress files and final recommendations.
+1. Collect the active API inventory worker's progress file and final recommendation.
 2. Collect the scaffold implementation worker's changes and verification results.
-3. Update the master plan with accepted findings from workers 004-010.
+3. Update the master plan with accepted findings from workers 004 and 010.
 
 ## Risks And Open Questions
 
@@ -94,3 +96,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Accepted and merged worker-008 renderer host-config report in commit `b49abb1`. Closed the worker-008 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-006 binding strategy report in commit `0417428`. Closed the worker-006 tmux session after merge.
 - 2026-05-09: Accepted and merged worker-009 benchmark strategy report in commit `0c154d5`. Closed the worker-009 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-005 upstream test reuse report in commit `cc825bf`. Closed the worker-005 tmux session after merge.
+- 2026-05-09: Accepted and merged worker-007 scheduler/fiber report in commit `b63b8c7`. Closed the worker-007 tmux session after merge.
