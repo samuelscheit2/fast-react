@@ -2,48 +2,59 @@
 
 This file is for workers. `ORCHESTRATOR.md` is for the orchestrator role only.
 
-## Project Mission
+## Mission And Targets
 
-Fast React is an almost 1-to-1 Rust reimplementation of React intended to be faster than the JavaScript implementation while staying generic enough for `react-dom`, `react-native`, and other renderer-dependent libraries.
+Fast React is an almost 1-to-1 Rust reimplementation of React intended to be
+faster than the JavaScript implementation while staying generic enough for
+`react-dom`, `react-native`, and other renderer-dependent libraries.
 
-Current compatibility target checked on 2026-05-09:
+Current compatibility target:
 
 - `react` 19.2.6
 - `react-dom` 19.2.6
 - `@types/react` 19.2.14
 
-Local React reference source clone:
+Local React source reference clone:
 
 - `/Users/user/Developer/Developer/react-reference`
-- Upstream tag: `v19.2.6`
-- Commit: `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
+- Upstream `facebook/react` tag `v19.2.6`
+- Commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
 
-Use that clone when you need to inspect the reference JavaScript
-implementation, Fiber/reconciler internals, Scheduler, React DOM, or
-react-test-renderer source. Use the existing npm tarball/oracle probes for
-published package behavior and exact runtime output.
+Use the clone for readable source-level investigations of React internals,
+React DOM, Scheduler, and react-test-renderer. Use npm tarball/runtime oracles
+for published package behavior and exact runtime output.
 
 ## Worker Rules
 
-- Immediately use `/goal` (the Codex `create_goal` tool) for your assigned worker task using the objective in your `docs/tasks/worker-*.prompt.md`, before research, file reads, implementation, or verification. On continuation, use `/goal` / `create_goal` again if the active goal is not already set for this exact worker task.
-- After goal setup, call `get_goal` if available and record the active goal status/objective in your progress report. If the goal command/tool or `get_goal` is unavailable, say that explicitly before continuing.
-- Work only on your assigned objective.
-- Modify only the files in your write scope.
-- Record progress in your assigned `worker-progress/<worker-id>.md` file.
-- You are already running as a real Codex process in a tmux worker session. You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses or verify work.
-- Worker-internal nested agents are allowed even if they make the aggregate agent/process count exceed the orchestrator's 30 top-level tmux worker limit.
-- If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
+- First action: use `/goal` or `create_goal` for your assigned objective before
+  research, file reads, implementation, or verification.
+- After goal setup, call `get_goal` if available and record active
+  status/objective in your progress report. If unavailable, state that
+  explicitly.
+- Work only on your assigned objective and write scope.
+- Record progress in `worker-progress/<worker-id>.md`.
+- You are running as a real Codex process in a tmux worker session.
+- You may spawn managed Codex subagents, explorers, nested agents, or parallel
+  agent tools inside this worker when useful for hypothesis testing or
+  verification. Summarize delegated checks that affect your conclusions.
+- Worker-internal nested agents do not count against the orchestrator's
+  30-top-level-worker cap.
 - Plan and research before implementing.
 - Find root causes; do not patch symptoms.
-- Breaking changes are allowed when necessary, but document the reason and tradeoff.
-- Question your own assumptions and decisions; change course when evidence shows a better path.
-- Regenerable generated artifacts such as `node_modules/`, `target/`, and root `Cargo.lock` do not need cleanup merely because they exist. Remove or document them only if they are stale, ambiguous, or would pollute your scoped final diff/status.
-- Do not take over orchestration, worker assignment, merge policy, or project-wide planning unless your task explicitly asks for a recommendation.
-- Do not call `update_goal(status: "complete")` for intermediate phases. If goal tools are available, call it only once after the whole worker task is complete.
+- Breaking changes are allowed when necessary, but document the reason and
+  tradeoff.
+- Regenerable artifacts such as `node_modules/`, `target/`, and root
+  `Cargo.lock` do not need cleanup merely because they exist. Remove or
+  document them only if stale, ambiguous, or diff-polluting.
+- Do not take over orchestration, worker assignment, merge policy, or
+  project-wide planning unless your task explicitly asks for a recommendation.
+- Call `update_goal(status: "complete")` only after the whole assigned worker
+  task is complete.
 
 ## Handoff Requirements
 
-Before finishing, review your work for quality, maintainability, performance, and security implications.
+Before finishing, review your work for quality, maintainability, performance,
+and security implications.
 
 Your final report must include:
 
