@@ -1,0 +1,1161 @@
+{
+  "schemaVersion": 1,
+  "oracleKind": "react-19.2.6-react-dom-hydration-marker-oracle",
+  "deterministic": true,
+  "generatedArtifacts": true,
+  "compatibilityLabel": "React DOM 19.2.6 hydration marker and mismatch evidence oracle",
+  "sources": [
+    "WORKER_BRIEF.md",
+    "MASTER_PLAN.md",
+    "MASTER_PROGRESS.md",
+    "worker-progress/worker-033-react-dom-inventory.md",
+    "worker-progress/worker-042-react-dom-server-fizz-plan.md",
+    "worker-progress/worker-043-react-dom-hydration-plan.md",
+    "inventory/react-19.2.6-runtime-package-inventory.json",
+    "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/client/ReactFiberConfigDOM.js",
+    "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js",
+    "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-reconciler/src/ReactFiberHydrationContext.js",
+    "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetInlineCodeStrings.js"
+  ],
+  "generation": {
+    "method": "checked runtime inventory, exact react-dom npm tarball, accepted worker reports, and React source files pinned to the v19.2.6 commit",
+    "lifecycleScriptsExecuted": false,
+    "rootManifestsOrLockfilesMutated": false,
+    "hydrationOrDomCodeExecuted": false,
+    "reactDomRuntimeRenderingExecuted": false,
+    "generatedTimestampIncluded": false,
+    "tarballTimeoutMs": 10000,
+    "fetchTimeoutMs": 30000
+  },
+  "evidenceClaims": {
+    "checkedRuntimeInventoryRead": true,
+    "exactTarballUrlFromInventory": true,
+    "tarballDownloaded": true,
+    "tarballIntegrityVerified": true,
+    "tarballFileListMatchedInventory": true,
+    "publishedBundleSnippetsValidated": true,
+    "worker033EvidenceRead": true,
+    "worker042EvidenceRead": true,
+    "worker043EvidenceRead": true,
+    "worker042And043EvidenceCoRecorded": true,
+    "pinnedReactSourceFilesFetched": true,
+    "pinnedReactSourceFingerprintsVerified": true,
+    "clientMarkerConstantsExtracted": true,
+    "serverFizzMarkerChunksExtracted": true,
+    "inlineFizzRuntimeMutationsValidated": true,
+    "mismatchContractsExtracted": true,
+    "fastReactComparedToReactDom": false
+  },
+  "conformanceClaims": {
+    "realReactDomSourceEvidenceCaptured": true,
+    "realReactDomRuntimeBehaviorProbed": false,
+    "fastReactComparedToReactDom": false,
+    "fastReactHydrationCompatible": false,
+    "fullDualRunOracleExists": false,
+    "compatibilityClaimed": false
+  },
+  "sourceInventory": {
+    "path": "inventory/react-19.2.6-runtime-package-inventory.json",
+    "sha256": "56b8f4c85c649d77844692f3d953ef00c3bbd7352020bba97b50bec7f14c1b8b",
+    "inventoryKind": "react-19.2.6-runtime-package-inventory",
+    "schemaVersion": 2,
+    "reactDomVersionMatched": true
+  },
+  "reactDomTarget": {
+    "packageName": "react-dom",
+    "version": "19.2.6",
+    "role": "official-react-dom-hydration-marker-target"
+  },
+  "reactSource": {
+    "repository": "facebook/react",
+    "tag": "v19.2.6",
+    "tagObject": "2fcbe419ed90f863e6f67ce5b9738f38dbec640b",
+    "commit": "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401"
+  },
+  "packageEvidence": {
+    "react-dom": {
+      "packageName": "react-dom",
+      "version": "19.2.6",
+      "role": "official-react-dom-runtime-target",
+      "targetStatus": "official-target",
+      "registry": {
+        "metadataUrl": "https://registry.npmjs.org/react-dom/19.2.6",
+        "distTarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+        "distIntegrity": "sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "distShasum": "44a81b0bcca22da814c00847d09d01c8615529b7",
+        "unpackedSize": 7319413
+      },
+      "tarball": {
+        "integrityAlgorithm": "sha512",
+        "integrityDigest": "0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==",
+        "integrityVerified": true,
+        "fileCount": 43,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cjs/react-dom-client.development.js",
+          "cjs/react-dom-client.production.js",
+          "cjs/react-dom-profiling.development.js",
+          "cjs/react-dom-profiling.profiling.js",
+          "cjs/react-dom-server-legacy.browser.development.js",
+          "cjs/react-dom-server-legacy.browser.production.js",
+          "cjs/react-dom-server-legacy.node.development.js",
+          "cjs/react-dom-server-legacy.node.production.js",
+          "cjs/react-dom-server.browser.development.js",
+          "cjs/react-dom-server.browser.production.js",
+          "cjs/react-dom-server.bun.development.js",
+          "cjs/react-dom-server.bun.production.js",
+          "cjs/react-dom-server.edge.development.js",
+          "cjs/react-dom-server.edge.production.js",
+          "cjs/react-dom-server.node.development.js",
+          "cjs/react-dom-server.node.production.js",
+          "cjs/react-dom-test-utils.development.js",
+          "cjs/react-dom-test-utils.production.js",
+          "cjs/react-dom.development.js",
+          "cjs/react-dom.production.js",
+          "cjs/react-dom.react-server.development.js",
+          "cjs/react-dom.react-server.production.js",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "package.json",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js"
+        ]
+      },
+      "packageJson": {
+        "name": "react-dom",
+        "version": "19.2.6",
+        "main": "index.js",
+        "type": null,
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "LICENSE",
+          "README.md",
+          "client.js",
+          "client.react-server.js",
+          "index.js",
+          "profiling.js",
+          "profiling.react-server.js",
+          "react-dom.react-server.js",
+          "server.browser.js",
+          "server.bun.js",
+          "server.edge.js",
+          "server.js",
+          "server.node.js",
+          "server.react-server.js",
+          "static.browser.js",
+          "static.edge.js",
+          "static.js",
+          "static.node.js",
+          "static.react-server.js",
+          "test-utils.js",
+          "cjs/"
+        ],
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "react": "^19.2.6"
+        },
+        "engines": null
+      },
+      "runtimeSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils"
+      ],
+      "publicSubpaths": [
+        ".",
+        "./client",
+        "./server",
+        "./server.browser",
+        "./server.bun",
+        "./server.edge",
+        "./server.node",
+        "./static",
+        "./static.browser",
+        "./static.edge",
+        "./static.node",
+        "./profiling",
+        "./test-utils",
+        "./package.json"
+      ]
+    }
+  },
+  "workerInputs": [
+    {
+      "id": "worker-033-react-dom-inventory",
+      "path": "worker-progress/worker-033-react-dom-inventory.md",
+      "sha256": "2af3931fe862b6457485c52baa2b971daad08c2e952298147b5b86781875e42e",
+      "evidenceLines": [
+        {
+          "phrase": "hydrateRoot",
+          "line": 14
+        },
+        {
+          "phrase": "Fizz",
+          "line": 15
+        },
+        {
+          "phrase": "Suspense markers",
+          "line": 15
+        },
+        {
+          "phrase": "form markers",
+          "line": 552
+        }
+      ]
+    },
+    {
+      "id": "worker-042-react-dom-server-fizz-plan",
+      "path": "worker-progress/worker-042-react-dom-server-fizz-plan.md",
+      "sha256": "ceab0a6fc30fd9c6b6df255e3500c6c27ece52cb8d971201c2bc0bba8e6ad073",
+      "evidenceLines": [
+        {
+          "phrase": "Completed Suspense",
+          "line": 169
+        },
+        {
+          "phrase": "Pending Suspense start",
+          "line": 170
+        },
+        {
+          "phrase": "Client-rendered Suspense start",
+          "line": 171
+        },
+        {
+          "phrase": "Form state markers",
+          "line": 174
+        }
+      ]
+    },
+    {
+      "id": "worker-043-react-dom-hydration-plan",
+      "path": "worker-progress/worker-043-react-dom-hydration-plan.md",
+      "sha256": "31d0a42066afd64a48d310911398c97eac6a8fa2d512379073ffd3ca7080e9c3",
+      "evidenceLines": [
+        {
+          "phrase": "Fizz marker compatibility contract",
+          "line": 17
+        },
+        {
+          "phrase": "Hydration failed",
+          "line": 265
+        },
+        {
+          "phrase": "FORM_STATE",
+          "line": 282
+        },
+        {
+          "phrase": "unstable_scheduleHydration",
+          "line": 11
+        }
+      ]
+    }
+  ],
+  "workerEvidenceReconciliation": {
+    "id": "worker-042-043-marker-hydration-reconciliation",
+    "sourceWorkerIds": [
+      "worker-033-react-dom-inventory",
+      "worker-042-react-dom-server-fizz-plan",
+      "worker-043-react-dom-hydration-plan"
+    ],
+    "contract": "Worker 042 server/Fizz marker evidence and worker 043 client hydration contract evidence are co-recorded here and checked against pinned React source, resolving worker 043's earlier note that worker 042 was unavailable during that report.",
+    "compatibilityClaimed": false
+  },
+  "pinnedSourceFiles": [
+    {
+      "id": "react-fiber-config-dom",
+      "path": "packages/react-dom-bindings/src/client/ReactFiberConfigDOM.js",
+      "url": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/client/ReactFiberConfigDOM.js",
+      "role": "client DOM hydration host marker constants, marker traversal, form markers, and dev warning hooks",
+      "sha256": "15f10be941c9a1aa5f593ddc1bedac9fd22554294653dc7dc839c3fcce8832f7",
+      "lineCount": 6403,
+      "evidenceLines": [
+        {
+          "needle": "const ACTIVITY_START_DATA",
+          "line": 262
+        },
+        {
+          "needle": "const SUSPENSE_QUEUED_START_DATA",
+          "line": 267
+        },
+        {
+          "needle": "const FORM_STATE_IS_MATCHING",
+          "line": 272
+        },
+        {
+          "needle": "export function getNextHydratable",
+          "line": 3906
+        },
+        {
+          "needle": "export function diffHydratedTextForDevWarnings",
+          "line": 4077
+        }
+      ]
+    },
+    {
+      "id": "react-fizz-config-dom",
+      "path": "packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js",
+      "url": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js",
+      "role": "server DOM Fizz marker bytes, boundary/segment/template prefixes, preamble markers, and external runtime data templates",
+      "sha256": "1f196f0c944c1441c5b042ef14ba05ec165f1c9b5e4686db686326576f7b58db",
+      "lineCount": 7150,
+      "evidenceLines": [
+        {
+          "needle": "const formStateMarkerIsMatching",
+          "line": 2276
+        },
+        {
+          "needle": "const startActivityBoundary",
+          "line": 4559
+        },
+        {
+          "needle": "const startCompletedSuspenseBoundary",
+          "line": 4577
+        },
+        {
+          "needle": "const startPendingSuspenseBoundary1",
+          "line": 4578
+        },
+        {
+          "needle": "const startClientRenderedSuspenseBoundary",
+          "line": 4582
+        },
+        {
+          "needle": "const completeSegmentData1",
+          "line": 4842
+        },
+        {
+          "needle": "const completeBoundaryWithStylesData1",
+          "line": 4916
+        },
+        {
+          "needle": "const clientRenderData1",
+          "line": 5064
+        }
+      ]
+    },
+    {
+      "id": "react-fiber-hydration-context",
+      "path": "packages/react-reconciler/src/ReactFiberHydrationContext.js",
+      "url": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-reconciler/src/ReactFiberHydrationContext.js",
+      "role": "hydration mismatch exception, recoverable error queueing, and dev-only mismatch warning contracts",
+      "sha256": "023d49e2c530fc68e97aac0bc4e451e939a942946f133238b645aff7ce5fc75f",
+      "lineCount": 919,
+      "evidenceLines": [
+        {
+          "needle": "HydrationMismatchException",
+          "line": 369
+        },
+        {
+          "needle": "function throwOnHydrationMismatch",
+          "line": 374
+        },
+        {
+          "needle": "export function queueHydrationError",
+          "line": 855
+        },
+        {
+          "needle": "export function emitPendingHydrationWarnings",
+          "line": 863
+        }
+      ]
+    },
+    {
+      "id": "react-dom-fizz-inline-runtime",
+      "path": "packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetInlineCodeStrings.js",
+      "url": "https://raw.githubusercontent.com/facebook/react/eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401/packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetInlineCodeStrings.js",
+      "role": "inline Fizz runtime mutations for completed, queued, and client-rendered Suspense boundaries plus form replay",
+      "sha256": "0299dfd3283b25f9b88a8bd93330dbc7d12791fe5605983ca98fa6c8a0fba838",
+      "lineCount": 18,
+      "evidenceLines": [
+        {
+          "needle": "export const clientRenderBoundary",
+          "line": 6
+        },
+        {
+          "needle": "export const completeBoundary",
+          "line": 8
+        },
+        {
+          "needle": "export const completeBoundaryWithStyles",
+          "line": 12
+        },
+        {
+          "needle": "export const completeSegment",
+          "line": 14
+        },
+        {
+          "needle": "export const formReplaying",
+          "line": 16
+        }
+      ]
+    }
+  ],
+  "publishedBundleEvidence": {
+    "cjs/react-dom-client.development.js": {
+      "sha256": "d27de6648360d44909aca6a3a93b9d306e6cad2d23913caf1b10cc39c896225b",
+      "lineCount": 28122,
+      "snippets": [
+        {
+          "snippet": "Hydration failed because the server rendered ",
+          "present": true,
+          "line": 5239
+        },
+        {
+          "snippet": "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up.",
+          "present": true,
+          "line": 5440
+        },
+        {
+          "snippet": "ACTIVITY_START_DATA = \"&\"",
+          "present": true,
+          "line": 27471
+        },
+        {
+          "snippet": "SUSPENSE_QUEUED_START_DATA = \"$~\"",
+          "present": true,
+          "line": 27476
+        },
+        {
+          "snippet": "FORM_STATE_IS_MATCHING = \"F!\"",
+          "present": true,
+          "line": 27481
+        }
+      ]
+    },
+    "cjs/react-dom-server.node.development.js": {
+      "sha256": "ffe870bb3b91676c975b0e68c83d46214f8c5856801634b3b9ec06be12aab8ff",
+      "lineCount": 10803,
+      "snippets": [
+        {
+          "snippet": "\\x3c!--$--\\x3e",
+          "present": true,
+          "line": 9965
+        },
+        {
+          "snippet": "\\x3c!--$?--\\x3e<template id=\"",
+          "present": true,
+          "line": 9967
+        },
+        {
+          "snippet": "\\x3c!--$!--\\x3e",
+          "present": true,
+          "line": 9971
+        },
+        {
+          "snippet": "\\x3c!--/$--\\x3e",
+          "present": true,
+          "line": 9972
+        },
+        {
+          "snippet": "\\x3c!--F!--\\x3e",
+          "present": true,
+          "line": 9943
+        },
+        {
+          "snippet": "data-dgst=\"",
+          "present": true,
+          "line": 9978
+        },
+        {
+          "snippet": "data-cstck=\"",
+          "present": true,
+          "line": 9984
+        }
+      ]
+    }
+  },
+  "extractedEvidence": {
+    "clientCommentConstants": {
+      "ACTIVITY_START_DATA": {
+        "value": "&",
+        "sourceLine": 262
+      },
+      "ACTIVITY_END_DATA": {
+        "value": "/&",
+        "sourceLine": 263
+      },
+      "SUSPENSE_START_DATA": {
+        "value": "$",
+        "sourceLine": 264
+      },
+      "SUSPENSE_END_DATA": {
+        "value": "/$",
+        "sourceLine": 265
+      },
+      "SUSPENSE_PENDING_START_DATA": {
+        "value": "$?",
+        "sourceLine": 266
+      },
+      "SUSPENSE_QUEUED_START_DATA": {
+        "value": "$~",
+        "sourceLine": 267
+      },
+      "SUSPENSE_FALLBACK_START_DATA": {
+        "value": "$!",
+        "sourceLine": 268
+      },
+      "PREAMBLE_CONTRIBUTION_HTML": {
+        "value": "html",
+        "sourceLine": 269
+      },
+      "PREAMBLE_CONTRIBUTION_BODY": {
+        "value": "body",
+        "sourceLine": 270
+      },
+      "PREAMBLE_CONTRIBUTION_HEAD": {
+        "value": "head",
+        "sourceLine": 271
+      },
+      "FORM_STATE_IS_MATCHING": {
+        "value": "F!",
+        "sourceLine": 272
+      },
+      "FORM_STATE_IS_NOT_MATCHING": {
+        "value": "F",
+        "sourceLine": 273
+      }
+    },
+    "serverFizzChunks": {
+      "formStateMarkerIsMatching": {
+        "value": "<!--F!-->",
+        "sourceLine": 2276
+      },
+      "formStateMarkerIsNotMatching": {
+        "value": "<!--F-->",
+        "sourceLine": 2277
+      },
+      "headPreambleContributionChunk": {
+        "value": "<!--head-->",
+        "sourceLine": 3655
+      },
+      "bodyPreambleContributionChunk": {
+        "value": "<!--body-->",
+        "sourceLine": 3656
+      },
+      "htmlPreambleContributionChunk": {
+        "value": "<!--html-->",
+        "sourceLine": 3657
+      },
+      "placeholder1": {
+        "value": "<template id=\"",
+        "sourceLine": 4544
+      },
+      "placeholder2": {
+        "value": "\"></template>",
+        "sourceLine": 4545
+      },
+      "startActivityBoundary": {
+        "value": "<!--&-->",
+        "sourceLine": 4559
+      },
+      "endActivityBoundary": {
+        "value": "<!--/&-->",
+        "sourceLine": 4560
+      },
+      "startCompletedSuspenseBoundary": {
+        "value": "<!--$-->",
+        "sourceLine": 4577
+      },
+      "startPendingSuspenseBoundary1": {
+        "value": "<!--$?--><template id=\"",
+        "sourceLine": 4578
+      },
+      "startPendingSuspenseBoundary2": {
+        "value": "\"></template>",
+        "sourceLine": 4581
+      },
+      "startClientRenderedSuspenseBoundary": {
+        "value": "<!--$!-->",
+        "sourceLine": 4582
+      },
+      "endSuspenseBoundary": {
+        "value": "<!--/$-->",
+        "sourceLine": 4584
+      },
+      "clientRenderedSuspenseBoundaryError1A": {
+        "value": " data-dgst=\"",
+        "sourceLine": 4590
+      },
+      "clientRenderedSuspenseBoundaryError1B": {
+        "value": " data-msg=\"",
+        "sourceLine": 4592
+      },
+      "clientRenderedSuspenseBoundaryError1C": {
+        "value": " data-stck=\"",
+        "sourceLine": 4594
+      },
+      "clientRenderedSuspenseBoundaryError1D": {
+        "value": " data-cstck=\"",
+        "sourceLine": 4596
+      },
+      "completeSegmentData1": {
+        "value": "<template data-rsi=\"\" data-sid=\"",
+        "sourceLine": 4842
+      },
+      "completeSegmentData2": {
+        "value": "\" data-pid=\"",
+        "sourceLine": 4845
+      },
+      "completeBoundaryData1": {
+        "value": "<template data-rci=\"\" data-bid=\"",
+        "sourceLine": 4913
+      },
+      "completeBoundaryWithStylesData1": {
+        "value": "<template data-rri=\"\" data-bid=\"",
+        "sourceLine": 4916
+      },
+      "completeBoundaryData2": {
+        "value": "\" data-sid=\"",
+        "sourceLine": 4919
+      },
+      "completeBoundaryData3a": {
+        "value": "\" data-sty=\"",
+        "sourceLine": 4920
+      },
+      "clientRenderData1": {
+        "value": "<template data-rxi=\"\" data-bid=\"",
+        "sourceLine": 5064
+      },
+      "clientRenderData2": {
+        "value": "\" data-dgst=\"",
+        "sourceLine": 5067
+      },
+      "clientRenderData3": {
+        "value": "\" data-msg=\"",
+        "sourceLine": 5068
+      },
+      "clientRenderData4": {
+        "value": "\" data-stck=\"",
+        "sourceLine": 5069
+      },
+      "clientRenderData5": {
+        "value": "\" data-cstck=\"",
+        "sourceLine": 5070
+      }
+    },
+    "renderStatePrefixes": {
+      "placeholderPrefix": {
+        "suffix": "P:",
+        "sourceLine": 491
+      },
+      "segmentPrefix": {
+        "suffix": "S:",
+        "sourceLine": 492
+      },
+      "boundaryPrefix": {
+        "suffix": "B:",
+        "sourceLine": 493
+      }
+    },
+    "inlineRuntimeMutations": {
+      "clientRenderBoundary": {
+        "sourceLine": 6,
+        "snippets": [
+          {
+            "snippet": "$RX=function",
+            "present": true,
+            "line": 7
+          },
+          {
+            "snippet": "b.data=\"$!\"",
+            "present": true,
+            "line": 7
+          },
+          {
+            "snippet": "a.dgst=c",
+            "present": true,
+            "line": 7
+          },
+          {
+            "snippet": "a.msg=d",
+            "present": true,
+            "line": 7
+          },
+          {
+            "snippet": "a.stck=e",
+            "present": true,
+            "line": 7
+          },
+          {
+            "snippet": "a.cstck=f",
+            "present": true,
+            "line": 7
+          },
+          {
+            "snippet": "b._reactRetry&&b._reactRetry()",
+            "present": true,
+            "line": 7
+          }
+        ]
+      },
+      "completeBoundary": {
+        "sourceLine": 8,
+        "snippets": [
+          {
+            "snippet": "$RB=[]",
+            "present": true,
+            "line": 9
+          },
+          {
+            "snippet": "$RV=function",
+            "present": true,
+            "line": 9
+          },
+          {
+            "snippet": "\"$~\"",
+            "present": true,
+            "line": 9
+          },
+          {
+            "snippet": "g.data=\"$\"",
+            "present": true,
+            "line": 9
+          },
+          {
+            "snippet": "$RC=function",
+            "present": true,
+            "line": 9
+          },
+          {
+            "snippet": "requestAnimationFrame(g._reactRetry)",
+            "present": true,
+            "line": 9
+          }
+        ]
+      },
+      "completeBoundaryWithStyles": {
+        "sourceLine": 12,
+        "snippets": [
+          {
+            "snippet": "$RR=function",
+            "present": true,
+            "line": 13
+          },
+          {
+            "snippet": "$RM=new Map",
+            "present": true,
+            "line": 13
+          },
+          {
+            "snippet": "data-precedence",
+            "present": true,
+            "line": 13
+          },
+          {
+            "snippet": "p.previousSibling.data=",
+            "present": true,
+            "line": 13
+          },
+          {
+            "snippet": "Promise.all(b).then($RC.bind(null,n,w),$RX.bind(null,n,\"CSS failed to load\"))",
+            "present": true,
+            "line": 13
+          }
+        ]
+      },
+      "completeSegment": {
+        "sourceLine": 14,
+        "snippets": [
+          {
+            "snippet": "$RS=function",
+            "present": true,
+            "line": 15
+          },
+          {
+            "snippet": "a.parentNode.removeChild(a)",
+            "present": true,
+            "line": 15
+          },
+          {
+            "snippet": "b.parentNode.insertBefore(a.firstChild,b)",
+            "present": true,
+            "line": 15
+          },
+          {
+            "snippet": "b.parentNode.removeChild(b)",
+            "present": true,
+            "line": 9
+          }
+        ]
+      },
+      "formReplaying": {
+        "sourceLine": 16,
+        "snippets": [
+          {
+            "snippet": "$$reactFormReplay",
+            "present": true,
+            "line": 17
+          },
+          {
+            "snippet": "FormData(c)",
+            "present": true,
+            "line": 17
+          },
+          {
+            "snippet": "javascript:throw new Error(\\'React form unexpectedly submitted.\\')",
+            "present": true,
+            "line": 17
+          }
+        ]
+      }
+    },
+    "mismatchEvidence": {
+      "hydrationMismatchException": {
+        "sourceLine": 369,
+        "messagePrefix": "Hydration Mismatch Exception: This is not a real error, and should not leak into userspace.",
+        "present": true
+      },
+      "fatalMismatchMessageTemplate": {
+        "sourceLine": 386,
+        "htmlPrefix": "Hydration failed because the server rendered HTML didn't match the client.",
+        "textPrefix": "Hydration failed because the server rendered text didn't match the client.",
+        "link": "https://react.dev/link/hydration-mismatch",
+        "queuesBeforeThrow": true,
+        "throwsInternalSentinel": true
+      },
+      "recoverableQueue": {
+        "queueFunctionLine": 855,
+        "upgradeFunctionLine": 837,
+        "queuesRecoverableErrors": true
+      },
+      "devSuccessfulHydrationWarning": {
+        "sourceLine": 881,
+        "messagePrefix": "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up.",
+        "consoleError": true
+      },
+      "suppressHydrationWarningTextDiff": {
+        "sourceLine": 4077,
+        "propName": "suppressHydrationWarning",
+        "returnsNullWhenSuppressed": true
+      },
+      "formMarkerMismatchPath": {
+        "sourceLine": 513,
+        "fallsThroughToThrowOnHydrationMismatch": true
+      }
+    }
+  },
+  "markerContracts": [
+    {
+      "id": "activity-start",
+      "area": "Activity boundary",
+      "serializedMarker": "<!--&-->",
+      "commentData": "&",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-consumed",
+      "contract": "Client hydration claims this comment as a dehydrated Activity boundary start."
+    },
+    {
+      "id": "activity-end",
+      "area": "Activity boundary",
+      "serializedMarker": "<!--/&-->",
+      "commentData": "/&",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-consumed",
+      "contract": "Client boundary traversal treats this comment as the end of an Activity boundary."
+    },
+    {
+      "id": "suspense-completed-start",
+      "area": "Suspense boundary",
+      "serializedMarker": "<!--$-->",
+      "commentData": "$",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-consumed",
+      "contract": "Client hydration claims this comment as a Suspense boundary whose content is available."
+    },
+    {
+      "id": "suspense-pending-start",
+      "area": "Suspense boundary",
+      "serializedMarker": "<!--$?--><template id=\"{identifierPrefix}B:{hex}\"></template>",
+      "commentData": "$?",
+      "companionNode": "template placeholder with boundary id",
+      "lifecycle": "server-emitted-client-consumed-runtime-mutable",
+      "contract": "Client hydration treats this as pending; Fizz runtime completion can later queue or reveal it."
+    },
+    {
+      "id": "suspense-queued-start",
+      "area": "Suspense boundary",
+      "serializedMarker": null,
+      "commentData": "$~",
+      "companionNode": "existing pending boundary template",
+      "lifecycle": "runtime-mutated-client-consumed",
+      "contract": "Fizz runtime mutates a pending boundary comment to queued while completed content waits for reveal."
+    },
+    {
+      "id": "suspense-client-rendered-start",
+      "area": "Suspense boundary",
+      "serializedMarker": "<!--$!--><template data-dgst=\"...\" data-msg=\"...\" data-stck=\"...\" data-cstck=\"...\"></template>",
+      "commentData": "$!",
+      "companionNode": "template carrying optional error digest/message/stack/component-stack attributes",
+      "lifecycle": "server-emitted-or-runtime-mutated-client-consumed",
+      "contract": "Client hydration treats this boundary as client-rendered/fallback and can read adjacent template error evidence."
+    },
+    {
+      "id": "suspense-end",
+      "area": "Suspense boundary",
+      "serializedMarker": "<!--/$-->",
+      "commentData": "/$",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-consumed",
+      "contract": "Client traversal and clear/hide operations use this marker to terminate Suspense boundary depth."
+    },
+    {
+      "id": "form-state-matching",
+      "area": "Form state",
+      "serializedMarker": "<!--F!-->",
+      "commentData": "F!",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-consumed",
+      "contract": "Hydration consumes this form marker as matching the root formState passed to hydrateRoot."
+    },
+    {
+      "id": "form-state-not-matching",
+      "area": "Form state",
+      "serializedMarker": "<!--F-->",
+      "commentData": "F",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-consumed",
+      "contract": "Hydration consumes this form marker as not matching the hydrateRoot formState."
+    },
+    {
+      "id": "preamble-html-contribution",
+      "area": "Preamble cleanup",
+      "serializedMarker": "<!--html-->",
+      "commentData": "html",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-boundary-clear-consumed",
+      "contract": "Boundary clearing treats this marker as evidence that html singleton state contributed to the boundary."
+    },
+    {
+      "id": "preamble-head-contribution",
+      "area": "Preamble cleanup",
+      "serializedMarker": "<!--head-->",
+      "commentData": "head",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-boundary-clear-consumed",
+      "contract": "Boundary clearing treats this marker as evidence that head singleton state contributed to the boundary."
+    },
+    {
+      "id": "preamble-body-contribution",
+      "area": "Preamble cleanup",
+      "serializedMarker": "<!--body-->",
+      "commentData": "body",
+      "companionNode": null,
+      "lifecycle": "server-emitted-client-boundary-clear-consumed",
+      "contract": "Boundary clearing treats this marker as evidence that body singleton state contributed to the boundary."
+    },
+    {
+      "id": "segment-placeholder",
+      "area": "Fizz segment movement",
+      "serializedMarker": "<template id=\"{identifierPrefix}P:{hex}\"></template>",
+      "commentData": null,
+      "companionNode": "template placeholder",
+      "lifecycle": "server-emitted-runtime-consumed",
+      "contract": "Fizz completed-segment instructions move segment children into this placeholder location."
+    },
+    {
+      "id": "external-runtime-complete-segment",
+      "area": "Fizz external runtime",
+      "serializedMarker": "<template data-rsi=\"\" data-sid=\"{identifierPrefix}S:{hex}\" data-pid=\"{identifierPrefix}P:{hex}\"></template>",
+      "commentData": null,
+      "companionNode": "template carrying segment and placeholder ids",
+      "lifecycle": "server-emitted-runtime-consumed",
+      "contract": "External data streaming uses template data attributes for completed segment insertion instead of inline script calls."
+    },
+    {
+      "id": "external-runtime-complete-boundary",
+      "area": "Fizz external runtime",
+      "serializedMarker": "<template data-rci=\"\" data-bid=\"{identifierPrefix}B:{hex}\" data-sid=\"{identifierPrefix}S:{hex}\"></template>",
+      "commentData": null,
+      "companionNode": "template carrying boundary and segment ids",
+      "lifecycle": "server-emitted-runtime-consumed",
+      "contract": "External data streaming uses template data attributes for completed boundary replacement."
+    },
+    {
+      "id": "external-runtime-complete-boundary-with-styles",
+      "area": "Fizz external runtime",
+      "serializedMarker": "<template data-rri=\"\" data-bid=\"{identifierPrefix}B:{hex}\" data-sid=\"{identifierPrefix}S:{hex}\" data-sty=\"...\"></template>",
+      "commentData": null,
+      "companionNode": "template carrying boundary id, segment id, and serialized style/resource precedence data",
+      "lifecycle": "server-emitted-runtime-consumed",
+      "contract": "External data streaming uses template data attributes for completed boundary replacement that must coordinate stylesheet precedence before reveal."
+    },
+    {
+      "id": "external-runtime-client-render-boundary",
+      "area": "Fizz external runtime",
+      "serializedMarker": "<template data-rxi=\"\" data-bid=\"{identifierPrefix}B:{hex}\" data-dgst=\"...\" data-msg=\"...\" data-stck=\"...\" data-cstck=\"...\"></template>",
+      "commentData": null,
+      "companionNode": "template carrying boundary id and optional error evidence",
+      "lifecycle": "server-emitted-runtime-consumed",
+      "contract": "External data streaming uses template data attributes to mark a boundary as client-rendered."
+    }
+  ],
+  "mismatchContracts": [
+    {
+      "id": "fatal-html-mismatch",
+      "sourceFunction": "throwOnHydrationMismatch",
+      "trigger": "host element, boundary, form marker, or unhydrated-tail mismatch",
+      "errorMessagePrefix": "Hydration failed because the server rendered HTML didn't match the client.",
+      "delivery": "queueHydrationError records the captured error, then React throws the internal HydrationMismatchException sentinel.",
+      "fastReactContract": "Represent as structured mismatch evidence and recoverable-error queue data, not a string-only console warning."
+    },
+    {
+      "id": "fatal-text-mismatch",
+      "sourceFunction": "throwOnHydrationMismatch",
+      "trigger": "text hydration mismatch",
+      "errorMessagePrefix": "Hydration failed because the server rendered text didn't match the client.",
+      "delivery": "queueHydrationError records the captured error, then React throws the internal HydrationMismatchException sentinel.",
+      "fastReactContract": "Text and HTML mismatch classes stay distinct because React emits different fatal error text."
+    },
+    {
+      "id": "internal-hydration-mismatch-exception",
+      "sourceFunction": "HydrationMismatchException",
+      "trigger": "internal control-flow sentinel after queueing the public mismatch error",
+      "errorMessagePrefix": "Hydration Mismatch Exception: This is not a real error, and should not leak into userspace.",
+      "delivery": "internal throw only",
+      "fastReactContract": "Do not expose the sentinel as the user-facing recoverable error."
+    },
+    {
+      "id": "dev-successful-hydration-warning",
+      "sourceFunction": "emitPendingHydrationWarnings",
+      "trigger": "development-only props/text differences that did not force client rendering",
+      "errorMessagePrefix": "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up.",
+      "delivery": "console.error after successful hydration in development",
+      "fastReactContract": "Keep fatal mismatch errors separate from successful-hydration dev warnings."
+    },
+    {
+      "id": "suppress-hydration-warning-text-diff",
+      "sourceFunction": "diffHydratedTextForDevWarnings",
+      "trigger": "parent props include suppressHydrationWarning: true for text diff warnings",
+      "errorMessagePrefix": null,
+      "delivery": "returns null dev-warning diff",
+      "fastReactContract": "Suppression affects dev warning diff collection; it is not a blanket marker parser bypass."
+    },
+    {
+      "id": "form-marker-mismatch",
+      "sourceFunction": "tryToClaimNextHydratableFormMarkerInstance",
+      "trigger": "no matching F!/F form marker is found during form state hydration",
+      "errorMessagePrefix": "Hydration failed because the server rendered HTML didn't match the client.",
+      "delivery": "falls through to throwOnHydrationMismatch",
+      "fastReactContract": "Form markers must be typed hydratable comments and mismatches must join the same fatal mismatch path."
+    }
+  ],
+  "fastReactContracts": [
+    {
+      "id": "marker-generation-owned-by-fizz",
+      "contract": "Server/Fizz work owns emitting marker bytes; client hydration owns recognizing DOM comments/templates and acting on typed marker evidence."
+    },
+    {
+      "id": "mismatch-evidence-is-structured",
+      "contract": "Hydration mismatches require structured internal evidence, recoverable-error queueing, and dev diff data; Fast React must not reduce them to console strings."
+    },
+    {
+      "id": "no-hydration-implementation-claimed",
+      "contract": "This oracle captures evidence and contracts only. It does not implement hydrateRoot, DOM matching, event replay, Suspense hydration, or Fizz rendering."
+    }
+  ],
+  "intentionalGaps": [
+    {
+      "id": "no-dom-fixture-hydration",
+      "reason": "This worker is scoped to marker and mismatch evidence; DOM fixture hydration requires future DOM/hydration implementation work."
+    },
+    {
+      "id": "no-fast-react-comparison",
+      "reason": "Fast React has no hydration or DOM implementation in this scope, so compatibility claims remain false."
+    },
+    {
+      "id": "source-contract-not-runtime-render-oracle",
+      "reason": "The oracle validates pinned source and published bundle evidence. It does not execute React DOM rendering or hydrateRoot flows."
+    }
+  ]
+}
