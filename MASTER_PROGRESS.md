@@ -50,6 +50,7 @@ M0: Orchestration Foundation.
 - Accepted structured host operation errors from worker-022: `HostResult<T>` now carries a top-level `HostError`, unsupported capabilities remain inspectable as a distinct variant, the in-memory test renderer returns structured operation errors for invalid handles, missing insert/remove targets, cross-renderer handles, and impossible self/cycle mutations, and failed insert/remove paths preserve the existing tree.
 - Accepted element-object oracle from worker-021: the conformance workspace now has a deterministic React 19.2.6 element-object oracle covering 22 scenarios across default and `react-server` development/production modes, with checked Fast React observations recorded only as known mismatches or unsupported placeholders and all compatibility claims kept false.
 - Accepted JS element factory from worker-023: `@fast-react/react` now implements the oracle-covered `createElement`, `cloneElement`, `isValidElement`, `jsx`, `jsxs`, and `jsxDEV` behavior in a shared JS facade module. The regenerated oracle records 84 exact normalized Fast React behavior matches, 4 intentional entrypoint-surface mismatches, 0 unsupported placeholders, and still keeps package-wide compatibility claims false.
+- Accepted createRef behavior from worker-024: `@fast-react/react` now implements direct `createRef()` behavior for default and `react-server` root entrypoints. The new deterministic ref-object oracle records 16 exact normalized Fast React behavior matches, 0 known mismatches, 0 unsupported placeholders, and keeps package-wide compatibility claims false; broader refs behavior remains explicitly unsupported.
 
 ## Worker Roster
 
@@ -78,12 +79,12 @@ M0: Orchestration Foundation.
 | worker-021-element-object-oracle | merged | Implement deterministic element-object conformance oracle and Fast React mismatch reporting | `worker-progress/worker-021-element-object-oracle.md` |
 | worker-022-host-operation-errors | merged | Add structured host operation errors for invalid test-renderer operations | `worker-progress/worker-022-host-operation-errors.md` |
 | worker-023-js-element-factory | merged | Implement conformance-backed JS element factory behavior from the checked oracle | `worker-progress/worker-023-js-element-factory.md` |
-| worker-024-create-ref-behavior | running in tmux worktree; nested subagents allowed | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `../fast-react-worker-024-create-ref-behavior/worker-progress/worker-024-create-ref-behavior.md` |
+| worker-024-create-ref-behavior | merged | Add a deterministic `createRef` oracle and implement covered JS facade behavior | `worker-progress/worker-024-create-ref-behavior.md` |
 
 ## Next Actions
 
-1. Monitor worker 024 and audit/merge it after it checks a deterministic `createRef` oracle, implements only covered direct ref-object behavior, and keeps broader refs compatibility claims false.
-2. Keep `Children` helper work paused until worker 024 no longer has a moving `packages/react/**` and `tests/conformance/**` target.
+1. Queue the next conformance-backed package behavior slice for `Children` helpers now that `createRef` is merged.
+2. Keep broader refs work (`forwardRef`, `useRef`, owner stacks, renderer ref attachment/detachment) paused until a renderer lifecycle path exists.
 
 ## Risks And Open Questions
 
@@ -163,3 +164,5 @@ M0: Orchestration Foundation.
 - 2026-05-09: Removed clean merged worktrees `../fast-react-worker-021-element-object-oracle` and `../fast-react-worker-023-js-element-factory`; left `../fast-react-worker-022-host-operation-errors` because its only remaining change is an untracked regenerable `Cargo.lock`.
 - 2026-05-09: Queued worker-024 to add a deterministic React 19.2.6 `createRef` oracle and implement the covered JS facade behavior, with write scope limited to `packages/react/**`, `tests/smoke/**`, `tests/conformance/**`, and its worker report.
 - 2026-05-09: Launched worker-024 as a real `codex --yolo` tmux process in `../fast-react-worker-024-create-ref-behavior`.
+- 2026-05-09: Accepted and merged worker-024 createRef behavior in commit `3216c97`. Closed the worker-024 tmux session after merge. Verified in the worker worktree with `npm test --workspace @fast-react/conformance`, `npm run test:conformance`, `npm run check:js`, ref-object oracle regeneration byte-compare, element-object oracle regeneration byte-compare, the ref-object temp/local path leak guard, and scoped `git diff --check`.
+- 2026-05-09: Verified merged `main` after worker-024 with `npm run check:js`; 28 conformance tests passed through the workspace check. Removed the clean worker-024 worktree after merge.
