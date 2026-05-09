@@ -27,12 +27,13 @@ M0: Orchestration Foundation.
 - Top-level tmux workers may spawn managed Codex subagents/explorers internally when useful. Those nested agents do not count against the 30 top-level tmux worker limit.
 - Do not start implementation before architecture, conformance, and scaffold hypotheses have been tested by separate workers.
 - Worker runner requests `gpt-5.5` with `model_reasoning_effort="xhigh"` and uses the local yolo-equivalent Codex flag.
+- Accepted architecture direction from worker-001: Rust should own renderer-agnostic React semantics behind arena/generational handles, use a capability-grouped host-config boundary, and expose a JS-compatible package facade through N-API first. WASM and third-party `react-reconciler` compatibility are deferred until conformance evidence justifies them.
 
 ## Worker Roster
 
 | Worker | Status | Assignment | Progress File |
 | --- | --- | --- | --- |
-| worker-001-architecture | running in tmux worktree; nested subagents allowed | Test Rust core and renderer-boundary architecture hypotheses | `../fast-react-worker-001-architecture/worker-progress/worker-001-architecture.md` |
+| worker-001-architecture | merged | Test Rust core and renderer-boundary architecture hypotheses | `worker-progress/worker-001-architecture.md` |
 | worker-002-conformance | running in tmux worktree; nested subagents allowed | Design React 19.2.6 compatibility inventory and test strategy | `../fast-react-worker-002-conformance/worker-progress/worker-002-conformance.md` |
 | worker-003-scaffold | running in tmux worktree; nested subagents allowed | Propose Cargo workspace, JS package scaffold, and worktree task split | `../fast-react-worker-003-scaffold/worker-progress/worker-003-scaffold.md` |
 | worker-004-api-inventory | running in tmux worktree; nested subagents allowed | Build exact public API, runtime export, subpath, and type inventory | `../fast-react-worker-004-api-inventory/worker-progress/worker-004-api-inventory.md` |
@@ -44,7 +45,7 @@ M0: Orchestration Foundation.
 
 ## Next Actions
 
-1. Collect the nine active workers' progress files and final recommendations.
+1. Collect the eight active workers' progress files and final recommendations.
 2. Update the master plan with accepted architecture and scaffold decisions.
 3. Create implementation worktrees from the accepted scaffold plan.
 
@@ -80,3 +81,4 @@ M0: Orchestration Foundation.
 - 2026-05-09: Stopped the three workers before accepting reports written under the superseded managed-subagent prohibition.
 - 2026-05-09: Relaunched workers 001, 002, and 003 as real `codex --yolo` tmux processes with nested managed subagents allowed.
 - 2026-05-09: Added six more non-overlapping research workers: public API inventory, upstream test reuse, binding strategy, scheduler/fiber model, renderer host config, and benchmark strategy.
+- 2026-05-09: Accepted and merged worker-001 architecture report in commit `b5a0da1`. Closed the worker-001 tmux session after merge.
