@@ -669,6 +669,201 @@ test("private controlled restore queue write preflight records intent rows witho
   }
 });
 
+test("private controlled restore queue write execution records deterministic mutation intent", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-write-execution"
+    });
+  const rows = [
+    {
+      domEventName: "input",
+      latestProps: {
+        type: "text",
+        value: "alpha",
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: "INPUT",
+      queueId: "oracle-text-write-execution",
+      value: "browser-mutated"
+    },
+    {
+      domEventName: "click",
+      latestProps: {
+        type: "radio",
+        name: "choice",
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: "INPUT",
+      queueId: "oracle-radio-write-execution"
+    }
+  ];
+  const records = rows.map((row) => {
+    const dispatch = createPrivateControlledEventDispatch(row);
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          "deterministic-event-latest-props-post-event-restore-queue",
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: "controlled-input-post-event-restore-queue"
+      }
+    );
+    return {dispatch, intent};
+  });
+  const preflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-controlled-input-post-event-restore-queue-write-preflight",
+      queueId: "oracle-controlled-write-execution-preflight",
+      targetKind: "controlled-input-post-event-restore-queue-write-preflight"
+    }
+  );
+  const execution = gate.recordRestoreQueueWriteExecution(preflight, {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-write-execution",
+    queueId: "oracle-controlled-write-execution-queue",
+    targetKind: "controlled-input-post-event-restore-queue-write-execution"
+  });
+
+  assert.equal(
+    execution.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWriteExecutionStatus
+  );
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueWriteExecutionRecord(
+      execution
+    ),
+    true
+  );
+  assert.equal(execution.sourcePreflightRequestId, preflight.requestId);
+  assert.deepEqual(
+    execution.writeExecutionRows.map((row) => ({
+      rowId: row.rowId,
+      sourcePreflightRowId: row.sourcePreflightRowId,
+      sourceRequestId: row.sourceRequestId,
+      queueSlot: row.queueSlot,
+      queueMutationKind: row.queueMutationKind,
+      hostTag: row.hostTag,
+      controlKind: row.controlKind,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      metadataRestoreTargetWritten: row.metadataRestoreTargetWritten,
+      metadataRestoreQueueWritten: row.metadataRestoreQueueWritten,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      radioGroupLookupRequired: row.radioGroupLookupRequired,
+      radioGroupLookupPerformed: row.radioGroupLookupPerformed,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        rowId: "controlled-oracle-write-execution:4:row:1",
+        sourcePreflightRowId: "controlled-oracle-write-execution:3:row:1",
+        sourceRequestId: "controlled-oracle-write-execution:1",
+        queueSlot: "restore-target",
+        queueMutationKind: "set-restore-target",
+        hostTag: "input",
+        controlKind: "value",
+        acceptedRestoreKind: "input-text-value",
+        metadataRestoreTargetWritten: true,
+        metadataRestoreQueueWritten: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: "controlled-oracle-write-execution:4:row:2",
+        sourcePreflightRowId: "controlled-oracle-write-execution:3:row:2",
+        sourceRequestId: "controlled-oracle-write-execution:2",
+        queueSlot: "restore-queue",
+        queueMutationKind: "append-restore-queue",
+        hostTag: "input",
+        controlKind: "checked",
+        acceptedRestoreKind: "input-radio-checked",
+        metadataRestoreTargetWritten: false,
+        metadataRestoreQueueWritten: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupRequired: true,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.equal(execution.restoreTargetMutation.slot, "restoreTarget");
+  assert.equal(
+    execution.restoreTargetMutation.acceptedRestoreKind,
+    "input-text-value"
+  );
+  assert.equal(execution.restoreTargetMutation.restoreQueueWritten, false);
+  assert.deepEqual(
+    execution.restoreQueueMutations.map((row) => ({
+      slot: row.slot,
+      appendOrder: row.appendOrder,
+      sourceRequestId: row.sourceRequestId,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      restoreQueueWritten: row.restoreQueueWritten,
+      hostWrapperInvoked: row.hostWrapperInvoked
+    })),
+    [
+      {
+        slot: "restoreQueue",
+        appendOrder: 1,
+        sourceRequestId: "controlled-oracle-write-execution:2",
+        acceptedRestoreKind: "input-radio-checked",
+        restoreQueueWritten: false,
+        hostWrapperInvoked: false
+      }
+    ]
+  );
+  assert.deepEqual(execution.queueMutationPlan.writeSequence, [
+    "consume-restore-queue-write-preflight",
+    "record-restore-target-mutation-intent",
+    "record-restore-queue-append-mutation-intents",
+    "keep-post-event-controlled-restore-flush-blocked",
+    "keep-host-wrapper-restore-blocked"
+  ]);
+  assert.equal(execution.queueMutationPlan.restoreTargetWriteRecorded, true);
+  assert.equal(execution.queueMutationPlan.restoreQueueAppendRecorded, true);
+  assert.equal(execution.queueMutationPlan.restoreQueueWritten, false);
+  assert.equal(execution.queueMutationPlan.restoreQueueFlushed, false);
+  assert.equal(execution.queueMutationPlan.hostWrapperInvoked, false);
+  assert.equal(execution.postEventRestoreBoundary.restoreQueueWritten, false);
+  assert.equal(execution.postEventRestoreBoundary.hostWrapperInvoked, false);
+  assert.equal(execution.sideEffects.restoreQueueWriteExecutionRecorded, true);
+  assert.equal(execution.sideEffects.restoreQueueMutationIntentRecorded, true);
+  assert.equal(execution.sideEffects.metadataRestoreTargetWritten, true);
+  assert.equal(execution.sideEffects.metadataRestoreQueueWritten, true);
+  assert.equal(execution.sideEffects.restoreQueueWritten, false);
+  assert.equal(execution.sideEffects.restoreQueueFlushed, false);
+  assert.equal(execution.sideEffects.hostWrapperInvoked, false);
+  assert.equal(execution.sideEffects.radioGroupLookupRequired, true);
+  assert.equal(execution.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(execution.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(execution.sideEffects.browserInputMutated, false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  for (const {dispatch} of records) {
+    assert.equal(Object.hasOwn(dispatch.targetNode, "_valueTracker"), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+});
+
 test("private controlled select and textarea post-event restore queue consumes fake-DOM observations with latest props only", () => {
   const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: "controlled-oracle-fake-dom-tracker"
