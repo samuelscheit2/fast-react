@@ -118,6 +118,12 @@ export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
       "The private toTree metadata must record the FunctionComponent tree wrapper above the accepted committed host output without exposing public toTree."
   },
   {
+    id: "js-totree-private-multi-child-metadata",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree metadata must record minimal multi-child host output and composite-above-multi-child shapes without exposing public toTree."
+  },
+  {
     id: "js-totree-public-tree-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -298,6 +304,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToTreePrivateFacadeConsumesRustTreeMetadata &&
     localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape &&
     localChecks.privateToTreeCompositeFunctionMetadataPresent &&
+    localChecks.privateToTreeMultiChildMetadataPresent &&
     localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
   const requiredLocalTargetsReady =
     privateToJSONFacadeGateReady && privateToTreeMetadataGateReady;
@@ -350,6 +357,9 @@ export function evaluateReactTestRendererSerializationLocalGate({
           requirement.id === "js-totree-private-composite-function-metadata"
         ) {
           return !localChecks.privateToTreeCompositeFunctionMetadataPresent;
+        }
+        if (requirement.id === "js-totree-private-multi-child-metadata") {
+          return !localChecks.privateToTreeMultiChildMetadataPresent;
         }
         if (requirement.id === "js-totree-public-tree-blocked") {
           return !localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
@@ -992,6 +1002,61 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bpublicTreeAvailable\s*:\s*false\b/u
     );
+  const privateToTreeMultiChildMetadataPresent =
+    privateToTreeHostOutputMetadataGatePresent &&
+    privateToTreePrivateFacadeGatePresent &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTEST_RENDERER_PRIVATE_TREE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateTreeRenderedRoot\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_tree_host_shape_from_snapshot_for_diagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedMultiChildFiberShape\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /HostRoot[\s\S]*HostText[\s\S]*HostComponent[\s\S]*HostText/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateMultiChildTreeMetadataSerializable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateToTreeMultiChildHostOutputDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-485-test-renderer-totree-multichild-gate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicTreeAvailable\s*:\s*false\b/u
+    );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
     hasSourcePattern(
@@ -1208,6 +1273,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToTreePrivateFacadeConsumesRustTreeMetadata,
     privateToTreeHostOutputMetadataRecognizesMinimalShape,
     privateToTreeCompositeFunctionMetadataPresent,
+    privateToTreeMultiChildMetadataPresent,
     privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,

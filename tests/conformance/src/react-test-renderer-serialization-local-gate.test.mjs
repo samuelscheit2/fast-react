@@ -86,6 +86,19 @@ const privateToTreeCompositeAcceptedFiberShape = [
   "HostComponent",
   "HostText"
 ];
+const privateToTreeMultiChildAcceptedFiberShape = [
+  "HostRoot",
+  "HostText",
+  "HostComponent",
+  "HostText"
+];
+const privateToTreeCompositeMultiChildAcceptedFiberShape = [
+  "HostRoot",
+  "FunctionComponent",
+  "HostText",
+  "HostComponent",
+  "HostText"
+];
 const privateToTreeFunctionComponentType = "CanaryFunctionComponent";
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
@@ -128,6 +141,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToTreePrivateFacadeConsumesRustTreeMetadata: true,
     privateToTreeHostOutputMetadataRecognizesMinimalShape: true,
     privateToTreeCompositeFunctionMetadataPresent: true,
+    privateToTreeMultiChildMetadataPresent: true,
     privateToTreeHostOutputMetadataPubliclyBlocked: true,
     privateRecordOnlyTestInstanceWrapperPresent: true,
     privateRecordOnlyTestInstanceQueryPathPresent: true,
@@ -182,6 +196,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-totree-consumes-accepted-rust-private-tree-metadata",
       "js-totree-recognizes-accepted-minimal-host-output-shape",
       "js-totree-private-composite-function-metadata",
+      "js-totree-private-multi-child-metadata",
       "js-totree-public-tree-blocked"
     ]
   );
@@ -682,6 +697,24 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
       "root_private_tree_metadata_canary_describes_function_component_above_host_output"
     ]);
+    if (entry.entrypoint.endsWith(".development")) {
+      assert.deepEqual(
+        metadataGate.acceptedMultiChildFiberShape,
+        privateToTreeMultiChildAcceptedFiberShape
+      );
+      assert.deepEqual(
+        metadataGate.acceptedCompositeMultiChildFiberShape,
+        privateToTreeCompositeMultiChildAcceptedFiberShape
+      );
+      assert.equal(
+        metadataGate.privateMultiChildHostOutputTreeMetadataAvailable,
+        true
+      );
+      assert.equal(
+        metadataGate.multiChildAcceptedWorker,
+        "worker-485-test-renderer-totree-multichild-gate"
+      );
+    }
     assert.deepEqual(metadataGate.blockedPublicSurfaces, [
       "create().toTree",
       "create().toJSON",
@@ -754,6 +787,24 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "root_private_tree_metadata_canary_describes_function_component_above_host_output",
       "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
     ]);
+    if (entry.entrypoint.endsWith(".development")) {
+      assert.equal(facadeGate.privateMultiChildTreeMetadataSerializable, true);
+      assert.equal(
+        facadeGate.multiChildAcceptedWorker,
+        "worker-485-test-renderer-totree-multichild-gate"
+      );
+      assert.deepEqual(facadeGate.multiChildAcceptedRustApis, [
+        "TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics",
+        "TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics",
+        "TestRendererPrivateTreeRenderedRoot",
+        "TestRendererPrivateTreeRenderedHostComponent",
+        "TestRendererPrivateTreeRenderedFunctionComponent"
+      ]);
+      assert.deepEqual(facadeGate.multiChildAcceptedRustTests, [
+        "root_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings",
+        "root_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output"
+      ]);
+    }
     assert.deepEqual(facadeGate.blockedPublicSurfaces, [
       "create().toTree",
       "create().toJSON",
@@ -788,6 +839,12 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateMetadata.rootRequest, error.rootRequest);
     assert.equal(privateMetadata.privateHostOutputTreeMetadataAvailable, true);
     assert.equal(privateMetadata.privateCompositeFunctionMetadataAvailable, true);
+    if (entry.entrypoint.endsWith(".development")) {
+      assert.equal(
+        privateMetadata.privateMultiChildHostOutputTreeMetadataAvailable,
+        true
+      );
+    }
     assert.equal(privateMetadata.publicTreeAvailable, false);
     assert.equal(privateMetadata.publicRouteAvailable, false);
     assert.equal(privateMetadata.nativeBridgeAvailable, false);
@@ -933,6 +990,9 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateFacade.rootRequest, error.rootRequest);
     assert.equal(privateFacade.privateTreeMetadataSerializable, true);
     assert.equal(privateFacade.privateCompositeFunctionMetadataSerializable, true);
+    if (entry.entrypoint.endsWith(".development")) {
+      assert.equal(privateFacade.privateMultiChildTreeMetadataSerializable, true);
+    }
     assert.equal(privateFacade.publicTreeAvailable, false);
     assert.equal(privateFacade.publicRouteAvailable, false);
     assert.equal(privateFacade.nativeBridgeAvailable, false);
@@ -981,6 +1041,117 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         rendered: ["goodbye"]
       }
     });
+    if (entry.entrypoint.endsWith(".development")) {
+      const multiChildShape = privateMetadata.describeAcceptedHostOutputDiagnostic(
+        createAcceptedMultiChildTreeMetadataDiagnostic()
+      );
+      assert.equal(Object.isFrozen(multiChildShape), true);
+      assert.equal(
+        multiChildShape.id,
+        "react-test-renderer-private-totree-multi-child-host-output-metadata"
+      );
+      assert.deepEqual(
+        multiChildShape.acceptedMultiChildFiberShape,
+        privateToTreeMultiChildAcceptedFiberShape
+      );
+      assert.deepEqual(
+        multiChildShape.acceptedCompositeMultiChildFiberShape,
+        privateToTreeCompositeMultiChildAcceptedFiberShape
+      );
+      assert.deepEqual(multiChildShape.traversal.order, [
+        "HostRoot",
+        "HostText",
+        "HostComponent",
+        "HostText"
+      ]);
+      assert.equal(
+        multiChildShape.traversal.hostRootReturnsArrayForMultipleChildren,
+        true
+      );
+      assert.equal(multiChildShape.hostRoot.rootChildCount, 2);
+      assert.equal(Object.isFrozen(multiChildShape.hostChildren), true);
+      assert.deepEqual(multiChildShape.hostChildren[0], {
+        fiberTag: "HostText",
+        source: "ReactTestRenderer.js toTree HostText",
+        text: "first sibling",
+        returnsTextValue: true,
+        publicTreeObject: false
+      });
+      assert.deepEqual(multiChildShape.hostChildren[1], {
+        fiberTag: "HostComponent",
+        source: "ReactTestRenderer.js toTree HostComponent",
+        treeNodeType: "host",
+        elementType: "span",
+        props: {},
+        instanceAvailable: false,
+        renderedChildCount: 1,
+        renderedChildren: [
+          {
+            fiberTag: "HostText",
+            source: "ReactTestRenderer.js toTree HostText",
+            text: "second sibling",
+            returnsTextValue: true,
+            publicTreeObject: false
+          }
+        ],
+        publicTreeObject: false
+      });
+
+      const multiChildPrivateTree = privateFacade.serializeAcceptedTreeMetadata(
+        createAcceptedMultiChildTreeMetadataDiagnostic()
+      );
+      assert.equal(Object.isFrozen(multiChildPrivateTree), true);
+      assert.equal(Object.isFrozen(multiChildPrivateTree[1]), true);
+      assert.equal(Object.isFrozen(multiChildPrivateTree[1].props), true);
+      assert.equal(Object.isFrozen(multiChildPrivateTree[1].rendered), true);
+      assert.deepEqual(multiChildPrivateTree, [
+        "first sibling",
+        {
+          nodeType: "host",
+          type: "span",
+          props: {},
+          instance: null,
+          rendered: ["second sibling"]
+        }
+      ]);
+
+      const compositeMultiChildPrivateTree =
+        privateFacade.serializeAcceptedTreeMetadata(
+          createAcceptedMultiChildTreeMetadataDiagnostic({
+            composite: true
+          })
+        );
+      assert.equal(Object.isFrozen(compositeMultiChildPrivateTree), true);
+      assert.equal(
+        Object.isFrozen(compositeMultiChildPrivateTree.rendered),
+        true
+      );
+      assert.deepEqual(compositeMultiChildPrivateTree, {
+        nodeType: "component",
+        type: privateToTreeFunctionComponentType,
+        props: {},
+        instance: null,
+        rendered: [
+          "first sibling",
+          {
+            nodeType: "host",
+            type: "span",
+            props: {},
+            instance: null,
+            rendered: ["second sibling"]
+          }
+        ]
+      });
+
+      const staleMultiChildTreeMetadata =
+        createAcceptedMultiChildTreeMetadataDiagnostic({
+          hostOutputSnapshotCurrent: false
+        });
+      assert.equal(
+        privateFacade.canSerializeAcceptedTreeMetadata(staleMultiChildTreeMetadata),
+        false
+      );
+    }
     assert.equal(
       privateFacade.canSerializeAcceptedTreeMetadata(
         createAcceptedMinimalTreeMetadataDiagnostic()
@@ -1374,6 +1545,87 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
     },
     publicTreeObjectAvailable: false
   };
+}
+
+function createAcceptedMultiChildTreeMetadataDiagnostic({
+  composite = false,
+  hostOutputSnapshotCurrent = true,
+  hostOutputUpdateKind = "Create"
+} = {}) {
+  const report = {
+    diagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent,
+    acceptedFiberShape: privateToTreeMultiChildAcceptedFiberShape,
+    acceptedMultiChildFiberShape: privateToTreeMultiChildAcceptedFiberShape,
+    acceptedCompositeMultiChildFiberShape:
+      privateToTreeCompositeMultiChildAcceptedFiberShape,
+    rootChildCount: 2,
+    hostRoot: {
+      fiberTag: "HostRoot",
+      delegatesToChild: true,
+      childFiberTags: ["HostText", "HostComponent"],
+      publicTreeObjectAvailable: false
+    },
+    hostChildren: [
+      {
+        fiberTag: "HostText",
+        text: "first sibling",
+        returnsTextValue: true,
+        publicTreeObjectAvailable: false
+      },
+      {
+        fiberTag: "HostComponent",
+        nodeType: "host",
+        elementType: { name: "span" },
+        props: {
+          attributes: {},
+          textContent: null
+        },
+        instanceAvailable: false,
+        renderedChildCount: 1,
+        renderedChildren: [
+          {
+            fiberTag: "HostText",
+            text: "second sibling",
+            returnsTextValue: true,
+            publicTreeObjectAvailable: false
+          }
+        ],
+        publicTreeObjectAvailable: false
+      }
+    ],
+    publicBlockers: {
+      jsonMethodBlocked: true,
+      treeMethodBlocked: true,
+      instanceWrapperBlocked: true,
+      jsFacadeRoutingBlocked: true,
+      publicActBlocked: true,
+      compatibilityClaimBlocked: true
+    },
+    publicTreeObjectAvailable: false
+  };
+
+  if (composite) {
+    report.functionComponent = {
+      fiberTag: "FunctionComponent",
+      nodeType: "component",
+      componentType: privateToTreeFunctionComponentType,
+      props: {
+        attributes: {},
+        textContent: null
+      },
+      instanceAvailable: false,
+      renderedChildFiberTags: ["HostText", "HostComponent"],
+      renderedChildCount: 2,
+      wrapsCommittedHostOutput: true,
+      publicTreeObjectAvailable: false
+    };
+  }
+
+  return report;
 }
 
 test("react-test-renderer serialization React oracle generation remains React-only while public compatibility is blocked", () => {

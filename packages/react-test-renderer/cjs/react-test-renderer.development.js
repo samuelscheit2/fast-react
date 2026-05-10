@@ -1096,6 +1096,19 @@ const privateToTreeCompositeAcceptedFiberShape = Object.freeze([
   'HostComponent',
   'HostText'
 ]);
+const privateToTreeMultiChildAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'HostText',
+  'HostComponent',
+  'HostText'
+]);
+const privateToTreeCompositeMultiChildAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'FunctionComponent',
+  'HostText',
+  'HostComponent',
+  'HostText'
+]);
 const privateToTreeFunctionComponentType = 'CanaryFunctionComponent';
 const privateGetInstanceDiagnosticsSymbol = Symbol.for(
   'fast.react_test_renderer.private_get_instance_diagnostics'
@@ -1133,6 +1146,9 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedMinimalFiberShape: privateToTreeAcceptedFiberShape,
   acceptedCompositeFiberShape: privateToTreeCompositeAcceptedFiberShape,
+  acceptedMultiChildFiberShape: privateToTreeMultiChildAcceptedFiberShape,
+  acceptedCompositeMultiChildFiberShape:
+    privateToTreeCompositeMultiChildAcceptedFiberShape,
   acceptedReactSourceAlgorithm: 'ReactTestRenderer.js toTree',
   hostRootBehavior: 'childrenToTree(node.child)',
   functionComponentBehavior:
@@ -1145,6 +1161,7 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   acceptedRustPrivateCompositeTreeMetadata: true,
   acceptedCommittedFiberInspection: true,
   privateCompositeFunctionMetadataAvailable: true,
+  privateMultiChildHostOutputTreeMetadataAvailable: true,
   publicTreeAvailable: false,
   publicRouteAvailable: false,
   nativeBridgeAvailable: false,
@@ -1174,6 +1191,19 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
     'root_private_tree_metadata_canary_describes_function_component_above_host_output'
   ]),
+  multiChildAcceptedWorker:
+    'worker-485-test-renderer-totree-multichild-gate',
+  multiChildAcceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererPrivateTreeRenderedRoot',
+    'TestRendererPrivateTreeRenderedHostComponent',
+    'TestRendererPrivateTreeRenderedFunctionComponent'
+  ]),
+  multiChildAcceptedRustTests: Object.freeze([
+    'root_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings',
+    'root_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output'
+  ]),
   blockedPublicSurfaces: Object.freeze([
     'create().toTree',
     'create().toJSON',
@@ -1196,6 +1226,7 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateFacadeGateAvailable: true,
   privateTreeMetadataSerializable: true,
   privateCompositeFunctionMetadataSerializable: true,
+  privateMultiChildTreeMetadataSerializable: true,
   privateFacadeSymbol: privateToTreeFacadeSymbol.description,
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedRustPrivateTreeMetadata: true,
@@ -1229,6 +1260,19 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
+  ]),
+  multiChildAcceptedWorker:
+    'worker-485-test-renderer-totree-multichild-gate',
+  multiChildAcceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererPrivateTreeRenderedRoot',
+    'TestRendererPrivateTreeRenderedHostComponent',
+    'TestRendererPrivateTreeRenderedFunctionComponent'
+  ]),
+  multiChildAcceptedRustTests: Object.freeze([
+    'root_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings',
+    'root_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output'
   ]),
   blockedPublicSurfaces: Object.freeze([
     'create().toTree',
@@ -4499,6 +4543,7 @@ function createPrivateToTreeHostOutputMetadata(rootRequest) {
     rootRequest,
     privateHostOutputTreeMetadataAvailable: true,
     privateCompositeFunctionMetadataAvailable: true,
+    privateMultiChildHostOutputTreeMetadataAvailable: true,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4530,6 +4575,7 @@ function createPrivateToTreeFacade(rootRequest) {
     rootRequest,
     privateTreeMetadataSerializable: true,
     privateCompositeFunctionMetadataSerializable: true,
+    privateMultiChildTreeMetadataSerializable: true,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4580,6 +4626,10 @@ function createPrivateGetInstanceClassRootDiagnostics(rootRequest) {
 
 function describePrivateToTreeHostOutputDiagnostic(report) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+
+  if (diagnostic.kind === 'multi-child') {
+    return describePrivateToTreeMultiChildHostOutputDiagnostic(diagnostic);
+  }
 
   return freezeRecord({
     id: 'react-test-renderer-private-totree-minimal-host-output-metadata',
@@ -4671,15 +4721,34 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
       'source_json_diagnostic_name',
       privateToJSONAcceptedDiagnosticName
     );
-    assertPrivateToJSONHostOutputUpdateKind(report);
+    const hostOutputUpdateKind = assertPrivateToJSONHostOutputUpdateKind(report);
     assertPrivateToJSONBooleanField(
       report,
       'hostOutputSnapshotCurrent',
       'host_output_snapshot_current',
       true
     );
-    assertPrivateToJSONNumberField(report, 'rootChildCount', 'root_child_count', 1);
+    const rootChildCount = readPrivateToJSONNonNegativeIntegerField(
+      report,
+      'rootChildCount',
+      'root_child_count'
+    );
     assertPrivateToJSONGateIfPresent(readPrivateToJSONField(report, 'gate'));
+
+    if (Array.isArray(readPrivateToJSONField(report, 'hostChildren', 'host_children'))) {
+      return validatePrivateToTreeMultiChildHostOutputDiagnostic(
+        report,
+        rootChildCount,
+        hostOutputUpdateKind
+      );
+    }
+
+    if (rootChildCount !== 1) {
+      throwPrivateToTreeMetadataError(
+        'Expected private tree metadata rootChildCount to be 1.'
+      );
+    }
+
     assertPrivateToTreeAcceptedFiberShape(
       readPrivateToJSONArrayField(report, 'acceptedFiberShape', 'accepted_fiber_shape')
     );
@@ -4849,11 +4918,8 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     );
 
     return {
-      hostOutputUpdateKind: readPrivateToJSONStringField(
-        report,
-        'hostOutputUpdateKind',
-        'host_output_update_kind'
-      ),
+      kind: 'minimal',
+      hostOutputUpdateKind,
       componentProps,
       componentType: readPrivateToJSONStringField(
         functionComponent,
@@ -4886,6 +4952,333 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
   }
 }
 
+function describePrivateToTreeMultiChildHostOutputDiagnostic(diagnostic) {
+  const record = {
+    id: diagnostic.componentWrapped
+      ? 'react-test-renderer-private-totree-composite-multi-child-host-output-metadata'
+      : 'react-test-renderer-private-totree-multi-child-host-output-metadata',
+    status: privateToTreeHostOutputMetadataStatus,
+    entrypoint,
+    publicSurface: 'create().toTree',
+    sourceDiagnostic: privateToTreeAcceptedDiagnosticName,
+    acceptedMinimalFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedMinimalFiberShape,
+    acceptedCompositeFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedCompositeFiberShape,
+    acceptedMultiChildFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedMultiChildFiberShape,
+    acceptedCompositeMultiChildFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedCompositeMultiChildFiberShape,
+    traversal: freezeRecord({
+      source: 'ReactTestRenderer.js toTree childrenToTree',
+      order: diagnostic.componentWrapped
+        ? privateToTreeCompositeMultiChildAcceptedFiberShape
+        : privateToTreeMultiChildAcceptedFiberShape,
+      committedHostOutputOrder: privateToTreeMultiChildAcceptedFiberShape,
+      hostRootDelegatesToChild: true,
+      hostRootReturnsArrayForMultipleChildren: !diagnostic.componentWrapped,
+      functionComponentProducesComponentNodeMetadata:
+        diagnostic.componentWrapped,
+      functionComponentRendersCommittedHostOutput: diagnostic.componentWrapped,
+      hostComponentProducesHostNodeMetadata: true,
+      hostTextProducesTextValueMetadata: true,
+      textSiblingProducesTextValueMetadata: true
+    }),
+    hostRoot: freezeRecord({
+      fiberTag: 'HostRoot',
+      source: 'ReactTestRenderer.js toTree HostRoot childrenToTree',
+      delegatesToChild: true,
+      childFiberTags: freezeArray(privateToTreeMultiChildAcceptedFiberShape.slice(1)),
+      rootChildCount: diagnostic.rootChildCount,
+      returnsArrayForMultipleChildren: !diagnostic.componentWrapped,
+      compositeChildFiberTag: diagnostic.componentWrapped
+        ? 'FunctionComponent'
+        : null,
+      publicTreeObject: false
+    }),
+    hostChildren: diagnostic.hostChildren,
+    publicTreeObjectAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  };
+
+  if (diagnostic.componentWrapped) {
+    record.functionComponent = freezeRecord({
+      fiberTag: 'FunctionComponent',
+      source: 'ReactTestRenderer.js toTree FunctionComponent',
+      treeNodeType: 'component',
+      componentType: diagnostic.componentType,
+      props: diagnostic.componentProps,
+      instanceAvailable: false,
+      renderedChildFiberTags: freezeArray(
+        privateToTreeMultiChildAcceptedFiberShape.slice(1)
+      ),
+      renderedChildNodeTypes: freezeArray(['text', 'host']),
+      renderedChildCount: diagnostic.rootChildCount,
+      wrapsCommittedHostOutput: true,
+      publicTreeObject: false
+    });
+  }
+
+  return freezeRecord(record);
+}
+
+function validatePrivateToTreeMultiChildHostOutputDiagnostic(
+  report,
+  rootChildCount,
+  hostOutputUpdateKind
+) {
+  assertPrivateToTreeMultiChildAcceptedFiberShape(
+    readPrivateToJSONArrayField(report, 'acceptedFiberShape', 'accepted_fiber_shape')
+  );
+  const acceptedMultiChildFiberShape = readPrivateToJSONField(
+    report,
+    'acceptedMultiChildFiberShape',
+    'accepted_multi_child_fiber_shape'
+  );
+  if (acceptedMultiChildFiberShape !== undefined) {
+    assertPrivateToTreeMultiChildAcceptedFiberShape(acceptedMultiChildFiberShape);
+  }
+  const acceptedCompositeMultiChildFiberShape = readPrivateToJSONField(
+    report,
+    'acceptedCompositeMultiChildFiberShape',
+    'accepted_composite_multi_child_fiber_shape'
+  );
+  if (acceptedCompositeMultiChildFiberShape !== undefined) {
+    assertPrivateToTreeCompositeMultiChildAcceptedFiberShape(
+      acceptedCompositeMultiChildFiberShape
+    );
+  }
+  if (rootChildCount !== 2) {
+    throwPrivateToTreeMetadataError(
+      'Expected private multi-child tree metadata rootChildCount to be 2.'
+    );
+  }
+
+  const hostRoot = readPrivateToJSONRecordField(report, 'hostRoot', 'host_root');
+  assertPrivateToJSONStringField(hostRoot, 'fiberTag', 'fiber_tag', 'HostRoot');
+  assertPrivateToJSONBooleanField(
+    hostRoot,
+    'delegatesToChild',
+    'delegates_to_child',
+    true
+  );
+  assertPrivateToTreeStringArrayField(
+    hostRoot,
+    'childFiberTags',
+    'child_fiber_tags',
+    ['HostText', 'HostComponent']
+  );
+  assertPrivateToJSONBooleanField(
+    hostRoot,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+
+  const hostChildren = readPrivateToJSONArrayField(
+    report,
+    'hostChildren',
+    'host_children'
+  );
+  if (hostChildren.length !== rootChildCount) {
+    throwPrivateToTreeMetadataError(
+      'Expected private multi-child tree metadata hostChildren length to match rootChildCount.'
+    );
+  }
+
+  const firstText = validatePrivateToTreeTextChild(hostChildren[0], 'hostChildren[0]');
+  const hostComponent = validatePrivateToTreeHostComponentChild(
+    hostChildren[1],
+    'hostChildren[1]'
+  );
+  const renderedChildren = freezeArray([firstText.text, hostComponent.tree]);
+  const functionComponent = readPrivateToJSONField(
+    report,
+    'functionComponent',
+    'function_component'
+  );
+  let componentWrapped = false;
+  let componentType = null;
+  let componentProps = null;
+
+  if (functionComponent !== undefined) {
+    assertPrivateToJSONRecord(functionComponent, 'functionComponent');
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'fiberTag',
+      'fiber_tag',
+      'FunctionComponent'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'nodeType',
+      'node_type',
+      'component'
+    );
+    componentType = readPrivateToJSONStringField(
+      functionComponent,
+      'componentType',
+      'component_type'
+    );
+    if (componentType !== privateToTreeFunctionComponentType) {
+      throwPrivateToTreeMetadataError(
+        `Expected private multi-child FunctionComponent type to be ${privateToTreeFunctionComponentType}.`
+      );
+    }
+    componentProps = normalizePrivateToJSONEmptyProps(
+      readPrivateToJSONField(functionComponent, 'props')
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'instanceAvailable',
+      'instance_available',
+      false
+    );
+    assertPrivateToTreeStringArrayField(
+      functionComponent,
+      'renderedChildFiberTags',
+      'rendered_child_fiber_tags',
+      ['HostText', 'HostComponent']
+    );
+    assertPrivateToJSONNumberField(
+      functionComponent,
+      'renderedChildCount',
+      'rendered_child_count',
+      rootChildCount
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'wrapsCommittedHostOutput',
+      'wraps_committed_host_output',
+      true
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'publicTreeObjectAvailable',
+      'public_tree_object_available',
+      false
+    );
+    componentWrapped = true;
+  }
+
+  assertPrivateToJSONPublicBlockers(
+    readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
+  );
+  assertPrivateToJSONBooleanField(
+    report,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+
+  return {
+    kind: 'multi-child',
+    hostOutputUpdateKind,
+    rootChildCount,
+    componentWrapped,
+    componentProps,
+    componentType,
+    hostChildren: freezeArray([firstText.metadata, hostComponent.metadata]),
+    renderedChildren
+  };
+}
+
+function validatePrivateToTreeTextChild(record, label) {
+  assertPrivateToJSONRecord(record, label);
+  assertPrivateToJSONStringField(record, 'fiberTag', 'fiber_tag', 'HostText');
+  const text = readPrivateToJSONStringField(record, 'text');
+  assertPrivateToJSONBooleanField(
+    record,
+    'returnsTextValue',
+    'returns_text_value',
+    true
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+
+  return {
+    text,
+    metadata: freezeRecord({
+      fiberTag: 'HostText',
+      source: 'ReactTestRenderer.js toTree HostText',
+      text,
+      returnsTextValue: true,
+      publicTreeObject: false
+    })
+  };
+}
+
+function validatePrivateToTreeHostComponentChild(record, label) {
+  assertPrivateToJSONRecord(record, label);
+  assertPrivateToJSONStringField(record, 'fiberTag', 'fiber_tag', 'HostComponent');
+  assertPrivateToJSONStringField(record, 'nodeType', 'node_type', 'host');
+  const type = normalizePrivateToJSONElementType(
+    readPrivateToJSONField(record, 'elementType', 'element_type')
+  );
+  const props = normalizePrivateToJSONProps(readPrivateToJSONField(record, 'props'));
+  assertPrivateToJSONBooleanField(
+    record,
+    'instanceAvailable',
+    'instance_available',
+    false
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'renderedChildCount',
+    'rendered_child_count',
+    1
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  const renderedChildren = readPrivateToJSONArrayField(
+    record,
+    'renderedChildren',
+    'rendered_children'
+  );
+  if (renderedChildren.length !== 1) {
+    throwPrivateToTreeMetadataError(
+      'Expected private multi-child host component to have one rendered text child.'
+    );
+  }
+  const textChild = validatePrivateToTreeTextChild(
+    renderedChildren[0],
+    `${label}.renderedChildren[0]`
+  );
+  const tree = freezeRecord({
+    nodeType: 'host',
+    type,
+    props,
+    instance: null,
+    rendered: freezeArray([textChild.text])
+  });
+
+  return {
+    tree,
+    metadata: freezeRecord({
+      fiberTag: 'HostComponent',
+      source: 'ReactTestRenderer.js toTree HostComponent',
+      treeNodeType: 'host',
+      elementType: type,
+      props,
+      instanceAvailable: false,
+      renderedChildCount: 1,
+      renderedChildren: freezeArray([textChild.metadata]),
+      publicTreeObject: false
+    })
+  };
+}
+
 function assertPrivateToTreeAcceptedFiberShape(shape) {
   if (
     shape.length !== privateToTreeAcceptedFiberShape.length ||
@@ -4893,6 +5286,20 @@ function assertPrivateToTreeAcceptedFiberShape(shape) {
   ) {
     throwPrivateToTreeMetadataError(
       'Expected private tree metadata acceptedFiberShape to be HostRoot, HostComponent, HostText.'
+    );
+  }
+}
+
+function assertPrivateToTreeMultiChildAcceptedFiberShape(shape) {
+  if (
+    !Array.isArray(shape) ||
+    shape.length !== privateToTreeMultiChildAcceptedFiberShape.length ||
+    shape.some(
+      (tag, index) => tag !== privateToTreeMultiChildAcceptedFiberShape[index]
+    )
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Expected private tree metadata accepted multi-child fiber shape to be HostRoot, HostText, HostComponent, HostText.'
     );
   }
 }
@@ -4910,8 +5317,49 @@ function assertPrivateToTreeCompositeAcceptedFiberShape(shape) {
   }
 }
 
+function assertPrivateToTreeCompositeMultiChildAcceptedFiberShape(shape) {
+  if (
+    !Array.isArray(shape) ||
+    shape.length !== privateToTreeCompositeMultiChildAcceptedFiberShape.length ||
+    shape.some(
+      (tag, index) =>
+        tag !== privateToTreeCompositeMultiChildAcceptedFiberShape[index]
+    )
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Expected private tree metadata accepted composite multi-child fiber shape to be HostRoot, FunctionComponent, HostText, HostComponent, HostText.'
+    );
+  }
+}
+
+function assertPrivateToTreeStringArrayField(record, camelName, snakeName, expected) {
+  const actual = readPrivateToJSONArrayField(record, camelName, snakeName);
+  if (
+    actual.length !== expected.length ||
+    actual.some((value, index) => value !== expected[index])
+  ) {
+    throwPrivateToTreeMetadataError(
+      `Expected private tree metadata ${camelName} to be ${expected.join(', ')}.`
+    );
+  }
+}
+
 function serializePrivateToTreeMetadataDiagnostic(report) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+
+  if (diagnostic.kind === 'multi-child') {
+    if (diagnostic.componentWrapped) {
+      return freezeRecord({
+        nodeType: 'component',
+        type: diagnostic.componentType,
+        props: diagnostic.componentProps,
+        instance: null,
+        rendered: diagnostic.renderedChildren
+      });
+    }
+
+    return diagnostic.renderedChildren;
+  }
 
   const renderedHostTree = freezeRecord({
     nodeType: 'host',
@@ -6291,7 +6739,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
   const toTree = createRendererUnsupportedFunction(
     'create().toTree',
     0,
-    'Fiber tree inspection is intentionally blocked for the public API. The JS facade records private toTree metadata for a FunctionComponent wrapper above the accepted HostRoot, HostComponent, and HostText canary; it has no native bridge, public toTree serializer, or compatibility claim.',
+    'Fiber tree inspection is intentionally blocked for the public API. The JS facade records private toTree metadata for multi-child host output and a FunctionComponent wrapper above accepted host diagnostics; it has no native bridge, public toTree serializer, or compatibility claim.',
     routingGate,
     undefined,
     () => createRequest
