@@ -1,12 +1,14 @@
-//! Private begin-work handoff for function components and a narrow Fragment canary.
+//! Private begin-work handoff for function components and narrow Fragment/array canaries.
 //!
 //! This is intentionally below the public work loop. The default handoff
 //! delegates only the accepted function-component render skeleton and one
 //! unkeyed Fragment with exactly one existing HostComponent/HostText child. The
 //! private function-component single-child helper records one admitted
-//! HostComponent/HostText output for root-loop canaries. It does not implement
-//! broad reconciliation, complete host work, commit effects, mutate hosts, or
-//! switch roots.
+//! HostComponent/HostText output for root-loop canaries. The HostRoot child-set
+//! helper validates only one-level unkeyed arrays or top-level unkeyed fragments
+//! containing multiple host children. It does not implement broad
+//! reconciliation, complete host work, commit effects, mutate hosts, keyed
+//! diffing, or root switching.
 
 #![allow(dead_code)]
 
@@ -208,6 +210,161 @@ pub(crate) struct FragmentSingleHostChildBeginWorkRecord {
     pending_props: PropsHandle,
     child_pending_props: PropsHandle,
     render_lanes: Lanes,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostRootOneLevelChildSetKind {
+    Array,
+    Fragment,
+}
+
+impl HostRootOneLevelChildSetKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Array => "array",
+            Self::Fragment => "fragment",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootOneLevelChildSet {
+    root_element: RootElementHandle,
+    kind: HostRootOneLevelChildSetKind,
+    key: Option<ReactKey>,
+    entries: Vec<HostRootOneLevelChildSetEntry>,
+}
+
+impl HostRootOneLevelChildSet {
+    #[must_use]
+    pub fn array(
+        root_element: RootElementHandle,
+        entries: Vec<HostRootOneLevelChildSetEntry>,
+    ) -> Self {
+        Self {
+            root_element,
+            kind: HostRootOneLevelChildSetKind::Array,
+            key: None,
+            entries,
+        }
+    }
+
+    #[must_use]
+    pub fn fragment(
+        root_element: RootElementHandle,
+        key: Option<ReactKey>,
+        entries: Vec<HostRootOneLevelChildSetEntry>,
+    ) -> Self {
+        Self {
+            root_element,
+            kind: HostRootOneLevelChildSetKind::Fragment,
+            key,
+            entries,
+        }
+    }
+
+    #[must_use]
+    pub const fn root_element(&self) -> RootElementHandle {
+        self.root_element
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> HostRootOneLevelChildSetKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub fn key(&self) -> Option<&ReactKey> {
+        self.key.as_ref()
+    }
+
+    #[must_use]
+    pub fn entries(&self) -> &[HostRootOneLevelChildSetEntry] {
+        &self.entries
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootOneLevelChildSetEntry {
+    Host {
+        element: RootElementHandle,
+    },
+    KeyedHost {
+        element: RootElementHandle,
+        key: ReactKey,
+    },
+    NestedArray {
+        first_child: Option<RootElementHandle>,
+    },
+    NestedFragment {
+        key: Option<ReactKey>,
+        first_child: Option<RootElementHandle>,
+    },
+}
+
+impl HostRootOneLevelChildSetEntry {
+    #[must_use]
+    pub const fn host(element: RootElementHandle) -> Self {
+        Self::Host { element }
+    }
+
+    #[must_use]
+    pub fn keyed_host(element: RootElementHandle, key: ReactKey) -> Self {
+        Self::KeyedHost { element, key }
+    }
+
+    #[must_use]
+    pub const fn nested_array(first_child: Option<RootElementHandle>) -> Self {
+        Self::NestedArray { first_child }
+    }
+
+    #[must_use]
+    pub fn nested_fragment(key: Option<ReactKey>, first_child: Option<RootElementHandle>) -> Self {
+        Self::NestedFragment { key, first_child }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootOneLevelChildSetBeginWorkRecord {
+    root_element: RootElementHandle,
+    kind: HostRootOneLevelChildSetKind,
+    child_count: usize,
+    first_child: RootElementHandle,
+    last_child: RootElementHandle,
+    children: Vec<RootElementHandle>,
+}
+
+impl HostRootOneLevelChildSetBeginWorkRecord {
+    #[must_use]
+    pub const fn root_element(&self) -> RootElementHandle {
+        self.root_element
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> HostRootOneLevelChildSetKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn child_count(&self) -> usize {
+        self.child_count
+    }
+
+    #[must_use]
+    pub const fn first_child(&self) -> RootElementHandle {
+        self.first_child
+    }
+
+    #[must_use]
+    pub const fn last_child(&self) -> RootElementHandle {
+        self.last_child
+    }
+
+    #[must_use]
+    pub fn children(&self) -> &[RootElementHandle] {
+        &self.children
+    }
 }
 
 impl FragmentSingleHostChildBeginWorkRecord {
@@ -1537,6 +1694,111 @@ pub(crate) enum FragmentSingleHostChildBeginWorkError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootOneLevelChildSetBeginWorkError {
+    RootElementMissing {
+        kind: HostRootOneLevelChildSetKind,
+    },
+    KeyedFragmentUnsupported {
+        root_element: RootElementHandle,
+        key: ReactKey,
+    },
+    ExpectedMultipleHostChildren {
+        root_element: RootElementHandle,
+        kind: HostRootOneLevelChildSetKind,
+        count: usize,
+    },
+    MissingHostChild {
+        root_element: RootElementHandle,
+        kind: HostRootOneLevelChildSetKind,
+        child_index: usize,
+    },
+    KeyedHostChildUnsupported {
+        root_element: RootElementHandle,
+        kind: HostRootOneLevelChildSetKind,
+        child_index: usize,
+        element: RootElementHandle,
+        key: ReactKey,
+    },
+    NestedChildSetUnsupported {
+        root_element: RootElementHandle,
+        kind: HostRootOneLevelChildSetKind,
+        child_index: usize,
+        nested_kind: HostRootOneLevelChildSetKind,
+        first_child: Option<RootElementHandle>,
+    },
+}
+
+impl Display for HostRootOneLevelChildSetBeginWorkError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootElementMissing { kind } => write!(
+                formatter,
+                "private HostRoot {} child-set begin-work requires a root element handle",
+                kind.as_str()
+            ),
+            Self::KeyedFragmentUnsupported { root_element, key } => write!(
+                formatter,
+                "private HostRoot fragment child-set {} has key {:?}; keyed Fragment reconciliation stays unsupported",
+                root_element.raw(),
+                key.as_str()
+            ),
+            Self::ExpectedMultipleHostChildren {
+                root_element,
+                kind,
+                count,
+            } => write!(
+                formatter,
+                "private HostRoot {} child-set {} requires at least two host children, found {count}",
+                kind.as_str(),
+                root_element.raw()
+            ),
+            Self::MissingHostChild {
+                root_element,
+                kind,
+                child_index,
+            } => write!(
+                formatter,
+                "private HostRoot {} child-set {} has missing/null host child at index {child_index}",
+                kind.as_str(),
+                root_element.raw()
+            ),
+            Self::KeyedHostChildUnsupported {
+                root_element,
+                kind,
+                child_index,
+                element,
+                key,
+            } => write!(
+                formatter,
+                "private HostRoot {} child-set {} child {} ({}) has key {:?}; keyed child reconciliation stays unsupported",
+                kind.as_str(),
+                root_element.raw(),
+                child_index,
+                element.raw(),
+                key.as_str()
+            ),
+            Self::NestedChildSetUnsupported {
+                root_element,
+                kind,
+                child_index,
+                nested_kind,
+                first_child,
+            } => write!(
+                formatter,
+                "private HostRoot {} child-set {} child {} is a nested {} set starting at {:?}; nested child reconciliation stays unsupported",
+                kind.as_str(),
+                root_element.raw(),
+                child_index,
+                nested_kind.as_str(),
+                first_child.map(RootElementHandle::raw)
+            ),
+        }
+    }
+}
+
+impl Error for HostRootOneLevelChildSetBeginWorkError {}
+
 impl Display for FragmentSingleHostChildBeginWorkError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -1794,6 +2056,96 @@ pub(crate) fn begin_work_fragment_single_host_child(
         pending_props,
         child_pending_props,
         render_lanes: request.render_lanes(),
+    })
+}
+
+pub(crate) fn begin_work_host_root_one_level_child_set(
+    child_set: &HostRootOneLevelChildSet,
+) -> Result<HostRootOneLevelChildSetBeginWorkRecord, HostRootOneLevelChildSetBeginWorkError> {
+    let root_element = child_set.root_element();
+    let kind = child_set.kind();
+    if root_element.is_none() {
+        return Err(HostRootOneLevelChildSetBeginWorkError::RootElementMissing { kind });
+    }
+    if kind == HostRootOneLevelChildSetKind::Fragment
+        && let Some(key) = child_set.key().cloned()
+    {
+        return Err(
+            HostRootOneLevelChildSetBeginWorkError::KeyedFragmentUnsupported { root_element, key },
+        );
+    }
+
+    let mut children = Vec::with_capacity(child_set.entries().len());
+    for (child_index, entry) in child_set.entries().iter().enumerate() {
+        match entry {
+            HostRootOneLevelChildSetEntry::Host { element } if element.is_some() => {
+                children.push(*element);
+            }
+            HostRootOneLevelChildSetEntry::Host { .. } => {
+                return Err(HostRootOneLevelChildSetBeginWorkError::MissingHostChild {
+                    root_element,
+                    kind,
+                    child_index,
+                });
+            }
+            HostRootOneLevelChildSetEntry::KeyedHost { element, key } => {
+                return Err(
+                    HostRootOneLevelChildSetBeginWorkError::KeyedHostChildUnsupported {
+                        root_element,
+                        kind,
+                        child_index,
+                        element: *element,
+                        key: key.clone(),
+                    },
+                );
+            }
+            HostRootOneLevelChildSetEntry::NestedArray { first_child } => {
+                return Err(
+                    HostRootOneLevelChildSetBeginWorkError::NestedChildSetUnsupported {
+                        root_element,
+                        kind,
+                        child_index,
+                        nested_kind: HostRootOneLevelChildSetKind::Array,
+                        first_child: *first_child,
+                    },
+                );
+            }
+            HostRootOneLevelChildSetEntry::NestedFragment { first_child, .. } => {
+                return Err(
+                    HostRootOneLevelChildSetBeginWorkError::NestedChildSetUnsupported {
+                        root_element,
+                        kind,
+                        child_index,
+                        nested_kind: HostRootOneLevelChildSetKind::Fragment,
+                        first_child: *first_child,
+                    },
+                );
+            }
+        }
+    }
+
+    if children.len() < 2 {
+        return Err(
+            HostRootOneLevelChildSetBeginWorkError::ExpectedMultipleHostChildren {
+                root_element,
+                kind,
+                count: children.len(),
+            },
+        );
+    }
+
+    let first_child = children[0];
+    let last_child = *children
+        .last()
+        .expect("child count was validated to contain at least two entries");
+
+    Ok(HostRootOneLevelChildSetBeginWorkRecord {
+        root_element,
+        kind,
+        child_count: children.len(),
+        first_child,
+        last_child,
+        children,
     })
 }
 
@@ -4413,6 +4765,184 @@ mod tests {
         }
 
         assert!(registry.calls().is_empty());
+    }
+
+    #[test]
+    fn begin_work_host_root_one_level_child_set_accepts_array_and_unkeyed_fragment() {
+        let root_element = RootElementHandle::from_raw(800);
+        let first = RootElementHandle::from_raw(801);
+        let second = RootElementHandle::from_raw(802);
+        let third = RootElementHandle::from_raw(803);
+
+        let array = HostRootOneLevelChildSet::array(
+            root_element,
+            vec![
+                HostRootOneLevelChildSetEntry::host(first),
+                HostRootOneLevelChildSetEntry::host(second),
+                HostRootOneLevelChildSetEntry::host(third),
+            ],
+        );
+        let array_record = begin_work_host_root_one_level_child_set(&array).unwrap();
+
+        assert_eq!(array_record.root_element(), root_element);
+        assert_eq!(array_record.kind(), HostRootOneLevelChildSetKind::Array);
+        assert_eq!(array_record.child_count(), 3);
+        assert_eq!(array_record.first_child(), first);
+        assert_eq!(array_record.last_child(), third);
+        assert_eq!(array_record.children(), &[first, second, third]);
+
+        let fragment = HostRootOneLevelChildSet::fragment(
+            root_element,
+            None,
+            vec![
+                HostRootOneLevelChildSetEntry::host(first),
+                HostRootOneLevelChildSetEntry::host(second),
+            ],
+        );
+        let fragment_record = begin_work_host_root_one_level_child_set(&fragment).unwrap();
+
+        assert_eq!(fragment_record.root_element(), root_element);
+        assert_eq!(
+            fragment_record.kind(),
+            HostRootOneLevelChildSetKind::Fragment
+        );
+        assert_eq!(fragment_record.child_count(), 2);
+        assert_eq!(fragment_record.first_child(), first);
+        assert_eq!(fragment_record.last_child(), second);
+        assert_eq!(fragment_record.children(), &[first, second]);
+    }
+
+    #[test]
+    fn begin_work_host_root_one_level_child_set_fails_closed_for_missing_or_single_child() {
+        let root_element = RootElementHandle::from_raw(810);
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::array(
+                RootElementHandle::NONE,
+                vec![
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(811)),
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(812)),
+                ],
+            )),
+            Err(HostRootOneLevelChildSetBeginWorkError::RootElementMissing {
+                kind: HostRootOneLevelChildSetKind::Array,
+            },)
+        );
+
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::fragment(
+                root_element,
+                None,
+                vec![HostRootOneLevelChildSetEntry::host(RootElementHandle::NONE)],
+            )),
+            Err(HostRootOneLevelChildSetBeginWorkError::MissingHostChild {
+                root_element,
+                kind: HostRootOneLevelChildSetKind::Fragment,
+                child_index: 0,
+            },)
+        );
+
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::array(
+                root_element,
+                vec![HostRootOneLevelChildSetEntry::host(
+                    RootElementHandle::from_raw(813),
+                )],
+            )),
+            Err(
+                HostRootOneLevelChildSetBeginWorkError::ExpectedMultipleHostChildren {
+                    root_element,
+                    kind: HostRootOneLevelChildSetKind::Array,
+                    count: 1,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn begin_work_host_root_one_level_child_set_fails_closed_for_keyed_or_nested_shapes() {
+        let root_element = RootElementHandle::from_raw(820);
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::fragment(
+                root_element,
+                Some(ReactKey::from_normalized("root-fragment")),
+                vec![
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(821)),
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(822)),
+                ],
+            )),
+            Err(
+                HostRootOneLevelChildSetBeginWorkError::KeyedFragmentUnsupported {
+                    root_element,
+                    key: ReactKey::from_normalized("root-fragment"),
+                },
+            )
+        );
+
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::array(
+                root_element,
+                vec![
+                    HostRootOneLevelChildSetEntry::keyed_host(
+                        RootElementHandle::from_raw(823),
+                        ReactKey::from_normalized("child"),
+                    ),
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(824)),
+                ],
+            )),
+            Err(
+                HostRootOneLevelChildSetBeginWorkError::KeyedHostChildUnsupported {
+                    root_element,
+                    kind: HostRootOneLevelChildSetKind::Array,
+                    child_index: 0,
+                    element: RootElementHandle::from_raw(823),
+                    key: ReactKey::from_normalized("child"),
+                },
+            )
+        );
+
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::array(
+                root_element,
+                vec![
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(825)),
+                    HostRootOneLevelChildSetEntry::nested_array(Some(RootElementHandle::from_raw(
+                        826,
+                    ))),
+                ],
+            )),
+            Err(
+                HostRootOneLevelChildSetBeginWorkError::NestedChildSetUnsupported {
+                    root_element,
+                    kind: HostRootOneLevelChildSetKind::Array,
+                    child_index: 1,
+                    nested_kind: HostRootOneLevelChildSetKind::Array,
+                    first_child: Some(RootElementHandle::from_raw(826)),
+                },
+            )
+        );
+
+        assert_eq!(
+            begin_work_host_root_one_level_child_set(&HostRootOneLevelChildSet::fragment(
+                root_element,
+                None,
+                vec![
+                    HostRootOneLevelChildSetEntry::nested_fragment(
+                        Some(ReactKey::from_normalized("nested-fragment")),
+                        Some(RootElementHandle::from_raw(827)),
+                    ),
+                    HostRootOneLevelChildSetEntry::host(RootElementHandle::from_raw(828)),
+                ],
+            )),
+            Err(
+                HostRootOneLevelChildSetBeginWorkError::NestedChildSetUnsupported {
+                    root_element,
+                    kind: HostRootOneLevelChildSetKind::Fragment,
+                    child_index: 0,
+                    nested_kind: HostRootOneLevelChildSetKind::Fragment,
+                    first_child: Some(RootElementHandle::from_raw(827)),
+                },
+            )
+        );
     }
 
     #[test]
