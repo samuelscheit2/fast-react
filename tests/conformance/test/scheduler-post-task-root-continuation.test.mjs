@@ -1,19 +1,25 @@
-'use strict';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const assert = require('node:assert/strict');
-const path = require('node:path');
-const test = require('node:test');
-const {pathToFileURL} = require('node:url');
-
-const packageRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(packageRoot, '..', '..');
+const require = createRequire(import.meta.url);
+const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+const conformanceRoot = path.resolve(testDirectory, '..');
+const repoRoot = path.resolve(conformanceRoot, '..', '..');
 const {
   ROOT_CONTINUATION_BLOCKED_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
   ROOT_CONTINUATION_REJECTED_STATUS,
   createPrivatePostTaskRootContinuationMetadataRow,
   derivePrivatePostTaskRootContinuationId
-} = require(path.join(packageRoot, 'src/scheduler-post-task.js'));
+} = require(
+  path.join(
+    conformanceRoot,
+    'src/scheduler-post-task-root-continuation.cjs'
+  )
+);
 
 let postTaskOracleModulePromise = null;
 

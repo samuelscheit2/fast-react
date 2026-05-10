@@ -28,7 +28,7 @@ const {
   ROOT_CONTINUATION_METADATA_STATUS,
   ROOT_CONTINUATION_REJECTED_STATUS,
   createPrivatePostTaskRootContinuationMetadataRow
-} = require("../../../packages/scheduler/src/scheduler-post-task.js");
+} = require("../src/scheduler-post-task-root-continuation.cjs");
 
 const ROOT_EXPORT_KEYS = [
   "unstable_IdlePriority",
