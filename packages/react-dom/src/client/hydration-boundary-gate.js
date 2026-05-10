@@ -37,10 +37,16 @@ const HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND =
   'FastReactDomHydrationTextMismatchDiagnostics';
 const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND =
   'FastReactDomHydrationTextMismatchRecoverableErrorMetadata';
+const HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationReplayOwnershipGateDiagnostic';
+const HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND =
+  'FastReactDomHydrationReplayOwnershipGateEntryRecord';
 const HYDRATION_TEXT_MISMATCH_BLOCKED_REASON =
   'FAST_REACT_DOM_HYDRATION_TEXT_MISMATCH_BLOCKED';
 const HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON =
   'FAST_REACT_DOM_HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED';
+const INVALID_HYDRATION_BOUNDARY_RECORD_CODE =
+  'FAST_REACT_DOM_INVALID_HYDRATION_BOUNDARY_RECORD';
 
 const privateHydrationBoundaryRecordType =
   'fast.react_dom.unsupported_hydration_boundary_record';
@@ -371,6 +377,49 @@ function isPrivateHydrationBoundaryRecord(value) {
   return hydrationBoundaryRecordPayloads.has(value);
 }
 
+function assertPrivateHydrationBoundaryRecord(record) {
+  if (isPrivateHydrationBoundaryRecord(record)) {
+    return record;
+  }
+
+  const error = new Error(
+    'Expected a private unsupported hydration boundary record.'
+  );
+  error.code = INVALID_HYDRATION_BOUNDARY_RECORD_CODE;
+  throw error;
+}
+
+function createHydrationReplayOwnershipGateDiagnostic(
+  hydrationBoundaryRecord,
+  dispatchRecords,
+  options
+) {
+  const record = assertPrivateHydrationBoundaryRecord(
+    hydrationBoundaryRecord
+  );
+  const normalizedOptions =
+    options && typeof options === 'object' ? options : {};
+  const source =
+    typeof normalizedOptions.source === 'string'
+      ? normalizedOptions.source
+      : 'private-hydration-replay-ownership-gate';
+  const eventReplayQueueDiagnostics =
+    createHydrationReplayEventQueueDiagnostic(dispatchRecords, {
+      dehydratedTargetResolution: record.targetResolutionDiagnostics,
+      markerReplayTargetCandidates:
+        record.replayQueueDiagnostics.markerReplayTargetCandidates,
+      source
+    });
+
+  return createHydrationReplayOwnershipGateDiagnosticFromQueue({
+    eventReplayQueueDiagnostics,
+    recordId: record.recordId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    source
+  });
+}
+
 function inspectHydrationContainerMarkers(container, options) {
   return inspectHydrationContainerMarkersWithContracts(container, {
     markerContracts: acceptedHydrationMarkerContracts,
@@ -478,8 +527,17 @@ function createUnsupportedHydrateRootRecordWithGate(
         replayQueueDiagnostics.markerReplayTargetCandidates,
       source: 'unsupported-hydrate-root-boundary-record'
     });
+  const eventReplayOwnershipDiagnostics =
+    createHydrationReplayOwnershipGateDiagnosticFromQueue({
+      eventReplayQueueDiagnostics,
+      recordId,
+      rootKind: UNSUPPORTED_HYDRATION_ROOT_KIND,
+      rootTag: CONCURRENT_ROOT_TAG,
+      source: 'unsupported-hydrate-root-boundary-record'
+    });
   const eventReplayBlockers = createHydrationEventReplayBlockers({
     eventReplayQueueDiagnostics,
+    eventReplayOwnershipDiagnostics,
     listenerGuard,
     markerDiagnostics,
     markerParserEvidence,
@@ -510,6 +568,7 @@ function createUnsupportedHydrateRootRecordWithGate(
     replayQueueDiagnostics,
     targetResolutionDiagnostics,
     eventReplayQueueDiagnostics,
+    eventReplayOwnershipDiagnostics,
     eventReplayBlockers,
     canHydrate: false,
     publicRootCreated: false,
@@ -1124,6 +1183,7 @@ function getHydrationMarkerReplayTargetKind(contractId) {
 
 function createHydrationEventReplayBlockers({
   eventReplayQueueDiagnostics,
+  eventReplayOwnershipDiagnostics,
   listenerGuard,
   markerDiagnostics,
   markerParserEvidence,
@@ -1180,6 +1240,19 @@ function createHydrationEventReplayBlockers({
       eventReplayQueueDiagnostics.drainOrderDiagnosticsAccepted,
     drainOrderCount: eventReplayQueueDiagnostics.drainOrderCount,
     drainOrder: eventReplayQueueDiagnostics.drainOrder,
+    eventReplayOwnershipDiagnostics,
+    eventReplayOwnershipDiagnosticsAccepted:
+      eventReplayOwnershipDiagnostics.kind ===
+      HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    replayOwnershipRowCount:
+      eventReplayOwnershipDiagnostics.ownershipRowCount,
+    ownershipRetainedThroughDrainOrder:
+      eventReplayOwnershipDiagnostics.ownershipRetainedThroughDrainOrder,
+    rootOwnershipRetainedCount:
+      eventReplayOwnershipDiagnostics.rootOwnershipRetainedCount,
+    dehydratedBoundaryOwnershipRetainedCount:
+      eventReplayOwnershipDiagnostics
+        .dehydratedBoundaryOwnershipRetainedCount,
     replayQueueDiagnostics,
     replayQueueDiagnosticsAccepted:
       replayQueueDiagnostics.status ===
@@ -1197,6 +1270,240 @@ function createHydrationEventReplayBlockers({
     hasRootListeningMarker: listenerGuard.hasRootListeningMarker,
     blockerCount: hydrationEventReplayBlockerContracts.length,
     blockers: hydrationEventReplayBlockerContracts
+  });
+}
+
+function createHydrationReplayOwnershipGateDiagnosticFromQueue({
+  eventReplayQueueDiagnostics,
+  recordId,
+  rootKind,
+  rootTag,
+  source
+}) {
+  const blockedTargets = Array.isArray(
+    eventReplayQueueDiagnostics.blockedEventReplayTargets
+  )
+    ? eventReplayQueueDiagnostics.blockedEventReplayTargets
+    : [];
+  const blockedTargetsByInputOrder = new Map(
+    blockedTargets.map((entry) => [entry.inputOrder, entry])
+  );
+  const drainOrderEntries = Array.isArray(eventReplayQueueDiagnostics.drainOrder)
+    ? eventReplayQueueDiagnostics.drainOrder
+    : [];
+  const ownershipRows = freezeArray(
+    drainOrderEntries.map((drainEntry) =>
+      createHydrationReplayOwnershipGateEntryRecord(
+        drainEntry,
+        blockedTargetsByInputOrder.get(drainEntry.inputOrder) || null
+      )
+    )
+  );
+  const rootOwnershipRetainedCount = ownershipRows.filter(
+    (row) => row.rootOwnershipRetained
+  ).length;
+  const dehydratedBoundaryOwnershipRequiredCount = ownershipRows.filter(
+    (row) => row.dehydratedBoundaryOwnershipRequired
+  ).length;
+  const dehydratedBoundaryOwnershipRetainedCount = ownershipRows.filter(
+    (row) => row.dehydratedBoundaryOwnershipRetained === true
+  ).length;
+  const ownershipRetainedCount = ownershipRows.filter(
+    (row) => row.ownershipRetainedThroughDrainOrder
+  ).length;
+  const ownershipRetainedThroughDrainOrder =
+    ownershipRows.length > 0 && ownershipRetainedCount === ownershipRows.length;
+
+  return freezeRecord({
+    kind: HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    status:
+      ownershipRows.length === 0
+        ? 'blocked-no-replay-ownership-targets-recorded'
+        : ownershipRetainedThroughDrainOrder
+          ? 'blocked-replay-ownership-retained-through-drain-order'
+          : 'blocked-replay-ownership-mismatch-through-drain-order',
+    source:
+      typeof source === 'string'
+        ? source
+        : 'private-hydration-replay-ownership-gate',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    hostInstanceHydrationAttempted: false,
+    hasScheduledReplayAttempt: false,
+    queueMutationAllowed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
+    eventsReplayed: false,
+    willDispatchEvents: false,
+    willHydrateHostInstances: false,
+    blockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    rootRecordId: typeof recordId === 'string' ? recordId : null,
+    rootKind: typeof rootKind === 'string' ? rootKind : null,
+    rootTag: typeof rootTag === 'string' ? rootTag : null,
+    eventReplayQueueDiagnostics,
+    eventReplayQueueDiagnosticsAccepted:
+      eventReplayQueueDiagnostics.status ===
+        'blocked-no-event-replay-targets-recorded' ||
+      eventReplayQueueDiagnostics.status ===
+        'blocked-event-replay-targets-recorded',
+    targetResolutionDiagnosticsAccepted:
+      eventReplayQueueDiagnostics.targetResolutionDiagnosticsAccepted ===
+      true,
+    drainOrderDiagnosticsAccepted:
+      eventReplayQueueDiagnostics.drainOrderDiagnosticsAccepted === true,
+    orderSource:
+      eventReplayQueueDiagnostics.replayQueueDrainOrderDiagnostics
+        .orderSource,
+    blockedEventReplayTargetCount:
+      eventReplayQueueDiagnostics.blockedEventReplayTargetCount,
+    drainOrderCount: eventReplayQueueDiagnostics.drainOrderCount,
+    ownershipRowCount: ownershipRows.length,
+    ownershipRetainedCount,
+    ownershipRetainedThroughDrainOrder,
+    rootOwnershipRetainedCount,
+    dehydratedBoundaryOwnershipRequiredCount,
+    dehydratedBoundaryOwnershipRetainedCount,
+    queuedEventReplayTargetCount: 0,
+    replayedEventCount: 0,
+    ownershipRows
+  });
+}
+
+function createHydrationReplayOwnershipGateEntryRecord(
+  drainOrderEntry,
+  eventQueueEntry
+) {
+  const hasEventQueueEntry = eventQueueEntry !== null;
+  const rootOwnershipRetained =
+    hasEventQueueEntry &&
+    eventQueueEntry.rootOwnershipStatus ===
+      drainOrderEntry.rootOwnershipStatus &&
+    drainOrderEntry.rootOwnershipStatus === 'owned-by-dehydrated-root';
+  const dehydratedBoundaryOwnershipRequired =
+    drainOrderEntry.blockedOnKind === 'activity-boundary' ||
+    drainOrderEntry.blockedOnKind === 'suspense-boundary';
+  const dehydratedBoundaryOwnershipRetained =
+    dehydratedBoundaryOwnershipRequired
+      ? hasEventQueueEntry &&
+        eventQueueEntry.dehydratedBoundaryOwnerId ===
+          drainOrderEntry.dehydratedBoundaryOwnerId &&
+        eventQueueEntry.dehydratedBoundaryOwnerStatus ===
+          drainOrderEntry.dehydratedBoundaryOwnerStatus &&
+        eventQueueEntry.dehydratedBoundaryOwnerPath ===
+          drainOrderEntry.dehydratedBoundaryOwnerPath
+      : null;
+  const targetPathRetained =
+    hasEventQueueEntry &&
+    eventQueueEntry.targetPath === drainOrderEntry.targetPath &&
+    eventQueueEntry.targetPathStatus === drainOrderEntry.targetPathStatus;
+  const queueIdentityRetained =
+    hasEventQueueEntry &&
+    eventQueueEntry.domEventName === drainOrderEntry.domEventName &&
+    eventQueueEntry.queueName === drainOrderEntry.queueName &&
+    eventQueueEntry.queueCategory === drainOrderEntry.queueCategory;
+  const blockedOwnerRetained =
+    hasEventQueueEntry &&
+    eventQueueEntry.blockedOnKind === drainOrderEntry.blockedOnKind &&
+    eventQueueEntry.blockedOnStatus === drainOrderEntry.blockedOnStatus;
+  const ownershipRetainedThroughDrainOrder =
+    rootOwnershipRetained &&
+    targetPathRetained &&
+    queueIdentityRetained &&
+    blockedOwnerRetained &&
+    (dehydratedBoundaryOwnershipRetained === true ||
+      dehydratedBoundaryOwnershipRetained === null);
+
+  return freezeRecord({
+    kind: HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
+    status: ownershipRetainedThroughDrainOrder
+      ? dehydratedBoundaryOwnershipRequired
+        ? 'retained-root-and-boundary-ownership-through-drain-order'
+        : 'retained-root-ownership-through-drain-order'
+      : 'mismatched-ownership-through-drain-order',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    inputOrder: drainOrderEntry.inputOrder,
+    drainOrder: drainOrderEntry.drainOrder,
+    replayQueueOrder: drainOrderEntry.replayQueueOrder,
+    prioritySortKey: drainOrderEntry.prioritySortKey,
+    domEventName: drainOrderEntry.domEventName,
+    nativeEventType: drainOrderEntry.nativeEventType,
+    queueCategory: drainOrderEntry.queueCategory,
+    queueName: drainOrderEntry.queueName,
+    queuePolicy: drainOrderEntry.queuePolicy,
+    replayableEvent: drainOrderEntry.replayableEvent,
+    eventQueueEntryFound: hasEventQueueEntry,
+    eventQueueRootOwnershipStatus: hasEventQueueEntry
+      ? eventQueueEntry.rootOwnershipStatus
+      : null,
+    drainOrderRootOwnershipStatus: drainOrderEntry.rootOwnershipStatus,
+    rootOwnershipRetained,
+    eventQueueDehydratedRootOwnerStatus: hasEventQueueEntry
+      ? eventQueueEntry.dehydratedRootOwnerStatus
+      : null,
+    drainOrderDehydratedRootOwnerStatus:
+      drainOrderEntry.dehydratedRootOwnerStatus,
+    dehydratedBoundaryOwnershipRequired,
+    dehydratedBoundaryOwnershipRetained,
+    dehydratedBoundaryOwnershipStatus:
+      dehydratedBoundaryOwnershipRequired
+        ? dehydratedBoundaryOwnershipRetained
+          ? 'retained-dehydrated-boundary-owner'
+          : 'mismatched-dehydrated-boundary-owner'
+        : drainOrderEntry.blockedOnKind === 'dehydrated-root'
+          ? 'not-applicable-blocked-on-dehydrated-root'
+          : 'not-applicable-no-dehydrated-boundary-owner',
+    eventQueueDehydratedBoundaryOwnerId: hasEventQueueEntry
+      ? eventQueueEntry.dehydratedBoundaryOwnerId
+      : null,
+    drainOrderDehydratedBoundaryOwnerId:
+      drainOrderEntry.dehydratedBoundaryOwnerId,
+    eventQueueDehydratedBoundaryOwnerIndex: hasEventQueueEntry
+      ? eventQueueEntry.dehydratedBoundaryOwnerIndex
+      : null,
+    drainOrderDehydratedBoundaryOwnerIndex:
+      drainOrderEntry.dehydratedBoundaryOwnerIndex,
+    eventQueueDehydratedBoundaryOwnerPath: hasEventQueueEntry
+      ? eventQueueEntry.dehydratedBoundaryOwnerPath
+      : null,
+    drainOrderDehydratedBoundaryOwnerPath:
+      drainOrderEntry.dehydratedBoundaryOwnerPath,
+    eventQueueDehydratedBoundaryOwnerStatus: hasEventQueueEntry
+      ? eventQueueEntry.dehydratedBoundaryOwnerStatus
+      : null,
+    drainOrderDehydratedBoundaryOwnerStatus:
+      drainOrderEntry.dehydratedBoundaryOwnerStatus,
+    blockedOnKind: drainOrderEntry.blockedOnKind,
+    blockedOnStatus: drainOrderEntry.blockedOnStatus,
+    blockedOnSortKey: drainOrderEntry.blockedOnSortKey,
+    blockedOwnerRetained,
+    eventQueueTargetPath: hasEventQueueEntry ? eventQueueEntry.targetPath : null,
+    drainOrderTargetPath: drainOrderEntry.targetPath,
+    eventQueueTargetPathStatus: hasEventQueueEntry
+      ? eventQueueEntry.targetPathStatus
+      : null,
+    drainOrderTargetPathStatus: drainOrderEntry.targetPathStatus,
+    targetPathRetained,
+    targetPathSortKey: drainOrderEntry.targetPathSortKey,
+    queueIdentityRetained,
+    ownershipRetainedThroughDrainOrder,
+    queued: false,
+    replayQueueDrained: false,
+    willDrainReplayQueues: false,
+    willDispatch: false,
+    willHydrate: false,
+    willReplay: false
   });
 }
 
@@ -1398,12 +1705,16 @@ module.exports = {
   HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
   HYDRATION_MARKER_ORACLE_KIND,
   HYDRATION_MARKER_ORACLE_SCHEMA_VERSION,
+  HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+  HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
   HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
   HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
+  INVALID_HYDRATION_BOUNDARY_RECORD_CODE,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
+  createHydrationReplayOwnershipGateDiagnostic,
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
