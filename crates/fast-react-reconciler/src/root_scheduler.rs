@@ -941,6 +941,113 @@ impl SuspenseThenableRetryRootSchedulerRequestRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SuspenseThenableRetryRootRenderHandoffRecord {
+    request: SuspenseThenableRetryRootSchedulerRequestRecord,
+    execution: RootPingedRetryExecutionRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private Suspense retry render handoff metadata is reserved for future Suspense workers"
+)]
+impl SuspenseThenableRetryRootRenderHandoffRecord {
+    #[must_use]
+    pub(crate) const fn request(self) -> SuspenseThenableRetryRootSchedulerRequestRecord {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn execution(self) -> RootPingedRetryExecutionRecord {
+        self.execution
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn boundary(self) -> FiberId {
+        self.request.boundary()
+    }
+
+    #[must_use]
+    pub(crate) const fn retry_lane(self) -> Lane {
+        self.request.retry_lane()
+    }
+
+    #[must_use]
+    pub(crate) const fn pinged_lanes(self) -> Lanes {
+        self.request.pinged_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> SchedulerCallbackRequest {
+        self.execution.callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> RootPingedRetryExecutionStatus {
+        self.execution.status()
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(self) -> Option<HostRootRenderPhaseRecord> {
+        self.execution.render_phase()
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled_root(self) -> Option<ScheduledRootUpdateResult> {
+        self.request.scheduled_root()
+    }
+
+    #[must_use]
+    pub(crate) fn root_work_loop_reached(self) -> bool {
+        let Some(render) = self.render_phase() else {
+            return false;
+        };
+
+        self.request.accepted()
+            && self.status() == RootPingedRetryExecutionStatus::Rendered
+            && !self.execution.validation().is_stale()
+            && render.root() == self.root()
+            && self.execution.validation().root() == self.root()
+            && self
+                .execution
+                .pinged_retry_lanes()
+                .contains_all(self.pinged_lanes())
+            && self.execution.selected_priority_lanes() == self.pinged_lanes()
+            && render.render_lanes() == self.pinged_lanes()
+            && self.execution.selected_render_lanes() == self.pinged_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn suspense_boundary_rendering_executed(self) -> bool {
+        self.request.suspense_boundary_rendering_executed()
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_traversal_executed(self) -> bool {
+        self.request.fallback_traversal_executed()
+    }
+
+    #[must_use]
+    pub(crate) const fn wakeable_subscription_performed(self) -> bool {
+        self.request.wakeable_subscription_performed()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_suspense_compatibility_claimed(self) -> bool {
+        self.request.public_suspense_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootSyncFlushPlan {
     skipped_reentrant_flush: bool,
@@ -2746,6 +2853,20 @@ pub(crate) fn execute_suspense_thenable_retry_root_callback<H: HostTypes>(
     }
 
     execute_pinged_retry_root_callback(store, callback)
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private Suspense retry render handoff is reserved for future Suspense workers"
+)]
+pub(crate) fn execute_suspense_thenable_retry_root_render_handoff<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    request: SuspenseThenableRetryRootSchedulerRequestRecord,
+    callback: SchedulerCallbackRequest,
+) -> Result<SuspenseThenableRetryRootRenderHandoffRecord, RootSchedulerError> {
+    let execution = execute_suspense_thenable_retry_root_callback(store, request, callback)?;
+
+    Ok(SuspenseThenableRetryRootRenderHandoffRecord { request, execution })
 }
 
 fn suspense_thenable_retry_root_scheduler_record(
@@ -4937,6 +5058,82 @@ mod tests {
         );
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_suspense_thenable_retry_render_handoff_records_root_work_loop_evidence() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let suspense = attach_suspense_retry_boundary(
+            &mut store,
+            root_id,
+            Lanes::from(Lane::RETRY_2),
+            UpdateQueueHandle::from_raw(996),
+            Some(UpdateQueueHandle::from_raw(997)),
+        );
+        mark_suspended_lane(&mut store, root_id, Lane::RETRY_2);
+
+        let request =
+            request_suspense_thenable_retry_root_scheduler(&mut store, root_id, &suspense).unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let schedule = processed.records()[0];
+        let callback = schedule.scheduled_callback().unwrap();
+        let handoff =
+            execute_suspense_thenable_retry_root_render_handoff(&mut store, request, callback)
+                .unwrap();
+        let execution = handoff.execution();
+        let render = handoff.render_phase().unwrap();
+
+        assert_eq!(handoff.request(), request);
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.boundary(), suspense.fiber());
+        assert_eq!(handoff.retry_lane(), Lane::RETRY_2);
+        assert_eq!(handoff.pinged_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(handoff.callback(), callback);
+        assert_eq!(handoff.scheduled_root(), request.scheduled_root());
+        assert!(handoff.root_work_loop_reached());
+        assert!(!handoff.suspense_boundary_rendering_executed());
+        assert!(!handoff.fallback_traversal_executed());
+        assert!(!handoff.wakeable_subscription_performed());
+        assert!(!handoff.public_suspense_compatibility_claimed());
+        assert!(!handoff.public_root_compatibility_claimed());
+
+        assert_eq!(schedule.root(), root_id);
+        assert_eq!(schedule.outcome(), RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(schedule.next_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(handoff.status(), RootPingedRetryExecutionStatus::Rendered);
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            execution.selected_priority_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            execution.selected_render_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(render.root(), root_id);
+        assert_eq!(render.current(), current);
+        assert_eq!(render.render_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(render.resulting_element(), RootElementHandle::NONE);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .render_exit_status(),
+            RootRenderExitStatus::Completed
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pinged_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

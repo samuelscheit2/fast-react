@@ -115,7 +115,7 @@ use crate::{
     root_scheduler::{
         RootPingedRetryExecutionStatus, RootSyncSchedulerContinuationExecutionStatus,
         SuspenseThenableRetryRootSchedulerStatus, execute_pinged_retry_root_callback,
-        execute_suspense_thenable_retry_root_callback,
+        execute_suspense_thenable_retry_root_render_handoff,
         execute_sync_scheduler_continuation_for_render_handoff,
         request_suspense_thenable_retry_root_scheduler,
     },
@@ -7926,9 +7926,11 @@ mod tests {
                 .unwrap();
         let processed = process_root_schedule_in_microtask(&mut store).unwrap();
         let callback = processed.records()[0].scheduled_callback().unwrap();
-        let execution =
-            execute_suspense_thenable_retry_root_callback(&mut store, request, callback).unwrap();
-        let render = execution.render_phase().unwrap();
+        let render_handoff =
+            execute_suspense_thenable_retry_root_render_handoff(&mut store, request, callback)
+                .unwrap();
+        let execution = render_handoff.execution();
+        let render = render_handoff.render_phase().unwrap();
         let handoff = handoff_completed_host_root_render_to_test_complete_work(
             &mut store, &mut host, render, &source,
         )
@@ -7952,6 +7954,19 @@ mod tests {
             processed.records()[0].next_lanes(),
             Lanes::from(Lane::RETRY_2)
         );
+
+        assert_eq!(render_handoff.request(), request);
+        assert_eq!(render_handoff.root(), root_id);
+        assert_eq!(render_handoff.boundary(), suspense);
+        assert_eq!(render_handoff.retry_lane(), Lane::RETRY_2);
+        assert_eq!(render_handoff.pinged_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(render_handoff.callback(), callback);
+        assert!(render_handoff.root_work_loop_reached());
+        assert!(!render_handoff.suspense_boundary_rendering_executed());
+        assert!(!render_handoff.fallback_traversal_executed());
+        assert!(!render_handoff.wakeable_subscription_performed());
+        assert!(!render_handoff.public_suspense_compatibility_claimed());
+        assert!(!render_handoff.public_root_compatibility_claimed());
 
         assert_eq!(execution.status(), RootPingedRetryExecutionStatus::Rendered);
         assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
