@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -167,6 +168,81 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS =
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS =
   "blocked-private-root-bridge-request-row";
 
+export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID =
+  "react-dom-portal-root-render-blocked-gate-1";
+
+export const REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS =
+  "accepted-create-portal-object-record";
+
+export const REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS =
+  "accepted-reconciler-portal-fail-closed-diagnostic";
+
+export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS =
+  "blocked-portal-root-render";
+
+export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS =
+  Object.freeze([
+    Object.freeze({
+      id: "portal-public-root-render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      reason:
+        "createPortal object construction is accepted, but rendering a portal through public React DOM roots is blocked until public root render and reconciler portal admission can hand off safely."
+    }),
+    Object.freeze({
+      id: "portal-mounting",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      reason:
+        "Portal container mounting is not implemented; the accepted reconciler diagnostic must fail closed before mounting portal children."
+    }),
+    Object.freeze({
+      id: "portal-listener-setup",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      reason:
+        "Portal listener setup and preparePortalMount behavior remain unsupported and must not be inferred from createPortal object construction."
+    }),
+    Object.freeze({
+      id: "portal-dom-mutation",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      reason:
+        "Portal DOM mutation remains blocked; the local gate checks only create-only object behavior and fail-closed diagnostics."
+    }),
+    Object.freeze({
+      id: "portal-compatibility-claim",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      reason:
+        "React DOM portal root-render compatibility is not claimed while mounting, listeners, DOM mutation, and public roots are blocked."
+    })
+  ]);
+
+export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE = Object.freeze({
+  id: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID,
+  reactDomPortalOracle: `${REACT_DOM_ROOT_RENDER_E2E_TARGET.packageName}@${REACT_DOM_ROOT_RENDER_E2E_TARGET.version}`,
+  reactDomRootRenderE2EOracle: `${REACT_DOM_ROOT_RENDER_E2E_TARGET.packageName}@${REACT_DOM_ROOT_RENDER_E2E_TARGET.version}`,
+  localTargetPackageName: REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET.packageName,
+  acceptedPrerequisiteStatuses: Object.freeze([
+    REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
+    REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS
+  ]),
+  blockedBoundaryRows: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS,
+  unsupportedBehavior: Object.freeze({
+    gateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+    portalMountingAvailable: false,
+    portalListenerSetupAvailable: false,
+    portalDomMutationAvailable: false,
+    compatibilityClaimed: false
+  })
+});
+
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_REQUEST_ADMISSIONS =
   Object.freeze([
     {
@@ -250,7 +326,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
     checkedOracle,
     currentOracle: currentOracle ?? (await generateReactDomRootRenderE2EOracle()),
     privateBridgeObservations:
-      inspectReactDomRootRenderE2EPrivateBridgeRequests({ workspaceRoot })
+      inspectReactDomRootRenderE2EPrivateBridgeRequests({ workspaceRoot }),
+    portalRootRenderObservations: inspectReactDomPortalRootRenderBlockedBoundary({
+      workspaceRoot
+    })
   });
 }
 
@@ -280,7 +359,9 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   checkedOracle,
   currentOracle,
   privateBridgeObservations =
-    inspectReactDomRootRenderE2EPrivateBridgeRequests()
+    inspectReactDomRootRenderE2EPrivateBridgeRequests(),
+  portalRootRenderObservations =
+    inspectReactDomPortalRootRenderBlockedBoundary()
 }) {
   const failures = [];
   const admitted = [];
@@ -520,6 +601,14 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     });
   }
 
+  const portalRootRenderGate = evaluateReactDomPortalRootRenderBlockedGate({
+    checkedOracle,
+    currentOracle,
+    portalRootRenderObservations,
+    rootRenderBlockedScenarioModeRows: blocked
+  });
+  failures.push(...portalRootRenderGate.failures);
+
   return {
     gate: REACT_DOM_ROOT_RENDER_E2E_CONFORMANCE_GATE,
     privateBridgeGate: {
@@ -541,6 +630,9 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     blockedScenarioModeRows: blocked,
     privateBridgeComparableScenarioModeRows: privateBridgeComparableRows,
     privateBridgeBlockedScenarioModeRows: privateBridgeBlockedRows,
+    portalRootRenderGate,
+    portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
+    portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
     failures,
     summary: {
       admittedScenarioModeRowCount: admitted.length,
@@ -549,6 +641,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateBridgeComparableRows.length,
       privateBridgeBlockedScenarioModeRowCount:
         privateBridgeBlockedRows.length,
+      portalRootRenderPrerequisiteRowCount:
+        portalRootRenderGate.summary.prerequisiteRowCount,
+      portalRootRenderBlockedRowCount:
+        portalRootRenderGate.summary.blockedRowCount,
       failureCount: failures.length,
       totalScenarioModeRowCount:
         REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length *
@@ -558,6 +654,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         blocked.length === 0 &&
         admitted.length > 0,
       privateBridgeCompatibilityClaimed: false,
+      portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
   };
@@ -657,6 +754,66 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   };
 }
 
+export function evaluateReactDomPortalRootRenderBlockedGate({
+  checkedOracle,
+  currentOracle,
+  portalRootRenderObservations =
+    inspectReactDomPortalRootRenderBlockedBoundary(),
+  rootRenderBlockedScenarioModeRows = null
+} = {}) {
+  const failures = [];
+  const prerequisiteRows = [];
+  const blockedRows = [];
+
+  validatePortalRootRenderOracleTie({
+    checkedOracle,
+    currentOracle,
+    rootRenderBlockedScenarioModeRows,
+    failures
+  });
+  validatePortalCreateOnlyBoundary({
+    portalRootRenderObservations,
+    prerequisiteRows,
+    failures
+  });
+  validatePortalReconcilerFailClosedDiagnostics({
+    portalRootRenderObservations,
+    prerequisiteRows,
+    failures
+  });
+  validatePortalUnsupportedRows({
+    portalRootRenderObservations,
+    blockedRows,
+    failures
+  });
+
+  if (blockedRows.length > 0 && checkedOracle && currentOracle) {
+    rejectCompatibilityClaimsWhileBlocked({
+      checkedOracle,
+      currentOracle,
+      failures
+    });
+  }
+
+  return {
+    gate: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE,
+    ok: failures.length === 0,
+    prerequisiteRows,
+    blockedRows,
+    portalRootRenderObservations,
+    failures,
+    summary: {
+      prerequisiteRowCount: prerequisiteRows.length,
+      blockedRowCount: blockedRows.length,
+      rootRenderE2EScenarioModeRowCount:
+        REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length *
+        REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length,
+      failureCount: failures.length,
+      compatibilityClaimed: false
+    }
+  };
+}
+
 export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   const lines = [
     `React DOM root render E2E conformance gate: ${result.ok ? "PASS" : "FAIL"}`,
@@ -667,6 +824,8 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Blocked unsupported scenario-mode rows: ${result.summary.blockedScenarioModeRowCount}`,
     `Private bridge request rows compared: ${result.summary.privateBridgeComparableScenarioModeRowCount}`,
     `Private bridge request rows blocked: ${result.summary.privateBridgeBlockedScenarioModeRowCount}`,
+    `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
+    `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
   ];
 
@@ -678,6 +837,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateBridgeComparableScenarioModeRows.length > 0) {
     lines.push(
       "Private root-bridge rows compare request metadata only; public createRoot, DOM mutation, listeners, hydration, and compatibility claims remain blocked."
+    );
+  }
+  if (result.portalRootRenderBlockedRows.length > 0) {
+    lines.push(
+      "Portal root-render rows remain separate from public root compatibility; createPortal object shape and reconciler fail-closed diagnostics are tracked without mounting portals."
     );
   }
 
@@ -929,6 +1093,92 @@ export function inspectReactDomPrivateRootBridgeBoundary({
         rootMarkers,
         listenerRegistry
       )
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error)
+    };
+  }
+}
+
+export function inspectReactDomPortalRootRenderBlockedBoundary({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const reactDom = require(join(workspaceRoot, "packages/react-dom/index.js"));
+    const createPortalShared = require(
+      join(workspaceRoot, "packages/react-dom/src/shared/create-portal.js")
+    );
+    const rootMarkers = require(
+      join(workspaceRoot, "packages/react-dom/src/client/root-markers.js")
+    );
+    const listenerRegistry = require(
+      join(workspaceRoot, "packages/react-dom/src/events/listener-registry.js")
+    );
+    const domContainer = require(
+      join(workspaceRoot, "packages/react-dom/src/client/dom-container.js")
+    );
+
+    const ownerDocument = createGateDocument("portal-root-render", domContainer);
+    const rootContainer = createGateElement("DIV", ownerDocument, domContainer);
+    const portalContainer = createGateElement(
+      "SECTION",
+      ownerDocument,
+      domContainer
+    );
+    const portalChild = {
+      props: {
+        children: "portal child"
+      },
+      type: "span"
+    };
+
+    const publicPortal = reactDom.createPortal(
+      portalChild,
+      portalContainer,
+      "portal-key"
+    );
+    const privateRecord =
+      createPortalShared.createPortalRecordFromNormalizedParts(
+        "normalized-key",
+        portalChild,
+        portalContainer,
+        createPortalShared.reactDomPortalImplementation
+      );
+    const unsupportedImplementation = attemptGateOperation(
+      "createPortal unsupported implementation",
+      () =>
+        createPortalShared.createPortalObject(
+          portalChild,
+          portalContainer,
+          {
+            renderer: "dom"
+          },
+          "unsupported-key"
+        )
+    );
+
+    return {
+      loadError: null,
+      publicCreatePortalExport: describeLocalFunction(reactDom.createPortal),
+      publicPortal: summarizePortalObject(publicPortal, {
+        expectedChildren: portalChild,
+        expectedContainer: portalContainer
+      }),
+      privateRecord: summarizePortalObject(privateRecord, {
+        expectedChildren: portalChild,
+        expectedContainer: portalContainer
+      }),
+      unsupportedImplementation,
+      portalCreationSideEffects: summarizePortalRootRenderSideEffects({
+        containers: [rootContainer, portalContainer],
+        documents: [ownerDocument],
+        listenerRegistry,
+        rootMarkers
+      }),
+      reconcilerDiagnostics: inspectPortalReconcilerFailClosedDiagnostics({
+        workspaceRoot
+      })
     };
   } catch (error) {
     return {
@@ -1607,6 +1857,279 @@ function validatePrivateRootBridgeAdmissions({ admissions, failures }) {
       gateStatus: "private-root-bridge-admission-row-not-record-only",
       key: expected.key,
       admission
+    });
+  }
+}
+
+function validatePortalRootRenderOracleTie({
+  checkedOracle,
+  currentOracle,
+  rootRenderBlockedScenarioModeRows,
+  failures
+}) {
+  validateOracleShape({
+    checkedOracle,
+    currentOracle,
+    failures
+  });
+  if (!checkedOracle || !currentOracle) {
+    return;
+  }
+
+  const portalScenarioIds = REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.filter(
+    (scenarioId) => scenarioId.includes("portal")
+  );
+  if (portalScenarioIds.length > 0) {
+    failures.push({
+      gateStatus: "portal-scenarios-admitted-to-public-root-e2e-oracle",
+      scenarioIds: portalScenarioIds
+    });
+  }
+
+  const expectedScenarioModeRowCount =
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length *
+    REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderBlockedScenarioModeRows &&
+    rootRenderBlockedScenarioModeRows.length !== expectedScenarioModeRowCount
+  ) {
+    failures.push({
+      gateStatus: "portal-root-render-public-blocked-row-count-mismatch",
+      actual: rootRenderBlockedScenarioModeRows.length,
+      expected: expectedScenarioModeRowCount
+    });
+  }
+
+  let unsupportedComparisonCount = 0;
+  for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+    for (const scenarioId of REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS) {
+      const checkedReactObservation = findObservation({
+        oracle: checkedOracle,
+        modeId: mode.id,
+        packageName: REACT_DOM_ROOT_RENDER_E2E_TARGET.packageName,
+        scenarioId
+      });
+      const comparison = findComparison({
+        oracle: currentOracle,
+        modeId: mode.id,
+        scenarioId
+      });
+
+      if (checkedReactObservation?.result?.result?.status !== "ok") {
+        failures.push({
+          modeId: mode.id,
+          scenarioId,
+          gateStatus: "portal-root-render-react-oracle-row-not-accepted",
+          status: checkedReactObservation?.result?.result?.status ?? null
+        });
+      }
+
+      if (
+        comparison?.status === "unsupported-placeholder" &&
+        comparison.compatibilityClaimed === false
+      ) {
+        unsupportedComparisonCount += 1;
+      } else {
+        failures.push({
+          modeId: mode.id,
+          scenarioId,
+          gateStatus: "portal-root-render-public-comparison-not-blocked",
+          status: comparison?.status ?? null,
+          compatibilityClaimed: comparison?.compatibilityClaimed ?? null
+        });
+      }
+    }
+  }
+
+  if (unsupportedComparisonCount !== expectedScenarioModeRowCount) {
+    failures.push({
+      gateStatus: "portal-root-render-public-comparison-count-mismatch",
+      actual: unsupportedComparisonCount,
+      expected: expectedScenarioModeRowCount
+    });
+  }
+}
+
+function validatePortalCreateOnlyBoundary({
+  portalRootRenderObservations,
+  prerequisiteRows,
+  failures
+}) {
+  if (portalRootRenderObservations.loadError) {
+    failures.push({
+      gateStatus: "portal-root-render-boundary-load-failed",
+      error: portalRootRenderObservations.loadError
+    });
+    return;
+  }
+
+  if (
+    portalRootRenderObservations.publicCreatePortalExport.type !== "function" ||
+    portalRootRenderObservations.publicCreatePortalExport.length !== 2
+  ) {
+    failures.push({
+      gateStatus: "portal-create-portal-export-shape-mismatch",
+      exportInfo: portalRootRenderObservations.publicCreatePortalExport
+    });
+  }
+
+  if (
+    isAcceptedPortalSummary(
+      portalRootRenderObservations.publicPortal,
+      "portal-key"
+    )
+  ) {
+    prerequisiteRows.push({
+      id: "accepted-public-create-portal-object",
+      gateStatus: REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
+      comparedToAcceptedReactDomOracle: true,
+      compatibilityClaimed: false
+    });
+  } else {
+    failures.push({
+      gateStatus: "portal-public-object-shape-mismatch",
+      portal: portalRootRenderObservations.publicPortal
+    });
+  }
+
+  if (
+    isAcceptedPortalSummary(
+      portalRootRenderObservations.privateRecord,
+      "normalized-key"
+    )
+  ) {
+    prerequisiteRows.push({
+      id: "accepted-private-create-portal-record",
+      gateStatus: REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
+      comparedToAcceptedReactDomOracle: false,
+      compatibilityClaimed: false
+    });
+  } else {
+    failures.push({
+      gateStatus: "portal-private-record-shape-mismatch",
+      portal: portalRootRenderObservations.privateRecord
+    });
+  }
+
+  const unsupportedImplementation =
+    portalRootRenderObservations.unsupportedImplementation;
+  if (
+    unsupportedImplementation.status !== "throws" ||
+    unsupportedImplementation.thrown.code !==
+      "FAST_REACT_DOM_PORTAL_IMPLEMENTATION_UNSUPPORTED"
+  ) {
+    failures.push({
+      gateStatus: "portal-private-implementation-not-fail-closed",
+      unsupportedImplementation
+    });
+  }
+
+  if (
+    !isPortalRootRenderSideEffectFree(
+      portalRootRenderObservations.portalCreationSideEffects
+    )
+  ) {
+    failures.push({
+      gateStatus: "portal-create-only-boundary-produced-side-effects",
+      sideEffects: portalRootRenderObservations.portalCreationSideEffects
+    });
+  }
+}
+
+function validatePortalReconcilerFailClosedDiagnostics({
+  portalRootRenderObservations,
+  prerequisiteRows,
+  failures
+}) {
+  if (portalRootRenderObservations.loadError) {
+    return;
+  }
+
+  const diagnostics = portalRootRenderObservations.reconcilerDiagnostics;
+  if (diagnostics.loadError) {
+    failures.push({
+      gateStatus: "portal-reconciler-diagnostic-source-load-failed",
+      error: diagnostics.loadError
+    });
+    return;
+  }
+
+  if (
+    diagnostics.beginWorkUnsupportedFeatureConstantPresent &&
+    diagnostics.beginWorkUnsupportedPortalRecordPresent &&
+    diagnostics.beginWorkErrorVariantPresent &&
+    diagnostics.beginWorkPortalTagGuardPresent
+  ) {
+    prerequisiteRows.push({
+      id: "accepted-reconciler-begin-work-portal-diagnostic",
+      gateStatus: REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
+      compatibilityClaimed: false
+    });
+  } else {
+    failures.push({
+      gateStatus: "portal-reconciler-begin-work-diagnostic-missing",
+      diagnostics
+    });
+  }
+
+  if (
+    diagnostics.rootPreflightErrorVariantPresent &&
+    diagnostics.rootPreflightPortalTagGuardPresent &&
+    diagnostics.rootPreflightNoDelegationTestPresent
+  ) {
+    prerequisiteRows.push({
+      id: "accepted-reconciler-root-preflight-portal-diagnostic",
+      gateStatus: REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
+      compatibilityClaimed: false
+    });
+  } else {
+    failures.push({
+      gateStatus: "portal-reconciler-root-preflight-diagnostic-missing",
+      diagnostics
+    });
+  }
+}
+
+function validatePortalUnsupportedRows({
+  portalRootRenderObservations,
+  blockedRows,
+  failures
+}) {
+  if (portalRootRenderObservations.loadError) {
+    return;
+  }
+
+  if (
+    !isPortalRootRenderSideEffectFree(
+      portalRootRenderObservations.portalCreationSideEffects
+    )
+  ) {
+    return;
+  }
+
+  for (const row of REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS) {
+    blockedRows.push({
+      id: row.id,
+      gateStatus: row.expectedGateStatus,
+      admission: row.admission,
+      compatibilityClaimed: false,
+      portalRootRenderSurface: "react-dom-createPortal-through-root-render",
+      publicRootCompatibilitySurface: false,
+      rootRenderE2EScenarioModeRowCount:
+        REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length *
+        REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length,
+      reason: row.reason
+    });
+  }
+
+  if (
+    blockedRows.some(
+      (row) => row.gateStatus !== REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS
+    )
+  ) {
+    failures.push({
+      gateStatus: "portal-root-render-blocked-row-status-mismatch"
     });
   }
 }
@@ -2390,6 +2913,125 @@ function summarizePrivateBridgeSideEffects({
   };
 }
 
+function summarizePortalObject(portal, { expectedChildren, expectedContainer }) {
+  return {
+    brand: {
+      description: portal?.$$typeof?.description ?? null,
+      keyFor:
+        typeof portal?.$$typeof === "symbol"
+          ? Symbol.keyFor(portal.$$typeof)
+          : null,
+      stringValue:
+        typeof portal?.$$typeof === "symbol" ? String(portal.$$typeof) : null
+    },
+    childrenIdentityPreserved: portal?.children === expectedChildren,
+    containerInfoIdentityPreserved: portal?.containerInfo === expectedContainer,
+    implementation: describeLocalValue(portal?.implementation),
+    key: describeLocalValue(portal?.key),
+    objectKeys: Object.keys(portal ?? {}),
+    ownKeys: Reflect.ownKeys(portal ?? {}).map(describePropertyKey),
+    type: describeLocalValue(portal)
+  };
+}
+
+function summarizePortalRootRenderSideEffects({
+  containers,
+  documents,
+  listenerRegistry,
+  rootMarkers
+}) {
+  const containerMarkerPropertyCount = sum(
+    containers,
+    (container) => rootMarkers.inspectContainerRootMarker(container).propertyCount
+  );
+  const containerListeningMarkerPropertyCount = sum(
+    containers,
+    (container) => listenerRegistry.inspectListeningMarker(container).propertyCount
+  );
+  const ownerDocumentListeningMarkerPropertyCount = sum(
+    documents,
+    (document) => listenerRegistry.inspectListeningMarker(document).propertyCount
+  );
+  const containerListenerRegistrationCount = sum(
+    containers,
+    (container) => container.__registrations.length
+  );
+  const ownerDocumentListenerRegistrationCount = sum(
+    documents,
+    (document) => document.__registrations.length
+  );
+  const containerMutationCount = sum(
+    containers,
+    (container) => container.__mutationLog.length
+  );
+  const ownerDocumentMutationCount = sum(
+    documents,
+    (document) => document.__mutationLog.length
+  );
+
+  return {
+    compatibilityClaimed: false,
+    containerListenerRegistrationCount,
+    containerListeningMarkerPropertyCount,
+    containerMarkerPropertyCount,
+    containerMutationCount,
+    domMutationObserved:
+      containerMutationCount > 0 || ownerDocumentMutationCount > 0,
+    listenerInstallationObserved:
+      containerListenerRegistrationCount > 0 ||
+      ownerDocumentListenerRegistrationCount > 0 ||
+      containerListeningMarkerPropertyCount > 0 ||
+      ownerDocumentListeningMarkerPropertyCount > 0,
+    markerWriteObserved: containerMarkerPropertyCount > 0,
+    ownerDocumentListenerRegistrationCount,
+    ownerDocumentListeningMarkerPropertyCount,
+    ownerDocumentMutationCount,
+    portalMountingObserved: false,
+    publicRootCompatibilityClaimed: false
+  };
+}
+
+function inspectPortalReconcilerFailClosedDiagnostics({ workspaceRoot }) {
+  try {
+    const beginWorkSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/begin_work.rs"
+    );
+    const rootWorkLoopSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_work_loop.rs"
+    );
+
+    return {
+      loadError: null,
+      beginWorkErrorVariantPresent:
+        /BeginWorkError[\s\S]*UnsupportedPortal/u.test(beginWorkSource),
+      beginWorkPortalTagGuardPresent:
+        /FiberTag::Portal/u.test(beginWorkSource) &&
+        /unsupported_portal_begin_work_record/u.test(beginWorkSource),
+      beginWorkUnsupportedFeatureConstantPresent:
+        /PORTAL_RECONCILER_UNSUPPORTED_FEATURE/u.test(beginWorkSource),
+      beginWorkUnsupportedPortalRecordPresent:
+        /UnsupportedPortalBeginWorkRecord/u.test(beginWorkSource),
+      rootPreflightErrorVariantPresent:
+        /HostRootChildBeginWorkPreflightError[\s\S]*UnsupportedPortal/u.test(
+          rootWorkLoopSource
+        ),
+      rootPreflightNoDelegationTestPresent:
+        /root_work_loop_preflight_fails_closed_for_portal_child_without_delegating_or_mounting/u.test(
+          rootWorkLoopSource
+        ),
+      rootPreflightPortalTagGuardPresent:
+        /child_tag == FiberTag::Portal/u.test(rootWorkLoopSource) &&
+        /unsupported_portal_begin_work_record/u.test(rootWorkLoopSource)
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error)
+    };
+  }
+}
+
 function createGateDocument(label, domContainer) {
   const document = createGateEventTarget({
     label,
@@ -2573,6 +3215,25 @@ function describeLocalValue(value) {
   };
 }
 
+function describePropertyKey(key) {
+  if (typeof key === "symbol") {
+    return {
+      description: key.description ?? null,
+      keyFor: Symbol.keyFor(key),
+      type: "symbol"
+    };
+  }
+
+  return {
+    type: "string",
+    value: key
+  };
+}
+
+function readWorkspaceFile(workspaceRoot, relativePath) {
+  return readFileSync(join(workspaceRoot, relativePath), "utf8");
+}
+
 function serializeGateError(error) {
   return {
     name: error?.name ?? "Error",
@@ -2650,6 +3311,51 @@ function validateLocalFastReactBehavior({ behaviorByScenario, failures }) {
       });
     }
   }
+}
+
+function isAcceptedPortalSummary(portal, expectedKey) {
+  return (
+    portal?.brand?.keyFor === "react.portal" &&
+    portal.brand.description === "react.portal" &&
+    portal.brand.stringValue === "Symbol(react.portal)" &&
+    portal.childrenIdentityPreserved === true &&
+    portal.containerInfoIdentityPreserved === true &&
+    portal.implementation.type === "null" &&
+    portal.key.type === "string" &&
+    portal.key.value === expectedKey &&
+    findFirstDifferencePath(
+      portal.objectKeys,
+      ["$$typeof", "key", "children", "containerInfo", "implementation"]
+    ) === null &&
+    findFirstDifferencePath(
+      portal.ownKeys,
+      [
+        { type: "string", value: "$$typeof" },
+        { type: "string", value: "key" },
+        { type: "string", value: "children" },
+        { type: "string", value: "containerInfo" },
+        { type: "string", value: "implementation" }
+      ]
+    ) === null
+  );
+}
+
+function isPortalRootRenderSideEffectFree(sideEffects) {
+  return (
+    sideEffects?.compatibilityClaimed === false &&
+    sideEffects.publicRootCompatibilityClaimed === false &&
+    sideEffects.portalMountingObserved === false &&
+    sideEffects.domMutationObserved === false &&
+    sideEffects.listenerInstallationObserved === false &&
+    sideEffects.markerWriteObserved === false &&
+    sideEffects.containerListenerRegistrationCount === 0 &&
+    sideEffects.containerListeningMarkerPropertyCount === 0 &&
+    sideEffects.containerMarkerPropertyCount === 0 &&
+    sideEffects.containerMutationCount === 0 &&
+    sideEffects.ownerDocumentListenerRegistrationCount === 0 &&
+    sideEffects.ownerDocumentListeningMarkerPropertyCount === 0 &&
+    sideEffects.ownerDocumentMutationCount === 0
+  );
 }
 
 function validatePrivateBridgeAdmissionMetadata({
