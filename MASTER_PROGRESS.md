@@ -82,9 +82,296 @@ sequencing belong in `MASTER_PLAN.md`.
   explicit execution-context guards and deterministic sync-flush render records
   for later HostRoot commit handoff without public facade behavior or host
   mutation.
+- Worker 151 private host complete-work skeleton was merged, adding test-only
+  HostRoot/HostComponent/HostText WIP construction, detached fake host records,
+  state-node handles, child attachment, and bubbling without container commit.
+- Worker 153 Rust test-renderer root canary was merged, adding a Rust-only
+  `TestRendererRoot` that owns the in-memory mutation host container and a
+  `FiberRootStore<TestRenderer>`, routes create/update/unmount through shared
+  reconciler root APIs, and stops at scheduled/rendered HostRoot diagnostics
+  without JS facade, serialization, act, or committed host-output claims.
+- Worker 154 private DOM mutation adapter shell was merged, adding private
+  `packages/react-dom/src/dom-host` mutation and text-content helpers plus a
+  fake-DOM smoke test for append, insert, remove, clear, text update, and
+  simple text-content decisions without changing public React DOM entrypoints.
+- Worker 155 scheduler callback execution was merged, adding an internal API
+  that consumes `SchedulerCallbackRequest`, validates callback identity, and
+  returns deterministic stale/no-work/rendered records that hand matching
+  callbacks to the HostRoot render-phase path without sync flush, commit, host
+  mutation, or public Scheduler package behavior.
+- Worker 156 core root-lane selection helpers were merged, adding
+  React-source-grounded `get_next_lanes`,
+  `get_next_lanes_to_flush_sync`, and prerender checks on `RootLaneState` plus
+  exported pure-core wrappers, without changing reconciler scheduling behavior.
+- Worker 157 core hook effect ring was merged, adding an arena-backed
+  generational hook-effect ring, opaque create/destroy/dependency handles,
+  ordered circular iteration from `lastEffect.next`, and all-flags-present
+  filtering with `HookEffectFlags`, without function-component render, commit,
+  passive scheduler, DOM, or JS package integration.
+- Worker 158 core hook state queue was merged, adding pure-core generic hook
+  queue/update storage, circular pending and base queue handling, lane-aware
+  rebase results, eager state and optimistic revert metadata, render-phase
+  queue helpers, staged update finishing, and generational stale-handle guards,
+  without reconciler dispatcher, function-component render, public hook facade,
+  DOM, package, or native bridge integration.
+- Worker 159 private function-component render skeleton was merged, adding an
+  internal invocation request/record boundary, opaque output handle, explicit
+  unsupported hook/context/class/thrown-value errors, and focused tests proving
+  no host mutation, commit, child reconciliation, or public hook facade wiring.
+- Worker 160 root update callback commit prep was merged, adding deterministic
+  HostRoot callback records with queue, source update, sequence, handle, and
+  visible/hidden/deferred visibility, plus peek/take APIs for future layout
+  commit tests without invoking JS callbacks or wiring error/public/native
+  callback paths.
+- Worker 161 root error option handles were merged, adding internal typed root
+  option records for uncaught, caught, and recoverable error callback handles
+  while preserving inert root creation and avoiding render error capture,
+  callback invocation, DOM packages, native handle tables, or test-renderer
+  public error surfaces.
+- Worker 162 benchmark manifest gate was merged, adding a fail-closed
+  `tests/benchmarks` manifest/result schema checker, blocked initial root,
+  test-renderer, and DOM benchmark manifests, and a `check:benchmarks` script
+  wired into `check:js` so timing claims stay diagnostic until referenced
+  conformance artifacts are green.
+- Worker 163 root E2E conformance gate was merged, adding a fail-closed
+  `root-render-e2e:conformance` command around the React DOM 19.2.6 root
+  render/update/unmount oracle so local Fast React placeholder output remains
+  blocked until scenarios are explicitly admitted and matched.
+- Worker 164 scheduler regression tests were merged, adding committed local
+  Fast React vs `scheduler@0.27.0` root-entry oracle comparisons with 22
+  matched-but-not-claimed rows while keeping broad Scheduler compatibility and
+  browser post-task ordering claims false.
+- Worker 165 package surface guard was merged, adding a strict smoke snapshot
+  for package directories, public resolver files, declaration-file presence,
+  runtime export keys, and placeholder metadata, wired into `check:js` without
+  dropping the benchmark gate.
+- Worker 167 React DOM private root bridge was merged, adding a private
+  JavaScript `root-bridge.js` shell for deterministic client-root
+  create/update/unmount records, private root owners and handles, hidden
+  WeakMap payloads for raw containers/elements/callbacks, and a focused smoke
+  test proving public `react-dom/client` root APIs remain placeholders with no
+  marker, listener, native, or Rust side effects.
+- Worker 168 DOM component tree map shell was merged, adding private
+  element/text host-node attach/detach helpers, opaque host instance tokens,
+  reverse-map wrong-node validation, latest-props storage and cleanup, and a
+  focused smoke test proving no public React DOM export, event, ref, hydration,
+  portal, Rust, or DOM mutation commit wiring changed.
+- Worker 169 hydration boundary skeleton was merged, adding fail-closed
+  internal HostRoot hydration state accessors, typed hydration boundary handles
+  and Activity/Suspense placeholder records, while preserving client roots as
+  non-hydrated by default and leaving public `hydrateRoot`, DOM marker parsing,
+  host hydration traits, and event replay unsupported.
+- Worker 172 resource/form unsupported gates were merged, adding fail-closed
+  conformance checks for React DOM resource hints, singletons, form actions,
+  and controlled form behavior so placeholder API shape and source boundaries
+  stay explicit until private adapter prerequisites exist.
+- Worker 173 passive pending state was merged, expanding internal reconciler
+  pending passive metadata into fail-closed mount/unmount queues with
+  deterministic unmount-before-mount ordering and root scheduling-state
+  helpers, without hook effect traversal, passive flushing, public `act`, DOM,
+  or native integration.
+- Worker 175 Suspense/Offscreen fail-closed markers were merged, adding
+  internal unsupported-fiber-tag markers for Suspense, Offscreen, Activity, and
+  ViewTransition plus expanded React 19.2.6 fiber tag mapping coverage, without
+  wiring generic begin-work traversal or claiming those features.
+- Worker 176 act queue routing skeleton was merged, adding internal act queue
+  request records, a fake act callback-node sentinel, root-schedule act
+  microtask dedupe, and non-sync callback routing through the act queue when
+  active, without public `act`, task execution, continuation flushing, DOM, or
+  test-renderer facade behavior.
+- Worker 178 test-renderer serialization local gate was merged, adding a
+  fail-closed conformance gate and explicit scenario admission metadata so
+  React Test Renderer serialization compatibility remains blocked until
+  committed test-renderer host output, fiber inspection, Rust serialization
+  APIs, and a public JS facade exist.
+- Worker 179 sync flush commit integration was merged, adding an internal
+  HostRoot-only `flush_sync_commit_work_on_all_roots` path that renders sync
+  lanes, commits completed HostRoot work through the accepted current-switch
+  commit API, recomputes possible sync work, and keeps the existing
+  execution-context guarded render-only sync-flush handoff intact.
+- Worker 180 core context stack foundation was merged, adding a
+  renderer-agnostic `ContextStack` with typed context/value/frame handles,
+  default/current value lookup, provider push snapshots, restore validation,
+  stable handle reports, and ownership checks for future function-component and
+  context integration without JS facade or renderer wiring.
+- Worker 181 React DOM `createPortal` object behavior was merged, replacing
+  the root and profiling placeholder with a conformance-backed portal object
+  constructor that validates containers, preserves React portal shape and key
+  coercion, keeps server/client render behavior fail-closed, and leaves portal
+  mounting/listeners/commit work unimplemented.
+- Worker 182 React hook dispatcher guard was merged, adding a package-private
+  shared dispatcher holder plus selected public hook forwarding for the default
+  and react-server React entrypoints, with invalid-hook-call boundaries,
+  shape-matched hook arity/name, and tests proving dispatcher forwarding
+  without hook state, effect queues, function-component render, DOM, or Rust
+  integration.
+- Worker 183 React transition facade was merged, replacing the default React
+  `startTransition` placeholder with a narrow synchronous facade, internal
+  transition batch marker, React-like global error reporting for thrown and
+  non-function scopes, nested marker restore, and export-shape coverage while
+  leaving async transition finishing, tracing, lanes, scheduler, and
+  react-server behavior out of scope.
+- Worker 184 React memo element type guard was merged, adding a package-private
+  `isValidElementType` helper for modeled React symbols and wrapper objects,
+  routing development `memo` diagnostics through it for invalid non-null
+  inputs, preserving memo/lazy/forwardRef object shapes, and keeping
+  compatibility claims false without regenerating wrapper-object oracles.
+- Worker 185 React DOM namespace context helper was merged, adding private
+  owner-document and namespace context helpers for HTML, SVG, MathML,
+  integration points, and namespace-aware host element creation while leaving
+  public roots, mutation commits, hydration, events, resources, forms, and
+  attributes unwired.
 
 ## Latest Accepted Verification
 
+- Worker 185 was verified on its integrated worktree and again on `main` with
+  focused React DOM namespace context helper tests, the existing DOM namespace
+  SVG oracle test, smoke entrypoint checks, `npm run check:js` covering the
+  package-surface guard, benchmark gate, workspace checks, native loader
+  probes, and 460 conformance tests, plus `git diff --check`; merging current
+  `main` into the worker branch produced no conflicts.
+- Worker 184 was verified on its integrated worktree and again on `main` with
+  focused React memo element-type guard tests, the existing wrapper-object
+  oracle tests, smoke entrypoint checks, `npm run check:js` covering the
+  package-surface guard, benchmark gate, workspace checks, native loader
+  probes, and 455 conformance tests, plus `git diff --check`; merging current
+  `main` into the worker branch produced no conflicts after the smoke
+  import-entrypoints overlap auto-merged.
+- Worker 183 was verified on its integrated worktree and again on `main` with
+  focused React transition facade tests, focused hook dispatcher tests, smoke
+  entrypoint checks, `npm run check:js` covering the package-surface guard,
+  benchmark gate, workspace checks, native loader probes, and 450 conformance
+  tests, plus `git diff --check`; merging current `main` into the worker
+  branch produced no conflicts after the React index overlap auto-merged.
+- Worker 182 was verified on its integrated worktree and again on `main` with
+  focused React hook dispatcher guard tests, smoke entrypoint checks,
+  `npm run check:js` covering the package-surface guard, benchmark gate,
+  workspace checks, native loader probes, and 445 conformance tests, plus
+  `git diff --check`; merging current `main` into the worker branch produced
+  no conflicts after the import-entrypoints overlap auto-merged.
+- Worker 181 was verified on its integrated worktree and again on `main` with
+  focused React DOM `createPortal` conformance tests, smoke entrypoint and
+  React DOM root export checks, `npm run check:js` covering the package-surface
+  guard, benchmark gate, workspace checks, native loader probes, and 441
+  conformance tests, plus `git diff --check`; merging current `main` into the
+  worker branch produced no conflicts.
+- Worker 180 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `context_stack` tests, full
+  `fast-react-core` tests with 118 unit tests, core clippy with warnings
+  denied, and `git diff --check`; merging current `main` into the worker
+  branch produced no conflicts.
+- Worker 179 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `sync_flush`, `root_commit`, and
+  `root_scheduler` tests, full `fast-react-reconciler` tests with 118 unit
+  tests plus 1 doctest, reconciler clippy with warnings denied, and
+  `git diff --check`; the `root_scheduler.rs` merge conflict preserved the
+  existing guarded render-only sync-flush API and added shared sync-lane
+  filtering for the new commit-capable path.
+- Worker 178 was verified on its integrated worktree and again on `main` with
+  the focused `test:react-test-renderer:serialization` workspace script, full
+  conformance with 437 tests, `npm run check:js` covering the package-surface
+  guard, smoke imports, benchmark gate, workspace checks, and 437 conformance
+  tests, plus `git diff --check`; after merging current `main`, the local gate
+  expectation was updated for accepted worker 153's Rust `TestRendererRoot`
+  canary while remaining closed on missing committed host output.
+- Worker 176 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `scheduler_bridge` and `root_scheduler`
+  tests, full `fast-react-reconciler` tests with 112 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`; the
+  `root_scheduler.rs` merge conflict preserved accepted scheduler callback and
+  sync-flush execution helpers plus the new act queue routing records.
+- Worker 175 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused fiber-tag and unsupported-feature tests,
+  full `fast-react-core` tests with 112 unit tests, full
+  `fast-react-reconciler` tests with 104 unit tests plus 1 doctest, core and
+  reconciler clippy with warnings denied, and `git diff --check`; merging
+  current `main` into the worker branch produced no conflicts.
+- Worker 173 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_config` and `fiber_root` tests, full
+  `fast-react-reconciler` tests with 102 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`; the worktree merge
+  conflict in `root_config.rs` preserved both worker 169 hydration handle tests
+  and worker 173 pending passive metadata tests.
+- Worker 172 was verified on its integrated worktree and again on `main` with
+  syntax checks for the three new gate modules, focused resource/form/controlled
+  conformance tests, `npm run test:conformance` with 433 tests,
+  `npm run check:js` covering the package guard, smoke imports, benchmark gate,
+  workspace checks, and 433 conformance tests, plus `git diff --check`.
+- Worker 169 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_config` and `fiber_root` tests, full
+  `fast-react-reconciler` tests with 98 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`; the worktree merge
+  conflict in `root_config.rs` preserved both accepted root option callback
+  records and the new hydration handles/accessors.
+- Worker 168 was verified on its integrated worktree and again on `main` with
+  component-tree and smoke-test syntax checks, the focused
+  `react-dom-component-tree-map-shell` smoke test,
+  `npm run check:package-surface`, `npm run check:js` covering the package
+  guard, smoke imports, benchmark gate, workspace checks, and 428 conformance
+  tests, plus `git diff --check`.
+- Worker 167 was verified on its integrated worktree and again on `main` with
+  root-bridge and smoke-test syntax checks, the focused
+  `react-dom-private-root-bridge-shell` smoke test,
+  `npm run check:package-surface`, `npm run check:js` covering the package
+  guard, smoke imports, benchmark gate, workspace checks, and 428 conformance
+  tests, plus `git diff --check`.
+- Worker 165 was verified on its integrated worktree and again on `main` with
+  `node --check tests/smoke/package-surface-guard.mjs`,
+  `npm run check:package-surface`, `npm run check:js` covering the package
+  guard, smoke imports, benchmark gate, workspace checks, and 428 conformance
+  tests, plus `git diff --check`.
+- Worker 164 was verified on its integrated worktree and again on `main` with
+  scheduler root syntax checks, byte-stable scheduler root oracle regeneration,
+  focused Scheduler conformance covering 62 tests, `npm run check:js` with 428
+  conformance tests plus benchmark gate coverage, and `git diff --check`.
+- Worker 163 was verified on its integrated worktree and again on `main` with
+  focused root E2E syntax checks, the root oracle test, the
+  `root-render-e2e:conformance` gate showing 0 admitted and 20 blocked rows,
+  byte-stable oracle regeneration, `npm run test:conformance` with 427 tests,
+  `npm run check:js`, and `git diff --check`.
+- Worker 162 was verified on its integrated worktree and again on `main` with
+  `npm run check:benchmarks` covering 3 manifests, 40 scenarios, and 6
+  focused node tests, `npm run check:js` with 427 conformance tests, and
+  `git diff --check`.
+- Worker 161 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused root-config, fiber-root, and fiber-store
+  tests, full `fast-react-reconciler` tests with 95 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`.
+- Worker 160 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused update-queue and root-callback tests, full
+  `fast-react-reconciler` tests with 94 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`.
+- Worker 159 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `function_component` tests, full
+  `fast-react-reconciler` tests with 90 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`.
+- Worker 158 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `hook` tests with 24 unit tests, full
+  `fast-react-core` tests with 112 unit tests, core clippy with warnings
+  denied, and `git diff --check`.
+- Worker 157 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `hook_effect` tests, full
+  `fast-react-core` tests with 98 unit tests, core clippy with warnings denied,
+  and `git diff --check`.
+- Worker 156 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_lanes` tests, full
+  `fast-react-core` tests with 92 unit tests, core clippy with warnings
+  denied, and `git diff --check`.
+- Worker 155 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused root-scheduler and root-work-loop tests,
+  full `fast-react-reconciler` tests with 85 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`.
+- Worker 154 was verified on its integrated worktree and again on `main` with
+  the focused DOM mutation adapter smoke test, `npm run check:js` with 427
+  conformance tests, and `git diff --check`.
+- Worker 153 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, full `fast-react-test-renderer` tests, focused
+  `root_work_loop` and `host_work` reconciler tests, test-renderer clippy with
+  warnings denied, and `git diff --check`.
+- Worker 151 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused host-work and work-in-progress tests, full
+  `fast-react-reconciler` tests, reconciler clippy with warnings denied, and
+  `git diff --check`.
 - Worker 150 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused execution-context and root-scheduler
   tests, full `fast-react-reconciler` tests, reconciler clippy with warnings

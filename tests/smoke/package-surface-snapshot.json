@@ -1,0 +1,764 @@
+{
+  "schemaVersion": 1,
+  "updateInstructions": "When a public package entrypoint or type surface is intentionally accepted, update this snapshot in the same change and document the reason.",
+  "packageDirectories": [
+    "react",
+    "react-dom",
+    "scheduler"
+  ],
+  "manifestFields": [
+    "name",
+    "version",
+    "private",
+    "type",
+    "main",
+    "exports",
+    "types",
+    "typings",
+    "typesVersions",
+    "files",
+    "bin",
+    "browser",
+    "module",
+    "react-native",
+    "dependencies",
+    "peerDependencies"
+  ],
+  "keySets": {
+    "react.default": [
+      "Activity",
+      "Children",
+      "Component",
+      "Fragment",
+      "Profiler",
+      "PureComponent",
+      "StrictMode",
+      "Suspense",
+      "__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+      "__COMPILER_RUNTIME",
+      "act",
+      "cache",
+      "cacheSignal",
+      "captureOwnerStack",
+      "cloneElement",
+      "createContext",
+      "createElement",
+      "createRef",
+      "forwardRef",
+      "isValidElement",
+      "lazy",
+      "memo",
+      "startTransition",
+      "unstable_useCacheRefresh",
+      "use",
+      "useActionState",
+      "useCallback",
+      "useContext",
+      "useDebugValue",
+      "useDeferredValue",
+      "useEffect",
+      "useEffectEvent",
+      "useId",
+      "useImperativeHandle",
+      "useInsertionEffect",
+      "useLayoutEffect",
+      "useMemo",
+      "useOptimistic",
+      "useReducer",
+      "useRef",
+      "useState",
+      "useSyncExternalStore",
+      "useTransition",
+      "version"
+    ],
+    "react.server": [
+      "Children",
+      "Fragment",
+      "Profiler",
+      "StrictMode",
+      "Suspense",
+      "__SERVER_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+      "cache",
+      "cacheSignal",
+      "captureOwnerStack",
+      "cloneElement",
+      "createElement",
+      "createRef",
+      "forwardRef",
+      "isValidElement",
+      "lazy",
+      "memo",
+      "use",
+      "useCallback",
+      "useDebugValue",
+      "useId",
+      "useMemo",
+      "version"
+    ],
+    "react.jsxRuntime": [
+      "Fragment",
+      "jsx",
+      "jsxs"
+    ],
+    "react.serverJsxRuntime": [
+      "Fragment",
+      "jsx",
+      "jsxDEV",
+      "jsxs"
+    ],
+    "react.jsxDevRuntime": [
+      "Fragment",
+      "jsxDEV"
+    ],
+    "react.compilerRuntime": [
+      "c"
+    ],
+    "reactDom.default": [
+      "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+      "createPortal",
+      "flushSync",
+      "preconnect",
+      "prefetchDNS",
+      "preinit",
+      "preinitModule",
+      "preload",
+      "preloadModule",
+      "requestFormReset",
+      "unstable_batchedUpdates",
+      "useFormState",
+      "useFormStatus",
+      "version"
+    ],
+    "reactDom.server": [
+      "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+      "preconnect",
+      "prefetchDNS",
+      "preinit",
+      "preinitModule",
+      "preload",
+      "preloadModule",
+      "version"
+    ],
+    "reactDom.client": [
+      "createRoot",
+      "hydrateRoot",
+      "version"
+    ],
+    "reactDom.serverNode": [
+      "version",
+      "renderToString",
+      "renderToStaticMarkup",
+      "renderToPipeableStream",
+      "renderToReadableStream",
+      "resumeToPipeableStream",
+      "resume"
+    ],
+    "reactDom.serverBrowser": [
+      "version",
+      "renderToString",
+      "renderToStaticMarkup",
+      "renderToReadableStream",
+      "resume"
+    ],
+    "reactDom.serverEdge": [
+      "version",
+      "renderToReadableStream",
+      "renderToString",
+      "renderToStaticMarkup",
+      "resume"
+    ],
+    "reactDom.serverBun": [
+      "version",
+      "renderToReadableStream",
+      "resume",
+      "renderToString",
+      "renderToStaticMarkup"
+    ],
+    "reactDom.staticNode": [
+      "version",
+      "prerenderToNodeStream",
+      "prerender",
+      "resumeAndPrerenderToNodeStream",
+      "resumeAndPrerender"
+    ],
+    "reactDom.staticBrowser": [
+      "version",
+      "prerender",
+      "resumeAndPrerender"
+    ],
+    "reactDom.profiling": [
+      "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE",
+      "createPortal",
+      "createRoot",
+      "flushSync",
+      "hydrateRoot",
+      "preconnect",
+      "prefetchDNS",
+      "preinit",
+      "preinitModule",
+      "preload",
+      "preloadModule",
+      "requestFormReset",
+      "unstable_batchedUpdates",
+      "useFormState",
+      "useFormStatus",
+      "version"
+    ],
+    "reactDom.testUtils": [
+      "act"
+    ],
+    "scheduler.root": [
+      "unstable_now",
+      "unstable_IdlePriority",
+      "unstable_ImmediatePriority",
+      "unstable_LowPriority",
+      "unstable_NormalPriority",
+      "unstable_Profiling",
+      "unstable_UserBlockingPriority",
+      "unstable_cancelCallback",
+      "unstable_forceFrameRate",
+      "unstable_getCurrentPriorityLevel",
+      "unstable_next",
+      "unstable_requestPaint",
+      "unstable_runWithPriority",
+      "unstable_scheduleCallback",
+      "unstable_shouldYield",
+      "unstable_wrapCallback"
+    ],
+    "scheduler.native": [
+      "unstable_IdlePriority",
+      "unstable_ImmediatePriority",
+      "unstable_LowPriority",
+      "unstable_NormalPriority",
+      "unstable_Profiling",
+      "unstable_UserBlockingPriority",
+      "unstable_cancelCallback",
+      "unstable_forceFrameRate",
+      "unstable_getCurrentPriorityLevel",
+      "unstable_next",
+      "unstable_now",
+      "unstable_requestPaint",
+      "unstable_runWithPriority",
+      "unstable_scheduleCallback",
+      "unstable_shouldYield",
+      "unstable_wrapCallback"
+    ],
+    "scheduler.mock": [
+      "log",
+      "reset",
+      "unstable_IdlePriority",
+      "unstable_ImmediatePriority",
+      "unstable_LowPriority",
+      "unstable_NormalPriority",
+      "unstable_Profiling",
+      "unstable_UserBlockingPriority",
+      "unstable_advanceTime",
+      "unstable_cancelCallback",
+      "unstable_clearLog",
+      "unstable_flushAll",
+      "unstable_flushAllWithoutAsserting",
+      "unstable_flushExpired",
+      "unstable_flushNumberOfYields",
+      "unstable_flushUntilNextPaint",
+      "unstable_forceFrameRate",
+      "unstable_getCurrentPriorityLevel",
+      "unstable_hasPendingWork",
+      "unstable_next",
+      "unstable_now",
+      "unstable_requestPaint",
+      "unstable_runWithPriority",
+      "unstable_scheduleCallback",
+      "unstable_setDisableYieldValue",
+      "unstable_shouldYield",
+      "unstable_wrapCallback"
+    ]
+  },
+  "packages": {
+    "react": {
+      "manifest": {
+        "name": "@fast-react/react",
+        "version": "0.0.0",
+        "private": true,
+        "type": "commonjs",
+        "main": "./index.js",
+        "exports": {
+          ".": {
+            "react-server": "./react.react-server.js",
+            "default": "./index.js"
+          },
+          "./jsx-runtime": {
+            "react-server": "./jsx-runtime.react-server.js",
+            "default": "./jsx-runtime.js"
+          },
+          "./jsx-dev-runtime": {
+            "react-server": "./jsx-dev-runtime.react-server.js",
+            "default": "./jsx-dev-runtime.js"
+          },
+          "./compiler-runtime": {
+            "react-server": "./compiler-runtime.js",
+            "default": "./compiler-runtime.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "types": null,
+        "typings": null,
+        "typesVersions": null,
+        "files": null,
+        "bin": null,
+        "browser": null,
+        "module": null,
+        "react-native": null,
+        "dependencies": null,
+        "peerDependencies": null
+      },
+      "publicResolverFiles": [
+        "compiler-runtime.js",
+        "index.js",
+        "jsx-dev-runtime.js",
+        "jsx-dev-runtime.react-server.js",
+        "jsx-runtime.js",
+        "jsx-runtime.react-server.js",
+        "package.json",
+        "react.react-server.js"
+      ],
+      "declarationFiles": [],
+      "runtimeEntrypoints": [
+        {
+          "file": "index.js",
+          "keySet": "react.default",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react"
+          }
+        },
+        {
+          "file": "react.react-server.js",
+          "keySet": "react.server",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react react-server"
+          }
+        },
+        {
+          "file": "jsx-runtime.js",
+          "keySet": "react.jsxRuntime",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react/jsx-runtime"
+          }
+        },
+        {
+          "file": "jsx-runtime.react-server.js",
+          "keySet": "react.serverJsxRuntime",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react/jsx-runtime react-server"
+          }
+        },
+        {
+          "file": "jsx-dev-runtime.js",
+          "keySet": "react.jsxDevRuntime",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react/jsx-dev-runtime"
+          }
+        },
+        {
+          "file": "jsx-dev-runtime.react-server.js",
+          "keySet": "react.serverJsxRuntime",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react/jsx-dev-runtime react-server"
+          }
+        },
+        {
+          "file": "compiler-runtime.js",
+          "keySet": "react.compilerRuntime",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react@19.2.6",
+            "entrypoint": "react/compiler-runtime"
+          }
+        }
+      ]
+    },
+    "react-dom": {
+      "manifest": {
+        "name": "@fast-react/react-dom",
+        "version": "0.0.0",
+        "private": true,
+        "type": "commonjs",
+        "main": "./index.js",
+        "exports": {
+          ".": {
+            "react-server": "./react-dom.react-server.js",
+            "default": "./index.js"
+          },
+          "./client": {
+            "react-server": "./client.react-server.js",
+            "default": "./client.js"
+          },
+          "./server": {
+            "react-server": "./server.react-server.js",
+            "workerd": "./server.edge.js",
+            "bun": "./server.bun.js",
+            "deno": "./server.browser.js",
+            "worker": "./server.browser.js",
+            "node": "./server.node.js",
+            "edge-light": "./server.edge.js",
+            "browser": "./server.browser.js",
+            "default": "./server.node.js"
+          },
+          "./server.browser": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.browser.js"
+          },
+          "./server.bun": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.bun.js"
+          },
+          "./server.edge": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.edge.js"
+          },
+          "./server.node": {
+            "react-server": "./server.react-server.js",
+            "default": "./server.node.js"
+          },
+          "./static": {
+            "react-server": "./static.react-server.js",
+            "workerd": "./static.edge.js",
+            "deno": "./static.browser.js",
+            "worker": "./static.browser.js",
+            "node": "./static.node.js",
+            "edge-light": "./static.edge.js",
+            "browser": "./static.browser.js",
+            "default": "./static.node.js"
+          },
+          "./static.browser": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.browser.js"
+          },
+          "./static.edge": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.edge.js"
+          },
+          "./static.node": {
+            "react-server": "./static.react-server.js",
+            "default": "./static.node.js"
+          },
+          "./profiling": {
+            "react-server": "./profiling.react-server.js",
+            "default": "./profiling.js"
+          },
+          "./test-utils": "./test-utils.js",
+          "./package.json": "./package.json"
+        },
+        "types": null,
+        "typings": null,
+        "typesVersions": null,
+        "files": null,
+        "bin": null,
+        "browser": null,
+        "module": null,
+        "react-native": null,
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "@fast-react/react": "0.0.0"
+        }
+      },
+      "publicResolverFiles": [
+        "client.js",
+        "client.react-server.js",
+        "index.js",
+        "package.json",
+        "profiling.js",
+        "profiling.react-server.js",
+        "react-dom.react-server.js",
+        "server.browser.js",
+        "server.bun.js",
+        "server.edge.js",
+        "server.node.js",
+        "server.react-server.js",
+        "static.browser.js",
+        "static.edge.js",
+        "static.node.js",
+        "static.react-server.js",
+        "test-utils.js"
+      ],
+      "declarationFiles": [],
+      "runtimeEntrypoints": [
+        {
+          "file": "index.js",
+          "keySet": "reactDom.default",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom"
+          }
+        },
+        {
+          "file": "react-dom.react-server.js",
+          "keySet": "reactDom.server",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom"
+          }
+        },
+        {
+          "file": "client.js",
+          "keySet": "reactDom.client",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/client"
+          }
+        },
+        {
+          "file": "client.react-server.js",
+          "error": {
+            "name": "FastReactDomReactServerUnsupportedError",
+            "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
+            "compatibilityTarget": "react-dom@19.2.6"
+          }
+        },
+        {
+          "file": "server.node.js",
+          "keySet": "reactDom.serverNode",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/server.node"
+          }
+        },
+        {
+          "file": "server.browser.js",
+          "keySet": "reactDom.serverBrowser",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/server.browser"
+          }
+        },
+        {
+          "file": "server.edge.js",
+          "keySet": "reactDom.serverEdge",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/server.edge"
+          }
+        },
+        {
+          "file": "server.bun.js",
+          "keySet": "reactDom.serverBun",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/server.bun"
+          }
+        },
+        {
+          "file": "server.react-server.js",
+          "error": {
+            "name": "FastReactDomReactServerUnsupportedError",
+            "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
+            "compatibilityTarget": "react-dom@19.2.6"
+          }
+        },
+        {
+          "file": "static.node.js",
+          "keySet": "reactDom.staticNode",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/static.node"
+          }
+        },
+        {
+          "file": "static.browser.js",
+          "keySet": "reactDom.staticBrowser",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/static.browser"
+          }
+        },
+        {
+          "file": "static.edge.js",
+          "keySet": "reactDom.staticBrowser",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/static.edge"
+          }
+        },
+        {
+          "file": "static.react-server.js",
+          "error": {
+            "name": "FastReactDomReactServerUnsupportedError",
+            "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
+            "compatibilityTarget": "react-dom@19.2.6"
+          }
+        },
+        {
+          "file": "profiling.js",
+          "keySet": "reactDom.profiling",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/profiling"
+          }
+        },
+        {
+          "file": "profiling.react-server.js",
+          "error": {
+            "name": "FastReactDomReactServerUnsupportedError",
+            "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
+            "compatibilityTarget": "react-dom@19.2.6"
+          }
+        },
+        {
+          "file": "test-utils.js",
+          "keySet": "reactDom.testUtils",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/test-utils"
+          }
+        }
+      ]
+    },
+    "scheduler": {
+      "manifest": {
+        "name": "scheduler",
+        "version": "0.27.0",
+        "private": true,
+        "type": null,
+        "main": null,
+        "exports": null,
+        "types": null,
+        "typings": null,
+        "typesVersions": null,
+        "files": null,
+        "bin": null,
+        "browser": null,
+        "module": null,
+        "react-native": null,
+        "dependencies": null,
+        "peerDependencies": null
+      },
+      "publicResolverFiles": [
+        "cjs/scheduler-unstable_mock.development.js",
+        "cjs/scheduler-unstable_mock.production.js",
+        "cjs/scheduler-unstable_post_task.development.js",
+        "cjs/scheduler-unstable_post_task.production.js",
+        "cjs/scheduler.development.js",
+        "cjs/scheduler.native.development.js",
+        "cjs/scheduler.native.production.js",
+        "cjs/scheduler.production.js",
+        "index.js",
+        "index.native.js",
+        "package.json",
+        "unstable_mock.js",
+        "unstable_post_task.js"
+      ],
+      "declarationFiles": [],
+      "runtimeEntrypoints": [
+        {
+          "file": "index.js",
+          "keySet": "scheduler.root",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "index.native.js",
+          "keySet": "scheduler.native",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "unstable_mock.js",
+          "keySet": "scheduler.mock",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "unstable_post_task.js",
+          "error": {
+            "name": "ReferenceError",
+            "message": "window is not defined"
+          }
+        },
+        {
+          "file": "cjs/scheduler.development.js",
+          "keySet": "scheduler.root",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "cjs/scheduler.production.js",
+          "keySet": "scheduler.root",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "cjs/scheduler.native.development.js",
+          "keySet": "scheduler.native",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "cjs/scheduler.native.production.js",
+          "keySet": "scheduler.native",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "cjs/scheduler-unstable_mock.development.js",
+          "keySet": "scheduler.mock",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "cjs/scheduler-unstable_mock.production.js",
+          "keySet": "scheduler.mock",
+          "metadata": {
+            "placeholder": false
+          }
+        },
+        {
+          "file": "cjs/scheduler-unstable_post_task.development.js",
+          "error": {
+            "name": "ReferenceError",
+            "message": "window is not defined"
+          }
+        },
+        {
+          "file": "cjs/scheduler-unstable_post_task.production.js",
+          "error": {
+            "name": "ReferenceError",
+            "message": "window is not defined"
+          }
+        }
+      ]
+    }
+  }
+}
