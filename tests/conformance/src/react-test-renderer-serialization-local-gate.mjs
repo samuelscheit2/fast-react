@@ -3,6 +3,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIO_IDS
+} from "./react-test-renderer-error-surface-scenarios.mjs";
+import {
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS
 } from "./react-test-renderer-serialization-scenarios.mjs";
 import {
@@ -84,6 +87,104 @@ export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS =
     status: REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
     unblockRequires:
       REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.map(
+        (requirement) => requirement.id
+      )
+  }));
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_GATE_STATUS =
+  "ready-for-private-error-diagnostics-public-error-compatibility-blocked";
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS =
+  "blocked-until-react-test-renderer-private-error-diagnostics";
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROW_STATUS =
+  "admitted-private-error-diagnostic-row";
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_COMPATIBILITY_STATUS =
+  "blocked-public-react-test-renderer-error-surface-compatibility";
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS = [
+  {
+    id: "react-test-renderer-create-routing-private-diagnostic",
+    area: "create routing",
+    publicSurface: "create()",
+    privatePrerequisite: "deterministic create routing gate"
+  },
+  {
+    id: "react-test-renderer-update-route-private-diagnostic",
+    area: "root update",
+    publicSurface: "create().update",
+    privatePrerequisite: "accepted Rust update canary metadata"
+  },
+  {
+    id: "react-test-renderer-unmount-route-private-diagnostic",
+    area: "root unmount",
+    publicSurface: "create().unmount",
+    privatePrerequisite: "accepted Rust unmount canary metadata"
+  },
+  {
+    id: "react-test-renderer-serialization-private-json-diagnostic",
+    area: "serialization",
+    publicSurface: "create().toJSON/create().toTree",
+    privatePrerequisite: "accepted private JSON diagnostics"
+  },
+  {
+    id: "react-test-renderer-test-instance-private-fiber-diagnostic",
+    area: "TestInstance",
+    publicSurface: "create().root/find*/findBy*",
+    privatePrerequisite: "accepted committed-fiber inspection diagnostics"
+  },
+  {
+    id: "react-test-renderer-act-scheduler-private-diagnostic",
+    area: "act and Scheduler",
+    publicSurface: "act/_Scheduler/unstable_flushSync",
+    privatePrerequisite: "accepted private act queue and scheduler shell metadata"
+  }
+];
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS = [
+  {
+    id: "public-create-update-unmount-error-surface",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Public error compatibility needs create, update, and unmount to route through the real renderer instead of placeholder errors."
+  },
+  {
+    id: "public-serialization-error-surface",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Public error compatibility needs toJSON and toTree to expose React-shaped serializer errors instead of private diagnostics."
+  },
+  {
+    id: "public-test-instance-error-surface",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Public error compatibility needs ReactTestInstance wrappers and query errors, not committed-fiber diagnostic records."
+  },
+  {
+    id: "public-act-scheduler-error-surface",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Public error compatibility needs renderer-backed act, Scheduler, and flushSync behavior before their error surfaces can be compared."
+  },
+  {
+    id: "public-shallow-error-surface",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "The shallow subpath must stay explicitly blocked until its local placeholder error is intentionally reconciled with the React removal message."
+  }
+];
+
+export const REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_PUBLIC_SCENARIO_ADMISSIONS =
+  REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIO_IDS.map((scenarioId) => ({
+    scenarioId,
+    rowKind: "public-error-surface",
+    status: REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_COMPATIBILITY_STATUS,
+    publicComparisonBlocked: true,
+    admittedForFastReactComparison: false,
+    compatibilityClaimed: false,
+    unblockRequires:
+      REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS.map(
         (requirement) => requirement.id
       )
   }));
@@ -212,6 +313,114 @@ export function evaluateReactTestRendererSerializationLocalGate({
   };
 }
 
+export function evaluateReactTestRendererErrorSurfaceLocalGate({
+  oracle,
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  if (!oracle) {
+    throw new Error(
+      "A checked react-test-renderer error surface oracle is required"
+    );
+  }
+
+  const localChecks = inspectReactTestRendererErrorSurfaceLocalTargets({
+    workspaceRoot
+  });
+  const blockedPrivateDiagnosticRows =
+    REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS.filter(
+      (row) => !isErrorSurfacePrivateDiagnosticRowReady(row.id, localChecks)
+    ).map((row) => row.id);
+  const privateDiagnosticsReady = blockedPrivateDiagnosticRows.length === 0;
+  const privateDiagnosticRows =
+    REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS.filter((row) =>
+      isErrorSurfacePrivateDiagnosticRowReady(row.id, localChecks)
+    ).map((row) => ({
+      ...row,
+      rowKind: "private-diagnostic",
+      status: REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROW_STATUS,
+      admittedForPrivateDiagnostics: true,
+      publicComparisonBlocked: true,
+      admittedForFastReactComparison: false,
+      compatibilityClaimed: false
+    }));
+  const admittedPublicScenarios =
+    REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_PUBLIC_SCENARIO_ADMISSIONS.filter(
+      (scenario) =>
+        scenario.admittedForFastReactComparison ||
+        scenario.compatibilityClaimed
+    );
+  const publicCompatibilityClaimed = Boolean(
+    oracle.conformanceClaims?.compatibilityClaimed ||
+      oracle.conformanceClaims?.fastReactBehaviorCompatible ||
+      oracle.evidenceClaims?.fastReactComparedToReactTestRenderer
+  );
+  const publicCompatibilityBlockers =
+    REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS.filter(
+      (requirement) => {
+        if (requirement.id === "public-create-update-unmount-error-surface") {
+          return !localChecks.publicCreateUpdateUnmountErrorSurfaceReady;
+        }
+        if (requirement.id === "public-serialization-error-surface") {
+          return !localChecks.publicSerializationErrorSurfaceReady;
+        }
+        if (requirement.id === "public-test-instance-error-surface") {
+          return !localChecks.publicTestInstanceErrorSurfaceReady;
+        }
+        if (requirement.id === "public-act-scheduler-error-surface") {
+          return !localChecks.publicActSchedulerErrorSurfaceReady;
+        }
+        if (requirement.id === "public-shallow-error-surface") {
+          return !localChecks.publicShallowErrorSurfaceReady;
+        }
+        return true;
+      }
+    ).map((requirement) => requirement.id);
+  const publicCompatibilityReady =
+    publicCompatibilityBlockers.length === 0 &&
+    localChecks.publicJsFacadeRoutingPresent;
+  const violations = [];
+
+  if (publicCompatibilityClaimed && !publicCompatibilityReady) {
+    violations.push({
+      id: "error-surface-compatibility-claimed-before-public-support",
+      reason:
+        "react-test-renderer public error compatibility cannot be claimed while create/update/unmount, serialization, TestInstance, act, Scheduler, or shallow error surfaces remain blocked.",
+      blockers: publicCompatibilityBlockers
+    });
+  }
+
+  if (admittedPublicScenarios.length > 0 && !publicCompatibilityReady) {
+    violations.push({
+      id: "error-surface-public-scenario-admitted-before-public-support",
+      reason:
+        "Public error-surface oracle scenarios must stay blocked until real public renderer behavior is available.",
+      scenarioIds: admittedPublicScenarios.map(
+        (scenario) => scenario.scenarioId
+      )
+    });
+  }
+
+  return {
+    status:
+      violations.length > 0
+        ? "blocked-with-violations"
+        : privateDiagnosticsReady
+        ? REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_GATE_STATUS
+        : REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS,
+    privateDiagnosticsReady,
+    privateDiagnosticBlockers: blockedPrivateDiagnosticRows,
+    privateDiagnosticRows,
+    publicScenarioAdmissions:
+      REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_PUBLIC_SCENARIO_ADMISSIONS,
+    admittedPublicScenarios,
+    publicCompatibilityReady,
+    publicCompatibilityClaimed,
+    publicCompatibilityBlockers,
+    localChecks,
+    violations
+  };
+}
+
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
@@ -324,6 +533,223 @@ export function inspectReactTestRendererSerializationLocalTargets({
     publicTestInstanceWrappersPresent,
     publicJsFacadeRoutingPresent
   };
+}
+
+export function inspectReactTestRendererErrorSurfaceLocalTargets({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  const serializationLocalChecks =
+    inspectReactTestRendererSerializationLocalTargets({ workspaceRoot });
+  const testRendererSource = readWorkspaceTree(
+    workspaceRoot,
+    "packages/react-test-renderer"
+  );
+  const shallowSource = readWorkspaceFile(
+    workspaceRoot,
+    "packages/react-test-renderer/shallow.js"
+  );
+  const schedulerBridgeSource = readWorkspaceFile(
+    workspaceRoot,
+    "crates/fast-react-reconciler/src/scheduler_bridge.rs"
+  );
+  const rootSchedulerSource = readWorkspaceFile(
+    workspaceRoot,
+    "crates/fast-react-reconciler/src/root_scheduler.rs"
+  );
+  const syncFlushSource = readWorkspaceFile(
+    workspaceRoot,
+    "crates/fast-react-reconciler/src/sync_flush.rs"
+  );
+  const passiveEffectsSource = readWorkspaceFile(
+    workspaceRoot,
+    "crates/fast-react-reconciler/src/passive_effects.rs"
+  );
+  const actQueueSource = [
+    schedulerBridgeSource,
+    rootSchedulerSource,
+    syncFlushSource
+  ].join("\n");
+  const createRoutingGatePresent =
+    hasSourcePattern(
+      testRendererSource,
+      /\breact-test-renderer-create-routing-prerequisite-gate\b/u
+    ) &&
+    hasSourcePattern(testRendererSource, /\bcreateRouteAvailable:\s*false\b/u);
+  const updatePrivateRoutePresent =
+    hasSourcePattern(
+      testRendererSource,
+      /\breact-test-renderer-update-private-route\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bprivateRustCanaryAccepted:\s*true\b/u
+    );
+  const unmountPrivateRoutePresent =
+    hasSourcePattern(
+      testRendererSource,
+      /\breact-test-renderer-unmount-private-route\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bprivateRustCanaryAccepted:\s*true\b/u
+    );
+  const publicCreateUpdateUnmountErrorSurfaceBlocked =
+    hasSourcePattern(
+      testRendererSource,
+      /\bFastReactTestRendererUnimplementedError\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /Root updates are intentionally blocked/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /Root unmount is intentionally blocked/u
+    );
+  const publicSerializationErrorSurfaceBlocked =
+    hasSourcePattern(
+      testRendererSource,
+      /Serialization is intentionally blocked/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /Fiber tree inspection is intentionally blocked/u
+    );
+  const publicTestInstanceErrorSurfaceBlocked =
+    hasSourcePattern(
+      testRendererSource,
+      /TestInstance root access is intentionally blocked/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /Public instance lookup is intentionally blocked/u
+    );
+  const publicActErrorSurfaceBlocked = hasSourcePattern(
+    testRendererSource,
+    /\bexports\.act\s*=\s*isProduction\s*\?\s*undefined\s*:\s*createUnsupportedFunction\('act',\s*1\)/u
+  );
+  const publicSchedulerErrorSurfaceBlocked =
+    hasSourcePattern(
+      testRendererSource,
+      /\bcreateSchedulerUnsupportedFunction\b/u
+    ) &&
+    hasSourcePattern(testRendererSource, /\bunstable_scheduleCallback\b/u);
+  const publicShallowErrorSurfaceBlocked =
+    hasSourcePattern(
+      shallowSource,
+      /\bFastReactTestRendererShallowUnsupportedError\b/u
+    ) &&
+    hasSourcePattern(
+      shallowSource,
+      /without claiming shallow renderer behavior/u
+    );
+  const privateActQueueMetadataPresent =
+    hasSourcePattern(actQueueSource, /\bSchedulerActQueueRequest\b/u) &&
+    hasSourcePattern(actQueueSource, /\bSchedulerActQueueTaskKind\b/u) &&
+    hasSourcePattern(actQueueSource, /\bFAKE_ACT_CALLBACK_NODE\b/u) &&
+    hasSourcePattern(actQueueSource, /\bSchedulerActContinuationRecord\b/u) &&
+    hasSourcePattern(actQueueSource, /\brecord_sync_flush_act_continuation\b/u);
+  const actFlushExecutionPresent = hasSourcePattern(
+    actQueueSource,
+    /\b(?:flush|drain)_act_queue\b|\b(?:flush|drain)ActQueue\b|\brecursivelyFlushAsyncActWork\b/u
+  );
+  const effectCallbackExecutionPresent = hasSourcePattern(
+    passiveEffectsSource,
+    /\b(?:invoke|execute)_(?:layout|passive|hook)_effects?\b|\b(?:invoke|execute)Effect(?:Create|Destroy)\b/u
+  );
+  const passiveEffectMetadataOnly =
+    hasSourcePattern(
+      passiveEffectsSource,
+      /\bPassiveEffectFlushEffectRecord\b/u
+    ) &&
+    hasSourcePattern(
+      passiveEffectsSource,
+      /\bflush_passive_effects_after_commit\b/u
+    ) &&
+    !effectCallbackExecutionPresent;
+  const publicCreateUpdateUnmountErrorSurfaceReady =
+    serializationLocalChecks.publicJsFacadeRoutingPresent &&
+    !publicCreateUpdateUnmountErrorSurfaceBlocked;
+  const publicSerializationErrorSurfaceReady =
+    serializationLocalChecks.publicToJSONAvailable &&
+    serializationLocalChecks.publicToTreeAvailable &&
+    !publicSerializationErrorSurfaceBlocked;
+  const publicTestInstanceErrorSurfaceReady =
+    serializationLocalChecks.publicTestInstanceWrappersPresent &&
+    !publicTestInstanceErrorSurfaceBlocked;
+  const publicActSchedulerErrorSurfaceReady =
+    actFlushExecutionPresent &&
+    effectCallbackExecutionPresent &&
+    !publicActErrorSurfaceBlocked &&
+    !publicSchedulerErrorSurfaceBlocked;
+
+  return {
+    ...serializationLocalChecks,
+    createRoutingGatePresent,
+    updatePrivateRoutePresent,
+    unmountPrivateRoutePresent,
+    publicCreateUpdateUnmountErrorSurfaceBlocked,
+    publicSerializationErrorSurfaceBlocked,
+    publicTestInstanceErrorSurfaceBlocked,
+    publicActErrorSurfaceBlocked,
+    publicSchedulerErrorSurfaceBlocked,
+    publicShallowErrorSurfaceBlocked,
+    privateActQueueMetadataPresent,
+    actFlushExecutionPresent,
+    passiveEffectMetadataOnly,
+    effectCallbackExecutionPresent,
+    publicCreateUpdateUnmountErrorSurfaceReady,
+    publicSerializationErrorSurfaceReady,
+    publicTestInstanceErrorSurfaceReady,
+    publicActSchedulerErrorSurfaceReady,
+    publicShallowErrorSurfaceReady: false
+  };
+}
+
+function isErrorSurfacePrivateDiagnosticRowReady(rowId, localChecks) {
+  if (rowId === "react-test-renderer-create-routing-private-diagnostic") {
+    return (
+      localChecks.createRoutingGatePresent &&
+      localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked
+    );
+  }
+  if (rowId === "react-test-renderer-update-route-private-diagnostic") {
+    return (
+      localChecks.updatePrivateRoutePresent &&
+      localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked
+    );
+  }
+  if (rowId === "react-test-renderer-unmount-route-private-diagnostic") {
+    return (
+      localChecks.unmountPrivateRoutePresent &&
+      localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked
+    );
+  }
+  if (rowId === "react-test-renderer-serialization-private-json-diagnostic") {
+    return (
+      localChecks.rustTestRendererRootFacadePresent &&
+      localChecks.committedTestRendererHostOutputPresent &&
+      localChecks.committedFiberInspectionPresent &&
+      localChecks.privateJsonDiagnosticsPresent &&
+      localChecks.publicSerializationErrorSurfaceBlocked
+    );
+  }
+  if (rowId === "react-test-renderer-test-instance-private-fiber-diagnostic") {
+    return (
+      localChecks.committedFiberInspectionPresent &&
+      localChecks.publicTestInstanceErrorSurfaceBlocked &&
+      !localChecks.publicTestInstanceWrappersPresent
+    );
+  }
+  if (rowId === "react-test-renderer-act-scheduler-private-diagnostic") {
+    return (
+      localChecks.privateActQueueMetadataPresent &&
+      localChecks.passiveEffectMetadataOnly &&
+      localChecks.publicActErrorSurfaceBlocked &&
+      localChecks.publicSchedulerErrorSurfaceBlocked
+    );
+  }
+  return false;
 }
 
 function isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot) {
