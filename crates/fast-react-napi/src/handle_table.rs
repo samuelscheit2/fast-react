@@ -768,6 +768,91 @@ mod tests {
     }
 
     #[test]
+    fn root_lifecycle_canary_isolates_retirement_and_environment_teardown() {
+        let mut first = environment(232);
+        let mut second = environment(233);
+        let retired_root = first.insert_root(PlaceholderRootRecord::new(7001));
+        let teardown_root = first.insert_root(PlaceholderRootRecord::new(7002));
+        let peer_root = second.insert_root(PlaceholderRootRecord::new(8001));
+
+        assert_eq!(retired_root.environment_id(), first.environment_id());
+        assert_eq!(retired_root.kind(), BridgeHandleKind::Root);
+        assert_eq!(retired_root.generation(), 1);
+        assert_eq!(first.get_root(retired_root).unwrap().root_id(), 7001);
+        assert_eq!(first.get_root(teardown_root).unwrap().root_id(), 7002);
+        assert_eq!(second.get_root(peer_root).unwrap().root_id(), 8001);
+        assert_eq!(
+            first.get_root(peer_root).unwrap_err(),
+            BridgeHandleTableError::WrongEnvironment {
+                handle: peer_root,
+                expected: first.environment_id()
+            }
+        );
+
+        let removed = first.remove_root(retired_root).unwrap();
+        let replacement_root = first.insert_root(PlaceholderRootRecord::new(7003));
+
+        assert_eq!(removed.root_id(), 7001);
+        assert_eq!(replacement_root.slot(), retired_root.slot());
+        assert_eq!(replacement_root.generation(), retired_root.generation() + 1);
+        assert_eq!(first.get_root(replacement_root).unwrap().root_id(), 7003);
+        assert_eq!(
+            first.get_root(retired_root).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: retired_root,
+                current_generation: replacement_root.generation()
+            }
+        );
+        assert_eq!(second.get_root(peer_root).unwrap().root_id(), 8001);
+
+        let wrong_teardown = first.teardown_environment(second.environment_id());
+
+        assert!(!wrong_teardown.environment_matched());
+        assert_eq!(wrong_teardown.total_handles_invalidated(), 0);
+        assert_eq!(first.get_root(replacement_root).unwrap().root_id(), 7003);
+        assert_eq!(first.get_root(teardown_root).unwrap().root_id(), 7002);
+
+        let teardown = first.teardown_environment(first.environment_id());
+
+        assert!(teardown.environment_matched());
+        assert_eq!(teardown.root_handles_invalidated(), 2);
+        assert_eq!(teardown.value_handles_invalidated(), 0);
+        assert_eq!(teardown.total_handles_invalidated(), 2);
+        assert_eq!(
+            first.get_root(replacement_root).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: replacement_root,
+                current_generation: replacement_root.generation() + 1
+            }
+        );
+        assert_eq!(
+            first.get_root(teardown_root).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: teardown_root,
+                current_generation: teardown_root.generation() + 1
+            }
+        );
+        assert_eq!(second.get_root(peer_root).unwrap().root_id(), 8001);
+
+        let post_teardown_root = first.insert_root(PlaceholderRootRecord::new(7004));
+
+        assert_eq!(post_teardown_root.slot(), replacement_root.slot());
+        assert_eq!(
+            post_teardown_root.generation(),
+            replacement_root.generation() + 1
+        );
+        assert_eq!(
+            first.get_root(replacement_root).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: replacement_root,
+                current_generation: post_teardown_root.generation()
+            }
+        );
+        assert_eq!(first.get_root(post_teardown_root).unwrap().root_id(), 7004);
+        assert_eq!(second.get_root(peer_root).unwrap().root_id(), 8001);
+    }
+
+    #[test]
     fn teardown_invalidates_multiple_root_and_value_handles() {
         let mut table = environment(1);
         let first_root = table.insert_root(PlaceholderRootRecord::new(11));
