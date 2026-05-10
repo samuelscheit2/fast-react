@@ -663,6 +663,17 @@ function validateAcceptedGate(acceptedGate, label, errors) {
       `${label}: green-admitted requires admitted=true and compatibilityClaimed=true`
     );
   }
+  if (
+    acceptedGate.status !== "green-admitted" &&
+    (acceptedGate.admitted !== false ||
+      acceptedGate.compatibilityClaimed !== false)
+  ) {
+    errors.push(
+      `${label}: ${String(
+        acceptedGate.status
+      )} requires admitted=false and compatibilityClaimed=false`
+    );
+  }
 }
 
 function validateGateCompatibilityClaims(gates, label, errors) {

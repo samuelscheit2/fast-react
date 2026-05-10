@@ -30,7 +30,7 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
 
   assert.equal(result.manifestCount, 4);
   assert.equal(result.scenarioCount, 65);
-  assert.equal(result.milestoneCount, 9);
+  assert.equal(result.milestoneCount, 12);
   assert.equal(result.resultCount, 0);
   assert.deepEqual(COMPATIBILITY_STATUSES, [
     "blocked-by-conformance",
@@ -69,6 +69,14 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
   ]);
 
   for (const manifest of result.manifests) {
+    const acceptedGates = (manifest.conformanceGates ?? [])
+      .map((gate) => gate.acceptedGate)
+      .filter(Boolean);
+    for (const acceptedGate of acceptedGates) {
+      assert.notEqual(acceptedGate.status, "green-admitted");
+      assert.equal(acceptedGate.admitted, false);
+      assert.equal(acceptedGate.compatibilityClaimed, false);
+    }
     for (const scenario of manifest.scenarios) {
       assert.equal(scenario.compatibilityStatus, "blocked-by-conformance");
       assert.equal(scenario.timingStatus, "blocked-by-conformance");
@@ -80,6 +88,20 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
       assert.equal(milestone.benchmarkReadinessStatus, "blocked-by-conformance");
     }
   }
+
+  const acceptedGateStatusCounts = result.manifests
+    .flatMap((manifest) => manifest.conformanceGates ?? [])
+    .map((gate) => gate.acceptedGate)
+    .filter(Boolean)
+    .reduce((counts, acceptedGate) => {
+      counts[acceptedGate.status] = (counts[acceptedGate.status] ?? 0) + 1;
+      return counts;
+    }, {});
+  assert.deepEqual(acceptedGateStatusCounts, {
+    "accepted-blocked": 5,
+    "accepted-private-partial": 8,
+    "accepted-oracle-only": 5
+  });
 });
 
 test("benchmark manifest gate rejects missing required scenarios", () => {
@@ -164,6 +186,18 @@ test("benchmark milestone gate rejects diagnostic admission without green compat
   assert.match(
     errors.join("\n"),
     /benchmarkReadinessStatus diagnostic-admitted requires compatibilityStatus green/
+  );
+});
+
+test("benchmark accepted gates reject blocked metadata carrying admission claims", () => {
+  const manifest = clone(minimalRootMilestoneManifest);
+  manifest.conformanceGates[0].acceptedGate.admitted = true;
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.match(
+    errors.join("\n"),
+    /accepted-blocked requires admitted=false and compatibilityClaimed=false/
   );
 });
 

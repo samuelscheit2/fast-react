@@ -39,6 +39,23 @@
       }
     },
     {
+      "id": "react-test-renderer-create-routing-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-root-lifecycle-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-create-routing-prerequisite-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 237 accepted deterministic fail-closed create routing metadata; native/Rust routing, serialization, act, Scheduler behavior, and compatibility remain blocked."
+      }
+    },
+    {
       "id": "react-test-renderer-serialization-local-gate",
       "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-serialization-oracle.json",
       "requiredClaims": [
@@ -48,11 +65,11 @@
       ],
       "acceptedGate": {
         "id": "react-test-renderer-serialization-local-gate",
-        "status": "accepted-blocked",
+        "status": "accepted-private-partial",
         "command": "npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Workers 178 and 209 keep serialization admission blocked until committed host output, fiber inspection, Rust serialization APIs, and a real JS facade exist."
+        "notes": "Workers 234, 235, and 236 made private host-output, fiber inspection, and JSON diagnostics ready for the narrow Rust canary only; public serialization and compatibility remain blocked."
       }
     }
   ],
@@ -64,7 +81,10 @@
         "renderer-object-shape",
         "raw-create-act-boundary"
       ],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "benchmarkReadinessStatus": "blocked-by-conformance",
@@ -82,7 +102,7 @@
       ],
       "conformanceGateIds": [
         "react-test-renderer-root-lifecycle",
-        "react-test-renderer-serialization-local-gate"
+        "react-test-renderer-create-routing-gate"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
@@ -113,7 +133,10 @@
       "id": "renderer-object-shape",
       "area": "test renderer root object",
       "entrypoints": ["react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -123,7 +146,10 @@
       "id": "raw-create-act-boundary",
       "area": "test renderer create scheduling",
       "entrypoints": ["react", "react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -133,7 +159,10 @@
       "id": "create-update-unmount-flow",
       "area": "test renderer update flow",
       "entrypoints": ["react", "react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -143,7 +172,10 @@
       "id": "root-access-boundaries",
       "area": "test renderer root access",
       "entrypoints": ["react", "react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -153,7 +185,10 @@
       "id": "get-instance-boundaries",
       "area": "test renderer instance access",
       "entrypoints": ["react", "react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -163,7 +198,10 @@
       "id": "create-node-mock-ref-lifecycle",
       "area": "test renderer refs",
       "entrypoints": ["react", "react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -173,7 +211,10 @@
       "id": "strict-and-concurrent-options",
       "area": "test renderer root options",
       "entrypoints": ["react", "react-test-renderer"],
-      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-create-routing-gate"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",

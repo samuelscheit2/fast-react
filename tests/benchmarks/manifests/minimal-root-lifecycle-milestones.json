@@ -43,6 +43,57 @@
       }
     },
     {
+      "id": "react-dom-root-public-facade-blocked-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-public-facade-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 240 accepted a fail-closed public facade gate over client-root and root-render prerequisites; public root behavior remains blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-private-bridge-dual-run",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-bridge-dual-run-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 262 compares private root-bridge request records only; public root E2E rows remain blocked and compatibility remains false."
+      }
+    },
+    {
+      "id": "reconciler-private-root-commit-canaries",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-private-root-commit-canaries-233-249-250",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-reconciler --all-features",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Workers 233, 249, and 250 accepted private commit apply, function single-child, and passive handoff canaries without public renderer output or compatibility claims."
+      }
+    },
+    {
       "id": "react-dom-client-root",
       "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-client-root-oracle.json",
       "requiredClaims": [
@@ -124,7 +175,7 @@
         "command": "npm run dom-text-content:conformance --workspace @fast-react/conformance",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Worker 230 accepted a private shouldSetTextContent comparison slice only; public root render and DOM mutation rows remain skipped."
+        "notes": "Workers 230 and 261 accepted private shouldSetTextContent and HostText fake-DOM commit rows only; public roots, full DOM mutation, hydration, and compatibility remain blocked."
       }
     }
   ],
@@ -143,12 +194,14 @@
         "react-dom-client-root",
         "react-dom-container-root-markers",
         "react-dom-root-listener-installation",
-        "react-dom-root-render-e2e"
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "benchmarkReadinessStatus": "blocked-by-conformance",
-      "blockedReason": "Public root creation and side-effect conformance artifacts do not claim Fast React compatibility."
+      "blockedReason": "Public root creation, facade, private bridge, and side-effect conformance artifacts do not claim Fast React compatibility."
     },
     {
       "id": "root-render-admission",
@@ -156,12 +209,15 @@
       "scenarioIds": ["initial-host-render"],
       "conformanceGateIds": [
         "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries",
         "dom-text-content"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "benchmarkReadinessStatus": "blocked-by-conformance",
-      "blockedReason": "Initial root render and text host conformance artifacts do not claim Fast React compatibility."
+      "blockedReason": "Initial root render, private bridge, reconciler canary, and text host conformance artifacts do not claim Fast React compatibility."
     },
     {
       "id": "root-update-admission",
@@ -172,12 +228,15 @@
       ],
       "conformanceGateIds": [
         "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries",
         "dom-text-content"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "benchmarkReadinessStatus": "blocked-by-conformance",
-      "blockedReason": "Root update/replacement and text host conformance artifacts do not claim Fast React compatibility."
+      "blockedReason": "Root update/replacement, private bridge, reconciler canary, and text host conformance artifacts do not claim Fast React compatibility."
     },
     {
       "id": "root-unmount-admission",
@@ -191,13 +250,16 @@
       ],
       "conformanceGateIds": [
         "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries",
         "react-dom-client-root",
         "react-dom-container-root-markers"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "benchmarkReadinessStatus": "blocked-by-conformance",
-      "blockedReason": "Root clearing, unmount, marker cleanup, and error-surface conformance artifacts do not claim Fast React compatibility."
+      "blockedReason": "Root clearing, unmount, marker cleanup, private bridge, reconciler canary, and error-surface artifacts do not claim Fast React compatibility."
     },
     {
       "id": "root-sync-flush-admission",
@@ -209,12 +271,15 @@
       ],
       "conformanceGateIds": [
         "react-dom-flush-sync-batching",
-        "react-dom-root-render-e2e"
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "benchmarkReadinessStatus": "blocked-by-conformance",
-      "blockedReason": "flushSync and cross-root render conformance artifacts do not claim Fast React compatibility."
+      "blockedReason": "flushSync, cross-root render, private bridge, and reconciler conformance artifacts do not claim Fast React compatibility."
     },
     {
       "id": "root-development-warning-admission",
@@ -225,7 +290,8 @@
       ],
       "conformanceGateIds": [
         "react-dom-client-root",
-        "react-dom-root-render-e2e"
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate"
       ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",

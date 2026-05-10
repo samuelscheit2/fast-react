@@ -33,6 +33,57 @@
         "compatibilityClaimed": false,
         "notes": "Worker 163 accepted this fail-closed gate with 0 admitted and 20 blocked root render scenario-mode rows."
       }
+    },
+    {
+      "id": "react-dom-root-public-facade-blocked-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-public-facade-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 240 accepted a fail-closed public root facade gate; createRoot, hydrateRoot, render, unmount, DOM mutation, listener setup, and compatibility stay blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-private-bridge-dual-run",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-bridge-dual-run-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 262 compares only private root-bridge request records; public root render/update/unmount compatibility and warning rows remain blocked."
+      }
+    },
+    {
+      "id": "reconciler-private-root-commit-canaries",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-private-root-commit-canaries-233-249-250",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-reconciler --all-features",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Workers 233, 249, and 250 accepted private commit apply, function single-child, and passive handoff canaries without public renderer output or compatibility claims."
+      }
     }
   ],
   "scenarios": [
@@ -40,7 +91,12 @@
       "id": "create-root-no-render",
       "area": "react-dom root creation",
       "entrypoints": ["react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -50,7 +106,12 @@
       "id": "initial-host-render",
       "area": "react-dom root mount",
       "entrypoints": ["react-dom", "react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -60,7 +121,12 @@
       "id": "update-host-render",
       "area": "react-dom root update",
       "entrypoints": ["react-dom", "react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -70,7 +136,12 @@
       "id": "replace-host-tree",
       "area": "react-dom root replacement",
       "entrypoints": ["react-dom", "react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -80,7 +151,12 @@
       "id": "render-null-clears-container",
       "area": "react-dom root clearing",
       "entrypoints": ["react-dom", "react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -90,7 +166,12 @@
       "id": "root-unmount",
       "area": "react-dom root unmount",
       "entrypoints": ["react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -100,7 +181,12 @@
       "id": "double-unmount",
       "area": "react-dom root unmount",
       "entrypoints": ["react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -110,7 +196,12 @@
       "id": "render-after-unmount",
       "area": "react-dom root error surface",
       "entrypoints": ["react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -120,7 +211,12 @@
       "id": "flush-sync-cross-root-render",
       "area": "react-dom flushSync",
       "entrypoints": ["react-dom", "react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run",
+        "reconciler-private-root-commit-canaries"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
@@ -130,7 +226,11 @@
       "id": "development-warning-boundaries",
       "area": "react-dom development warnings",
       "entrypoints": ["react-dom/client"],
-      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-root-private-bridge-dual-run"
+      ],
       "compatibilityStatus": "blocked-by-conformance",
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",

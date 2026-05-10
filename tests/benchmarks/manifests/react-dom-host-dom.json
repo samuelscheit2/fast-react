@@ -37,7 +37,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "dom-ordinary-property-payload-private-gate-238-259",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/dom-property-payload-helper.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Workers 238 and 259 accepted private ordinary payload application and latest-props commit records only; public roots, browser DOM, events, hydration, and compatibility remain blocked."
+      }
     },
     {
       "id": "dom-style-dangerous-html",
@@ -46,7 +54,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "dom-style-dangerous-html-private-applier-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/dom-property-payload-helper.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 242 accepted private fake-DOM style and dangerouslySetInnerHTML payload application only; public roots, text-content transitions, browser DOM, and compatibility remain blocked."
+      }
     },
     {
       "id": "dom-namespace-svg",
@@ -56,6 +72,64 @@
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
       ]
+    }
+  ],
+  "milestones": [
+    {
+      "id": "dom-ordinary-payload-admission",
+      "description": "DOM attribute/property payload application readiness before host DOM timings are admitted.",
+      "scenarioIds": [
+        "common-host-props-and-aliases",
+        "boolean-and-booleanish-attributes",
+        "data-and-aria-attributes",
+        "custom-and-unknown-attributes",
+        "custom-element-attribute-property-routing",
+        "attribute-update-and-removal"
+      ],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Only private ordinary payload and latest-props records are accepted; the DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dom-style-dangerous-html-admission",
+      "description": "DOM style and dangerouslySetInnerHTML payload readiness before host DOM timings are admitted.",
+      "scenarioIds": [
+        "style-serialization-numeric-units-and-custom-properties",
+        "style-update-and-removal",
+        "invalid-style-development-warnings",
+        "style-prop-shape-validation",
+        "dangerously-set-inner-html-serialization",
+        "dangerously-set-inner-html-null-html",
+        "dangerously-set-inner-html-update-and-removal",
+        "dangerously-set-inner-html-shape-validation-string",
+        "dangerously-set-inner-html-shape-validation-missing-html",
+        "dangerously-set-inner-html-children-conflict"
+      ],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Only private fake-DOM style and innerHTML payload application is accepted; the DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dom-namespace-admission",
+      "description": "DOM namespace, SVG, MathML, and foreignObject readiness before host DOM timings are admitted.",
+      "scenarioIds": [
+        "svg-common-attributes",
+        "foreignobject-html-boundary",
+        "mathml-basic-tree",
+        "client-svg-common-attributes",
+        "client-html-svg-foreignobject-html-svg",
+        "client-svg-container-child-context",
+        "client-mathml-tree"
+      ],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Namespace/SVG/MathML behavior remains oracle-only and does not claim Fast React compatibility."
     }
   ],
   "scenarios": [
