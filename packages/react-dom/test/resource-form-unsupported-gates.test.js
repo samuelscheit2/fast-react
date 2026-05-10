@@ -6400,6 +6400,14 @@ test('private input/change controlled restore execution consumes fake-DOM text p
     false
   );
   assert.equal(
+    summary.liveControlledRestoreMutationPreflight.valueTrackerAccess,
+    false
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight.descriptorAccess,
+    false
+  );
+  assert.equal(
     summary.liveControlledRestoreMutationPreflight.liveDomMutations,
     false
   );
@@ -6435,6 +6443,8 @@ test('private input/change controlled restore execution consumes fake-DOM text p
   );
   const guardedReads = [];
   const guardedWrites = [];
+  const guardedDescriptorReads = [];
+  const guardedPresenceChecks = [];
   const guardedLiveNode = new Proxy(preflightLiveNode, {
     defineProperty(target, property, descriptor) {
       if (
@@ -6447,6 +6457,19 @@ test('private input/change controlled restore execution consumes fake-DOM text p
       }
       return Reflect.defineProperty(target, property, descriptor);
     },
+    getOwnPropertyDescriptor(target, property) {
+      if (
+        property === 'value' ||
+        property === 'checked' ||
+        property === '_valueTracker'
+      ) {
+        guardedDescriptorReads.push(String(property));
+        throw new Error(
+          `Unexpected live preflight descriptor ${String(property)}`
+        );
+      }
+      return Reflect.getOwnPropertyDescriptor(target, property);
+    },
     get(target, property, receiver) {
       if (
         property === 'value' ||
@@ -6457,6 +6480,17 @@ test('private input/change controlled restore execution consumes fake-DOM text p
         throw new Error(`Unexpected live preflight read ${String(property)}`);
       }
       return Reflect.get(target, property, receiver);
+    },
+    has(target, property) {
+      if (
+        property === 'value' ||
+        property === 'checked' ||
+        property === '_valueTracker'
+      ) {
+        guardedPresenceChecks.push(String(property));
+        throw new Error(`Unexpected live preflight has ${String(property)}`);
+      }
+      return Reflect.has(target, property);
     },
     set(target, property, value, receiver) {
       if (
@@ -6490,6 +6524,8 @@ test('private input/change controlled restore execution consumes fake-DOM text p
 
   assert.deepEqual(guardedReads, []);
   assert.deepEqual(guardedWrites, []);
+  assert.deepEqual(guardedDescriptorReads, []);
+  assert.deepEqual(guardedPresenceChecks, []);
   assert.equal(Object.hasOwn(preflightLiveNode, '_valueTracker'), false);
   assert.equal(Object.isFrozen(livePreflight), true);
   assert.equal(
@@ -6517,6 +6553,8 @@ test('private input/change controlled restore execution consumes fake-DOM text p
   assert.equal(livePreflight.admission.realDomMutationAllowed, false);
   assert.equal(livePreflight.admission.hostValueReadAllowed, false);
   assert.equal(livePreflight.admission.hostValueWriteAllowed, false);
+  assert.equal(livePreflight.admission.liveDescriptorAccessAllowed, false);
+  assert.equal(livePreflight.admission.valueTrackerFieldAccessAllowed, false);
   assert.equal(
     livePreflight.admission.valueTrackerFieldWriteAllowed,
     false
@@ -6534,7 +6572,11 @@ test('private input/change controlled restore execution consumes fake-DOM text p
       restoreQueueFlushed: row.restoreQueueFlushed,
       hostWrapperInvoked: row.hostWrapperInvoked,
       wrapperWritePerformed: row.wrapperWritePerformed,
+      valueTrackerAccessBlocked: row.valueTrackerAccessBlocked,
+      valueTrackerFieldAccessed: row.valueTrackerFieldAccessed,
       valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      descriptorAccessBlocked: row.descriptorAccessBlocked,
+      propertyDescriptorAccessed: row.propertyDescriptorAccessed,
       propertyDescriptorInstalled: row.propertyDescriptorInstalled,
       hostValueRead: row.hostValueRead,
       hostValueWritten: row.hostValueWritten,
@@ -6554,7 +6596,11 @@ test('private input/change controlled restore execution consumes fake-DOM text p
         restoreQueueFlushed: false,
         hostWrapperInvoked: false,
         wrapperWritePerformed: false,
+        valueTrackerAccessBlocked: true,
+        valueTrackerFieldAccessed: false,
         valueTrackerFieldWritten: false,
+        descriptorAccessBlocked: true,
+        propertyDescriptorAccessed: false,
         propertyDescriptorInstalled: false,
         hostValueRead: false,
         hostValueWritten: false,
@@ -6570,7 +6616,9 @@ test('private input/change controlled restore execution consumes fake-DOM text p
     'wrapper-property-write-disabled',
     'host-value-read-disabled',
     'host-value-write-disabled',
+    'live-descriptor-access-disabled',
     'live-descriptor-installation-disabled',
+    'value-tracker-access-disabled',
     'value-tracker-write-disabled',
     'browser-input-mutation-disabled',
     'public-controlled-behavior-disabled'
@@ -6587,7 +6635,23 @@ test('private input/change controlled restore execution consumes fake-DOM text p
   assert.equal(livePreflight.blockerEvidence.hostValueRead, false);
   assert.equal(livePreflight.blockerEvidence.hostValueWritten, false);
   assert.equal(
+    livePreflight.blockerEvidence.valueTrackerAccessBlocked,
+    true
+  );
+  assert.equal(
+    livePreflight.blockerEvidence.valueTrackerFieldAccessed,
+    false
+  );
+  assert.equal(
     livePreflight.blockerEvidence.valueTrackerFieldWritten,
+    false
+  );
+  assert.equal(
+    livePreflight.blockerEvidence.descriptorAccessBlocked,
+    true
+  );
+  assert.equal(
+    livePreflight.blockerEvidence.propertyDescriptorAccessed,
     false
   );
   assert.equal(
@@ -6605,12 +6669,22 @@ test('private input/change controlled restore execution consumes fake-DOM text p
   );
   assert.equal(livePreflight.postEventRestoreBoundary.hostValueRead, false);
   assert.equal(livePreflight.postEventRestoreBoundary.hostValueWritten, false);
+  assert.equal(
+    livePreflight.postEventRestoreBoundary.valueTrackerFieldAccessed,
+    false
+  );
+  assert.equal(
+    livePreflight.postEventRestoreBoundary.propertyDescriptorAccessed,
+    false
+  );
   assert.equal(livePreflight.sideEffects.liveMutationPreflightRecorded, true);
   assert.equal(livePreflight.sideEffects.liveMutationPreflightRowCount, 1);
   assert.equal(livePreflight.sideEffects.restoreQueueWritten, false);
   assert.equal(livePreflight.sideEffects.restoreQueueFlushed, false);
   assert.equal(livePreflight.sideEffects.hostWrapperInvoked, false);
+  assert.equal(livePreflight.sideEffects.valueTrackerFieldAccessed, false);
   assert.equal(livePreflight.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(livePreflight.sideEffects.propertyDescriptorAccessed, false);
   assert.equal(livePreflight.sideEffects.propertyDescriptorInstalled, false);
   assert.equal(livePreflight.sideEffects.hostValueRead, false);
   assert.equal(livePreflight.sideEffects.hostValueWritten, false);
