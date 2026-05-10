@@ -530,6 +530,187 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
+test("private preload/preinit dedupe and order diagnostics stay record-only", () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: "resource-conformance-order-source"
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: "resource-conformance-order-adapter"
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: "resource-conformance-order"
+    });
+  const fakeDom = createDeterministicResourceHintDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style-dupe",
+        fetchPriority: "high"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/font.woff2",
+      "font",
+      {
+        crossOrigin: "",
+        integrity: undefined,
+        nonce: undefined,
+        type: "font/woff2",
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ])
+  ];
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "document-head"
+    })
+  );
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "stylesheet",
+    "data-precedence": "theme",
+    "data-fast-react-resource-key": "style-main",
+    "data-fast-react-precedence-key": "precedence-theme"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "preload",
+    as: "font",
+    "data-fast-react-resource-key": "font-main"
+  });
+
+  const diagnostic = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-theme"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-theme"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: "font",
+          resourceKey: "font-main"
+        }
+      ]
+    }
+  );
+
+  assert.equal(
+    diagnostic.orderStatus,
+    resourceFormGate.privateResourceHintPreloadPreinitOrderStatus
+  );
+  assert.deepEqual(
+    diagnostic.dedupeRows.map((row) => row.dedupeAction),
+    [
+      "insert-preload",
+      "preinit-adopts-preload",
+      "dedupe-preinit",
+      "insert-preload"
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.plannedHeadInsertionOrder.rows.map((row) => row.contractId),
+    ["preinit-style", "preload", "preload"]
+  );
+  assert.deepEqual(
+    diagnostic.observedHeadOrder.rows.map((row) => ({
+      nodeName: row.nodeName,
+      relationship: row.relationship,
+      resourceKey: row.resourceKey,
+      orderMutated: row.orderMutated
+    })),
+    [
+      {
+        nodeName: "LINK",
+        relationship: "stylesheet",
+        resourceKey: "style-main",
+        orderMutated: false
+      },
+      {
+        nodeName: "LINK",
+        relationship: "preload",
+        resourceKey: "font-main",
+        orderMutated: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.resourceMapPlan.uniqueResourceCount, 2);
+  assert.equal(diagnostic.resourceMapPlan.dedupedRowCount, 1);
+  assert.equal(diagnostic.sideEffects.fakeHeadRead, true);
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
+  assert.equal(diagnostic.sideEffects.resourceHintDedupeRowsRecorded, true);
+  assert.equal(
+    diagnostic.sideEffects.publicPreloadPreinitDedupeBehavior,
+    false
+  );
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(diagnostic.publicResourceBoundary.realDocumentMutated, false);
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.status,
+    resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
+  );
+  assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
 test("React DOM resource hint oracle artifact does not leak temporary generation paths", () => {
   const oracleText = readCheckedReactDomResourceHintsOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
@@ -644,4 +825,13 @@ function createDeterministicResourceHintDom() {
     }
   };
   return { document, head };
+}
+
+function appendResourceHintFakeHeadChild(fakeDom, tagName, attributes) {
+  const element = fakeDom.document.createElement(tagName);
+  for (const [name, value] of Object.entries(attributes)) {
+    element.setAttribute(name, value);
+  }
+  fakeDom.head.appendChild(element);
+  return element;
 }

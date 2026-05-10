@@ -3442,6 +3442,680 @@ test('private resource hint head clear/retain diagnostic records singleton and r
   );
 });
 
+test('private resource hint preload/preinit order diagnostic records dedupe and precedence evidence only', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'preload-preinit-order-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'preload-preinit-order-adapter'
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: 'preload-preinit-order'
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const records = [
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/style.css',
+      'style',
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: 'low',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'high'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style-dupe',
+        fetchPriority: 'high'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/script.js',
+      'script',
+      {
+        crossOrigin: undefined,
+        integrity: 'sha256-script-preload',
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('X', [
+      '/script.js',
+      {
+        crossOrigin: undefined,
+        integrity: 'sha256-script',
+        fetchPriority: 'high',
+        nonce: 'nonce-script'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/font.woff2',
+      'font',
+      {
+        crossOrigin: '',
+        integrity: undefined,
+        nonce: undefined,
+        type: 'font/woff2',
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ])
+  ];
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    })
+  );
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'stylesheet',
+    'data-precedence': 'theme',
+    'data-fast-react-resource-key': 'style-main',
+    'data-fast-react-precedence-key': 'precedence-theme'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'preload',
+    as: 'style',
+    'data-fast-react-resource-key': 'style-main'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'preload',
+    as: 'script',
+    'data-fast-react-resource-key': 'script-main'
+  });
+  appendFakeHeadChild(fakeDom, 'script', {
+    'data-fast-react-resource-key': 'script-main'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'preload',
+    as: 'font',
+    'data-fast-react-resource-key': 'font-main'
+  });
+
+  const diagnostic = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      orderKind: 'deterministic-fake-dom-preload-preinit-dedupe-order',
+      orderId: 'preload-preinit-dedupe-order',
+      targetKind: 'document-head',
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-theme'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-theme'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'script-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[4].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'script-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: 'font',
+          resourceKey: 'font-main'
+        }
+      ]
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate();
+
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintPreloadPreinitOrderRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintPreloadPreinitOrderRecordPayload(
+      diagnostic
+    ),
+    diagnostic
+  );
+  assert.deepEqual(summarizePreloadPreinitOrder(diagnostic), {
+    orderDiagnosticId: 'preload-preinit-order:1',
+    requestType: 'resource-hint-preload-preinit-dedupe-order',
+    orderStatus:
+      resourceFormGate.privateResourceHintPreloadPreinitOrderStatus,
+    executionStatus:
+      resourceFormGate.privateResourceHintPreloadPreinitOrderExecutionStatus,
+    dedupeActions: [
+      'insert-preload',
+      'preinit-adopts-preload',
+      'dedupe-preinit',
+      'insert-preload',
+      'preinit-adopts-preload',
+      'insert-preload'
+    ],
+    plannedContractIds: [
+      'preinit-style',
+      'preload',
+      'preload',
+      'preinit-script',
+      'preload'
+    ],
+    observedNodeNames: ['LINK', 'LINK', 'LINK', 'SCRIPT', 'LINK'],
+    resourceMapPlan: {
+      uniqueResourceCount: 3,
+      preloadResourceCount: 3,
+      preinitResourceCount: 2,
+      dedupedRowCount: 1
+    }
+  });
+  assert.equal(diagnostic.status, resourceFormGate.unsupportedStatus);
+  assert.equal(diagnostic.unsupportedCode, unsupportedCode);
+  assert.equal(diagnostic.compatibilityTarget, compatibilityTarget);
+  assert.equal(
+    diagnostic.compatibilityStatus,
+    resourceFormGate
+      .privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus
+  );
+  assert.deepEqual(
+    diagnostic.sideEffects,
+    resourceFormGate.resourceHintPreloadPreinitOrderSideEffects
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadRead, true);
+  assert.equal(diagnostic.sideEffects.fakeHeadChildrenScanned, true);
+  assert.equal(
+    diagnostic.sideEffects.fakePreloadPreinitOrderDiagnosticInvoked,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
+  assert.equal(
+    diagnostic.sideEffects.fakeHeadInsertionOrderObserved,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.fakeHeadInsertionOrderMutated,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.resourceHintDedupeRowsRecorded, true);
+  assert.equal(
+    diagnostic.sideEffects.resourceHintPrecedenceRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.resourceHintHeadOrderRowsRecorded,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.preloadPreinitResourceMapCreated, false);
+  assert.equal(diagnostic.sideEffects.preloadPreinitResourceMapMutated, false);
+  assert.equal(diagnostic.sideEffects.realDocumentMutated, false);
+  assert.equal(diagnostic.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(
+    diagnostic.sideEffects.publicPreloadPreinitDedupeBehavior,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.compatibilityClaimed, false);
+  assert.equal(diagnostic.orderAdmission.rawDocumentCaptured, false);
+  assert.equal(diagnostic.orderAdmission.rawHeadCaptured, false);
+  assert.equal(diagnostic.orderAdmission.resourceMapCreationAllowed, false);
+  assert.equal(diagnostic.orderAdmission.fakeHeadMutationAllowed, false);
+  assert.equal(diagnostic.orderAdmission.realHeadMutationAllowed, false);
+  assert.deepEqual(
+    diagnostic.dedupeRows.map((row) => ({
+      inputIndex: row.inputIndex,
+      contractId: row.contractId,
+      resourceStage: row.resourceStage,
+      resourceKind: row.resourceKind,
+      resourceKey: row.resourceKey,
+      precedenceKey: row.precedenceKey,
+      dedupeAction: row.dedupeAction,
+      dedupeMatched: row.dedupeMatched,
+      wouldInsertIntoHead: row.wouldInsertIntoHead,
+      resourceMapMutated: row.resourceMapMutated
+    })),
+    [
+      {
+        inputIndex: 0,
+        contractId: 'preload',
+        resourceStage: 'preload',
+        resourceKind: 'style',
+        resourceKey: 'style:style-main',
+        precedenceKey: null,
+        dedupeAction: 'insert-preload',
+        dedupeMatched: false,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 1,
+        contractId: 'preinit-style',
+        resourceStage: 'preinit',
+        resourceKind: 'style',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-theme',
+        dedupeAction: 'preinit-adopts-preload',
+        dedupeMatched: true,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 2,
+        contractId: 'preinit-style',
+        resourceStage: 'preinit',
+        resourceKind: 'style',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-theme',
+        dedupeAction: 'dedupe-preinit',
+        dedupeMatched: true,
+        wouldInsertIntoHead: false,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 3,
+        contractId: 'preload',
+        resourceStage: 'preload',
+        resourceKind: 'script',
+        resourceKey: 'script:script-main',
+        precedenceKey: null,
+        dedupeAction: 'insert-preload',
+        dedupeMatched: false,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 4,
+        contractId: 'preinit-script',
+        resourceStage: 'preinit',
+        resourceKind: 'script',
+        resourceKey: 'script:script-main',
+        precedenceKey: null,
+        dedupeAction: 'preinit-adopts-preload',
+        dedupeMatched: true,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 5,
+        contractId: 'preload',
+        resourceStage: 'preload',
+        resourceKind: 'font',
+        resourceKey: 'font:font-main',
+        precedenceKey: null,
+        dedupeAction: 'insert-preload',
+        dedupeMatched: false,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(diagnostic.precedenceRows, [
+    {
+      rowId: 'stylesheet-precedence-0',
+      precedenceIndex: 0,
+      precedenceKey: 'precedence-theme',
+      sourceAdapterAdmissionIds: [admissions[1].adapterAdmissionId],
+      resourceKeys: ['style:style-main'],
+      plannedStylesheetCount: 1,
+      orderingApplied: false,
+      precedenceMapCreated: false,
+      precedenceQueryRun: false,
+      rawPrecedenceValueRetained: false,
+      compatibilityClaimed: false
+    }
+  ]);
+  assert.deepEqual(
+    diagnostic.plannedHeadInsertionOrder.rows.map((row) => ({
+      headOrderIndex: row.headOrderIndex,
+      inputIndex: row.inputIndex,
+      contractId: row.contractId,
+      placementKind: row.placementKind,
+      insertionMethod: row.insertionMethod,
+      insertionApplied: row.insertionApplied
+    })),
+    [
+      {
+        headOrderIndex: 0,
+        inputIndex: 1,
+        contractId: 'preinit-style',
+        placementKind: 'stylesheet-precedence',
+        insertionMethod: 'insert-before-or-after-precedence-peer',
+        insertionApplied: false
+      },
+      {
+        headOrderIndex: 1,
+        inputIndex: 0,
+        contractId: 'preload',
+        placementKind: 'append',
+        insertionMethod: 'appendChild',
+        insertionApplied: false
+      },
+      {
+        headOrderIndex: 2,
+        inputIndex: 3,
+        contractId: 'preload',
+        placementKind: 'append',
+        insertionMethod: 'appendChild',
+        insertionApplied: false
+      },
+      {
+        headOrderIndex: 3,
+        inputIndex: 4,
+        contractId: 'preinit-script',
+        placementKind: 'append',
+        insertionMethod: 'appendChild',
+        insertionApplied: false
+      },
+      {
+        headOrderIndex: 4,
+        inputIndex: 5,
+        contractId: 'preload',
+        placementKind: 'append',
+        insertionMethod: 'appendChild',
+        insertionApplied: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.observedHeadOrder.rows.map((row) => ({
+      childIndex: row.childIndex,
+      nodeName: row.nodeName,
+      relationship: row.relationship,
+      resourceKey: row.resourceKey,
+      precedenceKey: row.precedenceKey,
+      stylesheetPrecedenceCandidate: row.stylesheetPrecedenceCandidate,
+      orderMutated: row.orderMutated
+    })),
+    [
+      {
+        childIndex: 0,
+        nodeName: 'LINK',
+        relationship: 'stylesheet',
+        resourceKey: 'style-main',
+        precedenceKey: 'precedence-theme',
+        stylesheetPrecedenceCandidate: true,
+        orderMutated: false
+      },
+      {
+        childIndex: 1,
+        nodeName: 'LINK',
+        relationship: 'preload',
+        resourceKey: 'style-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        orderMutated: false
+      },
+      {
+        childIndex: 2,
+        nodeName: 'LINK',
+        relationship: 'preload',
+        resourceKey: 'script-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        orderMutated: false
+      },
+      {
+        childIndex: 3,
+        nodeName: 'SCRIPT',
+        relationship: null,
+        resourceKey: 'script-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        orderMutated: false
+      },
+      {
+        childIndex: 4,
+        nodeName: 'LINK',
+        relationship: 'preload',
+        resourceKey: 'font-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        orderMutated: false
+      }
+    ]
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.status,
+    resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.stylesheetPrecedenceRowsObserved,
+    true
+  );
+  assert.equal(diagnostic.stylesheetPrecedenceBoundary.stylesheetRowCount, 1);
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.observedStylesheetRowCount,
+    1
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetPrecedenceBoundary.blockedCapabilities,
+    resourceFormGate.resourceHintHeadStylesheetPrecedenceBlockedCapabilities
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
+  );
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(diagnostic.publicResourceBoundary.realDocumentMutated, false);
+  assert.equal(
+    diagnostic.publicHeadBoundary.publicSingletonBehavior,
+    false
+  );
+  assert.equal(diagnostic.publicHeadBoundary.realDocumentMutated, false);
+  assert.equal(fakeDom.head.childNodes.length, 5);
+  assert.equal(
+    JSON.stringify(diagnostic).includes('/style.css'),
+    false
+  );
+  assert.equal(
+    JSON.stringify(diagnostic).includes('sha256-style'),
+    false
+  );
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintPreloadPreinitOrderGateId
+  );
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(
+    summary.admissionStatus,
+    resourceFormGate
+      .privateResourceHintPreloadPreinitOrderAdmissionRequiredStatus
+  );
+  assert.deepEqual(summary.acceptsContractIds, [
+    'preload',
+    'preinit-style',
+    'preinit-script'
+  ]);
+  assert.equal(summary.mutatesFakeHead, false);
+  assert.equal(summary.mutatesRealHead, false);
+  assert.equal(summary.recordsDedupeRows, true);
+  assert.equal(summary.recordsPrecedenceRows, true);
+  assert.equal(summary.recordsHeadOrderRows, true);
+  assert.deepEqual(
+    summary.blockedCapabilities,
+    resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
+  );
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintPreloadPreinitOrderBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintPreloadPreinitOrderError(
+      diagnostic
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintPreloadPreinitOrderGateErrorCode
+  );
+  assert.equal(
+    error.exportName,
+    'resource-hint-preload-preinit-dedupe-order'
+  );
+  assert.equal(error.orderDiagnosticId, 'preload-preinit-order:1');
+  assert.deepEqual(
+    error.blockedCapabilities,
+    resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
+  );
+
+  assert.throws(
+    () =>
+      orderGate.recordPreloadPreinitOrderDiagnostic(admissions, {
+        explicitOrderDiagnostic: true,
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head,
+        resourceDescriptors: []
+      }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintPreloadPreinitOrderInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'preload/preinit order gate admits exactly one diagnostic record'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintPreloadPreinitOrderGate()
+        .recordPreloadPreinitOrderDiagnostic(admissions, {
+          explicitOrderDiagnostic: true,
+          fakeDocument: fakeDom.document,
+          fakeHead: fakeDom.head,
+          resourceDescriptors: []
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintPreloadPreinitOrderInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'resourceDescriptors must match the adapter admission count'
+    }
+  );
+  const preconnectAdmission = adapterGate.admitDispatcherRecord(
+    gate.recordResourceHintDispatcherRequest('C', [
+      'https://connect.example.test',
+      ''
+    ]),
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintPreloadPreinitOrderGate()
+        .recordPreloadPreinitOrderDiagnostic(
+          [preconnectAdmission],
+          {
+            explicitOrderDiagnostic: true,
+            fakeDocument: fakeDom.document,
+            fakeHead: fakeDom.head,
+            resourceDescriptors: [
+              {
+                sourceAdapterAdmissionId:
+                  preconnectAdmission.adapterAdmissionId,
+                resourceKind: 'other',
+                resourceKey: 'connect-main'
+              }
+            ]
+          }
+        ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintPreloadPreinitOrderInvalidRecordCode,
+      compatibilityTarget,
+      contractId: 'preconnect'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintPreloadPreinitOrderGate()
+        .recordPreloadPreinitOrderDiagnostic([admissions[1]], {
+          explicitOrderDiagnostic: true,
+          fakeDocument: fakeDom.document,
+          fakeHead: fakeDom.head,
+          resourceDescriptors: [
+            {
+              sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+              resourceKind: 'style',
+              resourceKey: 'style-main'
+            }
+          ]
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintPreloadPreinitOrderInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'preinit-style descriptors must include precedenceKey'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintPreloadPreinitOrderError(
+        {}
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintPreloadPreinitOrderInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -3808,6 +4482,27 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     summary.sideEffects.stylesheetPrecedenceBlockedCapabilitiesRecorded,
     false
   );
+  assert.equal(
+    summary.sideEffects.fakePreloadPreinitOrderDiagnosticInvoked,
+    false
+  );
+  assert.equal(
+    summary.sideEffects.fakeHeadInsertionOrderObserved,
+    false
+  );
+  assert.equal(summary.sideEffects.resourceHintDedupeRowsRecorded, false);
+  assert.equal(
+    summary.sideEffects.resourceHintPrecedenceRowsRecorded,
+    false
+  );
+  assert.equal(
+    summary.sideEffects.resourceHintHeadOrderRowsRecorded,
+    false
+  );
+  assert.equal(
+    summary.sideEffects.publicPreloadPreinitDedupeBehavior,
+    false
+  );
   assert.equal(summary.sideEffects.headSingletonResolved, false);
   assert.equal(summary.sideEffects.publicHeadSingletonBehavior, false);
   assert.equal(summary.sideEffects.realDocumentMutated, false);
@@ -3899,6 +4594,15 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       stylesheetPrecedenceOrderQueried: false,
       stylesheetPrecedenceOrderMutated: false,
       publicStylesheetPrecedenceBehavior: false,
+      fakePreloadPreinitOrderDiagnosticInvoked: false,
+      fakeHeadInsertionOrderObserved: false,
+      fakeHeadInsertionOrderMutated: false,
+      resourceHintDedupeRowsRecorded: false,
+      resourceHintPrecedenceRowsRecorded: false,
+      resourceHintHeadOrderRowsRecorded: false,
+      preloadPreinitResourceMapCreated: false,
+      preloadPreinitResourceMapMutated: false,
+      publicPreloadPreinitDedupeBehavior: false,
       resourceFetchStarted: false,
       realDocumentMutated: false,
       publicResourceHintDomInsertion: false,
@@ -3909,7 +4613,9 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       headBoundaryGate:
         resourceFormGate.describePrivateResourceHintHeadBoundaryGate(),
       headClearRetainGate:
-        resourceFormGate.describePrivateResourceHintHeadClearRetainGate()
+        resourceFormGate.describePrivateResourceHintHeadClearRetainGate(),
+      preloadPreinitOrderGate:
+        resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate()
     },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
@@ -4092,6 +4798,30 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         .stylesheetPrecedenceBlockedCapabilitiesRecorded,
       false
     );
+    assert.equal(
+      blockedRecord.sideEffects.fakePreloadPreinitOrderDiagnosticInvoked,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.fakeHeadInsertionOrderObserved,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.resourceHintDedupeRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.resourceHintPrecedenceRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.resourceHintHeadOrderRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.publicPreloadPreinitDedupeBehavior,
+      false
+    );
     assert.equal(blockedRecord.sideEffects.headSingletonResolved, false);
     assert.equal(
       blockedRecord.sideEffects.publicHeadSingletonBehavior,
@@ -4148,6 +4878,21 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         adapterBoundary.stylesheetPrecedenceBlockedCapabilitiesRecorded,
         false
       );
+      assert.equal(
+        adapterBoundary.fakePreloadPreinitOrderDiagnosticInvoked,
+        false
+      );
+      assert.equal(adapterBoundary.fakeHeadInsertionOrderObserved, false);
+      assert.equal(adapterBoundary.resourceHintDedupeRowsRecorded, false);
+      assert.equal(
+        adapterBoundary.resourceHintPrecedenceRowsRecorded,
+        false
+      );
+      assert.equal(adapterBoundary.resourceHintHeadOrderRowsRecorded, false);
+      assert.equal(
+        adapterBoundary.publicPreloadPreinitDedupeBehavior,
+        false
+      );
       assert.equal(adapterBoundary.resourceFetchStarted, false);
       assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
@@ -4166,6 +4911,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.deepEqual(
         adapterBoundary.headClearRetainGate,
         resourceFormGate.describePrivateResourceHintHeadClearRetainGate()
+      );
+      assert.deepEqual(
+        adapterBoundary.preloadPreinitOrderGate,
+        resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate()
       );
     } else {
       assert.equal(
@@ -4997,6 +5746,28 @@ function summarizeHeadClearRetain(diagnostic) {
       retainedChildCount: diagnostic.fakeHeadPlan.retainedChildCount,
       clearableChildCount: diagnostic.fakeHeadPlan.clearableChildCount,
       clearApplied: diagnostic.fakeHeadPlan.clearApplied
+    }
+  };
+}
+
+function summarizePreloadPreinitOrder(diagnostic) {
+  return {
+    orderDiagnosticId: diagnostic.orderDiagnosticId,
+    requestType: diagnostic.requestType,
+    orderStatus: diagnostic.orderStatus,
+    executionStatus: diagnostic.executionStatus,
+    dedupeActions: diagnostic.dedupeRows.map((row) => row.dedupeAction),
+    plannedContractIds: diagnostic.plannedHeadInsertionOrder.rows.map(
+      (row) => row.contractId
+    ),
+    observedNodeNames: diagnostic.observedHeadOrder.rows.map(
+      (row) => row.nodeName
+    ),
+    resourceMapPlan: {
+      uniqueResourceCount: diagnostic.resourceMapPlan.uniqueResourceCount,
+      preloadResourceCount: diagnostic.resourceMapPlan.preloadResourceCount,
+      preinitResourceCount: diagnostic.resourceMapPlan.preinitResourceCount,
+      dedupedRowCount: diagnostic.resourceMapPlan.dedupedRowCount
     }
   };
 }
