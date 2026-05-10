@@ -1601,6 +1601,7 @@ pub(crate) struct HostRootMutationPhaseRecord {
     root: FiberRootId,
     host_root: FiberId,
     fiber: FiberId,
+    alternate_fiber: Option<FiberId>,
     tag: FiberTag,
     kind: HostRootMutationPhaseRecordKind,
     lanes: Lanes,
@@ -1629,6 +1630,11 @@ impl HostRootMutationPhaseRecord {
     #[must_use]
     pub(crate) const fn fiber(self) -> FiberId {
         self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn alternate_fiber(self) -> Option<FiberId> {
+        self.alternate_fiber
     }
 
     #[must_use]
@@ -1738,6 +1744,7 @@ pub(crate) struct HostRootMutationApplyRecord {
     parent_tag: FiberTag,
     parent_state_node: StateNodeHandle,
     fiber: FiberId,
+    alternate_fiber: Option<FiberId>,
     tag: FiberTag,
     kind: HostRootMutationApplyRecordKind,
     lanes: Lanes,
@@ -1786,6 +1793,11 @@ impl HostRootMutationApplyRecord {
     #[must_use]
     pub(crate) const fn fiber(self) -> FiberId {
         self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn alternate_fiber(self) -> Option<FiberId> {
+        self.alternate_fiber
     }
 
     #[must_use]
@@ -1912,6 +1924,7 @@ fn host_root_mutation_phase_record(
         root,
         host_root,
         fiber,
+        alternate_fiber: node.alternate(),
         tag: node.tag(),
         kind,
         lanes,
@@ -2001,6 +2014,7 @@ fn host_root_mutation_phase_apply_record(
         parent_tag: FiberTag::HostRoot,
         parent_state_node: StateNodeHandle::NONE,
         fiber: record.fiber(),
+        alternate_fiber: record.alternate_fiber(),
         tag: record.tag(),
         kind,
         lanes: record.lanes(),
@@ -2048,6 +2062,7 @@ fn host_root_deletion_apply_record(
         parent_tag: request.parent_tag,
         parent_state_node: request.parent_state_node,
         fiber: request.deleted,
+        alternate_fiber: None,
         tag,
         kind,
         lanes: request.lanes,
@@ -2553,6 +2568,7 @@ mod tests {
         assert_eq!(records[0].root(), root_id);
         assert_eq!(records[0].host_root(), render.finished_work());
         assert_eq!(records[0].fiber(), child);
+        assert_eq!(records[0].alternate_fiber(), None);
         assert_eq!(records[0].tag(), FiberTag::HostText);
         assert_eq!(
             records[0].kind(),
@@ -2580,6 +2596,7 @@ mod tests {
         assert_eq!(apply_records[0].parent(), render.finished_work());
         assert_eq!(apply_records[0].parent_tag(), FiberTag::HostRoot);
         assert_eq!(apply_records[0].fiber(), child);
+        assert_eq!(apply_records[0].alternate_fiber(), None);
         assert_eq!(apply_records[0].tag(), FiberTag::HostText);
         assert_eq!(apply_records[0].state_node(), child_state_node);
         assert_eq!(
@@ -2695,6 +2712,7 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].kind(), HostRootMutationPhaseRecordKind::Update);
         assert_eq!(records[0].fiber(), finished_child);
+        assert_eq!(records[0].alternate_fiber(), Some(current_child));
         assert_eq!(records[0].tag(), FiberTag::HostComponent);
         assert_eq!(records[0].state_node(), state_node);
         assert_eq!(records[0].pending_props(), next_pending_props);
@@ -2706,6 +2724,7 @@ mod tests {
             HostRootMutationApplyRecordKind::CommitHostComponentUpdate
         );
         assert_eq!(apply_records[0].fiber(), finished_child);
+        assert_eq!(apply_records[0].alternate_fiber(), Some(current_child));
         assert_eq!(apply_records[0].state_node(), state_node);
         assert_eq!(
             apply_records[0].alternate_memoized_props(),
