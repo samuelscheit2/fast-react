@@ -16,8 +16,10 @@ use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootScheduleUpdateRecord,
     RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerCallbackRequest,
-    SchedulerCancellationRecord, SchedulerMicrotaskKind, SchedulerMicrotaskRequest,
-    SchedulerPriority, SyncFlushExecutionContextRecord, render_host_root_for_lanes,
+    SchedulerCallbackValidationRecord, SchedulerCancellationRecord, SchedulerMicrotaskKind,
+    SchedulerMicrotaskRequest, SchedulerPriority, SyncFlushExecutionContextRecord,
+    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
+    validate_scheduled_host_root_callback,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -213,6 +215,59 @@ impl RootScheduleMicrotaskResult {
     #[must_use]
     pub fn records(&self) -> &[RootTaskScheduleRecord] {
         &self.records
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootSchedulerCallbackExecutionStatus {
+    StaleCallback,
+    NoWork,
+    Rendered,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RootSchedulerCallbackExecutionRecord {
+    callback: SchedulerCallbackRequest,
+    validation: SchedulerCallbackValidationRecord,
+    selected_lanes: Lanes,
+    status: RootSchedulerCallbackExecutionStatus,
+    render_phase: Option<HostRootRenderPhaseRecord>,
+}
+
+impl RootSchedulerCallbackExecutionRecord {
+    #[must_use]
+    pub const fn callback(self) -> SchedulerCallbackRequest {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.callback.root()
+    }
+
+    #[must_use]
+    pub const fn callback_node(self) -> RootSchedulerCallbackHandle {
+        self.callback.node()
+    }
+
+    #[must_use]
+    pub const fn validation(self) -> SchedulerCallbackValidationRecord {
+        self.validation
+    }
+
+    #[must_use]
+    pub const fn selected_lanes(self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub const fn status(self) -> RootSchedulerCallbackExecutionStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn render_phase(self) -> Option<HostRootRenderPhaseRecord> {
+        self.render_phase
     }
 }
 
@@ -545,6 +600,59 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
     })
 }
 
+pub fn execute_scheduled_root_callback<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    callback: SchedulerCallbackRequest,
+) -> Result<RootSchedulerCallbackExecutionRecord, RootSchedulerError> {
+    let validation =
+        validate_scheduled_host_root_callback(store, callback.root(), callback.node())?;
+    if validation.is_stale() {
+        return Ok(RootSchedulerCallbackExecutionRecord {
+            callback,
+            validation,
+            selected_lanes: Lanes::NO,
+            status: RootSchedulerCallbackExecutionStatus::StaleCallback,
+            render_phase: None,
+        });
+    }
+
+    let selected_lanes = next_lanes_for_root(store, callback.root())?;
+    if selected_lanes.is_empty() {
+        store
+            .root_mut(callback.root())?
+            .scheduling_mut()
+            .clear_callback();
+        return Ok(RootSchedulerCallbackExecutionRecord {
+            callback,
+            validation,
+            selected_lanes,
+            status: RootSchedulerCallbackExecutionStatus::NoWork,
+            render_phase: None,
+        });
+    }
+
+    let render_result = render_host_root_via_scheduler_callback(
+        store,
+        callback.root(),
+        callback.node(),
+        selected_lanes,
+    )?;
+    let render_phase = render_result.render_phase();
+    let status = if render_phase.is_some() {
+        RootSchedulerCallbackExecutionStatus::Rendered
+    } else {
+        RootSchedulerCallbackExecutionStatus::StaleCallback
+    };
+
+    Ok(RootSchedulerCallbackExecutionRecord {
+        callback,
+        validation: render_result.validation(),
+        selected_lanes,
+        status,
+        render_phase,
+    })
+}
+
 pub fn collect_sync_flush_plan<H: HostTypes>(
     store: &mut FiberRootStore<H>,
 ) -> Result<RootSyncFlushPlan, RootSchedulerError> {
@@ -771,6 +879,20 @@ mod tests {
         ensure_root_is_scheduled(store, result.schedule()).unwrap()
     }
 
+    fn scheduled_callback_request(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) -> SchedulerCallbackRequest {
+        schedule_default_update(store, root_id);
+        let processed = process_root_schedule_in_microtask(store).unwrap();
+
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::Scheduled
+        );
+        store.scheduler_bridge().callback_requests()[0]
+    }
+
     fn schedule_sync_update(
         store: &mut FiberRootStore<RecordingHost>,
         root_id: FiberRootId,
@@ -902,6 +1024,95 @@ mod tests {
             store.root(root_id).unwrap().scheduling().callback_node(),
             store.scheduler_bridge().callback_requests()[0].node()
         );
+    }
+
+    #[test]
+    fn root_scheduler_execute_callback_renders_matching_host_root_callback() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let callback = scheduled_callback_request(&mut store, root_id);
+
+        let execution = execute_scheduled_root_callback(&mut store, callback).unwrap();
+        let render = execution.render_phase().unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSchedulerCallbackExecutionStatus::Rendered
+        );
+        assert_eq!(execution.callback(), callback);
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.callback_node(), callback.node());
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(render.root(), root_id);
+        assert_eq!(render.current(), current);
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.resulting_element(), RootElementHandle::from_raw(1));
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_execute_callback_reports_stale_callback_without_rendering() {
+        let (mut store, root_id, _host) = root_store();
+        let callback = scheduled_callback_request(&mut store, root_id);
+        let sync_result =
+            update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
+        ensure_root_is_scheduled(&mut store, sync_result.schedule()).unwrap();
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let current = store.root(root_id).unwrap().current();
+
+        let execution = execute_scheduled_root_callback(&mut store, callback).unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSchedulerCallbackExecutionStatus::StaleCallback
+        );
+        assert!(execution.validation().is_stale());
+        assert_eq!(
+            execution.validation().requested_callback_node(),
+            callback.node()
+        );
+        assert_eq!(execution.selected_lanes(), Lanes::NO);
+        assert_eq!(execution.render_phase(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.fiber_arena().get(current).unwrap().alternate(), None);
+    }
+
+    #[test]
+    fn root_scheduler_execute_callback_reports_no_work_without_rendering() {
+        let (mut store, root_id, _host) = root_store();
+        let callback = scheduled_callback_request(&mut store, root_id);
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_finished(RootFinishedLanes::new(Lanes::DEFAULT, Lanes::NO));
+        let current = store.root(root_id).unwrap().current();
+
+        let execution = execute_scheduled_root_callback(&mut store, callback).unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSchedulerCallbackExecutionStatus::NoWork
+        );
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.selected_lanes(), Lanes::NO);
+        assert_eq!(execution.render_phase(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .callback_priority(),
+            RootCallbackPriority::NO
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.fiber_arena().get(current).unwrap().alternate(), None);
     }
 
     #[test]

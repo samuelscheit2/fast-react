@@ -58,10 +58,12 @@ pub use root_config::{
     RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
 };
 pub use root_scheduler::{
-    RootScheduleMicrotaskResult, RootSchedulerError, RootSchedulerState, RootSyncFlushExitStatus,
-    RootSyncFlushPlan, RootSyncFlushRecord, RootSyncFlushRecordStatus, RootSyncFlushResult,
-    RootTaskScheduleOutcome, RootTaskScheduleRecord, ScheduledRootUpdateResult,
-    collect_sync_flush_plan, ensure_root_is_scheduled, flush_sync_work_on_all_roots,
+    RootScheduleMicrotaskResult, RootSchedulerCallbackExecutionRecord,
+    RootSchedulerCallbackExecutionStatus, RootSchedulerError, RootSchedulerState,
+    RootSyncFlushExitStatus, RootSyncFlushPlan, RootSyncFlushRecord, RootSyncFlushRecordStatus,
+    RootSyncFlushResult, RootTaskScheduleOutcome, RootTaskScheduleRecord,
+    ScheduledRootUpdateResult, collect_sync_flush_plan, ensure_root_is_scheduled,
+    execute_scheduled_root_callback, flush_sync_work_on_all_roots,
     process_root_schedule_in_microtask, schedule_task_for_root_during_microtask, scheduled_roots,
 };
 pub use root_updates::{
