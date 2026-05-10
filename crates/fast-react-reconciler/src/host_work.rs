@@ -29,7 +29,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum HostWorkError {
+pub(crate) enum HostWorkError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     Host(HostError),
@@ -316,7 +316,7 @@ impl DetachedHostRecords {
 }
 
 #[derive(Debug)]
-struct HostWorkResult {
+pub(crate) struct HostWorkResult {
     root: FiberRootId,
     work_in_progress: FiberId,
     root_child: Option<FiberId>,
@@ -324,12 +324,32 @@ struct HostWorkResult {
 }
 
 impl HostWorkResult {
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    pub(crate) const fn work_in_progress(&self) -> FiberId {
+        self.work_in_progress
+    }
+
+    pub(crate) const fn root_child(&self) -> Option<FiberId> {
+        self.root_child
+    }
+
+    pub(crate) fn detached_instance_count(&self) -> usize {
+        self.detached_hosts.instance_count()
+    }
+
+    pub(crate) fn detached_text_count(&self) -> usize {
+        self.detached_hosts.text_count()
+    }
+
     fn detached_hosts(&self) -> &DetachedHostRecords {
         &self.detached_hosts
     }
 }
 
-fn mount_test_host_work(
+pub(crate) fn mount_test_host_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
     render: HostRootRenderPhaseRecord,
