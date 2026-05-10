@@ -597,6 +597,209 @@ test('private hydration target resolution records dehydrated ownership without d
   assert.deepEqual(document.__registrations, []);
 });
 
+test('private hydration replay queue drain-order diagnostics sort blocked targets by dehydrated metadata', () => {
+  const document = createDocument('drain-order');
+  const container = createElement('DIV', document);
+  const firstBoundaryTarget = createElement('BUTTON', document);
+  const rootTarget = createElement('INPUT', document);
+  const secondBoundaryTarget = createElement('A', document);
+  firstBoundaryTarget.parentNode = container;
+  rootTarget.parentNode = container;
+  secondBoundaryTarget.parentNode = container;
+  container.childNodes = [
+    createComment('$'),
+    firstBoundaryTarget,
+    createComment('/$'),
+    rootTarget,
+    createComment('$'),
+    secondBoundaryTarget,
+    createComment('/$')
+  ];
+
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    recordIdPrefix: 'hydration-drain'
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    {
+      props: {
+        children: 'drain'
+      },
+      type: 'App'
+    },
+    {
+      identifierPrefix: 'drain-order-'
+    }
+  );
+  const secondBoundaryWrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      'mouseover',
+      0
+    );
+  const rootWrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      'change',
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const firstBoundaryWrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      'click',
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const secondBoundaryRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      secondBoundaryWrapper,
+      createNativeEvent('mouseover', secondBoundaryTarget)
+    );
+  const rootRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      rootWrapper,
+      createNativeEvent('change', rootTarget)
+    );
+  const firstBoundaryRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      firstBoundaryWrapper,
+      createNativeEvent('click', firstBoundaryTarget)
+    );
+  const diagnostics =
+    pluginEventSystem.createHydrationReplayEventQueueDiagnostic(
+      [secondBoundaryRecord, rootRecord, firstBoundaryRecord],
+      {
+        dehydratedTargetResolution: record.targetResolutionDiagnostics,
+        markerReplayTargetCandidates:
+          record.replayQueueDiagnostics.markerReplayTargetCandidates,
+        source: 'hydration-boundary-test-drain-order'
+      }
+    );
+
+  assertHydrationReplayEventQueueDiagnostics(diagnostics, {
+    blockedEventReplayTargetCount: 3,
+    markerReplayTargetCandidateCount: 2,
+    status: 'blocked-event-replay-targets-recorded'
+  });
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.kind,
+    pluginEventSystem.HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.orderSource,
+    'dehydrated-target-root-metadata'
+  );
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.status,
+    'blocked-replay-queue-drain-order-recorded'
+  );
+  assert.equal(diagnostics.drainOrderDiagnosticsAccepted, true);
+  assert.equal(
+    diagnostics.drainOrder,
+    diagnostics.replayQueueDrainOrderDiagnostics.drainOrder
+  );
+  assert.deepEqual(
+    diagnostics.drainOrder.map((entry) => [
+      entry.drainOrder,
+      entry.inputOrder,
+      entry.domEventName,
+      entry.queueName,
+      entry.targetPath,
+      entry.blockedOnStatus,
+      entry.blockedOnKind,
+      entry.dehydratedBoundaryOwnerId,
+      entry.targetPathSortKey,
+      entry.willDrainReplayQueues,
+      entry.willReplay
+    ]),
+    [
+      [
+        0,
+        2,
+        'click',
+        'discrete-hydration-replay-attempt',
+        'container.childNodes[1]',
+        'blocked-on-dehydrated-boundary',
+        'suspense-boundary',
+        'hydration-drain:1:boundary:0',
+        '00000001',
+        false,
+        false
+      ],
+      [
+        1,
+        1,
+        'change',
+        'queuedChangeEventTargets',
+        'container.childNodes[3]',
+        'blocked-on-dehydrated-root',
+        'dehydrated-root',
+        null,
+        '00000003',
+        false,
+        false
+      ],
+      [
+        2,
+        0,
+        'mouseover',
+        'queuedMouse',
+        'container.childNodes[5]',
+        'blocked-on-dehydrated-boundary',
+        'suspense-boundary',
+        'hydration-drain:1:boundary:1',
+        '00000005',
+        false,
+        false
+      ]
+    ]
+  );
+  assert.deepEqual(
+    diagnostics.blockedEventReplayTargets.map((entry) => [
+      entry.inputOrder,
+      entry.targetPath,
+      entry.blockedOnStatus,
+      entry.dehydratedBoundaryOwnerId,
+      entry.replayQueueDrained,
+      entry.willDrainReplayQueues,
+      entry.willReplay
+    ]),
+    [
+      [
+        0,
+        'container.childNodes[5]',
+        'blocked-on-dehydrated-boundary',
+        'hydration-drain:1:boundary:1',
+        false,
+        false,
+        false
+      ],
+      [
+        1,
+        'container.childNodes[3]',
+        'blocked-on-dehydrated-root',
+        null,
+        false,
+        false,
+        false
+      ],
+      [
+        2,
+        'container.childNodes[1]',
+        'blocked-on-dehydrated-boundary',
+        'hydration-drain:1:boundary:0',
+        false,
+        false,
+        false
+      ]
+    ]
+  );
+  assert.equal(secondBoundaryRecord.hydrationReplay.queued, false);
+  assert.equal(rootRecord.hydrationReplay.queued, false);
+  assert.equal(firstBoundaryRecord.hydrationReplay.queued, false);
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+});
+
 test('public hydrateRoot remains an unsupported placeholder with no guard side effects', () => {
   const document = createDocument('public');
   const container = createElement('DIV', document);
@@ -674,6 +877,13 @@ function assertHydrationEventReplayBlockers(blockers, expected) {
   assert.equal(blockers.queuedEventReplayTargetCount, 0);
   assert.deepEqual(blockers.eventQueueOrder, []);
   assert.deepEqual(blockers.priorityQueueOrder, []);
+  assert.equal(blockers.drainOrderDiagnosticsAccepted, true);
+  assert.equal(
+    blockers.replayQueueDrainOrderDiagnostics.kind,
+    pluginEventSystem.HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND
+  );
+  assert.equal(blockers.drainOrderCount, 0);
+  assert.deepEqual(blockers.drainOrder, []);
   assert.equal(blockers.replayQueueDiagnosticsAccepted, true);
   assert.equal(
     blockers.replayQueueDiagnostics.kind,
@@ -732,6 +942,8 @@ function assertHydrationReplayEventQueueDiagnostics(diagnostics, expected) {
   assert.equal(diagnostics.hostInstanceHydrationAttempted, false);
   assert.equal(diagnostics.hasScheduledReplayAttempt, false);
   assert.equal(diagnostics.queueMutationAllowed, false);
+  assert.equal(diagnostics.replayQueuesDrained, false);
+  assert.equal(diagnostics.willDrainReplayQueues, false);
   assert.equal(diagnostics.eventsReplayed, false);
   assert.equal(diagnostics.willDispatchEvents, false);
   assert.equal(diagnostics.willHydrateHostInstances, false);
@@ -761,6 +973,37 @@ function assertHydrationReplayEventQueueDiagnostics(diagnostics, expected) {
   );
   assert.equal(diagnostics.queuedEventReplayTargetCount, 0);
   assert.equal(diagnostics.replayedEventCount, 0);
+  assert.equal(diagnostics.drainOrderDiagnosticsAccepted, true);
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.kind,
+    pluginEventSystem.HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.status,
+    expected.blockedEventReplayTargetCount === 0
+      ? 'blocked-no-replay-queue-drain-order-targets-recorded'
+      : 'blocked-replay-queue-drain-order-recorded'
+  );
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.replayQueuesDrained,
+    false
+  );
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.willDrainReplayQueues,
+    false
+  );
+  assert.equal(
+    diagnostics.replayQueueDrainOrderDiagnostics.eventsReplayed,
+    false
+  );
+  assert.equal(
+    diagnostics.drainOrderCount,
+    expected.blockedEventReplayTargetCount
+  );
+  assert.equal(
+    diagnostics.drainOrder.length,
+    expected.blockedEventReplayTargetCount
+  );
   assert.equal(
     diagnostics.blockedEventReplayTargets.length,
     expected.blockedEventReplayTargetCount
@@ -968,6 +1211,8 @@ function assertHydrationMarkerReplayQueueDiagnostics(record, expected) {
   assert.equal(diagnostics.queueMutationAllowed, false);
   assert.equal(diagnostics.hydrationReplaySupported, false);
   assert.equal(diagnostics.eventReplaySupported, false);
+  assert.equal(diagnostics.replayQueuesDrained, false);
+  assert.equal(diagnostics.willDrainReplayQueues, false);
   assert.equal(diagnostics.eventsReplayed, false);
   assert.equal(diagnostics.hasScheduledReplayAttempt, false);
   assert.equal(diagnostics.explicitHydrationTargetsQueued, false);
