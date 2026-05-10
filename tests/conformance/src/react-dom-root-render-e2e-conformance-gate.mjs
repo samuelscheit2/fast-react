@@ -25,6 +25,7 @@ import {
 } from "./react-dom-root-render-e2e-scenarios.mjs";
 import {
   REACT_DOM_ROOT_RENDER_E2E_CONFORMANCE_GATE,
+  REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET,
   REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR,
   REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES,
@@ -108,6 +109,14 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       compatibilityClaimed: false
     }),
     Object.freeze({
+      id: "public-hydration",
+      publicApi: "hydration through react-dom/client.hydrateRoot",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-root-render",
       publicApi: "root.render",
       admission: "blocked",
@@ -122,6 +131,15 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       compatibilityClaimed: false
     }),
     ...REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
+    Object.freeze({
+      id: "public-portal-root-render",
+      publicApi: "ReactDOM.createPortal(...) through public root.render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateHostOutputEvidence: "separate",
+      portalRootRenderEvidence: "separate"
+    }),
     Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
@@ -702,6 +720,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
             gateStatus: privateHostOutputAdmission.gateStatus,
             oracleRowAccepted,
             publicFacadeGateStatus: behavior.gateStatus,
+            publicRootCompatibilitySurface: false,
             comparedToReactDomOracle: false,
             compatibilityClaimed: false,
             diagnosticKind:
@@ -728,6 +747,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
           gateStatus: privateHostOutputAdmission.gateStatus,
           oracleRowAccepted,
           publicFacadeGateStatus: behavior.gateStatus,
+          publicRootCompatibilitySurface: false,
           reason: privateHostOutputAdmission.reason,
           comparedToReactDomOracle: false,
           compatibilityClaimed: false
@@ -838,7 +858,8 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   currentOracle,
   clientRootOracle,
   localPublicFacadeBoundary = inspectReactDomRootPublicFacadeBoundary(),
-  privateRootBridgeBoundary = inspectReactDomPrivateRootBridgeBoundary()
+  privateRootBridgeBoundary = inspectReactDomPrivateRootBridgeBoundary(),
+  rootRenderGateResult: providedRootRenderGateResult = null
 } = {}) {
   const failures = [];
   const blockedScenarioModeRows = [];
@@ -846,12 +867,13 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
   const blockedPrivateBridgeRows = [];
 
   const rootRenderGateResult =
-    checkedOracle && currentOracle
+    providedRootRenderGateResult ??
+    (checkedOracle && currentOracle
       ? evaluateReactDomRootRenderE2EConformanceGate({
           checkedOracle,
           currentOracle
         })
-      : null;
+      : null);
 
   validateClientRootOraclePrerequisites({
     clientRootOracle,
@@ -1058,6 +1080,9 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateHostOutputBlockedScenarioModeRowCount ?? 0
     }`,
+    `Root-render portal rows blocked: ${
+      result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0
+    }`,
     `Failures: ${result.summary.failureCount}`
   ];
 
@@ -1077,6 +1102,11 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private host-output diagnostics remain fake-DOM evidence only and do not unblock public root facade rows."
+    );
+  }
+  if ((result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0) > 0) {
+    lines.push(
+      "Portal root-render blockers remain fail-closed; public root rendering, portal mounting, listeners, DOM mutation, and compatibility claims are still blocked."
     );
   }
 
@@ -1597,6 +1627,223 @@ function validateRootRenderGatePrerequisites({
         rootRenderGateResult.summary.compatibilityClaimed ?? null
     });
   }
+
+  validateRootRenderPrivateHostOutputBlockers({
+    rootRenderGateResult,
+    failures
+  });
+  validateRootRenderPortalBlockers({
+    rootRenderGateResult,
+    failures
+  });
+}
+
+function validateRootRenderPrivateHostOutputBlockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const admittedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS.filter(
+      (admission) => admission.admission === "private-host-output-diagnostic"
+    ).map((admission) => admission.scenarioId);
+  const unsupportedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS.filter(
+      (admission) => admission.admission === "unsupported"
+    ).map((admission) => admission.scenarioId);
+  const expectedAdmittedRows =
+    admittedScenarioIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+  const expectedBlockedRows =
+    unsupportedScenarioIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderGateResult.summary.privateHostOutputDiagnosticScenarioModeRowCount !==
+      expectedAdmittedRows ||
+    rootRenderGateResult.summary.privateHostOutputBlockedScenarioModeRowCount !==
+      expectedBlockedRows
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-host-output-row-count-mismatch",
+      actualAdmitted:
+        rootRenderGateResult.summary
+          .privateHostOutputDiagnosticScenarioModeRowCount ?? null,
+      actualBlocked:
+        rootRenderGateResult.summary
+          .privateHostOutputBlockedScenarioModeRowCount ?? null,
+      expectedAdmitted: expectedAdmittedRows,
+      expectedBlocked: expectedBlockedRows
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary.privateHostOutputCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.privateHostOutputGate?.compatibilityClaimed !== false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-host-output-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary.privateHostOutputCompatibilityClaimed ??
+        null,
+      gateClaim:
+        rootRenderGateResult.privateHostOutputGate?.compatibilityClaimed ?? null
+    });
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privateHostOutputGate
+        ?.admittedPrivateHostOutputScenarioIds ?? [],
+      admittedScenarioIds
+    ) !== null ||
+    findFirstDifferencePath(
+      rootRenderGateResult.privateHostOutputGate
+        ?.unsupportedPrivateHostOutputScenarioIds ?? [],
+      unsupportedScenarioIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-host-output-admission-set-mismatch",
+      admitted:
+        rootRenderGateResult.privateHostOutputGate
+          ?.admittedPrivateHostOutputScenarioIds ?? null,
+      unsupported:
+        rootRenderGateResult.privateHostOutputGate
+          ?.unsupportedPrivateHostOutputScenarioIds ?? null
+    });
+  }
+
+  for (const row of rootRenderGateResult.privateHostOutputDiagnosticScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.diagnosticKind !== "private-fake-dom-root-host-output"
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus: "root-render-private-host-output-row-not-private-blocked",
+        row
+      });
+      continue;
+    }
+
+    const rootBridgeAdmissions = row.rootBridgeEvidence?.admissions ?? [];
+    const rootBridgeHandoffs = row.rootBridgeEvidence?.nativeHandoffs ?? [];
+    if (
+      rootBridgeAdmissions.some(
+        (admission) =>
+          admission.admissionStatus !==
+            "admitted-private-root-bridge-request-record" ||
+          admission.executionStatus !==
+            "blocked-private-root-bridge-execution" ||
+          admission.compatibilityClaimed !== false
+      ) ||
+      rootBridgeHandoffs.some(
+        (handoff) =>
+          handoff.nativeExecution !== false ||
+          handoff.reconcilerExecution !== false ||
+          handoff.domMutation !== false ||
+          handoff.compatibilityClaimed !== false
+      )
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus:
+          "root-render-private-host-output-bridge-evidence-not-record-only",
+        rootBridgeEvidence: row.rootBridgeEvidence
+      });
+    }
+  }
+
+  for (const row of rootRenderGateResult.privateHostOutputBlockedScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus:
+          "root-render-private-host-output-blocked-row-not-fail-closed",
+        row
+      });
+    }
+  }
+}
+
+function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  if (
+    rootRenderGateResult.summary.portalRootRenderCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.portalRootRenderGate?.summary?.compatibilityClaimed !==
+      false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-portal-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary.portalRootRenderCompatibilityClaimed ??
+        null,
+      gateClaim:
+        rootRenderGateResult.portalRootRenderGate?.summary
+          ?.compatibilityClaimed ?? null
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary.portalRootRenderBlockedRowCount !==
+    REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS.length
+  ) {
+    failures.push({
+      gateStatus: "root-render-portal-blocked-row-count-mismatch",
+      actual: rootRenderGateResult.summary.portalRootRenderBlockedRowCount ?? null,
+      expected: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS.length
+    });
+  }
+
+  for (const row of rootRenderGateResult.portalRootRenderPrerequisiteRows ?? []) {
+    if (row.compatibilityClaimed !== false) {
+      failures.push({
+        gateStatus: "root-render-portal-prerequisite-claims-compatibility",
+        row
+      });
+    }
+  }
+
+  for (const row of rootRenderGateResult.portalRootRenderBlockedRows ?? []) {
+    if (
+      row.gateStatus !== REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.compatibilityClaimed !== false
+    ) {
+      failures.push({
+        gateStatus: "root-render-portal-blocked-row-not-fail-closed",
+        row
+      });
+    }
+  }
 }
 
 function validatePublicFacadeScenarioAdmissions({
@@ -1622,12 +1869,17 @@ function validatePublicFacadeScenarioAdmissions({
     }
     if (
       admission.admission !== "blocked" ||
+      admission.gateStatus !== REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS ||
+      admission.comparedToAcceptedReactDomOracle !== true ||
       admission.publicCompatibilityClaimed !== false
     ) {
       failures.push({
         scenarioId,
         gateStatus: "public-facade-scenario-admission-not-blocked",
         admission: admission.admission,
+        admissionGateStatus: admission.gateStatus ?? null,
+        comparedToAcceptedReactDomOracle:
+          admission.comparedToAcceptedReactDomOracle ?? null,
         publicCompatibilityClaimed:
           admission.publicCompatibilityClaimed ?? null
       });
@@ -1743,16 +1995,37 @@ function validatePublicFacadeBoundary({
     failures
   });
 
+  if (
+    localPublicFacadeBoundary.hydrateRoot.rootObjectCreated === false &&
+    isRootFacadeSideEffectFree(localPublicFacadeBoundary.hydrateRoot.sideEffects)
+  ) {
+    blockedPublicFacadeRows.push({
+      id: "public-hydration",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      reason:
+        "Public hydrateRoot throws before hydration root creation, marker consumption, event replay, or DOM matching can run.",
+      compatibilityClaimed: false,
+      privateBridgeEvidence: "separate"
+    });
+  } else {
+    failures.push({
+      gateStatus: "public-hydration-not-placeholder-blocked",
+      hydrateRoot: localPublicFacadeBoundary.hydrateRoot
+    });
+  }
+
   if (localPublicFacadeBoundary.createRoot.rootObjectCreated === false) {
     blockedPublicFacadeRows.push({
       id: "public-root-render",
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
-      reason: "root.render is unreachable because public createRoot is blocked."
+      reason: "root.render is unreachable because public createRoot is blocked.",
+      compatibilityClaimed: false
     });
     blockedPublicFacadeRows.push({
       id: "public-root-unmount",
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
-      reason: "root.unmount is unreachable because public createRoot is blocked."
+      reason: "root.unmount is unreachable because public createRoot is blocked.",
+      compatibilityClaimed: false
     });
   } else {
     failures.push({
@@ -1767,6 +2040,16 @@ function validatePublicFacadeBoundary({
     failures
   });
 
+  blockedPublicFacadeRows.push({
+    id: "public-portal-root-render",
+    gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    reason:
+      "createPortal object construction remains separate from mounting a portal through blocked public root.render.",
+    compatibilityClaimed: false,
+    privateHostOutputEvidence: "separate",
+    portalRootRenderEvidence: "separate"
+  });
+
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
   const hydrateRootSideEffects = localPublicFacadeBoundary.hydrateRoot.sideEffects;
   if (
@@ -1776,6 +2059,7 @@ function validatePublicFacadeBoundary({
     blockedPublicFacadeRows.push({
       id: "public-dom-mutation",
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
       mutationCount:
         createRootSideEffects.mutationCount +
         hydrateRootSideEffects.mutationCount
@@ -1783,6 +2067,7 @@ function validatePublicFacadeBoundary({
     blockedPublicFacadeRows.push({
       id: "public-listener-setup",
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
       listenerRegistrationCount:
         createRootSideEffects.listenerRegistrationCount +
         hydrateRootSideEffects.listenerRegistrationCount
@@ -1832,6 +2117,7 @@ function validatePublicRootExportBlocked({
     blockedPublicFacadeRows.push({
       id: `public-${exportName === "createRoot" ? "create-root" : "hydrate-root"}`,
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
       exportName,
       errorCode: operation.thrown.code
     });

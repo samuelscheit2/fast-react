@@ -160,6 +160,30 @@ test("React DOM client entrypoint and react-server throw behavior are recorded",
   );
 });
 
+test("Fast React client-root placeholder keeps createRoot and hydrateRoot non-compatible", () => {
+  const clientShape = fastReactValue(
+    "default-node-development",
+    "client-entrypoint-shape"
+  ).client.value;
+  assert.equal(descriptorFor(clientShape, "createRoot").value.length, 0);
+  assert.equal(descriptorFor(clientShape, "hydrateRoot").value.length, 0);
+  assert.deepEqual(descriptorFor(clientShape, "__FAST_REACT_PLACEHOLDER__").value, {
+    type: "boolean",
+    value: true
+  });
+  assert.deepEqual(descriptorFor(clientShape, "compatibilityTarget").value, {
+    type: "string",
+    value: "react-dom@19.2.6"
+  });
+
+  const comparison = oracle.fastReactComparisons[
+    "default-node-development"
+  ].find((candidate) => candidate.scenarioId === "client-entrypoint-shape");
+  assert.equal(comparison.status, "known-mismatch");
+  assert.equal(comparison.compatibilityClaimed, false);
+  assert.notEqual(comparison.firstDifferencePath, null);
+});
+
 test("React DOM createRoot validates containers and records marker/listener boundaries", () => {
   const valid = reactValue(
     "default-node-development",
@@ -441,6 +465,12 @@ function fastReactObservation(modeId, scenarioId) {
 
 function reactValue(modeId, scenarioId) {
   const result = reactObservation(modeId, scenarioId).result.result;
+  assert.equal(result.status, "ok", `${modeId}:${scenarioId} should be ok`);
+  return result.value;
+}
+
+function fastReactValue(modeId, scenarioId) {
+  const result = fastReactObservation(modeId, scenarioId).result.result;
   assert.equal(result.status, "ok", `${modeId}:${scenarioId} should be ok`);
   return result.value;
 }
