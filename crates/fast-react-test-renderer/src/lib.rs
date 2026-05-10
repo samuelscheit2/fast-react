@@ -2350,6 +2350,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.private-facade-result";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
+    "react-test-renderer-tojson-nested-host-output-update-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID: &str =
+    "react-test-renderer-tojson-sibling-text-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS: &str =
@@ -3982,13 +3986,76 @@ impl TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererPrivateToJsonHostOutputShape {
+    EmptyRoot,
+    SingleHostText,
+    NestedHostText,
+    SiblingText,
+}
+
+impl TestRendererPrivateToJsonHostOutputShape {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::EmptyRoot => "EmptyRoot",
+            Self::SingleHostText => "SingleHostText",
+            Self::NestedHostText => "NestedHostText",
+            Self::SiblingText => "SiblingText",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonHostOutputShapeDiagnostics {
+    shape: TestRendererPrivateToJsonHostOutputShape,
+    host_component_count: usize,
+    host_text_count: usize,
+    root_text_count: usize,
+    max_host_component_depth: usize,
+}
+
+impl TestRendererPrivateToJsonHostOutputShapeDiagnostics {
+    #[must_use]
+    pub const fn shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.shape
+    }
+
+    #[must_use]
+    pub const fn host_component_count(self) -> usize {
+        self.host_component_count
+    }
+
+    #[must_use]
+    pub const fn host_text_count(self) -> usize {
+        self.host_text_count
+    }
+
+    #[must_use]
+    pub const fn root_text_count(self) -> usize {
+        self.root_text_count
+    }
+
+    #[must_use]
+    pub const fn max_host_component_depth(self) -> usize {
+        self.max_host_component_depth
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererPrivateToJsonHostOutputRow {
     id: &'static str,
     diagnostic_name: &'static str,
     status: &'static str,
     host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
     previous_root_child_count: usize,
     current_root_child_count: usize,
+    previous_host_component_count: usize,
+    current_host_component_count: usize,
+    previous_host_text_count: usize,
+    current_host_text_count: usize,
+    current_root_text_count: usize,
+    current_max_host_component_depth: usize,
     dependency_diagnostics: TestRendererPrivateToJsonHostOutputDependencyDiagnostics,
     public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
 }
@@ -4015,6 +4082,11 @@ impl TestRendererPrivateToJsonHostOutputRow {
     }
 
     #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
     pub const fn previous_root_child_count(self) -> usize {
         self.previous_root_child_count
     }
@@ -4022,6 +4094,36 @@ impl TestRendererPrivateToJsonHostOutputRow {
     #[must_use]
     pub const fn current_root_child_count(self) -> usize {
         self.current_root_child_count
+    }
+
+    #[must_use]
+    pub const fn previous_host_component_count(self) -> usize {
+        self.previous_host_component_count
+    }
+
+    #[must_use]
+    pub const fn current_host_component_count(self) -> usize {
+        self.current_host_component_count
+    }
+
+    #[must_use]
+    pub const fn previous_host_text_count(self) -> usize {
+        self.previous_host_text_count
+    }
+
+    #[must_use]
+    pub const fn current_host_text_count(self) -> usize {
+        self.current_host_text_count
+    }
+
+    #[must_use]
+    pub const fn current_root_text_count(self) -> usize {
+        self.current_root_text_count
+    }
+
+    #[must_use]
+    pub const fn current_max_host_component_depth(self) -> usize {
+        self.current_max_host_component_depth
     }
 
     #[must_use]
@@ -4335,6 +4437,7 @@ pub struct TestRendererPrivateToJsonFacadeResult {
     diagnostic_name: &'static str,
     source_diagnostic_name: &'static str,
     host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
     host_output_row: Option<TestRendererPrivateToJsonHostOutputRow>,
     host_output_snapshot_current: bool,
     element_type: TestElementType,
@@ -4361,6 +4464,11 @@ impl TestRendererPrivateToJsonFacadeResult {
     #[must_use]
     pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
         self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(&self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
     }
 
     #[must_use]
@@ -4424,6 +4532,7 @@ pub struct TestRendererPrivateJsonSerializationReport {
     diagnostic_name: &'static str,
     gate: TestRendererSerializationGateReport,
     host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
     host_output_row: Option<TestRendererPrivateToJsonHostOutputRow>,
     host_output_snapshot_current: bool,
     root_child_count: usize,
@@ -4447,6 +4556,11 @@ impl TestRendererPrivateJsonSerializationReport {
     #[must_use]
     pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
         self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(&self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
     }
 
     #[must_use]
@@ -6051,6 +6165,11 @@ pub enum TestRendererPrivateJsonSerializationError {
         expected: TestRendererRootUpdateKind,
         actual: TestRendererRootUpdateKind,
     },
+    HostOutputRowShapeMismatch {
+        row_id: &'static str,
+        expected: TestRendererPrivateToJsonHostOutputShape,
+        actual: TestRendererPrivateToJsonHostOutputShape,
+    },
     UnmountSnapshotNotEmpty {
         actual: usize,
     },
@@ -6110,6 +6229,16 @@ impl Display for TestRendererPrivateJsonSerializationError {
                 formatter,
                 "private JSON serialization canary row '{row_id}' expected {:?} host output, found {:?}",
                 expected, actual
+            ),
+            Self::HostOutputRowShapeMismatch {
+                row_id,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "private JSON serialization canary row '{row_id}' expected {} host output shape, found {}",
+                expected.as_str(),
+                actual.as_str()
             ),
             Self::UnmountSnapshotNotEmpty { actual } => write!(
                 formatter,
@@ -7293,6 +7422,52 @@ impl TestRendererRoot {
         })
     }
 
+    pub fn describe_private_to_json_nested_host_output_update_row_for_canary(
+        &self,
+        output: &TestRendererNestedHostParentPlacedHostOutput,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        self.validate_serialization_gate_commit(output.commit())?;
+
+        let Some(last_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: TestRendererRootUpdateKind::Create,
+            });
+        };
+        if last_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: last_update.kind(),
+            });
+        }
+
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
+        }
+
+        Self::private_to_json_host_output_row_with_shape(
+            TestRendererRootUpdateKind::Update,
+            TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID,
+            Some(TestRendererPrivateToJsonHostOutputShape::NestedHostText),
+            output.previous_snapshot(),
+            output.snapshot(),
+        )
+    }
+
+    pub fn describe_private_to_json_sibling_text_host_output_row_from_snapshot_for_diagnostics(
+        previous_snapshot: &TestContainerSnapshot,
+        current_snapshot: &TestContainerSnapshot,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        Self::private_to_json_host_output_row_with_shape(
+            TestRendererRootUpdateKind::Update,
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID,
+            Some(TestRendererPrivateToJsonHostOutputShape::SiblingText),
+            previous_snapshot,
+            current_snapshot,
+        )
+    }
+
     pub fn describe_private_to_json_host_output_unmount_row_for_canary(
         &self,
         output: &TestRendererUnmountedHostOutput,
@@ -7653,7 +7828,12 @@ impl TestRendererRoot {
         if current_snapshot != *snapshot {
             return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
         }
-        Self::validate_private_to_json_host_output_row(host_output_update_kind, host_output_row)?;
+        let host_output_shape = Self::private_to_json_host_output_shape_from_snapshot(snapshot);
+        Self::validate_private_to_json_host_output_row(
+            host_output_update_kind,
+            host_output_row,
+            Some(host_output_shape.shape()),
+        )?;
 
         Self::validate_private_json_canary_current_fibers(&fiber_inspection, current_fibers)?;
         let component = Self::private_json_component_from_snapshot(snapshot)?;
@@ -7664,6 +7844,7 @@ impl TestRendererRoot {
             diagnostic_name: TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
             gate,
             host_output_update_kind,
+            host_output_shape: host_output_shape.shape(),
             host_output_row,
             host_output_snapshot_current: true,
             root_child_count: snapshot.children().len(),
@@ -7679,19 +7860,52 @@ impl TestRendererRoot {
         previous_snapshot: &TestContainerSnapshot,
         current_snapshot: &TestContainerSnapshot,
     ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
-        let (id, route_row_id) = match host_output_update_kind {
-            TestRendererRootUpdateKind::Update => (
-                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID,
-                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID,
-            ),
-            TestRendererRootUpdateKind::Unmount => (
-                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID,
-                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID,
-            ),
+        let id = match host_output_update_kind {
+            TestRendererRootUpdateKind::Update => {
+                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+            }
+            TestRendererRootUpdateKind::Unmount => {
+                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+            }
             TestRendererRootUpdateKind::Create => {
                 return Err(
                     TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
                         row_id: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID,
+                        expected: TestRendererRootUpdateKind::Update,
+                        actual: TestRendererRootUpdateKind::Create,
+                    }
+                    .into(),
+                );
+            }
+        };
+
+        Self::private_to_json_host_output_row_with_shape(
+            host_output_update_kind,
+            id,
+            None,
+            previous_snapshot,
+            current_snapshot,
+        )
+    }
+
+    fn private_to_json_host_output_row_with_shape(
+        host_output_update_kind: TestRendererRootUpdateKind,
+        id: &'static str,
+        expected_shape: Option<TestRendererPrivateToJsonHostOutputShape>,
+        previous_snapshot: &TestContainerSnapshot,
+        current_snapshot: &TestContainerSnapshot,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        let route_row_id = match host_output_update_kind {
+            TestRendererRootUpdateKind::Update => {
+                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
+            }
+            TestRendererRootUpdateKind::Unmount => {
+                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+            }
+            TestRendererRootUpdateKind::Create => {
+                return Err(
+                    TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                        row_id: id,
                         expected: TestRendererRootUpdateKind::Update,
                         actual: TestRendererRootUpdateKind::Create,
                     }
@@ -7711,13 +7925,36 @@ impl TestRendererRoot {
             );
         }
 
+        let previous_shape =
+            Self::private_to_json_host_output_shape_from_snapshot(previous_snapshot);
+        let current_shape = Self::private_to_json_host_output_shape_from_snapshot(current_snapshot);
+        if let Some(expected_shape) = expected_shape
+            && current_shape.shape() != expected_shape
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowShapeMismatch {
+                    row_id: id,
+                    expected: expected_shape,
+                    actual: current_shape.shape(),
+                }
+                .into(),
+            );
+        }
+
         Ok(TestRendererPrivateToJsonHostOutputRow {
             id,
             diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME,
             status: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS,
             host_output_update_kind,
+            host_output_shape: current_shape.shape(),
             previous_root_child_count: previous_snapshot.children().len(),
             current_root_child_count: current_snapshot.children().len(),
+            previous_host_component_count: previous_shape.host_component_count(),
+            current_host_component_count: current_shape.host_component_count(),
+            previous_host_text_count: previous_shape.host_text_count(),
+            current_host_text_count: current_shape.host_text_count(),
+            current_root_text_count: current_shape.root_text_count(),
+            current_max_host_component_depth: current_shape.max_host_component_depth(),
             dependency_diagnostics: TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
                 route_row_id,
                 serialization_row_id: TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID,
@@ -7736,6 +7973,7 @@ impl TestRendererRoot {
     fn validate_private_to_json_host_output_row(
         expected: TestRendererRootUpdateKind,
         row: Option<TestRendererPrivateToJsonHostOutputRow>,
+        expected_shape: Option<TestRendererPrivateToJsonHostOutputShape>,
     ) -> Result<(), TestRendererRootError> {
         let Some(row) = row else {
             return Ok(());
@@ -7752,16 +7990,7 @@ impl TestRendererRoot {
             );
         }
 
-        let expected_row_id = match expected {
-            TestRendererRootUpdateKind::Update => {
-                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
-            }
-            TestRendererRootUpdateKind::Unmount => {
-                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
-            }
-            TestRendererRootUpdateKind::Create => return Ok(()),
-        };
-        if row.id() != expected_row_id {
+        if !Self::private_to_json_host_output_row_id_matches_kind(expected, row.id()) {
             return Err(
                 TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
                     row_id: row.id(),
@@ -7772,7 +8001,38 @@ impl TestRendererRoot {
             );
         }
 
+        if let Some(expected_shape) = expected_shape
+            && row.host_output_shape() != expected_shape
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowShapeMismatch {
+                    row_id: row.id(),
+                    expected: expected_shape,
+                    actual: row.host_output_shape(),
+                }
+                .into(),
+            );
+        }
+
         Ok(())
+    }
+
+    fn private_to_json_host_output_row_id_matches_kind(
+        expected: TestRendererRootUpdateKind,
+        row_id: &str,
+    ) -> bool {
+        match expected {
+            TestRendererRootUpdateKind::Update => matches!(
+                row_id,
+                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+                    | TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
+                    | TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+            ),
+            TestRendererRootUpdateKind::Unmount => {
+                row_id == TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+            }
+            TestRendererRootUpdateKind::Create => true,
+        }
     }
 
     fn private_to_json_facade_result_from_report(
@@ -7781,6 +8041,7 @@ impl TestRendererRoot {
         Self::validate_private_to_json_host_output_row(
             report.host_output_update_kind(),
             report.host_output_row(),
+            Some(report.host_output_shape()),
         )?;
         let component = report.component();
 
@@ -7788,6 +8049,7 @@ impl TestRendererRoot {
             diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME,
             source_diagnostic_name: report.diagnostic_name(),
             host_output_update_kind: report.host_output_update_kind(),
+            host_output_shape: report.host_output_shape(),
             host_output_row: report.host_output_row(),
             host_output_snapshot_current: report.host_output_snapshot_current(),
             element_type: component.element_type().clone(),
@@ -8823,6 +9085,87 @@ impl TestRendererRoot {
                     actual,
                 },
             )
+        }
+    }
+
+    fn private_to_json_host_output_shape_from_snapshot(
+        snapshot: &TestContainerSnapshot,
+    ) -> TestRendererPrivateToJsonHostOutputShapeDiagnostics {
+        let mut host_component_count = 0;
+        let mut host_text_count = 0;
+        let mut root_text_count = 0;
+        let mut max_host_component_depth = 0;
+
+        for child in snapshot.children() {
+            Self::collect_private_to_json_host_output_shape(
+                child,
+                0,
+                true,
+                &mut host_component_count,
+                &mut host_text_count,
+                &mut root_text_count,
+                &mut max_host_component_depth,
+            );
+        }
+
+        let shape = if snapshot.children().is_empty() {
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        } else if root_text_count > 0 {
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        } else if max_host_component_depth > 1 {
+            TestRendererPrivateToJsonHostOutputShape::NestedHostText
+        } else {
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        };
+
+        TestRendererPrivateToJsonHostOutputShapeDiagnostics {
+            shape,
+            host_component_count,
+            host_text_count,
+            root_text_count,
+            max_host_component_depth,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn collect_private_to_json_host_output_shape(
+        snapshot: &TestNodeSnapshot,
+        host_component_depth: usize,
+        is_root_child: bool,
+        host_component_count: &mut usize,
+        host_text_count: &mut usize,
+        root_text_count: &mut usize,
+        max_host_component_depth: &mut usize,
+    ) {
+        match snapshot {
+            TestNodeSnapshot::Text(text) => {
+                if text.is_hidden() {
+                    return;
+                }
+                *host_text_count += 1;
+                if is_root_child {
+                    *root_text_count += 1;
+                }
+            }
+            TestNodeSnapshot::Element(element) => {
+                if element.is_hidden() || element.is_detached() {
+                    return;
+                }
+                let next_depth = host_component_depth + 1;
+                *host_component_count += 1;
+                *max_host_component_depth = (*max_host_component_depth).max(next_depth);
+                for child in element.children() {
+                    Self::collect_private_to_json_host_output_shape(
+                        child,
+                        next_depth,
+                        false,
+                        host_component_count,
+                        host_text_count,
+                        root_text_count,
+                        max_host_component_depth,
+                    );
+                }
+            }
         }
     }
 
@@ -10977,6 +11320,10 @@ mod tests {
             report.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
         );
+        assert_eq!(
+            report.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
         let row = report.host_output_row().unwrap();
         let dependencies = row.dependency_diagnostics();
         assert_eq!(
@@ -10991,8 +11338,18 @@ mod tests {
             row.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
         );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
         assert_eq!(row.previous_root_child_count(), 1);
         assert_eq!(row.current_root_child_count(), 1);
+        assert_eq!(row.previous_host_component_count(), 1);
+        assert_eq!(row.current_host_component_count(), 1);
+        assert_eq!(row.previous_host_text_count(), 1);
+        assert_eq!(row.current_host_text_count(), 1);
+        assert_eq!(row.current_root_text_count(), 0);
+        assert_eq!(row.current_max_host_component_depth(), 1);
         assert_eq!(
             dependencies.route_row_id(),
             TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
@@ -11084,6 +11441,10 @@ mod tests {
             result.host_output_update_kind(),
             TestRendererRootUpdateKind::Create
         );
+        assert_eq!(
+            result.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
         assert!(result.host_output_snapshot_current());
         assert_eq!(result.element_type().as_str(), "span");
         assert_eq!(result.props(), &TestProps::new());
@@ -11135,6 +11496,10 @@ mod tests {
         assert_eq!(
             result.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            result.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
         );
         assert_eq!(
             result.host_output_row().unwrap().id(),
@@ -11193,8 +11558,18 @@ mod tests {
             row.host_output_update_kind(),
             TestRendererRootUpdateKind::Unmount
         );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        );
         assert_eq!(row.previous_root_child_count(), 1);
         assert_eq!(row.current_root_child_count(), 0);
+        assert_eq!(row.previous_host_component_count(), 1);
+        assert_eq!(row.current_host_component_count(), 0);
+        assert_eq!(row.previous_host_text_count(), 1);
+        assert_eq!(row.current_host_text_count(), 0);
+        assert_eq!(row.current_root_text_count(), 0);
+        assert_eq!(row.current_max_host_component_depth(), 0);
         assert_eq!(
             dependencies.route_row_id(),
             TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
@@ -11248,6 +11623,202 @@ mod tests {
         assert!(matches!(
             error.as_ref(),
             TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
+    fn root_private_to_json_nested_host_output_update_row_records_nested_text_rows() {
+        let mut root = TestRendererRoot::create_nested_host_components_with_text_for_canary(
+            "section",
+            "span",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_nested_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let placed = root
+            .render_and_commit_nested_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+
+        let row = root
+            .describe_private_to_json_nested_host_output_update_row_for_canary(&placed)
+            .unwrap();
+        let dependencies = row.dependency_diagnostics();
+
+        assert_eq!(
+            row.id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            row.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS
+        );
+        assert_eq!(
+            row.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::NestedHostText
+        );
+        assert_eq!(row.previous_root_child_count(), 1);
+        assert_eq!(row.current_root_child_count(), 1);
+        assert_eq!(row.previous_host_component_count(), 2);
+        assert_eq!(row.current_host_component_count(), 2);
+        assert_eq!(row.previous_host_text_count(), 1);
+        assert_eq!(row.current_host_text_count(), 2);
+        assert_eq!(row.current_root_text_count(), 0);
+        assert_eq!(row.current_max_host_component_depth(), 2);
+        assert_eq!(
+            dependencies.route_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
+        );
+        assert_eq!(
+            dependencies.serialization_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID
+        );
+        assert!(dependencies.host_output_snapshot_current());
+        assert!(dependencies.public_surfaces_blocked());
+        assert!(row.public_blockers().all_blocked());
+        assert_eq!(
+            nested_container_inner_texts(placed.previous_snapshot()),
+            vec!["stable"]
+        );
+        assert_eq!(
+            nested_container_inner_texts(placed.snapshot()),
+            vec!["stable", "inserted"]
+        );
+    }
+
+    #[test]
+    fn root_private_to_json_nested_host_output_update_row_rejects_stale_snapshot() {
+        let mut root = TestRendererRoot::create_nested_host_components_with_text_for_canary(
+            "section",
+            "span",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_nested_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut placed = root
+            .render_and_commit_nested_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+        placed.snapshot = placed.previous_snapshot.clone();
+
+        let error = root
+            .describe_private_to_json_nested_host_output_update_row_for_canary(&placed)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_host_output_row_records_text_sibling_shape() {
+        let previous_snapshot = TestContainerSnapshot {
+            children: vec![TestNodeSnapshot::Element(TestElementSnapshot {
+                element_type: element_type("span"),
+                props: TestProps::new(),
+                hidden: false,
+                detached: false,
+                children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "second sibling".to_owned(),
+                    hidden: false,
+                })],
+            })],
+        };
+        let current_snapshot = TestContainerSnapshot {
+            children: vec![
+                TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "first sibling".to_owned(),
+                    hidden: false,
+                }),
+                TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: element_type("span"),
+                    props: TestProps::new(),
+                    hidden: false,
+                    detached: false,
+                    children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                        text: "second sibling".to_owned(),
+                        hidden: false,
+                    })],
+                }),
+            ],
+        };
+
+        let row =
+            TestRendererRoot::describe_private_to_json_sibling_text_host_output_row_from_snapshot_for_diagnostics(
+                &previous_snapshot,
+                &current_snapshot,
+            )
+            .unwrap();
+
+        assert_eq!(
+            row.id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            row.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert_eq!(row.previous_root_child_count(), 1);
+        assert_eq!(row.current_root_child_count(), 2);
+        assert_eq!(row.previous_host_component_count(), 1);
+        assert_eq!(row.current_host_component_count(), 1);
+        assert_eq!(row.previous_host_text_count(), 1);
+        assert_eq!(row.current_host_text_count(), 2);
+        assert_eq!(row.current_root_text_count(), 1);
+        assert_eq!(row.current_max_host_component_depth(), 1);
+        assert!(row.dependency_diagnostics().public_surfaces_blocked());
+        assert!(row.public_blockers().all_blocked());
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_host_output_row_rejects_mismatched_shape() {
+        let previous_snapshot = TestContainerSnapshot { children: vec![] };
+        let current_snapshot = TestContainerSnapshot {
+            children: vec![TestNodeSnapshot::Element(TestElementSnapshot {
+                element_type: element_type("span"),
+                props: TestProps::new(),
+                hidden: false,
+                detached: false,
+                children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "only child".to_owned(),
+                    hidden: false,
+                })],
+            })],
+        };
+
+        let error =
+            TestRendererRoot::describe_private_to_json_sibling_text_host_output_row_from_snapshot_for_diagnostics(
+                &previous_snapshot,
+                &current_snapshot,
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputRowShapeMismatch {
+                row_id,
+                expected: TestRendererPrivateToJsonHostOutputShape::SiblingText,
+                actual: TestRendererPrivateToJsonHostOutputShape::SingleHostText,
+            } if *row_id == TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
         ));
     }
 

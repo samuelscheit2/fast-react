@@ -855,7 +855,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
       testRendererSource,
       /\bTestRendererPrivateToJsonFacadeResult\b/u
     );
-  const privateToJSONUpdateUnmountRowsPresent =
+  const privateToJSONBaseUpdateUnmountRowsPresent =
     privateToJSONSerializationFacadeExposesDiagnosticResult &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
@@ -913,6 +913,67 @@ export function inspectReactTestRendererSerializationLocalTargets({
       testRendererSource,
       /\broot_private_to_json_update_host_output_row_rejects_mismatched_row_kind\b/u
     );
+  const privateToJSONNestedUpdateSiblingTextRowsPresent =
+    privateToJSONBaseUpdateUnmountRowsPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-tojson-nested-host-output-update-private-diagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-tojson-sibling-text-host-output-private-diagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateToJSONUpdateHostOutputRowIds\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bNestedHostText\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bSiblingText\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bmismatchedUpdateShapeRejection\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\binferPrivateToJSONHostOutputShape\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_json_nested_host_output_update_row_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_json_sibling_text_host_output_row_from_snapshot_for_diagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateToJsonHostOutputShapeDiagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_nested_host_output_update_row_records_nested_text_rows\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_nested_host_output_update_row_rejects_stale_snapshot\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_sibling_text_host_output_row_records_text_sibling_shape\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_sibling_text_host_output_row_rejects_mismatched_shape\b/u
+    );
+  const privateToJSONUpdateUnmountRowsPresent =
+    privateToJSONBaseUpdateUnmountRowsPresent &&
+    privateToJSONNestedUpdateSiblingTextRowsPresent;
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
     hasSourcePattern(
