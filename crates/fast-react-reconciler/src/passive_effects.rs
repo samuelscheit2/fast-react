@@ -15,11 +15,13 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberId, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes,
+    FiberId, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes, RefHandle,
+    StateNodeHandle,
 };
-use fast_react_host_config::HostTypes;
+use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 use crate::function_component::FunctionComponentHookRenderPhase;
+use crate::host_tokens::HostFiberTokenId;
 use crate::root_commit::{
     FunctionComponentCommittedPassiveEffectsSnapshot,
     FunctionComponentDeletedSubtreePassiveEffectsSnapshot, FunctionComponentEffectListCommitPhase,
@@ -27,7 +29,9 @@ use crate::root_commit::{
     FunctionComponentEffectListCommitPhaseOrderRecord,
     FunctionComponentLayoutEffectCallbackInvocationGateSnapshot,
     FunctionComponentPendingPassiveCommitHandoff,
-    FunctionComponentPendingPassiveEffectPhaseCommitRecord, PendingPassiveCommitHandoff,
+    FunctionComponentPendingPassiveEffectPhaseCommitRecord, HostRootDeletionCleanupOrderGateRecord,
+    HostRootDeletionCleanupOrderPhase, HostRootRefCleanupReturnExecutionGateRecord,
+    HostRootRefCommitAction, HostRootRefDetachReason, PendingPassiveCommitHandoff,
 };
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
@@ -1438,6 +1442,259 @@ impl PassiveEffectsFlushResult {
 
     #[must_use]
     pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct DeletedSubtreeRefCleanupReturnExecutionRequest {
+    order_gate_sequence: usize,
+    cleanup_return_sequence: usize,
+    root: FiberRootId,
+    finished_work: FiberId,
+    deleted_root: FiberId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    token: HostFiberTokenId,
+    token_phase: HostFiberTokenPhase,
+    token_target: HostFiberTokenTarget,
+}
+
+impl DeletedSubtreeRefCleanupReturnExecutionRequest {
+    #[must_use]
+    pub(crate) const fn order_gate_sequence(self) -> usize {
+        self.order_gate_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_sequence(self) -> usize {
+        self.cleanup_return_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(self) -> RefHandle {
+        self.ref_handle
+    }
+
+    #[must_use]
+    pub(crate) const fn token(self) -> HostFiberTokenId {
+        self.token
+    }
+
+    #[must_use]
+    pub(crate) const fn token_phase(self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn token_target(self) -> HostFiberTokenTarget {
+        self.token_target
+    }
+}
+
+pub(crate) trait DeletedSubtreeRefCleanupReturnExecutor {
+    fn execute_deleted_ref_cleanup_return(
+        &mut self,
+        request: DeletedSubtreeRefCleanupReturnExecutionRequest,
+    );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct DeletedSubtreeRefCleanupReturnExecutionRecord {
+    execution_order: usize,
+    request: DeletedSubtreeRefCleanupReturnExecutionRequest,
+}
+
+impl DeletedSubtreeRefCleanupReturnExecutionRecord {
+    #[must_use]
+    pub(crate) const fn execution_order(self) -> usize {
+        self.execution_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request(self) -> DeletedSubtreeRefCleanupReturnExecutionRequest {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(self) -> FiberId {
+        self.request.deleted_root()
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.request.fiber()
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(self) -> StateNodeHandle {
+        self.request.state_node()
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(self) -> RefHandle {
+        self.request.ref_handle()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct DeletedSubtreeRefPassiveCleanupExecutionRecord {
+    sequence: usize,
+    order_gate_sequence: usize,
+    phase: HostRootDeletionCleanupOrderPhase,
+    root: FiberRootId,
+    finished_work: FiberId,
+    deleted_root: FiberId,
+    fiber: FiberId,
+    ref_cleanup_return_execution_order: Option<usize>,
+    passive_destroy_execution_order: Option<usize>,
+    host_cleanup_sequence: Option<usize>,
+}
+
+impl DeletedSubtreeRefPassiveCleanupExecutionRecord {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn order_gate_sequence(self) -> usize {
+        self.order_gate_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn phase(self) -> HostRootDeletionCleanupOrderPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_cleanup_return_execution_order(self) -> Option<usize> {
+        self.ref_cleanup_return_execution_order
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_destroy_execution_order(self) -> Option<usize> {
+        self.passive_destroy_execution_order
+    }
+
+    #[must_use]
+    pub(crate) const fn host_cleanup_sequence(self) -> Option<usize> {
+        self.host_cleanup_sequence
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DeletedSubtreeRefPassiveCleanupExecutionResult {
+    root: FiberRootId,
+    finished_work: FiberId,
+    records: Vec<DeletedSubtreeRefPassiveCleanupExecutionRecord>,
+    ref_cleanup_return_executions: Vec<DeletedSubtreeRefCleanupReturnExecutionRecord>,
+    passive_effects: Option<PassiveEffectsFlushResult>,
+}
+
+impl DeletedSubtreeRefPassiveCleanupExecutionResult {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[DeletedSubtreeRefPassiveCleanupExecutionRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn ref_cleanup_return_executions(
+        &self,
+    ) -> &[DeletedSubtreeRefCleanupReturnExecutionRecord] {
+        &self.ref_cleanup_return_executions
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_effects(&self) -> Option<&PassiveEffectsFlushResult> {
+        self.passive_effects.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn ref_cleanup_return_callbacks_invoked(&self) -> bool {
+        !self.ref_cleanup_return_executions.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn passive_destroy_callbacks_invoked(&self) -> bool {
+        self.passive_effects
+            .as_ref()
+            .is_some_and(PassiveEffectsFlushResult::did_execute_destroy_callbacks)
+    }
+
+    #[must_use]
+    pub(crate) const fn public_unmount_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_ref_or_effect_compatibility_claimed(&self) -> bool {
         false
     }
 }
@@ -3319,6 +3576,110 @@ impl From<SyncFlushError> for PassiveEffectsFlushWithSyncFlushContinuationError 
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DeletedSubtreeRefPassiveCleanupExecutionError {
+    PassiveEffects(PassiveEffectsFlushError),
+    MissingRefCleanupReturnRecord {
+        root: FiberRootId,
+        fiber: FiberId,
+        order_gate_sequence: usize,
+        cleanup_return_sequence: usize,
+    },
+    RefCleanupAfterPassiveDestroy {
+        root: FiberRootId,
+        fiber: FiberId,
+        order_gate_sequence: usize,
+    },
+    MissingPassiveDestroyPendingOrder {
+        root: FiberRootId,
+        fiber: FiberId,
+        order_gate_sequence: usize,
+    },
+    MissingPassiveDestroyExecution {
+        root: FiberRootId,
+        fiber: FiberId,
+        order_gate_sequence: usize,
+        pending_order: PendingPassiveEffectOrder,
+        destroy: HookEffectCallbackHandle,
+    },
+}
+
+impl Display for DeletedSubtreeRefPassiveCleanupExecutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PassiveEffects(error) => Display::fmt(error, formatter),
+            Self::MissingRefCleanupReturnRecord {
+                root,
+                fiber,
+                order_gate_sequence,
+                cleanup_return_sequence,
+            } => write!(
+                formatter,
+                "root {} deleted cleanup order gate record {} for fiber slot {} references missing ref cleanup-return gate record {}",
+                root.raw(),
+                order_gate_sequence,
+                fiber.slot().get(),
+                cleanup_return_sequence
+            ),
+            Self::RefCleanupAfterPassiveDestroy {
+                root,
+                fiber,
+                order_gate_sequence,
+            } => write!(
+                formatter,
+                "root {} deleted cleanup order gate record {} for fiber slot {} attempted ref cleanup after passive destroy execution started",
+                root.raw(),
+                order_gate_sequence,
+                fiber.slot().get()
+            ),
+            Self::MissingPassiveDestroyPendingOrder {
+                root,
+                fiber,
+                order_gate_sequence,
+            } => write!(
+                formatter,
+                "root {} deleted cleanup order gate record {} for fiber slot {} is missing a passive unmount order",
+                root.raw(),
+                order_gate_sequence,
+                fiber.slot().get()
+            ),
+            Self::MissingPassiveDestroyExecution {
+                root,
+                fiber,
+                order_gate_sequence,
+                pending_order,
+                destroy,
+            } => write!(
+                formatter,
+                "root {} deleted cleanup order gate record {} for fiber slot {} did not execute passive destroy {:?} at pending order {:?}",
+                root.raw(),
+                order_gate_sequence,
+                fiber.slot().get(),
+                destroy,
+                pending_order
+            ),
+        }
+    }
+}
+
+impl Error for DeletedSubtreeRefPassiveCleanupExecutionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::PassiveEffects(error) => Some(error),
+            Self::MissingRefCleanupReturnRecord { .. }
+            | Self::RefCleanupAfterPassiveDestroy { .. }
+            | Self::MissingPassiveDestroyPendingOrder { .. }
+            | Self::MissingPassiveDestroyExecution { .. } => None,
+        }
+    }
+}
+
+impl From<PassiveEffectsFlushError> for DeletedSubtreeRefPassiveCleanupExecutionError {
+    fn from(error: PassiveEffectsFlushError) -> Self {
+        Self::PassiveEffects(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum PassiveEffectRecordSource<'a> {
     None,
@@ -3435,6 +3796,99 @@ pub(crate) fn flush_passive_effects_after_commit_with_deleted_subtree_destroy_ex
         Some(destroy_executor),
         None,
     )
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree ref/passive execution canary keeps public unmount blocked"
+)]
+pub(crate) fn execute_deleted_subtree_ref_and_passive_cleanup_after_commit_for_canary<H, E>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    executor: &mut E,
+) -> Result<
+    DeletedSubtreeRefPassiveCleanupExecutionResult,
+    DeletedSubtreeRefPassiveCleanupExecutionError,
+>
+where
+    H: HostTypes,
+    E: DeletedSubtreeRefCleanupReturnExecutor + PassiveEffectDestroyCallbackExecutor,
+{
+    let order_gate = commit.deletion_cleanup_order_gate_for_canary();
+    let mut records = Vec::with_capacity(order_gate.len());
+    let mut ref_cleanup_return_executions = Vec::new();
+    let mut passive_effects = None;
+
+    for order_record in order_gate.records() {
+        match order_record.phase() {
+            HostRootDeletionCleanupOrderPhase::RefCleanupReturn => {
+                if passive_effects.is_some() {
+                    return Err(
+                        DeletedSubtreeRefPassiveCleanupExecutionError::RefCleanupAfterPassiveDestroy {
+                            root: order_record.root(),
+                            fiber: order_record.fiber(),
+                            order_gate_sequence: order_record.sequence(),
+                        },
+                    );
+                }
+
+                let execution = execute_deleted_ref_cleanup_return_for_order_record(
+                    commit,
+                    order_record,
+                    ref_cleanup_return_executions.len(),
+                    executor,
+                )?;
+                ref_cleanup_return_executions.push(execution);
+                records.push(deleted_subtree_ref_passive_cleanup_execution_record(
+                    records.len(),
+                    order_record,
+                    Some(execution.execution_order()),
+                    None,
+                ));
+            }
+            HostRootDeletionCleanupOrderPhase::PassiveDestroy => {
+                if passive_effects.is_none() {
+                    passive_effects = Some(
+                        flush_passive_effects_after_commit_with_deleted_subtree_destroy_executor_for_canary(
+                            store,
+                            commit,
+                            executor,
+                        )?,
+                    );
+                }
+
+                let passive_destroy_execution_order =
+                    deleted_subtree_passive_destroy_execution_order(
+                        passive_effects
+                            .as_ref()
+                            .expect("passive effects were initialized above"),
+                        order_record,
+                    )?;
+                records.push(deleted_subtree_ref_passive_cleanup_execution_record(
+                    records.len(),
+                    order_record,
+                    None,
+                    passive_destroy_execution_order,
+                ));
+            }
+            HostRootDeletionCleanupOrderPhase::HostNodeCleanup => {
+                records.push(deleted_subtree_ref_passive_cleanup_execution_record(
+                    records.len(),
+                    order_record,
+                    None,
+                    None,
+                ));
+            }
+        }
+    }
+
+    Ok(DeletedSubtreeRefPassiveCleanupExecutionResult {
+        root: commit.root(),
+        finished_work: commit.finished_work(),
+        records,
+        ref_cleanup_return_executions,
+        passive_effects,
+    })
 }
 
 #[allow(
@@ -3691,6 +4145,138 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         root_error_routing,
         callback_execution_errors,
     })
+}
+
+fn execute_deleted_ref_cleanup_return_for_order_record(
+    commit: &HostRootCommitRecord,
+    order_record: &HostRootDeletionCleanupOrderGateRecord,
+    execution_order: usize,
+    executor: &mut impl DeletedSubtreeRefCleanupReturnExecutor,
+) -> Result<
+    DeletedSubtreeRefCleanupReturnExecutionRecord,
+    DeletedSubtreeRefPassiveCleanupExecutionError,
+> {
+    let cleanup_return_sequence = order_record.ref_cleanup_return_sequence().ok_or(
+        DeletedSubtreeRefPassiveCleanupExecutionError::MissingRefCleanupReturnRecord {
+            root: order_record.root(),
+            fiber: order_record.fiber(),
+            order_gate_sequence: order_record.sequence(),
+            cleanup_return_sequence: usize::MAX,
+        },
+    )?;
+    let cleanup_record = deleted_ref_cleanup_return_gate_record_for_order_record(
+        commit,
+        order_record,
+        cleanup_return_sequence,
+    )?;
+    let request = DeletedSubtreeRefCleanupReturnExecutionRequest {
+        order_gate_sequence: order_record.sequence(),
+        cleanup_return_sequence,
+        root: order_record.root(),
+        finished_work: order_record.finished_work(),
+        deleted_root: order_record.deleted_root(),
+        fiber: cleanup_record.fiber(),
+        state_node: cleanup_record.state_node(),
+        ref_handle: cleanup_record.ref_handle(),
+        token: cleanup_record.token(),
+        token_phase: cleanup_record.token_phase(),
+        token_target: cleanup_record.token_target(),
+    };
+    executor.execute_deleted_ref_cleanup_return(request);
+
+    Ok(DeletedSubtreeRefCleanupReturnExecutionRecord {
+        execution_order,
+        request,
+    })
+}
+
+fn deleted_ref_cleanup_return_gate_record_for_order_record<'a>(
+    commit: &'a HostRootCommitRecord,
+    order_record: &HostRootDeletionCleanupOrderGateRecord,
+    cleanup_return_sequence: usize,
+) -> Result<
+    &'a HostRootRefCleanupReturnExecutionGateRecord,
+    DeletedSubtreeRefPassiveCleanupExecutionError,
+> {
+    commit
+        .ref_cleanup_return_execution_gate()
+        .records()
+        .iter()
+        .find(|record| {
+            record.sequence() == cleanup_return_sequence
+                && record.root() == order_record.root()
+                && record.fiber() == order_record.fiber()
+                && record.action() == HostRootRefCommitAction::Detach
+                && record.detach_reason() == Some(HostRootRefDetachReason::Deleted)
+                && record.cleanup_return_execution_gate()
+        })
+        .ok_or(
+            DeletedSubtreeRefPassiveCleanupExecutionError::MissingRefCleanupReturnRecord {
+                root: order_record.root(),
+                fiber: order_record.fiber(),
+                order_gate_sequence: order_record.sequence(),
+                cleanup_return_sequence,
+            },
+        )
+}
+
+fn deleted_subtree_passive_destroy_execution_order(
+    passive_effects: &PassiveEffectsFlushResult,
+    order_record: &HostRootDeletionCleanupOrderGateRecord,
+) -> Result<Option<usize>, DeletedSubtreeRefPassiveCleanupExecutionError> {
+    let Some(destroy) = order_record.passive_destroy() else {
+        return Ok(None);
+    };
+    let pending_order = order_record.passive_unmount_order().ok_or(
+        DeletedSubtreeRefPassiveCleanupExecutionError::MissingPassiveDestroyPendingOrder {
+            root: order_record.root(),
+            fiber: order_record.fiber(),
+            order_gate_sequence: order_record.sequence(),
+        },
+    )?;
+
+    passive_effects
+        .destroy_callback_executions()
+        .iter()
+        .find(|execution| {
+            execution.fiber() == order_record.fiber()
+                && execution.pending_order() == pending_order
+                && execution.destroy_callback() == destroy
+                && matches!(
+                    execution.unmount_origin(),
+                    Some(PendingPassiveUnmountOrigin::DeletedSubtree { .. })
+                )
+        })
+        .map(|execution| Some(execution.execution_order()))
+        .ok_or(
+            DeletedSubtreeRefPassiveCleanupExecutionError::MissingPassiveDestroyExecution {
+                root: order_record.root(),
+                fiber: order_record.fiber(),
+                order_gate_sequence: order_record.sequence(),
+                pending_order,
+                destroy,
+            },
+        )
+}
+
+fn deleted_subtree_ref_passive_cleanup_execution_record(
+    sequence: usize,
+    order_record: &HostRootDeletionCleanupOrderGateRecord,
+    ref_cleanup_return_execution_order: Option<usize>,
+    passive_destroy_execution_order: Option<usize>,
+) -> DeletedSubtreeRefPassiveCleanupExecutionRecord {
+    DeletedSubtreeRefPassiveCleanupExecutionRecord {
+        sequence,
+        order_gate_sequence: order_record.sequence(),
+        phase: order_record.phase(),
+        root: order_record.root(),
+        finished_work: order_record.finished_work(),
+        deleted_root: order_record.deleted_root(),
+        fiber: order_record.fiber(),
+        ref_cleanup_return_execution_order,
+        passive_destroy_execution_order,
+        host_cleanup_sequence: order_record.host_cleanup_sequence(),
+    }
 }
 
 fn validate_pending_passive_handoff(
@@ -4734,6 +5320,58 @@ mod tests {
             } else {
                 Ok(())
             }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum DeletedCleanupExecutionEvent {
+        RefCleanup(FiberId),
+        PassiveDestroy(HookEffectCallbackHandle),
+    }
+
+    #[derive(Default)]
+    struct RecordingDeletedCleanupExecutor {
+        events: Vec<DeletedCleanupExecutionEvent>,
+        ref_cleanup_calls: Vec<DeletedSubtreeRefCleanupReturnExecutionRequest>,
+        destroy_calls: Vec<PassiveEffectDestroyCallbackExecutionRequest>,
+    }
+
+    impl RecordingDeletedCleanupExecutor {
+        fn events(&self) -> &[DeletedCleanupExecutionEvent] {
+            &self.events
+        }
+
+        fn ref_cleanup_calls(&self) -> &[DeletedSubtreeRefCleanupReturnExecutionRequest] {
+            &self.ref_cleanup_calls
+        }
+
+        fn destroy_calls(&self) -> &[PassiveEffectDestroyCallbackExecutionRequest] {
+            &self.destroy_calls
+        }
+    }
+
+    impl DeletedSubtreeRefCleanupReturnExecutor for RecordingDeletedCleanupExecutor {
+        fn execute_deleted_ref_cleanup_return(
+            &mut self,
+            request: DeletedSubtreeRefCleanupReturnExecutionRequest,
+        ) {
+            self.events
+                .push(DeletedCleanupExecutionEvent::RefCleanup(request.fiber()));
+            self.ref_cleanup_calls.push(request);
+        }
+    }
+
+    impl PassiveEffectDestroyCallbackExecutor for RecordingDeletedCleanupExecutor {
+        fn execute_destroy_callback(
+            &mut self,
+            request: PassiveEffectDestroyCallbackExecutionRequest,
+        ) -> Result<(), PassiveEffectDestroyCallbackErrorHandle> {
+            self.events
+                .push(DeletedCleanupExecutionEvent::PassiveDestroy(
+                    request.destroy_callback(),
+                ));
+            self.destroy_calls.push(request);
+            Ok(())
         }
     }
 
@@ -7628,6 +8266,175 @@ mod tests {
     }
 
     #[test]
+    fn deletion_ref_passive_cleanup_execution_runs_ref_cleanup_before_deleted_passive_destroy() {
+        let (mut store, root_id, host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9_965),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let fixture = attach_deleted_host_subtree_ref_passive_fixture(
+            &mut store,
+            &mut hook_store,
+            finished_work,
+        );
+        let deleted_handoff = queue_function_component_deleted_subtree_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            finished_work,
+            fixture.deleted_host,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let queued_passive = deleted_handoff.records()[0];
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        commit
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[
+                deleted_handoff,
+            ])
+            .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut executor = RecordingDeletedCleanupExecutor::default();
+
+        let execution = execute_deleted_subtree_ref_and_passive_cleanup_after_commit_for_canary(
+            &mut store,
+            &commit,
+            &mut executor,
+        )
+        .unwrap();
+
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.finished_work(), finished_work);
+        assert!(execution.ref_cleanup_return_callbacks_invoked());
+        assert!(execution.passive_destroy_callbacks_invoked());
+        assert!(!execution.public_unmount_compatibility_claimed());
+        assert!(!execution.public_ref_or_effect_compatibility_claimed());
+        assert_eq!(
+            executor.events(),
+            &[
+                DeletedCleanupExecutionEvent::RefCleanup(fixture.deleted_host),
+                DeletedCleanupExecutionEvent::PassiveDestroy(fixture.passive_destroy),
+            ]
+        );
+        assert_eq!(executor.ref_cleanup_calls().len(), 1);
+        assert_eq!(executor.destroy_calls().len(), 1);
+
+        let ref_execution = execution.ref_cleanup_return_executions()[0];
+        assert_eq!(ref_execution.execution_order(), 0);
+        assert_eq!(ref_execution.root(), root_id);
+        assert_eq!(ref_execution.finished_work(), finished_work);
+        assert_eq!(ref_execution.deleted_root(), fixture.deleted_host);
+        assert_eq!(ref_execution.fiber(), fixture.deleted_host);
+        assert_eq!(ref_execution.state_node(), fixture.deleted_host_state_node);
+        assert_eq!(ref_execution.ref_handle(), fixture.deleted_host_ref);
+        assert_eq!(ref_execution.request(), executor.ref_cleanup_calls()[0]);
+        assert_eq!(ref_execution.request().order_gate_sequence(), 0);
+        assert_eq!(ref_execution.request().cleanup_return_sequence(), 0);
+
+        let passive = execution.passive_effects().unwrap();
+        assert_eq!(passive.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(passive.consumed_pending_passive());
+        assert!(passive.did_execute_destroy_callbacks());
+        assert!(!passive.public_effect_execution_enabled());
+        assert!(!passive.public_act_compatibility_claimed());
+        assert!(!passive.scheduler_driven_passive_execution_enabled());
+        assert_eq!(passive.destroy_callback_executions().len(), 1);
+        assert_eq!(passive.records().len(), 1);
+        assert_eq!(
+            passive.records()[0].unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+                nearest_mounted_ancestor: finished_work,
+            })
+        );
+        assert_eq!(
+            passive.records()[0].destroy_callback(),
+            Some(fixture.passive_destroy)
+        );
+        assert!(passive.records()[0].destroy_callback_invoked());
+
+        let passive_execution = passive.destroy_callback_executions()[0];
+        assert_eq!(passive_execution.execution_order(), 0);
+        assert_eq!(passive_execution.fiber(), fixture.deleted_function);
+        assert_eq!(
+            passive_execution.pending_order(),
+            queued_passive.unmount_order()
+        );
+        assert_eq!(
+            passive_execution.destroy_callback(),
+            fixture.passive_destroy
+        );
+        assert_eq!(executor.destroy_calls()[0], passive_execution.request());
+
+        let records = execution.records();
+        assert_eq!(records.len(), 4);
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.phase())
+                .collect::<Vec<_>>(),
+            vec![
+                HostRootDeletionCleanupOrderPhase::RefCleanupReturn,
+                HostRootDeletionCleanupOrderPhase::PassiveDestroy,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+            ]
+        );
+        assert_eq!(records[0].order_gate_sequence(), 0);
+        assert_eq!(records[0].fiber(), fixture.deleted_host);
+        assert_eq!(records[0].deleted_root(), fixture.deleted_host);
+        assert_eq!(records[0].ref_cleanup_return_execution_order(), Some(0));
+        assert_eq!(records[0].passive_destroy_execution_order(), None);
+        assert_eq!(records[0].host_cleanup_sequence(), None);
+        assert_eq!(records[1].order_gate_sequence(), 1);
+        assert_eq!(records[1].fiber(), fixture.deleted_function);
+        assert_eq!(records[1].deleted_root(), fixture.deleted_host);
+        assert_eq!(records[1].ref_cleanup_return_execution_order(), None);
+        assert_eq!(records[1].passive_destroy_execution_order(), Some(0));
+        assert_eq!(records[1].host_cleanup_sequence(), None);
+        assert_eq!(records[2].fiber(), fixture.deleted_text);
+        assert_eq!(records[2].host_cleanup_sequence(), Some(0));
+        assert_eq!(records[3].fiber(), fixture.deleted_host);
+        assert_eq!(records[3].host_cleanup_sequence(), Some(1));
+
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert!(
+            !commit
+                .host_node_deletion_cleanup_log()
+                .public_unmount_compatibility_claimed()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
     fn passive_effects_deleted_subtree_destroy_executor_rejects_non_deleted_unmounts() {
         let (mut store, root_id, host) = root_store();
         let previous_current = store.root(root_id).unwrap().current();
