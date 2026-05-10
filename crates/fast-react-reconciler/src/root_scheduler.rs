@@ -15,16 +15,16 @@ use fast_react_core::{
 use fast_react_host_config::HostTypes;
 
 use crate::concurrent_updates::root_for_updated_fiber;
-use crate::root_commit::PendingPassiveCommitHandoff;
+use crate::root_commit::{HostRootCommitRecord, PendingPassiveCommitHandoff};
 use crate::scheduler_bridge::{SchedulerActContinuationRecord, SchedulerActContinuationStatus};
 use crate::{
     ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
-    HostRootRenderPhaseRecord, RootCallbackPriority, RootErrorCallbackHandle,
+    HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootErrorCallbackHandle,
     RootRecoverableErrorCallbackHandle, RootScheduleUpdateRecord, RootSchedulerCallbackHandle,
     RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge, SchedulerCallbackRequest,
     SchedulerCallbackValidationRecord, SchedulerCancellationRecord, SchedulerMicrotaskKind,
     SchedulerMicrotaskRequest, SchedulerPriority, SyncFlushExecutionContextRecord,
-    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
+    commit_finished_host_root, render_host_root_for_lanes, render_host_root_via_scheduler_callback,
     validate_scheduled_host_root_callback,
 };
 
@@ -673,6 +673,185 @@ impl SyncFlushActContinuationDrainRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SchedulerBridgeActContinuationExecutionStatus {
+    RejectedContinuation,
+    NoContinuationWork,
+    BlockedByLaneMismatch,
+    RenderedAndCommitted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SchedulerBridgeActContinuationExecutionRecord {
+    continuation: SyncFlushActContinuationDrainRecord,
+    selected_lanes: Lanes,
+    status: SchedulerBridgeActContinuationExecutionStatus,
+    render_phase: Option<HostRootRenderPhaseRecord>,
+    commit: Option<HostRootCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private scheduler-bridge act continuation execution diagnostics reserved for private act workers"
+)]
+impl SchedulerBridgeActContinuationExecutionRecord {
+    #[must_use]
+    pub(crate) const fn continuation(&self) -> SyncFlushActContinuationDrainRecord {
+        self.continuation
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.continuation.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn requested_lanes(&self) -> Lanes {
+        self.continuation.continuation_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> SchedulerBridgeActContinuationExecutionStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(&self) -> Option<HostRootRenderPhaseRecord> {
+        self.render_phase
+    }
+
+    #[must_use]
+    pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
+        self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn did_execute_accepted_internal_act_continuation(&self) -> bool {
+        matches!(
+            self.status,
+            SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn rejected_unaccepted_continuation(&self) -> bool {
+        matches!(
+            self.status,
+            SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_lane_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            SchedulerBridgeActContinuationExecutionStatus::BlockedByLaneMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn drains_public_react_act_queue(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_effects(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SchedulerBridgeActContinuationExecutionResult {
+    records: Vec<SchedulerBridgeActContinuationExecutionRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private scheduler-bridge act continuation execution diagnostics reserved for private act workers"
+)]
+impl SchedulerBridgeActContinuationExecutionResult {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[SchedulerBridgeActContinuationExecutionRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn executed_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.did_execute_accepted_internal_act_continuation())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn rejected_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.rejected_unaccepted_continuation())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn blocked_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.blocked_by_lane_mismatch()
+                    || matches!(
+                        record.status(),
+                        SchedulerBridgeActContinuationExecutionStatus::NoContinuationWork
+                    )
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn did_execute_accepted_internal_act_continuations(&self) -> bool {
+        self.executed_count() > 0
+            && self.records.iter().all(|record| {
+                !record.did_execute_accepted_internal_act_continuation()
+                    || record
+                        .continuation()
+                        .is_accepted_internal_act_continuation()
+            })
+    }
+
+    #[must_use]
+    pub(crate) const fn drains_public_react_act_queue(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_effects(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SyncFlushPostPassiveContinuationRootRecord {
     order: usize,
     root: FiberRootId,
@@ -995,6 +1174,42 @@ impl From<ConcurrentUpdateError> for RootSchedulerError {
 impl From<RootWorkLoopError> for RootSchedulerError {
     fn from(error: RootWorkLoopError) -> Self {
         Self::RootWorkLoop(error)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SchedulerBridgeActContinuationExecutionError {
+    RootScheduler(RootSchedulerError),
+    RootCommit(RootCommitError),
+}
+
+impl Display for SchedulerBridgeActContinuationExecutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootScheduler(error) => Display::fmt(error, formatter),
+            Self::RootCommit(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for SchedulerBridgeActContinuationExecutionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::RootScheduler(error) => Some(error),
+            Self::RootCommit(error) => Some(error),
+        }
+    }
+}
+
+impl From<RootSchedulerError> for SchedulerBridgeActContinuationExecutionError {
+    fn from(error: RootSchedulerError) -> Self {
+        Self::RootScheduler(error)
+    }
+}
+
+impl From<RootCommitError> for SchedulerBridgeActContinuationExecutionError {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
     }
 }
 
@@ -1493,6 +1708,92 @@ pub(crate) fn sync_flush_act_continuation_drain_record_after_host_output_canary(
     record
         .is_accepted_internal_act_continuation()
         .then_some(record)
+}
+
+pub(crate) fn execute_scheduler_bridge_act_continuations<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    continuations: &[SyncFlushActContinuationDrainRecord],
+) -> Result<
+    SchedulerBridgeActContinuationExecutionResult,
+    SchedulerBridgeActContinuationExecutionError,
+> {
+    let mut records = Vec::with_capacity(continuations.len());
+    for continuation in continuations {
+        records.push(execute_scheduler_bridge_act_continuation(
+            store,
+            *continuation,
+        )?);
+    }
+
+    Ok(SchedulerBridgeActContinuationExecutionResult { records })
+}
+
+fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    continuation: SyncFlushActContinuationDrainRecord,
+) -> Result<
+    SchedulerBridgeActContinuationExecutionRecord,
+    SchedulerBridgeActContinuationExecutionError,
+> {
+    if !continuation.is_accepted_internal_act_continuation() {
+        return Ok(scheduler_bridge_act_continuation_execution_record(
+            continuation,
+            Lanes::NO,
+            SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation,
+            None,
+            None,
+        ));
+    }
+
+    let selected_lanes = sync_flush_act_continuation_lanes_for_root(store, continuation.root())?;
+    if selected_lanes.is_empty() {
+        return Ok(scheduler_bridge_act_continuation_execution_record(
+            continuation,
+            selected_lanes,
+            SchedulerBridgeActContinuationExecutionStatus::NoContinuationWork,
+            None,
+            None,
+        ));
+    }
+
+    if selected_lanes != continuation.continuation_lanes() {
+        return Ok(scheduler_bridge_act_continuation_execution_record(
+            continuation,
+            selected_lanes,
+            SchedulerBridgeActContinuationExecutionStatus::BlockedByLaneMismatch,
+            None,
+            None,
+        ));
+    }
+
+    let render_phase = render_host_root_for_lanes(store, continuation.root(), selected_lanes)
+        .map_err(RootSchedulerError::from)?;
+    let commit = commit_finished_host_root(store, render_phase)?;
+    recompute_might_have_pending_sync_work(store)?;
+
+    Ok(scheduler_bridge_act_continuation_execution_record(
+        continuation,
+        selected_lanes,
+        SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted,
+        Some(render_phase),
+        Some(commit),
+    ))
+}
+
+fn scheduler_bridge_act_continuation_execution_record(
+    continuation: SyncFlushActContinuationDrainRecord,
+    selected_lanes: Lanes,
+    status: SchedulerBridgeActContinuationExecutionStatus,
+    render_phase: Option<HostRootRenderPhaseRecord>,
+    commit: Option<HostRootCommitRecord>,
+) -> SchedulerBridgeActContinuationExecutionRecord {
+    SchedulerBridgeActContinuationExecutionRecord {
+        continuation,
+        selected_lanes,
+        status,
+        render_phase,
+        commit,
+    }
 }
 
 pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
@@ -3039,6 +3340,166 @@ mod tests {
             ),
             None
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_scheduler_bridge_act_continuation_execution_commits_accepted_work() {
+        let (mut store, root_id, host) = root_store();
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_default_update(&mut store, root_id);
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let pending = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(
+                root_id,
+                11,
+                Lanes::SYNC,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let accepted =
+            sync_flush_act_continuation_drain_record_after_host_output_canary(pending, true)
+                .unwrap();
+
+        let result = execute_scheduler_bridge_act_continuations(&mut store, &[accepted]).unwrap();
+
+        assert_eq!(result.records().len(), 1);
+        assert_eq!(result.executed_count(), 1);
+        assert_eq!(result.rejected_count(), 0);
+        assert_eq!(result.blocked_count(), 0);
+        assert!(result.did_execute_accepted_internal_act_continuations());
+        assert!(!result.drains_public_react_act_queue());
+        assert!(!result.public_act_compatibility_claimed());
+        assert!(!result.public_scheduler_timing_compatibility_claimed());
+        assert!(!result.executes_effects());
+
+        let record = &result.records()[0];
+        assert_eq!(
+            record.status(),
+            SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.selected_lanes(), Lanes::DEFAULT);
+        assert!(record.did_execute_accepted_internal_act_continuation());
+        assert!(!record.drains_public_react_act_queue());
+        assert!(!record.public_act_compatibility_claimed());
+        assert!(!record.public_scheduler_timing_compatibility_claimed());
+        assert!(!record.executes_effects());
+        let render_phase = record.render_phase().unwrap();
+        assert_eq!(render_phase.root(), root_id);
+        assert_eq!(render_phase.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            render_phase.resulting_element(),
+            RootElementHandle::from_raw(1)
+        );
+        let commit = record.commit().unwrap();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(commit.remaining_lanes(), Lanes::NO);
+        assert_eq!(store.root(root_id).unwrap().current(), commit.current());
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_scheduler_bridge_act_continuation_execution_rejects_unaccepted_records() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_default_update(&mut store, root_id);
+        let unaccepted = SyncFlushActContinuationDrainRecord {
+            root: root_id,
+            sync_flush_order: 12,
+            flushed_lanes: Lanes::SYNC,
+            remaining_lanes: Lanes::DEFAULT,
+            continuation_lanes: Lanes::DEFAULT,
+            act_scope_depth: 1,
+            nested_act_scope: false,
+            source_status: SchedulerActContinuationStatus::NoContinuation,
+            host_output_canary_committed: true,
+        };
+
+        let result = execute_scheduler_bridge_act_continuations(&mut store, &[unaccepted]).unwrap();
+
+        assert_eq!(result.records().len(), 1);
+        assert_eq!(result.executed_count(), 0);
+        assert_eq!(result.rejected_count(), 1);
+        assert_eq!(result.blocked_count(), 0);
+        assert!(!result.did_execute_accepted_internal_act_continuations());
+        let record = &result.records()[0];
+        assert_eq!(
+            record.status(),
+            SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation
+        );
+        assert!(record.rejected_unaccepted_continuation());
+        assert_eq!(record.selected_lanes(), Lanes::NO);
+        assert_eq!(record.render_phase(), None);
+        assert!(record.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_scheduler_bridge_act_continuation_execution_blocks_stale_lane_order() {
+        let (mut store, root_id, host) = root_store();
+        store.scheduler_bridge_mut().enter_act_scope();
+        let current = store.root(root_id).unwrap().current();
+        schedule_default_update(&mut store, root_id);
+        let pending = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(
+                root_id,
+                13,
+                Lanes::SYNC,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let accepted =
+            sync_flush_act_continuation_drain_record_after_host_output_canary(pending, true)
+                .unwrap();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(2));
+
+        let result = execute_scheduler_bridge_act_continuations(&mut store, &[accepted]).unwrap();
+
+        assert_eq!(result.records().len(), 1);
+        assert_eq!(result.executed_count(), 0);
+        assert_eq!(result.rejected_count(), 0);
+        assert_eq!(result.blocked_count(), 1);
+        let record = &result.records()[0];
+        assert_eq!(
+            record.status(),
+            SchedulerBridgeActContinuationExecutionStatus::BlockedByLaneMismatch
+        );
+        assert!(record.blocked_by_lane_mismatch());
+        assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
+        assert!(record.selected_lanes().contains_lane(Lane::SYNC));
+        assert!(record.selected_lanes().contains_lane(Lane::DEFAULT));
+        assert_eq!(record.render_phase(), None);
+        assert!(record.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
+        assert!(pending_lanes.contains_lane(Lane::SYNC));
+        assert!(pending_lanes.contains_lane(Lane::DEFAULT));
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
