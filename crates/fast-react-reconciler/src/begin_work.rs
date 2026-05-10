@@ -16,8 +16,8 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    ContextHandle, ContextStackError, ContextStackSnapshot, ContextValueHandle, FiberArena,
-    FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, ReactKey, StateHandle,
+    ContextFrameId, ContextHandle, ContextStackError, ContextStackSnapshot, ContextValueHandle,
+    FiberArena, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, ReactKey, StateHandle,
     StateNodeHandle,
 };
 
@@ -1462,6 +1462,8 @@ pub(crate) struct NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
     inner_value: ContextValueHandle,
     outer_provider_snapshot: ContextStackSnapshot,
     inner_provider_snapshot: ContextStackSnapshot,
+    outer_provider_token: ContextFrameId,
+    inner_provider_token: ContextFrameId,
     outer_pushed_stack_depth: usize,
     inner_pushed_stack_depth: usize,
     inner_restored_stack_depth: usize,
@@ -1703,6 +1705,16 @@ impl NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
     #[must_use]
     pub const fn inner_provider_snapshot(self) -> ContextStackSnapshot {
         self.inner_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn outer_provider_token(self) -> ContextFrameId {
+        self.outer_provider_token
+    }
+
+    #[must_use]
+    pub const fn inner_provider_token(self) -> ContextFrameId {
+        self.inner_provider_token
     }
 
     #[must_use]
@@ -3583,6 +3595,7 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
             context: request.outer_context(),
             error: Box::new(error),
         })?;
+    let outer_provider_token = context_store.context_stack().snapshot().top_frame();
     let outer_pushed_stack_depth = context_store.stack_depth();
 
     let inner_snapshot =
@@ -3605,6 +3618,7 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
                 });
             }
         };
+    let inner_provider_token = context_store.context_stack().snapshot().top_frame();
     let inner_pushed_stack_depth = context_store.stack_depth();
 
     let first_child_result = begin_work_function_component_required_use_context(
@@ -3651,6 +3665,8 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
                 inner_value: request.inner_value(),
                 outer_provider_snapshot: outer_snapshot,
                 inner_provider_snapshot: inner_snapshot,
+                outer_provider_token,
+                inner_provider_token,
                 outer_pushed_stack_depth,
                 inner_pushed_stack_depth,
                 inner_restored_stack_depth,
@@ -4837,6 +4853,9 @@ mod tests {
         assert_eq!(record.inner_value(), inner_value);
         assert!(record.outer_provider_snapshot().is_root());
         assert_eq!(record.inner_provider_snapshot().depth(), 1);
+        assert!(record.outer_provider_token().is_some());
+        assert!(record.inner_provider_token().is_some());
+        assert_ne!(record.outer_provider_token(), record.inner_provider_token());
         assert_eq!(record.outer_pushed_stack_depth(), 1);
         assert_eq!(record.inner_pushed_stack_depth(), 2);
         assert_eq!(record.inner_restored_stack_depth(), 1);
