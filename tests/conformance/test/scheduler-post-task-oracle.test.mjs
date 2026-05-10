@@ -6,6 +6,7 @@ import {
   findFastReactSchedulerPostTaskComparison,
   findFastReactSchedulerPostTaskObservation,
   findSchedulerPostTaskObservation,
+  inspectSchedulerPostTaskPriorityDiagnostics,
   readCheckedSchedulerPostTaskOracle,
   readCheckedSchedulerPostTaskOracleText
 } from "../src/scheduler-post-task-oracle.mjs";
@@ -592,6 +593,250 @@ test("scheduler post-task oracle records matching Fast React post-task behavior 
       assert.equal(scenarioComparison.firstDifferencePath, null);
       assert.equal(scenarioComparison.schedulerResultStatus, "returned");
       assert.equal(scenarioComparison.fastReactResultStatus, "returned");
+    }
+  }
+});
+
+test("scheduler post-task private priority diagnostics are opt-in and preserve public shape", () => {
+  for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
+    const report = inspectSchedulerPostTaskPriorityDiagnostics({
+      enableDiagnostics: false,
+      nodeEnv: mode.nodeEnv,
+      withYield: true
+    });
+
+    assert.deepEqual(report.exportKeys, EXPECTED_EXPORT_KEYS);
+    for (const entry of report.scheduling) {
+      assert.deepEqual(entry.publicNodeKeys, ["_controller"], entry.label);
+      assert.equal(entry.privateDiagnosticSymbolPresent, false, entry.label);
+      assert.equal(entry.diagnosticsBeforeFlush, null, entry.label);
+      assert.equal(entry.diagnosticsAfterFlush, null, entry.label);
+    }
+    assert.deepEqual(report.cancellation.publicNodeKeys, ["_controller"]);
+    assert.equal(report.cancellation.privateDiagnosticSymbolPresent, false);
+    assert.equal(report.cancellation.diagnosticsBeforeCancel, null);
+    assert.equal(report.cancellation.diagnosticsAfterCancel, null);
+    assert.deepEqual(report.continuation.publicNodeKeys, ["_controller"]);
+    assert.equal(report.continuation.privateDiagnosticSymbolPresent, false);
+    assert.equal(report.continuation.diagnosticsBeforeFlush, null);
+    assert.equal(report.continuation.diagnosticsAfterFlush, null);
+  }
+});
+
+test("scheduler post-task private priority diagnostics capture shimmed TaskController scheduling and cancellation", () => {
+  const expectedScheduling = [
+    ["immediate", 1, "user-blocking", "number", 0],
+    ["user-blocking", 2, "user-blocking", "number", 0],
+    ["normal", 3, "user-visible", "undefined", null],
+    ["low-delay", 4, "user-visible", "number", 7],
+    ["idle-zero-delay", 5, "background", "number", 0],
+    ["invalid-delay", 99, "user-visible", "number", 2]
+  ];
+
+  for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
+    const report = inspectSchedulerPostTaskPriorityDiagnostics({
+      nodeEnv: mode.nodeEnv,
+      withYield: true
+    });
+
+    assert.deepEqual(report.exportKeys, EXPECTED_EXPORT_KEYS);
+    assert.deepEqual(
+      report.scheduling.map((entry) => [
+        entry.label,
+        entry.diagnosticsBeforeFlush.schedule.priorityLevel,
+        entry.diagnosticsBeforeFlush.schedule.postTaskPriority,
+        entry.diagnosticsBeforeFlush.schedule.delay.type,
+        entry.diagnosticsBeforeFlush.schedule.delay.value
+      ]),
+      expectedScheduling
+    );
+
+    for (const entry of report.scheduling) {
+      assert.deepEqual(entry.publicNodeKeys, ["_controller"], entry.label);
+      assert.equal(entry.privateDiagnosticSymbolPresent, true, entry.label);
+      assert.equal(Object.isFrozen(entry.diagnosticsBeforeFlush), true);
+      assert.equal(entry.diagnosticsBeforeFlush.compatibilityClaimed, false);
+      assert.equal(
+        entry.diagnosticsBeforeFlush.browserPostTaskCompatibilityClaimed,
+        false
+      );
+      assert.equal(
+        entry.diagnosticsBeforeFlush.publicSchedulerTimingCompatibilityClaimed,
+        false
+      );
+      assert.equal(
+        entry.diagnosticsBeforeFlush.schedule.status,
+        "scheduled-shimmed-task-controller"
+      );
+      assert.equal(
+        entry.diagnosticsBeforeFlush.schedule.controller.constructorName,
+        "TaskController"
+      );
+      assert.deepEqual(entry.diagnosticsBeforeFlush.schedule.controller.ownKeys, [
+        "priority",
+        "signal"
+      ]);
+      assert.deepEqual(entry.diagnosticsBeforeFlush.schedule.signal.ownKeys, [
+        "id",
+        "aborted",
+        "priority"
+      ]);
+      assert.equal(entry.diagnosticsBeforeFlush.callbackRuns.length, 0);
+      assert.equal(entry.diagnosticsAfterFlush.callbackRuns.length, 1);
+      assert.equal(
+        entry.diagnosticsAfterFlush.callbackRuns[0].priorityLevel,
+        entry.priorityLevel
+      );
+      assert.equal(
+        entry.diagnosticsAfterFlush.callbackRuns[0].postTaskPriority,
+        entry.diagnosticsBeforeFlush.schedule.postTaskPriority
+      );
+      assert.equal(entry.diagnosticsAfterFlush.callbackRuns[0].didTimeout, false);
+      assert.equal(
+        entry.diagnosticsAfterFlush.callbackRuns[0].shouldYieldAtStart,
+        false
+      );
+    }
+
+    assert.deepEqual(
+      report.schedulingFlush.map((entry) => [
+        entry.type,
+        entry.signal.priority,
+        entry.signal.aborted
+      ]),
+      [
+        ["run-post-task", "user-blocking", false],
+        ["run-post-task", "user-blocking", false],
+        ["run-post-task", "user-visible", false],
+        ["run-post-task", "user-visible", false],
+        ["run-post-task", "background", false],
+        ["run-post-task", "user-visible", false]
+      ]
+    );
+    assert.deepEqual(report.schedulingPostFlushEvents, []);
+
+    assert.equal(
+      report.cancellation.diagnosticsBeforeCancel.schedule.postTaskPriority,
+      "user-visible"
+    );
+    assert.equal(report.cancellation.diagnosticsBeforeCancel.cancellation, null);
+    assert.equal(report.cancellation.cancelReturnType, "undefined");
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel.shimmedTaskControllerCancellation,
+      true
+    );
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel.cancellation.status,
+      "cancelled-shimmed-task-controller"
+    );
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel.cancellation.abortObserved,
+      true
+    );
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel.cancellation.signal.aborted,
+      true
+    );
+    assert.deepEqual(report.cancellation.cancellationEvents, [
+      {
+        type: "abort",
+        priority: "user-visible",
+        signalId: 7
+      }
+    ]);
+    assert.deepEqual(report.cancellation.cancellationFlush, [
+      {
+        type: "skip-aborted",
+        signal: {
+          id: 7,
+          priority: "user-visible",
+          aborted: true
+        }
+      }
+    ]);
+  }
+});
+
+test("scheduler post-task private priority diagnostics capture continuation fallbacks without browser compatibility claims", () => {
+  for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
+    for (const withYield of [true, false]) {
+      const report = inspectSchedulerPostTaskPriorityDiagnostics({
+        nodeEnv: mode.nodeEnv,
+        withYield
+      });
+      const expectedFallback = withYield
+        ? "scheduler.yield"
+        : "scheduler.postTask";
+
+      assert.deepEqual(report.continuation.publicNodeKeys, ["_controller"]);
+      assert.equal(report.continuation.privateDiagnosticSymbolPresent, true);
+      assert.equal(
+        report.continuation.diagnosticsBeforeFlush.continuationFallbacks.length,
+        0
+      );
+      assert.deepEqual(report.continuation.events, [
+        {
+          label: "start",
+          currentPriorityLevel: 3
+        },
+        {
+          label: "continuation",
+          currentPriorityLevel: 3
+        }
+      ]);
+      assert.deepEqual(
+        report.continuation.flush.map((entry) => entry.type),
+        withYield
+          ? ["run-post-task"]
+          : ["run-post-task", "run-post-task"]
+      );
+      assert.deepEqual(
+        report.continuation.postFlushEvents.map((entry) => entry.type),
+        withYield ? ["yield", "yield.then"] : ["postTask"]
+      );
+
+      const diagnostics = report.continuation.diagnosticsAfterFlush;
+      assert.equal(diagnostics.compatibilityClaimed, false);
+      assert.equal(diagnostics.browserPostTaskCompatibilityClaimed, false);
+      assert.equal(diagnostics.browserTaskOrderingCompatibilityClaimed, false);
+      assert.equal(
+        diagnostics.publicSchedulerTimingCompatibilityClaimed,
+        false
+      );
+      assert.equal(diagnostics.continuationFallbackDiagnostics, true);
+      assert.equal(diagnostics.callbackRuns.length, 2);
+      assert.deepEqual(
+        diagnostics.callbackRuns.map((entry) => [
+          entry.runIndex,
+          entry.priorityLevel,
+          entry.postTaskPriority,
+          entry.currentPriorityLevel,
+          entry.signal.priority
+        ]),
+        [
+          [0, 3, "user-visible", 3, "user-visible"],
+          [1, 3, "user-visible", 3, "user-visible"]
+        ]
+      );
+      assert.deepEqual(diagnostics.continuationFallbacks, [
+        {
+          status: "scheduled-shimmed-post-task-continuation",
+          continuationIndex: 0,
+          fallback: expectedFallback,
+          priorityLevel: 3,
+          postTaskPriority: "user-visible",
+          reusesOriginalSignal: true,
+          signal: {
+            id: 8,
+            priority: "user-visible",
+            aborted: false,
+            ownKeys: ["id", "aborted", "priority"]
+          },
+          browserPostTaskCompatibilityClaimed: false,
+          publicSchedulerTimingCompatibilityClaimed: false,
+          compatibilityClaimed: false
+        }
+      ]);
     }
   }
 });
