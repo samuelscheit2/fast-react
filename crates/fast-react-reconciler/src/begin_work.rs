@@ -1358,6 +1358,7 @@ pub(crate) struct ContextProviderUseContextOpenScopeBeginWorkRecord {
     context: ContextHandle,
     value: ContextValueHandle,
     provider_snapshot: ContextStackSnapshot,
+    provider_token: ContextFrameId,
     pushed_stack_depth: usize,
     child_begin_work: FunctionComponentUseContextBeginWorkRecord,
 }
@@ -1763,6 +1764,11 @@ impl ContextProviderUseContextOpenScopeBeginWorkRecord {
     }
 
     #[must_use]
+    pub const fn provider_token(self) -> ContextFrameId {
+        self.provider_token
+    }
+
+    #[must_use]
     pub const fn pushed_stack_depth(self) -> usize {
         self.pushed_stack_depth
     }
@@ -1785,6 +1791,11 @@ impl ContextProviderUseContextOpenScopeBeginWorkRecord {
     #[must_use]
     pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
         self.child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.child_begin_work.context_dependency()
     }
 
     #[must_use]
@@ -1831,6 +1842,11 @@ impl ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
     }
 
     #[must_use]
+    pub const fn provider_token(self) -> ContextFrameId {
+        self.begin_work.provider_token()
+    }
+
+    #[must_use]
     pub const fn pushed_stack_depth(self) -> usize {
         self.begin_work.pushed_stack_depth()
     }
@@ -1853,6 +1869,11 @@ impl ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
     #[must_use]
     pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
         self.begin_work.child_context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.begin_work.child_context_dependency()
     }
 
     #[must_use]
@@ -4515,6 +4536,7 @@ pub(crate) fn begin_work_context_provider_use_context_child_for_complete_travers
             context: request.context(),
             error: Box::new(error),
         })?;
+    let provider_token = context_store.context_stack().snapshot().top_frame();
     let pushed_stack_depth = context_store.stack_depth();
 
     let child_result = begin_work_function_component_required_use_context(
@@ -4532,6 +4554,7 @@ pub(crate) fn begin_work_context_provider_use_context_child_for_complete_travers
             context: request.context(),
             value: request.value(),
             provider_snapshot,
+            provider_token,
             pushed_stack_depth,
             child_begin_work,
         }),

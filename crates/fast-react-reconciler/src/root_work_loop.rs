@@ -32,6 +32,12 @@ use fast_react_host_config::HostTypes;
 
 #[cfg(test)]
 use crate::UpdateId;
+#[cfg(test)]
+use crate::context::{
+    ContextProviderUpdateLaneGateError, ContextProviderUpdateSingleConsumerLaneRecord,
+    ContextProviderUpdateSingleConsumerLaneRequest,
+    record_context_provider_update_single_consumer_lane_gate,
+};
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
@@ -2619,6 +2625,11 @@ impl HostRootContextProviderUseContextPropagationGateRequest {
     }
 
     #[must_use]
+    const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
     const fn propagation_lanes(self) -> Lanes {
         self.propagation_lanes
     }
@@ -3058,6 +3069,121 @@ impl HostRootContextProviderUseContextCompleteUnwindTraversalRecord {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootContextProviderUpdateRenderCommitTraversalRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    original_root_element: RootElementHandle,
+    provider: FiberId,
+    function_component: FiberId,
+    begin_work: ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+    provider_update: ContextProviderUpdateSingleConsumerLaneRecord,
+    stack_depth_after_begin: usize,
+    stack_depth_after_provider_update: usize,
+    stack_depth_after_host_child_complete: usize,
+    provider_complete: ContextProviderStackRestorationRecord,
+    complete_commit: HostRootCompleteWorkCommitHandoffRecord,
+}
+
+#[cfg(test)]
+impl HostRootContextProviderUpdateRenderCommitTraversalRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn original_root_element(&self) -> RootElementHandle {
+        self.original_root_element
+    }
+
+    #[must_use]
+    const fn provider(&self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    const fn function_component(&self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    const fn begin_work(&self) -> ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    const fn provider_update(&self) -> ContextProviderUpdateSingleConsumerLaneRecord {
+        self.provider_update
+    }
+
+    #[must_use]
+    const fn stack_depth_after_begin(&self) -> usize {
+        self.stack_depth_after_begin
+    }
+
+    #[must_use]
+    const fn stack_depth_after_provider_update(&self) -> usize {
+        self.stack_depth_after_provider_update
+    }
+
+    #[must_use]
+    const fn stack_depth_after_host_child_complete(&self) -> usize {
+        self.stack_depth_after_host_child_complete
+    }
+
+    #[must_use]
+    const fn provider_complete(&self) -> ContextProviderStackRestorationRecord {
+        self.provider_complete
+    }
+
+    #[must_use]
+    const fn complete_work(&self) -> HostRootCompleteWorkHandoffRecord {
+        self.complete_commit.complete_work()
+    }
+
+    #[must_use]
+    const fn commit(&self) -> &HostRootCommitRecord {
+        self.complete_commit.commit()
+    }
+
+    #[must_use]
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        self.complete_commit.finished_work_handoff()
+    }
+
+    #[must_use]
+    fn placement_apply_diagnostics(&self) -> &[HostRootPlacementApplyDiagnosticForCanary] {
+        self.complete_commit.placement_apply_diagnostics()
+    }
+
+    #[must_use]
+    const fn child_element(&self) -> RootElementHandle {
+        self.begin_work.child_element()
+    }
+
+    #[must_use]
+    const fn child_tag(&self) -> FiberTag {
+        self.begin_work.child_tag()
+    }
+
+    #[must_use]
+    const fn host_operations_unchanged_by_commit(&self) -> bool {
+        self.complete_commit.host_operations_unchanged_by_commit()
+    }
+
+    #[must_use]
+    const fn public_context_compatibility_blocked(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootContextProviderUseContextCompleteUnwindTraversalError {
     ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
     ContextProvider(ContextProviderBeginWorkError),
@@ -3180,6 +3306,157 @@ impl From<ContextProviderStackRestorationError>
 {
     fn from(error: ContextProviderStackRestorationError) -> Self {
         Self::ProviderStackRestoration(error)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootContextProviderUpdateRenderCommitTraversalError {
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    ContextProvider(ContextProviderBeginWorkError),
+    ContextProviderUpdate(ContextProviderUpdateLaneGateError),
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    ProviderStackRestoration(ContextProviderStackRestorationError),
+    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    ProviderStackUnwindAfterCompleteWorkError {
+        complete_error: Box<HostRootCompleteWorkHandoffError>,
+        unwind_error: Box<ContextProviderStackRestorationError>,
+    },
+    MissingContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    CompletedChildTagMismatch {
+        expected: FiberTag,
+        actual: Option<FiberTag>,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootContextProviderUpdateRenderCommitTraversalError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ChildPreflight(error) => Display::fmt(error, formatter),
+            Self::ContextProvider(error) => Display::fmt(error, formatter),
+            Self::ContextProviderUpdate(error) => Display::fmt(error, formatter),
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::ProviderStackRestoration(error) => Display::fmt(error, formatter),
+            Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::ProviderStackUnwindAfterCompleteWorkError {
+                complete_error,
+                unwind_error,
+            } => write!(
+                formatter,
+                "private context-provider update complete traversal failed ({complete_error}) and provider unwind also failed: {unwind_error}"
+            ),
+            Self::MissingContextProviderChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no ContextProvider child for private provider update render/commit traversal",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedContextProviderChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be ContextProvider for private provider update render/commit traversal, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::CompletedChildTagMismatch { expected, actual } => write!(
+                formatter,
+                "private context-provider update render/commit traversal resolved {:?}, but complete-work produced {:?}",
+                expected, actual
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootContextProviderUpdateRenderCommitTraversalError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::ChildPreflight(error) => Some(error.as_ref()),
+            Self::ContextProvider(error) => Some(error),
+            Self::ContextProviderUpdate(error) => Some(error),
+            Self::CompleteWork(error) => Some(error),
+            Self::ProviderStackRestoration(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::ProviderStackUnwindAfterCompleteWorkError { complete_error, .. } => {
+                Some(complete_error.as_ref())
+            }
+            Self::MissingContextProviderChild { .. }
+            | Self::ExpectedContextProviderChild { .. }
+            | Self::CompletedChildTagMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootContextProviderUpdateRenderCommitTraversalError
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderBeginWorkError>
+    for HostRootContextProviderUpdateRenderCommitTraversalError
+{
+    fn from(error: ContextProviderBeginWorkError) -> Self {
+        Self::ContextProvider(error)
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderUpdateLaneGateError>
+    for HostRootContextProviderUpdateRenderCommitTraversalError
+{
+    fn from(error: ContextProviderUpdateLaneGateError) -> Self {
+        Self::ContextProviderUpdate(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootContextProviderUpdateRenderCommitTraversalError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderStackRestorationError>
+    for HostRootContextProviderUpdateRenderCommitTraversalError
+{
+    fn from(error: ContextProviderStackRestorationError) -> Self {
+        Self::ProviderStackRestoration(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootContextProviderUpdateRenderCommitTraversalError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkCommitHandoff(error)
     }
 }
 
@@ -3564,6 +3841,179 @@ fn handoff_completed_context_provider_use_context_child_to_test_complete_work_wi
             complete_work,
         },
     )
+}
+
+#[cfg(test)]
+fn handoff_context_provider_update_to_test_render_commit_traversal(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    request: HostRootContextProviderUseContextPropagationGateRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    HostRootContextProviderUpdateRenderCommitTraversalRecord,
+    HostRootContextProviderUpdateRenderCommitTraversalError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        render.render_lanes(),
+    )?;
+    let provider = validated.child.ok_or(
+        HostRootContextProviderUpdateRenderCommitTraversalError::MissingContextProviderChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootContextProviderUpdateRenderCommitTraversalError::MissingContextProviderChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::ContextProvider {
+        return Err(
+            HostRootContextProviderUpdateRenderCommitTraversalError::ExpectedContextProviderChild {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                child: provider,
+                tag: child_tag,
+            },
+        );
+    }
+
+    let resolver = HostRootTestHostTreeFunctionOutputResolver::new(source);
+    let begin_work = begin_work_context_provider_use_context_single_child_for_complete_traversal(
+        store.fiber_arena_mut(),
+        ContextProviderBeginWorkRequest::new(
+            provider,
+            render.render_lanes(),
+            request.context(),
+            request.previous_value(),
+        ),
+        context_store,
+        invoker,
+        &resolver,
+    )?;
+    let function_component = begin_work.child();
+    let child_element = begin_work.child_element();
+    let expected_child_tag = begin_work.child_tag();
+    let stack_depth_after_begin = context_store.stack_depth();
+
+    let provider_update = record_context_provider_update_single_consumer_lane_gate(
+        store,
+        context_store,
+        begin_work,
+        ContextProviderUpdateSingleConsumerLaneRequest::new(
+            render.root(),
+            render.work_in_progress(),
+            begin_work.provider_snapshot(),
+            begin_work.provider_token(),
+            request.context(),
+            request.previous_value(),
+            request.next_value(),
+            request.propagation_lanes(),
+        ),
+    )?;
+    let stack_depth_after_provider_update = context_store.stack_depth();
+
+    let host_work = mount_test_context_provider_function_component_single_host_child_work_until_provider_complete(
+        store,
+        host,
+        render,
+        provider,
+        function_component,
+        child_element,
+        source,
+    );
+    let host_work = match host_work {
+        Ok(host_work) => host_work,
+        Err(error) => {
+            match unwind_context_provider_for_test(
+                store.fiber_arena_mut(),
+                context_store,
+                begin_work.begin_work(),
+            ) {
+                Ok(_) => {
+                    return Err(
+                        HostRootContextProviderUpdateRenderCommitTraversalError::CompleteWork(
+                            error,
+                        ),
+                    );
+                }
+                Err(unwind_error) => {
+                    return Err(
+                        HostRootContextProviderUpdateRenderCommitTraversalError::ProviderStackUnwindAfterCompleteWorkError {
+                            complete_error: Box::new(error),
+                            unwind_error: Box::new(unwind_error),
+                        },
+                    );
+                }
+            }
+        }
+    };
+    let stack_depth_after_host_child_complete = context_store.stack_depth();
+
+    let provider_complete = complete_context_provider_for_test(
+        store.fiber_arena_mut(),
+        context_store,
+        begin_work.begin_work(),
+    )?;
+    complete_host_root_after_context_provider(store, render.work_in_progress())?;
+    let complete_work = host_root_complete_work_handoff_record_from_context_provider_host_work(
+        store,
+        render,
+        provider,
+        child_element,
+        &host_work,
+    )?;
+    if complete_work.completed_child_tag() != Some(expected_child_tag) {
+        return Err(
+            HostRootContextProviderUpdateRenderCommitTraversalError::CompletedChildTagMismatch {
+                expected: expected_child_tag,
+                actual: complete_work.completed_child_tag(),
+            },
+        );
+    }
+
+    let host_operation_count_after_complete_work = host.operations().len();
+    let pending_finished_work =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending_finished_work),
+        2,
+    )?;
+    let host_operation_count_after_commit = host.operations().len();
+    let placement_apply_diagnostics = finished_work_handoff
+        .commit()
+        .host_root_placement_apply_diagnostics_for_canary();
+
+    Ok(HostRootContextProviderUpdateRenderCommitTraversalRecord {
+        root: render.root(),
+        host_root_work_in_progress: render.work_in_progress(),
+        original_root_element: render.resulting_element(),
+        provider,
+        function_component,
+        begin_work,
+        provider_update,
+        stack_depth_after_begin,
+        stack_depth_after_provider_update,
+        stack_depth_after_host_child_complete,
+        provider_complete,
+        complete_commit: HostRootCompleteWorkCommitHandoffRecord {
+            complete_work,
+            finished_work_handoff,
+            placement_apply_diagnostics,
+            host_operation_count_after_complete_work,
+            host_operation_count_after_commit,
+        },
+    })
 }
 
 #[cfg(test)]
@@ -6978,6 +7428,245 @@ mod tests {
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            host.operations(),
+            vec![
+                "root_host_context",
+                "child_host_context",
+                "should_set_text_content",
+                "create_text_instance",
+                "create_instance",
+                "append_initial_child",
+                "finalize_initial_children",
+            ]
+        );
+    }
+
+    #[test]
+    fn root_work_loop_context_provider_update_lanes_survive_private_render_commit_traversal() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let child_element = source.insert_host_element_with_text("main", "updated provider");
+        let original_root_element = RootElementHandle::from_raw(1_039);
+        let skipped_sync_element = RootElementHandle::from_raw(1_040);
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, original_root_element, None).unwrap();
+        update_container_sync(&mut store, root_id, skipped_sync_element, None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        assert_eq!(render.resulting_element(), original_root_element);
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.skipped_update_count(), 1);
+        assert_eq!(render.remaining_lanes(), Lanes::SYNC);
+
+        let (provider, function_component, component) =
+            attach_context_provider_wip_child(&mut store, render.work_in_progress());
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_041);
+        let previous_value = context_value(child_element.raw());
+        let next_value = context_value(child_element.raw() + 1);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+
+        let record = handoff_context_provider_update_to_test_render_commit_traversal(
+            &mut store,
+            &mut host,
+            render,
+            &source,
+            HostRootContextProviderUseContextPropagationGateRequest::new(
+                context,
+                previous_value,
+                next_value,
+                Lanes::SYNC,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(record.original_root_element(), original_root_element);
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.function_component(), function_component);
+        assert_eq!(record.child_element(), child_element);
+        assert_eq!(record.child_tag(), FiberTag::HostComponent);
+        assert!(record.public_context_compatibility_blocked());
+        assert_eq!(record.stack_depth_after_begin(), 1);
+        assert_eq!(record.stack_depth_after_provider_update(), 1);
+        assert_eq!(record.stack_depth_after_host_child_complete(), 1);
+
+        let begin_work = record.begin_work();
+        assert_eq!(begin_work.provider(), provider);
+        assert_eq!(begin_work.child(), function_component);
+        assert_eq!(begin_work.context(), context);
+        assert_eq!(begin_work.value(), previous_value);
+        assert!(begin_work.provider_token().is_some());
+        assert_eq!(begin_work.pushed_stack_depth(), 1);
+        assert_eq!(begin_work.child_context_read_count(), 1);
+        assert_eq!(
+            begin_work.child_output(),
+            FunctionComponentOutputHandle::from_raw(child_element.raw())
+        );
+        let read = begin_work.child_context_read();
+        assert_eq!(read.fiber(), function_component);
+        assert_eq!(read.context(), context);
+        assert_eq!(read.default_value(), default_value);
+        assert_eq!(read.value(), previous_value);
+        assert_eq!(read.active_provider_count(), 1);
+        assert_eq!(registry.reads(), &[read]);
+
+        let provider_update = record.provider_update();
+        assert_eq!(provider_update.root(), root_id);
+        assert_eq!(
+            provider_update.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(provider_update.provider(), provider);
+        assert_eq!(provider_update.consumer(), function_component);
+        assert_eq!(provider_update.context(), context);
+        assert_eq!(provider_update.previous_value(), previous_value);
+        assert_eq!(provider_update.next_value(), next_value);
+        assert_eq!(provider_update.propagation_lanes(), Lanes::SYNC);
+        assert!(provider_update.provider_changed());
+        assert_eq!(provider_update.marked_dependency_count(), 1);
+        assert!(provider_update.public_context_compatibility_blocked());
+        let provider_stack = provider_update.provider_stack_push();
+        assert_eq!(provider_stack.provider(), provider);
+        assert_eq!(
+            provider_stack.provider_snapshot(),
+            begin_work.provider_snapshot()
+        );
+        assert_eq!(provider_stack.provider_token(), begin_work.provider_token());
+        assert_eq!(provider_stack.pushed_stack_depth(), 1);
+
+        let consumer = provider_update.dependent_consumer();
+        assert_eq!(consumer.consumer(), function_component);
+        assert_eq!(consumer.dependency(), read.dependency());
+        assert_eq!(consumer.context(), context);
+        assert_eq!(consumer.memoized_value(), previous_value);
+        assert_eq!(consumer.previous_value(), previous_value);
+        assert_eq!(consumer.next_value(), next_value);
+        assert_eq!(consumer.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(consumer.propagation_lanes(), Lanes::SYNC);
+        assert_eq!(consumer.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(consumer.dependency_lanes(), Lanes::SYNC);
+        assert_eq!(consumer.marked_dependency_count(), 1);
+        assert!(consumer.marked_changed_provider_lanes());
+        assert_eq!(consumer.scanned_dependency_count(), 1);
+        assert_eq!(consumer.root(), root_id);
+        assert_eq!(
+            context_store
+                .context_dependency(read.dependency())
+                .unwrap()
+                .dependency_lanes(),
+            Lanes::SYNC
+        );
+
+        let provider_complete = record.provider_complete();
+        assert_eq!(provider_complete.provider(), provider);
+        assert_eq!(provider_complete.context(), context);
+        assert_eq!(provider_complete.value(), previous_value);
+        assert_eq!(
+            provider_complete.phase(),
+            ContextProviderStackRestorationPhase::Complete
+        );
+        assert_eq!(provider_complete.stack_depth_before_restore(), 1);
+        assert_eq!(provider_complete.restored_stack_depth(), 0);
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+
+        let complete_work = record.complete_work();
+        assert_eq!(complete_work.root_child(), Some(provider));
+        assert_eq!(
+            complete_work.root_child_tag(),
+            Some(FiberTag::ContextProvider)
+        );
+        assert_eq!(complete_work.completed_child_count(), 1);
+        assert_eq!(
+            complete_work.completed_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(complete_work.resulting_element(), child_element);
+
+        let finished_work_handoff = record.finished_work_handoff();
+        let pending_finished_work = finished_work_handoff.pending();
+        let expected_pending_before_commit = Lanes::DEFAULT.merge_lane(Lane::SYNC);
+        assert_eq!(
+            pending_finished_work.pending_lanes_before_commit(),
+            expected_pending_before_commit
+        );
+        assert_eq!(pending_finished_work.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_finished_work.remaining_lanes(), Lanes::SYNC);
+        assert!(finished_work_handoff.consumed_finished_work_record());
+        assert!(finished_work_handoff.mutation_execution_blocked());
+        assert!(finished_work_handoff.public_root_rendering_blocked());
+        assert!(finished_work_handoff.effects_refs_and_hydration_blocked());
+
+        let commit = record.commit();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), render.work_in_progress());
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(commit.remaining_lanes(), Lanes::SYNC);
+        assert_eq!(commit.pending_lanes(), Lanes::SYNC);
+        assert!(commit.has_remaining_work());
+        assert!(commit.mutation_log().is_empty());
+        assert!(commit.mutation_apply_log().is_empty());
+        assert!(record.placement_apply_diagnostics().is_empty());
+        assert!(record.host_operations_unchanged_by_commit());
+
+        let committed_root = store.root(root_id).unwrap();
+        assert_eq!(committed_root.current(), render.work_in_progress());
+        assert_eq!(committed_root.finished_work(), None);
+        assert_eq!(committed_root.finished_lanes(), Lanes::NO);
+        assert_eq!(committed_root.lanes().pending_lanes(), Lanes::SYNC);
+        assert!(
+            store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .lanes()
+                .contains_all(Lanes::SYNC)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(provider)
+                .unwrap()
+                .child_lanes()
+                .contains_all(Lanes::SYNC)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(render.work_in_progress())
+                .unwrap()
+                .child_lanes()
+                .contains_all(Lanes::SYNC)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .dependencies(),
+            DependenciesHandle::NONE
+        );
+        assert!(
+            !store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .flags()
+                .contains_any(FiberFlags::NEEDS_PROPAGATION)
+        );
+        store.fiber_arena().validate_topology().unwrap();
         assert_eq!(
             host.operations(),
             vec![
