@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  findFastReactSchedulerNativeEntryComparison,
+  findFastReactSchedulerNativeEntryObservation,
   findSchedulerNativeEntryDirectCjsProbe,
   findSchedulerNativeEntryObservation,
   findSchedulerNativeEntryResolution,
@@ -11,6 +13,7 @@ import {
 } from "../src/scheduler-native-entry-oracle.mjs";
 import {
   SCHEDULER_NATIVE_ENTRY_DIRECT_CJS_SPECIFIERS,
+  SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET,
   SCHEDULER_NATIVE_ENTRY_NATIVE_FILES,
   SCHEDULER_NATIVE_ENTRY_ORACLE_ARTIFACT_PATH,
   SCHEDULER_NATIVE_ENTRY_PROBE_MODES,
@@ -98,6 +101,10 @@ test("checked scheduler native entry oracle artifact has the expected schema and
     generatedTimestampIncluded: false
   });
   assert.deepEqual(oracle.schedulerTarget, SCHEDULER_NATIVE_ENTRY_TARGET);
+  assert.deepEqual(
+    oracle.fastReactTarget,
+    SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET
+  );
   assert.equal(oracle.packages.scheduler.version, "0.27.0");
   assert.equal(oracle.packages.scheduler.tarball.integrityVerified, true);
   assert.deepEqual(
@@ -136,6 +143,10 @@ test("checked scheduler native entry oracle artifact has the expected schema and
     },
     homepage: "https://react.dev/"
   });
+  assert.equal(
+    oracle.packages.fastReactScheduler.behaviorCompatibilityClaimed,
+    false
+  );
 });
 
 test("scheduler native entry oracle keeps compatibility claims false", () => {
@@ -148,11 +159,11 @@ test("scheduler native entry oracle keeps compatibility claims false", () => {
     nativeUnsupportedRuntimeBehaviorProbed: true,
     nativeRuntimeDelegationProbed: true,
     defaultEntrypointRelationshipProbed: true,
-    fastReactComparedToScheduler: false
+    fastReactComparedToScheduler: true
   });
   assert.deepEqual(oracle.conformanceClaims, {
     realSchedulerBehaviorProbed: true,
-    fastReactComparedToScheduler: false,
+    fastReactComparedToScheduler: true,
     fastReactBehaviorCompatible: false,
     fullDualRunOracleExists: false,
     compatibilityClaimed: false
@@ -166,8 +177,15 @@ test("scheduler native entry oracle keeps compatibility claims false", () => {
     unsupportedPriorityContextHelpers: true,
     nativeRuntimeSchedulerDelegation: true,
     defaultEntrypointRelationship: true,
-    directNativeCjsRequire: true
+    directNativeCjsRequire: true,
+    localPackageMetadataExcludedFromBehaviorComparison: true
   });
+  assert.deepEqual(
+    oracle.implementationComparison.afterWorker126.statusCounts,
+    {
+      "matched-but-compatibility-not-claimed": 14
+    }
+  );
 });
 
 test("scheduler native entry oracle covers every scenario in every probe mode", () => {
@@ -199,6 +217,14 @@ test("scheduler native entry oracle covers every scenario in every probe mode", 
       );
       assert.equal(observation.scenarioId, scenarioId);
       assert.equal(observation.status, "ok");
+
+      const fastReactObservation = findFastReactSchedulerNativeEntryObservation(
+        oracle,
+        mode.id,
+        scenarioId
+      );
+      assert.equal(fastReactObservation.scenarioId, scenarioId);
+      assert.equal(fastReactObservation.status, "ok");
     }
   }
 });
@@ -446,6 +472,27 @@ test("direct native CJS files are physically loadable with environment-sensitive
           fallbackPriorityConstants()
         );
       }
+    }
+  }
+});
+
+test("Fast React native entry behavior matches checked scheduler native observations", () => {
+  for (const mode of SCHEDULER_NATIVE_ENTRY_PROBE_MODES) {
+    for (const scenarioId of SCHEDULER_NATIVE_ENTRY_SCENARIO_IDS) {
+      const scenarioComparison =
+        findFastReactSchedulerNativeEntryComparison(
+          oracle,
+          mode.id,
+          scenarioId
+        );
+      assert.equal(
+        scenarioComparison.status,
+        "matched-but-compatibility-not-claimed"
+      );
+      assert.equal(scenarioComparison.compatibilityClaimed, false);
+      assert.equal(scenarioComparison.firstDifferencePath, null);
+      assert.equal(scenarioComparison.schedulerStatus, "ok");
+      assert.equal(scenarioComparison.fastReactStatus, "ok");
     }
   }
 });

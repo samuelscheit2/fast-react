@@ -31,14 +31,24 @@
     "nativeUnsupportedRuntimeBehaviorProbed": true,
     "nativeRuntimeDelegationProbed": true,
     "defaultEntrypointRelationshipProbed": true,
-    "fastReactComparedToScheduler": false
+    "fastReactComparedToScheduler": true
   },
   "conformanceClaims": {
     "realSchedulerBehaviorProbed": true,
-    "fastReactComparedToScheduler": false,
+    "fastReactComparedToScheduler": true,
     "fastReactBehaviorCompatible": false,
     "fullDualRunOracleExists": false,
     "compatibilityClaimed": false
+  },
+  "implementationComparison": {
+    "afterWorker126": {
+      "source": "packages/scheduler/index.native.js and cjs/scheduler.native.* are copied under scheduler for native-entry behavior comparison",
+      "generatedProbe": true,
+      "statusCounts": {
+        "matched-but-compatibility-not-claimed": 14
+      },
+      "compatibilityClaimed": false
+    }
   },
   "schedulerTarget": {
     "packageName": "scheduler",
@@ -47,6 +57,13 @@
     "targetStatus": "supporting-package-not-official-react-target",
     "expectedDistIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
     "expectedDistShasum": "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
+  },
+  "fastReactTarget": {
+    "packageName": "scheduler",
+    "sourcePackageName": "scheduler",
+    "version": "0.27.0",
+    "role": "fast-react-local-scheduler-native-entry-implementation",
+    "targetStatus": "local-implementation-under-comparison"
   },
   "probeModes": [
     {
@@ -229,6 +246,14 @@
         },
         "homepage": "https://react.dev/"
       }
+    },
+    "fastReactScheduler": {
+      "packageName": "scheduler",
+      "sourcePackageName": "scheduler",
+      "version": "0.27.0",
+      "role": "fast-react-local-scheduler-native-entry-implementation",
+      "source": "local packages/scheduler copied for behavior comparison",
+      "behaviorCompatibilityClaimed": false
     }
   },
   "coverage": {
@@ -240,12 +265,14 @@
     "unsupportedPriorityContextHelpers": true,
     "nativeRuntimeSchedulerDelegation": true,
     "defaultEntrypointRelationship": true,
-    "directNativeCjsRequire": true
+    "directNativeCjsRequire": true,
+    "localPackageMetadataExcludedFromBehaviorComparison": true
   },
   "intentionalGaps": [
-    "This oracle does not compare Fast React to scheduler because native scheduler implementation work is out of scope.",
+    "The local scheduler package metadata intentionally remains workspace-specific and is excluded from scheduler/index.native behavior comparisons.",
     "This oracle runs in Node child processes with controlled globals; it does not claim React Native host integration compatibility.",
-    "Timing assertions are restricted to deterministic logical values and task object fields, not wall-clock latency."
+    "Timing assertions are restricted to deterministic logical values and task object fields, not wall-clock latency.",
+    "This oracle covers only scheduler/index.native and direct native CJS behavior; root scheduler, mock scheduler, post-task scheduler, reconciler lane scheduling, and renderer integration remain separate compatibility surfaces."
   ],
   "observations": {
     "node-development": {
@@ -3846,6 +3873,3744 @@
           "node_modules/scheduler/cjs/scheduler.native.production.js"
         ],
         "consoleCalls": []
+      }
+    }
+  },
+  "fastReactObservations": {
+    "node-development": {
+      "nativeFileSurface": {
+        "scenarioId": "native-file-surface",
+        "status": "ok",
+        "packageJson": {
+          "name": "scheduler",
+          "version": "0.27.0",
+          "description": "Scheduler compatibility package placeholder for Fast React.",
+          "main": null,
+          "type": null,
+          "exports": null,
+          "browser": null,
+          "reactNative": null,
+          "files": null,
+          "dependencies": null,
+          "peerDependencies": null,
+          "engines": {
+            "node": ">=26.0.0"
+          },
+          "license": "MIT",
+          "repository": null,
+          "bugs": null,
+          "homepage": null
+        },
+        "nativeConditionFields": {
+          "exports": null,
+          "main": null,
+          "type": null,
+          "browser": null,
+          "reactNative": null
+        },
+        "resolution": [
+          {
+            "specifier": "scheduler",
+            "status": "ok",
+            "path": "node_modules/scheduler/index.js"
+          },
+          {
+            "specifier": "scheduler/index.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/index.js"
+          },
+          {
+            "specifier": "scheduler/index.native.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/index.native.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.development.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.development.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.production.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.production.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.native.development.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.native.development.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.native.production.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.native.production.js"
+          },
+          {
+            "specifier": "scheduler/package.json",
+            "status": "ok",
+            "path": "node_modules/scheduler/package.json"
+          }
+        ],
+        "consoleCalls": []
+      },
+      "nativeEntryLoading": {
+        "scenarioId": "native-entry-loading",
+        "status": "ok",
+        "beforeFiles": [],
+        "afterFiles": [
+          "node_modules/scheduler/cjs/scheduler.native.development.js",
+          "node_modules/scheduler/index.native.js"
+        ],
+        "selectedNativeCjsFile": "node_modules/scheduler/cjs/scheduler.native.development.js",
+        "module": {
+          "status": "ok",
+          "exportKeys": [
+            "unstable_IdlePriority",
+            "unstable_ImmediatePriority",
+            "unstable_LowPriority",
+            "unstable_NormalPriority",
+            "unstable_Profiling",
+            "unstable_UserBlockingPriority",
+            "unstable_cancelCallback",
+            "unstable_forceFrameRate",
+            "unstable_getCurrentPriorityLevel",
+            "unstable_next",
+            "unstable_now",
+            "unstable_requestPaint",
+            "unstable_runWithPriority",
+            "unstable_scheduleCallback",
+            "unstable_shouldYield",
+            "unstable_wrapCallback"
+          ],
+          "priorityConstants": {
+            "unstable_ImmediatePriority": 1,
+            "unstable_UserBlockingPriority": 2,
+            "unstable_NormalPriority": 3,
+            "unstable_LowPriority": 4,
+            "unstable_IdlePriority": 5,
+            "unstable_Profiling": null
+          },
+          "exportDetails": [
+            {
+              "key": "unstable_IdlePriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 5
+                }
+              }
+            },
+            {
+              "key": "unstable_ImmediatePriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "key": "unstable_LowPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 4
+                }
+              }
+            },
+            {
+              "key": "unstable_NormalPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 3
+                }
+              }
+            },
+            {
+              "key": "unstable_Profiling",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "null"
+                }
+              }
+            },
+            {
+              "key": "unstable_UserBlockingPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "key": "unstable_cancelCallback",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "unstable_cancelCallback$1",
+                  "length": 1
+                }
+              }
+            },
+            {
+              "key": "unstable_forceFrameRate",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_getCurrentPriorityLevel",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "unstable_getCurrentPriorityLevel$1",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_next",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_now",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "getCurrentTime",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_requestPaint",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "requestPaint",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_runWithPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_scheduleCallback",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "unstable_scheduleCallback$1",
+                  "length": 3
+                }
+              }
+            },
+            {
+              "key": "unstable_shouldYield",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "shouldYieldToHost",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_wrapCallback",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            }
+          ]
+        },
+        "priorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "consoleCalls": []
+      },
+      "nativeExportDescriptors": {
+        "scenarioId": "native-export-descriptors",
+        "status": "ok",
+        "expectedNativeExportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "exportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "ownKeys": [
+          {
+            "type": "string",
+            "value": "unstable_IdlePriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_ImmediatePriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_LowPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_NormalPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_Profiling"
+          },
+          {
+            "type": "string",
+            "value": "unstable_UserBlockingPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_cancelCallback"
+          },
+          {
+            "type": "string",
+            "value": "unstable_forceFrameRate"
+          },
+          {
+            "type": "string",
+            "value": "unstable_getCurrentPriorityLevel"
+          },
+          {
+            "type": "string",
+            "value": "unstable_next"
+          },
+          {
+            "type": "string",
+            "value": "unstable_now"
+          },
+          {
+            "type": "string",
+            "value": "unstable_requestPaint"
+          },
+          {
+            "type": "string",
+            "value": "unstable_runWithPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_scheduleCallback"
+          },
+          {
+            "type": "string",
+            "value": "unstable_shouldYield"
+          },
+          {
+            "type": "string",
+            "value": "unstable_wrapCallback"
+          }
+        ],
+        "constants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "unstableNoPriority": {
+          "hasIn": false,
+          "hasOwn": false
+        },
+        "descriptors": [
+          {
+            "key": "unstable_IdlePriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 5
+              }
+            }
+          },
+          {
+            "key": "unstable_ImmediatePriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          },
+          {
+            "key": "unstable_LowPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 4
+              }
+            }
+          },
+          {
+            "key": "unstable_NormalPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 3
+              }
+            }
+          },
+          {
+            "key": "unstable_Profiling",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "key": "unstable_UserBlockingPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 2
+              }
+            }
+          },
+          {
+            "key": "unstable_cancelCallback",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "unstable_cancelCallback$1",
+                "length": 1
+              }
+            }
+          },
+          {
+            "key": "unstable_forceFrameRate",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_getCurrentPriorityLevel",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "unstable_getCurrentPriorityLevel$1",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_next",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_now",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "getCurrentTime",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_requestPaint",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "requestPaint",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_runWithPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_scheduleCallback",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "unstable_scheduleCallback$1",
+                "length": 3
+              }
+            }
+          },
+          {
+            "key": "unstable_shouldYield",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "shouldYieldToHost",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_wrapCallback",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          }
+        ],
+        "functionExports": [
+          {
+            "key": "unstable_cancelCallback",
+            "value": {
+              "type": "function",
+              "name": "unstable_cancelCallback$1",
+              "length": 1
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_forceFrameRate",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_getCurrentPriorityLevel",
+            "value": {
+              "type": "function",
+              "name": "unstable_getCurrentPriorityLevel$1",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_next",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_now",
+            "value": {
+              "type": "function",
+              "name": "getCurrentTime",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_requestPaint",
+            "value": {
+              "type": "function",
+              "name": "requestPaint",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_runWithPriority",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_scheduleCallback",
+            "value": {
+              "type": "function",
+              "name": "unstable_scheduleCallback$1",
+              "length": 3
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_shouldYield",
+            "value": {
+              "type": "function",
+              "name": "shouldYieldToHost",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_wrapCallback",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          }
+        ],
+        "consoleCalls": []
+      },
+      "nativeFallbackRuntime": {
+        "scenarioId": "native-fallback-runtime",
+        "status": "ok",
+        "exportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "priorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "nowInitial": 0,
+        "currentPriority": 3,
+        "shouldYield": {
+          "beforePaint": false,
+          "requestPaint": {
+            "type": "undefined"
+          },
+          "afterPaint": true
+        },
+        "scheduledTask": {
+          "beforeCancel": {
+            "ownKeys": [
+              "id",
+              "callback",
+              "priorityLevel",
+              "startTime",
+              "expirationTime",
+              "sortIndex"
+            ],
+            "id": 1,
+            "callback": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "priorityLevel": 3,
+            "startTime": 0,
+            "expirationTime": 5000,
+            "sortIndex": 5000
+          },
+          "afterCancel": {
+            "ownKeys": [
+              "id",
+              "callback",
+              "priorityLevel",
+              "startTime",
+              "expirationTime",
+              "sortIndex"
+            ],
+            "id": 1,
+            "callback": {
+              "type": "null"
+            },
+            "priorityLevel": 3,
+            "startTime": 0,
+            "expirationTime": 5000,
+            "sortIndex": 5000
+          }
+        },
+        "throwers": {
+          "unstable_runWithPriority": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_next": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_wrapCallback": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_forceFrameRate": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          }
+        },
+        "hostEvents": [
+          [
+            "setImmediate",
+            1,
+            {
+              "type": "function",
+              "name": "performWorkUntilDeadline",
+              "length": 0
+            }
+          ]
+        ],
+        "consoleCalls": []
+      },
+      "nativeRuntimeDelegation": {
+        "scenarioId": "native-runtime-delegation",
+        "status": "ok",
+        "exportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "priorityConstants": {
+          "unstable_ImmediatePriority": 11,
+          "unstable_UserBlockingPriority": 12,
+          "unstable_NormalPriority": 13,
+          "unstable_LowPriority": 14,
+          "unstable_IdlePriority": 15,
+          "unstable_Profiling": null
+        },
+        "scheduledTask": {
+          "nativeTask": true,
+          "priority": 12,
+          "delay": 4
+        },
+        "currentPriority": 13,
+        "shouldYield": "native-should-yield",
+        "now": 123,
+        "requestPaint": {
+          "type": "string",
+          "value": "native-request-paint"
+        },
+        "throwers": {
+          "unstable_runWithPriority": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_next": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_wrapCallback": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_forceFrameRate": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          }
+        },
+        "nativeRuntimeEvents": [
+          [
+            "schedule",
+            12,
+            {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            4
+          ],
+          [
+            "cancel",
+            true,
+            12,
+            4
+          ],
+          [
+            "getCurrentPriorityLevel"
+          ],
+          [
+            "shouldYield"
+          ],
+          [
+            "now"
+          ],
+          [
+            "requestPaint"
+          ]
+        ],
+        "fallbackHostEvents": [],
+        "consoleCalls": []
+      },
+      "nativeDefaultRelationship": {
+        "scenarioId": "native-default-relationship",
+        "status": "ok",
+        "defaultExportKeys": [
+          "unstable_now",
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "nativeExportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "sortedExportNameSetsEqual": true,
+        "exactExportOrderEqual": false,
+        "defaultOnlyExportKeys": [],
+        "nativeOnlyExportKeys": [],
+        "moduleIdentitySame": false,
+        "priorityConstantsEqual": true,
+        "defaultPriorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "nativePriorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "functionIdentityEqual": [
+          {
+            "key": "unstable_cancelCallback",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "unstable_cancelCallback$1",
+              "length": 1
+            }
+          },
+          {
+            "key": "unstable_forceFrameRate",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_getCurrentPriorityLevel",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "unstable_getCurrentPriorityLevel$1",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_next",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_now",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "getCurrentTime",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_requestPaint",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "requestPaint",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_runWithPriority",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 2
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_scheduleCallback",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 3
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "unstable_scheduleCallback$1",
+              "length": 3
+            }
+          },
+          {
+            "key": "unstable_shouldYield",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "shouldYieldToHost",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "shouldYieldToHost",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_wrapCallback",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          }
+        ],
+        "defaultPriorityHelpers": {
+          "runWithPriorityUserBlocking": {
+            "status": "ok",
+            "value": {
+              "type": "number",
+              "value": 2
+            }
+          },
+          "nextInsideImmediate": {
+            "status": "ok",
+            "value": {
+              "type": "number",
+              "value": 3
+            }
+          },
+          "wrapCallbackCapturedPriority": {
+            "status": "ok",
+            "value": {
+              "type": "number",
+              "value": 2
+            }
+          },
+          "forceFrameRate": {
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          }
+        },
+        "nativePriorityHelpers": {
+          "unstable_runWithPriority": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_next": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_wrapCallback": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_forceFrameRate": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          }
+        },
+        "loadedFiles": [
+          "node_modules/scheduler/cjs/scheduler.development.js",
+          "node_modules/scheduler/cjs/scheduler.native.development.js",
+          "node_modules/scheduler/index.js",
+          "node_modules/scheduler/index.native.js"
+        ],
+        "consoleCalls": []
+      },
+      "directNativeCjsLoading": {
+        "scenarioId": "direct-native-cjs-loading",
+        "status": "ok",
+        "probes": [
+          {
+            "specifier": "scheduler/cjs/scheduler.native.development.js",
+            "requireResolve": {
+              "specifier": "scheduler/cjs/scheduler.native.development.js",
+              "status": "ok",
+              "path": "node_modules/scheduler/cjs/scheduler.native.development.js"
+            },
+            "require": {
+              "status": "ok",
+              "exportKeys": [
+                "unstable_IdlePriority",
+                "unstable_ImmediatePriority",
+                "unstable_LowPriority",
+                "unstable_NormalPriority",
+                "unstable_Profiling",
+                "unstable_UserBlockingPriority",
+                "unstable_cancelCallback",
+                "unstable_forceFrameRate",
+                "unstable_getCurrentPriorityLevel",
+                "unstable_next",
+                "unstable_now",
+                "unstable_requestPaint",
+                "unstable_runWithPriority",
+                "unstable_scheduleCallback",
+                "unstable_shouldYield",
+                "unstable_wrapCallback"
+              ],
+              "priorityConstants": {
+                "unstable_ImmediatePriority": 1,
+                "unstable_UserBlockingPriority": 2,
+                "unstable_NormalPriority": 3,
+                "unstable_LowPriority": 4,
+                "unstable_IdlePriority": 5,
+                "unstable_Profiling": null
+              },
+              "exportDetails": [
+                {
+                  "key": "unstable_IdlePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 5
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_ImmediatePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_LowPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 4
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_NormalPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_Profiling",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "null"
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_UserBlockingPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_cancelCallback$1",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_getCurrentPriorityLevel$1",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_next",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_now",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "getCurrentTime",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "requestPaint",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_scheduleCallback$1",
+                      "length": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "shouldYieldToHost",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.native.production.js",
+            "requireResolve": {
+              "specifier": "scheduler/cjs/scheduler.native.production.js",
+              "status": "ok",
+              "path": "node_modules/scheduler/cjs/scheduler.native.production.js"
+            },
+            "require": {
+              "status": "ok",
+              "exportKeys": [
+                "unstable_IdlePriority",
+                "unstable_ImmediatePriority",
+                "unstable_LowPriority",
+                "unstable_NormalPriority",
+                "unstable_Profiling",
+                "unstable_UserBlockingPriority",
+                "unstable_cancelCallback",
+                "unstable_forceFrameRate",
+                "unstable_getCurrentPriorityLevel",
+                "unstable_next",
+                "unstable_now",
+                "unstable_requestPaint",
+                "unstable_runWithPriority",
+                "unstable_scheduleCallback",
+                "unstable_shouldYield",
+                "unstable_wrapCallback"
+              ],
+              "priorityConstants": {
+                "unstable_ImmediatePriority": 1,
+                "unstable_UserBlockingPriority": 2,
+                "unstable_NormalPriority": 3,
+                "unstable_LowPriority": 4,
+                "unstable_IdlePriority": 5,
+                "unstable_Profiling": null
+              },
+              "exportDetails": [
+                {
+                  "key": "unstable_IdlePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 5
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_ImmediatePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_LowPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 4
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_NormalPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_Profiling",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "null"
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_UserBlockingPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_cancelCallback$1",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_getCurrentPriorityLevel$1",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_next",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_now",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "getCurrentTime",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "requestPaint",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_scheduleCallback$1",
+                      "length": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "shouldYieldToHost",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "loadedFiles": [
+          "node_modules/scheduler/cjs/scheduler.native.development.js",
+          "node_modules/scheduler/cjs/scheduler.native.production.js"
+        ],
+        "consoleCalls": []
+      }
+    },
+    "node-production": {
+      "nativeFileSurface": {
+        "scenarioId": "native-file-surface",
+        "status": "ok",
+        "packageJson": {
+          "name": "scheduler",
+          "version": "0.27.0",
+          "description": "Scheduler compatibility package placeholder for Fast React.",
+          "main": null,
+          "type": null,
+          "exports": null,
+          "browser": null,
+          "reactNative": null,
+          "files": null,
+          "dependencies": null,
+          "peerDependencies": null,
+          "engines": {
+            "node": ">=26.0.0"
+          },
+          "license": "MIT",
+          "repository": null,
+          "bugs": null,
+          "homepage": null
+        },
+        "nativeConditionFields": {
+          "exports": null,
+          "main": null,
+          "type": null,
+          "browser": null,
+          "reactNative": null
+        },
+        "resolution": [
+          {
+            "specifier": "scheduler",
+            "status": "ok",
+            "path": "node_modules/scheduler/index.js"
+          },
+          {
+            "specifier": "scheduler/index.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/index.js"
+          },
+          {
+            "specifier": "scheduler/index.native.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/index.native.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.development.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.development.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.production.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.production.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.native.development.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.native.development.js"
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.native.production.js",
+            "status": "ok",
+            "path": "node_modules/scheduler/cjs/scheduler.native.production.js"
+          },
+          {
+            "specifier": "scheduler/package.json",
+            "status": "ok",
+            "path": "node_modules/scheduler/package.json"
+          }
+        ],
+        "consoleCalls": []
+      },
+      "nativeEntryLoading": {
+        "scenarioId": "native-entry-loading",
+        "status": "ok",
+        "beforeFiles": [],
+        "afterFiles": [
+          "node_modules/scheduler/cjs/scheduler.native.production.js",
+          "node_modules/scheduler/index.native.js"
+        ],
+        "selectedNativeCjsFile": "node_modules/scheduler/cjs/scheduler.native.production.js",
+        "module": {
+          "status": "ok",
+          "exportKeys": [
+            "unstable_IdlePriority",
+            "unstable_ImmediatePriority",
+            "unstable_LowPriority",
+            "unstable_NormalPriority",
+            "unstable_Profiling",
+            "unstable_UserBlockingPriority",
+            "unstable_cancelCallback",
+            "unstable_forceFrameRate",
+            "unstable_getCurrentPriorityLevel",
+            "unstable_next",
+            "unstable_now",
+            "unstable_requestPaint",
+            "unstable_runWithPriority",
+            "unstable_scheduleCallback",
+            "unstable_shouldYield",
+            "unstable_wrapCallback"
+          ],
+          "priorityConstants": {
+            "unstable_ImmediatePriority": 1,
+            "unstable_UserBlockingPriority": 2,
+            "unstable_NormalPriority": 3,
+            "unstable_LowPriority": 4,
+            "unstable_IdlePriority": 5,
+            "unstable_Profiling": null
+          },
+          "exportDetails": [
+            {
+              "key": "unstable_IdlePriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 5
+                }
+              }
+            },
+            {
+              "key": "unstable_ImmediatePriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "key": "unstable_LowPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 4
+                }
+              }
+            },
+            {
+              "key": "unstable_NormalPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 3
+                }
+              }
+            },
+            {
+              "key": "unstable_Profiling",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "null"
+                }
+              }
+            },
+            {
+              "key": "unstable_UserBlockingPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "number",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "key": "unstable_cancelCallback",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "unstable_cancelCallback$1",
+                  "length": 1
+                }
+              }
+            },
+            {
+              "key": "unstable_forceFrameRate",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_getCurrentPriorityLevel",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "unstable_getCurrentPriorityLevel$1",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_next",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_now",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "getCurrentTime",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_requestPaint",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "requestPaint",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_runWithPriority",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_scheduleCallback",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "unstable_scheduleCallback$1",
+                  "length": 3
+                }
+              }
+            },
+            {
+              "key": "unstable_shouldYield",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "shouldYieldToHost",
+                  "length": 0
+                }
+              }
+            },
+            {
+              "key": "unstable_wrapCallback",
+              "descriptor": {
+                "kind": "data",
+                "configurable": true,
+                "enumerable": true,
+                "writable": true,
+                "value": {
+                  "type": "function",
+                  "name": "throwNotImplemented",
+                  "length": 0
+                }
+              }
+            }
+          ]
+        },
+        "priorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "consoleCalls": []
+      },
+      "nativeExportDescriptors": {
+        "scenarioId": "native-export-descriptors",
+        "status": "ok",
+        "expectedNativeExportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "exportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "ownKeys": [
+          {
+            "type": "string",
+            "value": "unstable_IdlePriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_ImmediatePriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_LowPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_NormalPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_Profiling"
+          },
+          {
+            "type": "string",
+            "value": "unstable_UserBlockingPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_cancelCallback"
+          },
+          {
+            "type": "string",
+            "value": "unstable_forceFrameRate"
+          },
+          {
+            "type": "string",
+            "value": "unstable_getCurrentPriorityLevel"
+          },
+          {
+            "type": "string",
+            "value": "unstable_next"
+          },
+          {
+            "type": "string",
+            "value": "unstable_now"
+          },
+          {
+            "type": "string",
+            "value": "unstable_requestPaint"
+          },
+          {
+            "type": "string",
+            "value": "unstable_runWithPriority"
+          },
+          {
+            "type": "string",
+            "value": "unstable_scheduleCallback"
+          },
+          {
+            "type": "string",
+            "value": "unstable_shouldYield"
+          },
+          {
+            "type": "string",
+            "value": "unstable_wrapCallback"
+          }
+        ],
+        "constants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "unstableNoPriority": {
+          "hasIn": false,
+          "hasOwn": false
+        },
+        "descriptors": [
+          {
+            "key": "unstable_IdlePriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 5
+              }
+            }
+          },
+          {
+            "key": "unstable_ImmediatePriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          },
+          {
+            "key": "unstable_LowPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 4
+              }
+            }
+          },
+          {
+            "key": "unstable_NormalPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 3
+              }
+            }
+          },
+          {
+            "key": "unstable_Profiling",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "key": "unstable_UserBlockingPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "number",
+                "value": 2
+              }
+            }
+          },
+          {
+            "key": "unstable_cancelCallback",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "unstable_cancelCallback$1",
+                "length": 1
+              }
+            }
+          },
+          {
+            "key": "unstable_forceFrameRate",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_getCurrentPriorityLevel",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "unstable_getCurrentPriorityLevel$1",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_next",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_now",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "getCurrentTime",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_requestPaint",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "requestPaint",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_runWithPriority",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_scheduleCallback",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "unstable_scheduleCallback$1",
+                "length": 3
+              }
+            }
+          },
+          {
+            "key": "unstable_shouldYield",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "shouldYieldToHost",
+                "length": 0
+              }
+            }
+          },
+          {
+            "key": "unstable_wrapCallback",
+            "descriptor": {
+              "kind": "data",
+              "configurable": true,
+              "enumerable": true,
+              "writable": true,
+              "value": {
+                "type": "function",
+                "name": "throwNotImplemented",
+                "length": 0
+              }
+            }
+          }
+        ],
+        "functionExports": [
+          {
+            "key": "unstable_cancelCallback",
+            "value": {
+              "type": "function",
+              "name": "unstable_cancelCallback$1",
+              "length": 1
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_forceFrameRate",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_getCurrentPriorityLevel",
+            "value": {
+              "type": "function",
+              "name": "unstable_getCurrentPriorityLevel$1",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_next",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_now",
+            "value": {
+              "type": "function",
+              "name": "getCurrentTime",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_requestPaint",
+            "value": {
+              "type": "function",
+              "name": "requestPaint",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_runWithPriority",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_scheduleCallback",
+            "value": {
+              "type": "function",
+              "name": "unstable_scheduleCallback$1",
+              "length": 3
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_shouldYield",
+            "value": {
+              "type": "function",
+              "name": "shouldYieldToHost",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          },
+          {
+            "key": "unstable_wrapCallback",
+            "value": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            },
+            "ownKeys": [
+              {
+                "type": "string",
+                "value": "length"
+              },
+              {
+                "type": "string",
+                "value": "name"
+              },
+              {
+                "type": "string",
+                "value": "prototype"
+              }
+            ]
+          }
+        ],
+        "consoleCalls": []
+      },
+      "nativeFallbackRuntime": {
+        "scenarioId": "native-fallback-runtime",
+        "status": "ok",
+        "exportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "priorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "nowInitial": 0,
+        "currentPriority": 3,
+        "shouldYield": {
+          "beforePaint": false,
+          "requestPaint": {
+            "type": "undefined"
+          },
+          "afterPaint": true
+        },
+        "scheduledTask": {
+          "beforeCancel": {
+            "ownKeys": [
+              "id",
+              "callback",
+              "priorityLevel",
+              "startTime",
+              "expirationTime",
+              "sortIndex"
+            ],
+            "id": 1,
+            "callback": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "priorityLevel": 3,
+            "startTime": 0,
+            "expirationTime": 5000,
+            "sortIndex": 5000
+          },
+          "afterCancel": {
+            "ownKeys": [
+              "id",
+              "callback",
+              "priorityLevel",
+              "startTime",
+              "expirationTime",
+              "sortIndex"
+            ],
+            "id": 1,
+            "callback": {
+              "type": "null"
+            },
+            "priorityLevel": 3,
+            "startTime": 0,
+            "expirationTime": 5000,
+            "sortIndex": 5000
+          }
+        },
+        "throwers": {
+          "unstable_runWithPriority": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_next": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_wrapCallback": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_forceFrameRate": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          }
+        },
+        "hostEvents": [
+          [
+            "setImmediate",
+            1,
+            {
+              "type": "function",
+              "name": "performWorkUntilDeadline",
+              "length": 0
+            }
+          ]
+        ],
+        "consoleCalls": []
+      },
+      "nativeRuntimeDelegation": {
+        "scenarioId": "native-runtime-delegation",
+        "status": "ok",
+        "exportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "priorityConstants": {
+          "unstable_ImmediatePriority": 11,
+          "unstable_UserBlockingPriority": 12,
+          "unstable_NormalPriority": 13,
+          "unstable_LowPriority": 14,
+          "unstable_IdlePriority": 15,
+          "unstable_Profiling": null
+        },
+        "scheduledTask": {
+          "nativeTask": true,
+          "priority": 12,
+          "delay": 4
+        },
+        "currentPriority": 13,
+        "shouldYield": "native-should-yield",
+        "now": 123,
+        "requestPaint": {
+          "type": "string",
+          "value": "native-request-paint"
+        },
+        "throwers": {
+          "unstable_runWithPriority": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_next": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_wrapCallback": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_forceFrameRate": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          }
+        },
+        "nativeRuntimeEvents": [
+          [
+            "schedule",
+            12,
+            {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            4
+          ],
+          [
+            "cancel",
+            true,
+            12,
+            4
+          ],
+          [
+            "getCurrentPriorityLevel"
+          ],
+          [
+            "shouldYield"
+          ],
+          [
+            "now"
+          ],
+          [
+            "requestPaint"
+          ]
+        ],
+        "fallbackHostEvents": [],
+        "consoleCalls": []
+      },
+      "nativeDefaultRelationship": {
+        "scenarioId": "native-default-relationship",
+        "status": "ok",
+        "defaultExportKeys": [
+          "unstable_now",
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "nativeExportKeys": [
+          "unstable_IdlePriority",
+          "unstable_ImmediatePriority",
+          "unstable_LowPriority",
+          "unstable_NormalPriority",
+          "unstable_Profiling",
+          "unstable_UserBlockingPriority",
+          "unstable_cancelCallback",
+          "unstable_forceFrameRate",
+          "unstable_getCurrentPriorityLevel",
+          "unstable_next",
+          "unstable_now",
+          "unstable_requestPaint",
+          "unstable_runWithPriority",
+          "unstable_scheduleCallback",
+          "unstable_shouldYield",
+          "unstable_wrapCallback"
+        ],
+        "sortedExportNameSetsEqual": true,
+        "exactExportOrderEqual": false,
+        "defaultOnlyExportKeys": [],
+        "nativeOnlyExportKeys": [],
+        "moduleIdentitySame": false,
+        "priorityConstantsEqual": true,
+        "defaultPriorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "nativePriorityConstants": {
+          "unstable_ImmediatePriority": 1,
+          "unstable_UserBlockingPriority": 2,
+          "unstable_NormalPriority": 3,
+          "unstable_LowPriority": 4,
+          "unstable_IdlePriority": 5,
+          "unstable_Profiling": null
+        },
+        "functionIdentityEqual": [
+          {
+            "key": "unstable_cancelCallback",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "unstable_cancelCallback$1",
+              "length": 1
+            }
+          },
+          {
+            "key": "unstable_forceFrameRate",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_getCurrentPriorityLevel",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "unstable_getCurrentPriorityLevel$1",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_next",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_now",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "getCurrentTime",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_requestPaint",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "requestPaint",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_runWithPriority",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 2
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_scheduleCallback",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 3
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "unstable_scheduleCallback$1",
+              "length": 3
+            }
+          },
+          {
+            "key": "unstable_shouldYield",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "shouldYieldToHost",
+              "length": 0
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "shouldYieldToHost",
+              "length": 0
+            }
+          },
+          {
+            "key": "unstable_wrapCallback",
+            "sameIdentity": false,
+            "defaultValue": {
+              "type": "function",
+              "name": "",
+              "length": 1
+            },
+            "nativeValue": {
+              "type": "function",
+              "name": "throwNotImplemented",
+              "length": 0
+            }
+          }
+        ],
+        "defaultPriorityHelpers": {
+          "runWithPriorityUserBlocking": {
+            "status": "ok",
+            "value": {
+              "type": "number",
+              "value": 2
+            }
+          },
+          "nextInsideImmediate": {
+            "status": "ok",
+            "value": {
+              "type": "number",
+              "value": 3
+            }
+          },
+          "wrapCallbackCapturedPriority": {
+            "status": "ok",
+            "value": {
+              "type": "number",
+              "value": 2
+            }
+          },
+          "forceFrameRate": {
+            "status": "ok",
+            "value": {
+              "type": "undefined"
+            }
+          }
+        },
+        "nativePriorityHelpers": {
+          "unstable_runWithPriority": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_next": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_wrapCallback": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          },
+          "unstable_forceFrameRate": {
+            "status": "throws",
+            "name": "Error",
+            "code": null,
+            "message": "Not implemented."
+          }
+        },
+        "loadedFiles": [
+          "node_modules/scheduler/cjs/scheduler.native.production.js",
+          "node_modules/scheduler/cjs/scheduler.production.js",
+          "node_modules/scheduler/index.js",
+          "node_modules/scheduler/index.native.js"
+        ],
+        "consoleCalls": []
+      },
+      "directNativeCjsLoading": {
+        "scenarioId": "direct-native-cjs-loading",
+        "status": "ok",
+        "probes": [
+          {
+            "specifier": "scheduler/cjs/scheduler.native.development.js",
+            "requireResolve": {
+              "specifier": "scheduler/cjs/scheduler.native.development.js",
+              "status": "ok",
+              "path": "node_modules/scheduler/cjs/scheduler.native.development.js"
+            },
+            "require": {
+              "status": "ok",
+              "exportKeys": [],
+              "priorityConstants": null,
+              "exportDetails": []
+            }
+          },
+          {
+            "specifier": "scheduler/cjs/scheduler.native.production.js",
+            "requireResolve": {
+              "specifier": "scheduler/cjs/scheduler.native.production.js",
+              "status": "ok",
+              "path": "node_modules/scheduler/cjs/scheduler.native.production.js"
+            },
+            "require": {
+              "status": "ok",
+              "exportKeys": [
+                "unstable_IdlePriority",
+                "unstable_ImmediatePriority",
+                "unstable_LowPriority",
+                "unstable_NormalPriority",
+                "unstable_Profiling",
+                "unstable_UserBlockingPriority",
+                "unstable_cancelCallback",
+                "unstable_forceFrameRate",
+                "unstable_getCurrentPriorityLevel",
+                "unstable_next",
+                "unstable_now",
+                "unstable_requestPaint",
+                "unstable_runWithPriority",
+                "unstable_scheduleCallback",
+                "unstable_shouldYield",
+                "unstable_wrapCallback"
+              ],
+              "priorityConstants": {
+                "unstable_ImmediatePriority": 1,
+                "unstable_UserBlockingPriority": 2,
+                "unstable_NormalPriority": 3,
+                "unstable_LowPriority": 4,
+                "unstable_IdlePriority": 5,
+                "unstable_Profiling": null
+              },
+              "exportDetails": [
+                {
+                  "key": "unstable_IdlePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 5
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_ImmediatePriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_LowPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 4
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_NormalPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_Profiling",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "null"
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_UserBlockingPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "number",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_cancelCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_cancelCallback$1",
+                      "length": 1
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_forceFrameRate",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_getCurrentPriorityLevel",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_getCurrentPriorityLevel$1",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_next",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_now",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "getCurrentTime",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_requestPaint",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "requestPaint",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_runWithPriority",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_scheduleCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "unstable_scheduleCallback$1",
+                      "length": 3
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_shouldYield",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "shouldYieldToHost",
+                      "length": 0
+                    }
+                  }
+                },
+                {
+                  "key": "unstable_wrapCallback",
+                  "descriptor": {
+                    "kind": "data",
+                    "configurable": true,
+                    "enumerable": true,
+                    "writable": true,
+                    "value": {
+                      "type": "function",
+                      "name": "throwNotImplemented",
+                      "length": 0
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "loadedFiles": [
+          "node_modules/scheduler/cjs/scheduler.native.development.js",
+          "node_modules/scheduler/cjs/scheduler.native.production.js"
+        ],
+        "consoleCalls": []
+      }
+    }
+  },
+  "fastReactComparisons": {
+    "node-development": {
+      "nativeFileSurface": {
+        "scenarioId": "native-file-surface",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeEntryLoading": {
+        "scenarioId": "native-entry-loading",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeExportDescriptors": {
+        "scenarioId": "native-export-descriptors",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeFallbackRuntime": {
+        "scenarioId": "native-fallback-runtime",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeRuntimeDelegation": {
+        "scenarioId": "native-runtime-delegation",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeDefaultRelationship": {
+        "scenarioId": "native-default-relationship",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "directNativeCjsLoading": {
+        "scenarioId": "direct-native-cjs-loading",
+        "nodeEnv": "development",
+        "condition": "node-development",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      }
+    },
+    "node-production": {
+      "nativeFileSurface": {
+        "scenarioId": "native-file-surface",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeEntryLoading": {
+        "scenarioId": "native-entry-loading",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeExportDescriptors": {
+        "scenarioId": "native-export-descriptors",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeFallbackRuntime": {
+        "scenarioId": "native-fallback-runtime",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeRuntimeDelegation": {
+        "scenarioId": "native-runtime-delegation",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "nativeDefaultRelationship": {
+        "scenarioId": "native-default-relationship",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+      },
+      "directNativeCjsLoading": {
+        "scenarioId": "direct-native-cjs-loading",
+        "nodeEnv": "production",
+        "condition": "node-production",
+        "status": "matched-but-compatibility-not-claimed",
+        "compatibilityClaimed": false,
+        "firstDifferencePath": null,
+        "schedulerStatus": "ok",
+        "fastReactStatus": "ok",
+        "reason": "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
       }
     }
   }

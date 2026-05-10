@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -14,6 +15,7 @@ import { basename, join } from "node:path";
 import { stringifySchedulerNativeEntryOracle } from "./scheduler-native-entry-oracle.mjs";
 import {
   SCHEDULER_NATIVE_ENTRY_DIRECT_CJS_SPECIFIERS,
+  SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET,
   SCHEDULER_NATIVE_ENTRY_PROBE_MODES,
   SCHEDULER_NATIVE_ENTRY_RESOLUTION_SPECIFIERS,
   SCHEDULER_NATIVE_ENTRY_SCENARIOS,
@@ -30,36 +32,73 @@ export async function generateSchedulerNativeEntryOracle() {
   );
 
   try {
-    const projectRoot = join(tempRoot, "project");
-    const nodeModulesRoot = join(projectRoot, "node_modules");
-    mkdirSync(nodeModulesRoot, { recursive: true });
+    const schedulerProjectRoot = join(tempRoot, "scheduler-project");
+    const schedulerNodeModulesRoot = join(schedulerProjectRoot, "node_modules");
+    mkdirSync(schedulerNodeModulesRoot, { recursive: true });
 
     const schedulerEvidence = await fetchAndExtractScheduler({
-      nodeModulesRoot,
+      nodeModulesRoot: schedulerNodeModulesRoot,
       tempRoot
     });
-    const probeFile = writeProbeFile(projectRoot);
+    const schedulerProbeFile = writeProbeFile(schedulerProjectRoot);
+
+    const fastReactProjectRoot = join(tempRoot, "fast-react-project");
+    const fastReactNodeModulesRoot = join(
+      fastReactProjectRoot,
+      "node_modules"
+    );
+    mkdirSync(fastReactNodeModulesRoot, { recursive: true });
+    copyFastReactSchedulerPackage({
+      nodeModulesRoot: fastReactNodeModulesRoot
+    });
+    const fastReactProbeFile = writeProbeFile(fastReactProjectRoot);
+
     const scenarioOptions = {
       resolutionSpecifiers: SCHEDULER_NATIVE_ENTRY_RESOLUTION_SPECIFIERS,
       directCjsSpecifiers: SCHEDULER_NATIVE_ENTRY_DIRECT_CJS_SPECIFIERS
     };
     const observations = {};
+    const fastReactObservations = {};
+    const fastReactComparisons = {};
 
     for (const mode of SCHEDULER_NATIVE_ENTRY_PROBE_MODES) {
       observations[mode.id] = {};
+      fastReactObservations[mode.id] = {};
+      fastReactComparisons[mode.id] = {};
 
       for (const scenario of SCHEDULER_NATIVE_ENTRY_SCENARIOS) {
-        observations[mode.id][scenarioObservationKey(scenario.id)] =
-          runSchedulerNativeEntryProbe({
+        const observationKey = scenarioObservationKey(scenario.id);
+        const schedulerObservation = runSchedulerNativeEntryProbe({
+          mode,
+          packageName: SCHEDULER_NATIVE_ENTRY_TARGET.packageName,
+          probeFile: schedulerProbeFile,
+          projectRoot: schedulerProjectRoot,
+          scenarioId: scenario.id,
+          scenarioOptions
+        });
+        const fastReactObservation = runSchedulerNativeEntryProbe({
+          mode,
+          packageName: SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET.packageName,
+          probeFile: fastReactProbeFile,
+          projectRoot: fastReactProjectRoot,
+          scenarioId: scenario.id,
+          scenarioOptions
+        });
+
+        observations[mode.id][observationKey] = schedulerObservation;
+        fastReactObservations[mode.id][observationKey] = fastReactObservation;
+        fastReactComparisons[mode.id][observationKey] =
+          compareFastReactToScheduler({
+            fastReactObservation,
             mode,
-            packageName: SCHEDULER_NATIVE_ENTRY_TARGET.packageName,
-            probeFile,
-            projectRoot,
             scenarioId: scenario.id,
-            scenarioOptions
+            schedulerObservation
           });
       }
     }
+
+    const fastReactStatusCounts =
+      countComparisonStatuses(fastReactComparisons);
 
     return {
       schemaVersion: 1,
@@ -88,20 +127,39 @@ export async function generateSchedulerNativeEntryOracle() {
         nativeUnsupportedRuntimeBehaviorProbed: true,
         nativeRuntimeDelegationProbed: true,
         defaultEntrypointRelationshipProbed: true,
-        fastReactComparedToScheduler: false
+        fastReactComparedToScheduler: true
       },
       conformanceClaims: {
         realSchedulerBehaviorProbed: true,
-        fastReactComparedToScheduler: false,
+        fastReactComparedToScheduler: true,
         fastReactBehaviorCompatible: false,
         fullDualRunOracleExists: false,
         compatibilityClaimed: false
       },
+      implementationComparison: {
+        afterWorker126: {
+          source:
+            "packages/scheduler/index.native.js and cjs/scheduler.native.* are copied under scheduler for native-entry behavior comparison",
+          generatedProbe: true,
+          statusCounts: fastReactStatusCounts,
+          compatibilityClaimed: false
+        }
+      },
       schedulerTarget: SCHEDULER_NATIVE_ENTRY_TARGET,
+      fastReactTarget: SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET,
       probeModes: SCHEDULER_NATIVE_ENTRY_PROBE_MODES,
       scenarios: SCHEDULER_NATIVE_ENTRY_SCENARIOS,
       packages: {
-        scheduler: schedulerEvidence
+        scheduler: schedulerEvidence,
+        fastReactScheduler: {
+          packageName: SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET.packageName,
+          sourcePackageName:
+            SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET.sourcePackageName,
+          version: SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET.version,
+          role: SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET.role,
+          source: "local packages/scheduler copied for behavior comparison",
+          behaviorCompatibilityClaimed: false
+        }
       },
       coverage: {
         publishedNativeFiles: true,
@@ -112,14 +170,18 @@ export async function generateSchedulerNativeEntryOracle() {
         unsupportedPriorityContextHelpers: true,
         nativeRuntimeSchedulerDelegation: true,
         defaultEntrypointRelationship: true,
-        directNativeCjsRequire: true
+        directNativeCjsRequire: true,
+        localPackageMetadataExcludedFromBehaviorComparison: true
       },
       intentionalGaps: [
-        "This oracle does not compare Fast React to scheduler because native scheduler implementation work is out of scope.",
+        "The local scheduler package metadata intentionally remains workspace-specific and is excluded from scheduler/index.native behavior comparisons.",
         "This oracle runs in Node child processes with controlled globals; it does not claim React Native host integration compatibility.",
-        "Timing assertions are restricted to deterministic logical values and task object fields, not wall-clock latency."
+        "Timing assertions are restricted to deterministic logical values and task object fields, not wall-clock latency.",
+        "This oracle covers only scheduler/index.native and direct native CJS behavior; root scheduler, mock scheduler, post-task scheduler, reconciler lane scheduling, and renderer integration remain separate compatibility surfaces."
       ],
-      observations
+      observations,
+      fastReactObservations,
+      fastReactComparisons
     };
   } finally {
     rmSync(tempRoot, { force: true, recursive: true });
@@ -187,6 +249,19 @@ async function fetchAndExtractScheduler({ nodeModulesRoot, tempRoot }) {
   };
 }
 
+function copyFastReactSchedulerPackage({ nodeModulesRoot }) {
+  const sourceRoot = new URL("../../../packages/scheduler", import.meta.url);
+  const packageRoot = join(
+    nodeModulesRoot,
+    SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET.packageName
+  );
+  cpSync(sourceRoot, packageRoot, {
+    recursive: true,
+    dereference: true,
+    filter: (source) => basename(source) !== "node_modules"
+  });
+}
+
 function writeProbeFile(projectRoot) {
   const probeFile = join(
     projectRoot,
@@ -242,6 +317,138 @@ function runSchedulerNativeEntryProbe({
 
 function normalizeProbeResult(result) {
   return normalizeErrorMessages(result);
+}
+
+function compareFastReactToScheduler({
+  fastReactObservation,
+  mode,
+  scenarioId,
+  schedulerObservation
+}) {
+  const schedulerComparableResult = comparableNativeEntryObservation({
+    observation: schedulerObservation,
+    scenarioId
+  });
+  const fastReactComparableResult = comparableNativeEntryObservation({
+    observation: fastReactObservation,
+    scenarioId
+  });
+  const firstDifferencePath = findFirstDifferencePath(
+    schedulerComparableResult,
+    fastReactComparableResult
+  );
+  const equal = firstDifferencePath === null;
+  const fastReactUnsupported = containsFastReactUnimplemented(
+    fastReactObservation
+  );
+
+  return {
+    scenarioId,
+    nodeEnv: mode.nodeEnv,
+    condition: mode.id,
+    status: fastReactUnsupported
+      ? "unsupported-placeholder"
+      : equal
+        ? "matched-but-compatibility-not-claimed"
+        : "known-mismatch",
+    compatibilityClaimed: false,
+    firstDifferencePath,
+    schedulerStatus: schedulerObservation.status ?? null,
+    fastReactStatus: fastReactObservation.status ?? null,
+    reason: fastReactUnsupported
+      ? "Fast React currently throws structured placeholder errors for this scheduler/index.native behavior."
+      : equal
+        ? "Normalized native-entry behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+        : "Fast React normalized native-entry observation differs from the scheduler@0.27.0 native-entry oracle."
+  };
+}
+
+function comparableNativeEntryObservation({ observation, scenarioId }) {
+  const comparable = cloneJson(observation);
+  if (scenarioId === "native-file-surface") {
+    delete comparable.packageJson;
+  }
+  return comparable;
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function countComparisonStatuses(comparisonsByMode) {
+  const counts = {};
+  for (const comparisons of Object.values(comparisonsByMode)) {
+    for (const comparison of Object.values(comparisons)) {
+      counts[comparison.status] = (counts[comparison.status] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+function containsFastReactUnimplemented(value) {
+  if (Array.isArray(value)) {
+    return value.some(containsFastReactUnimplemented);
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  if (
+    value.name === "FastReactSchedulerUnimplementedError" ||
+    value.name === "FastReactUnimplementedError" ||
+    value.code === "FAST_REACT_UNIMPLEMENTED"
+  ) {
+    return true;
+  }
+
+  return Object.values(value).some(containsFastReactUnimplemented);
+}
+
+function findFirstDifferencePath(left, right, path = "$") {
+  if (Object.is(left, right)) {
+    return null;
+  }
+
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== "object" ||
+    typeof right !== "object"
+  ) {
+    return path;
+  }
+
+  const leftIsArray = Array.isArray(left);
+  const rightIsArray = Array.isArray(right);
+  if (leftIsArray !== rightIsArray) {
+    return path;
+  }
+
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return `${path}.keys`;
+  }
+
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) {
+      return `${path}.keys[${index}]`;
+    }
+  }
+
+  for (const key of leftKeys) {
+    const difference = findFirstDifferencePath(
+      left[key],
+      right[key],
+      `${path}.${key}`
+    );
+    if (difference !== null) {
+      return difference;
+    }
+  }
+
+  return null;
 }
 
 function normalizeErrorMessages(value) {
