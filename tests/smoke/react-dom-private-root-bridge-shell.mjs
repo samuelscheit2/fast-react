@@ -122,6 +122,15 @@ assertPrivateRecordInvariants(second);
   assert.throws(() => otherBridge.updateContainer(record.handle, 'child'), {
     code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
   });
+  assert.throws(() => otherBridge.admitRequest(record), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  assert.throws(() => rootBridge.admitRootBridgeRequestRecord({}), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST'
+  });
+  assert.throws(() => rootBridge.admitRootBridgeRequestRecord(null), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST'
+  });
 }
 
 {
@@ -200,9 +209,13 @@ function createBridgeScenario(label) {
   const callback = function afterRootUpdate() {};
 
   const create = bridge.createClientRoot(container, rootOptions);
+  const createAdmission = bridge.admitRequest(create);
   const update = bridge.renderContainer(create.handle, element, callback);
+  const updateAdmission = bridge.admitRequest(update);
   const unmount = bridge.unmountContainer(create.handle);
+  const unmountAdmission = bridge.admitRequest(unmount);
   const secondUnmount = bridge.unmountContainer(create.handle);
+  const secondUnmountAdmission = bridge.admitRequest(secondUnmount);
 
   assertBridgeDidNotTouchContainer(container);
   assert.equal(rootBridge.getPrivateRootRecordPayload(create).container, container);
@@ -217,6 +230,51 @@ function createBridgeScenario(label) {
     rootBridge.getPrivateRootRecordPayload(secondUnmount).element,
     null
   );
+  assertAdmissionBlocksExecution(createAdmission, {
+    lifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_CREATED,
+    lifecycleStatusBefore: null,
+    lifecycleTransition: 'none->created',
+    operation: 'create',
+    requestId: 'request:1',
+    requestType: 'createRoot',
+    rootId: 'root:1',
+    sequence: 1,
+    updateId: null
+  });
+  assertAdmissionBlocksExecution(updateAdmission, {
+    lifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_RENDERED,
+    lifecycleStatusBefore: rootBridge.ROOT_LIFECYCLE_CREATED,
+    lifecycleTransition: 'created->rendered',
+    operation: 'render',
+    requestId: 'request:2',
+    requestType: 'root.render',
+    rootId: 'root:1',
+    sequence: 1,
+    updateId: 'update:1'
+  });
+  assertAdmissionBlocksExecution(unmountAdmission, {
+    lifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
+    lifecycleStatusBefore: rootBridge.ROOT_LIFECYCLE_RENDERED,
+    lifecycleTransition: 'rendered->unmounted',
+    operation: 'unmount',
+    requestId: 'request:3',
+    requestType: 'root.unmount',
+    rootId: 'root:1',
+    sequence: 2,
+    updateId: 'update:2'
+  });
+  assertAdmissionBlocksExecution(secondUnmountAdmission, {
+    lifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
+    lifecycleStatusBefore: rootBridge.ROOT_LIFECYCLE_UNMOUNTED,
+    lifecycleTransition: 'unmounted->unmounted',
+    operation: 'unmount',
+    requestId: 'request:4',
+    requestType: 'root.unmount',
+    rootId: 'root:1',
+    sequence: 3,
+    updateId: 'update:3'
+  });
+  assertBridgeDidNotTouchContainer(container);
   assert.throws(() => bridge.renderContainer(create.handle, 'after unmount'), {
     code: 'FAST_REACT_DOM_UNMOUNTED_ROOT'
   });
@@ -251,6 +309,11 @@ function assertPrivateRecordInvariants(scenario) {
   assert.equal(create.rootId, 'root:1');
   assert.equal(create.rootKind, rootBridge.CLIENT_ROOT_KIND);
   assert.equal(create.rootTag, rootBridge.CONCURRENT_ROOT_TAG);
+  assert.equal(create.lifecycleStatusBefore, null);
+  assert.equal(
+    create.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_CREATED
+  );
   assert.deepEqual(create.containerInfo, {
     kind: 'object',
     nodeName: 'DIV',
@@ -366,6 +429,69 @@ function assertPrivateRecordInvariants(scenario) {
   assert.equal(secondUnmount.noOp, true);
   assert.equal(secondUnmount.sync, false);
   assert.deepEqual(secondUnmount.elementInfo, {type: 'null'});
+}
+
+function assertAdmissionBlocksExecution(admission, expected) {
+  assert.equal(Object.isFrozen(admission), true);
+  assert.equal(Object.isFrozen(admission.lifecyclePrerequisites), true);
+  assert.equal(Object.isFrozen(admission.blockedCapabilities), true);
+  assert.equal(admission.$$typeof, rootBridge.privateRootAdmissionRecordType);
+  assert.equal(admission.kind, 'FastReactDomPrivateRootAdmissionRecord');
+  assert.equal(
+    admission.admissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    admission.executionStatus,
+    rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
+  );
+  assert.equal(
+    admission.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.equal(admission.operation, expected.operation);
+  assert.equal(admission.requestId, expected.requestId);
+  assert.equal(admission.requestType, expected.requestType);
+  assert.equal(admission.rootId, expected.rootId);
+  assert.equal(admission.rootKind, rootBridge.CLIENT_ROOT_KIND);
+  assert.equal(admission.rootTag, rootBridge.CONCURRENT_ROOT_TAG);
+  assert.equal(admission.sequence, expected.sequence);
+  assert.equal(admission.updateId, expected.updateId);
+  assert.deepEqual(admission.lifecyclePrerequisites, {
+    accepted: true,
+    lifecycleStatusAfter: expected.lifecycleStatusAfter,
+    lifecycleStatusBefore: expected.lifecycleStatusBefore,
+    lifecycleTransition: expected.lifecycleTransition,
+    operation: expected.operation,
+    rootKind: rootBridge.CLIENT_ROOT_KIND,
+    rootTag: rootBridge.CONCURRENT_ROOT_TAG
+  });
+  assert.deepEqual(
+    admission.blockedCapabilities.map((capability) => capability.id),
+    [
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'marker-writes',
+      'listener-installation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.ok(
+    admission.blockedCapabilities.every(
+      (capability) => Object.isFrozen(capability) && capability.blocked === true
+    )
+  );
+  assert.equal(admission.nativeExecution, false);
+  assert.equal(admission.reconcilerExecution, false);
+  assert.equal(admission.domMutation, false);
+  assert.equal(admission.markerWrites, false);
+  assert.equal(admission.listenerInstallation, false);
+  assert.equal(admission.hydration, false);
+  assert.equal(admission.eventDispatch, false);
+  assert.equal(admission.compatibilityClaimed, false);
 }
 
 function assertBridgeDidNotTouchContainer(container) {
