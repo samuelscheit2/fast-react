@@ -20,11 +20,19 @@ const ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS =
   'private-scheduler-post-task-root-continuation-execution-route';
 const ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS =
   'aborted-before-private-root-continuation-execution';
+const ROOT_CONTINUATION_PENDING_EXECUTION_STATUS =
+  'pending-private-root-continuation-execution-route';
+const ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS =
+  'accepted-private-scheduler-post-task-act-root-work-handoff';
 const SCHEDULER_COMPATIBILITY_TARGET = 'scheduler@0.27.0';
 const publicCompatibilityClaimKeys = new Set([
   'browserPostTaskCompatibilityClaimed',
   'browserTaskOrderingCompatibilityClaimed',
   'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'publicCompatibilityClaimed',
   'compatibilityClaimed'
 ]);
 
@@ -109,6 +117,8 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     );
   }
   const rootContinuationExecutionRoute = executionRouteValidation.route;
+  const acceptedActRootWorkHandoff =
+    executionRouteValidation.actRootWorkHandoff;
   const continuationFallback = createRootContinuationFallbackMetadata(
     continuation
   );
@@ -118,7 +128,8 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     signalValidation,
     abortOrdering,
     continuationFallback,
-    rootContinuationExecutionRoute
+    rootContinuationExecutionRoute,
+    acceptedActRootWorkHandoff
   });
 
   return freezeRecord({
@@ -159,6 +170,9 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     ),
     continuationFallback: cloneDiagnosticValue(continuationFallback),
     acceptedRootContinuation: cloneDiagnosticValue(acceptedRootContinuation),
+    acceptedActRootWorkHandoff: cloneDiagnosticValue(
+      acceptedActRootWorkHandoff
+    ),
     fallbackEnvironmentClassification: cloneDiagnosticValue(
       continuation.fallbackEnvironmentClassification || null
     ),
@@ -442,10 +456,29 @@ function readRootContinuationExecutionRoute(
       sourceCallbackRunIndex: continuation.sourceCallbackRunIndex
     };
   }
-  if (route.routeStatus !== ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS) {
+  const actRootWorkHandoffValidation = readActRootWorkHandoff(
+    route,
+    record,
+    continuationValidation,
+    continuation
+  );
+  if (
+    (route.hasActRootWorkHandoff === true || route.actRootWorkHandoff) &&
+    actRootWorkHandoffValidation.reason !== null
+  ) {
+    return actRootWorkHandoffValidation;
+  }
+  const isAbortedRoute =
+    route.routeStatus === ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS;
+  const isPendingActRootWorkHandoffRoute =
+    route.routeStatus === ROOT_CONTINUATION_PENDING_EXECUTION_STATUS &&
+    actRootWorkHandoffValidation.reason === null;
+  if (!isAbortedRoute && !isPendingActRootWorkHandoffRoute) {
     return {
       reason: 'pending-root-continuation-execution-route',
-      routeStatus: route.routeStatus || null
+      routeStatus: route.routeStatus || null,
+      actRootWorkHandoffRejectionReason:
+        actRootWorkHandoffValidation.reason || null
     };
   }
   const privateExecution =
@@ -460,7 +493,7 @@ function readRootContinuationExecutionRoute(
     };
   }
   if (
-    privateExecution.status !== ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS ||
+    privateExecution.status !== route.routeStatus ||
     privateExecution.rendererWorkExecuted !== false ||
     privateExecution.reconcilerWorkExecuted !== false ||
     privateExecution.nativeRendererWorkExecuted !== false ||
@@ -474,7 +507,123 @@ function readRootContinuationExecutionRoute(
   }
   return {
     reason: null,
-    route
+    route,
+    actRootWorkHandoff: actRootWorkHandoffValidation.handoff
+  };
+}
+
+function readActRootWorkHandoff(
+  route,
+  record,
+  continuationValidation,
+  continuation
+) {
+  const handoff =
+    route &&
+    route.actRootWorkHandoff &&
+    typeof route.actRootWorkHandoff === 'object'
+      ? route.actRootWorkHandoff
+      : null;
+  if (handoff === null) {
+    return {
+      reason: 'missing-act-root-work-handoff',
+      handoff: null
+    };
+  }
+  if (handoff.status !== ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS) {
+    return {
+      reason: 'unsupported-act-root-work-handoff',
+      status: handoff.status || null,
+      handoff: null
+    };
+  }
+  if (handoff.accepted !== true || handoff.rejected === true) {
+    return {
+      reason: 'rejected-act-root-work-handoff',
+      accepted: handoff.accepted === true,
+      rejected: handoff.rejected === true,
+      rejectionReason: handoff.rejectionReason || null,
+      handoff: null
+    };
+  }
+  if (
+    handoff.continuationIndex !== continuationValidation.continuationIndex ||
+    handoff.continuationDiagnosticEventIndex !==
+      continuation.diagnosticEventIndex ||
+    handoff.sourceCallbackRunIndex !== continuation.sourceCallbackRunIndex
+  ) {
+    return {
+      reason: 'stale-act-root-work-handoff',
+      handoffContinuationIndex: handoff.continuationIndex,
+      continuationIndex: continuationValidation.continuationIndex,
+      handoffContinuationDiagnosticEventIndex:
+        handoff.continuationDiagnosticEventIndex,
+      continuationDiagnosticEventIndex: continuation.diagnosticEventIndex,
+      handoffSourceCallbackRunIndex: handoff.sourceCallbackRunIndex,
+      sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+      handoff: null
+    };
+  }
+  if (
+    handoff.delayedCallbackPathAccepted !== true ||
+    !handoff.delay ||
+    handoff.delay.delayClassification !== 'delayed-task' ||
+    !record.schedule ||
+    !record.schedule.delay ||
+    record.schedule.delay.delayClassification !== 'delayed-task'
+  ) {
+    return {
+      reason: 'unsupported-act-root-work-handoff-delay',
+      handoffDelay: cloneDiagnosticValue(handoff.delay || null),
+      scheduleDelay: cloneDiagnosticValue(
+        record.schedule ? record.schedule.delay || null : null
+      ),
+      handoff: null
+    };
+  }
+  if (
+    handoff.actQueueHandoffOnly !== true ||
+    handoff.rootWorkMetadataOnly !== true ||
+    handoff.rendererWorkExecutionBlocked !== true ||
+    handoff.drainsPublicSchedulerTaskQueue !== false ||
+    handoff.drainsPublicReactActQueue !== false ||
+    handoff.executesQueuedWork !== false ||
+    handoff.executesEffects !== false ||
+    handoff.executesRendererWork !== false ||
+    handoff.executesRendererRoots !== false
+  ) {
+    return {
+      reason: 'unsupported-act-root-work-handoff-execution-policy',
+      handoff: cloneDiagnosticValue(handoff)
+    };
+  }
+  if (!Array.isArray(handoff.rootWorkRecords) || handoff.rootWorkRecords.length === 0) {
+    return {
+      reason: 'missing-act-root-work-handoff-records',
+      handoff: null
+    };
+  }
+  for (let index = 0; index < handoff.rootWorkRecords.length; index++) {
+    const rootWorkRecord = handoff.rootWorkRecords[index];
+    if (
+      !rootWorkRecord ||
+      typeof rootWorkRecord !== 'object' ||
+      rootWorkRecord.accepted !== true ||
+      rootWorkRecord.rendererWorkExecutionBlocked !== true ||
+      rootWorkRecord.rootWorkMetadataOnly !== true ||
+      rootWorkRecord.executesRendererWork !== false ||
+      rootWorkRecord.executesRendererRoots !== false
+    ) {
+      return {
+        reason: `unsupported-act-root-work-handoff-record-${index}`,
+        rootWorkRecord: cloneDiagnosticValue(rootWorkRecord || null),
+        handoff: null
+      };
+    }
+  }
+  return {
+    reason: null,
+    handoff
   };
 }
 
@@ -572,7 +721,8 @@ function createAcceptedRootContinuationRecord({
   signalValidation,
   abortOrdering,
   continuationFallback,
-  rootContinuationExecutionRoute
+  rootContinuationExecutionRoute,
+  acceptedActRootWorkHandoff
 }) {
   return freezeRecord({
     status: ACCEPTED_ROOT_CONTINUATION_STATUS,
@@ -588,6 +738,9 @@ function createAcceptedRootContinuationRecord({
     ),
     privateRootContinuationExecution: cloneDiagnosticValue(
       rootContinuationExecutionRoute.privateRootContinuationExecution
+    ),
+    acceptedActRootWorkHandoff: cloneDiagnosticValue(
+      acceptedActRootWorkHandoff
     ),
     rootContinuationMetadataOnly: true,
     rendererWorkExecuted: false,
@@ -679,8 +832,10 @@ module.exports = {
   ROOT_CONTINUATION_BLOCKED_STATUS,
   ROOT_CONTINUATION_FALLBACK_STATUS,
   ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS,
+  ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS,
   ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
+  ROOT_CONTINUATION_PENDING_EXECUTION_STATUS,
   ROOT_CONTINUATION_RECORD_TYPE,
   ROOT_CONTINUATION_REJECTED_STATUS,
   ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS,

@@ -80,6 +80,7 @@
         callbackRuns: [],
         continuationFallbacks: [],
         rootContinuationExecutionRoute: null,
+        actRootWorkHandoffDiagnostics: false,
         environmentCapabilityDiagnostics: true,
         priorityMappingDiagnostics: true,
         shimmedTaskControllerScheduling: true,
@@ -463,6 +464,20 @@
       record,
       continuation
     ) {
+      var actRootWorkHandoff = createPrivatePostTaskActRootWorkHandoff(
+        record,
+        continuation,
+        "pending-private-root-continuation-execution-route",
+        null,
+        null
+      );
+      if (null !== actRootWorkHandoff) {
+        record.actRootWorkHandoffDiagnostics = true;
+        recordPrivatePostTaskContinuationMetadataActRootWorkHandoff(
+          continuation,
+          actRootWorkHandoff
+        );
+      }
       return {
         status: "private-scheduler-post-task-root-continuation-execution-route",
         routeVersion: 1,
@@ -494,6 +509,8 @@
         abortOrdering: continuation.abortOrdering,
         delayAbortOrdering: null,
         abortSignal: null,
+        hasActRootWorkHandoff: null !== actRootWorkHandoff,
+        actRootWorkHandoff: actRootWorkHandoff,
         privateRootContinuationExecution:
           createPrivatePostTaskRootContinuationExecutionRecord(
             "pending-private-root-continuation-execution-route",
@@ -504,8 +521,31 @@
         browserPostTaskCompatibilityClaimed: false,
         browserTaskOrderingCompatibilityClaimed: false,
         publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false,
+        publicRootSchedulerCompatibilityClaimed: false,
+        publicRendererCompatibilityClaimed: false,
         compatibilityClaimed: false
       };
+    }
+    function recordPrivatePostTaskContinuationMetadataActRootWorkHandoff(
+      continuation,
+      actRootWorkHandoff
+    ) {
+      if (!continuation.continuationMetadata || null === actRootWorkHandoff) {
+        return;
+      }
+      continuation.continuationMetadata.actRootWorkHandoffStatus =
+        actRootWorkHandoff.status;
+      continuation.continuationMetadata.actRootWorkHandoffAccepted =
+        actRootWorkHandoff.accepted === true;
+      continuation.continuationMetadata.actRootWorkHandoffRouteStatus =
+        actRootWorkHandoff.routeStatus;
+      continuation.continuationMetadata.actRootWorkHandoffKind =
+        actRootWorkHandoff.handoffKind;
+      continuation.continuationMetadata.actRootWorkRecordCount =
+        actRootWorkHandoff.rootWorkRecordCount;
+      continuation.continuationMetadata.delayedCallbackPathAccepted =
+        actRootWorkHandoff.delayedCallbackPathAccepted === true;
     }
     function createPrivatePostTaskRootContinuationExecutionRecord(
       status,
@@ -554,6 +594,174 @@
         compatibilityClaimed: false
       };
     }
+    function createPrivatePostTaskActRootWorkHandoff(
+      record,
+      continuation,
+      routeStatus,
+      cancellation,
+      abortSignal
+    ) {
+      var delay = record.schedule ? record.schedule.delay : null;
+      if (!delay || "delayed-task" !== delay.delayClassification) {
+        return null;
+      }
+      var rootWorkRecords = createPrivatePostTaskActRootWorkRecords(
+          record,
+          continuation
+        ),
+        abortSignalState =
+          abortSignal && abortSignal.aborted === true
+            ? "aborted"
+            : abortSignal
+              ? "not-aborted"
+              : null;
+      return {
+        status: "accepted-private-scheduler-post-task-act-root-work-handoff",
+        handoffKind:
+          "fast-react.scheduler.post_task.private-act-root-work-handoff",
+        handoffVersion: 1,
+        entrypoint: "scheduler/unstable_post_task",
+        compatibilityTarget: schedulerCompatibilityTarget,
+        reactCompatibilityTarget: reactCompatibilityTarget,
+        routeName: "post-task-delayed-act-root-continuation",
+        routeStatus: routeStatus,
+        accepted: true,
+        rejected: false,
+        rejectionReason: null,
+        continuationIndex: continuation.continuationIndex,
+        continuationDiagnosticEventIndex: continuation.diagnosticEventIndex,
+        sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+        callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
+        callbackRunCountAtAbortRequest: cancellation
+          ? cancellation.abortOrdering.callbackRunCountAtRequest
+          : null,
+        callbackRunCountAtAbortCompletion: cancellation
+          ? cancellation.abortOrdering.callbackRunCountAtCompletion
+          : null,
+        continuationFallbackCountAtSchedule:
+          continuation.continuationIndex + 1,
+        continuationFallbackCountAtAbortRequest: cancellation
+          ? cancellation.abortOrdering.continuationFallbackCountAtRequest
+          : null,
+        continuationFallbackCountAtAbortCompletion: cancellation
+          ? cancellation.abortOrdering.continuationFallbackCountAtCompletion
+          : null,
+        priorityLevel: continuation.priorityLevel,
+        schedulerPriorityName: record.priorityMapping
+          ? record.priorityMapping.schedulerPriorityName
+          : null,
+        postTaskPriority: continuation.postTaskPriority,
+        taskControllerPriority: record.priorityMapping
+          ? record.priorityMapping.taskControllerPriority
+          : null,
+        delay: delay,
+        delayedCallbackPath: true,
+        delayedCallbackPathAccepted: true,
+        continuationStatus: continuation.continuationStatus,
+        signalAtSchedule: continuation.signalAtSchedule,
+        signalValidation: continuation.signalValidation,
+        abortSignalState: abortSignalState,
+        abortSemanticsPreserved:
+          cancellation && abortSignal ? abortSignal.aborted === true : null,
+        actQueueHandoffOnly: true,
+        rootWorkMetadataOnly: true,
+        rendererWorkExecutionBlocked: true,
+        actQueueHandoff:
+          createPrivatePostTaskActQueueHandoff(record, continuation),
+        rootWorkRecords: rootWorkRecords,
+        rootWorkRecordCount: rootWorkRecords.length,
+        publicCompatibilityClaimed: false,
+        browserPostTaskCompatibilityClaimed: false,
+        browserTaskOrderingCompatibilityClaimed: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false,
+        publicRootSchedulerCompatibilityClaimed: false,
+        publicRendererCompatibilityClaimed: false,
+        drainsPublicSchedulerTaskQueue: false,
+        drainsPublicReactActQueue: false,
+        executesQueuedWork: false,
+        executesEffects: false,
+        executesRendererWork: false,
+        executesRendererRoots: false,
+        compatibilityClaimed: false
+      };
+    }
+    function createPrivatePostTaskActQueueHandoff(record, continuation) {
+      return {
+        status: "accepted-private-scheduler-post-task-act-queue-handoff",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "RootSchedule",
+        continuationStatus: "PendingContinuation",
+        accepted: true,
+        schedulerPriorityName: record.priorityMapping
+          ? record.priorityMapping.schedulerPriorityName
+          : null,
+        priorityLevel: continuation.priorityLevel,
+        postTaskPriority: continuation.postTaskPriority,
+        actQueueHandoffOnly: true,
+        rootWorkMetadataOnly: true,
+        publicCompatibilityClaimed: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false,
+        drainsPublicSchedulerTaskQueue: false,
+        drainsPublicReactActQueue: false,
+        executesQueuedWork: false,
+        executesEffects: false,
+        executesRendererWork: false,
+        executesRendererRoots: false,
+        compatibilityClaimed: false
+      };
+    }
+    function createPrivatePostTaskActRootWorkRecords(record, continuation) {
+      return [
+        createPrivatePostTaskActRootWorkRecord(
+          record,
+          continuation,
+          "RootLaneSchedulingSnapshot"
+        ),
+        createPrivatePostTaskActRootWorkRecord(
+          record,
+          continuation,
+          "RootTaskScheduleRecord"
+        )
+      ];
+    }
+    function createPrivatePostTaskActRootWorkRecord(
+      record,
+      continuation,
+      recordKind
+    ) {
+      return {
+        recordKind: recordKind,
+        accepted: true,
+        rootId: "post-task-delayed-continuation-root",
+        rootLabel: "scheduler-post-task-delayed-continuation-root",
+        lane: "PostTaskContinuationLane",
+        laneLabel: "PostTaskContinuationLane",
+        continuationIndex: continuation.continuationIndex,
+        sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+        priorityLevel: continuation.priorityLevel,
+        schedulerPriorityName: record.priorityMapping
+          ? record.priorityMapping.schedulerPriorityName
+          : null,
+        postTaskPriority: continuation.postTaskPriority,
+        delayedCallbackPath: true,
+        rendererWorkExecutionBlocked: true,
+        rootWorkMetadataOnly: true,
+        publicCompatibilityClaimed: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false,
+        publicRootSchedulerCompatibilityClaimed: false,
+        publicRendererCompatibilityClaimed: false,
+        drainsPublicSchedulerTaskQueue: false,
+        drainsPublicReactActQueue: false,
+        executesQueuedWork: false,
+        executesEffects: false,
+        executesRendererWork: false,
+        executesRendererRoots: false,
+        compatibilityClaimed: false
+      };
+    }
     function recordPrivatePostTaskRootContinuationExecutionRouteAbort(
       record,
       continuation,
@@ -568,6 +776,22 @@
       route.delayAbortOrdering = cancellation.delayAbortOrdering;
       route.abortOrdering = continuation.abortOrdering;
       route.abortSignal = cancellation.signalAfterAbort;
+      var actRootWorkHandoff = createPrivatePostTaskActRootWorkHandoff(
+        record,
+        continuation,
+        "aborted-before-private-root-continuation-execution",
+        cancellation,
+        cancellation.signalAfterAbort
+      );
+      route.hasActRootWorkHandoff = null !== actRootWorkHandoff;
+      route.actRootWorkHandoff = actRootWorkHandoff;
+      if (null !== actRootWorkHandoff) {
+        record.actRootWorkHandoffDiagnostics = true;
+        recordPrivatePostTaskContinuationMetadataActRootWorkHandoff(
+          continuation,
+          actRootWorkHandoff
+        );
+      }
       route.privateRootContinuationExecution =
         createPrivatePostTaskRootContinuationExecutionRecord(
           "aborted-before-private-root-continuation-execution",
@@ -913,6 +1137,8 @@
           record.rootContinuationExecutionRouteDiagnostics,
         fallbackEnvironmentClassificationDiagnostics:
           record.fallbackEnvironmentClassificationDiagnostics,
+        actRootWorkHandoffDiagnostics:
+          record.actRootWorkHandoffDiagnostics,
         browserPostTaskCompatibilityClaimed:
           record.browserPostTaskCompatibilityClaimed,
         browserTaskOrderingCompatibilityClaimed:
@@ -948,6 +1174,7 @@
       deadline = 0,
       currentPriorityLevel_DEPRECATED = 3,
       schedulerCompatibilityTarget = "scheduler@0.27.0",
+      reactCompatibilityTarget = "react@19.2.6",
       privatePostTaskPriorityDiagnosticsExport =
         "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__",
       privatePostTaskPriorityDiagnosticsSymbolDescription =
