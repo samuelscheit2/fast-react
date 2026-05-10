@@ -45,17 +45,29 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 534-562 plus replacement workers 563 and 564
-has been accepted. No replacement workers should be launched until accepted
-sessions, worktrees, and branches from that queue are cleaned up.
+Top-level cap: 30 workers. Workers 565-594 are active in `fr-*` tmux sessions
+from isolated `worker/<slug>` branches and worktrees.
+
+- 565-572: Reconciler/root work-loop, scheduler, update queue, hooks/effects,
+  context, Suspense retry, and Offscreen visibility diagnostics.
+- 573-577: Test-renderer root work-loop, update, unmount, act, and nested
+  serialization diagnostics.
+- 578-584: React DOM root facade, DOM style/dangerousHTML fake-DOM commit,
+  controlled restore, hydration replay, and resource modulepreload gates.
+- 585-587: Scheduler mock/postTask continuation and native JSON streaming
+  transport diagnostics.
+- 588-589: React transition dispatcher and element key/ref warning refreshes.
+- 590-594: Package-surface, benchmark, private-admission, root-render E2E, and
+  worker-launcher status hardening.
 
 ## Near-Term Sequencing
 
-1. Clean accepted 534-564 tmux sessions, worktrees, and branches.
-2. Run a final post-cleanup status check for stale worker sessions, dirty
-   worktrees, unmerged worker branches, and ignored build-output churn.
-3. Queue the next capped worker batch from 565 onward only after cleanup is
-   complete.
+1. Monitor workers 565-594 and classify completions from tmux pane state,
+   worker reports, worktree status, and verification evidence.
+2. Before queueing replacement workers, merge and clean all completed accepted
+   work already available so replacement capacity starts from current `main`.
+3. Accept overlapping implementation work when scopes are different enough;
+   resolve merge conflicts on `main` after merge attempts.
 4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
