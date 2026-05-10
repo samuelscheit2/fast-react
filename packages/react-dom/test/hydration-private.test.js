@@ -153,6 +153,20 @@ test('private hydration replay target-dispatch link records one blocked replay c
   assert.equal(payload.hydratableEventTargetLookup, diagnostic.hydratableEventTargetLookup);
   assert.equal(payload.targetDispatchPathRecord, dispatchRecord.targetDispatchPathRecord);
   assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.throws(
+    () =>
+      pluginEventSystem.createHydrationReplayClickDispatchDiagnostic(
+        diagnostic,
+        {
+          source: 'hydration-private-target-dispatch-link-missing-claim'
+        }
+      ),
+    {
+      code:
+        pluginEventSystem
+          .INVALID_HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_CODE
+    }
+  );
   assert.deepEqual(fixture.container.__registrations, []);
   assert.deepEqual(fixture.document.__registrations, []);
 });
@@ -399,6 +413,63 @@ test('private hydration target claiming records one blocked replay target-dispat
   );
   assert.equal(execution.targetDispatchPathStatus, 'no-mounted-host-instance');
   assert.equal(execution.targetDispatchPathLength, 0);
+  assert.equal(
+    execution.clickReplayDispatchDiagnosticKind,
+    pluginEventSystem.HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    execution.clickReplayDispatchDiagnosticStatus,
+    pluginEventSystem.PRIVATE_HYDRATION_REPLAY_CLICK_DISPATCH_STATUS
+  );
+  assert.equal(execution.clickReplayDispatchDiagnosticRecorded, true);
+  assert.equal(execution.clickReplayDispatchDiagnosticBlocked, true);
+  assert.equal(execution.clickReplayDispatchQueueOrderPreserved, true);
+  assert.equal(execution.blockedClickReplayDispatchDiagnosticCount, 1);
+  const clickDiagnostic = execution.clickReplayDispatchDiagnostic;
+  assert.equal(
+    clickDiagnostic.kind,
+    pluginEventSystem.HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    clickDiagnostic.status,
+    pluginEventSystem.PRIVATE_HYDRATION_REPLAY_CLICK_DISPATCH_STATUS
+  );
+  assert.equal(clickDiagnostic.targetClaimingDiagnostic, claim);
+  assert.equal(clickDiagnostic.targetClaimEvidenceAccepted, true);
+  assert.equal(clickDiagnostic.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(clickDiagnostic.dispatchRecord, dispatchRecord);
+  assert.equal(clickDiagnostic.domEventName, 'click');
+  assert.equal(clickDiagnostic.nativeEventType, 'click');
+  assert.equal(clickDiagnostic.queueName, 'discrete-hydration-replay-attempt');
+  assert.equal(clickDiagnostic.inputOrder, execution.inputOrder);
+  assert.equal(clickDiagnostic.replayQueueOrder, execution.replayQueueOrder);
+  assert.equal(clickDiagnostic.queueOrderPreserved, true);
+  assert.equal(clickDiagnostic.publicDispatchEnabled, false);
+  assert.equal(clickDiagnostic.liveEventListenerInstalled, false);
+  assert.equal(clickDiagnostic.rootListenerInstallationAttempted, false);
+  assert.equal(clickDiagnostic.eventReplayInstalled, false);
+  assert.equal(clickDiagnostic.eventDispatch, false);
+  assert.equal(clickDiagnostic.targetDispatchExecuted, false);
+  assert.equal(clickDiagnostic.eventReplayDispatchAttempted, false);
+  assert.equal(clickDiagnostic.privateClickDelegationDispatchGateCalled, false);
+  assert.equal(clickDiagnostic.syntheticEventCreated, false);
+  assert.equal(clickDiagnostic.listenerInvocationCount, 0);
+  assert.equal(clickDiagnostic.willInvokeListeners, false);
+  assert.equal(
+    clickDiagnostic.publicDispatchBlockedReason,
+    pluginEventSystem.PUBLIC_EVENT_DISPATCH_BLOCKED_CODE
+  );
+  const clickPayload =
+    pluginEventSystem.getHydrationReplayClickDispatchDiagnosticPayload(
+      clickDiagnostic
+    );
+  assert.equal(clickPayload.targetClaimingDiagnostic, claim);
+  assert.equal(clickPayload.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(clickPayload.dispatchRecord, dispatchRecord);
+  assert.equal(
+    clickPayload.targetDispatchPathRecord,
+    dispatchRecord.targetDispatchPathRecord
+  );
   assert.equal(execution.executionRecordCount, 1);
   assert.equal(execution.blockedReplayTargetDispatchExecutionCount, 1);
   assert.equal(execution.replayTargetDispatchExecutionRecorded, true);
@@ -462,6 +533,8 @@ test('private hydration target claiming records one blocked replay target-dispat
   assert.equal(payload.targetClaimingDiagnostic, claim);
   assert.equal(payload.targetDispatchLinkDiagnostic, targetDispatchLink);
   assert.equal(payload.dispatchRecord, dispatchRecord);
+  assert.equal(payload.clickReplayDispatchDiagnostic, clickDiagnostic);
+  assert.equal(payload.clickReplayDispatchDiagnosticPayload, clickPayload);
   assert.equal(payload.recoverableErrorMetadata, fixture.record.recoverableErrorMetadata);
   assert.equal(
     rootBridge.getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
