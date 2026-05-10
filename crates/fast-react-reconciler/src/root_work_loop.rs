@@ -34,12 +34,14 @@ use crate::{
     begin_work::{
         BeginWorkError, BeginWorkRequest, BeginWorkResult, NestedContextProviderBeginWorkError,
         NestedContextProviderBeginWorkRecord, NestedContextProviderBeginWorkRequest,
-        NestedContextProviderUseContextBeginWorkRecord, UnsupportedOffscreenChildShapeRecord,
-        UnsupportedPortalBeginWorkRecord, UnsupportedSuspenseChildShapeRecord, begin_work,
+        NestedContextProviderUseContextBeginWorkRecord, UnsupportedActivityChildShapeRecord,
+        UnsupportedOffscreenChildShapeRecord, UnsupportedPortalBeginWorkRecord,
+        UnsupportedSuspenseChildShapeRecord, UnsupportedSuspenseListChildShapeRecord, begin_work,
         begin_work_nested_context_provider_child,
         begin_work_nested_context_provider_use_context_child,
-        unsupported_offscreen_begin_work_record, unsupported_portal_begin_work_record,
-        unsupported_suspense_begin_work_record,
+        unsupported_activity_begin_work_record, unsupported_offscreen_begin_work_record,
+        unsupported_portal_begin_work_record, unsupported_suspense_begin_work_record,
+        unsupported_suspense_list_begin_work_record,
     },
     create_host_root_work_in_progress,
     function_component::{
@@ -60,7 +62,8 @@ use crate::{
         HostRootOneLevelChildSetBeginWorkError, HostRootOneLevelChildSetBeginWorkRecord,
         HostRootOneLevelChildSetEntry, HostRootOneLevelChildSetKind,
         NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
-        UnsupportedOffscreenChildShapeKind, UnsupportedSuspenseChildShapeKind,
+        UnsupportedActivityChildShapeKind, UnsupportedOffscreenChildShapeKind,
+        UnsupportedSuspenseChildShapeKind, UnsupportedSuspenseListChildShapeKind,
         begin_work_context_provider_child, begin_work_context_provider_use_context_child,
         begin_work_context_provider_use_context_single_child,
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
@@ -244,6 +247,16 @@ enum HostRootChildBeginWorkPreflightError {
         host_root_work_in_progress: FiberId,
         offscreen: Box<UnsupportedOffscreenChildShapeRecord>,
     },
+    UnsupportedSuspenseListChildShape {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        suspense_list: Box<UnsupportedSuspenseListChildShapeRecord>,
+    },
+    UnsupportedActivityChildShape {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        activity: Box<UnsupportedActivityChildShapeRecord>,
+    },
 }
 
 impl Display for HostRootChildBeginWorkPreflightError {
@@ -321,6 +334,32 @@ impl Display for HostRootChildBeginWorkPreflightError {
                 offscreen.shape().as_str(),
                 offscreen.feature()
             ),
+            Self::UnsupportedSuspenseListChildShape {
+                root,
+                host_root_work_in_progress,
+                suspense_list,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} cannot admit SuspenseList child {} shape {} into root work: {}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                suspense_list.fiber().slot().get(),
+                suspense_list.shape().as_str(),
+                suspense_list.feature()
+            ),
+            Self::UnsupportedActivityChildShape {
+                root,
+                host_root_work_in_progress,
+                activity,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} cannot admit Activity child {} shape {} into root work: {}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                activity.fiber().slot().get(),
+                activity.shape().as_str(),
+                activity.feature()
+            ),
         }
     }
 }
@@ -336,7 +375,9 @@ impl Error for HostRootChildBeginWorkPreflightError {
             | Self::UnsupportedReconcilerFiberFeature { .. }
             | Self::UnsupportedPortal { .. }
             | Self::UnsupportedSuspenseChildShape { .. }
-            | Self::UnsupportedOffscreenChildShape { .. } => None,
+            | Self::UnsupportedOffscreenChildShape { .. }
+            | Self::UnsupportedSuspenseListChildShape { .. }
+            | Self::UnsupportedActivityChildShape { .. } => None,
         }
     }
 }
@@ -441,6 +482,32 @@ fn validate_host_root_child_preflight<H: HostTypes>(
                 root: root_id,
                 host_root_work_in_progress,
                 offscreen: Box::new(offscreen),
+            },
+        );
+    }
+    if child_tag == FiberTag::SuspenseList {
+        let suspense_list = unsupported_suspense_list_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(child, render_lanes),
+        )?;
+        return Err(
+            HostRootChildBeginWorkPreflightError::UnsupportedSuspenseListChildShape {
+                root: root_id,
+                host_root_work_in_progress,
+                suspense_list: Box::new(suspense_list),
+            },
+        );
+    }
+    if child_tag == FiberTag::Activity {
+        let activity = unsupported_activity_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(child, render_lanes),
+        )?;
+        return Err(
+            HostRootChildBeginWorkPreflightError::UnsupportedActivityChildShape {
+                root: root_id,
+                host_root_work_in_progress,
+                activity: Box::new(activity),
             },
         );
     }
@@ -4331,6 +4398,88 @@ mod tests {
         (offscreen, first_child, second_child)
     }
 
+    fn attach_suspense_list_wip_child_with_rows(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberId) {
+        let suspense_list = store.fiber_arena_mut().create_fiber(
+            FiberTag::SuspenseList,
+            Some(ReactKey::from_normalized("rows")),
+            PropsHandle::from_raw(761),
+            FiberMode::NO,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(suspense_list).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(762));
+            node.set_memoized_state(StateHandle::from_raw(763));
+        }
+        let first_row = store.fiber_arena_mut().create_fiber(
+            FiberTag::Suspense,
+            None,
+            PropsHandle::from_raw(764),
+            FiberMode::NO,
+        );
+        let second_row = store.fiber_arena_mut().create_fiber(
+            FiberTag::Suspense,
+            None,
+            PropsHandle::from_raw(765),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(suspense_list, &[first_row, second_row])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[suspense_list])
+            .unwrap();
+
+        (suspense_list, first_row, second_row)
+    }
+
+    fn attach_activity_wip_child_with_primary(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberId) {
+        let activity = store.fiber_arena_mut().create_fiber(
+            FiberTag::Activity,
+            Some(ReactKey::from_normalized("activity")),
+            PropsHandle::from_raw(771),
+            FiberMode::NO,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(activity).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(772));
+            node.set_state_node(StateNodeHandle::from_raw(773));
+        }
+        let primary = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            None,
+            PropsHandle::from_raw(774),
+            FiberMode::NO,
+        );
+        let primary_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(775),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(primary, &[primary_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(activity, &[primary])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[activity])
+            .unwrap();
+
+        (activity, primary, primary_child)
+    }
+
     fn attach_fragment_wip_child_with_descendant(
         store: &mut FiberRootStore<RecordingHost>,
         host_root_work_in_progress: FiberId,
@@ -4603,6 +4752,41 @@ mod tests {
                     assert_eq!(offscreen.feature(), feature);
                 }
                 other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
+            },
+            FiberTag::SuspenseList => match error {
+                HostRootChildBeginWorkPreflightError::UnsupportedSuspenseListChildShape {
+                    root,
+                    host_root_work_in_progress: actual_work_in_progress,
+                    suspense_list,
+                } => {
+                    assert_eq!(root, root_id);
+                    assert_eq!(actual_work_in_progress, host_root_work_in_progress);
+                    assert_eq!(suspense_list.fiber(), child);
+                    assert_eq!(
+                        suspense_list.shape(),
+                        UnsupportedSuspenseListChildShapeKind::Empty
+                    );
+                    assert_eq!(suspense_list.child(), None);
+                    assert_eq!(suspense_list.render_lanes(), render_lanes);
+                    assert_eq!(suspense_list.feature(), feature);
+                }
+                other => panic!("expected SuspenseList child-shape preflight, got {other:?}"),
+            },
+            FiberTag::Activity => match error {
+                HostRootChildBeginWorkPreflightError::UnsupportedActivityChildShape {
+                    root,
+                    host_root_work_in_progress: actual_work_in_progress,
+                    activity,
+                } => {
+                    assert_eq!(root, root_id);
+                    assert_eq!(actual_work_in_progress, host_root_work_in_progress);
+                    assert_eq!(activity.fiber(), child);
+                    assert_eq!(activity.shape(), UnsupportedActivityChildShapeKind::Empty);
+                    assert_eq!(activity.child(), None);
+                    assert_eq!(activity.render_lanes(), render_lanes);
+                    assert_eq!(activity.feature(), feature);
+                }
+                other => panic!("expected Activity child-shape preflight, got {other:?}"),
             },
             _ => assert_eq!(
                 error,
@@ -6393,10 +6577,12 @@ mod tests {
     }
 
     #[test]
-    fn root_work_loop_pinged_retry_scheduler_handoff_keeps_suspense_offscreen_fail_closed() {
+    fn root_work_loop_pinged_retry_scheduler_handoff_keeps_blocker_tags_fail_closed() {
         for (tag, feature) in [
             (FiberTag::Suspense, SUSPENSE_UNSUPPORTED_FEATURE),
             (FiberTag::Offscreen, OFFSCREEN_UNSUPPORTED_FEATURE),
+            (FiberTag::Activity, ACTIVITY_UNSUPPORTED_FEATURE),
+            (FiberTag::SuspenseList, SUSPENSE_LIST_UNSUPPORTED_FEATURE),
         ] {
             let (mut store, root_id, host) = root_store();
             let current = store.root(root_id).unwrap().current();
@@ -6682,6 +6868,226 @@ mod tests {
                 .unwrap()
                 .return_fiber(),
             Some(offscreen)
+        );
+    }
+
+    #[test]
+    fn root_work_loop_preflight_and_complete_handoff_report_suspense_list_activity_child_shapes() {
+        let (mut list_store, list_root, mut list_host) = root_store();
+        let mut list_source = TestHostTree::new();
+        let list_element = list_source.insert_host_element_with_text("section", "blocked");
+        let list_current = list_store.root(list_root).unwrap().current();
+        update_container(&mut list_store, list_root, list_element, None).unwrap();
+        let list_render =
+            render_host_root_for_lanes(&mut list_store, list_root, Lanes::DEFAULT).unwrap();
+        let (suspense_list, first_row, second_row) = attach_suspense_list_wip_child_with_rows(
+            &mut list_store,
+            list_render.work_in_progress(),
+        );
+        let mut list_registry = TestFunctionComponentRegistry::default();
+
+        let list_preflight = preflight_host_root_child_begin_work(
+            &mut list_store,
+            list_root,
+            list_render.work_in_progress(),
+            Lanes::from(Lane::RETRY_3),
+            &mut list_registry,
+        )
+        .unwrap_err();
+
+        match list_preflight {
+            HostRootChildBeginWorkPreflightError::UnsupportedSuspenseListChildShape {
+                root,
+                host_root_work_in_progress,
+                suspense_list: record,
+            } => {
+                assert_eq!(root, list_root);
+                assert_eq!(host_root_work_in_progress, list_render.work_in_progress());
+                assert_eq!(record.fiber(), suspense_list);
+                assert_eq!(record.key().map(ReactKey::as_str), Some("rows"));
+                assert_eq!(record.pending_props(), PropsHandle::from_raw(761));
+                assert_eq!(record.memoized_props(), PropsHandle::from_raw(762));
+                assert_eq!(record.memoized_state(), StateHandle::from_raw(763));
+                assert_eq!(record.child(), Some(first_row));
+                assert_eq!(record.child_tag(), Some(FiberTag::Suspense));
+                assert_eq!(record.child_sibling(), Some(second_row));
+                assert_eq!(record.child_sibling_tag(), Some(FiberTag::Suspense));
+                assert_eq!(
+                    record.shape(),
+                    UnsupportedSuspenseListChildShapeKind::MultipleChildren
+                );
+                assert_eq!(record.render_lanes(), Lanes::from(Lane::RETRY_3));
+                assert_eq!(record.feature(), SUSPENSE_LIST_UNSUPPORTED_FEATURE);
+            }
+            other => panic!("expected SuspenseList child-shape preflight, got {other:?}"),
+        }
+
+        let list_complete_error = handoff_completed_host_root_render_to_test_complete_work(
+            &mut list_store,
+            &mut list_host,
+            list_render,
+            &list_source,
+        )
+        .unwrap_err();
+
+        match list_complete_error {
+            HostRootCompleteWorkHandoffError::ChildPreflight(error) => match *error {
+                HostRootChildBeginWorkPreflightError::UnsupportedSuspenseListChildShape {
+                    root,
+                    host_root_work_in_progress,
+                    suspense_list: record,
+                } => {
+                    assert_eq!(root, list_root);
+                    assert_eq!(host_root_work_in_progress, list_render.work_in_progress());
+                    assert_eq!(record.fiber(), suspense_list);
+                    assert_eq!(
+                        record.shape(),
+                        UnsupportedSuspenseListChildShapeKind::MultipleChildren
+                    );
+                    assert_eq!(record.child(), Some(first_row));
+                    assert_eq!(record.child_sibling(), Some(second_row));
+                    assert_eq!(record.render_lanes(), list_render.render_lanes());
+                }
+                other => panic!("expected SuspenseList child-shape preflight, got {other:?}"),
+            },
+            other => panic!("expected complete-work child preflight, got {other:?}"),
+        }
+        assert!(list_registry.calls().is_empty());
+        assert_client_root_fail_closed_without_side_effects(
+            &list_store,
+            &list_host,
+            list_root,
+            list_current,
+            list_render,
+            suspense_list,
+        );
+        assert_eq!(
+            list_store
+                .fiber_arena()
+                .get(first_row)
+                .unwrap()
+                .return_fiber(),
+            Some(suspense_list)
+        );
+        assert_eq!(
+            list_store
+                .fiber_arena()
+                .get(second_row)
+                .unwrap()
+                .return_fiber(),
+            Some(suspense_list)
+        );
+
+        let (mut activity_store, activity_root, mut activity_host) = root_store();
+        let mut activity_source = TestHostTree::new();
+        let activity_element = activity_source.insert_host_element_with_text("aside", "blocked");
+        let activity_current = activity_store.root(activity_root).unwrap().current();
+        update_container(&mut activity_store, activity_root, activity_element, None).unwrap();
+        let activity_render =
+            render_host_root_for_lanes(&mut activity_store, activity_root, Lanes::DEFAULT).unwrap();
+        let (activity, primary, primary_child) = attach_activity_wip_child_with_primary(
+            &mut activity_store,
+            activity_render.work_in_progress(),
+        );
+        let mut activity_registry = TestFunctionComponentRegistry::default();
+
+        let activity_preflight = preflight_host_root_child_begin_work(
+            &mut activity_store,
+            activity_root,
+            activity_render.work_in_progress(),
+            Lanes::from(Lane::RETRY_2),
+            &mut activity_registry,
+        )
+        .unwrap_err();
+
+        match activity_preflight {
+            HostRootChildBeginWorkPreflightError::UnsupportedActivityChildShape {
+                root,
+                host_root_work_in_progress,
+                activity: record,
+            } => {
+                assert_eq!(root, activity_root);
+                assert_eq!(
+                    host_root_work_in_progress,
+                    activity_render.work_in_progress()
+                );
+                assert_eq!(record.fiber(), activity);
+                assert_eq!(record.key().map(ReactKey::as_str), Some("activity"));
+                assert_eq!(record.pending_props(), PropsHandle::from_raw(771));
+                assert_eq!(record.memoized_props(), PropsHandle::from_raw(772));
+                assert_eq!(record.memoized_state(), StateHandle::NONE);
+                assert_eq!(record.state_node(), StateNodeHandle::from_raw(773));
+                assert_eq!(record.child(), Some(primary));
+                assert_eq!(record.child_tag(), Some(FiberTag::Offscreen));
+                assert_eq!(record.child_sibling(), None);
+                assert_eq!(record.child_sibling_tag(), None);
+                assert_eq!(
+                    record.shape(),
+                    UnsupportedActivityChildShapeKind::PrimaryOffscreen
+                );
+                assert_eq!(record.render_lanes(), Lanes::from(Lane::RETRY_2));
+                assert_eq!(record.feature(), ACTIVITY_UNSUPPORTED_FEATURE);
+            }
+            other => panic!("expected Activity child-shape preflight, got {other:?}"),
+        }
+
+        let activity_complete_error = handoff_completed_host_root_render_to_test_complete_work(
+            &mut activity_store,
+            &mut activity_host,
+            activity_render,
+            &activity_source,
+        )
+        .unwrap_err();
+
+        match activity_complete_error {
+            HostRootCompleteWorkHandoffError::ChildPreflight(error) => match *error {
+                HostRootChildBeginWorkPreflightError::UnsupportedActivityChildShape {
+                    root,
+                    host_root_work_in_progress,
+                    activity: record,
+                } => {
+                    assert_eq!(root, activity_root);
+                    assert_eq!(
+                        host_root_work_in_progress,
+                        activity_render.work_in_progress()
+                    );
+                    assert_eq!(record.fiber(), activity);
+                    assert_eq!(
+                        record.shape(),
+                        UnsupportedActivityChildShapeKind::PrimaryOffscreen
+                    );
+                    assert_eq!(record.child(), Some(primary));
+                    assert_eq!(record.child_sibling(), None);
+                    assert_eq!(record.render_lanes(), activity_render.render_lanes());
+                }
+                other => panic!("expected Activity child-shape preflight, got {other:?}"),
+            },
+            other => panic!("expected complete-work child preflight, got {other:?}"),
+        }
+        assert!(activity_registry.calls().is_empty());
+        assert_client_root_fail_closed_without_side_effects(
+            &activity_store,
+            &activity_host,
+            activity_root,
+            activity_current,
+            activity_render,
+            activity,
+        );
+        assert_eq!(
+            activity_store
+                .fiber_arena()
+                .get(primary)
+                .unwrap()
+                .return_fiber(),
+            Some(activity)
+        );
+        assert_eq!(
+            activity_store
+                .fiber_arena()
+                .get(primary_child)
+                .unwrap()
+                .return_fiber(),
+            Some(primary)
         );
     }
 
