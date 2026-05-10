@@ -264,9 +264,24 @@ sequencing belong in `MASTER_PLAN.md`.
   hook-count mismatches, cursor drift, and corrupt links, without reconciler
   dispatcher, function-component invocation, commit traversal, public hook
   facades, DOM/package, or native bridge wiring.
+- Worker 193 root commit callback handoff was merged, extending
+  `commit_finished_host_root` to drain deterministic root update callback
+  records from the committed HostRoot work-in-progress queue into
+  `HostRootCommitRecord`, returning visible callback records exactly once and
+  deferring hidden callback records as data, without JS callback invocation,
+  public facades, native callback registries, host mutation, scheduler
+  execution, or layout effects.
 
 ## Latest Accepted Verification
 
+- Worker 193 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_commit`, `root_callbacks`,
+  `update_queue`, and `sync_flush` tests, full `fast-react-reconciler` tests
+  with 134 unit tests plus 1 compile-fail doctest, reconciler clippy with
+  warnings denied, and `git diff --check`; merging current `main` into the
+  worker branch produced no textual conflicts, and the post-merge integration
+  fix made `SyncFlushRootRecord` borrow its non-`Copy` callback-owning commit
+  record.
 - Worker 192 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `hook_list` tests with 7 tests, broader
   `hook` tests with 31 tests, full `fast-react-core` tests with 129 unit tests
