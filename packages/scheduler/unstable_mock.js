@@ -68,6 +68,7 @@ const privateSchedulerMockDelayedActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockDelayedActRootWorkDiagnosticsKind
 );
 const privateSchedulerMockDelayedActRootWorkDiagnosticsVersion = 1;
+const delayedActRootWorkMetadataSources = new WeakMap();
 const acceptedExpiredActRootWorkRecordKinds = Object.freeze([
   'RootLaneSchedulingSnapshot',
   'UpdateContainerResult',
@@ -172,6 +173,11 @@ function createPrivateActQueueFlushDiagnostics(
     consumesDelayedActRootWorkThroughExpiredActRootRoute: true,
     rejectsAmbiguousDelayedOrExpiredCallbackHandles: true,
     rejectsDelayedActRootWorkPublicCompatibilityClaims: true,
+    producesDelayedActRootWorkMetadataFromAcceptedRootMetadata: true,
+    rejectsUnownedDelayedActRootWorkMetadata: true,
+    rejectsClonedDelayedActRootWorkEvidence: true,
+    bindsProducedDelayedActRootWorkNestedEvidence: true,
+    rejectsMutatedDelayedActRootWorkNestedEvidence: true,
     drainExpiredMockSchedulerWork(lanePriorityRootSchedulerMetadata) {
       if (arguments.length === 0) {
         return sourceDiagnostics.drainExpiredMockSchedulerWork();
@@ -258,6 +264,17 @@ function createPrivateActQueueFlushDiagnostics(
         shadowState,
         sourceDiagnostics,
         delayedActRootWorkMetadata
+      );
+    },
+    createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+      expiredActRootWorkMetadata,
+      options
+    ) {
+      return createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+        sourceScheduler,
+        shadowState,
+        expiredActRootWorkMetadata,
+        options
       );
     },
     describeExpiredMockSchedulerWorkForDiagnostics() {
@@ -1038,7 +1055,8 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
   sourceDiagnostics,
   expiredActRootWorkMetadata,
   flushHelperName = 'unstable_flushExpired',
-  createContinuationRejectionError = createExpiredActRootWorkMetadataError
+  createContinuationRejectionError = createExpiredActRootWorkMetadataError,
+  validateNestedEvidenceBeforeConsumption = null
 ) {
   const before = getMockSchedulerYieldPaintSnapshot(
     sourceScheduler,
@@ -1074,6 +1092,13 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
     createContinuationRejectionError
   );
   const expiredDrainReport = sourceDiagnostics.drainExpiredMockSchedulerWork();
+  if (typeof validateNestedEvidenceBeforeConsumption === 'function') {
+    const nestedEvidenceRejectionReason =
+      validateNestedEvidenceBeforeConsumption();
+    if (nestedEvidenceRejectionReason !== null) {
+      throw createContinuationRejectionError(nestedEvidenceRejectionReason);
+    }
+  }
   const rootWorkRecordConsumptionReport =
     consumeAcceptedExpiredActRootWorkRecords(validation.rootWorkRecords);
   const actQueueDrainReport = sourceDiagnostics.drainAcceptedInternalActQueue(
@@ -1225,6 +1250,11 @@ function describeDelayedActRootWorkMetadataForDiagnostics(
     consumesDelayedActRootWorkThroughExpiredActRootRoute: true,
     rejectsAmbiguousDelayedOrExpiredCallbackHandles: true,
     rejectsDelayedActRootWorkPublicCompatibilityClaims: true,
+    producesDelayedActRootWorkMetadataFromAcceptedRootMetadata: true,
+    rejectsUnownedDelayedActRootWorkMetadata: true,
+    rejectsClonedDelayedActRootWorkEvidence: true,
+    bindsProducedDelayedActRootWorkNestedEvidence: true,
+    rejectsMutatedDelayedActRootWorkNestedEvidence: true,
     drainsExpiredMockSchedulerWork: false,
     drainsAcceptedInternalTestQueues: false,
     drainsPublicSchedulerTaskQueue: false,
@@ -1333,7 +1363,13 @@ function drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
       sourceDiagnostics,
       validation.expiredActRootWorkMetadata,
       flushHelperName,
-      createDelayedActRootWorkMetadataError
+      createDelayedActRootWorkMetadataError,
+      () => {
+        const source = delayedActRootWorkMetadataSources.get(
+          delayedActRootWorkMetadata
+        );
+        return getRejectedDelayedActRootWorkNestedSourceReason(source);
+      }
     );
 
   const after = getMockSchedulerYieldPaintSnapshot(
@@ -1417,6 +1453,11 @@ function drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
     consumesDelayedActRootWorkThroughExpiredActRootRoute: true,
     rejectsAmbiguousDelayedOrExpiredCallbackHandles: true,
     rejectsDelayedActRootWorkPublicCompatibilityClaims: true,
+    producesDelayedActRootWorkMetadataFromAcceptedRootMetadata: true,
+    rejectsUnownedDelayedActRootWorkMetadata: true,
+    rejectsClonedDelayedActRootWorkEvidence: true,
+    bindsProducedDelayedActRootWorkNestedEvidence: true,
+    rejectsMutatedDelayedActRootWorkNestedEvidence: true,
     recognizesExpiredActRootWorkMetadata: true,
     linksExpiredCallbacksToAcceptedActRootWorkRecords: true,
     routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics: true,
@@ -1452,6 +1493,474 @@ function drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
   );
 
   return Object.freeze(metadata);
+}
+
+function createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+  sourceScheduler,
+  shadowState,
+  expiredActRootWorkMetadata,
+  options = {}
+) {
+  const snapshotTime = sourceScheduler.unstable_now();
+  const validation = validateDelayedActRootWorkProducerMetadata(
+    sourceScheduler,
+    shadowState,
+    expiredActRootWorkMetadata,
+    options,
+    snapshotTime
+  );
+  if (validation.rejectionReason !== null) {
+    throw createDelayedActRootWorkMetadataError(validation.rejectionReason);
+  }
+
+  const metadata = {
+    kind: privateSchedulerMockDelayedActRootWorkMetadataKind,
+    version: privateSchedulerMockDelayedActRootWorkMetadataVersion,
+    compatibilityTarget: schedulerCompatibilityTarget,
+    reactCompatibilityTarget,
+    rootId: expiredActRootWorkMetadata.rootId,
+    rootLabel: expiredActRootWorkMetadata.rootLabel,
+    lane: expiredActRootWorkMetadata.lane,
+    laneLabel: expiredActRootWorkMetadata.laneLabel,
+    priorityLevel: validation.taskRecord.task.priorityLevel,
+    schedulerPriority: validation.schedulerPriority,
+    callbackHandle: expiredActRootWorkMetadata.callbackHandle,
+    scheduledVirtualTime: validation.scheduledVirtualTime,
+    delayMs: validation.delayMs,
+    startTime: validation.startTime,
+    expirationTime: validation.expirationTime,
+    priorityTimeoutMs: validation.priorityTimeoutMs,
+    expiredActRootWorkMetadata,
+    producerStatus:
+      'produced-private-delayed-act-root-work-metadata-from-accepted-root-metadata',
+    producerSnapshotVirtualTime: snapshotTime,
+    producerActQueueRecordCount:
+      validation.expiredActRootWorkValidation.actQueuePendingCount,
+    producerRootWorkRecordCount:
+      validation.expiredActRootWorkValidation.rootWorkRecords.length,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    rendererWorkExecutionBlocked: true,
+    rootWorkMetadataOnly: true,
+    actQueueHandoffOnly: true,
+    delayedCallbackPromotionOnly: true
+  };
+
+  Object.defineProperty(
+    metadata,
+    privateSchedulerMockDelayedActRootWorkMetadataBrand,
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
+
+  delayedActRootWorkMetadataSources.set(metadata, {
+    sourceScheduler,
+    shadowState,
+    taskRecord: validation.taskRecord,
+    callbackHandle: expiredActRootWorkMetadata.callbackHandle,
+    expiredActRootWorkMetadata,
+    actQueue: expiredActRootWorkMetadata.actQueue,
+    rootWorkRecords: expiredActRootWorkMetadata.rootWorkRecords,
+    scheduleOrder: validation.taskRecord.scheduleOrder,
+    producedAtVirtualTime: snapshotTime,
+    scheduledVirtualTime: validation.scheduledVirtualTime,
+    delayMs: validation.delayMs,
+    startTime: validation.startTime,
+    expirationTime: validation.expirationTime,
+    priorityTimeoutMs: validation.priorityTimeoutMs,
+    nestedEvidence: createDelayedActRootWorkNestedSourceEvidence(
+      validation.expiredActRootWorkValidation
+    )
+  });
+
+  return Object.freeze(metadata);
+}
+
+function validateDelayedActRootWorkProducerMetadata(
+  sourceScheduler,
+  shadowState,
+  expiredActRootWorkMetadata,
+  options,
+  snapshotTime
+) {
+  const invalid = (rejectionReason) => ({
+    rejectionReason,
+    taskRecord: null,
+    priorityLabel: null,
+    schedulerPriority: null,
+    scheduledVirtualTime: null,
+    delayMs: null,
+    startTime: null,
+    expirationTime: null,
+    priorityTimeoutMs: null,
+    expiredActRootWorkValidation: null
+  });
+  const normalizedOptions =
+    options && typeof options === 'object' ? options : {};
+
+  if (hasDelayedActRootWorkProducerPublicClaim(normalizedOptions)) {
+    return invalid('producer-public-claim');
+  }
+  if (hasDelayedActRootWorkProducerExecutionClaim(normalizedOptions)) {
+    return invalid('producer-execution-claim');
+  }
+  if (!isObjectLike(expiredActRootWorkMetadata)) {
+    return invalid('producer-expired-act-root-work-metadata-not-object');
+  }
+  if (!isExpiredActRootWorkMetadataObject(expiredActRootWorkMetadata)) {
+    return invalid(
+      'producer-expired-act-root-work-metadata-missing-internal-brand'
+    );
+  }
+
+  const callbackHandle = expiredActRootWorkMetadata.callbackHandle;
+  const taskRecord = findShadowTaskRecord(shadowState, callbackHandle);
+  if (taskRecord === null) {
+    return invalid('producer-stale-callback-handle');
+  }
+  if (taskRecord.cancelled === true || taskRecord.task.callback === null) {
+    return invalid('producer-stale-callback-handle');
+  }
+  if (typeof taskRecord.task.callback !== 'function') {
+    return invalid('producer-callback-handle-not-function');
+  }
+
+  const callbackRejectionReason =
+    getRejectedExpiredActRootWorkCallbackReason(
+      taskRecord.task.callback,
+      'producer-callback-handle'
+    );
+  if (callbackRejectionReason !== null) {
+    return invalid(callbackRejectionReason);
+  }
+
+  const priorityLabel = getSchedulerPriorityLevelLabel(
+    sourceScheduler,
+    taskRecord.task.priorityLevel
+  );
+  if (priorityLabel === null) {
+    return invalid('producer-unsupported-callback-priority-level');
+  }
+  const schedulerPriority =
+    getSchedulerPriorityNameForPriorityLevelLabel(priorityLabel);
+  if (
+    normalizedOptions.priorityLevel !== undefined &&
+    normalizedOptions.priorityLevel !== taskRecord.task.priorityLevel
+  ) {
+    return invalid('producer-callback-priority-mismatch');
+  }
+  if (
+    normalizedOptions.schedulerPriority !== undefined &&
+    normalizedOptions.schedulerPriority !== schedulerPriority
+  ) {
+    return invalid('producer-scheduler-priority-mismatch');
+  }
+
+  const scheduledVirtualTime =
+    normalizedOptions.scheduledVirtualTime ?? snapshotTime;
+  const delayMs =
+    normalizedOptions.delayMs ??
+    taskRecord.task.startTime - scheduledVirtualTime;
+  const startTime = taskRecord.task.startTime;
+  const expirationTime = taskRecord.task.expirationTime;
+  const priorityTimeoutMs = expirationTime - startTime;
+  if (
+    typeof scheduledVirtualTime !== 'number' ||
+    !Number.isFinite(scheduledVirtualTime) ||
+    scheduledVirtualTime < 0
+  ) {
+    return invalid('producer-scheduled-virtual-time-metadata');
+  }
+  if (typeof delayMs !== 'number' || !Number.isFinite(delayMs) || delayMs <= 0) {
+    return invalid('producer-delay-metadata');
+  }
+  if (startTime - scheduledVirtualTime !== delayMs) {
+    return invalid('producer-delay-metadata-mismatch');
+  }
+  if (
+    normalizedOptions.startTime !== undefined &&
+    normalizedOptions.startTime !== startTime
+  ) {
+    return invalid('producer-start-time-metadata-mismatch');
+  }
+  if (
+    normalizedOptions.expirationTime !== undefined &&
+    normalizedOptions.expirationTime !== expirationTime
+  ) {
+    return invalid('producer-expiration-time-metadata-mismatch');
+  }
+  if (
+    normalizedOptions.priorityTimeoutMs !== undefined &&
+    normalizedOptions.priorityTimeoutMs !== priorityTimeoutMs
+  ) {
+    return invalid('producer-priority-timeout-metadata-mismatch');
+  }
+  if (
+    startTime <= snapshotTime ||
+    expirationTime <= snapshotTime ||
+    taskRecord.task.sortIndex !== startTime
+  ) {
+    return invalid('producer-callback-handle-not-delayed-pending');
+  }
+
+  const expiredActRootWorkValidation = validateExpiredActRootWorkMetadata(
+    sourceScheduler,
+    shadowState,
+    expiredActRootWorkMetadata,
+    expirationTime
+  );
+  if (expiredActRootWorkValidation.rejectionReason !== null) {
+    return invalid(
+      'producer-expired-act-root-work-' +
+        expiredActRootWorkValidation.rejectionReason
+    );
+  }
+  if (
+    expiredActRootWorkMetadata.expectedActQueuePendingCount !==
+    expiredActRootWorkValidation.actQueuePendingCount
+  ) {
+    return invalid('producer-expected-act-queue-pending-count-mismatch');
+  }
+
+  return {
+    rejectionReason: null,
+    taskRecord,
+    priorityLabel,
+    schedulerPriority,
+    scheduledVirtualTime,
+    delayMs,
+    startTime,
+    expirationTime,
+    priorityTimeoutMs,
+    expiredActRootWorkValidation
+  };
+}
+
+function hasDelayedActRootWorkProducerPublicClaim(options) {
+  return (
+    options.publicCompatibilityClaimed === true ||
+    options.publicSchedulerTimingCompatibilityClaimed === true ||
+    options.publicReactActCompatibilityClaimed === true ||
+    options.publicRootSchedulerCompatibilityClaimed === true ||
+    options.publicRendererCompatibilityClaimed === true ||
+    options.compatibilityClaimed === true
+  );
+}
+
+function hasDelayedActRootWorkProducerExecutionClaim(options) {
+  return (
+    options.drainsPublicSchedulerTaskQueue === true ||
+    options.drainsPublicReactActQueue === true ||
+    options.executesQueuedWork === true ||
+    options.executesEffects === true ||
+    options.executesRendererWork === true ||
+    options.executesRendererRoots === true
+  );
+}
+
+function createDelayedActRootWorkNestedSourceEvidence(
+  expiredActRootWorkValidation
+) {
+  const actQueue = expiredActRootWorkValidation.actQueue;
+  const actQueueRecords = actQueue.records.slice();
+  const rootWorkRecords = expiredActRootWorkValidation.rootWorkRecords;
+  const rootWorkRecordEntries = rootWorkRecords.slice();
+
+  return Object.freeze({
+    actQueue,
+    actQueueRecordCount: actQueueRecords.length,
+    actQueueRecordsArray: actQueue.records,
+    actQueueRecords: Object.freeze(actQueueRecords),
+    actQueueRecordCallbacks: Object.freeze(
+      actQueueRecords.map(getDelayedActRootWorkActTaskCallbackIdentity)
+    ),
+    actQueueRecordSignatures: Object.freeze(
+      actQueueRecords.map(createDelayedActRootWorkActTaskSignature)
+    ),
+    rootWorkRecords,
+    rootWorkRecordCount: rootWorkRecordEntries.length,
+    rootWorkRecordEntries: Object.freeze(rootWorkRecordEntries),
+    rootWorkRecordSignatures: Object.freeze(
+      rootWorkRecordEntries.map(createDelayedActRootWorkRecordSignature)
+    )
+  });
+}
+
+function getRejectedDelayedActRootWorkNestedSourceReason(source) {
+  if (!isObjectLike(source)) {
+    return 'metadata-source-missing';
+  }
+
+  const evidence = source.nestedEvidence;
+  if (!isObjectLike(evidence)) {
+    return 'metadata-source-nested-evidence-missing';
+  }
+  if (source.actQueue !== evidence.actQueue) {
+    return 'metadata-source-act-queue-evidence-mismatch';
+  }
+  if (source.rootWorkRecords !== evidence.rootWorkRecords) {
+    return 'metadata-source-root-work-records-evidence-mismatch';
+  }
+
+  const actQueueRecords = evidence.actQueue.records;
+  if (!Array.isArray(actQueueRecords)) {
+    return 'metadata-source-act-queue-records-not-array';
+  }
+  if (actQueueRecords !== evidence.actQueueRecordsArray) {
+    return 'metadata-source-act-queue-records-array-mismatch';
+  }
+  if (actQueueRecords.length !== evidence.actQueueRecordCount) {
+    return 'metadata-source-act-queue-record-count-mismatch';
+  }
+  for (let index = 0; index < evidence.actQueueRecordCount; index++) {
+    const record = actQueueRecords[index];
+    if (record !== evidence.actQueueRecords[index]) {
+      return 'metadata-source-act-queue-record-' + index + '-identity-mismatch';
+    }
+    if (
+      getDelayedActRootWorkActTaskCallbackIdentity(record) !==
+      evidence.actQueueRecordCallbacks[index]
+    ) {
+      return 'metadata-source-act-queue-record-' + index + '-callback-mismatch';
+    }
+    if (
+      createDelayedActRootWorkActTaskSignature(record) !==
+      evidence.actQueueRecordSignatures[index]
+    ) {
+      return 'metadata-source-act-queue-record-' + index + '-signature-mismatch';
+    }
+  }
+
+  const rootWorkRecords = evidence.rootWorkRecords;
+  if (!Array.isArray(rootWorkRecords)) {
+    return 'metadata-source-root-work-records-not-array';
+  }
+  if (rootWorkRecords.length !== evidence.rootWorkRecordCount) {
+    return 'metadata-source-root-work-record-count-mismatch';
+  }
+  for (let index = 0; index < evidence.rootWorkRecordCount; index++) {
+    const record = rootWorkRecords[index];
+    if (record !== evidence.rootWorkRecordEntries[index]) {
+      return (
+        'metadata-source-root-work-record-' + index + '-identity-mismatch'
+      );
+    }
+    if (
+      createDelayedActRootWorkRecordSignature(record) !==
+      evidence.rootWorkRecordSignatures[index]
+    ) {
+      return (
+        'metadata-source-root-work-record-' + index + '-signature-mismatch'
+      );
+    }
+  }
+
+  return null;
+}
+
+function getDelayedActRootWorkActTaskCallbackIdentity(task) {
+  if (!isObjectLike(task)) {
+    return null;
+  }
+  return task.callback ?? null;
+}
+
+function createDelayedActRootWorkActTaskSignature(task) {
+  if (!isObjectLike(task)) {
+    return 'not-object';
+  }
+
+  return JSON.stringify({
+    kind: task.kind ?? null,
+    version: task.version ?? null,
+    compatibilityTarget: task.compatibilityTarget ?? null,
+    schedulerCompatibilityTarget: task.schedulerCompatibilityTarget ?? null,
+    recordKind: task.recordKind ?? null,
+    taskKind: task.taskKind ?? null,
+    continuationStatus: task.continuationStatus ?? null,
+    label: task.label ?? null,
+    callback: createDelayedActRootWorkCallbackSignature(task.callback),
+    publicCompatibilityClaimed: task.publicCompatibilityClaimed,
+    publicSchedulerTimingCompatibilityClaimed:
+      task.publicSchedulerTimingCompatibilityClaimed,
+    publicReactActCompatibilityClaimed: task.publicReactActCompatibilityClaimed,
+    executesQueuedWork: task.executesQueuedWork,
+    executesEffects: task.executesEffects
+  });
+}
+
+function createDelayedActRootWorkCallbackSignature(callback) {
+  if (callback === undefined) {
+    return Object.freeze({ status: 'undefined' });
+  }
+  if (callback === null) {
+    return Object.freeze({ status: 'null' });
+  }
+  if (typeof callback !== 'function') {
+    return Object.freeze({
+      status: 'not-function',
+      type: typeof callback
+    });
+  }
+
+  return Object.freeze({
+    status: 'function',
+    kind: callback.kind ?? null,
+    version: callback.version ?? null,
+    compatibilityTarget: callback.compatibilityTarget ?? null,
+    schedulerCompatibilityTarget: callback.schedulerCompatibilityTarget ?? null,
+    label: callback.label ?? null,
+    publicCompatibilityClaimed: callback.publicCompatibilityClaimed,
+    publicSchedulerTimingCompatibilityClaimed:
+      callback.publicSchedulerTimingCompatibilityClaimed,
+    publicReactActCompatibilityClaimed:
+      callback.publicReactActCompatibilityClaimed,
+    executesQueuedWork: callback.executesQueuedWork,
+    executesEffects: callback.executesEffects
+  });
+}
+
+function createDelayedActRootWorkRecordSignature(record) {
+  if (!isObjectLike(record)) {
+    return 'not-object';
+  }
+
+  return JSON.stringify({
+    recordKind: getExpiredActRootWorkRecordKind(record) ?? null,
+    accepted: record.accepted,
+    rootId: record.rootId ?? null,
+    rootLabel: record.rootLabel ?? null,
+    lane: record.lane ?? null,
+    laneLabel: record.laneLabel ?? null,
+    publicCompatibilityClaimed: record.publicCompatibilityClaimed,
+    publicSchedulerTimingCompatibilityClaimed:
+      record.publicSchedulerTimingCompatibilityClaimed,
+    publicReactActCompatibilityClaimed: record.publicReactActCompatibilityClaimed,
+    publicRootSchedulerCompatibilityClaimed:
+      record.publicRootSchedulerCompatibilityClaimed,
+    publicRendererCompatibilityClaimed: record.publicRendererCompatibilityClaimed,
+    drainsPublicSchedulerTaskQueue: record.drainsPublicSchedulerTaskQueue,
+    drainsPublicReactActQueue: record.drainsPublicReactActQueue,
+    executesQueuedWork: record.executesQueuedWork,
+    executesEffects: record.executesEffects,
+    executesRendererWork: record.executesRendererWork,
+    executesRendererRoots: record.executesRendererRoots,
+    rendererWorkExecutionBlocked: record.rendererWorkExecutionBlocked,
+    rootWorkMetadataOnly: record.rootWorkMetadataOnly
+  });
 }
 
 function validateDelayedActRootWorkMetadata(
@@ -1782,6 +2291,34 @@ function validateDelayedActRootWorkMetadata(
     });
   }
 
+  const producerSourceRejectionReason =
+    getRejectedDelayedActRootWorkMetadataProducerSourceReason(
+      sourceScheduler,
+      shadowState,
+      delayedActRootWorkMetadata,
+      taskRecord,
+      expiredActRootWorkMetadata,
+      scheduledVirtualTime,
+      delayMs,
+      taskRecord.task.startTime,
+      taskRecord.task.expirationTime,
+      priorityTimeoutMs
+    );
+  if (producerSourceRejectionReason !== null) {
+    return invalid(producerSourceRejectionReason, {
+      taskRecord,
+      priorityLabel,
+      schedulerPriority,
+      scheduledVirtualTime,
+      delayMs,
+      startTime: taskRecord.task.startTime,
+      expirationTime: taskRecord.task.expirationTime,
+      priorityTimeoutMs,
+      expiredActRootWorkMetadata,
+      expiredActRootWorkValidation
+    });
+  }
+
   return {
     rejectionReason: null,
     taskRecord,
@@ -1795,6 +2332,60 @@ function validateDelayedActRootWorkMetadata(
     expiredActRootWorkMetadata,
     expiredActRootWorkValidation
   };
+}
+
+function getRejectedDelayedActRootWorkMetadataProducerSourceReason(
+  sourceScheduler,
+  shadowState,
+  delayedActRootWorkMetadata,
+  taskRecord,
+  expiredActRootWorkMetadata,
+  scheduledVirtualTime,
+  delayMs,
+  startTime,
+  expirationTime,
+  priorityTimeoutMs
+) {
+  const source = delayedActRootWorkMetadataSources.get(
+    delayedActRootWorkMetadata
+  );
+  if (source === undefined) {
+    return 'metadata-not-produced-by-private-delayed-root-producer';
+  }
+  if (source.sourceScheduler !== sourceScheduler) {
+    return 'metadata-source-scheduler-mismatch';
+  }
+  if (source.shadowState !== shadowState) {
+    return 'metadata-source-shadow-state-mismatch';
+  }
+  if (source.taskRecord !== taskRecord) {
+    return 'metadata-source-task-record-mismatch';
+  }
+  if (source.callbackHandle !== delayedActRootWorkMetadata.callbackHandle) {
+    return 'metadata-source-callback-handle-mismatch';
+  }
+  if (source.expiredActRootWorkMetadata !== expiredActRootWorkMetadata) {
+    return 'metadata-source-expired-act-root-work-mismatch';
+  }
+  if (source.actQueue !== expiredActRootWorkMetadata.actQueue) {
+    return 'metadata-source-act-queue-mismatch';
+  }
+  if (source.rootWorkRecords !== expiredActRootWorkMetadata.rootWorkRecords) {
+    return 'metadata-source-root-work-records-mismatch';
+  }
+  if (source.scheduleOrder !== taskRecord.scheduleOrder) {
+    return 'metadata-source-schedule-order-mismatch';
+  }
+  if (
+    source.scheduledVirtualTime !== scheduledVirtualTime ||
+    source.delayMs !== delayMs ||
+    source.startTime !== startTime ||
+    source.expirationTime !== expirationTime ||
+    source.priorityTimeoutMs !== priorityTimeoutMs
+  ) {
+    return 'metadata-source-timing-mismatch';
+  }
+  return getRejectedDelayedActRootWorkNestedSourceReason(source);
 }
 
 function isDelayedActRootWorkMetadataObject(value) {
@@ -1888,6 +2479,11 @@ function summarizeDelayedActRootWorkMetadataForDiagnostics(
       taskRecord.task.startTime > snapshotTime &&
       taskRecord.task.expirationTime > snapshotTime &&
       taskRecord.task.sortIndex === taskRecord.task.startTime,
+    producedByPrivateDelayedActRootWorkMetadataProducer:
+      delayedActRootWorkMetadataSources.has(delayedActRootWorkMetadata),
+    producerStatus: isMetadataObject
+      ? delayedActRootWorkMetadata.producerStatus ?? null
+      : null,
     scheduledVirtualTime,
     delayMs,
     startTime,
