@@ -9,12 +9,19 @@ const actSchedulerGateStatus =
   'blocked-private-react-test-renderer-act-scheduler-metadata-only';
 const actWarningThenableBlockerStatus =
   'blocked-private-react-test-renderer-act-warning-thenable-diagnostics-only';
+const actNestedScopeBlockerStatus =
+  'blocked-private-react-test-renderer-act-nested-scope-diagnostics-only';
 const createRoutingGateStatus =
   'blocked-missing-react-test-renderer-create-routing-prerequisites';
 const publicAsyncActCompatibilityBlockerIds = Object.freeze([
   'public-react-test-renderer-act-warning-emission',
   'public-react-test-renderer-act-thenable-awaiting',
   'public-react-test-renderer-async-act-scope-settlement'
+]);
+const publicNestedActScopeCompatibilityBlockerIds = Object.freeze([
+  'public-react-test-renderer-act-scope-depth-tracking',
+  'public-react-test-renderer-nested-act-queue-reuse',
+  'public-react-test-renderer-overlapping-act-warning-emission'
 ]);
 const actSchedulerMissingBeforeExecution = Object.freeze([
   'public-react-test-renderer-act-queue-drain',
@@ -23,7 +30,8 @@ const actSchedulerMissingBeforeExecution = Object.freeze([
   'react-test-renderer-renderer-roots-compatibility-admission',
   'react-test-renderer-passive-effect-callback-execution',
   'react-test-renderer-private-root-request-execution',
-  ...publicAsyncActCompatibilityBlockerIds
+  ...publicAsyncActCompatibilityBlockerIds,
+  ...publicNestedActScopeCompatibilityBlockerIds
 ]);
 const privateActQueueFlushDiagnosticsExport =
   '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
@@ -70,6 +78,11 @@ const privateSchedulerMockExpiredWorkMetadataBrand = Symbol.for(
   privateSchedulerMockExpiredWorkMetadataKind
 );
 const privateSchedulerMockExpiredWorkMetadataVersion = 1;
+const actNestedScopeBlockerIds = Object.freeze([
+  'react-test-renderer-act-nested-sync-scope-blocker',
+  'react-test-renderer-act-overlapping-async-scope-blocker',
+  'react-test-renderer-act-overlapping-sync-async-scope-blocker'
+]);
 const acceptedActQueueRecordKinds = Object.freeze([
   'SchedulerActQueueRequest',
   'SchedulerActScopeBoundaryRecord',
@@ -678,6 +691,81 @@ const actWarningThenableBlockerDiagnostics = Object.freeze({
   executesEffects: false,
   compatibilityClaimed: false
 });
+const actNestedScopeBlockerDiagnostics = Object.freeze({
+  id: 'react-test-renderer-act-nested-scope-blockers',
+  status: actNestedScopeBlockerStatus,
+  acceptedWorker: 'worker-541-test-renderer-act-nested-scope-blockers',
+  acceptedOracle: 'react-19.2.6-react-test-renderer-act-oracle',
+  acceptedReactSource: 'packages/react/src/ReactAct.js',
+  acceptedReactSourceAlgorithm: 'ReactAct.js popActScope',
+  sourceInvariant: 'prevActScopeDepth !== actScopeDepth - 1',
+  observedPublicWarningSurface: 'overlapping-act-scope-warning',
+  nestedScopeBlockerIds: actNestedScopeBlockerIds,
+  blockedPublicPrerequisiteIds: publicNestedActScopeCompatibilityBlockerIds,
+  records: Object.freeze([
+    Object.freeze({
+      id: 'react-test-renderer-act-nested-sync-scope-blocker',
+      scopeKind: 'sync',
+      publicPrerequisiteId:
+        'public-react-test-renderer-act-scope-depth-tracking',
+      recordsNestedScopeDepth: false,
+      reusesPublicActQueue: false,
+      invokesActCallback: false,
+      drainsPublicReactActQueue: false,
+      executesQueuedWork: false,
+      executesEffects: false,
+      compatibilityClaimed: false
+    }),
+    Object.freeze({
+      id: 'react-test-renderer-act-overlapping-async-scope-blocker',
+      scopeKind: 'async',
+      publicPrerequisiteId:
+        'public-react-test-renderer-overlapping-act-warning-emission',
+      expectedPublicWarningCount: 2,
+      emitsOverlappingActWarning: false,
+      awaitsThenables: false,
+      settlesAsyncActScopes: false,
+      invokesActCallback: false,
+      drainsPublicReactActQueue: false,
+      executesQueuedWork: false,
+      executesEffects: false,
+      compatibilityClaimed: false
+    }),
+    Object.freeze({
+      id: 'react-test-renderer-act-overlapping-sync-async-scope-blocker',
+      scopeKind: 'sync-inside-pending-async',
+      publicPrerequisiteId:
+        'public-react-test-renderer-nested-act-queue-reuse',
+      reusesPublicActQueue: false,
+      tracksPendingAsyncActScope: false,
+      restoresSyncActThenableScope: false,
+      invokesActCallback: false,
+      drainsPublicReactActQueue: false,
+      drainsPublicSchedulerTaskQueue: false,
+      executesQueuedWork: false,
+      executesEffects: false,
+      compatibilityClaimed: false
+    })
+  ]),
+  publicActScopeDepthTrackingAvailable: false,
+  publicNestedActQueueReuseAvailable: false,
+  publicOverlappingActWarningEmissionAvailable: false,
+  publicActThenableAwaitingAvailable: false,
+  publicActThenableResolutionAvailable: false,
+  publicActThenableSettlementAvailable: false,
+  publicAsyncActScopeSettlementAvailable: false,
+  publicAsyncActCompatibilityClaimed: false,
+  returnsPublicActThenable: false,
+  tracksDidAwaitActCall: false,
+  invokesActCallback: false,
+  drainsPublicReactActQueue: false,
+  drainsPublicSchedulerTaskQueue: false,
+  publicSchedulerFlushExecutionAvailable: false,
+  executesQueuedWork: false,
+  executesEffects: false,
+  executesPassiveEffects: false,
+  compatibilityClaimed: false
+});
 const schedulerReactActQueueDiagnosticRecords = Object.freeze([
   Object.freeze({
     id: 'scheduler-private-act-queue-flush-diagnostics',
@@ -768,6 +856,31 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     compatibilityClaimed: false
   }),
   Object.freeze({
+    id: 'react-test-renderer-act-nested-scope-blockers',
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    status: actNestedScopeBlockerStatus,
+    diagnostics: actNestedScopeBlockerDiagnostics,
+    acceptedWorker: 'worker-541-test-renderer-act-nested-scope-blockers',
+    acceptedOracle: 'react-19.2.6-react-test-renderer-act-oracle',
+    acceptedReactSource: 'packages/react/src/ReactAct.js',
+    nestedScopeBlockerIds: actNestedScopeBlockerIds,
+    blockedPublicPrerequisiteIds: publicNestedActScopeCompatibilityBlockerIds,
+    publicActScopeDepthTrackingAvailable: false,
+    publicNestedActQueueReuseAvailable: false,
+    publicOverlappingActWarningEmissionAvailable: false,
+    publicActThenableSettlementAvailable: false,
+    publicAsyncActScopeSettlementAvailable: false,
+    publicAsyncActCompatibilityClaimed: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesPassiveEffects: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
     id: 'test-renderer-mock-scheduler-expired-work-act-route',
     jsPrivateExport: privateActQueueFlushDiagnosticsExport,
     schedulerStatus: 'private-scheduler-act-queue-flush-diagnostics',
@@ -842,12 +955,19 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   describesExpiredMockSchedulerWorkWithoutFlushing: true,
   drainsExpiredMockSchedulerWork: false,
   warningThenableBlockerDiagnostics: actWarningThenableBlockerDiagnostics,
+  nestedScopeBlockerDiagnostics: actNestedScopeBlockerDiagnostics,
   publicActWarningEmissionAvailable: false,
+  publicActScopeDepthTrackingAvailable: false,
+  publicNestedActQueueReuseAvailable: false,
+  publicOverlappingActWarningEmissionAvailable: false,
   publicActThenableAwaitingAvailable: false,
   publicActThenableResolutionAvailable: false,
+  publicActThenableSettlementAvailable: false,
   publicAsyncActCompatibilityClaimed: false,
   emitsActWarnings: false,
+  emitsOverlappingActWarnings: false,
   awaitsActThenables: false,
+  settlesAsyncActScopes: false,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
   publicSchedulerTimingCompatibilityClaimed: false,
@@ -905,6 +1025,7 @@ const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'scheduler-act-queue-routing-records',
   'scheduler-mock-flush-helper-metadata',
   'act-warning-thenable-public-compatibility-blockers',
+  'act-nested-scope-public-compatibility-blockers',
   'sync-flush-act-continuation-records',
   'sync-flush-post-passive-continuation-execution-gate',
   'sync-flush-post-passive-private-execution-metadata',
@@ -977,6 +1098,28 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     drainsPublicSchedulerTaskQueue: false,
     executesQueuedWork: false,
     executesEffects: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
+    id: 'act-nested-scope-public-compatibility-blockers',
+    present: true,
+    recordOnly: true,
+    diagnostics: actNestedScopeBlockerDiagnostics,
+    blockedPublicPrerequisiteIds:
+      publicNestedActScopeCompatibilityBlockerIds,
+    publicActScopeDepthTrackingAvailable: false,
+    publicNestedActQueueReuseAvailable: false,
+    publicOverlappingActWarningEmissionAvailable: false,
+    publicActThenableSettlementAvailable: false,
+    publicAsyncActScopeSettlementAvailable: false,
+    publicAsyncActCompatibilityClaimed: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesPassiveEffects: false,
     compatibilityClaimed: false
   }),
   Object.freeze({
@@ -1123,9 +1266,12 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   consumesPrivatePassiveEffectDrainDiagnostics: true,
   consumesPendingPassiveFlushMetadata: true,
   emitsActWarnings: false,
+  emitsOverlappingActWarnings: false,
   awaitsActThenables: false,
   resolvesActThenables: false,
   settlesAsyncActScopes: false,
+  tracksActScopeDepth: false,
+  reusesNestedActQueue: false,
   publicAsyncActCompatibilityClaimed: false,
   drainsAcceptedInternalTestQueues: true,
   routesAcceptedMockSchedulerFlushHelperMetadata: true,
@@ -1174,7 +1320,8 @@ const actSchedulerGate = Object.freeze({
     'worker-469-scheduler-mock-expired-continuation-gate',
     'worker-482-test-renderer-act-scheduler-flush-gate',
     'worker-517-test-renderer-act-warning-thenable-blockers',
-    'worker-518-scheduler-mock-expired-act-route'
+    'worker-518-scheduler-mock-expired-act-route',
+    'worker-541-test-renderer-act-nested-scope-blockers'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -1212,9 +1359,14 @@ const actSchedulerGate = Object.freeze({
   privatePassiveSchedulerFlushMetadataAccepted: true,
   privatePassiveEffectDrainDiagnosticsConsumed: true,
   warningThenableBlockerDiagnosticsAccepted: true,
+  nestedScopeBlockerDiagnosticsAccepted: true,
   publicActWarningEmissionAvailable: false,
+  publicActScopeDepthTrackingAvailable: false,
+  publicNestedActQueueReuseAvailable: false,
+  publicOverlappingActWarningEmissionAvailable: false,
   publicActThenableAwaitingAvailable: false,
   publicActThenableResolutionAvailable: false,
+  publicActThenableSettlementAvailable: false,
   publicAsyncActScopeSettlementAvailable: false,
   publicAsyncActCompatibilityClaimed: false,
   privateRootOutputDiagnosticsAccepted: true,
@@ -1225,6 +1377,7 @@ const actSchedulerGate = Object.freeze({
     schedulerReactActQueueDiagnosticRecords,
   recognizedActWarningThenableBlockers:
     actWarningThenableBlockerDiagnostics,
+  recognizedActNestedScopeBlockers: actNestedScopeBlockerDiagnostics,
   privateActQueueFlushDiagnostics,
   privateActPassiveEffectDrainDiagnostics,
   recognizedSchedulerMockFlushHelpers: schedulerMockFlushHelperMetadata,
@@ -1238,6 +1391,8 @@ const actSchedulerGate = Object.freeze({
   blockedPrivateFlushPrerequisiteIds: blockedPrivateActFlushPrerequisiteIds,
   blockedPublicAsyncActCompatibilityPrerequisiteIds:
     publicAsyncActCompatibilityBlockerIds,
+  blockedPublicNestedActCompatibilityPrerequisiteIds:
+    publicNestedActScopeCompatibilityBlockerIds,
   sideEffectPolicy: actSchedulerSideEffectPolicy,
   missingBeforeExecution: actSchedulerMissingBeforeExecution
 });
@@ -3160,12 +3315,22 @@ function createUnsupportedError(
       recognizedActSchedulerGate.privatePassiveCallbackExecutionMetadataAccepted;
     error.warningThenableBlockerDiagnosticsAccepted =
       recognizedActSchedulerGate.warningThenableBlockerDiagnosticsAccepted;
+    error.nestedScopeBlockerDiagnosticsAccepted =
+      recognizedActSchedulerGate.nestedScopeBlockerDiagnosticsAccepted;
     error.publicActWarningEmissionAvailable =
       recognizedActSchedulerGate.publicActWarningEmissionAvailable;
+    error.publicActScopeDepthTrackingAvailable =
+      recognizedActSchedulerGate.publicActScopeDepthTrackingAvailable;
+    error.publicNestedActQueueReuseAvailable =
+      recognizedActSchedulerGate.publicNestedActQueueReuseAvailable;
+    error.publicOverlappingActWarningEmissionAvailable =
+      recognizedActSchedulerGate.publicOverlappingActWarningEmissionAvailable;
     error.publicActThenableAwaitingAvailable =
       recognizedActSchedulerGate.publicActThenableAwaitingAvailable;
     error.publicActThenableResolutionAvailable =
       recognizedActSchedulerGate.publicActThenableResolutionAvailable;
+    error.publicActThenableSettlementAvailable =
+      recognizedActSchedulerGate.publicActThenableSettlementAvailable;
     error.publicAsyncActScopeSettlementAvailable =
       recognizedActSchedulerGate.publicAsyncActScopeSettlementAvailable;
     error.publicAsyncActCompatibilityClaimed =

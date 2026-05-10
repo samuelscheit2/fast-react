@@ -154,10 +154,24 @@ const ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION = [
   "public-react-test-renderer-act-thenable-awaiting",
   "public-react-test-renderer-async-act-scope-settlement"
 ];
+const ACT_SCHEDULER_NESTED_SCOPE_MISSING_BEFORE_EXECUTION = [
+  "public-react-test-renderer-act-scope-depth-tracking",
+  "public-react-test-renderer-nested-act-queue-reuse",
+  "public-react-test-renderer-overlapping-act-warning-emission"
+];
 const ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID =
   "act-warning-thenable-public-compatibility-blockers";
 const ACT_WARNING_THENABLE_BLOCKER_RECORD_ID =
   "react-test-renderer-act-warning-thenable-blockers";
+const ACT_NESTED_SCOPE_BLOCKER_PREREQUISITE_ID =
+  "act-nested-scope-public-compatibility-blockers";
+const ACT_NESTED_SCOPE_BLOCKER_RECORD_ID =
+  "react-test-renderer-act-nested-scope-blockers";
+const ACT_NESTED_SCOPE_BLOCKER_IDS = [
+  "react-test-renderer-act-nested-sync-scope-blocker",
+  "react-test-renderer-act-overlapping-async-scope-blocker",
+  "react-test-renderer-act-overlapping-sync-async-scope-blocker"
+];
 const ACT_SCHEDULER_FLUSH_HELPER_METADATA = [
   [
     "unstable_flushAll",
@@ -215,6 +229,7 @@ const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
   ACT_WARNING_THENABLE_BLOCKER_RECORD_ID,
+  ACT_NESTED_SCOPE_BLOCKER_RECORD_ID,
   "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
@@ -225,7 +240,8 @@ function actSchedulerMissingBeforeExecution(entrypoint) {
   return entrypoint === CJS_DEVELOPMENT_ENTRYPOINT
     ? [
         ...ACT_SCHEDULER_MISSING_BEFORE_EXECUTION,
-        ...ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION
+        ...ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION,
+        ...ACT_SCHEDULER_NESTED_SCOPE_MISSING_BEFORE_EXECUTION
       ]
     : ACT_SCHEDULER_MISSING_BEFORE_EXECUTION;
 }
@@ -324,6 +340,7 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS = [
 const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS = [
   ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(0, 4),
   ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID,
+  ACT_NESTED_SCOPE_BLOCKER_PREREQUISITE_ID,
   ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4)
 ];
 
@@ -1246,18 +1263,36 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
   assert.equal(diagnostics.invokesActCallback, false);
   if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
     assert.equal(diagnostics.publicActWarningEmissionAvailable, false);
+    assert.equal(diagnostics.publicActScopeDepthTrackingAvailable, false);
+    assert.equal(diagnostics.publicNestedActQueueReuseAvailable, false);
+    assert.equal(
+      diagnostics.publicOverlappingActWarningEmissionAvailable,
+      false
+    );
     assert.equal(diagnostics.publicActThenableAwaitingAvailable, false);
     assert.equal(diagnostics.publicActThenableResolutionAvailable, false);
+    assert.equal(diagnostics.publicActThenableSettlementAvailable, false);
     assert.equal(diagnostics.publicAsyncActCompatibilityClaimed, false);
     assert.equal(diagnostics.emitsActWarnings, false);
+    assert.equal(diagnostics.emitsOverlappingActWarnings, false);
     assert.equal(diagnostics.awaitsActThenables, false);
+    assert.equal(diagnostics.settlesAsyncActScopes, false);
     assertActWarningThenableBlockerDiagnostics(
       entry,
       diagnostics.warningThenableBlockerDiagnostics
     );
+    assertActNestedScopeBlockerDiagnostics(
+      entry,
+      diagnostics.nestedScopeBlockerDiagnostics
+    );
   } else {
     assert.equal(
       diagnostics.warningThenableBlockerDiagnostics,
+      undefined,
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.nestedScopeBlockerDiagnostics,
       undefined,
       entry.entrypoint
     );
@@ -1502,6 +1537,96 @@ function assertActWarningThenableBlockerDiagnostics(entry, diagnostics) {
     },
     entry.entrypoint
   );
+}
+
+function assertActNestedScopeBlockerDiagnostics(entry, diagnostics) {
+  assert.equal(Object.isFrozen(diagnostics), true, entry.entrypoint);
+  assert.equal(
+    diagnostics.id,
+    ACT_NESTED_SCOPE_BLOCKER_RECORD_ID,
+    entry.entrypoint
+  );
+  assert.equal(
+    diagnostics.status,
+    "blocked-private-react-test-renderer-act-nested-scope-diagnostics-only"
+  );
+  assert.equal(
+    diagnostics.acceptedWorker,
+    "worker-541-test-renderer-act-nested-scope-blockers"
+  );
+  assert.equal(
+    diagnostics.acceptedOracle,
+    "react-19.2.6-react-test-renderer-act-oracle"
+  );
+  assert.equal(
+    diagnostics.acceptedReactSource,
+    "packages/react/src/ReactAct.js"
+  );
+  assert.equal(
+    diagnostics.acceptedReactSourceAlgorithm,
+    "ReactAct.js popActScope"
+  );
+  assert.equal(
+    diagnostics.sourceInvariant,
+    "prevActScopeDepth !== actScopeDepth - 1"
+  );
+  assert.equal(
+    diagnostics.observedPublicWarningSurface,
+    "overlapping-act-scope-warning"
+  );
+  assert.deepEqual(
+    diagnostics.nestedScopeBlockerIds,
+    ACT_NESTED_SCOPE_BLOCKER_IDS
+  );
+  assert.deepEqual(
+    diagnostics.blockedPublicPrerequisiteIds,
+    ACT_SCHEDULER_NESTED_SCOPE_MISSING_BEFORE_EXECUTION
+  );
+  assert.deepEqual(
+    diagnostics.records.map((record) => record.id),
+    ACT_NESTED_SCOPE_BLOCKER_IDS
+  );
+  assert.deepEqual(
+    diagnostics.records.map((record) => record.scopeKind),
+    ["sync", "async", "sync-inside-pending-async"]
+  );
+  for (const record of diagnostics.records) {
+    assert.equal(Object.isFrozen(record), true, record.id);
+    assert.equal(record.invokesActCallback, false, record.id);
+    assert.equal(record.drainsPublicReactActQueue, false, record.id);
+    assert.equal(record.executesQueuedWork, false, record.id);
+    assert.equal(record.executesEffects, false, record.id);
+    assert.equal(record.compatibilityClaimed, false, record.id);
+  }
+  assert.equal(diagnostics.records[0].recordsNestedScopeDepth, false);
+  assert.equal(diagnostics.records[0].reusesPublicActQueue, false);
+  assert.equal(diagnostics.records[1].expectedPublicWarningCount, 2);
+  assert.equal(diagnostics.records[1].emitsOverlappingActWarning, false);
+  assert.equal(diagnostics.records[1].awaitsThenables, false);
+  assert.equal(diagnostics.records[1].settlesAsyncActScopes, false);
+  assert.equal(diagnostics.records[2].tracksPendingAsyncActScope, false);
+  assert.equal(diagnostics.records[2].restoresSyncActThenableScope, false);
+  assert.equal(diagnostics.publicActScopeDepthTrackingAvailable, false);
+  assert.equal(diagnostics.publicNestedActQueueReuseAvailable, false);
+  assert.equal(
+    diagnostics.publicOverlappingActWarningEmissionAvailable,
+    false
+  );
+  assert.equal(diagnostics.publicActThenableAwaitingAvailable, false);
+  assert.equal(diagnostics.publicActThenableResolutionAvailable, false);
+  assert.equal(diagnostics.publicActThenableSettlementAvailable, false);
+  assert.equal(diagnostics.publicAsyncActScopeSettlementAvailable, false);
+  assert.equal(diagnostics.publicAsyncActCompatibilityClaimed, false);
+  assert.equal(diagnostics.returnsPublicActThenable, false);
+  assert.equal(diagnostics.tracksDidAwaitActCall, false);
+  assert.equal(diagnostics.invokesActCallback, false);
+  assert.equal(diagnostics.drainsPublicReactActQueue, false);
+  assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(diagnostics.publicSchedulerFlushExecutionAvailable, false);
+  assert.equal(diagnostics.executesQueuedWork, false);
+  assert.equal(diagnostics.executesEffects, false);
+  assert.equal(diagnostics.executesPassiveEffects, false);
+  assert.equal(diagnostics.compatibilityClaimed, false);
 }
 
 function assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate) {
@@ -2333,14 +2458,27 @@ function assertActSurface(entry, moduleExports) {
   assert.equal(error.privatePassiveCallbackExecutionMetadataAccepted, true);
   if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
     assert.equal(error.warningThenableBlockerDiagnosticsAccepted, true);
+    assert.equal(error.nestedScopeBlockerDiagnosticsAccepted, true);
     assert.equal(error.publicActWarningEmissionAvailable, false);
+    assert.equal(error.publicActScopeDepthTrackingAvailable, false);
+    assert.equal(error.publicNestedActQueueReuseAvailable, false);
+    assert.equal(
+      error.publicOverlappingActWarningEmissionAvailable,
+      false
+    );
     assert.equal(error.publicActThenableAwaitingAvailable, false);
     assert.equal(error.publicActThenableResolutionAvailable, false);
+    assert.equal(error.publicActThenableSettlementAvailable, false);
     assert.equal(error.publicAsyncActScopeSettlementAvailable, false);
     assert.equal(error.publicAsyncActCompatibilityClaimed, false);
   } else {
     assert.equal(
       error.warningThenableBlockerDiagnosticsAccepted,
+      undefined,
+      entry.entrypoint
+    );
+    assert.equal(
+      error.nestedScopeBlockerDiagnosticsAccepted,
       undefined,
       entry.entrypoint
     );
@@ -2447,7 +2585,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-469-scheduler-mock-expired-continuation-gate",
       "worker-482-test-renderer-act-scheduler-flush-gate",
       "worker-517-test-renderer-act-warning-thenable-blockers",
-      "worker-518-scheduler-mock-expired-act-route"
+      "worker-518-scheduler-mock-expired-act-route",
+      "worker-541-test-renderer-act-nested-scope-blockers"
     );
   }
 
@@ -2508,7 +2647,23 @@ function assertActSchedulerGate(gate, entrypoint) {
     cjsDevelopmentOnly ? true : undefined
   );
   assert.equal(
+    gate.nestedScopeBlockerDiagnosticsAccepted,
+    cjsDevelopmentOnly ? true : undefined
+  );
+  assert.equal(
     gate.publicActWarningEmissionAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicActScopeDepthTrackingAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicNestedActQueueReuseAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicOverlappingActWarningEmissionAvailable,
     cjsDevelopmentOnly ? false : undefined
   );
   assert.equal(
@@ -2517,6 +2672,10 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.equal(
     gate.publicActThenableResolutionAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicActThenableSettlementAvailable,
     cjsDevelopmentOnly ? false : undefined
   );
   assert.equal(
@@ -2561,10 +2720,23 @@ function assertActSchedulerGate(gate, entrypoint) {
       { entrypoint },
       gate.privateActQueueFlushDiagnostics.warningThenableBlockerDiagnostics
     );
+    assertActNestedScopeBlockerDiagnostics(
+      { entrypoint },
+      gate.recognizedActNestedScopeBlockers
+    );
+    assertActNestedScopeBlockerDiagnostics(
+      { entrypoint },
+      gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics
+    );
   } else {
     assert.equal(gate.recognizedActWarningThenableBlockers, undefined);
+    assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
     assert.equal(
       gate.privateActQueueFlushDiagnostics.warningThenableBlockerDiagnostics,
+      undefined
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics,
       undefined
     );
   }
@@ -2603,6 +2775,12 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.blockedPublicAsyncActCompatibilityPrerequisiteIds,
     cjsDevelopmentOnly
       ? ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION
+      : undefined
+  );
+  assert.deepEqual(
+    gate.blockedPublicNestedActCompatibilityPrerequisiteIds,
+    cjsDevelopmentOnly
+      ? ACT_SCHEDULER_NESTED_SCOPE_MISSING_BEFORE_EXECUTION
       : undefined
   );
   assert.deepEqual(
@@ -2648,9 +2826,12 @@ function assertActSchedulerGate(gate, entrypoint) {
       publicSchedulerFlushBehaviorExecuted: false,
       drainsExpiredMockSchedulerWork: false,
       emitsActWarnings: false,
+      emitsOverlappingActWarnings: false,
       awaitsActThenables: false,
       resolvesActThenables: false,
       settlesAsyncActScopes: false,
+      tracksActScopeDepth: false,
+      reusesNestedActQueue: false,
       publicAsyncActCompatibilityClaimed: false
     });
   }
@@ -2724,6 +2905,49 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(warningThenableRecord.executesQueuedWork, false);
     assert.equal(warningThenableRecord.executesEffects, false);
 
+    const nestedScopeRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_NESTED_SCOPE_BLOCKER_RECORD_ID
+      );
+    assert.notEqual(nestedScopeRecord, undefined);
+    assert.equal(
+      nestedScopeRecord.status,
+      "blocked-private-react-test-renderer-act-nested-scope-diagnostics-only"
+    );
+    assert.deepEqual(
+      nestedScopeRecord.nestedScopeBlockerIds,
+      ACT_NESTED_SCOPE_BLOCKER_IDS
+    );
+    assert.deepEqual(
+      nestedScopeRecord.blockedPublicPrerequisiteIds,
+      ACT_SCHEDULER_NESTED_SCOPE_MISSING_BEFORE_EXECUTION
+    );
+    assert.equal(
+      nestedScopeRecord.publicActScopeDepthTrackingAvailable,
+      false
+    );
+    assert.equal(
+      nestedScopeRecord.publicNestedActQueueReuseAvailable,
+      false
+    );
+    assert.equal(
+      nestedScopeRecord.publicOverlappingActWarningEmissionAvailable,
+      false
+    );
+    assert.equal(nestedScopeRecord.publicActThenableSettlementAvailable, false);
+    assert.equal(nestedScopeRecord.publicAsyncActCompatibilityClaimed, false);
+    assert.equal(nestedScopeRecord.invokesActCallback, false);
+    assert.equal(nestedScopeRecord.drainsPublicReactActQueue, false);
+    assert.equal(nestedScopeRecord.drainsPublicSchedulerTaskQueue, false);
+    assert.equal(
+      nestedScopeRecord.publicSchedulerFlushExecutionAvailable,
+      false
+    );
+    assert.equal(nestedScopeRecord.executesQueuedWork, false);
+    assert.equal(nestedScopeRecord.executesEffects, false);
+    assert.equal(nestedScopeRecord.executesPassiveEffects, false);
+    assert.equal(nestedScopeRecord.compatibilityClaimed, false);
+
     const expiredWorkRouteRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
         (record) =>
@@ -2760,6 +2984,12 @@ function assertActSchedulerGate(gate, entrypoint) {
       false
     );
   } else {
+    const nestedScopeRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_NESTED_SCOPE_BLOCKER_RECORD_ID
+      );
+    assert.equal(nestedScopeRecord, undefined);
+
     const expiredWorkRouteRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
         (record) =>

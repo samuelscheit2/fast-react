@@ -95,6 +95,11 @@ const actSchedulerWarningThenableMissingBeforeExecution = [
   "public-react-test-renderer-act-thenable-awaiting",
   "public-react-test-renderer-async-act-scope-settlement"
 ];
+const actSchedulerNestedScopeMissingBeforeExecution = [
+  "public-react-test-renderer-act-scope-depth-tracking",
+  "public-react-test-renderer-nested-act-queue-reuse",
+  "public-react-test-renderer-overlapping-act-warning-emission"
+];
 const privateRouteStatus = "blocked-js-native-bridge-not-loaded";
 const privateRootBridgeStatus =
   "blocked-private-test-renderer-root-bridge-execution";
@@ -240,6 +245,7 @@ const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
   "react-test-renderer-act-warning-thenable-blockers",
+  "react-test-renderer-act-nested-scope-blockers",
   "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
@@ -291,6 +297,7 @@ const acceptedPrivateActFlushCjsPrerequisiteIds = [
 const acceptedPrivateActFlushCjsDevelopmentPrerequisiteIds = [
   ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(0, 4),
   "act-warning-thenable-public-compatibility-blockers",
+  "act-nested-scope-public-compatibility-blockers",
   ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(4)
 ];
 const blockedPrivateActFlushPrerequisiteIds = [
@@ -4569,7 +4576,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-469-scheduler-mock-expired-continuation-gate",
       "worker-482-test-renderer-act-scheduler-flush-gate",
       "worker-517-test-renderer-act-warning-thenable-blockers",
-      "worker-518-scheduler-mock-expired-act-route"
+      "worker-518-scheduler-mock-expired-act-route",
+      "worker-541-test-renderer-act-nested-scope-blockers"
     );
   }
 
@@ -4625,6 +4633,30 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.privatePassiveEffectDrainDiagnosticsConsumed,
     isCjs ? true : undefined
   );
+  assert.equal(
+    gate.warningThenableBlockerDiagnosticsAccepted,
+    cjsDevelopmentOnly ? true : undefined
+  );
+  assert.equal(
+    gate.nestedScopeBlockerDiagnosticsAccepted,
+    cjsDevelopmentOnly ? true : undefined
+  );
+  assert.equal(
+    gate.publicActScopeDepthTrackingAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicNestedActQueueReuseAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicOverlappingActWarningEmissionAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicActThenableSettlementAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
   assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
   assert.equal(gate.privateFlushExecutionReady, false);
@@ -4678,10 +4710,64 @@ function assertActSchedulerGate(gate, entrypoint) {
     cjsDevelopmentOnly
       ? [
           ...actSchedulerMissingBeforeExecution,
-          ...actSchedulerWarningThenableMissingBeforeExecution
+          ...actSchedulerWarningThenableMissingBeforeExecution,
+          ...actSchedulerNestedScopeMissingBeforeExecution
         ]
       : actSchedulerMissingBeforeExecution
   );
+
+  if (cjsDevelopmentOnly) {
+    const nestedScopeRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) =>
+          record.id === "react-test-renderer-act-nested-scope-blockers"
+      );
+    assert.notEqual(nestedScopeRecord, undefined);
+    assert.equal(
+      nestedScopeRecord.status,
+      "blocked-private-react-test-renderer-act-nested-scope-diagnostics-only"
+    );
+    assert.deepEqual(nestedScopeRecord.nestedScopeBlockerIds, [
+      "react-test-renderer-act-nested-sync-scope-blocker",
+      "react-test-renderer-act-overlapping-async-scope-blocker",
+      "react-test-renderer-act-overlapping-sync-async-scope-blocker"
+    ]);
+    assert.deepEqual(
+      nestedScopeRecord.blockedPublicPrerequisiteIds,
+      actSchedulerNestedScopeMissingBeforeExecution
+    );
+    assert.equal(
+      gate.recognizedActNestedScopeBlockers.id,
+      "react-test-renderer-act-nested-scope-blockers"
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics.id,
+      "react-test-renderer-act-nested-scope-blockers"
+    );
+    assert.equal(nestedScopeRecord.invokesActCallback, false);
+    assert.equal(nestedScopeRecord.drainsPublicReactActQueue, false);
+    assert.equal(nestedScopeRecord.drainsPublicSchedulerTaskQueue, false);
+    assert.equal(
+      nestedScopeRecord.publicSchedulerFlushExecutionAvailable,
+      false
+    );
+    assert.equal(nestedScopeRecord.executesQueuedWork, false);
+    assert.equal(nestedScopeRecord.executesEffects, false);
+    assert.equal(nestedScopeRecord.executesPassiveEffects, false);
+    assert.equal(nestedScopeRecord.compatibilityClaimed, false);
+  } else {
+    const nestedScopeRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) =>
+          record.id === "react-test-renderer-act-nested-scope-blockers"
+      );
+    assert.equal(nestedScopeRecord, undefined);
+    assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics,
+      undefined
+    );
+  }
 
   for (const record of [
     ...gate.recognizedReactActPrivateDispatcherRecords,
