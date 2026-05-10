@@ -2,6 +2,7 @@
 
 ## Goal Setup
 
+- Status: complete.
 - `create_goal` was called as the first action for this worker objective.
 - `get_goal` was available and returned status `active`.
 - Active objective recorded by the tool:
@@ -93,12 +94,20 @@ Inline `hook_state_queue` unit tests cover:
 
 ## Verification
 
-- `cargo test -p fast-react-core --all-features hook`: passed, 18 tests.
+- `cargo test -p fast-react-core --all-features hook`: passed, 24 tests after
+  integrating current `main`.
 - `cargo fmt --all --check`: passed.
-- `cargo test -p fast-react-core --all-features`: passed, 93 tests.
+- `cargo test -p fast-react-core --all-features`: passed, 112 tests after
+  integrating current `main`.
 - `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`:
   passed.
 - `git diff --check`: passed.
+
+## Integration With Current Main
+
+- Merged current `main` after implementation, resolving the `lib.rs` export
+  conflict by keeping both worker 157 hook-effect exports and this hook-state
+  queue export set, then reran the full verification set above.
 
 ## Risks Or Blockers
 
