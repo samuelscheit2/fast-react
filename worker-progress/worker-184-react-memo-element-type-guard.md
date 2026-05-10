@@ -40,6 +40,14 @@
   passed.
 - `npm run check:js` passed.
 - `git diff --check` passed.
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `node --test tests/conformance/test/react-memo-element-type-guard.test.mjs`
+  - `node --test tests/conformance/test/wrapper-object-oracle.test.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `npm run check:js`: 455 conformance tests plus package surface,
+    benchmark, native loader, and workspace smoke checks
+  - `git diff --check`
 
 ## Notes
 
