@@ -138,34 +138,46 @@ test("act/passive local gate recognizes accepted queue diagnostics without publi
       "react-test-renderer/cjs/react-test-renderer.development"
   );
   assert.notEqual(cjsDevelopmentRendererGate, undefined);
-  assert.ok(
-    cjsDevelopmentRendererGate.acceptedPrivateFlushPrerequisiteIds.includes(
-      "act-warning-thenable-public-compatibility-blockers"
-    )
+  const cjsRendererGates = gate.testRendererActSchedulerGates.filter(
+    (rendererGate) => rendererGate.entrypoint.includes("/cjs/")
   );
-  assert.equal(
-    cjsDevelopmentRendererGate.sideEffectPolicy.emitsActWarnings,
-    false
-  );
-  assert.equal(
-    cjsDevelopmentRendererGate.sideEffectPolicy.awaitsActThenables,
-    false
-  );
-  assert.equal(
-    cjsDevelopmentRendererGate.sideEffectPolicy.resolvesActThenables,
-    false
-  );
-  assert.equal(
-    cjsDevelopmentRendererGate.sideEffectPolicy.settlesAsyncActScopes,
-    false
-  );
-  assert.equal(
-    cjsDevelopmentRendererGate.sideEffectPolicy.publicAsyncActCompatibilityClaimed,
-    false
-  );
+  assert.equal(cjsRendererGates.length, 2);
+  for (const rendererGate of cjsRendererGates) {
+    assert.ok(
+      rendererGate.acceptedPrivateFlushPrerequisiteIds.includes(
+        "act-warning-thenable-public-compatibility-blockers"
+      ),
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.emitsActWarnings,
+      false,
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.awaitsActThenables,
+      false,
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.resolvesActThenables,
+      false,
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.settlesAsyncActScopes,
+      false,
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.publicAsyncActCompatibilityClaimed,
+      false,
+      rendererGate.entrypoint
+    );
+  }
 
   for (const rendererGate of gate.testRendererActSchedulerGates.filter(
-    (candidate) => candidate !== cjsDevelopmentRendererGate
+    (candidate) => !candidate.entrypoint.includes("/cjs/")
   )) {
     assert.equal(
       rendererGate.acceptedPrivateFlushPrerequisiteIds.includes(

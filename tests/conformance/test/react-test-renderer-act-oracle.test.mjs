@@ -281,7 +281,7 @@ const CJS_DEVELOPMENT_ENTRYPOINT =
   "react-test-renderer/cjs/react-test-renderer.development";
 
 function actSchedulerMissingBeforeExecution(entrypoint) {
-  return entrypoint === CJS_DEVELOPMENT_ENTRYPOINT
+  return entrypoint.startsWith("react-test-renderer/cjs/")
     ? [
         ...ACT_SCHEDULER_MISSING_BEFORE_EXECUTION,
         ...ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION,
@@ -359,9 +359,15 @@ function actSchedulerRootFlushRecordIds(entrypoint) {
 }
 
 function actSchedulerReactQueueDiagnosticRecordIds(entrypoint) {
-  return entrypoint === CJS_DEVELOPMENT_ENTRYPOINT
-    ? ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS
-    : ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS;
+  if (!entrypoint.startsWith("react-test-renderer/cjs/")) {
+    return ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS;
+  }
+  if (entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    return ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS;
+  }
+  return ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS.filter(
+    (id) => id !== ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+  );
 }
 const ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS = [
   "react-act-private-dispatcher-gate",
@@ -393,12 +399,15 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS = [
 ];
 
 function acceptedPrivateActFlushPrerequisiteIds(entrypoint) {
-  if (entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
-    return ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS;
+  if (entrypoint.startsWith("react-test-renderer/cjs/")) {
+    if (entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+      return ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS;
+    }
+    return ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS.filter(
+      (id) => id !== ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
+    );
   }
-  return entrypoint.startsWith("react-test-renderer/cjs/")
-    ? ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS
-    : ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS;
+  return ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS;
 }
 const BLOCKED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS = [
   "private-act-queue-drain-execution",
@@ -1306,6 +1315,7 @@ function inspectLocalReactTestRendererActBlockedGate() {
 }
 
 function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
+  const isCjs = entry.entrypoint.startsWith("react-test-renderer/cjs/");
   const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
   const diagnostics =
     moduleExports._Scheduler.unstable_flushAllWithoutAsserting[
@@ -1346,7 +1356,7 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
   assert.equal(diagnostics.executesQueuedWork, false);
   assert.equal(diagnostics.executesEffects, false);
   assert.equal(diagnostics.invokesActCallback, false);
-  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+  if (isCjs) {
     assert.equal(diagnostics.publicActWarningEmissionAvailable, false);
     assert.equal(diagnostics.publicActScopeDepthTrackingAvailable, false);
     assert.equal(diagnostics.publicNestedActQueueReuseAvailable, false);
@@ -1399,7 +1409,7 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
       entry.entrypoint
     );
   }
-  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+  if (isCjs) {
     assert.equal(
       diagnostics.routesAcceptedMockSchedulerFlushHelperMetadata,
       true
@@ -2348,6 +2358,7 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
     assert.equal(inspection.available, false, entry.entrypoint);
     return;
   }
+  const cjsDevelopmentOnly = entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT;
 
   assert.equal(inspection.available, true, entry.entrypoint);
   assert.equal(
@@ -2401,7 +2412,7 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
   assert.equal(diagnostics.executesPassiveEffects, false);
   assert.equal(diagnostics.invokesEffectCallbacks, false);
   assert.equal(diagnostics.invokesActCallback, false);
-  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+  if (entry.entrypoint.startsWith("react-test-renderer/cjs/")) {
     assert.equal(
       diagnostics.nativeUpdateExecutionResultKind,
       "FastReactTestRendererPrivateRootExecutionResult"
@@ -2416,21 +2427,26 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
     assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
     assert.equal(
       diagnostics.nestedScopePassiveFlushDiagnosticId,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+      cjsDevelopmentOnly ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID : undefined
     );
     assert.equal(
       diagnostics.nestedScopePassiveFlushStatus,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS
+      cjsDevelopmentOnly ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS : undefined
     );
     assert.equal(
       diagnostics.nestedScopePassiveFlushPrerequisiteId,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
+      cjsDevelopmentOnly
+        ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
+        : undefined
     );
     assert.deepEqual(
       diagnostics.nestedScopePassiveFlushOrder,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+      cjsDevelopmentOnly ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER : undefined
     );
-    assert.equal(diagnostics.nestedScopePassiveFlushEvidenceAccepted, true);
+    assert.equal(
+      diagnostics.nestedScopePassiveFlushEvidenceAccepted,
+      cjsDevelopmentOnly ? true : undefined
+    );
     assert.equal(diagnostics.publicUpdateCompatibilityClaimed, false);
     assert.equal(
       typeof diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
@@ -2442,11 +2458,11 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
     );
     assert.equal(
       typeof diagnostics.describeAcceptedNestedActScopePassiveFlush,
-      "function"
+      cjsDevelopmentOnly ? "function" : "undefined"
     );
     assert.equal(
       typeof diagnostics.flushAcceptedNestedActScopePassiveWork,
-      "function"
+      cjsDevelopmentOnly ? "function" : "undefined"
     );
   } else {
     assert.equal(diagnostics.consumesAcceptedNativeUpdateExecution, undefined);
@@ -2579,12 +2595,14 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
   assert.equal(report.invokesEffectCallbacks, false);
   assert.equal(metadata.records.length, 0, entry.entrypoint);
 
-  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+  if (entry.entrypoint.startsWith("react-test-renderer/cjs/")) {
     assertPrivateActNativeUpdatePassiveDrainConsumer(
       entry,
       moduleExports,
       diagnostics
     );
+  }
+  if (cjsDevelopmentOnly) {
     assertPrivateActNestedScopePassiveFlushConsumer(entry, diagnostics);
   }
 
@@ -3077,7 +3095,7 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-473-test-renderer-act-passive-effect-drain"
     );
   }
-  if (cjsDevelopmentOnly) {
+  if (isCjs) {
     expectedAcceptedWorkers.push(
       "worker-404-scheduler-mock-private-callback-execution",
       "worker-436-scheduler-mock-continuation-execution",
@@ -3089,7 +3107,11 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-576-test-renderer-act-private-root-passive-sequence",
       "worker-622-scheduler-mock-act-root-work-execution",
       "worker-640-test-renderer-act-scheduler-flush-execution",
-      "worker-670-test-renderer-act-passive-native-flush",
+      "worker-670-test-renderer-act-passive-native-flush"
+    );
+  }
+  if (cjsDevelopmentOnly) {
+    expectedAcceptedWorkers.push(
       "worker-700-test-renderer-act-nested-scope-passive-flush"
     );
   }
@@ -3118,7 +3140,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.schedulerReactActQueueDiagnosticsAccepted, true);
   assert.equal(gate.privateSchedulerActQueueDiagnosticsConsumed, true);
   assert.equal(gate.privateActQueueDiagnosticConsumptionReady, true);
-  if (cjsDevelopmentOnly) {
+  if (isCjs) {
     assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
     assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
     assert.equal(gate.privateMockSchedulerExpiredWorkMetadataRouted, true);
@@ -3151,14 +3173,19 @@ function assertActSchedulerGate(gate, entrypoint) {
       gate.privateNativeUpdatePassiveEffectDrainPrerequisiteId,
       ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID
     );
-    assert.equal(gate.privateNestedScopePassiveFlushEvidenceAccepted, true);
+    assert.equal(
+      gate.privateNestedScopePassiveFlushEvidenceAccepted,
+      cjsDevelopmentOnly ? true : undefined
+    );
     assert.equal(
       gate.privateNestedScopePassiveFlushDiagnosticId,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+      cjsDevelopmentOnly ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID : undefined
     );
     assert.equal(
       gate.privateNestedScopePassiveFlushPrerequisiteId,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
+      cjsDevelopmentOnly
+        ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
+        : undefined
     );
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
@@ -3180,51 +3207,51 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.equal(
     gate.warningThenableBlockerDiagnosticsAccepted,
-    cjsDevelopmentOnly ? true : undefined
+    isCjs ? true : undefined
   );
   assert.equal(
     gate.nestedScopeBlockerDiagnosticsAccepted,
-    cjsDevelopmentOnly ? true : undefined
+    isCjs ? true : undefined
   );
   assert.equal(
     gate.privateRootPassivePrerequisiteSequenceAccepted,
-    cjsDevelopmentOnly ? true : undefined
+    isCjs ? true : undefined
   );
   assert.equal(
     gate.publicActWarningEmissionAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicActScopeDepthTrackingAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicNestedActQueueReuseAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicOverlappingActWarningEmissionAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicActThenableAwaitingAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicActThenableResolutionAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicActThenableSettlementAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicAsyncActScopeSettlementAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(
     gate.publicAsyncActCompatibilityClaimed,
-    cjsDevelopmentOnly ? false : undefined
+    isCjs ? false : undefined
   );
   assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
@@ -3251,7 +3278,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   } else {
     assert.equal(gate.privateActPassiveEffectDrainDiagnostics, undefined);
   }
-  if (cjsDevelopmentOnly) {
+  if (isCjs) {
     assertActWarningThenableBlockerDiagnostics(
       { entrypoint },
       gate.recognizedActWarningThenableBlockers
@@ -3291,53 +3318,60 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(
       gate.privateActQueueFlushDiagnostics
         .privateNestedScopePassiveFlushEvidenceAccepted,
-      true
+      cjsDevelopmentOnly ? true : undefined
     );
     assert.equal(
       gate.privateActQueueFlushDiagnostics
         .privateNestedScopePassiveFlushDiagnosticId,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+      cjsDevelopmentOnly ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID : undefined
     );
     assert.deepEqual(
       gate.privateActQueueFlushDiagnostics.privateNestedScopePassiveFlushOrder,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+      cjsDevelopmentOnly ? ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER : undefined
     );
 
-    const nestedScopePassiveFlushRecord =
-      gate.recognizedSchedulerReactActQueueDiagnostics.find(
-        (record) => record.id === ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+    if (cjsDevelopmentOnly) {
+      const nestedScopePassiveFlushRecord =
+        gate.recognizedSchedulerReactActQueueDiagnostics.find(
+          (record) => record.id === ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+        );
+      assert.notEqual(nestedScopePassiveFlushRecord, undefined);
+      assert.equal(
+        gate.recognizedNestedScopePassiveFlushDiagnostics,
+        nestedScopePassiveFlushRecord
       );
-    assert.notEqual(nestedScopePassiveFlushRecord, undefined);
-    assert.equal(
-      gate.recognizedNestedScopePassiveFlushDiagnostics,
-      nestedScopePassiveFlushRecord
-    );
-    assert.equal(
-      nestedScopePassiveFlushRecord.status,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS
-    );
-    assert.deepEqual(
-      nestedScopePassiveFlushRecord.passiveFlushOrder,
-      ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
-    );
-    assert.equal(nestedScopePassiveFlushRecord.outerScopeDepth, 1);
-    assert.equal(nestedScopePassiveFlushRecord.innerScopeDepth, 2);
-    assert.equal(nestedScopePassiveFlushRecord.passiveFlushOrderIndex, 2);
-    assert.equal(
-      nestedScopePassiveFlushRecord.consumesNestedScopeBlockerDiagnostics,
-      true
-    );
-    assert.equal(
-      nestedScopePassiveFlushRecord.drainsAcceptedPendingPassiveFlushMetadata,
-      true
-    );
-    assert.equal(nestedScopePassiveFlushRecord.deterministicFlushOrder, true);
-    assert.equal(
-      nestedScopePassiveFlushRecord.publicActCompatibilityClaimed,
-      false
-    );
-    assert.equal(nestedScopePassiveFlushRecord.executesPassiveEffects, false);
-    assert.equal(nestedScopePassiveFlushRecord.invokesActCallback, false);
+      assert.equal(
+        nestedScopePassiveFlushRecord.status,
+        ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS
+      );
+      assert.deepEqual(
+        nestedScopePassiveFlushRecord.passiveFlushOrder,
+        ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+      );
+      assert.equal(nestedScopePassiveFlushRecord.outerScopeDepth, 1);
+      assert.equal(nestedScopePassiveFlushRecord.innerScopeDepth, 2);
+      assert.equal(nestedScopePassiveFlushRecord.passiveFlushOrderIndex, 2);
+      assert.equal(
+        nestedScopePassiveFlushRecord.consumesNestedScopeBlockerDiagnostics,
+        true
+      );
+      assert.equal(
+        nestedScopePassiveFlushRecord.drainsAcceptedPendingPassiveFlushMetadata,
+        true
+      );
+      assert.equal(nestedScopePassiveFlushRecord.deterministicFlushOrder, true);
+      assert.equal(
+        nestedScopePassiveFlushRecord.publicActCompatibilityClaimed,
+        false
+      );
+      assert.equal(nestedScopePassiveFlushRecord.executesPassiveEffects, false);
+      assert.equal(nestedScopePassiveFlushRecord.invokesActCallback, false);
+    } else {
+      assert.equal(
+        gate.recognizedNestedScopePassiveFlushDiagnostics,
+        undefined
+      );
+    }
   } else {
     assert.equal(gate.recognizedActWarningThenableBlockers, undefined);
     assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
@@ -3396,13 +3430,13 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.blockedPublicAsyncActCompatibilityPrerequisiteIds,
-    cjsDevelopmentOnly
+    isCjs
       ? ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION
       : undefined
   );
   assert.deepEqual(
     gate.blockedPublicNestedActCompatibilityPrerequisiteIds,
-    cjsDevelopmentOnly
+    isCjs
       ? ACT_SCHEDULER_NESTED_SCOPE_MISSING_BEFORE_EXECUTION
       : undefined
   );
@@ -3427,10 +3461,42 @@ function assertActSchedulerGate(gate, entrypoint) {
     ...(isCjs
       ? {
           consumesPrivatePassiveEffectDrainDiagnostics: true,
-          consumesPendingPassiveFlushMetadata: true
+          consumesPendingPassiveFlushMetadata: true,
+          consumesAcceptedNativeUpdateExecution: true,
+          consumesPrivateUpdateNativeBridgeAdmission: true,
+          consumesAcceptedNativeUpdateHostOutput: true,
+          drainsAcceptedPendingPassiveFlushMetadata: true,
+          ...(cjsDevelopmentOnly
+            ? {
+                consumesNestedScopeBlockerDiagnostics: true,
+                drainsAcceptedNestedScopePassiveFlushMetadata: true,
+                deterministicNestedScopePassiveFlushOrder: true
+              }
+            : {}),
+          sequencesPrivateRootPassivePrerequisites: true,
+          emitsActWarnings: false,
+          emitsOverlappingActWarnings: false,
+          awaitsActThenables: false,
+          resolvesActThenables: false,
+          settlesAsyncActScopes: false,
+          tracksActScopeDepth: false,
+          reusesNestedActQueue: false,
+          publicAsyncActCompatibilityClaimed: false
         }
       : {}),
     drainsAcceptedInternalTestQueues: true,
+    ...(isCjs
+      ? {
+          routesAcceptedMockSchedulerFlushHelperMetadata: true,
+          delegatesToPrivateSchedulerDiagnostics: true,
+          recognizesExpiredMockSchedulerMetadata: true,
+          routesAcceptedMockSchedulerExpiredWorkMetadata: true,
+          describesExpiredMockSchedulerWorkWithoutFlushing: true,
+          invokesPublicSchedulerFlushHelper: false,
+          publicSchedulerFlushBehaviorExecuted: false,
+          drainsExpiredMockSchedulerWork: false
+        }
+      : {}),
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
     executesPublicSchedulerTasks: false,
@@ -3438,34 +3504,6 @@ function assertActSchedulerGate(gate, entrypoint) {
     publicReactActCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
-  if (cjsDevelopmentOnly) {
-    Object.assign(expectedSideEffectPolicy, {
-      routesAcceptedMockSchedulerFlushHelperMetadata: true,
-      delegatesToPrivateSchedulerDiagnostics: true,
-      recognizesExpiredMockSchedulerMetadata: true,
-      routesAcceptedMockSchedulerExpiredWorkMetadata: true,
-      describesExpiredMockSchedulerWorkWithoutFlushing: true,
-      invokesPublicSchedulerFlushHelper: false,
-      publicSchedulerFlushBehaviorExecuted: false,
-      drainsExpiredMockSchedulerWork: false,
-      sequencesPrivateRootPassivePrerequisites: true,
-      consumesAcceptedNativeUpdateExecution: true,
-      consumesPrivateUpdateNativeBridgeAdmission: true,
-      consumesAcceptedNativeUpdateHostOutput: true,
-      drainsAcceptedPendingPassiveFlushMetadata: true,
-      consumesNestedScopeBlockerDiagnostics: true,
-      drainsAcceptedNestedScopePassiveFlushMetadata: true,
-      deterministicNestedScopePassiveFlushOrder: true,
-      emitsActWarnings: false,
-      emitsOverlappingActWarnings: false,
-      awaitsActThenables: false,
-      resolvesActThenables: false,
-      settlesAsyncActScopes: false,
-      tracksActScopeDepth: false,
-      reusesNestedActQueue: false,
-      publicAsyncActCompatibilityClaimed: false
-    });
-  }
   assert.deepEqual(gate.sideEffectPolicy, expectedSideEffectPolicy);
 
   for (const record of [
@@ -3504,7 +3542,7 @@ function assertActSchedulerGate(gate, entrypoint) {
       .drainsPublicReactActQueue,
     false
   );
-  if (cjsDevelopmentOnly) {
+  if (isCjs) {
     const warningThenableRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
         (record) => record.id === ACT_WARNING_THENABLE_BLOCKER_RECORD_ID
@@ -3983,12 +4021,16 @@ function createAcceptedNativeUpdateExecutionResult(entry, moduleExports) {
   assert.equal(bridge.bridgeKind, "FastReactTestRendererPrivateRootRequestBridge");
 
   const renderer = moduleExports.create({
-    props: { "data-state": "old", children: "hello" },
+    props: { "data-state": "old", children: "hello", style: { color: "red" } },
     type: "span"
   });
   const updateError = captureThrown(() =>
     renderer.update({
-      props: { "data-state": "new", children: "goodbye" },
+      props: {
+        "data-state": "new",
+        children: "goodbye",
+        style: { color: "blue" }
+      },
       type: "span"
     })
   );
@@ -4017,11 +4059,48 @@ function createRustUpdateNativeBridgeAdmissionEvidence(request) {
     rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
     updateRouteRootWorkLoopDiagnostic:
       createRustUpdateRouteRootWorkLoopDiagnosticSource(request),
+    privateErrorBoundaryCommitRecoveryMetadata:
+      createRustErrorBoundaryCommitRecoveryMetadataSource(request),
     hostOutputProduced: true,
     nativeAddonLoaded: false,
     nativeExecution: false,
     rustExecution: true,
     reconcilerExecution: true
+  };
+}
+
+function createRustErrorBoundaryCommitRecoveryMetadataSource(request) {
+  return {
+    id: "fast-react-test-renderer.error-boundary.private-commit-recovery-evidence",
+    kind: "FastReactTestRendererPrivateErrorBoundaryCommitRecoveryMetadata",
+    status: "private-error-boundary-commit-recovery-metadata-public-recovery-blocked",
+    acceptedRustApi:
+      "TestRendererRoot::describe_private_error_boundary_commit_recovery_for_canary",
+    rootRequestId: request.requestId,
+    rootId: request.rootId,
+    operation: "update",
+    updateFailurePath: "commit",
+    commitPhaseRecoveryPath: "ReactFiberWorkLoop.captureCommitPhaseError",
+    commitPhaseRecoveryAction: "createRootErrorUpdate(SyncLane)",
+    sourceUpdateRecord: "TestRendererUpdateNativeBridgeAdmission",
+    sourceUpdateRecordId:
+      "react-test-renderer-update-native-bridge-admission-private-diagnostic",
+    sourceUpdateRecordStatus:
+      "private-update-native-bridge-admission-host-output-handoff-public-update-blocked",
+    sourceUpdateKind: "Update",
+    sourceFailureRecord: "HostRootRenderFailureRecoveryCommitEvidenceForCanary",
+    sourceCommitRecoverySnapshotRecord:
+      "HostRootCommitRecoverySnapshotForCanary",
+    consumesAcceptedRustUpdateMetadata: true,
+    consumesAcceptedRustFailureMetadata: true,
+    consumesAcceptedCommitRecoverySnapshot: true,
+    preservesRootErrorOptionHandles: true,
+    commitPhaseRecoveryPathConsumed: true,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicErrorRecoveryAvailable: false,
+    compatibilityClaimed: false
   };
 }
 
@@ -4100,6 +4179,10 @@ function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
     hostTextUpdateMetadata: {
       hostOutputUpdateRecord: "TestRendererUpdatedHostOutput",
       hostTextUpdateApplyRequired: true,
+      hostComponentPropUpdateRecorded: true,
+      hostComponentStyleUpdateRecorded: true,
+      acceptedHostComponentUpdatePayloadShape:
+        "HostComponentPropStyleTextUpdate",
       textUpdateApplyRecorded: true,
       hostTextUpdateApplyCount: 1,
       hostComponentUpdateApplyCount: 1

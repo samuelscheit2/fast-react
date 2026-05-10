@@ -60,6 +60,7 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
       "worker-513-event-type-dispatch-canary",
       "worker-514-portal-event-error-routing",
       "worker-528-hydration-replay-error-metadata",
+      "worker-708-hydration-text-node-claim-patch",
       "worker-533-controlled-restore-queue-write-preflight",
       "worker-641-public-facade-root-render-execution"
     ]
