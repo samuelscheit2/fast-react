@@ -26,6 +26,8 @@ const rendererBackedActDrainConsumptionStatus =
   'consumed-accepted-renderer-backed-act-drain-diagnostics';
 const schedulerPostTaskYieldActRootHandoffConsumptionStatus =
   'consumed-accepted-scheduler-post-task-yield-act-root-handoff-diagnostics';
+const schedulerMockExpiredActRootWorkConsumptionStatus =
+  'consumed-accepted-scheduler-mock-expired-act-root-work-diagnostics';
 const acceptedActQueueMetadataKind =
   'fast-react.react.act-queue-metadata';
 const acceptedActQueueMetadataVersion = 1;
@@ -73,6 +75,161 @@ const acceptedRendererBackedActDrainRendererRecords = Object.freeze([
   'FastReactTestRendererCurrentRustCanaryMetadata',
   'TestRendererHostOutputDiagnostics',
   'TestRendererCommittedFiberTreeInspection'
+]);
+const privateSchedulerMockExpiredActRootWorkDiagnosticsKind =
+  'fast-react.scheduler.mock-expired-act-root-work-diagnostics';
+const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
+  privateSchedulerMockExpiredActRootWorkDiagnosticsKind
+);
+const privateSchedulerMockExpiredActRootWorkDiagnosticsVersion = 1;
+const privateSchedulerMockExpiredActRootWorkMetadataKind =
+  'fast-react.scheduler.mock-expired-act-root-work-metadata';
+const privateSchedulerMockExpiredActRootWorkMetadataVersion = 1;
+const schedulerMockExpiredActRootWorkDiagnosticsStatus =
+  'drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics';
+const acceptedSchedulerMockExpiredActRootWorkRecords = Object.freeze([
+  'RootLaneSchedulingSnapshot',
+  'UpdateContainerResult',
+  'RootScheduleUpdateRecord',
+  'RootTaskScheduleRecord',
+  'SchedulerCallbackRequest',
+  'RootSchedulerCallbackExecutionRecord',
+  'HostRootFinishedWorkPendingCommitRecordForCanary',
+  'HostRootFinishedWorkCommitHandoffRecordForCanary'
+]);
+const schedulerMockExpiredActRootWorkRecordKeys = Object.freeze([
+  'index',
+  'recordKind',
+  'rootId',
+  'rootLabel',
+  'lane',
+  'laneLabel',
+  'accepted',
+  'rendererWorkExecutionBlocked',
+  'rootWorkMetadataOnly',
+  'publicCompatibilityClaimed',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesRendererWork',
+  'executesRendererRoots'
+]);
+const schedulerMockExpiredActRootWorkConsumptionReportKeys = Object.freeze([
+  'status',
+  'accepted',
+  'pendingBefore',
+  'consumedCount',
+  'remainingCount',
+  'consumedRecords',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'compatibilityClaimed',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesRendererWork',
+  'executesRendererRoots'
+]);
+const schedulerMockExpiredActRootWorkActQueueDrainReportKeys =
+  Object.freeze([
+    'status',
+    'accepted',
+    'queueKind',
+    'pendingBefore',
+    'drainedCount',
+    'executedCallbackCount',
+    'recordedContinuationCount',
+    'executedContinuationCount',
+    'remainingCount',
+    'drainedRecords',
+    'recordedContinuations',
+    'executedContinuations',
+    'mockSchedulerPendingWorkBefore',
+    'mockSchedulerPendingWorkAfter',
+    'mockSchedulerNowBefore',
+    'mockSchedulerNowAfter',
+    'drainsPublicSchedulerTaskQueue',
+    'drainsPublicReactActQueue',
+    'executesBrandedInternalTestCallbacks',
+    'recordsBrandedInternalTestContinuations',
+    'executesBrandedInternalTestContinuations',
+    'publicSchedulerTimingCompatibilityClaimed',
+    'publicReactActCompatibilityClaimed',
+    'executesQueuedWork',
+    'executesEffects'
+  ]);
+const schedulerMockExpiredActRootWorkDrainedRecordKeys = Object.freeze([
+  'index',
+  'label',
+  'recordKind',
+  'taskKind',
+  'continuationStatus',
+  'callbackStatus',
+  'callback',
+  'returnedContinuation',
+  'executesQueuedWork',
+  'executesEffects'
+]);
+const schedulerMockExpiredActRootWorkCallbackSummaryKeys = Object.freeze([
+  'kind',
+  'label',
+  'executesQueuedWork',
+  'executesEffects'
+]);
+const schedulerMockExpiredActRootWorkMetadataCallbackSummaryKeys =
+  Object.freeze([
+    'status',
+    'kind',
+    'label',
+    'executesQueuedWork',
+    'executesEffects'
+  ]);
+const schedulerMockExpiredActRootWorkCancelledCallbackSummaryKeys =
+  Object.freeze(['status']);
+const schedulerMockExpiredActRootWorkContinuationKeys = Object.freeze([
+  'sourceIndex',
+  'sourceLabel',
+  'status',
+  'continuation',
+  'returnedContinuation',
+  'executesQueuedWork',
+  'executesEffects'
+]);
+const schedulerMockExpiredActRootWorkRecordedContinuationKeys =
+  Object.freeze([
+    'status',
+    'continuation',
+    'executesQueuedWork',
+    'executesEffects'
+  ]);
+const schedulerMockExpiredActRootWorkSourceDrainReportKeys = Object.freeze([
+  'status',
+  'pendingBefore',
+  'pendingAfter',
+  'flushedExpiredWork',
+  'hasMoreWorkAfterDrain',
+  'nowBefore',
+  'nowAfter',
+  'priorityLevelBefore',
+  'priorityLevelAfter',
+  'expiredCallbackCountBefore',
+  'expiredCallbackCountAfter',
+  'cancelledTombstoneCountBefore',
+  'cancelledTombstoneCountAfter',
+  'taskQueueBefore',
+  'taskQueueAfter',
+  'drainsExpiredMockSchedulerWork',
+  'drainsPublicReactActQueue',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed'
 ]);
 const schedulerCompatibilityTarget = 'scheduler@0.27.0';
 const privatePostTaskPriorityDiagnosticsStatus =
@@ -172,8 +329,94 @@ function hasExactStringList(value, expectedValues) {
   return true;
 }
 
+function hasExactOwnStringKeys(value, expectedKeys) {
+  if (!isObjectLike(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+  return (
+    keys.length === expectedKeys.length &&
+    expectedKeys.every((expectedKey, index) => keys[index] === expectedKey)
+  );
+}
+
 function includesString(value, expectedValues) {
   return typeof value === 'string' && expectedValues.includes(value);
+}
+
+function getSchedulerMockExpiredActRootWorkSourceValidator() {
+  const Scheduler = loadSchedulerMockForExpiredActRootWorkSourceProof();
+  if (!isObjectLike(Scheduler)) {
+    return null;
+  }
+
+  const flushExpiredDescriptor = Object.getOwnPropertyDescriptor(
+    Scheduler,
+    'unstable_flushExpired'
+  );
+  if (
+    flushExpiredDescriptor === undefined ||
+    flushExpiredDescriptor.configurable !== false ||
+    flushExpiredDescriptor.enumerable !== true ||
+    flushExpiredDescriptor.writable !== false ||
+    typeof flushExpiredDescriptor.value !== 'function'
+  ) {
+    return null;
+  }
+
+  const flushExpired = flushExpiredDescriptor.value;
+  for (const key of Reflect.ownKeys(flushExpired)) {
+    if (typeof key !== 'symbol') {
+      continue;
+    }
+
+    const descriptor = Object.getOwnPropertyDescriptor(flushExpired, key);
+    const value = descriptor === undefined ? null : descriptor.value;
+    if (
+      descriptor !== undefined &&
+      descriptor.configurable === false &&
+      descriptor.enumerable === false &&
+      descriptor.writable === false &&
+      isObjectLike(value) &&
+      Object.isFrozen(value) &&
+      value.status ===
+        'fast-react.scheduler.mock-expired-act-root-work-source-validator' &&
+      typeof value.isSchedulerMockExpiredActRootWorkSource === 'function'
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function loadSchedulerMockForExpiredActRootWorkSourceProof() {
+  try {
+    return require('../scheduler/unstable_mock.js');
+  } catch (relativeError) {
+    if (relativeError === null || relativeError.code !== 'MODULE_NOT_FOUND') {
+      throw relativeError;
+    }
+    try {
+      return require('scheduler/unstable_mock.js');
+    } catch (packageError) {
+      if (packageError === null || packageError.code !== 'MODULE_NOT_FOUND') {
+        throw packageError;
+      }
+      return null;
+    }
+  }
+}
+
+function hasSchedulerMockExpiredActRootWorkSourceProof(value) {
+  const validator = getSchedulerMockExpiredActRootWorkSourceValidator();
+  return (
+    isObjectLike(value) &&
+    Object.isFrozen(value) &&
+    validator !== null &&
+    validator.isSchedulerMockExpiredActRootWorkSource(value) === true
+  );
 }
 
 function isAcceptedActQueueMetadata(metadata) {
@@ -210,10 +453,21 @@ function isAcceptedActQueueMetadata(metadata) {
     metadata.drainsAcceptedRendererBackedActDiagnostics === true &&
     metadata.schedulerPostTaskYieldActRootHandoffDiagnosticsReady === true &&
     metadata.consumesSchedulerPostTaskYieldActRootHandoffDiagnostics === true &&
+    metadata.schedulerMockExpiredActRootWorkDiagnosticsReady === true &&
+    metadata.consumesSchedulerMockExpiredActRootWorkDiagnostics === true &&
+    metadata.schedulerMockExpiredActRootWorkDiagnosticKind ===
+      privateSchedulerMockExpiredActRootWorkDiagnosticsKind &&
+    metadata.schedulerMockExpiredActRootWorkDiagnosticVersion ===
+      privateSchedulerMockExpiredActRootWorkDiagnosticsVersion &&
+    metadata.drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics ===
+      true &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
+    metadata.publicRootSchedulerCompatibilityClaimed === false &&
+    metadata.publicRendererCompatibilityClaimed === false &&
     metadata.executesQueuedWork === false &&
     metadata.executesEffects === false &&
+    metadata.executesRendererWork === false &&
     metadata.executesRendererRoots === false &&
     hasExactStringSet(metadata.acceptedRecords, acceptedActQueueRecordKinds) &&
     hasExactStringSet(metadata.acceptedTaskKinds, acceptedActQueueTaskKinds) &&
@@ -244,6 +498,10 @@ function isAcceptedActQueueMetadata(metadata) {
     hasExactStringSet(
       metadata.acceptedRendererBackedActDrainRendererRecords,
       acceptedRendererBackedActDrainRendererRecords
+    ) &&
+    hasExactStringSet(
+      metadata.acceptedSchedulerMockExpiredActRootWorkRecords,
+      acceptedSchedulerMockExpiredActRootWorkRecords
     )
   );
 }
@@ -288,10 +546,21 @@ function createActQueueMetadata(overrides = {}) {
     acceptedRendererBackedActDrainSchedulerRecords,
     acceptedRendererBackedActDrainReconcilerRecords,
     acceptedRendererBackedActDrainRendererRecords,
+    schedulerMockExpiredActRootWorkDiagnosticsReady: true,
+    consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+    schedulerMockExpiredActRootWorkDiagnosticKind:
+      privateSchedulerMockExpiredActRootWorkDiagnosticsKind,
+    schedulerMockExpiredActRootWorkDiagnosticVersion:
+      privateSchedulerMockExpiredActRootWorkDiagnosticsVersion,
+    drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
+    acceptedSchedulerMockExpiredActRootWorkRecords,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
     executesQueuedWork: false,
     executesEffects: false,
+    executesRendererWork: false,
     executesRendererRoots: false,
     ...overrides
   });
@@ -1492,6 +1761,737 @@ function createRendererBackedActDrainDiagnostics(overrides = {}) {
   });
 }
 
+function hasBlockedPublicCompatibilityClaims(value) {
+  return (
+    isObjectLike(value) &&
+    value.publicSchedulerTimingCompatibilityClaimed === false &&
+    value.publicReactActCompatibilityClaimed === false &&
+    (value.publicRootSchedulerCompatibilityClaimed === undefined ||
+      value.publicRootSchedulerCompatibilityClaimed === false) &&
+    (value.publicRendererCompatibilityClaimed === undefined ||
+      value.publicRendererCompatibilityClaimed === false) &&
+    (value.publicCompatibilityClaimed === undefined ||
+      value.publicCompatibilityClaimed === false) &&
+    (value.compatibilityClaimed === undefined ||
+      value.compatibilityClaimed === false)
+  );
+}
+
+function hasBlockedPublicQueueAndExecutionClaims(value) {
+  return (
+    isObjectLike(value) &&
+    (value.drainsPublicSchedulerTaskQueue === undefined ||
+      value.drainsPublicSchedulerTaskQueue === false) &&
+    (value.drainsPublicReactActQueue === undefined ||
+      value.drainsPublicReactActQueue === false) &&
+    value.executesQueuedWork === false &&
+    value.executesEffects === false &&
+    (value.executesRendererWork === undefined ||
+      value.executesRendererWork === false) &&
+    (value.executesRendererRoots === undefined ||
+      value.executesRendererRoots === false)
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkRecord(record, index) {
+  return (
+    isObjectLike(record) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(record) &&
+    hasExactOwnStringKeys(
+      record,
+      schedulerMockExpiredActRootWorkRecordKeys
+    ) &&
+    record.index === index &&
+    includesString(
+      record.recordKind,
+      acceptedSchedulerMockExpiredActRootWorkRecords
+    ) &&
+    record.rootId !== null &&
+    record.rootId !== undefined &&
+    typeof record.rootLabel === 'string' &&
+    typeof record.lane === 'string' &&
+    typeof record.laneLabel === 'string' &&
+    record.accepted === true &&
+    record.rendererWorkExecutionBlocked === true &&
+    record.rootWorkMetadataOnly === true &&
+    record.publicCompatibilityClaimed === false &&
+    record.publicSchedulerTimingCompatibilityClaimed === false &&
+    record.publicReactActCompatibilityClaimed === false &&
+    record.publicRootSchedulerCompatibilityClaimed === false &&
+    record.publicRendererCompatibilityClaimed === false &&
+    record.drainsPublicSchedulerTaskQueue === false &&
+    record.drainsPublicReactActQueue === false &&
+    record.executesQueuedWork === false &&
+    record.executesEffects === false &&
+    record.executesRendererWork === false &&
+    record.executesRendererRoots === false
+  );
+}
+
+function areSchedulerMockExpiredActRootWorkRecordsEqual(left, right) {
+  return (
+    isObjectLike(left) &&
+    isObjectLike(right) &&
+    isAcceptedSchedulerMockExpiredActRootWorkRecord(left, left.index) &&
+    isAcceptedSchedulerMockExpiredActRootWorkRecord(right, right.index) &&
+    schedulerMockExpiredActRootWorkRecordKeys.every(
+      (key) => left[key] === right[key]
+    )
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkActQueueSummary(
+  summary
+) {
+  return (
+    isObjectLike(summary) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(summary) &&
+    summary.accepted === true &&
+    summary.kind === privateActQueueTestQueueKind &&
+    summary.version === privateActQueueTestQueueVersion &&
+    isPositiveInteger(summary.pendingCount) &&
+    Array.isArray(summary.records) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(summary.records) &&
+    summary.records.length === summary.pendingCount &&
+    summary.records.every(isAcceptedSchedulerMockExpiredActRootWorkActTask) &&
+    summary.drainsAcceptedInternalTestQueues === true &&
+    summary.drainsPublicSchedulerTaskQueue === false &&
+    summary.drainsPublicReactActQueue === false &&
+    summary.executesQueuedWork === false &&
+    summary.executesEffects === false
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkActTask(task, index) {
+  return (
+    isObjectLike(task) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(task) &&
+    task.index === index &&
+    typeof task.label === 'string' &&
+    includesString(task.recordKind, acceptedActQueueRecordKinds) &&
+    includesString(task.taskKind, acceptedActQueueTaskKinds) &&
+    includesString(
+      task.continuationStatus,
+      acceptedActQueueContinuationStatuses
+    ) &&
+    isAcceptedSchedulerMockExpiredActRootWorkMetadataCallbackSummary(
+      task.callback
+    ) &&
+    hasBlockedPublicCompatibilityClaims(task) &&
+    hasBlockedPublicQueueAndExecutionClaims(task)
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkCallbackSummary(
+  callback
+) {
+  return (
+    callback === null ||
+    (isObjectLike(callback) &&
+      hasSchedulerMockExpiredActRootWorkSourceProof(callback) &&
+      hasExactOwnStringKeys(
+        callback,
+        schedulerMockExpiredActRootWorkCallbackSummaryKeys
+      ) &&
+      callback.kind === privateActQueueTestCallbackKind &&
+      typeof callback.label === 'string' &&
+      callback.executesQueuedWork === false &&
+      callback.executesEffects === false)
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkMetadataCallbackSummary(
+  callback
+) {
+  if (
+    isObjectLike(callback) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(callback) &&
+    hasExactOwnStringKeys(
+      callback,
+      schedulerMockExpiredActRootWorkCancelledCallbackSummaryKeys
+    )
+  ) {
+    return callback.status === 'cancelled-tombstone';
+  }
+
+  return (
+    isObjectLike(callback) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(callback) &&
+    hasExactOwnStringKeys(
+      callback,
+      schedulerMockExpiredActRootWorkMetadataCallbackSummaryKeys
+    ) &&
+    callback.status === 'branded-internal-test-callback' &&
+    callback.kind === privateActQueueTestCallbackKind &&
+    typeof callback.label === 'string' &&
+    callback.executesQueuedWork === false &&
+    callback.executesEffects === false
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkMetadataSummary(
+  metadata
+) {
+  return (
+    isObjectLike(metadata) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(metadata) &&
+    metadata.kind === privateSchedulerMockExpiredActRootWorkMetadataKind &&
+    metadata.version ===
+      privateSchedulerMockExpiredActRootWorkMetadataVersion &&
+    metadata.accepted === true &&
+    metadata.rejectionReason === null &&
+    metadata.compatibilityTarget === schedulerCompatibilityTarget &&
+    metadata.reactCompatibilityTarget === compatibilityTarget &&
+    typeof metadata.rootLabel === 'string' &&
+    typeof metadata.laneLabel === 'string' &&
+    isPositiveInteger(metadata.priorityLevel) &&
+    typeof metadata.priorityLabel === 'string' &&
+    typeof metadata.schedulerPriority === 'string' &&
+    metadata.callbackHandleMatched === true &&
+    isAcceptedSchedulerMockExpiredActRootWorkActQueueSummary(
+      metadata.actQueue
+    ) &&
+    metadata.actQueuePendingCount === metadata.actQueue.pendingCount &&
+    isPositiveInteger(metadata.rootWorkRecordCount) &&
+    Array.isArray(metadata.rootWorkRecords) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(
+      metadata.rootWorkRecords
+    ) &&
+    metadata.rootWorkRecords.length === metadata.rootWorkRecordCount &&
+    metadata.rootWorkRecords.every(
+      isAcceptedSchedulerMockExpiredActRootWorkRecord
+    ) &&
+    metadata.rendererWorkExecutionBlocked === true &&
+    metadata.rootWorkMetadataOnly === true &&
+    metadata.actQueueHandoffOnly === true &&
+    hasBlockedPublicCompatibilityClaims(metadata) &&
+    hasBlockedPublicQueueAndExecutionClaims(metadata)
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkConsumptionReport(
+  report,
+  expectedCount
+) {
+  if (
+    !isObjectLike(report) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(report) ||
+    !hasExactOwnStringKeys(
+      report,
+      schedulerMockExpiredActRootWorkConsumptionReportKeys
+    ) ||
+    report.status !== 'consumed-accepted-expired-act-root-work-records' ||
+    report.accepted !== true ||
+    report.pendingBefore !== expectedCount ||
+    report.consumedCount !== expectedCount ||
+    !isPositiveInteger(report.consumedCount) ||
+    report.remainingCount !== 0 ||
+    !Array.isArray(report.consumedRecords) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(
+      report.consumedRecords
+    ) ||
+    report.consumedRecords.length !== expectedCount ||
+    !report.consumedRecords.every(
+      isAcceptedSchedulerMockExpiredActRootWorkRecord
+    ) ||
+    !hasBlockedPublicCompatibilityClaims(report) ||
+    !hasBlockedPublicQueueAndExecutionClaims(report)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkActQueueDrainReport(
+  report,
+  actQueueSummary
+) {
+  if (
+    !isAcceptedSchedulerPrivateActQueueDrainReport(report) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(report) ||
+    !hasExactOwnStringKeys(
+      report,
+      schedulerMockExpiredActRootWorkActQueueDrainReportKeys
+    ) ||
+    report.accepted !== true ||
+    report.queueKind !== privateActQueueTestQueueKind ||
+    !isPositiveInteger(report.pendingBefore) ||
+    report.pendingBefore !== actQueueSummary.pendingCount ||
+    report.drainedCount !== report.pendingBefore ||
+    report.remainingCount !== 0 ||
+    !isNonNegativeInteger(report.executedCallbackCount) ||
+    !isNonNegativeInteger(report.recordedContinuationCount) ||
+    !isNonNegativeInteger(report.executedContinuationCount) ||
+    report.executedCallbackCount > report.drainedCount ||
+    report.recordedContinuationCount !== report.executedContinuationCount ||
+    !Array.isArray(report.drainedRecords) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(
+      report.drainedRecords
+    ) ||
+    report.drainedRecords.length !== report.drainedCount ||
+    !Array.isArray(report.recordedContinuations) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(
+      report.recordedContinuations
+    ) ||
+    report.recordedContinuations.length !==
+      report.recordedContinuationCount ||
+    !Array.isArray(report.executedContinuations) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(
+      report.executedContinuations
+    ) ||
+    report.executedContinuations.length !==
+      report.executedContinuationCount ||
+    report.executesBrandedInternalTestCallbacks !== true ||
+    report.recordsBrandedInternalTestContinuations !== true ||
+    report.executesBrandedInternalTestContinuations !== true ||
+    report.drainsPublicSchedulerTaskQueue !== false ||
+    report.drainsPublicReactActQueue !== false ||
+    report.publicSchedulerTimingCompatibilityClaimed !== false ||
+    report.publicReactActCompatibilityClaimed !== false ||
+    report.executesQueuedWork !== false ||
+    report.executesEffects !== false
+  ) {
+    return false;
+  }
+
+  const returnedContinuations = [];
+  for (let index = 0; index < report.drainedRecords.length; index++) {
+    const record = report.drainedRecords[index];
+    const actQueueTask = actQueueSummary.records[index];
+    if (
+      !isAcceptedSchedulerMockExpiredActRootWorkDrainedRecord(
+        record,
+        index,
+        actQueueTask
+      )
+    ) {
+      return false;
+    }
+    if (record.returnedContinuation !== null) {
+      returnedContinuations.push(record.returnedContinuation);
+    }
+  }
+
+  if (returnedContinuations.length !== report.recordedContinuationCount) {
+    return false;
+  }
+
+  for (let index = 0; index < returnedContinuations.length; index++) {
+    const continuation = returnedContinuations[index];
+    const sourceRecord = report.drainedRecords[continuation.sourceIndex];
+    if (
+      continuation !== report.recordedContinuations[index] ||
+      continuation !== report.executedContinuations[index] ||
+      !isAcceptedSchedulerMockExpiredActRootWorkContinuation(
+        continuation,
+        sourceRecord
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkDrainedRecord(
+  record,
+  index,
+  actQueueTask
+) {
+  if (
+    !isObjectLike(record) ||
+    !hasSchedulerMockExpiredActRootWorkSourceProof(record) ||
+    !hasExactOwnStringKeys(
+      record,
+      schedulerMockExpiredActRootWorkDrainedRecordKeys
+    ) ||
+    record.index !== index ||
+    typeof record.label !== 'string' ||
+    !includesString(record.recordKind, acceptedActQueueRecordKinds) ||
+    !includesString(record.taskKind, acceptedActQueueTaskKinds) ||
+    !includesString(
+      record.continuationStatus,
+      acceptedActQueueContinuationStatuses
+    ) ||
+    record.executesQueuedWork !== false ||
+    record.executesEffects !== false
+  ) {
+    return false;
+  }
+  if (
+    !isObjectLike(actQueueTask) ||
+    record.label !== actQueueTask.label ||
+    record.recordKind !== actQueueTask.recordKind ||
+    record.taskKind !== actQueueTask.taskKind ||
+    record.continuationStatus !== actQueueTask.continuationStatus
+  ) {
+    return false;
+  }
+
+  if (record.callbackStatus === 'no-callback') {
+    return (
+      actQueueTask.callback.status === 'cancelled-tombstone' &&
+      record.callback === null &&
+      record.returnedContinuation === null
+    );
+  }
+  if (record.callbackStatus !== 'executed-branded-internal-test-callback') {
+    return false;
+  }
+
+  return (
+    isAcceptedSchedulerMockExpiredActRootWorkCallbackSummary(
+      record.callback
+    ) &&
+    actQueueTask.callback.status === 'branded-internal-test-callback' &&
+    record.callback.kind === actQueueTask.callback.kind &&
+    record.callback.label === actQueueTask.callback.label &&
+    (record.returnedContinuation === null ||
+      isAcceptedSchedulerMockExpiredActRootWorkContinuation(
+        record.returnedContinuation,
+        record
+      ))
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkContinuation(
+  continuation,
+  sourceRecord
+) {
+  return (
+    isObjectLike(continuation) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(continuation) &&
+    hasExactOwnStringKeys(
+      continuation,
+      schedulerMockExpiredActRootWorkContinuationKeys
+    ) &&
+    isNonNegativeInteger(continuation.sourceIndex) &&
+    typeof continuation.sourceLabel === 'string' &&
+    isObjectLike(sourceRecord) &&
+    continuation.sourceIndex === sourceRecord.index &&
+    continuation.sourceLabel === sourceRecord.label &&
+    continuation.status === 'executed-branded-internal-test-continuation' &&
+    isAcceptedSchedulerMockExpiredActRootWorkCallbackSummary(
+      continuation.continuation
+    ) &&
+    (continuation.returnedContinuation === null ||
+      isAcceptedSchedulerMockExpiredActRootWorkRecordedContinuation(
+        continuation.returnedContinuation
+      )) &&
+    continuation.executesQueuedWork === false &&
+    continuation.executesEffects === false
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkRecordedContinuation(
+  continuation
+) {
+  return (
+    isObjectLike(continuation) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(continuation) &&
+    hasExactOwnStringKeys(
+      continuation,
+      schedulerMockExpiredActRootWorkRecordedContinuationKeys
+    ) &&
+    continuation.status ===
+      'recorded-branded-internal-test-continuation' &&
+    isAcceptedSchedulerMockExpiredActRootWorkCallbackSummary(
+      continuation.continuation
+    ) &&
+    continuation.executesQueuedWork === false &&
+    continuation.executesEffects === false
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkFlushRoute(
+  route,
+  report
+) {
+  return (
+    isObjectLike(route) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(route) &&
+    route.status ===
+      'executed-expired-act-root-work-flush-all-or-expired-route' &&
+    route.routeKind === 'flush-all-or-expired-act-root-work-diagnostics' &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(
+      route.availableFlushHelpers
+    ) &&
+    hasExactStringSet(route.availableFlushHelpers, [
+      'unstable_flushAll',
+      'unstable_flushExpired'
+    ]) &&
+    includesString(route.selectedFlushHelper, [
+      'unstable_flushAll',
+      'unstable_flushExpired'
+    ]) &&
+    route.effectivePrivateDrainHelper === 'drainExpiredMockSchedulerWork' &&
+    route.sourceDrainStatus === report.sourceDrainStatus &&
+    route.sourceDrainFlushedExpiredWork === true &&
+    route.rootWorkRecordConsumptionStatus ===
+      report.rootWorkRecordConsumptionReport.status &&
+    route.rootWorkRecordsPendingBefore === report.rootWorkRecordCount &&
+    route.rootWorkRecordsPendingAfter === 0 &&
+    route.rootWorkRecordsConsumedCount === report.rootWorkRecordCount &&
+    route.actQueueDrainStatus === report.actQueueDrainReport.status &&
+    route.actQueuePendingBefore === report.actQueuePendingBefore &&
+    route.actQueuePendingAfter === 0 &&
+    route.routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics ===
+      true &&
+    route.consumesAcceptedExpiredActRootWorkRecords === true &&
+    route.drainsExpiredMockSchedulerWork === true &&
+    route.drainsAcceptedInternalTestQueues === true &&
+    route.invokesPublicSchedulerFlushHelper === false &&
+    route.publicSchedulerFlushBehaviorExecuted === false &&
+    route.executesAcceptedInternalTestCallbacks === true &&
+    route.executesScheduledCallbacks === true &&
+    hasBlockedPublicCompatibilityClaims(route) &&
+    hasBlockedPublicQueueAndExecutionClaims(route)
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkSourceDrain(report) {
+  return (
+    isObjectLike(report.sourceDrainReport) &&
+    hasSchedulerMockExpiredActRootWorkSourceProof(report.sourceDrainReport) &&
+    hasExactOwnStringKeys(
+      report.sourceDrainReport,
+      schedulerMockExpiredActRootWorkSourceDrainReportKeys
+    ) &&
+    report.sourceDrainStatus === report.sourceDrainReport.status &&
+    report.sourceDrainFlushedExpiredWork === true &&
+    report.sourceDrainReport.flushedExpiredWork === true &&
+    report.sourceDrainHasMoreWorkAfterDrain ===
+      report.sourceDrainReport.hasMoreWorkAfterDrain &&
+    report.sourceDrainReport.status ===
+      'drained-expired-mock-scheduler-work-for-diagnostics' &&
+    report.sourceDrainReport.drainsExpiredMockSchedulerWork === true &&
+    report.sourceDrainReport.expiredCallbackCountBefore === 1 &&
+    report.sourceDrainReport.expiredCallbackCountAfter === 0 &&
+    report.sourceDrainReport.drainsPublicReactActQueue === false &&
+    report.sourceDrainReport.publicSchedulerTimingCompatibilityClaimed ===
+      false &&
+    report.sourceDrainReport.publicReactActCompatibilityClaimed === false
+  );
+}
+
+function getRejectedSchedulerMockExpiredActRootWorkDiagnosticsReason(
+  report
+) {
+  if (!isObjectLike(report)) {
+    return 'scheduler-expired-act-root-diagnostics';
+  }
+  if (!Object.isFrozen(report)) {
+    return 'scheduler-expired-act-root-diagnostics-not-frozen';
+  }
+  if (
+    report[privateSchedulerMockExpiredActRootWorkDiagnosticsBrand] !== true
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-brand';
+  }
+  if (
+    report.kind !== privateSchedulerMockExpiredActRootWorkDiagnosticsKind
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-kind';
+  }
+  if (
+    report.version !==
+    privateSchedulerMockExpiredActRootWorkDiagnosticsVersion
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-version';
+  }
+  if (
+    report.status !== schedulerMockExpiredActRootWorkDiagnosticsStatus ||
+    report.accepted !== true ||
+    report.compatibilityTarget !== schedulerCompatibilityTarget ||
+    report.reactCompatibilityTarget !== compatibilityTarget ||
+    report.schedulerDiagnosticStatus !==
+      schedulerPrivateActQueueFlushDiagnosticsStatus
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-shape';
+  }
+  if (
+    !hasBlockedPublicCompatibilityClaims(report) ||
+    !hasBlockedPublicQueueAndExecutionClaims(report) ||
+    report.drainsPublicSchedulerTaskQueue !== false ||
+    report.drainsPublicReactActQueue !== false ||
+    report.executesQueuedWork !== false ||
+    report.executesEffects !== false ||
+    report.executesRendererWork !== false ||
+    report.executesRendererRoots !== false ||
+    report.invokesPublicSchedulerFlushHelper !== false ||
+    report.publicSchedulerFlushBehaviorExecuted !== false
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-public-claim';
+  }
+  if (
+    report.recognizesExpiredActRootWorkMetadata !== true ||
+    report.linksExpiredCallbacksToAcceptedActRootWorkRecords !== true ||
+    report.routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics !==
+      true ||
+    report.consumesAcceptedExpiredActRootWorkRecords !== true ||
+    report.rejectsStaleExpiredActQueues !== true ||
+    report.rejectsExpiredActRootWorkPublicCompatibilityClaims !== true ||
+    report.drainsExpiredMockSchedulerWork !== true ||
+    report.drainsAcceptedInternalTestQueues !== true ||
+    report.executesAcceptedInternalTestCallbacks !== true
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-policy';
+  }
+  if (
+    !isAcceptedSchedulerMockExpiredActRootWorkMetadataSummary(
+      report.expiredActRootWorkMetadata
+    )
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-metadata';
+  }
+  if (
+    !isAcceptedSchedulerMockExpiredActRootWorkActQueueDrainReport(
+      report.actQueueDrainReport,
+      report.expiredActRootWorkMetadata.actQueue
+    ) ||
+    !isPositiveInteger(report.actQueuePendingBefore) ||
+    report.actQueuePendingBefore !== report.actQueueDrainReport.pendingBefore ||
+    report.actQueuePendingAfter !== 0 ||
+    report.actQueuePendingAfter !== report.actQueueDrainReport.remainingCount
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-act-queue-drain';
+  }
+  if (
+    !isPositiveInteger(report.rootWorkRecordCount) ||
+    !Array.isArray(report.rootWorkRecords) ||
+    !Object.isFrozen(report.rootWorkRecords) ||
+    report.rootWorkRecords !==
+      report.expiredActRootWorkMetadata.rootWorkRecords ||
+    report.rootWorkRecords.length !== report.rootWorkRecordCount ||
+    !report.rootWorkRecords.every(
+      isAcceptedSchedulerMockExpiredActRootWorkRecord
+    ) ||
+    report.rootWorkRecordsPendingBefore !== report.rootWorkRecordCount ||
+    report.rootWorkRecordsPendingAfter !== 0 ||
+    report.rootWorkRecordsConsumedCount !== report.rootWorkRecordCount ||
+    !isAcceptedSchedulerMockExpiredActRootWorkConsumptionReport(
+      report.rootWorkRecordConsumptionReport,
+      report.rootWorkRecordCount
+    ) ||
+    !report.rootWorkRecords.every((record, index) =>
+      areSchedulerMockExpiredActRootWorkRecordsEqual(
+        record,
+        report.rootWorkRecordConsumptionReport.consumedRecords[index]
+      )
+    )
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-root-work-consumption';
+  }
+  if (
+    !isAcceptedSchedulerMockExpiredActRootWorkFlushRoute(
+      report.flushAllOrFlushExpiredRoute,
+      report
+    )
+  ) {
+    return 'scheduler-expired-act-root-diagnostics-flush-route';
+  }
+  if (!isAcceptedSchedulerMockExpiredActRootWorkSourceDrain(report)) {
+    return 'scheduler-expired-act-root-diagnostics-source-drain';
+  }
+  if (!hasSchedulerMockExpiredActRootWorkSourceProof(report)) {
+    return 'scheduler-expired-act-root-diagnostics-source-proof';
+  }
+  return null;
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(report) {
+  return (
+    getRejectedSchedulerMockExpiredActRootWorkDiagnosticsReason(report) ===
+    null
+  );
+}
+
+function summarizeSchedulerMockExpiredActRootWorkRecordConsumption(
+  report
+) {
+  return Object.freeze({
+    recordCount: report.rootWorkRecordCount,
+    pendingBefore: report.rootWorkRecordsPendingBefore,
+    consumedCount: report.rootWorkRecordsConsumedCount,
+    remainingCount: report.rootWorkRecordsPendingAfter,
+    records: report.rootWorkRecordConsumptionReport.consumedRecords
+  });
+}
+
+function summarizeSchedulerMockExpiredActRootWorkActQueueDrain(report) {
+  return Object.freeze({
+    pendingBefore: report.actQueueDrainReport.pendingBefore,
+    drainedCount: report.actQueueDrainReport.drainedCount,
+    executedCallbackCount: report.actQueueDrainReport.executedCallbackCount,
+    recordedContinuationCount:
+      report.actQueueDrainReport.recordedContinuationCount,
+    executedContinuationCount:
+      report.actQueueDrainReport.executedContinuationCount,
+    remainingCount: report.actQueueDrainReport.remainingCount,
+    records: report.actQueueDrainReport.drainedRecords
+  });
+}
+
+function consumeSchedulerMockExpiredActRootWorkDiagnostics(report) {
+  const rejectionReason =
+    getRejectedSchedulerMockExpiredActRootWorkDiagnosticsReason(report);
+  if (rejectionReason !== null) {
+    throw createSchedulerMockExpiredActRootWorkDiagnosticsGateError(
+      rejectionReason
+    );
+  }
+
+  return Object.freeze({
+    status: schedulerMockExpiredActRootWorkConsumptionStatus,
+    accepted: true,
+    schedulerMockExpiredActRootWorkDiagnosticsStatus: report.status,
+    schedulerMockExpiredActRootWorkDiagnosticKind: report.kind,
+    schedulerMockExpiredActRootWorkDiagnosticVersion: report.version,
+    schedulerDiagnosticStatus: report.schedulerDiagnosticStatus,
+    expiredCallbackPriorityLevel: report.expiredCallbackPriorityLevel,
+    expiredCallbackPriorityLabel: report.expiredCallbackPriorityLabel,
+    expiredCallbackSchedulerPriority:
+      report.expiredCallbackSchedulerPriority,
+    expiredCallbackVirtualTime: report.expiredCallbackVirtualTime,
+    expiredCallbackLaneLabel: report.expiredCallbackLaneLabel,
+    selectedFlushHelper:
+      report.flushAllOrFlushExpiredRoute.selectedFlushHelper,
+    rootWorkRecordSummary:
+      summarizeSchedulerMockExpiredActRootWorkRecordConsumption(report),
+    actQueueDrainSummary:
+      summarizeSchedulerMockExpiredActRootWorkActQueueDrain(report),
+    expiredActRootWorkMetadata: report.expiredActRootWorkMetadata,
+    actQueueDrainReport: report.actQueueDrainReport,
+    rootWorkRecordConsumptionReport:
+      report.rootWorkRecordConsumptionReport,
+    flushAllOrFlushExpiredRoute: report.flushAllOrFlushExpiredRoute,
+    schedulerMockExpiredActRootWorkDiagnosticsReady: true,
+    consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+    drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
+    drainsAcceptedInternalTestQueues: true,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false
+  });
+}
+
 function getDispatcherActQueueMetadata(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     return null;
@@ -1556,6 +2556,30 @@ function createSchedulerPostTaskYieldActRootHandoffDiagnosticsGateError(
   error.publicReactActCompatibilityClaimed = false;
   error.publicRootSchedulerCompatibilityClaimed = false;
   error.publicRendererCompatibilityClaimed = false;
+  return error;
+}
+
+function createSchedulerMockExpiredActRootWorkDiagnosticsGateError(
+  reason
+) {
+  const error = createUnimplementedError(
+    entrypoint,
+    `${privateActDispatcherGateExport}.consumeSchedulerMockExpiredActRootWorkDiagnostics`,
+    'rejected Scheduler mock expired act/root work diagnostics',
+    'Only accepted private scheduler/unstable_mock expired act/root work diagnostics can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicRootSchedulerCompatibilityClaimed = false;
+  error.publicRendererCompatibilityClaimed = false;
+  error.drainsPublicSchedulerTaskQueue = false;
+  error.drainsPublicReactActQueue = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
+  error.executesRendererWork = false;
+  error.executesRendererRoots = false;
   return error;
 }
 
@@ -1805,6 +2829,8 @@ module.exports = Object.freeze({
     privatePostTaskActRootWorkHandoffKind,
   schedulerPostTaskActRootWorkHandoffVersion:
     privatePostTaskActRootWorkHandoffVersion,
+  schedulerMockExpiredActRootWorkDiagnosticsStatus,
+  schedulerMockExpiredActRootWorkConsumptionStatus,
   requiredRecords: acceptedActQueueRecordKinds,
   requiredTaskKinds: acceptedActQueueTaskKinds,
   requiredContinuationStatuses: acceptedActQueueContinuationStatuses,
@@ -1846,14 +2872,26 @@ module.exports = Object.freeze({
   acceptedRendererBackedActDrainRendererRecords,
   acceptedSchedulerPostTaskRootWorkRecordKinds:
     privatePostTaskAcceptedRootWorkRecordKinds,
+  schedulerMockExpiredActRootWorkDiagnosticsReady: true,
+  consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+  schedulerMockExpiredActRootWorkDiagnosticKind:
+    privateSchedulerMockExpiredActRootWorkDiagnosticsKind,
+  schedulerMockExpiredActRootWorkDiagnosticVersion:
+    privateSchedulerMockExpiredActRootWorkDiagnosticsVersion,
+  drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
+  acceptedSchedulerMockExpiredActRootWorkRecords,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
+  publicRootSchedulerCompatibilityClaimed: false,
+  publicRendererCompatibilityClaimed: false,
   executesQueuedWork: false,
   executesEffects: false,
+  executesRendererWork: false,
   executesRendererRoots: false,
   consumeRendererBackedActDrainDiagnostics,
   consumeSchedulerPrivateActContinuationDiagnostics,
   consumeSchedulerPostTaskYieldActRootHandoffDiagnostics,
+  consumeSchedulerMockExpiredActRootWorkDiagnostics,
   createActQueueMetadata,
   createInternalActQueueTestCallback,
   createInternalActQueueTestQueue,
@@ -1865,6 +2903,7 @@ module.exports = Object.freeze({
   isAcceptedInternalActQueueTestQueue,
   isAcceptedInternalActQueueTestTask,
   isAcceptedRendererBackedActDrainDiagnostics,
+  isAcceptedSchedulerMockExpiredActRootWorkDiagnostics,
   isAcceptedSchedulerPrivateActQueueFlushDiagnostics,
   isAcceptedSchedulerPostTaskYieldActRootHandoffDiagnostics,
   isPrivateActDispatcher,

@@ -69,6 +69,14 @@ const privateSchedulerMockDelayedActRootWorkDiagnosticsBrand = Symbol.for(
 );
 const privateSchedulerMockDelayedActRootWorkDiagnosticsVersion = 1;
 const delayedActRootWorkMetadataSources = new WeakMap();
+const privateSchedulerMockExpiredActRootWorkSourceValidator = Symbol(
+  'fast-react.scheduler.mock-expired-act-root-work-source-validator'
+);
+const schedulerMockExpiredActRootWorkSources = new WeakSet();
+const schedulerMockExpiredActRootWorkSourceValidator = Object.freeze({
+  status: 'fast-react.scheduler.mock-expired-act-root-work-source-validator',
+  isSchedulerMockExpiredActRootWorkSource
+});
 const acceptedExpiredActRootWorkRecordKinds = Object.freeze([
   'RootLaneSchedulingSnapshot',
   'UpdateContainerResult',
@@ -97,6 +105,22 @@ const scheduler =
 
 module.exports = createPrivateSchedulerMockDiagnosticsWrapper(scheduler);
 
+function freezeSchedulerOwnedExpiredActRootWorkSource(value) {
+  schedulerMockExpiredActRootWorkSources.add(value);
+  return Object.freeze(value);
+}
+
+function freezeSchedulerOwnedExpiredActRootWorkSourceArray(values) {
+  return freezeSchedulerOwnedExpiredActRootWorkSource(values);
+}
+
+function isSchedulerMockExpiredActRootWorkSource(value) {
+  return (
+    isObjectLike(value) &&
+    schedulerMockExpiredActRootWorkSources.has(value)
+  );
+}
+
 function createPrivateSchedulerMockDiagnosticsWrapper(sourceScheduler) {
   const shadowState = {
     nextScheduleOrder: 1,
@@ -119,7 +143,7 @@ function createPrivateSchedulerMockDiagnosticsWrapper(sourceScheduler) {
 
   for (const key of Object.keys(sourceScheduler)) {
     const value = sourceScheduler[key];
-    wrappedScheduler[key] =
+    const wrappedValue =
       typeof value === 'function'
         ? wrapSchedulerFunction(
             sourceScheduler,
@@ -129,6 +153,12 @@ function createPrivateSchedulerMockDiagnosticsWrapper(sourceScheduler) {
             value
           )
         : value;
+    Object.defineProperty(wrappedScheduler, key, {
+      configurable: typeof value !== 'function',
+      enumerable: true,
+      value: wrappedValue,
+      writable: typeof value !== 'function'
+    });
   }
 
   return wrappedScheduler;
@@ -139,7 +169,7 @@ function createPrivateActQueueFlushDiagnostics(
   shadowState,
   sourceDiagnostics
 ) {
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     ...sourceDiagnostics,
     mockSchedulerExpiredWorkActRouteDiagnosticsReady: true,
     recognizesExpiredMockSchedulerMetadata: true,
@@ -397,9 +427,19 @@ function wrapSchedulerFunction(
       value: diagnostics,
       writable: false
     });
+    Object.defineProperty(
+      wrappedFunction,
+      privateSchedulerMockExpiredActRootWorkSourceValidator,
+      {
+        configurable: false,
+        enumerable: false,
+        value: schedulerMockExpiredActRootWorkSourceValidator,
+        writable: false
+      }
+    );
   }
 
-  return wrappedFunction;
+  return Object.freeze(wrappedFunction);
 }
 
 function createForwardingFunction(sourceScheduler, sourceFunction) {
@@ -1091,7 +1131,9 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
     validation.taskRecord,
     createContinuationRejectionError
   );
-  const expiredDrainReport = sourceDiagnostics.drainExpiredMockSchedulerWork();
+  const expiredDrainReport = cloneExpiredActRootWorkSourceDrainReport(
+    sourceDiagnostics.drainExpiredMockSchedulerWork()
+  );
   if (typeof validateNestedEvidenceBeforeConsumption === 'function') {
     const nestedEvidenceRejectionReason =
       validateNestedEvidenceBeforeConsumption();
@@ -1101,8 +1143,8 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
   }
   const rootWorkRecordConsumptionReport =
     consumeAcceptedExpiredActRootWorkRecords(validation.rootWorkRecords);
-  const actQueueDrainReport = sourceDiagnostics.drainAcceptedInternalActQueue(
-    validation.actQueue
+  const actQueueDrainReport = cloneExpiredActRootWorkActQueueDrainReport(
+    sourceDiagnostics.drainAcceptedInternalActQueue(validation.actQueue)
   );
   const flushRouteReport =
     createExpiredActRootWorkFlushRouteReportForDiagnostics(
@@ -1204,8 +1246,7 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
       writable: false
     }
   );
-
-  return Object.freeze(metadata);
+  return freezeSchedulerOwnedExpiredActRootWorkSource(metadata);
 }
 
 function describeDelayedActRootWorkMetadataForDiagnostics(
@@ -3098,6 +3139,120 @@ function getExpiredActRootWorkRecordKind(record) {
   return record.recordKind ?? record.kind ?? record.rootWorkRecordKind;
 }
 
+function cloneExpiredActRootWorkSourceDrainReport(report) {
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
+    ...report
+  });
+}
+
+function cloneExpiredActRootWorkCallbackSummary(callback) {
+  if (callback === null) {
+    return null;
+  }
+
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
+    ...callback
+  });
+}
+
+function cloneExpiredActRootWorkMetadataCallbackSummary(callback) {
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
+    ...callback
+  });
+}
+
+function cloneExpiredActRootWorkRecordedContinuation(continuation) {
+  if (continuation === null) {
+    return null;
+  }
+
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
+    status: continuation.status,
+    continuation: cloneExpiredActRootWorkCallbackSummary(
+      continuation.continuation
+    ),
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function cloneExpiredActRootWorkExecutedContinuation(
+  continuation,
+  continuationMap
+) {
+  if (continuation === null) {
+    return null;
+  }
+  if (continuationMap.has(continuation)) {
+    return continuationMap.get(continuation);
+  }
+
+  const clonedContinuation = freezeSchedulerOwnedExpiredActRootWorkSource({
+    sourceIndex: continuation.sourceIndex,
+    sourceLabel: continuation.sourceLabel,
+    status: continuation.status,
+    continuation: cloneExpiredActRootWorkCallbackSummary(
+      continuation.continuation
+    ),
+    returnedContinuation: cloneExpiredActRootWorkRecordedContinuation(
+      continuation.returnedContinuation
+    ),
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+  continuationMap.set(continuation, clonedContinuation);
+  return clonedContinuation;
+}
+
+function cloneExpiredActRootWorkActQueueDrainReport(report) {
+  const continuationMap = new Map();
+  const drainedRecords = freezeSchedulerOwnedExpiredActRootWorkSourceArray(
+    report.drainedRecords.map((record) =>
+      freezeSchedulerOwnedExpiredActRootWorkSource({
+        index: record.index,
+        label: record.label,
+        recordKind: record.recordKind,
+        taskKind: record.taskKind,
+        continuationStatus: record.continuationStatus,
+        callbackStatus: record.callbackStatus,
+        callback: cloneExpiredActRootWorkCallbackSummary(record.callback),
+        returnedContinuation:
+          cloneExpiredActRootWorkExecutedContinuation(
+            record.returnedContinuation,
+            continuationMap
+          ),
+        executesQueuedWork: false,
+        executesEffects: false
+      })
+    )
+  );
+  const recordedContinuations =
+    freezeSchedulerOwnedExpiredActRootWorkSourceArray(
+      report.recordedContinuations.map((continuation) =>
+        cloneExpiredActRootWorkExecutedContinuation(
+          continuation,
+          continuationMap
+        )
+      )
+    );
+  const executedContinuations =
+    freezeSchedulerOwnedExpiredActRootWorkSourceArray(
+      report.executedContinuations.map((continuation) =>
+        cloneExpiredActRootWorkExecutedContinuation(
+          continuation,
+          continuationMap
+        )
+      )
+    );
+
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
+    ...report,
+    drainedRecords,
+    recordedContinuations,
+    executedContinuations
+  });
+}
+
 function consumeAcceptedExpiredActRootWorkRecords(rootWorkRecords) {
   const pendingBefore = rootWorkRecords.length;
   const consumedRecords = [];
@@ -3115,13 +3270,15 @@ function consumeAcceptedExpiredActRootWorkRecords(rootWorkRecords) {
     consumedRecords.push(summarizeExpiredActRootWorkRecord(record, index));
   }
 
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     status: 'consumed-accepted-expired-act-root-work-records',
     accepted: true,
     pendingBefore,
     consumedCount: consumedRecords.length,
     remainingCount: rootWorkRecords.length,
-    consumedRecords: Object.freeze(consumedRecords),
+    consumedRecords: freezeSchedulerOwnedExpiredActRootWorkSourceArray(
+      consumedRecords
+    ),
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
     publicSchedulerTimingCompatibilityClaimed: false,
@@ -3146,10 +3303,10 @@ function createExpiredActRootWorkFlushRouteReportForDiagnostics(
     ? flushHelperName
     : 'unstable_flushExpired';
 
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     status: 'executed-expired-act-root-work-flush-all-or-expired-route',
     routeKind: 'flush-all-or-expired-act-root-work-diagnostics',
-    availableFlushHelpers: Object.freeze([
+    availableFlushHelpers: freezeSchedulerOwnedExpiredActRootWorkSourceArray([
       'unstable_flushAll',
       'unstable_flushExpired'
     ]),
@@ -3224,7 +3381,7 @@ function summarizeExpiredActRootWorkMetadataForDiagnostics(
         ? expiredActRootWorkMetadata.rootWorkRecords
         : [];
 
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     kind: isMetadataObject ? expiredActRootWorkMetadata.kind : null,
     version: isMetadataObject ? expiredActRootWorkMetadata.version : null,
     accepted: validation.rejectionReason === null,
@@ -3253,7 +3410,7 @@ function summarizeExpiredActRootWorkMetadataForDiagnostics(
     actQueue: summarizeExpiredActRootWorkActQueue(actQueue),
     actQueuePendingCount: validation.actQueuePendingCount,
     rootWorkRecordCount: rootWorkRecords.length,
-    rootWorkRecords: Object.freeze(
+    rootWorkRecords: freezeSchedulerOwnedExpiredActRootWorkSourceArray(
       rootWorkRecords.map(summarizeExpiredActRootWorkRecord)
     ),
     rendererWorkExecutionBlocked: isMetadataObject
@@ -3281,20 +3438,22 @@ function summarizeExpiredActRootWorkMetadataForDiagnostics(
 
 function summarizeExpiredActRootWorkActQueue(queue) {
   if (!isObjectLike(queue)) {
-    return Object.freeze({
+    return freezeSchedulerOwnedExpiredActRootWorkSource({
       accepted: false,
       pendingCount: 0,
-      records: Object.freeze([])
+      records: freezeSchedulerOwnedExpiredActRootWorkSourceArray([])
     });
   }
 
   const records = Array.isArray(queue.records) ? queue.records : [];
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     accepted: validateExpiredActRootWorkActQueue(queue).rejectionReason === null,
     kind: queue.kind ?? null,
     version: queue.version ?? null,
     pendingCount: records.length,
-    records: Object.freeze(records.map(summarizeExpiredActRootWorkActTask)),
+    records: freezeSchedulerOwnedExpiredActRootWorkSourceArray(
+      records.map(summarizeExpiredActRootWorkActTask)
+    ),
     drainsAcceptedInternalTestQueues:
       queue.drainsAcceptedInternalTestQueues === true,
     drainsPublicSchedulerTaskQueue: false,
@@ -3306,19 +3465,21 @@ function summarizeExpiredActRootWorkActQueue(queue) {
 
 function summarizeExpiredActRootWorkActTask(task, index) {
   if (!isObjectLike(task)) {
-    return Object.freeze({
+    return freezeSchedulerOwnedExpiredActRootWorkSource({
       index,
       status: 'not-object'
     });
   }
 
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     index,
     label: typeof task.label === 'string' ? task.label : null,
     recordKind: task.recordKind ?? null,
     taskKind: task.taskKind ?? null,
     continuationStatus: task.continuationStatus ?? null,
-    callback: summarizeMockSchedulerCallback(task.callback ?? null),
+    callback: cloneExpiredActRootWorkMetadataCallbackSummary(
+      summarizeMockSchedulerCallback(task.callback ?? null)
+    ),
     publicCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
@@ -3329,13 +3490,13 @@ function summarizeExpiredActRootWorkActTask(task, index) {
 
 function summarizeExpiredActRootWorkRecord(record, index) {
   if (!isObjectLike(record)) {
-    return Object.freeze({
+    return freezeSchedulerOwnedExpiredActRootWorkSource({
       index,
       status: 'not-object'
     });
   }
 
-  return Object.freeze({
+  return freezeSchedulerOwnedExpiredActRootWorkSource({
     index,
     recordKind: getExpiredActRootWorkRecordKind(record) ?? null,
     rootId: record.rootId ?? null,
