@@ -1339,6 +1339,10 @@ pub struct HostRootDeletionCleanupRecord {
     subtree_index: usize,
     parent: FiberId,
     parent_tag: FiberTag,
+    host_parent: Option<FiberId>,
+    host_parent_tag: Option<FiberTag>,
+    host_parent_state_node: StateNodeHandle,
+    host_parent_traversal_depth: Option<usize>,
     deleted_root: FiberId,
     fiber: FiberId,
     tag: FiberTag,
@@ -1395,6 +1399,26 @@ impl HostRootDeletionCleanupRecord {
     }
 
     #[must_use]
+    pub const fn host_parent(self) -> Option<FiberId> {
+        self.host_parent
+    }
+
+    #[must_use]
+    pub const fn host_parent_tag(self) -> Option<FiberTag> {
+        self.host_parent_tag
+    }
+
+    #[must_use]
+    pub const fn host_parent_state_node(self) -> StateNodeHandle {
+        self.host_parent_state_node
+    }
+
+    #[must_use]
+    pub const fn host_parent_traversal_depth(self) -> Option<usize> {
+        self.host_parent_traversal_depth
+    }
+
+    #[must_use]
     pub const fn deleted_root(self) -> FiberId {
         self.deleted_root
     }
@@ -1440,11 +1464,20 @@ struct PendingHostRootDeletionCleanupRecord {
     subtree_index: usize,
     parent: FiberId,
     parent_tag: FiberTag,
+    host_parent: Option<HostRootDeletionHostParentRecord>,
     deleted_root: FiberId,
     fiber: FiberId,
     tag: FiberTag,
     state_node: StateNodeHandle,
     token_target: HostFiberTokenTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootDeletionHostParentRecord {
+    fiber: FiberId,
+    tag: FiberTag,
+    state_node: StateNodeHandle,
+    traversal_depth: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3353,8 +3386,16 @@ fn collect_host_root_mutation_apply_log<H: HostTypes>(
     let mut log = HostRootMutationApplyLog::new(root, finished_work);
 
     for deletion_list in deletion_lists {
-        let parent = arena.get(deletion_list.parent())?;
+        let deletion_parent = arena.get(deletion_list.parent())?;
+        let host_parent = find_nearest_host_parent_for_deletion(arena, deletion_list.parent())?;
         for &deleted in deletion_list.deleted() {
+            let (parent, parent_tag, parent_state_node) = host_parent
+                .map(|record| (record.fiber, record.tag, record.state_node))
+                .unwrap_or((
+                    deletion_list.parent(),
+                    deletion_parent.tag(),
+                    deletion_parent.state_node(),
+                ));
             log.push(host_root_deletion_apply_record(
                 arena,
                 HostRootDeletionApplyRecordRequest {
@@ -3362,9 +3403,9 @@ fn collect_host_root_mutation_apply_log<H: HostTypes>(
                     host_root: finished_work,
                     lanes,
                     list: deletion_list.list(),
-                    parent: parent.id(),
-                    parent_tag: parent.tag(),
-                    parent_state_node: parent.state_node(),
+                    parent,
+                    parent_tag,
+                    parent_state_node,
                     deleted,
                 },
             )?);
@@ -3376,6 +3417,36 @@ fn collect_host_root_mutation_apply_log<H: HostTypes>(
     }
 
     Ok(log)
+}
+
+fn find_nearest_host_parent_for_deletion(
+    arena: &FiberArena,
+    deletion_parent: FiberId,
+) -> Result<Option<HostRootDeletionHostParentRecord>, RootCommitError> {
+    let mut candidate = deletion_parent;
+    let mut traversal_depth = 0;
+
+    loop {
+        let node = arena.get(candidate)?;
+        match node.tag() {
+            FiberTag::HostRoot | FiberTag::HostComponent => {
+                return Ok(Some(HostRootDeletionHostParentRecord {
+                    fiber: candidate,
+                    tag: node.tag(),
+                    state_node: node.state_node(),
+                    traversal_depth,
+                }));
+            }
+            FiberTag::FunctionComponent => {
+                let Some(parent) = node.return_fiber() else {
+                    return Ok(None);
+                };
+                candidate = parent;
+                traversal_depth += 1;
+            }
+            _ => return Ok(None),
+        }
+    }
 }
 
 fn host_root_mutation_phase_apply_record(
@@ -4401,6 +4472,7 @@ fn collect_pending_host_node_deletion_cleanup<H: HostTypes>(
 
     for (deletion_list_index, deletion_list) in deletion_lists.iter().enumerate() {
         let parent = arena.get(deletion_list.parent())?;
+        let host_parent = find_nearest_host_parent_for_deletion(arena, deletion_list.parent())?;
         for (deleted_index, &deleted_root) in deletion_list.deleted().iter().enumerate() {
             let mut subtree_index = 0;
             collect_pending_deleted_subtree_host_node_cleanup(
@@ -4413,6 +4485,7 @@ fn collect_pending_host_node_deletion_cleanup<H: HostTypes>(
                     deleted_index,
                     parent: deletion_list.parent(),
                     parent_tag: parent.tag(),
+                    host_parent,
                     deleted_root,
                 },
                 deleted_root,
@@ -4434,6 +4507,7 @@ struct PendingDeletedSubtreeHostNodeCleanupRequest {
     deleted_index: usize,
     parent: FiberId,
     parent_tag: FiberTag,
+    host_parent: Option<HostRootDeletionHostParentRecord>,
     deleted_root: FiberId,
 }
 
@@ -4466,6 +4540,7 @@ fn collect_pending_deleted_subtree_host_node_cleanup(
             subtree_index: *subtree_index,
             parent: request.parent,
             parent_tag: request.parent_tag,
+            host_parent: request.host_parent,
             deleted_root: request.deleted_root,
             fiber,
             tag: node.tag(),
@@ -4518,6 +4593,13 @@ fn materialize_host_node_deletion_cleanup_log<H: HostTypes>(
             subtree_index: pending.subtree_index,
             parent: pending.parent,
             parent_tag: pending.parent_tag,
+            host_parent: pending.host_parent.map(|parent| parent.fiber),
+            host_parent_tag: pending.host_parent.map(|parent| parent.tag),
+            host_parent_state_node: pending
+                .host_parent
+                .map(|parent| parent.state_node)
+                .unwrap_or(StateNodeHandle::NONE),
+            host_parent_traversal_depth: pending.host_parent.map(|parent| parent.traversal_depth),
             deleted_root: pending.deleted_root,
             fiber: pending.fiber,
             tag: pending.tag,
@@ -4874,6 +4956,18 @@ mod tests {
         third_deleted_state_node: StateNodeHandle,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct FunctionComponentDeletionHostParentFixture {
+        owner: FiberId,
+        list: DeletionListId,
+        deleted_text: FiberId,
+        deleted_text_state_node: StateNodeHandle,
+        deleted_component: FiberId,
+        deleted_component_state_node: StateNodeHandle,
+        nested_text: FiberId,
+        nested_text_state_node: StateNodeHandle,
+    }
+
     fn create_test_fiber(
         store: &mut FiberRootStore<RecordingHost>,
         tag: FiberTag,
@@ -5152,6 +5246,67 @@ mod tests {
             second_list,
             third_deleted,
             third_deleted_state_node,
+        }
+    }
+
+    fn attach_function_component_deletion_host_parent_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> FunctionComponentDeletionHostParentFixture {
+        let owner = create_test_fiber(store, FiberTag::FunctionComponent, 401);
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[owner])
+            .unwrap();
+
+        let deleted_text = create_test_fiber(store, FiberTag::HostText, 402);
+        let deleted_component = create_test_fiber(store, FiberTag::HostComponent, 403);
+        let nested_text = create_test_fiber(store, FiberTag::HostText, 404);
+        let deleted_text_state_node = StateNodeHandle::from_raw(8402);
+        let deleted_component_state_node = StateNodeHandle::from_raw(8403);
+        let nested_text_state_node = StateNodeHandle::from_raw(8404);
+        store
+            .fiber_arena_mut()
+            .get_mut(deleted_text)
+            .unwrap()
+            .set_state_node(deleted_text_state_node);
+        store
+            .fiber_arena_mut()
+            .get_mut(deleted_component)
+            .unwrap()
+            .set_state_node(deleted_component_state_node);
+        store
+            .fiber_arena_mut()
+            .get_mut(nested_text)
+            .unwrap()
+            .set_state_node(nested_text_state_node);
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_component, &[nested_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(owner, &[deleted_text, deleted_component])
+            .unwrap();
+        let list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(owner, deleted_text)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(owner, deleted_component)
+            .unwrap();
+        bubble_test_fiber(store, host_root_work_in_progress);
+
+        FunctionComponentDeletionHostParentFixture {
+            owner,
+            list,
+            deleted_text,
+            deleted_text_state_node,
+            deleted_component,
+            deleted_component_state_node,
+            nested_text,
+            nested_text_state_node,
         }
     }
 
@@ -6276,6 +6431,16 @@ mod tests {
         assert_eq!(cleanup_records[0].subtree_index(), 0);
         assert_eq!(cleanup_records[0].parent(), fixture.first_parent);
         assert_eq!(cleanup_records[0].parent_tag(), FiberTag::HostComponent);
+        assert_eq!(cleanup_records[0].host_parent(), Some(fixture.first_parent));
+        assert_eq!(
+            cleanup_records[0].host_parent_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(
+            cleanup_records[0].host_parent_state_node(),
+            fixture.first_parent_state_node
+        );
+        assert_eq!(cleanup_records[0].host_parent_traversal_depth(), Some(0));
         assert_eq!(cleanup_records[0].deleted_root(), fixture.second_deleted);
         assert_eq!(cleanup_records[0].fiber(), fixture.second_deleted);
         assert_eq!(cleanup_records[0].tag(), FiberTag::HostText);
@@ -6436,6 +6601,168 @@ mod tests {
             Some(fixture.first_list)
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_deletion_cleanup_finds_nearest_host_root_parent_through_function_component() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let host_root_state_node = store.fiber_arena().get(finished_work).unwrap().state_node();
+        let fixture =
+            attach_function_component_deletion_host_parent_fixture(&mut store, finished_work);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let deletion_lists = commit.deletion_lists();
+        let apply_records = commit.mutation_apply_log().records();
+        let cleanup_records = commit.host_node_deletion_cleanup_log().records();
+
+        assert_eq!(deletion_lists.len(), 1);
+        assert_eq!(deletion_lists[0].parent(), fixture.owner);
+        assert_eq!(deletion_lists[0].list(), fixture.list);
+        assert_eq!(
+            deletion_lists[0].deleted(),
+            &[fixture.deleted_text, fixture.deleted_component]
+        );
+
+        assert_eq!(apply_records.len(), 2);
+        assert_eq!(
+            apply_records[0].source(),
+            HostRootMutationApplyRecordSource::DeletionList(fixture.list)
+        );
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+        );
+        assert_eq!(apply_records[0].parent(), finished_work);
+        assert_eq!(apply_records[0].parent_tag(), FiberTag::HostRoot);
+        assert_eq!(apply_records[0].parent_state_node(), host_root_state_node);
+        assert_eq!(apply_records[0].fiber(), fixture.deleted_text);
+        assert_eq!(
+            apply_records[0].state_node(),
+            fixture.deleted_text_state_node
+        );
+        assert_eq!(
+            apply_records[1].kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+        );
+        assert_eq!(apply_records[1].parent(), finished_work);
+        assert_eq!(apply_records[1].parent_tag(), FiberTag::HostRoot);
+        assert_eq!(apply_records[1].fiber(), fixture.deleted_component);
+        assert_eq!(
+            apply_records[1].state_node(),
+            fixture.deleted_component_state_node
+        );
+
+        assert_eq!(cleanup_records.len(), 3);
+        assert_eq!(cleanup_records[0].sequence(), 0);
+        assert_eq!(cleanup_records[0].deletion_list_index(), 0);
+        assert_eq!(cleanup_records[0].deleted_index(), 0);
+        assert_eq!(cleanup_records[0].subtree_index(), 0);
+        assert_eq!(cleanup_records[0].parent(), fixture.owner);
+        assert_eq!(cleanup_records[0].parent_tag(), FiberTag::FunctionComponent);
+        assert_eq!(cleanup_records[0].host_parent(), Some(finished_work));
+        assert_eq!(
+            cleanup_records[0].host_parent_tag(),
+            Some(FiberTag::HostRoot)
+        );
+        assert_eq!(
+            cleanup_records[0].host_parent_state_node(),
+            host_root_state_node
+        );
+        assert_eq!(cleanup_records[0].host_parent_traversal_depth(), Some(1));
+        assert_eq!(cleanup_records[0].deleted_root(), fixture.deleted_text);
+        assert_eq!(cleanup_records[0].fiber(), fixture.deleted_text);
+        assert_eq!(cleanup_records[0].tag(), FiberTag::HostText);
+
+        assert_eq!(cleanup_records[1].sequence(), 1);
+        assert_eq!(cleanup_records[1].deleted_index(), 1);
+        assert_eq!(cleanup_records[1].subtree_index(), 0);
+        assert_eq!(cleanup_records[1].parent(), fixture.owner);
+        assert_eq!(cleanup_records[1].host_parent(), Some(finished_work));
+        assert_eq!(cleanup_records[1].host_parent_traversal_depth(), Some(1));
+        assert_eq!(cleanup_records[1].deleted_root(), fixture.deleted_component);
+        assert_eq!(cleanup_records[1].fiber(), fixture.nested_text);
+        assert_eq!(cleanup_records[1].tag(), FiberTag::HostText);
+        assert_eq!(
+            cleanup_records[1].state_node(),
+            fixture.nested_text_state_node
+        );
+
+        assert_eq!(cleanup_records[2].sequence(), 2);
+        assert_eq!(cleanup_records[2].deleted_index(), 1);
+        assert_eq!(cleanup_records[2].subtree_index(), 1);
+        assert_eq!(cleanup_records[2].parent(), fixture.owner);
+        assert_eq!(cleanup_records[2].host_parent(), Some(finished_work));
+        assert_eq!(cleanup_records[2].host_parent_traversal_depth(), Some(1));
+        assert_eq!(cleanup_records[2].deleted_root(), fixture.deleted_component);
+        assert_eq!(cleanup_records[2].fiber(), fixture.deleted_component);
+        assert_eq!(cleanup_records[2].tag(), FiberTag::HostComponent);
+        assert_eq!(
+            cleanup_records[2].state_node(),
+            fixture.deleted_component_state_node
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_deletion_host_parent_traversal_keeps_fragment_and_portal_blocked() {
+        for blocker_tag in [FiberTag::Fragment, FiberTag::Portal] {
+            let (mut store, root_id, host) = root_store();
+            update_container(&mut store, root_id, RootElementHandle::from_raw(47), None).unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let owner = create_test_fiber(&mut store, blocker_tag, 501);
+            let deleted_text = create_test_fiber(&mut store, FiberTag::HostText, 502);
+            let deleted_text_state_node = StateNodeHandle::from_raw(8502);
+            store
+                .fiber_arena_mut()
+                .get_mut(deleted_text)
+                .unwrap()
+                .set_state_node(deleted_text_state_node);
+            store
+                .fiber_arena_mut()
+                .set_children(owner, &[deleted_text])
+                .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(render.finished_work(), &[owner])
+                .unwrap();
+            let list = store
+                .fiber_arena_mut()
+                .mark_child_for_deletion(owner, deleted_text)
+                .unwrap();
+            bubble_test_fiber(&mut store, render.finished_work());
+
+            let commit = commit_finished_host_root(&mut store, render).unwrap();
+            let apply_records = commit.mutation_apply_log().records();
+            let cleanup_records = commit.host_node_deletion_cleanup_log().records();
+
+            assert_eq!(commit.deletion_lists().len(), 1);
+            assert_eq!(commit.deletion_lists()[0].parent(), owner);
+            assert_eq!(commit.deletion_lists()[0].list(), list);
+            assert_eq!(apply_records.len(), 1);
+            assert_eq!(
+                apply_records[0].kind(),
+                HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber
+            );
+            assert_eq!(apply_records[0].parent(), owner);
+            assert_eq!(apply_records[0].parent_tag(), blocker_tag);
+            assert_eq!(apply_records[0].fiber(), deleted_text);
+            assert_eq!(cleanup_records.len(), 1);
+            assert_eq!(cleanup_records[0].parent(), owner);
+            assert_eq!(cleanup_records[0].parent_tag(), blocker_tag);
+            assert_eq!(cleanup_records[0].host_parent(), None);
+            assert_eq!(cleanup_records[0].host_parent_tag(), None);
+            assert_eq!(
+                cleanup_records[0].host_parent_state_node(),
+                StateNodeHandle::NONE
+            );
+            assert_eq!(cleanup_records[0].host_parent_traversal_depth(), None);
+            assert_eq!(cleanup_records[0].fiber(), deleted_text);
+            assert_eq!(cleanup_records[0].state_node(), deleted_text_state_node);
+            assert_eq!(host.operations(), Vec::<&'static str>::new());
+        }
     }
 
     #[test]
