@@ -45,12 +45,41 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 323-352 has been accepted; refill the queue
-after stale accepted sessions/worktrees are cleaned.
+Top-level cap: 30 workers. Queue 353-382 is assigned in isolated worktrees with
+overlapping implementation allowed where write scopes differ.
 
 | Worker | Focus |
 | --- | --- |
-| _None_ | Refill pending |
+| 353 | Root commit HostText update apply |
+| 354 | Root commit nested host-parent placement apply |
+| 355 | Root commit deletion subtree cleanup apply |
+| 356 | Root work-loop host-output commit handoff |
+| 357 | Sync flush root host-output commit |
+| 358 | Function-component `useMemo`/`useRef` render path |
+| 359 | Function-component state dispatch root reschedule |
+| 360 | Context consumer propagation through function render |
+| 361 | Passive effect mount create execution private gate |
+| 362 | Passive effect unmount destroy ordering private gate |
+| 363 | Test renderer update `toJSON` private host output |
+| 364 | Test renderer `toTree` private host output |
+| 365 | Test renderer TestInstance multi-child query path |
+| 366 | Test renderer act private flush execution gate |
+| 367 | React DOM root private initial render host output |
+| 368 | React DOM root private update host output |
+| 369 | React DOM root private unmount host output |
+| 370 | React DOM event listener invocation private path |
+| 371 | React DOM ref attach/detach ordering private path |
+| 372 | Hydration marker replay queue private path |
+| 373 | Portal private fake-DOM mount gate |
+| 374 | Resource hint private DOM insertion gate |
+| 375 | Controlled input value tracker private gate |
+| 376 | Native root bridge Rust handle-table handoff |
+| 377 | Scheduler act queue flush helper private path |
+| 378 | Package surface private root execution audit |
+| 379 | Benchmark private host-output admissions refresh |
+| 380 | Root render E2E private update/unmount admissions |
+| 381 | Conformance root public blockers after private host output |
+| 382 | React DOM test-utils act after private root output |
 
 ## Near-Term Sequencing
 
