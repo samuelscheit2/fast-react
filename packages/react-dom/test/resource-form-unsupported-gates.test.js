@@ -13,6 +13,11 @@ const resourceFormGate = require(path.join(
   sourceRoot,
   'resource-form-gates.js'
 ));
+const formActions = require(path.join(
+  sourceRoot,
+  'shared',
+  'form-actions.js'
+));
 const propertyPayload = require(path.join(
   sourceRoot,
   'dom-host',
@@ -1153,6 +1158,323 @@ test('private form reset queue/commit gate records boundary metadata only', () =
         resourceFormGate.privateFormActionResetQueueCommitInvalidAdmissionCode,
       compatibilityTarget,
       reason: 'queueKind must be metadata-only-reset-state-queue'
+    }
+  );
+});
+
+test('private form action FormData blocker records target, submitter, and accepted metadata ids only', () => {
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: 'formdata-source'
+  });
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: 'formdata-extraction'
+  });
+  const queueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: 'formdata-reset'
+    });
+  const blockerGate =
+    formActions.createFormActionFormDataBlockerDiagnosticGate({
+      requestIdPrefix: 'formdata-blocker'
+    });
+  const submitIntent = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    submissionTrigger: 'requestSubmit',
+    actionKind: 'function',
+    actionSource: 'form',
+    submitControlKind: 'button',
+    formActionKind: 'function',
+    submitterActionKind: 'none',
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const extraction =
+    extractionGate.recordEventExtractionFromSubmissionIntent(submitIntent);
+  const resetIntent = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: 'r',
+    resetSource: 'action-completion',
+    formOwnership: 'react-owned',
+    transitionContext: 'action'
+  });
+  const resetQueueCommit = queueCommitGate.recordResetQueueCommit(
+    resetIntent,
+    {
+      explicitAdmission: true,
+      queueSource: 'action-completion',
+      queueKind: 'metadata-only-reset-state-queue',
+      commitKind: 'after-mutation-form-reset-order',
+      hostTag: 'form'
+    }
+  );
+  const record = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    resetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: {
+        targetKind: 'form',
+        hostTag: 'form',
+        methodKind: 'post',
+        encodingKind: 'multipart'
+      },
+      submitterShape: {
+        controlKind: 'button',
+        hostTag: 'button',
+        nameKind: 'string',
+        valueKind: 'string'
+      }
+    }
+  );
+  const summary =
+    formActions.describePrivateFormActionFormDataBlockerGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionFormDataBlockerGateId
+  );
+  assert.equal(
+    summary.status,
+    formActions.privateFormActionFormDataBlockerStatus
+  );
+  assert.equal(
+    summary.acceptedEventExtractionRecordType,
+    resourceFormGate.privateFormActionEventExtractionRecordType
+  );
+  assert.equal(
+    summary.acceptedResetQueueCommitRecordType,
+    resourceFormGate.privateFormActionResetQueueCommitRecordType
+  );
+  assert.equal(summary.recordsAcceptedMetadataIds, true);
+  assert.equal(summary.recordsFormTargetShape, true);
+  assert.equal(summary.recordsSubmitterShape, true);
+  assert.equal(summary.blocksFormDataConstruction, true);
+  assert.equal(summary.blocksActionInvocation, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsRawEvents, false);
+  assert.equal(summary.acceptsActionFunctions, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.equal(summary.callsPreviousDispatchers, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.commitsFormResets, false);
+  assert.equal(summary.resetsForms, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    formActions.formActionFormDataBlockerBlockedSideEffects
+  );
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    formActions.isPrivateFormActionFormDataBlockerRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionFormDataBlockerRecordPayload(record),
+    record
+  );
+  assert.equal(
+    record.status,
+    formActions.privateFormActionFormDataBlockerRecordedStatus
+  );
+  assert.equal(record.blockerId, 'formdata-blocker:1');
+  assert.equal(record.sourceEventExtractionId, extraction.extractionId);
+  assert.equal(
+    record.sourceResetQueueCommitRequestId,
+    resetQueueCommit.requestId
+  );
+  assert.deepEqual(record.acceptedMetadataIds, {
+    eventExtractionId: extraction.extractionId,
+    eventExtractionSequence: extraction.extractionSequence,
+    submissionIntentRequestId: extraction.sourceRequestId,
+    submissionIntentRequestSequence: extraction.sourceRequestSequence,
+    resetQueueCommitRequestId: resetQueueCommit.requestId,
+    resetQueueCommitRequestSequence: resetQueueCommit.requestSequence,
+    resetIntentRequestId: resetQueueCommit.sourceResetRequestId,
+    resetIntentRequestSequence: resetQueueCommit.sourceResetRequestSequence,
+    eventExtractionGateId: extraction.gateId,
+    resetQueueCommitGateId: resetQueueCommit.gateId
+  });
+
+  assert.equal(record.formTargetShape.targetKind, 'form');
+  assert.equal(record.formTargetShape.hostTag, 'form');
+  assert.equal(record.formTargetShape.methodKind, 'post');
+  assert.equal(record.formTargetShape.encodingKind, 'multipart');
+  assert.equal(record.formTargetShape.formPropsWouldBeRead, true);
+  assert.equal(record.formTargetShape.realFormInspected, false);
+  assert.equal(record.formTargetShape.formDataConstructed, false);
+  assert.equal(record.submitterShape.controlKind, 'button');
+  assert.equal(record.submitterShape.hostTag, 'button');
+  assert.equal(record.submitterShape.valueWouldBeIncludedInFormData, true);
+  assert.equal(record.submitterShape.temporaryControlWouldBeInserted, true);
+  assert.equal(record.submitterShape.submitControlInspected, false);
+  assert.equal(record.submitterShape.propsRead, false);
+  assert.equal(record.submitterShape.attributeRead, false);
+
+  assert.equal(
+    record.formDataConstructionBlocker.status,
+    'blocked-private-form-action-formdata-construction'
+  );
+  assert.equal(
+    record.formDataConstructionBlocker.wouldConstructForPendingStatus,
+    true
+  );
+  assert.equal(
+    record.formDataConstructionBlocker.wouldConstructForActionInvocation,
+    true
+  );
+  assert.equal(
+    record.formDataConstructionBlocker.wouldUseSubmitControlValue,
+    true
+  );
+  assert.equal(
+    record.formDataConstructionBlocker.wouldInsertTemporarySubmitControl,
+    true
+  );
+  assert.equal(record.formDataConstructionBlocker.constructorCallBlocked, true);
+  assert.equal(record.formDataConstructionBlocker.realFormInspected, false);
+  assert.equal(record.formDataConstructionBlocker.formDataConstructed, false);
+  assert.equal(
+    record.formDataConstructionBlocker.temporarySubmitControlInserted,
+    false
+  );
+  assert.equal(record.actionInvocationBlocker.status, 'blocked-private-form-action-invocation');
+  assert.equal(record.actionInvocationBlocker.actionInvocationWouldBeScheduled, true);
+  assert.equal(record.actionInvocationBlocker.defaultPreventedByGate, false);
+  assert.equal(record.actionInvocationBlocker.actionFunctionCaptured, false);
+  assert.equal(record.actionInvocationBlocker.actionInvoked, false);
+  assert.equal(record.actionInvocationBlocker.hostTransitionStarted, false);
+  assert.equal(record.resetExecutionBlocker.previousDispatcherCalled, false);
+  assert.equal(record.resetExecutionBlocker.resetStateQueued, false);
+  assert.equal(record.resetExecutionBlocker.reactUpdateQueued, false);
+  assert.equal(record.resetExecutionBlocker.resetFormInstanceCalled, false);
+  assert.equal(record.resetExecutionBlocker.formResetCommitted, false);
+  assert.equal(record.resetExecutionBlocker.realFormReset, false);
+  assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(record.publicFormActionBoundary.formDataConstructed, false);
+  assert.equal(record.publicFormActionBoundary.actionInvoked, false);
+  assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionFormDataBlockerDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.sourceEventExtractionAccepted, true);
+  assert.equal(record.sideEffects.sourceResetQueueCommitAccepted, true);
+  assert.equal(record.sideEffects.acceptedMetadataIdsRecorded, true);
+  assert.equal(record.sideEffects.targetShapeRecorded, true);
+  assert.equal(record.sideEffects.submitterShapeRecorded, true);
+  assert.equal(record.sideEffects.formDataConstructionBlocked, true);
+  assert.equal(record.sideEffects.formDataConstructed, false);
+  assert.equal(record.sideEffects.actionFunctionCaptured, false);
+  assert.equal(record.sideEffects.actionInvoked, false);
+  assert.equal(record.sideEffects.hostTransitionStarted, false);
+  assert.equal(record.sideEffects.previousDispatcherCalled, false);
+  assert.equal(record.sideEffects.resetStateQueued, false);
+  assert.equal(record.sideEffects.formResetCommitted, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+
+  const error =
+    formActions.createUnsupportedFormActionFormDataBlockerError(record);
+  assert.equal(
+    error.code,
+    formActions.privateFormActionFormDataBlockerGateErrorCode
+  );
+  assert.equal(error.blockerId, 'formdata-blocker:1');
+  assert.deepEqual(error.acceptedMetadataIds, record.acceptedMetadataIds);
+  assert.deepEqual(
+    error.formDataConstructionBlocker,
+    record.formDataConstructionBlocker
+  );
+  assert.match(
+    error.message,
+    /private form action data blocker records shape and blocker metadata only/u
+  );
+
+  let actionCalls = 0;
+  const action = () => {
+    actionCalls++;
+  };
+  assert.throws(
+    () =>
+      blockerGate.recordFormDataBlockerDiagnostic(
+        extraction,
+        resetQueueCommit,
+        {
+          explicitFormActionFormDataBlocker: true,
+          action
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFormDataBlockerInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'action must not be passed to the form action data blocker gate'
+    }
+  );
+  assert.equal(actionCalls, 0);
+
+  assert.throws(
+    () =>
+      blockerGate.recordFormDataBlockerDiagnostic(
+        extraction,
+        resetQueueCommit,
+        {
+          explicitFormActionFormDataBlocker: true,
+          submitter: throwingProxy('submitter')
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFormDataBlockerInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'submitter must not be passed to the form action data blocker gate'
+    }
+  );
+
+  assert.throws(
+    () =>
+      blockerGate.recordFormDataBlockerDiagnostic(
+        resetIntent,
+        resetQueueCommit,
+        {
+          explicitFormActionFormDataBlocker: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFormDataBlockerInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source event extraction must be accepted metadata-only submit extraction'
+    }
+  );
+  assert.throws(
+    () =>
+      blockerGate.recordFormDataBlockerDiagnostic(
+        extraction,
+        resetIntent,
+        {
+          explicitFormActionFormDataBlocker: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionFormDataBlockerInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source reset queue/commit must be accepted metadata-only reset boundary'
+    }
+  );
+  assert.throws(
+    () => formActions.createUnsupportedFormActionFormDataBlockerError({}),
+    {
+      code:
+        formActions.privateFormActionFormDataBlockerInvalidRecordCode,
+      compatibilityTarget
     }
   );
 });

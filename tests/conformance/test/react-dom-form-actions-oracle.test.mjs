@@ -24,6 +24,9 @@ import {
   assertFastReactFormActionPrerequisiteGate,
   assertFastReactFormActionsUnsupportedGate
 } from "../src/react-dom-form-actions-unsupported-gates.mjs";
+import {
+  requireReactDomPackageFile
+} from "../src/react-dom-resource-hints-unsupported-gates.mjs";
 
 const oracle = readCheckedReactDomFormActionsOracle();
 
@@ -93,6 +96,128 @@ test("Fast React form-action APIs stay unsupported placeholders until form adapt
 
 test("Fast React form-action event extraction stays private metadata-only", () => {
   assertPrivateFormActionResetDispatcherGate();
+});
+
+test("Fast React form-action FormData blocker stays private metadata-only", () => {
+  const resourceFormGate = requireReactDomPackageFile(
+    "src/resource-form-gates.js"
+  );
+  const formActions = requireReactDomPackageFile(
+    "src/shared/form-actions.js"
+  );
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: "oracle-formdata-source"
+  });
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: "oracle-formdata-extraction"
+  });
+  const resetQueueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: "oracle-formdata-reset"
+    });
+  const blockerGate =
+    formActions.createFormActionFormDataBlockerDiagnosticGate({
+      requestIdPrefix: "oracle-formdata-blocker"
+    });
+  const submitIntent = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: "submit",
+    submissionTrigger: "requestSubmit",
+    actionKind: "function",
+    actionSource: "form",
+    submitControlKind: "button",
+    formActionKind: "function",
+    submitterActionKind: "none",
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const extraction =
+    extractionGate.recordEventExtractionFromSubmissionIntent(submitIntent);
+  const resetIntent = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: "r",
+    resetSource: "action-completion",
+    formOwnership: "react-owned",
+    transitionContext: "action"
+  });
+  const resetQueueCommit = resetQueueCommitGate.recordResetQueueCommit(
+    resetIntent,
+    {
+      explicitAdmission: true,
+      queueSource: "action-completion",
+      queueKind: "metadata-only-reset-state-queue",
+      commitKind: "after-mutation-form-reset-order",
+      hostTag: "form"
+    }
+  );
+  const record = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    resetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: { targetKind: "form", hostTag: "form" },
+      submitterShape: { controlKind: "button", hostTag: "button" }
+    }
+  );
+  const summary =
+    formActions.describePrivateFormActionFormDataBlockerGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionFormDataBlockerGateId
+  );
+  assert.equal(summary.recordsAcceptedMetadataIds, true);
+  assert.equal(summary.recordsFormTargetShape, true);
+  assert.equal(summary.recordsSubmitterShape, true);
+  assert.equal(summary.blocksFormDataConstruction, true);
+  assert.equal(summary.blocksActionInvocation, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsRawEvents, false);
+  assert.equal(summary.acceptsActionFunctions, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.callsPreviousDispatchers, false);
+  assert.equal(summary.resetsForms, false);
+
+  assert.equal(
+    formActions.isPrivateFormActionFormDataBlockerRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionFormDataBlockerRecordPayload(record),
+    record
+  );
+  assert.equal(record.sourceEventExtractionId, extraction.extractionId);
+  assert.equal(
+    record.sourceResetQueueCommitRequestId,
+    resetQueueCommit.requestId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.eventExtractionId,
+    extraction.extractionId
+  );
+  assert.equal(
+    record.acceptedMetadataIds.resetQueueCommitRequestId,
+    resetQueueCommit.requestId
+  );
+  assert.equal(record.formTargetShape.realFormInspected, false);
+  assert.equal(record.submitterShape.submitControlInspected, false);
+  assert.equal(
+    record.formDataConstructionBlocker.constructorCallBlocked,
+    true
+  );
+  assert.equal(record.formDataConstructionBlocker.formDataConstructed, false);
+  assert.equal(record.actionInvocationBlocker.actionInvoked, false);
+  assert.equal(record.actionInvocationBlocker.hostTransitionStarted, false);
+  assert.equal(record.resetExecutionBlocker.previousDispatcherCalled, false);
+  assert.equal(record.resetExecutionBlocker.realFormReset, false);
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionFormDataBlockerDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.formDataConstructed, false);
+  assert.equal(record.sideEffects.actionInvoked, false);
+  assert.equal(record.sideEffects.realFormReset, false);
 });
 
 test("Fast React form-action implementation gates stay fail-closed", () => {
