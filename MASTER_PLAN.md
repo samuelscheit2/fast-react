@@ -61,12 +61,8 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-239-dom-root-bridge-request-admission-gate`.
 - Worker 240: DOM root public facade dual-run blocked gate in
   `/Users/user/Developer/Developer/fast-react-worker-240-dom-root-public-facade-dualrun-blocked-gate`.
-- Worker 241: DOM text-content private predicate gaps in
-  `/Users/user/Developer/Developer/fast-react-worker-241-dom-text-content-private-predicate-gaps`.
 - Worker 242: DOM style/dangerous HTML applier gate in
   `/Users/user/Developer/Developer/fast-react-worker-242-dom-style-dangerous-html-applier-gate`.
-- Worker 243: portal reconciler fail-closed admission in
-  `/Users/user/Developer/Developer/fast-react-worker-243-portal-reconciler-failclosed-admission`.
 - Worker 244: DOM event dispatch plugin skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-244-dom-event-dispatch-plugin-skeleton`.
 - Worker 245: DOM ref callback commit gate in
@@ -75,14 +71,10 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-246-hydration-container-marker-parser`.
 - Worker 247: function component context read canary in
   `/Users/user/Developer/Developer/fast-react-worker-247-function-component-context-read-canary`.
-- Worker 248: React `useContext` dispatcher fail-closed surface in
-  `/Users/user/Developer/Developer/fast-react-worker-248-react-usecontext-dispatcher-failclosed`.
 - Worker 249: function component single child reconciliation canary in
   `/Users/user/Developer/Developer/fast-react-worker-249-function-component-single-child-reconciliation`.
 - Worker 250: hook effect passive commit handoff in
   `/Users/user/Developer/Developer/fast-react-worker-250-hook-effect-passive-commit-handoff`.
-- Worker 251: React `useEffect` dispatcher fail-closed surface in
-  `/Users/user/Developer/Developer/fast-react-worker-251-react-useeffect-dispatcher-failclosed`.
 - Worker 252: sync flush act continuation skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-252-sync-flush-act-continuation-skeleton`.
 - Worker 253: public React `act` blocked gate in

@@ -466,9 +466,38 @@ sequencing belong in `MASTER_PLAN.md`.
   the package-surface smoke snapshot and guard for React DOM subpath version,
   placeholder, `server.bun`, and react-server load-error boundaries without
   changing React DOM runtime behavior.
+- Worker 241 DOM text-content private predicate gaps was merged, admitting
+  BigInt into the private `shouldSetTextContent` dual-run gate where local
+  behavior matches the React DOM oracle, while keeping `textarea`, `noscript`,
+  public roots, server rendering, HostText commit, DOM mutation, and
+  compatibility claims blocked.
+- Worker 243 portal reconciler fail-closed admission was merged, adding
+  structured private portal diagnostics in begin-work and root preflight paths
+  that stop before child scheduling, host mutation, listener setup, portal
+  mounting, serialization, or compatibility claims.
+- Worker 248 React `useContext` dispatcher fail-closed surface was merged,
+  adding package-private context dispatcher markers so public `useContext`
+  forwards only through marked dispatchers while preserving invalid-hook-call
+  behavior and leaving provider propagation/runtime compatibility blocked.
+- Worker 251 React effect hook dispatcher fail-closed surface was merged,
+  adding package-private effect dispatcher markers for `useEffect`,
+  `useLayoutEffect`, `useInsertionEffect`, and `useImperativeHandle` without
+  executing effects, wiring reconciler hooks, or claiming compatibility.
 
 ## Latest Accepted Verification
 
+- Workers 241, 243, 248, and 251 were verified on their worktrees and again on
+  `main`; worker 251 required a scoped conflict resolution with worker 248 in
+  `packages/react/hook-dispatcher.js` and
+  `tests/conformance/test/react-hook-dispatcher-guard.test.mjs`, preserving
+  state, context, and effect private dispatcher markers together. The combined
+  `main` result passed `cargo fmt --all --check`, full
+  `fast-react-reconciler` tests with 187 unit tests plus 1 compile-fail
+  doctest, reconciler clippy with warnings denied, DOM text-content dual-run
+  conformance with 15 admitted private rows and 2 skipped private rows,
+  focused hook/context/text oracle tests with 39 tests, `npm run check:js`
+  with 509 conformance tests plus package-surface, benchmark, workspace, and
+  native checks, and `git diff --check`.
 - Workers 208, 210, 213, 215, 217, 230, and 231 were verified on their
   integrated worktrees and again on `main` after merging; worker 208 required a
   scoped `fast-react-test-renderer` conflict resolution that preserved both the
