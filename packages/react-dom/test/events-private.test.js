@@ -735,6 +735,99 @@ test('private input/change controlled restore execution flushes one fake-DOM tex
   componentTree.detachHostInstanceToken(sources.token);
 });
 
+test('private input/change controlled restore execution flushes one fake-DOM checkbox input', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'event-private-checkbox-change-execution'
+    });
+  const sources = createPrivateInputChangeRestoreExecutionSources(gate, {
+    domEventName: 'click',
+    inputType: 'checkbox',
+    latestProps: {
+      checked: false,
+      onChange() {},
+      type: 'checkbox'
+    },
+    targetKind: 'checkbox-input'
+  });
+  const fakeTarget = createPrivateControlledRestoreFakeDomTarget({
+    checked: true
+  });
+  const execution = gate.recordInputChangeEventControlledRestoreExecution(
+    sources.inputPreflight,
+    sources.bridge,
+    sources.writeExecution,
+    sources.flushBlocker,
+    sources.wrapperIntent,
+    createPrivateInputChangeExecutionAdmission(fakeTarget)
+  );
+
+  assert.equal(fakeTarget.checked, false);
+  assert.equal(execution.latestPropsValidation.currentLatestPropsFresh, true);
+  assert.equal(execution.restoreQueueWriteEvidence.restoreQueueWritten, true);
+  assert.equal(execution.flushIntentEvidence.restoreQueueFlushed, true);
+  assert.equal(
+    execution.wrapperMutationExecutionEvidence.wrapperWritePerformed,
+    true
+  );
+  assert.deepEqual(
+    execution.inputChangeRestoreExecutionRows.map((row) => ({
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      targetField: row.targetField,
+      valueRestoreExecuted: row.valueRestoreExecuted,
+      checkedRestoreExecuted: row.checkedRestoreExecuted,
+      beforeValueSnapshot: row.beforeValueSnapshot,
+      nextValueSnapshot: row.nextValueSnapshot,
+      afterValueSnapshot: row.afterValueSnapshot,
+      hostWrapperOperation: row.hostWrapperOperation,
+      wrapperMutationKind: row.wrapperMutationKind,
+      intendedUpdateKind: row.intendedUpdateKind,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      fakeDomInputMutated: row.fakeDomInputMutated,
+      browserInputMutated: row.browserInputMutated,
+      compatibilityClaimed: row.compatibilityClaimed
+    })),
+    [
+      {
+        acceptedRestoreKind: 'input-checkbox-checked',
+        targetField: 'checked',
+        valueRestoreExecuted: false,
+        checkedRestoreExecuted: true,
+        beforeValueSnapshot: true,
+        nextValueSnapshot: false,
+        afterValueSnapshot: false,
+        hostWrapperOperation: 'input-checked-sync',
+        wrapperMutationKind: 'checked-property-sync',
+        intendedUpdateKind: 'checked',
+        restoreQueueWritten: true,
+        restoreQueueFlushed: true,
+        hostWrapperInvoked: true,
+        wrapperWritePerformed: true,
+        fakeDomInputMutated: true,
+        browserInputMutated: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
+  assert.equal(execution.sideEffects.privateRestoreQueueWritten, true);
+  assert.equal(execution.sideEffects.privateRestoreQueueFlushed, true);
+  assert.equal(execution.sideEffects.restoreQueueWritten, false);
+  assert.equal(execution.sideEffects.restoreQueueFlushed, false);
+  assert.equal(execution.sideEffects.fakeDomInputMutated, true);
+  assert.equal(execution.sideEffects.browserInputMutated, false);
+  assert.equal(
+    execution.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(sources.container.__registrations.length, 0);
+  assert.equal(Object.hasOwn(sources.targetNode, '_valueTracker'), false);
+
+  componentTree.detachHostInstanceToken(sources.token);
+});
+
 test('private input/change controlled restore execution rejects stale latest props and live DOM targets before mutation', () => {
   const gate =
     controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({

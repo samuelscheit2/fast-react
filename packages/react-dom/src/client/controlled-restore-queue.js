@@ -2925,6 +2925,8 @@ function createInputChangeEventRestoreQueueExecutionSummary() {
       'input-text-value',
       'input-checkbox-checked'
     ]),
+    acceptsTextInputValueFakeDomPath: true,
+    acceptsCheckboxCheckedFakeDomPath: true,
     eventDispatches: false,
     syntheticEventCreation: false,
     restoreQueueWrites: true,
@@ -3828,6 +3830,8 @@ function executeInputChangeEventControlledRestoreOnFakeDom(
 
   return freezeRecord({
     targetField,
+    valueRestoreExecuted: targetField === 'value',
+    checkedRestoreExecuted: targetField === 'checked',
     beforeValueSnapshot,
     nextValueSnapshot,
     afterValueSnapshot,
@@ -3928,6 +3932,8 @@ function createInputChangeEventRestoreQueueExecutionRow(
     wrapperMutationKind: wrapperIntentRow.wrapperMutationKind,
     intendedUpdateKind: wrapperIntentRow.intendedUpdateKind,
     targetField: executionResult.targetField,
+    valueRestoreExecuted: executionResult.valueRestoreExecuted,
+    checkedRestoreExecuted: executionResult.checkedRestoreExecuted,
     beforeValueSnapshot: executionResult.beforeValueSnapshot,
     nextValueSnapshot: executionResult.nextValueSnapshot,
     afterValueSnapshot: executionResult.afterValueSnapshot,
