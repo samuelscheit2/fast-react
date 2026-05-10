@@ -41,7 +41,7 @@ const rootListeners = require(
 const pluginEventSystem = require(
   path.join(packageRoot, 'src/events/plugin-event-system.js')
 );
-const {DOCUMENT_NODE, ELEMENT_NODE, TEXT_NODE} = require(
+const {DOCUMENT_NODE, ELEMENT_NODE, TEXT_NODE, describeContainer} = require(
   path.join(packageRoot, 'src/client/dom-container.js')
 );
 
@@ -6664,6 +6664,11 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   const hydratePayload = rootBridge.getPrivateRootRecordPayload(
     payload.requestRecord
   );
+  const markerListenerPreflight = hydratePreflight.markerListenerPreflight;
+  const markerListenerPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload(
+      markerListenerPreflight
+    );
 
   assertPrivateHydrateRootPublicFacadePreflightRecord(hydratePreflight, {
     hydrateId: 'hydrate-preflight-root:1',
@@ -6672,7 +6677,25 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   });
   assert.equal(payload.requestAdmission, hydratePreflight.requestAdmission);
   assert.equal(payload.nativeHandoffRecord, null);
+  assert.equal(payload.markerListenerPreflight, markerListenerPreflight);
   assert.equal(payload.preflight, preflight);
+  assertPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+    markerListenerPreflight,
+    {
+      hydrateId: 'hydrate-preflight-root:1',
+      preflightId: 'hydrate-facade-preflight:1',
+      requestId: 'hydrate-preflight-request:1'
+    }
+  );
+  assert.equal(markerListenerPayload.bridge, payload.bridge);
+  assert.equal(markerListenerPayload.container, container);
+  assert.equal(markerListenerPayload.ownerDocument, document);
+  assert.equal(markerListenerPayload.preflight, preflight);
+  assert.equal(markerListenerPayload.requestRecord, payload.requestRecord);
+  assert.equal(
+    markerListenerPayload.preconditions,
+    markerListenerPreflight.preconditions
+  );
   assert.equal(hydratePayload.container, container);
   assert.equal(hydratePayload.initialChildren, initialChildren);
   assert.equal(hydratePayload.hydrationOptions, hydrationOptions);
@@ -6694,6 +6717,16 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   assert.equal(
     rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
       .preflightRecordCount,
+    1
+  );
+  assert.deepEqual(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .markerListenerPreflightRecords,
+    [markerListenerPreflight]
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .markerListenerPreflightRecordCount,
     1
   );
   assert.deepEqual(
@@ -6734,6 +6767,84 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   assert.equal(serialized.includes('__mutationLog'), false);
   assert.equal(serialized.includes('__registrations'), false);
   assert.equal(serialized.includes('__reactContainer$'), false);
+  assert.equal(serialized.includes('__reactEvents$'), false);
+  assert.equal(serialized.includes('_reactListening'), false);
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
+test('private react-dom/client hydrateRoot facade preflight records existing marker/listener preconditions without writes', () => {
+  const document = createDocument(
+    'private-client-hydrate-existing-marker-listener'
+  );
+  const container = createElement('DIV', document);
+  const existingBridge = rootBridge.createPrivateRootBridgeShell({
+    sideEffectIdPrefix: 'hydrate-existing-side-effect'
+  });
+  const existingCreate = existingBridge.createClientRoot(container);
+  const sideEffects =
+    existingBridge.applyCreateRootSideEffects(existingCreate);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.hydrateRoot,
+    rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+  );
+  const beforeRegistrationCount = container.__registrations.length;
+  const beforeDocumentRegistrationCount = document.__registrations.length;
+
+  const preflight = descriptor.value({
+    hydrateIdPrefix: 'hydrate-existing-root',
+    publicFacadeHydratePreflightIdPrefix: 'hydrate-existing-preflight',
+    requestIdPrefix: 'hydrate-existing-request'
+  });
+  const record = preflight.hydrateRoot(container, 'hydrated text', {});
+  const markerListenerPreflight = record.markerListenerPreflight;
+
+  assert.equal(markerListenerPreflight.markerWrites, false);
+  assert.equal(markerListenerPreflight.listenerInstallation, false);
+  assert.equal(markerListenerPreflight.preconditions.accepted, true);
+  assert.equal(markerListenerPreflight.preconditions.stateUnchanged, true);
+  assert.equal(
+    markerListenerPreflight.preconditions.isContainerMarkedAsRoot,
+    true
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootMarkerPropertyCount,
+    1
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootMarkerTruthyCount,
+    1
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootListeningMarkerPresent,
+    true
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions
+      .ownerDocumentListeningMarkerPresent,
+    true
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootListenerRegistrationCount,
+    138
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions
+      .ownerDocumentListenerRegistrationCount,
+    1
+  );
+  assert.equal(container.__registrations.length, beforeRegistrationCount);
+  assert.equal(
+    document.__registrations.length,
+    beforeDocumentRegistrationCount
+  );
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+  assert.equal(record.markerWrites, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.publicHydrateRootEnabled, false);
+  assert.equal(record.compatibilityClaimed, false);
+
+  existingBridge.revertCreateRootSideEffects(sideEffects);
   assertBridgeDidNotTouchContainer(container, document);
 });
 
@@ -6753,6 +6864,55 @@ test('private react-dom/client hydrateRoot facade preflight rejects top-level gr
     metadataOverrides: {
       publicResourceDomInsertionCompatibilityClaimed: true
     }
+  });
+});
+
+test('private react-dom/client hydrateRoot facade preflight rejects tampered marker/listener guards', () => {
+  assertHydrateRootTamperedMarkerListenerGuardRejected({
+    markerGuardOverrides: {
+      isContainerMarkedAsRoot: true
+    },
+    message: /marker guard/
+  });
+  assertHydrateRootTamperedMarkerListenerGuardRejected({
+    markerGuardOverrides: {
+      rootMarkerSnapshot: Object.freeze({
+        inspectable: true,
+        nullCount: 0,
+        properties: Object.freeze([
+          Object.freeze({
+            enumerable: true,
+            keyPrefix: '__reactContainer$',
+            valueState: 'truthy',
+            valueType: 'object'
+          })
+        ]),
+        propertyCount: 0,
+        truthyCount: 0
+      })
+    },
+    message: /marker guard/
+  });
+  assertHydrateRootTamperedMarkerListenerGuardRejected({
+    listenerGuardOverrides: {
+      hasRootListeningMarker: true
+    },
+    message: /listener guard/
+  });
+  assertHydrateRootTamperedMarkerListenerGuardRejected({
+    listenerGuardOverrides: {
+      ownerDocumentInfo: Object.freeze({
+        kind: 'object',
+        nodeName: 'DIV',
+        nodeType: ELEMENT_NODE
+      }),
+      rootEventTargetInfo: Object.freeze({
+        kind: 'object',
+        nodeName: '#document',
+        nodeType: DOCUMENT_NODE
+      })
+    },
+    message: /listener guard/
   });
 });
 
@@ -6856,6 +7016,200 @@ function assertHydrateRootTamperedAcceptedMetadataRejected({
   } finally {
     hydrationGate.createHydrationBoundaryGate =
       originalCreateHydrationBoundaryGate;
+    delete require.cache[rootBridgeCacheKey];
+    if (rootBridgeCacheEntry !== undefined) {
+      require.cache[rootBridgeCacheKey] = rootBridgeCacheEntry;
+    }
+  }
+}
+
+function assertHydrateRootTamperedMarkerListenerGuardRejected({
+  listenerGuardOverrides,
+  markerGuardOverrides,
+  message
+}) {
+  const rootBridgePath = path.join(
+    packageRoot,
+    'src/client/root-bridge.js'
+  );
+  const hydrationGatePath = path.join(
+    packageRoot,
+    'src/client/hydration-boundary-gate.js'
+  );
+  const rootBridgeCacheKey = require.resolve(rootBridgePath);
+  const rootBridgeCacheEntry = require.cache[rootBridgeCacheKey];
+  const hydrationGate = require(hydrationGatePath);
+  const originalCreateHydrationBoundaryGate =
+    hydrationGate.createHydrationBoundaryGate;
+  const originalIsPrivateHydrationBoundaryRecord =
+    hydrationGate.isPrivateHydrationBoundaryRecord;
+  const originalGetPrivateHydrationBoundaryRecordPayload =
+    hydrationGate.getPrivateHydrationBoundaryRecordPayload;
+  const metadataContracts =
+    hydrationGate.acceptedHydrationBoundaryMetadataContracts;
+  const metadataIds = Object.freeze(
+    metadataContracts.map((contract) => contract.metadataId)
+  );
+  const gateIds = Object.freeze(
+    metadataContracts.map((contract) => contract.gateId)
+  );
+  const acceptedRecordTypes = Object.freeze(
+    metadataContracts.map((contract) => contract.recordType)
+  );
+  const acceptedStatuses = Object.freeze(
+    metadataContracts.map((contract) => contract.acceptedStatus)
+  );
+  const metadataRows = Object.freeze(
+    metadataContracts.map((contract) =>
+      Object.freeze(createAcceptedPrivateMetadataRow(contract))
+    )
+  );
+  const tamperedPayloads = new WeakMap();
+
+  hydrationGate.createHydrationBoundaryGate =
+    function createTamperedHydrationBoundaryGate() {
+      return Object.freeze({
+        recordUnsupportedHydrateRoot(
+          container,
+          initialChildren,
+          hydrationOptions
+        ) {
+          const recordId = 'tampered-hydration-marker-listener:1';
+          const ownerDocument = container.ownerDocument || null;
+          const acceptedPrivateMetadataDiagnostics = Object.freeze({
+            kind:
+              hydrationGate
+                .HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
+            gateId:
+              hydrationGate.privateHydrationBoundaryAcceptedMetadataGateId,
+            status:
+              hydrationGate.privateHydrationBoundaryAcceptedMetadataStatus,
+            rootRecordId: recordId,
+            compatibilityClaimed: false,
+            publicRootCompatibilitySurface: false,
+            publicRootRenderCompatibilityClaimed: false,
+            publicHydrationCompatibilityClaimed: false,
+            publicHydrationReplayCompatibilityClaimed: false,
+            publicEventCompatibilityClaimed: false,
+            publicResourceCompatibilityClaimed: false,
+            publicResourceDomInsertionCompatibilityClaimed: false,
+            publicStylesheetCompatibilityClaimed: false,
+            publicFormCompatibilityClaimed: false,
+            publicFormActionCompatibilityClaimed: false,
+            publicFormResetCompatibilityClaimed: false,
+            publicControlledInputCompatibilityClaimed: false,
+            metadataIdCount: metadataRows.length,
+            metadataIds,
+            gateIds,
+            acceptedRecordTypes,
+            acceptedStatuses,
+            metadataRows
+          });
+          const markerGuard = Object.freeze({
+            action: 'defer-mark-container-as-root-for-hydrate-root',
+            hasLegacyRootMarker: false,
+            isContainerMarkedAsRoot: false,
+            rootMarkerSnapshot: Object.freeze({
+              inspectable: true,
+              nullCount: 0,
+              properties: Object.freeze([]),
+              propertyCount: 0,
+              truthyCount: 0
+            }),
+            warning: null,
+            ...(markerGuardOverrides || {})
+          });
+          const listenerGuard = Object.freeze({
+            action:
+              'defer-listen-to-all-supported-events-for-hydrate-root',
+            canInstallRootListeners: true,
+            hasRootListeningMarker: false,
+            ownerDocumentCanInstallSelectionChange: true,
+            ownerDocumentHasSelectionChangeMarker: false,
+            ownerDocumentInfo:
+              ownerDocument === null
+                ? null
+                : Object.freeze(describeContainer(ownerDocument)),
+            rootEventTargetInfo: Object.freeze(describeContainer(container)),
+            ...(listenerGuardOverrides || {})
+          });
+          const record = Object.freeze({
+            recordId,
+            rootKind: 'unsupported-hydration',
+            rootTag: rootBridge.CONCURRENT_ROOT_TAG,
+            markerGuard,
+            listenerGuard,
+            markerDiagnostics: Object.freeze({}),
+            markerParserEvidence: Object.freeze({}),
+            markerEvidence: Object.freeze({}),
+            textMismatchDiagnostics: Object.freeze({}),
+            recoverableErrorMetadata: Object.freeze({}),
+            replayQueueDiagnostics: Object.freeze({}),
+            targetResolutionDiagnostics: Object.freeze({}),
+            eventReplayBlockers: Object.freeze([]),
+            acceptedPrivateMetadataDiagnostics,
+            acceptedPrivateMetadataIds: metadataIds,
+            acceptedPrivateMetadataGateIds: gateIds,
+            containerInfo: Object.freeze({}),
+            initialChildrenInfo: Object.freeze({}),
+            optionsInfo: Object.freeze({}),
+            oracleInfo: Object.freeze({}),
+            blockedOn: Object.freeze([]),
+            canHydrate: false,
+            publicRootCreated: false,
+            containerMarked: false,
+            listenersAttached: false,
+            domMutated: false,
+            eventsReplayed: false,
+            rootScheduled: false,
+            suspenseHydrationScheduled: false
+          });
+          tamperedPayloads.set(record, {
+            container,
+            hydrationOptions,
+            initialChildren
+          });
+          return record;
+        }
+      });
+    };
+  hydrationGate.isPrivateHydrationBoundaryRecord =
+    function isTamperedPrivateHydrationBoundaryRecord(record) {
+      return (
+        tamperedPayloads.has(record) ||
+        originalIsPrivateHydrationBoundaryRecord(record)
+      );
+    };
+  hydrationGate.getPrivateHydrationBoundaryRecordPayload =
+    function getTamperedHydrationBoundaryPayload(record) {
+      return (
+        tamperedPayloads.get(record) ||
+        originalGetPrivateHydrationBoundaryRecordPayload(record)
+      );
+    };
+
+  delete require.cache[rootBridgeCacheKey];
+  try {
+    const freshRootBridge = require(rootBridgePath);
+    const document = createDocument('tampered-hydrate-marker-listener');
+    const container = createElement('DIV', document);
+    const preflight =
+      freshRootBridge.createPrivateHydrateRootPublicFacadePreflight();
+
+    assert.throws(
+      () => preflight.hydrateRoot(container, 'hydrated', {}),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT',
+        message
+      }
+    );
+  } finally {
+    hydrationGate.createHydrationBoundaryGate =
+      originalCreateHydrationBoundaryGate;
+    hydrationGate.isPrivateHydrationBoundaryRecord =
+      originalIsPrivateHydrationBoundaryRecord;
+    hydrationGate.getPrivateHydrationBoundaryRecordPayload =
+      originalGetPrivateHydrationBoundaryRecordPayload;
     delete require.cache[rootBridgeCacheKey];
     if (rootBridgeCacheEntry !== undefined) {
       require.cache[rootBridgeCacheKey] = rootBridgeCacheEntry;
@@ -10425,7 +10779,8 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
     record.acceptedCapabilities.map((capability) => capability.id),
     [
       'private-hydrate-root-bridge-request-admission',
-      'unsupported-hydration-boundary-diagnostics'
+      'unsupported-hydration-boundary-diagnostics',
+      'hydrate-root-marker-listener-preflight-diagnostics'
     ]
   );
   assert.deepEqual(
@@ -10459,6 +10814,20 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
   assert.equal(
     record.acceptedPrivateMetadataGateIds,
     record.acceptedPrivateMetadataDiagnostics.gateIds
+  );
+  assert.equal(
+    record.markerListenerPreflightId,
+    `${expected.preflightId}:marker-listener`
+  );
+  assert.equal(
+    record.markerListenerPreflightStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED
+  );
+  assert.equal(record.markerListenerPreconditionsAccepted, true);
+  assert.equal(record.markerListenerStateUnchanged, true);
+  assertPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+    record.markerListenerPreflight,
+    expected
   );
   assert.equal(
     Object.isFrozen(record.acceptedPrivateMetadataDiagnostics),
@@ -10512,6 +10881,146 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
   assert.equal(record.listenerInstallation, false);
   assert.equal(record.hydration, false);
   assert.equal(record.eventDispatch, false);
+  assert.equal(record.compatibilityClaimed, false);
+}
+
+function assertPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+  record,
+  expected
+) {
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    record.$$typeof,
+    rootBridge
+      .privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType
+  );
+  assert.equal(
+    record.kind,
+    'FastReactDomPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord'
+  );
+  assert.equal(record.operation, 'hydrate-root-marker-listener-preflight');
+  assert.equal(record.facadeCall, 'hydrateRoot');
+  assert.equal(record.entrypoint, 'react-dom/client');
+  assert.equal(record.preflightId, expected.preflightId);
+  assert.equal(
+    record.markerListenerPreflightId,
+    `${expected.preflightId}:marker-listener`
+  );
+  assert.equal(
+    record.preflightStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED
+  );
+  assert.equal(record.executionStatus, rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED);
+  assert.equal(
+    record.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.equal(record.requestId, expected.requestId);
+  assert.equal(record.requestType, 'hydrateRoot');
+  assert.equal(record.hydrateId, expected.hydrateId);
+  assert.equal(record.rootId, null);
+  assert.equal(record.rootKind, 'unsupported-hydration');
+  assert.equal(
+    record.markerGuard.action,
+    'defer-mark-container-as-root-for-hydrate-root'
+  );
+  assert.equal(
+    record.listenerGuard.action,
+    'defer-listen-to-all-supported-events-for-hydrate-root'
+  );
+  assert.equal(record.preconditions.accepted, true);
+  assert.equal(record.preconditions.stateUnchanged, true);
+  assert.equal(record.preconditions.markerGuardMatchesContainerState, true);
+  assert.equal(record.preconditions.listenerGuardMatchesContainerState, true);
+  assert.equal(record.preconditions.hasLegacyRootMarker, false);
+  assert.equal(record.preconditions.isContainerMarkedAsRoot, false);
+  assert.equal(record.preconditions.rootMarkerPropertyCount, 0);
+  assert.equal(record.preconditions.rootMarkerTruthyCount, 0);
+  assert.equal(record.preconditions.canInstallRootListeners, true);
+  assert.equal(record.preconditions.rootListeningMarkerPresent, false);
+  assert.equal(record.preconditions.rootListeningMarkerPropertyCount, 0);
+  assert.equal(
+    record.preconditions.ownerDocumentCanInstallSelectionChange,
+    true
+  );
+  assert.equal(
+    record.preconditions.ownerDocumentListeningMarkerPresent,
+    false
+  );
+  assert.equal(
+    record.preconditions.ownerDocumentListeningMarkerPropertyCount,
+    0
+  );
+  assert.equal(record.preconditions.rootListenerRegistrationCount, 0);
+  assert.equal(
+    record.preconditions.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(record.preconditions.rootMutationCount, 0);
+  assert.equal(record.preconditions.ownerDocumentMutationCount, 0);
+  assert.equal(record.blockerEvidence.rootMarkerWriteBlocked, true);
+  assert.equal(record.blockerEvidence.rootListenerInstallationBlocked, true);
+  assert.equal(
+    record.blockerEvidence.hydrationMarkerConsumptionBlocked,
+    true
+  );
+  assert.equal(record.blockerEvidence.eventReplayBlocked, true);
+  assert.equal(record.blockerEvidence.recoverableErrorRoutingBlocked, true);
+  assert.equal(record.blockerEvidence.publicHydrateRootBlocked, true);
+  assert.equal(record.blockerEvidence.compatibilityClaimed, false);
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'hydrate-root-marker-guard-snapshot',
+      'hydrate-root-listener-guard-snapshot',
+      'hydrate-root-marker-listener-state-unchanged'
+    ]
+  );
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-hydrate-root-execution',
+      'public-root-object',
+      'native-request-handoff',
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'marker-writes',
+      'listener-installation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+      record
+    ),
+    true
+  );
+  assert.equal(record.acceptedPrivateBridgeDiagnostics, true);
+  assert.equal(record.hydrateRootRequestRecorded, true);
+  assert.equal(record.hydrationRequested, true);
+  assert.equal(record.canHydrate, false);
+  assert.equal(record.publicRootCreated, false);
+  assert.equal(record.publicRootObjectExposed, false);
+  assert.equal(record.publicCreateRootEnabled, false);
+  assert.equal(record.publicHydrateRootEnabled, false);
+  assert.equal(record.publicRootCompatibilitySurface, false);
+  assert.equal(record.containerMarked, false);
+  assert.equal(record.listenersAttached, false);
+  assert.equal(record.domMutated, false);
+  assert.equal(record.eventsReplayed, false);
+  assert.equal(record.rootScheduled, false);
+  assert.equal(record.suspenseHydrationScheduled, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.domMutation, false);
+  assert.equal(record.markerWrites, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.recoverableErrorRouting, false);
   assert.equal(record.compatibilityClaimed, false);
 }
 

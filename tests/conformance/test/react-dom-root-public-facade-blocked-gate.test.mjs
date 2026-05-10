@@ -893,6 +893,11 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
   const hydratePayload = rootBridge.getPrivateRootRecordPayload(
     payload.requestRecord
   );
+  const markerListenerPreflight = record.markerListenerPreflight;
+  const markerListenerPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload(
+      markerListenerPreflight
+    );
 
   assert.equal(
     preflight.preflightStatus,
@@ -926,6 +931,12 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
     record.nativeHandoffStatus,
     rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
   );
+  assert.equal(
+    record.markerListenerPreflightStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED
+  );
+  assert.equal(record.markerListenerPreconditionsAccepted, true);
+  assert.equal(record.markerListenerStateUnchanged, true);
   assert.equal(record.hydrationRequested, true);
   assert.equal(record.canHydrate, false);
   assert.equal(record.publicRootCreated, false);
@@ -948,7 +959,80 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
     record.acceptedCapabilities.map((capability) => capability.id),
     [
       "private-hydrate-root-bridge-request-admission",
-      "unsupported-hydration-boundary-diagnostics"
+      "unsupported-hydration-boundary-diagnostics",
+      "hydrate-root-marker-listener-preflight-diagnostics"
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+      markerListenerPreflight
+    ),
+    true
+  );
+  assert.equal(payload.markerListenerPreflight, markerListenerPreflight);
+  assert.equal(markerListenerPayload.container, container);
+  assert.equal(markerListenerPayload.ownerDocument, document);
+  assert.equal(markerListenerPayload.requestRecord, payload.requestRecord);
+  assert.equal(
+    markerListenerPreflight.preflightStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED
+  );
+  assert.equal(
+    markerListenerPreflight.markerListenerPreflightId,
+    "facade-hydrate-preflight:1:marker-listener"
+  );
+  assert.equal(markerListenerPreflight.preconditions.accepted, true);
+  assert.equal(markerListenerPreflight.preconditions.stateUnchanged, true);
+  assert.equal(
+    markerListenerPreflight.preconditions.markerGuardMatchesContainerState,
+    true
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.listenerGuardMatchesContainerState,
+    true
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.isContainerMarkedAsRoot,
+    false
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootMarkerPropertyCount,
+    0
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootListeningMarkerPresent,
+    false
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions.rootListenerRegistrationCount,
+    0
+  );
+  assert.equal(
+    markerListenerPreflight.preconditions
+      .ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(markerListenerPreflight.markerWrites, false);
+  assert.equal(markerListenerPreflight.listenerInstallation, false);
+  assert.equal(markerListenerPreflight.hydration, false);
+  assert.equal(markerListenerPreflight.eventDispatch, false);
+  assert.equal(markerListenerPreflight.compatibilityClaimed, false);
+  assert.equal(
+    markerListenerPreflight.blockerEvidence.rootMarkerWriteBlocked,
+    true
+  );
+  assert.equal(
+    markerListenerPreflight.blockerEvidence.rootListenerInstallationBlocked,
+    true
+  );
+  assert.deepEqual(
+    markerListenerPreflight.acceptedCapabilities.map(
+      (capability) => capability.id
+    ),
+    [
+      "hydrate-root-marker-guard-snapshot",
+      "hydrate-root-listener-guard-snapshot",
+      "hydrate-root-marker-listener-state-unchanged"
     ]
   );
   assert.deepEqual(
@@ -1061,6 +1145,16 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
   assert.equal(
     rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
       .preflightRecordCount,
+    1
+  );
+  assert.deepEqual(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .markerListenerPreflightRecords,
+    [markerListenerPreflight]
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .markerListenerPreflightRecordCount,
     1
   );
   assert.equal(rootMarkers.getContainerRoot(container), null);
