@@ -3916,9 +3916,13 @@ function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
     callbackIdentityMissingCount:
       refOrderingSnapshot.callbackIdentityMissingCount,
     callbackCleanupReturnCount: refOrderingSnapshot.callbackCleanupReturnCount,
+    callbackCleanupReturnHandleCount:
+      refOrderingSnapshot.callbackCleanupReturnHandleCount,
     cleanupReturnMatchedCount: refOrderingSnapshot.cleanupReturnMatchedCount,
     cleanupInvocationAttemptCount:
       refOrderingSnapshot.cleanupInvocationAttemptCount,
+    cleanupReturnHandleConsumedCount:
+      refOrderingSnapshot.cleanupReturnHandleConsumedCount,
     callbackNullDetachAttemptCount:
       refOrderingSnapshot.callbackNullDetachAttemptCount,
     hostIdentityReusedAfterDetachCount:
