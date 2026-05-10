@@ -1086,6 +1086,15 @@ mod tests {
         store.scheduler_bridge().callback_requests()[0]
     }
 
+    fn mark_default_suspended_with_pending_transition(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) {
+        let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+        lanes.mark_updated(Lane::TRANSITION_1);
+        lanes.mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+    }
+
     fn schedule_sync_update(
         store: &mut FiberRootStore<RecordingHost>,
         root_id: FiberRootId,
@@ -1508,6 +1517,93 @@ mod tests {
         assert_eq!(execution.selected_lanes(), Lanes::NO);
         assert_eq!(execution.render_phase(), None);
         assert_eq!(store.root(root_id).unwrap().current(), current);
+    }
+
+    #[test]
+    fn root_scheduler_microtask_cancels_existing_callback_when_reselection_finds_no_work() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_default_update(&mut store, root_id);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let original_node = store.root(root_id).unwrap().scheduling().callback_node();
+
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let record = processed.records()[0];
+
+        assert_eq!(record.outcome(), RootTaskScheduleOutcome::NoWork);
+        assert_eq!(record.next_lanes(), Lanes::NO);
+        assert_eq!(record.canceled_callback().unwrap().node(), original_node);
+        assert_eq!(store.scheduler_bridge().cancellation_records().len(), 1);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(scheduled_roots(&store).unwrap(), Vec::<FiberRootId>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_microtask_cancels_callback_when_reselection_changes_callback_lane() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_default_update(&mut store, root_id);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let original_node = store.root(root_id).unwrap().scheduling().callback_node();
+
+        mark_default_suspended_with_pending_transition(&mut store, root_id);
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let record = processed.records()[0];
+
+        assert_eq!(record.outcome(), RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(record.next_lanes(), Lanes::from(Lane::TRANSITION_1));
+        assert_eq!(
+            record.callback_priority(),
+            RootCallbackPriority::new(Lane::TRANSITION_1)
+        );
+        assert_eq!(record.scheduler_priority(), Some(SchedulerPriority::Normal));
+        assert_eq!(record.canceled_callback().unwrap().node(), original_node);
+        assert_eq!(store.scheduler_bridge().cancellation_records().len(), 1);
+        assert_eq!(store.scheduler_bridge().callback_requests().len(), 2);
+        assert_ne!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            original_node
+        );
+        assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_execute_callback_reselects_lanes_before_render_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let callback = scheduled_callback_request(&mut store, root_id);
+
+        mark_default_suspended_with_pending_transition(&mut store, root_id);
+        let execution = execute_scheduled_root_callback(&mut store, callback).unwrap();
+        let render = execution.render_phase().unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSchedulerCallbackExecutionStatus::Rendered
+        );
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.selected_lanes(), Lanes::from(Lane::TRANSITION_1));
+        assert_eq!(render.render_lanes(), Lanes::from(Lane::TRANSITION_1));
+        assert_eq!(render.applied_update_count(), 0);
+        assert_eq!(render.skipped_update_count(), 1);
+        assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     #[test]
