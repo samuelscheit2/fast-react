@@ -7,6 +7,8 @@ mod begin_work;
 #[cfg(test)]
 mod complete_work;
 mod concurrent_updates;
+#[cfg(test)]
+mod context;
 mod execution_context;
 mod fiber_root;
 mod fiber_store;
