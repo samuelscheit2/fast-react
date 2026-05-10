@@ -25,6 +25,10 @@ const privateRootUpdateRecordType =
   'fast.react_dom.private_root_update_record';
 const privateRootAdmissionRecordType =
   'fast.react_dom.private_root_admission_record';
+const privateRootNativeHandoffRecordType =
+  'fast.react_dom.private_root_native_handoff_record';
+const privateRootNativeBridgeHandleType =
+  'fast.react_dom.private_root_native_bridge_handle';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -36,6 +40,16 @@ const ROOT_BRIDGE_EXECUTION_BLOCKED =
   'blocked-private-root-bridge-execution';
 const ROOT_BRIDGE_COMPATIBILITY_BLOCKED =
   'blocked-private-root-bridge-compatibility';
+const ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED =
+  'mirrored-private-native-root-request-record';
+const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
+const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
+const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
+const NATIVE_ROOT_BRIDGE_HANDLE_ROOT = 'root';
+const NATIVE_ROOT_BRIDGE_HANDLE_VALUE = 'value';
+const NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE = 'active';
+const NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED = 'retired';
+const NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID = 1;
 const ROOT_BRIDGE_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'native-execution',
@@ -82,6 +96,8 @@ const ROOT_BRIDGE_BLOCKED_CAPABILITIES = freezeArray([
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
 const rootRecordPayloads = new WeakMap();
+const rootNativeHandoffPayloads = new WeakMap();
+const rootNativeHandoffRecords = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -129,6 +145,9 @@ function createPrivateRootBridgeShell(options) {
     },
     admitRequest(record) {
       return admitRootBridgeRequestWithBridge(bridgeState, record);
+    },
+    createNativeRequestHandoff(record) {
+      return createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record);
     }
   });
 }
@@ -171,6 +190,10 @@ function admitRootBridgeRequestRecord(record) {
   return admitRootBridgeRequestWithBridge(null, record);
 }
 
+function createNativeRootBridgeHandoffRecord(record) {
+  return createNativeRootBridgeHandoffRecordWithBridge(null, record);
+}
+
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
   if (
@@ -185,6 +208,68 @@ function admitRootBridgeRequestWithBridge(bridgeState, record) {
   }
 
   return createRootBridgeAdmissionRecord(record, validation);
+}
+
+function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
+  const validation = validateRootBridgeRequestRecord(record);
+  if (
+    bridgeState !== null &&
+    validation.rootHandleState.bridgeState !== bridgeState
+  ) {
+    const error = new Error(
+      'Cannot use a private root bridge request with a different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const existing = rootNativeHandoffRecords.get(record);
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const handoffSequence = record.requestSequence;
+  const payload = rootRecordPayloads.get(record) || null;
+  const nativeRequestRecord = createNativeRequestRecordMirror(
+    record,
+    validation.rootHandleState,
+    payload
+  );
+  const handoff = freezeRecord({
+    $$typeof: privateRootNativeHandoffRecordType,
+    kind: 'FastReactDomPrivateRootNativeRequestHandoffRecord',
+    operation: record.operation,
+    handoffId: `${rootBridgeState.nativeHandoffIdPrefix}:${handoffSequence}`,
+    handoffSequence,
+    handoffStatus: ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED,
+    sourceRequestId: record.requestId,
+    sourceRequestSequence: record.requestSequence,
+    sourceRequestType: record.requestType,
+    sourceLifecycleStatusBefore: record.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: record.lifecycleStatusAfter,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    nativeRequestRecord,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootNativeHandoffRecords.set(record, handoff);
+  rootNativeHandoffPayloads.set(handoff, {
+    sourcePayload: payload,
+    sourceRecord: record,
+    value: getNativeHandoffSourceValue(record, payload)
+  });
+
+  return handoff;
 }
 
 function createPrivateRootOwner(rootId, options) {
@@ -213,6 +298,11 @@ function createPrivateRootHandle(owner, container, rootOptions, bridgeState) {
   const ownerState = assertPrivateRootOwner(owner);
   const rootBridgeState = bridgeState || createBridgeState();
   assertValidContainer(container, rootBridgeState.validationOptions);
+  const nativeRootId = rootBridgeState.nextNativeRootId++;
+  const nativeRootHandle = createNativeBridgeHandle(
+    rootBridgeState,
+    NATIVE_ROOT_BRIDGE_HANDLE_ROOT
+  );
 
   const handle = Object.freeze({
     $$typeof: privateRootHandleType,
@@ -228,6 +318,8 @@ function createPrivateRootHandle(owner, container, rootOptions, bridgeState) {
     container,
     containerInfo: freezeRecord(describeContainer(container)),
     lifecycleStatus: ROOT_LIFECYCLE_CREATED,
+    nativeRootHandle,
+    nativeRootId,
     renderCount: 0,
     rootOptions
   });
@@ -249,6 +341,14 @@ function getRootOwnerFromHandle(rootHandle) {
 
 function getPrivateRootRecordPayload(record) {
   return rootRecordPayloads.get(record) || null;
+}
+
+function getNativeRootBridgeHandoffPayload(record) {
+  return rootNativeHandoffPayloads.get(record) || null;
+}
+
+function isNativeRootBridgeHandoffRecord(value) {
+  return rootNativeHandoffPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -293,6 +393,10 @@ function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
 
   rootRecordPayloads.set(record, {
     container,
+    nativeValueHandle: createNativeBridgeHandle(
+      bridgeState,
+      NATIVE_ROOT_BRIDGE_HANDLE_VALUE
+    ),
     rootOptions
   });
 
@@ -370,6 +474,13 @@ function createRootUpdateRecordWithBridge(
   rootRecordPayloads.set(record, {
     callback,
     element,
+    nativeValueHandle:
+      operation === 'render'
+        ? createNativeBridgeHandle(
+            bridgeState,
+            NATIVE_ROOT_BRIDGE_HANDLE_VALUE
+          )
+        : null,
     rootHandle
   });
 
@@ -538,6 +649,60 @@ function createRootBridgeAdmissionRecord(record, validation) {
   });
 }
 
+function createNativeRequestRecordMirror(record, rootHandleState, payload) {
+  let requestKind = null;
+  let rootHandleStateAfter = NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE;
+  let valueHandle = null;
+
+  if (record.operation === 'create') {
+    requestKind = NATIVE_ROOT_BRIDGE_REQUEST_CREATE;
+    valueHandle = payload.nativeValueHandle;
+  } else if (record.operation === 'render') {
+    requestKind = NATIVE_ROOT_BRIDGE_REQUEST_RENDER;
+    valueHandle = payload.nativeValueHandle;
+  } else if (record.operation === 'unmount') {
+    requestKind = NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT;
+    rootHandleStateAfter = NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED;
+  } else {
+    throwInvalidRootBridgeRequest(
+      `Unsupported private root bridge request operation: ${String(record.operation)}.`
+    );
+  }
+
+  return freezeRecord({
+    requestId: record.requestSequence,
+    kind: requestKind,
+    environmentId: rootHandleState.nativeRootHandle.environmentId,
+    rootHandle: rootHandleState.nativeRootHandle,
+    rootId: rootHandleState.nativeRootId,
+    valueHandle,
+    rootHandleState: rootHandleStateAfter
+  });
+}
+
+function createNativeBridgeHandle(bridgeState, kind) {
+  return freezeRecord({
+    $$typeof: privateRootNativeBridgeHandleType,
+    environmentId: bridgeState.nativeEnvironmentId,
+    slot: bridgeState.nextNativeHandleSlot++,
+    generation: 1,
+    kind
+  });
+}
+
+function getNativeHandoffSourceValue(record, payload) {
+  if (payload === null) {
+    return null;
+  }
+  if (record.operation === 'create') {
+    return payload.container;
+  }
+  if (record.operation === 'render') {
+    return payload.element;
+  }
+  return null;
+}
+
 function getPrivateRootHandleState(rootHandle) {
   const state = rootHandleState.get(rootHandle);
   if (state === undefined) {
@@ -585,6 +750,14 @@ function getIdPrefix(value, fallback) {
 function createBridgeState(options) {
   return {
     markerOptions: options && options.markerOptions,
+    nativeEnvironmentId: getPositiveInteger(
+      options && options.nativeEnvironmentId,
+      NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID
+    ),
+    nativeHandoffIdPrefix: getIdPrefix(
+      options && options.nativeHandoffIdPrefix,
+      'native-handoff'
+    ),
     nextRequestSequence: 1,
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
     requestIdPrefix: getIdPrefix(
@@ -592,6 +765,8 @@ function createBridgeState(options) {
       'request'
     ),
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
+    nextNativeHandleSlot: 1,
+    nextNativeRootId: 1,
     nextRootSequence: 1,
     nextUpdateSequence: 1,
     validationOptions: options && options.validationOptions
@@ -613,6 +788,10 @@ function createRequestInfo(bridgeState, requestType) {
     requestSequence,
     requestType
   });
+}
+
+function getPositiveInteger(value, fallback) {
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
 }
 
 function assertRootHandleCanRender(handleState) {
@@ -827,12 +1006,22 @@ module.exports = {
   ROOT_BRIDGE_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
   ROOT_BRIDGE_EXECUTION_BLOCKED,
+  ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_LIFECYCLE_CREATED,
   ROOT_LIFECYCLE_RENDERED,
   ROOT_LIFECYCLE_UNMOUNTED,
+  NATIVE_ROOT_BRIDGE_HANDLE_ROOT,
+  NATIVE_ROOT_BRIDGE_HANDLE_VALUE,
+  NATIVE_ROOT_BRIDGE_REQUEST_CREATE,
+  NATIVE_ROOT_BRIDGE_REQUEST_RENDER,
+  NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT,
+  NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE,
+  NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
+  NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
   admitRootBridgeRequestRecord,
   createClientRootRecord,
+  createNativeRootBridgeHandoffRecord,
   createPrivateRootBridgeShell,
   createPrivateRootHandle,
   createPrivateRootOwner,
@@ -842,11 +1031,15 @@ module.exports = {
   describeCreateRootMarkerGuard,
   describeRootListenerGuard,
   describeUnmountMarkerGuard,
+  getNativeRootBridgeHandoffPayload,
   getPrivateRootRecordPayload,
   getRootOwnerFromHandle,
+  isNativeRootBridgeHandoffRecord,
   isPrivateRootHandle,
   isPrivateRootOwner,
   privateRootAdmissionRecordType,
+  privateRootNativeBridgeHandleType,
+  privateRootNativeHandoffRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootOwnerType,
