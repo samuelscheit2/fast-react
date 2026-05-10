@@ -39,6 +39,11 @@ const privateActDispatcherGateModule =
   "packages/react/private-act-dispatcher-gate.js";
 const privateActQueueFlushDiagnosticsExport =
   "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+const privateFlushSyncActRoutingDiagnosticsSymbol = Symbol.for(
+  "fast.react_test_renderer.private_flushsync_act_routing_diagnostics"
+);
+const privateFlushSyncActRoutingDiagnosticsStatus =
+  "private-flushsync-act-routing-diagnostics-public-flushsync-blocked";
 const actUnblockingRequirements = [
   {
     id: "react-test-renderer-act-queue-flushing",
@@ -192,6 +197,31 @@ const ACT_SCHEDULER_SYNC_FLUSH_RECORD_IDS = [
   "sync-flush-post-passive-continuation-execution-gate",
   "sync-flush-post-passive-continuation-execution-record",
   "passive-effects-flush-with-sync-flush-continuation-result"
+];
+const FLUSH_SYNC_ACT_ROUTING_ACCEPTED_WORKERS = [
+  "worker-405-react-act-private-continuation-gate",
+  "worker-410-root-render-e2e-private-flushsync-admission",
+  "worker-422-scheduler-act-continuation-execution",
+  "worker-437-react-act-renderer-backed-private-drain",
+  "worker-450-sync-flush-error-recovery-diagnostics",
+  "worker-451-root-callback-invocation-execution-gate"
+];
+const FLUSH_SYNC_ACT_ROUTING_ACCEPTED_ACT_METADATA_KINDS = [
+  "fast-react.react.act-queue-metadata",
+  "fast-react.react.private-sync-flush-act-execution-diagnostic",
+  "fast-react.react.private-renderer-backed-act-drain-diagnostic"
+];
+const FLUSH_SYNC_ACT_ROUTING_ACCEPTED_RECONCILER_RECORDS = [
+  "SchedulerActContinuationRecord",
+  "SyncFlushActPostPassiveContinuationGateRecord",
+  "SyncFlushPostPassiveContinuationExecutionGateRecord",
+  "SyncFlushPostPassiveContinuationExecutionRecord",
+  "PassiveEffectsFlushWithSyncFlushContinuationResult",
+  "SyncFlushActContinuationDrainRecord",
+  "SyncFlushActPrivateExecutionDiagnosticsForCanary",
+  "SchedulerBridgeActContinuationExecutionRecord",
+  "SyncFlushErrorRecoveryDiagnostics",
+  "RootUpdateCallbackInvocationGateSnapshot"
 ];
 const ACT_SCHEDULER_PASSIVE_RECORD_IDS = [
   "pending-passive-commit-handoff",
@@ -624,6 +654,11 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
     assertActSchedulerGate(
       flushSyncError.actSchedulerGate,
       entry.entrypoint
+    );
+    assertPrivateFlushSyncActRoutingDiagnostics(
+      entry,
+      renderer,
+      flushSyncError
     );
     assertSchedulerFlushHelperDescriptorsMatchGate(
       moduleExports._Scheduler,
@@ -1236,6 +1271,182 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
     },
     entry.entrypoint
   );
+}
+
+function assertPrivateFlushSyncActRoutingDiagnostics(
+  entry,
+  renderer,
+  flushSyncError
+) {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    renderer.unstable_flushSync,
+    privateFlushSyncActRoutingDiagnosticsSymbol
+  );
+
+  if (!entry.entrypoint.startsWith("react-test-renderer/cjs/")) {
+    assert.equal(descriptor, undefined, entry.entrypoint);
+    assert.equal(
+      Object.hasOwn(flushSyncError, "flushSyncActRoutingGate"),
+      false,
+      entry.entrypoint
+    );
+    return;
+  }
+
+  assert.notEqual(descriptor, undefined, entry.entrypoint);
+  assert.equal(descriptor.enumerable, false, entry.entrypoint);
+  assert.equal(descriptor.configurable, false, entry.entrypoint);
+  assert.equal(descriptor.writable, false, entry.entrypoint);
+  assert.equal(
+    Object.keys(renderer.unstable_flushSync).includes(
+      privateFlushSyncActRoutingDiagnosticsSymbol.description
+    ),
+    false,
+    entry.entrypoint
+  );
+
+  const diagnostics = descriptor.value;
+  assert.equal(Object.isFrozen(diagnostics), true, entry.entrypoint);
+  assert.equal(
+    diagnostics.id,
+    "react-test-renderer-flushsync-act-routing-private-diagnostics"
+  );
+  assert.equal(diagnostics.status, privateFlushSyncActRoutingDiagnosticsStatus);
+  assert.equal(diagnostics.entrypoint, entry.entrypoint);
+  assert.equal(diagnostics.publicSurface, "create().unstable_flushSync");
+  assert.equal(diagnostics.compatibilityTarget, compatibilityTarget);
+  assert.equal(
+    diagnostics.symbol,
+    privateFlushSyncActRoutingDiagnosticsSymbol.description
+  );
+  assert.equal(diagnostics.routingGate, flushSyncError.flushSyncActRoutingGate);
+  assert.equal(
+    flushSyncError.flushSyncActRoutingGate,
+    flushSyncError.routingGate.flushSyncActRoutingGate
+  );
+  assert.equal(
+    flushSyncError.privateFlushSyncActRoutingDiagnosticsAvailable,
+    true
+  );
+  assert.equal(diagnostics.actSchedulerGate, flushSyncError.actSchedulerGate);
+  assert.equal(diagnostics.rootRequest, flushSyncError.rootRequest);
+  assert.equal(diagnostics.rootRequestStatus, flushSyncError.rootRequestStatus);
+  assert.equal(
+    diagnostics.rootRequestExecutionStatus,
+    flushSyncError.rootRequestExecutionStatus
+  );
+  assert.equal(
+    diagnostics.rootRequestCompatibilityStatus,
+    flushSyncError.rootRequestCompatibilityStatus
+  );
+
+  const gate = diagnostics.routingGate;
+  assert.equal(Object.isFrozen(gate), true, entry.entrypoint);
+  assert.equal(
+    gate.id,
+    "react-test-renderer-flushsync-act-routing-private-gate"
+  );
+  assert.equal(gate.status, privateFlushSyncActRoutingDiagnosticsStatus);
+  assert.equal(gate.entrypoint, entry.entrypoint);
+  assert.equal(gate.publicSurface, "create().unstable_flushSync");
+  assert.equal(gate.deterministic, true);
+  assert.equal(
+    gate.symbol,
+    privateFlushSyncActRoutingDiagnosticsSymbol.description
+  );
+  assert.equal(gate.actSchedulerGateStatus, actSchedulerGateStatus);
+  assert.deepEqual(
+    gate.acceptedWorkers,
+    FLUSH_SYNC_ACT_ROUTING_ACCEPTED_WORKERS
+  );
+  assert.deepEqual(
+    gate.acceptedActMetadataKinds,
+    FLUSH_SYNC_ACT_ROUTING_ACCEPTED_ACT_METADATA_KINDS
+  );
+  assert.deepEqual(
+    gate.acceptedSyncFlushRecords,
+    FLUSH_SYNC_ACT_ROUTING_ACCEPTED_RECONCILER_RECORDS
+  );
+  assert.equal(
+    gate.recognizedSyncFlushActRecords,
+    flushSyncError.actSchedulerGate.recognizedSyncFlushActRecords
+  );
+  assert.equal(
+    gate.privateActQueueFlushDiagnostics,
+    flushSyncError.actSchedulerGate.privateActQueueFlushDiagnostics
+  );
+  assert.equal(gate.seesReactActPrivateDispatcherGate, true);
+  assert.equal(gate.seesSchedulerActQueueDiagnostics, true);
+  assert.equal(gate.seesRendererBackedActDrainMetadata, true);
+  assert.equal(gate.seesSyncFlushActMetadata, true);
+  assert.equal(
+    gate.seesSchedulerBridgeActContinuationExecutionMetadata,
+    true
+  );
+  assert.equal(gate.seesSyncFlushErrorRecoveryMetadata, true);
+  assert.equal(gate.seesRootCallbackInvocationMetadata, true);
+  assert.equal(gate.privateDiagnosticAvailable, true);
+  assert.equal(gate.publicActBehaviorAvailable, false);
+  assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
+  assert.equal(gate.publicRootSyncFlushRouteAvailable, false);
+  assert.equal(gate.rootSyncFlushCompatibilityClaimed, false);
+  assert.equal(gate.invokesFlushSyncCallback, false);
+  assert.equal(gate.executesSyncFlush, false);
+  assert.equal(gate.executesQueuedWork, false);
+  assert.equal(gate.executesScheduledCallbacks, false);
+  assert.equal(gate.executesPassiveEffects, false);
+  assert.equal(gate.executesRendererRoots, false);
+  assert.equal(gate.invokesRootCallbacks, false);
+  assert.equal(gate.mutatesHostOutput, false);
+  assert.equal(gate.compatibilityClaimed, false);
+
+  assert.equal(Object.isFrozen(diagnostics.acceptedActMetadata), true);
+  assert.deepEqual(diagnostics.acceptedActMetadata, {
+    reactActPrivateDispatcherGateAccepted: true,
+    schedulerReactActQueueDiagnosticsAccepted: true,
+    privateSchedulerActQueueDiagnosticsConsumed: true,
+    privateActQueueDiagnosticConsumptionReady: true,
+    rendererBackedActDrainMetadataAccepted: true,
+    rendererBackedActDrainDiagnosticKind:
+      "fast-react.react.private-renderer-backed-act-drain-diagnostic",
+    publicReactActCompatibilityClaimed: false,
+    invokesActCallback: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+
+  assert.equal(Object.isFrozen(diagnostics.acceptedSyncFlushMetadata), true);
+  assert.deepEqual(diagnostics.acceptedSyncFlushMetadata, {
+    syncFlushActRecordsAccepted: true,
+    privateSyncFlushExecutionMetadataAccepted: true,
+    postPassiveContinuationExecutionGateAccepted: true,
+    schedulerBridgeActContinuationExecutionAccepted: true,
+    syncFlushErrorRecoveryMetadataAccepted: true,
+    rootCallbackInvocationMetadataAccepted: true,
+    acceptedRecords: FLUSH_SYNC_ACT_ROUTING_ACCEPTED_RECONCILER_RECORDS,
+    recognizedActRecordIds: ACT_SCHEDULER_SYNC_FLUSH_RECORD_IDS,
+    publicRootSyncFlushRouteAvailable: false,
+    rootSyncFlushCompatibilityClaimed: false,
+    executesSyncFlush: false,
+    invokesRootCallbacks: false
+  });
+
+  assert.equal(Object.isFrozen(diagnostics.publicFailClosed), true);
+  assert.deepEqual(diagnostics.publicFailClosed, {
+    invokesFlushSyncCallback: false,
+    publicActBehaviorAvailable: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicRootSyncFlushRouteAvailable: false,
+    rootSyncFlushCompatibilityClaimed: false,
+    executesSyncFlush: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    executesRendererRoots: false,
+    invokesRootCallbacks: false,
+    mutatesHostOutput: false,
+    compatibilityClaimed: false
+  });
 }
 
 function assertActSurface(entry, moduleExports) {

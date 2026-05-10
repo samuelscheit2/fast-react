@@ -32,6 +32,11 @@ const privateActQueueTestQueueBrand = Symbol.for(
 const privateActQueueTestTaskBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-task'
 );
+const privateFlushSyncActRoutingDiagnosticsSymbol = Symbol.for(
+  'fast.react_test_renderer.private_flushsync_act_routing_diagnostics'
+);
+const privateFlushSyncActRoutingDiagnosticsStatus =
+  'private-flushsync-act-routing-diagnostics-public-flushsync-blocked';
 const acceptedActQueueRecordKinds = Object.freeze([
   'SchedulerActQueueRequest',
   'SchedulerActScopeBoundaryRecord',
@@ -264,6 +269,18 @@ const syncFlushActSchedulerRecords = Object.freeze([
     createCallbackInvoked: false,
     destroyCallbackInvoked: false
   })
+]);
+const flushSyncActRoutingAcceptedReconcilerRecords = Object.freeze([
+  'SchedulerActContinuationRecord',
+  'SyncFlushActPostPassiveContinuationGateRecord',
+  'SyncFlushPostPassiveContinuationExecutionGateRecord',
+  'SyncFlushPostPassiveContinuationExecutionRecord',
+  'PassiveEffectsFlushWithSyncFlushContinuationResult',
+  'SyncFlushActContinuationDrainRecord',
+  'SyncFlushActPrivateExecutionDiagnosticsForCanary',
+  'SchedulerBridgeActContinuationExecutionRecord',
+  'SyncFlushErrorRecoveryDiagnostics',
+  'RootUpdateCallbackInvocationGateSnapshot'
 ]);
 const passiveActFlushRecords = Object.freeze([
   Object.freeze({
@@ -852,6 +869,52 @@ const actSchedulerGate = Object.freeze({
   blockedPrivateFlushPrerequisiteIds: blockedPrivateActFlushPrerequisiteIds,
   sideEffectPolicy: actSchedulerSideEffectPolicy,
   missingBeforeExecution: actSchedulerMissingBeforeExecution
+});
+const flushSyncActRoutingGate = Object.freeze({
+  id: 'react-test-renderer-flushsync-act-routing-private-gate',
+  status: privateFlushSyncActRoutingDiagnosticsStatus,
+  entrypoint,
+  publicSurface: 'create().unstable_flushSync',
+  deterministic: true,
+  symbol: privateFlushSyncActRoutingDiagnosticsSymbol.description,
+  actSchedulerGateStatus: actSchedulerGate.status,
+  seesReactActPrivateDispatcherGate: true,
+  seesSchedulerActQueueDiagnostics: true,
+  seesRendererBackedActDrainMetadata: true,
+  seesSyncFlushActMetadata: true,
+  seesSchedulerBridgeActContinuationExecutionMetadata: true,
+  seesSyncFlushErrorRecoveryMetadata: true,
+  seesRootCallbackInvocationMetadata: true,
+  acceptedWorkers: Object.freeze([
+    'worker-405-react-act-private-continuation-gate',
+    'worker-410-root-render-e2e-private-flushsync-admission',
+    'worker-422-scheduler-act-continuation-execution',
+    'worker-437-react-act-renderer-backed-private-drain',
+    'worker-450-sync-flush-error-recovery-diagnostics',
+    'worker-451-root-callback-invocation-execution-gate'
+  ]),
+  acceptedActMetadataKinds: Object.freeze([
+    'fast-react.react.act-queue-metadata',
+    'fast-react.react.private-sync-flush-act-execution-diagnostic',
+    'fast-react.react.private-renderer-backed-act-drain-diagnostic'
+  ]),
+  acceptedSyncFlushRecords: flushSyncActRoutingAcceptedReconcilerRecords,
+  recognizedSyncFlushActRecords: syncFlushActSchedulerRecords,
+  privateActQueueFlushDiagnostics,
+  privateDiagnosticAvailable: true,
+  publicActBehaviorAvailable: false,
+  publicSchedulerFlushExecutionAvailable: false,
+  publicRootSyncFlushRouteAvailable: false,
+  rootSyncFlushCompatibilityClaimed: false,
+  invokesFlushSyncCallback: false,
+  executesSyncFlush: false,
+  executesQueuedWork: false,
+  executesScheduledCallbacks: false,
+  executesPassiveEffects: false,
+  executesRendererRoots: false,
+  invokesRootCallbacks: false,
+  mutatesHostOutput: false,
+  compatibilityClaimed: false
 });
 const createRoutingMissingPrerequisites = Object.freeze([
   'public-react-test-renderer-root-lifecycle-routing',
@@ -2002,6 +2065,8 @@ const createRoutingGate = Object.freeze({
   schedulerIntegrationAvailable: false,
   actSchedulerGate,
   actSchedulerGateStatus: actSchedulerGate.status,
+  flushSyncActRoutingGate,
+  privateFlushSyncActRoutingDiagnosticsAvailable: true,
   compatibilityClaimed: false,
   missingPrerequisites: createRoutingMissingPrerequisites,
   prerequisites: createRoutingPrerequisites,
@@ -2468,6 +2533,9 @@ function createUnsupportedError(
     error.toTreePrivateFacadeGate = routingGate.toTreePrivateFacadeGate;
     error.getInstancePrivateClassRootGate =
       routingGate.getInstancePrivateClassRootGate;
+    error.flushSyncActRoutingGate = routingGate.flushSyncActRoutingGate;
+    error.privateFlushSyncActRoutingDiagnosticsAvailable =
+      routingGate.privateFlushSyncActRoutingDiagnosticsAvailable;
     error.privateErrorBoundaryDiagnosticsGate =
       routingGate.privateErrorBoundaryDiagnosticsGate;
   }
@@ -3108,6 +3176,75 @@ function consumeAcceptedSchedulerActQueueDiagnostics(queue) {
     publicSchedulerFlushExecutionAvailable: false,
     publicActBehaviorAvailable: false,
     rendererRootsCompatibilityClaimed: false
+  });
+}
+
+function createPrivateFlushSyncActRoutingDiagnostics(rootRequest) {
+  return freezeRecord({
+    id: 'react-test-renderer-flushsync-act-routing-private-diagnostics',
+    status: privateFlushSyncActRoutingDiagnosticsStatus,
+    entrypoint,
+    publicSurface: 'create().unstable_flushSync',
+    compatibilityTarget,
+    symbol: privateFlushSyncActRoutingDiagnosticsSymbol.description,
+    routingGate: flushSyncActRoutingGate,
+    actSchedulerGate,
+    actSchedulerGateStatus: actSchedulerGate.status,
+    rootRequest,
+    rootRequestStatus: rootRequest.status,
+    rootRequestExecutionStatus: rootRequest.executionStatus,
+    rootRequestCompatibilityStatus: rootRequest.compatibilityStatus,
+    acceptedActMetadata: freezeRecord({
+      reactActPrivateDispatcherGateAccepted:
+        actSchedulerGate.reactActPrivateDispatcherGateAccepted,
+      schedulerReactActQueueDiagnosticsAccepted:
+        actSchedulerGate.schedulerReactActQueueDiagnosticsAccepted,
+      privateSchedulerActQueueDiagnosticsConsumed:
+        actSchedulerGate.privateSchedulerActQueueDiagnosticsConsumed,
+      privateActQueueDiagnosticConsumptionReady:
+        actSchedulerGate.privateActQueueDiagnosticConsumptionReady,
+      rendererBackedActDrainMetadataAccepted: true,
+      rendererBackedActDrainDiagnosticKind:
+        'fast-react.react.private-renderer-backed-act-drain-diagnostic',
+      publicReactActCompatibilityClaimed: false,
+      invokesActCallback: false,
+      executesQueuedWork: false,
+      executesEffects: false
+    }),
+    acceptedSyncFlushMetadata: freezeRecord({
+      syncFlushActRecordsAccepted:
+        actSchedulerGate.syncFlushActRecordsAccepted,
+      privateSyncFlushExecutionMetadataAccepted:
+        actSchedulerGate.privateSyncFlushExecutionMetadataAccepted,
+      postPassiveContinuationExecutionGateAccepted:
+        actSchedulerGate.postPassiveContinuationExecutionGateAccepted,
+      schedulerBridgeActContinuationExecutionAccepted: true,
+      syncFlushErrorRecoveryMetadataAccepted: true,
+      rootCallbackInvocationMetadataAccepted: true,
+      acceptedRecords: flushSyncActRoutingAcceptedReconcilerRecords,
+      recognizedActRecordIds: freezeArray(
+        syncFlushActSchedulerRecords.map((record) => record.id)
+      ),
+      publicRootSyncFlushRouteAvailable: false,
+      rootSyncFlushCompatibilityClaimed: false,
+      executesSyncFlush: false,
+      invokesRootCallbacks: false
+    }),
+    publicFailClosed: freezeRecord({
+      invokesFlushSyncCallback: false,
+      publicActBehaviorAvailable: false,
+      publicSchedulerFlushExecutionAvailable: false,
+      publicRootSyncFlushRouteAvailable: false,
+      rootSyncFlushCompatibilityClaimed: false,
+      executesSyncFlush: false,
+      executesQueuedWork: false,
+      executesScheduledCallbacks: false,
+      executesPassiveEffects: false,
+      executesRendererRoots: false,
+      invokesRootCallbacks: false,
+      mutatesHostOutput: false,
+      compatibilityClaimed: false
+    })
   });
 }
 
@@ -6322,6 +6459,24 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
     value: createPrivateGetInstanceClassRootDiagnostics(createRequest),
     writable: false
   });
+  const unstableFlushSync = createRendererUnsupportedFunction(
+    'create().unstable_flushSync',
+    1,
+    'Synchronous flushing is intentionally blocked until react-test-renderer act and scheduler integration are wired.',
+    routingGate,
+    undefined,
+    () => createRequest
+  );
+  Object.defineProperty(
+    unstableFlushSync,
+    privateFlushSyncActRoutingDiagnosticsSymbol,
+    {
+      configurable: false,
+      enumerable: false,
+      value: createPrivateFlushSyncActRoutingDiagnostics(createRequest),
+      writable: false
+    }
+  );
   const renderer = {
     _Scheduler: schedulerPlaceholder,
     root: undefined,
@@ -6349,14 +6504,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
       () => testRendererRootRequestBridge.unmountRendererRootRequest(renderer)
     ),
     getInstance,
-    unstable_flushSync: createRendererUnsupportedFunction(
-      'create().unstable_flushSync',
-      1,
-      'Synchronous flushing is intentionally blocked until react-test-renderer act and scheduler integration are wired.',
-      routingGate,
-      undefined,
-      () => createRequest
-    )
+    unstable_flushSync: unstableFlushSync
   };
 
   rendererRootHandles.set(renderer, createRequest.rootHandle);
