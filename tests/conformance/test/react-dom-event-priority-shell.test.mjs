@@ -108,18 +108,48 @@ test("private event listener wrappers select priority entry points but stay iner
     {
       domEventName: "click",
       eventSystemFlags: rootListeners.IS_CAPTURE_PHASE,
+      expectedDispatcherName: "dispatchDiscreteEvent",
+      expectedPriorityLabel: "discrete",
+      expectedPriorityName: "DiscreteEventPriority",
+      expectedWrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+    },
+    {
+      domEventName: "keydown",
+      eventSystemFlags: rootListeners.IS_CAPTURE_PHASE,
+      expectedDispatcherName: "dispatchDiscreteEvent",
+      expectedPriorityLabel: "discrete",
       expectedPriorityName: "DiscreteEventPriority",
       expectedWrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
     },
     {
       domEventName: "wheel",
       eventSystemFlags: 0,
+      expectedDispatcherName: "dispatchContinuousEvent",
+      expectedPriorityLabel: "continuous",
+      expectedPriorityName: "ContinuousEventPriority",
+      expectedWrapperKind: eventListener.CONTINUOUS_EVENT_WRAPPER
+    },
+    {
+      domEventName: "mousemove",
+      eventSystemFlags: 0,
+      expectedDispatcherName: "dispatchContinuousEvent",
+      expectedPriorityLabel: "continuous",
       expectedPriorityName: "ContinuousEventPriority",
       expectedWrapperKind: eventListener.CONTINUOUS_EVENT_WRAPPER
     },
     {
       domEventName: "abort",
       eventSystemFlags: 0,
+      expectedDispatcherName: "dispatchEvent",
+      expectedPriorityLabel: "default",
+      expectedPriorityName: "DefaultEventPriority",
+      expectedWrapperKind: eventListener.DEFAULT_EVENT_WRAPPER
+    },
+    {
+      domEventName: "animationend",
+      eventSystemFlags: 0,
+      expectedDispatcherName: "dispatchEvent",
+      expectedPriorityLabel: "default",
       expectedPriorityName: "DefaultEventPriority",
       expectedWrapperKind: eventListener.DEFAULT_EVENT_WRAPPER
     },
@@ -129,6 +159,8 @@ test("private event listener wrappers select priority entry points but stay iner
       options: {
         schedulerPriority: eventPriorities.IdleSchedulerPriority
       },
+      expectedDispatcherName: "dispatchEvent",
+      expectedPriorityLabel: "idle",
       expectedPriorityName: "IdleEventPriority",
       expectedWrapperKind: eventListener.DEFAULT_EVENT_WRAPPER
     }
@@ -148,11 +180,28 @@ test("private event listener wrappers select priority entry points but stay iner
       listener
     );
     assert.equal(
+      listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__.dispatcherName,
+      testCase.expectedDispatcherName
+    );
+    assert.equal(
       listener.__FAST_REACT_DOM_EVENT_WRAPPER_KIND__,
       testCase.expectedWrapperKind
     );
     assert.equal(
+      listener.__FAST_REACT_DOM_EVENT_PRIORITY_LABEL__,
+      testCase.expectedPriorityLabel
+    );
+    assert.equal(
       listener.__FAST_REACT_DOM_EVENT_PRIORITY_NAME__,
+      testCase.expectedPriorityName
+    );
+    assert.equal(
+      listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__.eventPriorityLabel,
+      testCase.expectedPriorityLabel
+    );
+    assert.equal(
+      listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__.priorityRecord
+        .eventPriorityName,
       testCase.expectedPriorityName
     );
     assert.equal(
