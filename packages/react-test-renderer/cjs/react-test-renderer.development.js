@@ -7,15 +7,23 @@ const placeholderVersion = '0.0.0-fast-react-test-renderer-placeholder';
 const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';
 const actSchedulerGateStatus =
   'blocked-private-react-test-renderer-act-scheduler-metadata-only';
+const actWarningThenableBlockerStatus =
+  'blocked-private-react-test-renderer-act-warning-thenable-diagnostics-only';
 const createRoutingGateStatus =
   'blocked-missing-react-test-renderer-create-routing-prerequisites';
+const publicAsyncActCompatibilityBlockerIds = Object.freeze([
+  'public-react-test-renderer-act-warning-emission',
+  'public-react-test-renderer-act-thenable-awaiting',
+  'public-react-test-renderer-async-act-scope-settlement'
+]);
 const actSchedulerMissingBeforeExecution = Object.freeze([
   'public-react-test-renderer-act-queue-drain',
   'public-react-test-renderer-scheduler-flush-execution',
   'public-react-test-renderer-root-sync-flush-route',
   'react-test-renderer-renderer-roots-compatibility-admission',
   'react-test-renderer-passive-effect-callback-execution',
-  'react-test-renderer-private-root-request-execution'
+  'react-test-renderer-private-root-request-execution',
+  ...publicAsyncActCompatibilityBlockerIds
 ]);
 const privateActQueueFlushDiagnosticsExport =
   '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
@@ -623,6 +631,45 @@ const testRendererRootActFlushRecords = Object.freeze([
     hostOutputProducedFromJs: false
   })
 ]);
+const actWarningThenableBlockerDiagnostics = Object.freeze({
+  id: 'react-test-renderer-act-warning-thenable-blockers',
+  status: actWarningThenableBlockerStatus,
+  acceptedWorker: 'worker-517-test-renderer-act-warning-thenable-blockers',
+  acceptedOracle: 'react-19.2.6-react-test-renderer-act-oracle',
+  acceptedScenario: 'react-test-renderer-act-warning-surfaces',
+  acceptedReactSources: Object.freeze([
+    'packages/react/src/ReactAct.js',
+    'packages/react-reconciler/src/ReactFiberAct.js'
+  ]),
+  observedPublicWarningSurfaces: Object.freeze([
+    'missing-IS_REACT_ACT_ENVIRONMENT-warning',
+    'unawaited-async-act-warning'
+  ]),
+  observedPublicThenableShape: Object.freeze({
+    type: 'object',
+    ownKeys: Object.freeze(['then']),
+    thenName: 'then',
+    thenLength: 2
+  }),
+  blockedPublicPrerequisiteIds: publicAsyncActCompatibilityBlockerIds,
+  publicActWarningEmissionAvailable: false,
+  publicMissingEnvironmentWarningEmissionAvailable: false,
+  publicUnawaitedAsyncActWarningEmissionAvailable: false,
+  publicActThenableAwaitingAvailable: false,
+  publicActThenableResolutionAvailable: false,
+  publicAsyncActScopeSettlementAvailable: false,
+  publicAsyncActCompatibilityClaimed: false,
+  returnsPublicActThenable: false,
+  tracksDidAwaitActCall: false,
+  queuesWarningMicrotasks: false,
+  awaitsReturnedThenables: false,
+  invokesActCallback: false,
+  drainsPublicReactActQueue: false,
+  drainsPublicSchedulerTaskQueue: false,
+  executesQueuedWork: false,
+  executesEffects: false,
+  compatibilityClaimed: false
+});
 const schedulerReactActQueueDiagnosticRecords = Object.freeze([
   Object.freeze({
     id: 'scheduler-private-act-queue-flush-diagnostics',
@@ -682,6 +729,34 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     executesEffects: false
   }),
   Object.freeze({
+    id: 'react-test-renderer-act-warning-thenable-blockers',
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    status: actWarningThenableBlockerStatus,
+    diagnostics: actWarningThenableBlockerDiagnostics,
+    acceptedWorker:
+      'worker-517-test-renderer-act-warning-thenable-blockers',
+    acceptedOracle: 'react-19.2.6-react-test-renderer-act-oracle',
+    acceptedScenario: 'react-test-renderer-act-warning-surfaces',
+    warningSurfaces:
+      actWarningThenableBlockerDiagnostics.observedPublicWarningSurfaces,
+    returnedThenableOwnKeys:
+      actWarningThenableBlockerDiagnostics.observedPublicThenableShape
+        .ownKeys,
+    blockedPublicPrerequisiteIds: publicAsyncActCompatibilityBlockerIds,
+    publicActWarningEmissionAvailable: false,
+    publicActThenableAwaitingAvailable: false,
+    publicActThenableResolutionAvailable: false,
+    publicAsyncActCompatibilityClaimed: false,
+    emitsWarnings: false,
+    awaitsThenables: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
     id: 'react-private-act-internal-test-queue-factories',
     jsExport: '__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__',
     acceptedWorker: 'worker-377-scheduler-act-queue-flush-helper-private',
@@ -727,6 +802,13 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   publicSchedulerFlushBehaviorExecuted: false,
   mockSchedulerExpiredWorkDiagnosticsReady: true,
   drainsExpiredMockSchedulerWork: false,
+  warningThenableBlockerDiagnostics: actWarningThenableBlockerDiagnostics,
+  publicActWarningEmissionAvailable: false,
+  publicActThenableAwaitingAvailable: false,
+  publicActThenableResolutionAvailable: false,
+  publicAsyncActCompatibilityClaimed: false,
+  emitsActWarnings: false,
+  awaitsActThenables: false,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
   publicSchedulerTimingCompatibilityClaimed: false,
@@ -781,6 +863,7 @@ const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'scheduler-react-act-queue-diagnostic-consumption',
   'scheduler-act-queue-routing-records',
   'scheduler-mock-flush-helper-metadata',
+  'act-warning-thenable-public-compatibility-blockers',
   'sync-flush-act-continuation-records',
   'sync-flush-post-passive-continuation-execution-gate',
   'sync-flush-post-passive-private-execution-metadata',
@@ -834,6 +917,26 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     recordOnly: true,
     records: schedulerMockFlushHelperMetadata,
     executesScheduledCallbacks: false
+  }),
+  Object.freeze({
+    id: 'act-warning-thenable-public-compatibility-blockers',
+    present: true,
+    recordOnly: true,
+    diagnostics: actWarningThenableBlockerDiagnostics,
+    blockedPublicPrerequisiteIds: publicAsyncActCompatibilityBlockerIds,
+    publicActWarningEmissionAvailable: false,
+    publicActThenableAwaitingAvailable: false,
+    publicActThenableResolutionAvailable: false,
+    publicAsyncActScopeSettlementAvailable: false,
+    publicAsyncActCompatibilityClaimed: false,
+    emitsWarnings: false,
+    awaitsThenables: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    compatibilityClaimed: false
   }),
   Object.freeze({
     id: 'sync-flush-act-continuation-records',
@@ -978,6 +1081,11 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   consumesPrivateSchedulerActQueueDiagnostics: true,
   consumesPrivatePassiveEffectDrainDiagnostics: true,
   consumesPendingPassiveFlushMetadata: true,
+  emitsActWarnings: false,
+  awaitsActThenables: false,
+  resolvesActThenables: false,
+  settlesAsyncActScopes: false,
+  publicAsyncActCompatibilityClaimed: false,
   drainsAcceptedInternalTestQueues: true,
   routesAcceptedMockSchedulerFlushHelperMetadata: true,
   delegatesToPrivateSchedulerDiagnostics: true,
@@ -1020,7 +1128,8 @@ const actSchedulerGate = Object.freeze({
     'worker-404-scheduler-mock-private-callback-execution',
     'worker-436-scheduler-mock-continuation-execution',
     'worker-469-scheduler-mock-expired-continuation-gate',
-    'worker-482-test-renderer-act-scheduler-flush-gate'
+    'worker-482-test-renderer-act-scheduler-flush-gate',
+    'worker-517-test-renderer-act-warning-thenable-blockers'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -1054,12 +1163,20 @@ const actSchedulerGate = Object.freeze({
   privatePassiveCallbackExecutionMetadataAccepted: true,
   privatePassiveSchedulerFlushMetadataAccepted: true,
   privatePassiveEffectDrainDiagnosticsConsumed: true,
+  warningThenableBlockerDiagnosticsAccepted: true,
+  publicActWarningEmissionAvailable: false,
+  publicActThenableAwaitingAvailable: false,
+  publicActThenableResolutionAvailable: false,
+  publicAsyncActScopeSettlementAvailable: false,
+  publicAsyncActCompatibilityClaimed: false,
   privateRootOutputDiagnosticsAccepted: true,
   privateFlushPrerequisitesPresent: true,
   privateFlushExecutionReady: false,
   recognizedReactActPrivateDispatcherRecords: reactActPrivateDispatcherRecords,
   recognizedSchedulerReactActQueueDiagnostics:
     schedulerReactActQueueDiagnosticRecords,
+  recognizedActWarningThenableBlockers:
+    actWarningThenableBlockerDiagnostics,
   privateActQueueFlushDiagnostics,
   privateActPassiveEffectDrainDiagnostics,
   recognizedSchedulerMockFlushHelpers: schedulerMockFlushHelperMetadata,
@@ -1071,6 +1188,8 @@ const actSchedulerGate = Object.freeze({
   blockedPrivateFlushPrerequisites: blockedPrivateActFlushPrerequisites,
   acceptedPrivateFlushPrerequisiteIds: acceptedPrivateActFlushPrerequisiteIds,
   blockedPrivateFlushPrerequisiteIds: blockedPrivateActFlushPrerequisiteIds,
+  blockedPublicAsyncActCompatibilityPrerequisiteIds:
+    publicAsyncActCompatibilityBlockerIds,
   sideEffectPolicy: actSchedulerSideEffectPolicy,
   missingBeforeExecution: actSchedulerMissingBeforeExecution
 });
@@ -2867,6 +2986,18 @@ function createUnsupportedError(
       recognizedActSchedulerGate.privateSyncFlushExecutionMetadataAccepted;
     error.privatePassiveCallbackExecutionMetadataAccepted =
       recognizedActSchedulerGate.privatePassiveCallbackExecutionMetadataAccepted;
+    error.warningThenableBlockerDiagnosticsAccepted =
+      recognizedActSchedulerGate.warningThenableBlockerDiagnosticsAccepted;
+    error.publicActWarningEmissionAvailable =
+      recognizedActSchedulerGate.publicActWarningEmissionAvailable;
+    error.publicActThenableAwaitingAvailable =
+      recognizedActSchedulerGate.publicActThenableAwaitingAvailable;
+    error.publicActThenableResolutionAvailable =
+      recognizedActSchedulerGate.publicActThenableResolutionAvailable;
+    error.publicAsyncActScopeSettlementAvailable =
+      recognizedActSchedulerGate.publicAsyncActScopeSettlementAvailable;
+    error.publicAsyncActCompatibilityClaimed =
+      recognizedActSchedulerGate.publicAsyncActCompatibilityClaimed;
     error.privateRootOutputDiagnosticsAccepted =
       recognizedActSchedulerGate.privateRootOutputDiagnosticsAccepted;
     error.privateFlushExecutionReady =
