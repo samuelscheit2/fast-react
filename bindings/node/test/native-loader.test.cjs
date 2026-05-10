@@ -2,8 +2,13 @@
 
 const assert = require('node:assert/strict');
 const Module = require('node:module');
+const path = require('node:path');
 const native = require('../index.cjs');
 const packageJson = require('../package.json');
+const rootBridge = require(path.resolve(
+  __dirname,
+  '../../../packages/react-dom/src/client/root-bridge.js'
+));
 
 const expectedNativeTargetMatrix = [
   {
@@ -96,6 +101,53 @@ const expectedPackageExports = {
   './package.json': './package.json'
 };
 
+const expectedNativeRootBridgeRequestShape = {
+  gateStatus: 'admitted-native-root-bridge-js-request-shape',
+  validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+  jsRequestRecordFields: [
+    'requestId',
+    'kind',
+    'environmentId',
+    'rootHandle',
+    'rootId',
+    'valueHandle',
+    'rootHandleState'
+  ],
+  rustRequestRecordFields: [
+    'request_id',
+    'kind',
+    'environment_id',
+    'root_handle',
+    'root_id',
+    'value_handle',
+    'root_handle_state'
+  ],
+  jsHandleFields: ['environmentId', 'slot', 'generation', 'kind'],
+  rustHandleFields: ['environment_id', 'slot', 'generation', 'kind'],
+  requestKinds: ['create', 'render', 'unmount'],
+  handleKinds: ['root', 'value'],
+  rootHandleStates: ['active', 'retired'],
+  lifecycleTransitions: ['none->active', 'active->active', 'active->retired'],
+  validationErrorCodes: {
+    createAfterRootCreated:
+      'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
+    handleMismatch: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_MISMATCH',
+    requestAfterUnmount: 'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
+    rootHandleStateMismatch:
+      'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+    rootIdMismatch: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ROOT_ID_MISMATCH',
+    sequenceMustStartWithCreate:
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+    sequenceOutOfOrder:
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER',
+    shapeInvalid: 'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID',
+    unexpectedValueHandle:
+      'FAST_REACT_NAPI_ROOT_REQUEST_UNEXPECTED_VALUE_HANDLE',
+    wrongEnvironment: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    wrongHandleKind: 'FAST_REACT_NAPI_WRONG_HANDLE_KIND'
+  }
+};
+
 assert.equal(native.packageName, '@fast-react/native');
 assert.equal(native.bindingStatus, 'placeholder');
 assert.equal(native.nativeAddonName, 'fast_react_napi');
@@ -137,13 +189,22 @@ assert.ok(Object.isFrozen(native.platformPackages));
 assert.ok(Object.isFrozen(native.supportedNativeTargets));
 assert.ok(Object.isFrozen(native.nativeTargetMatrix));
 assert.ok(Object.isFrozen(native.nativeBindingManifest));
+assert.ok(Object.isFrozen(native.nativeRootBridgeRequestShape));
 assert.deepEqual(native.nativeTargetMatrix, expectedNativeTargetMatrix);
+assert.deepEqual(
+  native.nativeRootBridgeRequestShape,
+  expectedNativeRootBridgeRequestShape
+);
 assert.deepEqual(
   native.supportedNativeTargets,
   expectedNativeTargetMatrix.map((target) => target.target)
 );
 assert.deepEqual(native.platformPackages, expectedPlatformPackages);
 assert.equal(native.nativeBindingManifest.nativeTargetMatrix, native.nativeTargetMatrix);
+assert.equal(
+  native.nativeBindingManifest.nativeRootBridgeRequestShape,
+  native.nativeRootBridgeRequestShape
+);
 assert.equal(native.nativeBindingManifest.platformPackages, native.platformPackages);
 assert.equal(
   native.nativeBindingManifest.supportedNativeTargets,
@@ -157,6 +218,153 @@ assert.equal(
 for (const target of native.nativeTargetMatrix) {
   assert.ok(Object.isFrozen(target));
 }
+for (const shapeValue of [
+  native.nativeRootBridgeRequestShape.jsRequestRecordFields,
+  native.nativeRootBridgeRequestShape.rustRequestRecordFields,
+  native.nativeRootBridgeRequestShape.jsHandleFields,
+  native.nativeRootBridgeRequestShape.rustHandleFields,
+  native.nativeRootBridgeRequestShape.requestKinds,
+  native.nativeRootBridgeRequestShape.handleKinds,
+  native.nativeRootBridgeRequestShape.rootHandleStates,
+  native.nativeRootBridgeRequestShape.lifecycleTransitions,
+  native.nativeRootBridgeRequestShape.validationErrorCodes
+]) {
+  assert.ok(Object.isFrozen(shapeValue));
+}
+
+const document = createDocument('native-request-shape');
+const container = createElement('DIV', document);
+const bridge = rootBridge.createPrivateRootBridgeShell({
+  nativeEnvironmentId: 318,
+  nativeHandoffIdPrefix: 'native-shape'
+});
+const create = bridge.createClientRoot(container);
+const render = bridge.renderContainer(create.handle, {
+  props: {
+    children: 'shape gate'
+  },
+  type: 'span'
+});
+const unmount = bridge.unmountContainer(create.handle);
+const secondUnmount = bridge.unmountContainer(create.handle);
+const createHandoff = bridge.createNativeRequestHandoff(create);
+const renderHandoff = bridge.createNativeRequestHandoff(render);
+const unmountHandoff = bridge.createNativeRequestHandoff(unmount);
+const secondUnmountHandoff = bridge.createNativeRequestHandoff(secondUnmount);
+const nativeShapeGate = native.createNativeRootBridgeRequestShapeGate([
+  createHandoff,
+  renderHandoff.nativeRequestRecord,
+  unmountHandoff
+]);
+
+assert.equal(Object.isFrozen(nativeShapeGate), true);
+assert.equal(Object.isFrozen(nativeShapeGate.validationRecords), true);
+assert.equal(
+  nativeShapeGate.gateStatus,
+  native.nativeRootBridgeRequestShape.gateStatus
+);
+assert.equal(
+  nativeShapeGate.validationModel,
+  native.nativeRootBridgeRequestShape.validationModel
+);
+assert.equal(nativeShapeGate.requestCount, 3);
+assert.equal(nativeShapeGate.nativeAddonLoaded, false);
+assert.equal(nativeShapeGate.nativeExecution, false);
+assert.equal(nativeShapeGate.rendererExecution, false);
+assert.equal(nativeShapeGate.reconcilerExecution, false);
+assert.deepEqual(
+  nativeShapeGate.validationRecords.map((record) => record.lifecycleTransition),
+  ['none->active', 'active->active', 'active->retired']
+);
+
+assertNativeRootBridgeValidationRecord(nativeShapeGate.validationRecords[0], {
+  environmentId: 318,
+  kind: 'create',
+  requestId: 1,
+  rootHandleState: 'active',
+  rootId: 1,
+  rootSlot: 1,
+  valueHandleValidated: true,
+  valueSlot: 2
+});
+assertNativeRootBridgeValidationRecord(nativeShapeGate.validationRecords[1], {
+  environmentId: 318,
+  kind: 'render',
+  requestId: 2,
+  rootHandleState: 'active',
+  rootId: 1,
+  rootSlot: 1,
+  valueHandleValidated: true,
+  valueSlot: 3
+});
+assertNativeRootBridgeValidationRecord(nativeShapeGate.validationRecords[2], {
+  environmentId: 318,
+  kind: 'unmount',
+  requestId: 3,
+  rootHandleState: 'retired',
+  rootId: 1,
+  rootSlot: 1,
+  valueHandleValidated: false,
+  valueSlot: null
+});
+assert.deepEqual(nativeShapeGate.validationRecords[0].rootHandle, {
+  environmentId: 318,
+  generation: 1,
+  kind: 'root',
+  slot: 1
+});
+assert.deepEqual(
+  nativeShapeGate.validationRecords[0].rustValidationRecord.root_handle,
+  {
+    environment_id: 318,
+    generation: 1,
+    kind: 'root',
+    slot: 1
+  }
+);
+assert.equal(
+  createHandoff.nativeRequestRecord.rootHandle.$$typeof,
+  rootBridge.privateRootNativeBridgeHandleType
+);
+assert.equal(
+  nativeShapeGate.validationRecords[0].rootHandle.$$typeof,
+  undefined
+);
+assertBridgeDidNotTouchContainer(container, document);
+
+assert.throws(
+  () => native.createNativeRootBridgeRequestShapeGate([renderHandoff]),
+  { code: 'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE' }
+);
+assert.throws(
+  () =>
+    native.createNativeRootBridgeRequestShapeGate([
+      createHandoff,
+      unmountHandoff,
+      renderHandoff
+    ]),
+  { code: 'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER' }
+);
+assert.throws(
+  () =>
+    native.createNativeRootBridgeRequestShapeGate([
+      createHandoff,
+      unmountHandoff,
+      secondUnmountHandoff
+    ]),
+  { code: 'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT' }
+);
+assert.throws(
+  () =>
+    native.createNativeRootBridgeRequestShapeGate([
+      createHandoff,
+      {
+        ...renderHandoff.nativeRequestRecord,
+        rootHandleState: 'retired'
+      }
+    ]),
+  { code: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH' }
+);
 
 for (const expectedTarget of expectedNativeTargetMatrix) {
   const plan = native.getNativeBindingLoadPlan({
@@ -288,5 +496,101 @@ assert.deepEqual(
   [],
   'placeholder loader must not attempt platform package loading yet'
 );
+
+function assertNativeRootBridgeValidationRecord(record, expected) {
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(Object.isFrozen(record.rootHandle), true);
+  assert.equal(Object.isFrozen(record.rustValidationRecord), true);
+  assert.equal(record.requestId, expected.requestId);
+  assert.equal(record.kind, expected.kind);
+  assert.equal(record.environmentId, expected.environmentId);
+  assert.equal(record.rootId, expected.rootId);
+  assert.equal(record.rootHandleState, expected.rootHandleState);
+  assert.equal(record.rootHandleValidated, true);
+  assert.equal(record.valueHandleValidated, expected.valueHandleValidated);
+  assert.deepEqual(record.rootHandle, {
+    environmentId: expected.environmentId,
+    generation: 1,
+    kind: 'root',
+    slot: expected.rootSlot
+  });
+  assert.deepEqual(record.rustValidationRecord.root_handle, {
+    environment_id: expected.environmentId,
+    generation: 1,
+    kind: 'root',
+    slot: expected.rootSlot
+  });
+  assert.deepEqual(
+    Object.keys(record.rustValidationRecord),
+    [
+      'request_id',
+      'kind',
+      'environment_id',
+      'root_handle',
+      'root_id',
+      'value_handle',
+      'root_handle_state',
+      'lifecycle_transition',
+      'root_handle_validated',
+      'value_handle_validated'
+    ]
+  );
+  if (expected.valueSlot === null) {
+    assert.equal(record.valueHandle, null);
+    assert.equal(record.rustValidationRecord.value_handle, null);
+  } else {
+    assert.equal(Object.isFrozen(record.valueHandle), true);
+    assert.deepEqual(record.valueHandle, {
+      environmentId: expected.environmentId,
+      generation: 1,
+      kind: 'value',
+      slot: expected.valueSlot
+    });
+    assert.deepEqual(record.rustValidationRecord.value_handle, {
+      environment_id: expected.environmentId,
+      generation: 1,
+      kind: 'value',
+      slot: expected.valueSlot
+    });
+  }
+}
+
+function assertBridgeDidNotTouchContainer(container, document) {
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+  assert.deepEqual(container.__mutationLog, []);
+  assert.deepEqual(document.__mutationLog, []);
+}
+
+function createDocument(label) {
+  const document = createEventTarget({
+    label,
+    nodeName: '#document',
+    nodeType: 9
+  });
+  document.ownerDocument = document;
+  document.defaultView = createEventTarget({ label: `${label}-window` });
+  return document;
+}
+
+function createElement(nodeName, ownerDocument) {
+  return createEventTarget({
+    nodeName,
+    nodeType: 1,
+    ownerDocument
+  });
+}
+
+function createEventTarget(fields) {
+  return {
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener, options) {
+      this.__registrations.push({ listener, options, type });
+    },
+    removeEventListener() {},
+    ...fields
+  };
+}
 
 console.log('Fast React native CJS loader placeholder checks passed.');

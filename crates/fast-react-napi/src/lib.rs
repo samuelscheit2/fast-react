@@ -49,6 +49,16 @@ mod root_bridge_requests {
         Retired,
     }
 
+    impl NativeRootBridgeRootHandleState {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::Active => "active",
+                Self::Retired => "retired",
+            }
+        }
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeLifecycleTransition {
         NoneToActive,
@@ -825,6 +835,37 @@ pub const SUPPORTED_NODE_ENGINE_RANGE: &str = ">=22.0.0";
 pub const PLATFORM_ARTIFACT_POLICY: &str =
     "future per-platform optional npm packages; no native addon is built or loaded yet";
 pub const OPTIONAL_PACKAGE_PREFIX: &str = "@fast-react/native-";
+pub const NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS: &str =
+    "admitted-native-root-bridge-js-request-shape";
+pub const NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL: &str =
+    "fast-react-napi.NativeRootBridgeRequestSequenceValidator";
+pub const NATIVE_ROOT_BRIDGE_JS_REQUEST_RECORD_FIELDS: &[&str] = &[
+    "requestId",
+    "kind",
+    "environmentId",
+    "rootHandle",
+    "rootId",
+    "valueHandle",
+    "rootHandleState",
+];
+pub const NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS: &[&str] = &[
+    "request_id",
+    "kind",
+    "environment_id",
+    "root_handle",
+    "root_id",
+    "value_handle",
+    "root_handle_state",
+];
+pub const NATIVE_ROOT_BRIDGE_JS_HANDLE_FIELDS: &[&str] =
+    &["environmentId", "slot", "generation", "kind"];
+pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS: &[&str] =
+    &["environment_id", "slot", "generation", "kind"];
+pub const NATIVE_ROOT_BRIDGE_REQUEST_KIND_CODES: &[&str] = &["create", "render", "unmount"];
+pub const NATIVE_ROOT_BRIDGE_HANDLE_KIND_CODES: &[&str] = &["root", "value"];
+pub const NATIVE_ROOT_BRIDGE_ROOT_HANDLE_STATE_CODES: &[&str] = &["active", "retired"];
+pub const NATIVE_ROOT_BRIDGE_LIFECYCLE_TRANSITION_CODES: &[&str] =
+    &["none->active", "active->active", "active->retired"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeTargetMetadata {
@@ -1778,6 +1819,76 @@ mod tests {
                 handle: create.root_handle(),
                 current_generation: create.root_handle().generation() + 1
             }
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_js_request_shape_metadata_matches_handle_validation_model() {
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS,
+            "admitted-native-root-bridge-js-request-shape"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
+            "fast-react-napi.NativeRootBridgeRequestSequenceValidator"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JS_REQUEST_RECORD_FIELDS,
+            &[
+                "requestId",
+                "kind",
+                "environmentId",
+                "rootHandle",
+                "rootId",
+                "valueHandle",
+                "rootHandleState"
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS,
+            &[
+                "request_id",
+                "kind",
+                "environment_id",
+                "root_handle",
+                "root_id",
+                "value_handle",
+                "root_handle_state"
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JS_HANDLE_FIELDS,
+            &["environmentId", "slot", "generation", "kind"]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS,
+            &["environment_id", "slot", "generation", "kind"]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_REQUEST_KIND_CODES,
+            &[
+                NativeRootBridgeRequestKind::Create.code(),
+                NativeRootBridgeRequestKind::Render.code(),
+                NativeRootBridgeRequestKind::Unmount.code()
+            ]
+        );
+        assert_eq!(NATIVE_ROOT_BRIDGE_HANDLE_KIND_CODES, &["root", "value"]);
+        assert_eq!(BridgeHandleKind::Root.to_string(), "root");
+        assert_eq!(BridgeHandleKind::Value.to_string(), "value");
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_ROOT_HANDLE_STATE_CODES,
+            &[
+                NativeRootBridgeRootHandleState::Active.code(),
+                NativeRootBridgeRootHandleState::Retired.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_LIFECYCLE_TRANSITION_CODES,
+            &[
+                NativeRootBridgeLifecycleTransition::NoneToActive.code(),
+                NativeRootBridgeLifecycleTransition::ActiveToActive.code(),
+                NativeRootBridgeLifecycleTransition::ActiveToRetired.code()
+            ]
         );
     }
 
