@@ -26,11 +26,16 @@ use fast_react_reconciler::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCommitError, RootElementHandle, RootOptions,
     RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateCallbackHandle, RootUpdateError,
-    RootWorkLoopError, ScheduledRootUpdateResult, TestRendererHostOutputCanaryCompletedFibers,
-    TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryFixture,
-    TestRendererHostOutputCanaryPreparedFibers, UpdateContainerResult, commit_finished_host_root,
+    RootWorkLoopError, ScheduledRootUpdateResult, TestRendererHostOutputCanaryCommitDiagnostics,
+    TestRendererHostOutputCanaryCompletedFibers, TestRendererHostOutputCanaryCurrentFibers,
+    TestRendererHostOutputCanaryDeletedFibers, TestRendererHostOutputCanaryError,
+    TestRendererHostOutputCanaryFixture, TestRendererHostOutputCanaryPreparedFibers,
+    TestRendererHostOutputCanaryUpdatedFibers, UpdateContainerResult, commit_finished_host_root,
     ensure_root_is_scheduled, finish_test_renderer_host_output_canary_fibers,
-    prepare_test_renderer_host_output_canary_fibers, process_root_schedule_in_microtask,
+    inspect_test_renderer_host_output_canary_commit,
+    prepare_test_renderer_host_output_canary_fibers,
+    prepare_test_renderer_host_output_unmount_canary_fibers,
+    prepare_test_renderer_host_output_update_canary_fibers, process_root_schedule_in_microtask,
     render_host_root_for_lanes, scheduled_roots, update_container, update_container_sync,
 };
 
@@ -760,6 +765,14 @@ impl TestRendererHostOutputFixture {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct TestRendererCurrentHostOutput {
+    fixture: TestRendererHostOutputFixture,
+    fibers: TestRendererHostOutputCanaryCurrentFibers,
+    instance: TestInstance,
+    text: TestTextInstance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererCommittedHostOutput {
     render: HostRootRenderPhaseRecord,
     prepared_fibers: TestRendererHostOutputCanaryPreparedFibers,
@@ -792,6 +805,96 @@ impl TestRendererCommittedHostOutput {
     #[must_use]
     pub const fn snapshot(&self) -> &TestContainerSnapshot {
         &self.snapshot
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererUpdatedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    updated_fibers: TestRendererHostOutputCanaryUpdatedFibers,
+    commit: HostRootCommitRecord,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    previous_snapshot: TestContainerSnapshot,
+    snapshot: TestContainerSnapshot,
+}
+
+impl TestRendererUpdatedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn updated_fibers(&self) -> TestRendererHostOutputCanaryUpdatedFibers {
+        self.updated_fibers
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn previous_snapshot(&self) -> &TestContainerSnapshot {
+        &self.previous_snapshot
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererUnmountedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    deleted_fibers: TestRendererHostOutputCanaryDeletedFibers,
+    commit: HostRootCommitRecord,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    previous_snapshot: TestContainerSnapshot,
+    snapshot: TestContainerSnapshot,
+    detached_instance_snapshot: TestElementSnapshot,
+}
+
+impl TestRendererUnmountedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn deleted_fibers(&self) -> TestRendererHostOutputCanaryDeletedFibers {
+        self.deleted_fibers
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn previous_snapshot(&self) -> &TestContainerSnapshot {
+        &self.previous_snapshot
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+
+    #[must_use]
+    pub const fn detached_instance_snapshot(&self) -> &TestElementSnapshot {
+        &self.detached_instance_snapshot
     }
 }
 
@@ -1226,7 +1329,16 @@ pub enum TestRendererRootError {
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
     HostOutputCanary(TestRendererHostOutputCanaryError),
-    MissingHostOutputFixture { element: RootElementHandle },
+    MissingHostOutputFixture {
+        element: RootElementHandle,
+    },
+    MissingCommittedHostOutput {
+        operation: TestRendererRootUpdateKind,
+    },
+    UnexpectedHostOutputUpdateKind {
+        expected: TestRendererRootUpdateKind,
+        actual: TestRendererRootUpdateKind,
+    },
 }
 
 impl Display for TestRendererRootError {
@@ -1245,6 +1357,16 @@ impl Display for TestRendererRootError {
                 "test-renderer host-output canary has no fixture for root element {}",
                 element.raw()
             ),
+            Self::MissingCommittedHostOutput { operation } => write!(
+                formatter,
+                "test-renderer host-output canary cannot {:?} without committed host output",
+                operation
+            ),
+            Self::UnexpectedHostOutputUpdateKind { expected, actual } => write!(
+                formatter,
+                "test-renderer host-output canary expected a {:?} update, found {:?}",
+                expected, actual
+            ),
         }
     }
 }
@@ -1260,7 +1382,9 @@ impl Error for TestRendererRootError {
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
             Self::HostOutputCanary(error) => Some(error),
-            Self::MissingHostOutputFixture { .. } => None,
+            Self::MissingHostOutputFixture { .. }
+            | Self::MissingCommittedHostOutput { .. }
+            | Self::UnexpectedHostOutputUpdateKind { .. } => None,
         }
     }
 }
@@ -1322,6 +1446,7 @@ pub struct TestRendererRoot {
     lifecycle: TestRendererRootLifecycle,
     scheduled_updates: Vec<TestRendererRootScheduledUpdate>,
     host_output_fixtures: Vec<TestRendererHostOutputFixture>,
+    current_host_output: Option<TestRendererCurrentHostOutput>,
 }
 
 impl TestRendererRoot {
@@ -1382,6 +1507,7 @@ impl TestRendererRoot {
             lifecycle: TestRendererRootLifecycle::Active,
             scheduled_updates: Vec::new(),
             host_output_fixtures: Vec::new(),
+            current_host_output: None,
         })
     }
 
@@ -1398,6 +1524,22 @@ impl TestRendererRoot {
         callback: RootUpdateCallbackHandle,
     ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
         self.update_with_root_update_callback(element, Some(callback))
+    }
+
+    pub fn update_host_component_with_text_for_canary(
+        &mut self,
+        element_type: impl Into<TestElementType>,
+        text: impl Into<String>,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
+            return Ok(TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
+        }
+
+        let element = self.push_host_output_fixture_for_canary(element_type.into(), text.into());
+        let record =
+            self.schedule_root_update(TestRendererRootUpdateKind::Update, element, None)?;
+        self.scheduled_updates.push(record.clone());
+        Ok(TestRendererRootUpdateOutcome::Scheduled(record))
     }
 
     fn update_with_root_update_callback(
@@ -1627,6 +1769,12 @@ impl TestRendererRoot {
             .append_child_to_container(&mut container, HostChild::Instance(&instance))?;
         self.renderer.reset_after_commit(&container, commit_state)?;
         let snapshot = self.diagnostic_container_snapshot()?;
+        self.current_host_output = Some(TestRendererCurrentHostOutput {
+            fixture,
+            fibers: completed.current(),
+            instance,
+            text,
+        });
 
         Ok(Some(TestRendererCommittedHostOutput {
             render,
@@ -1634,6 +1782,144 @@ impl TestRendererRoot {
             completed_fibers: completed,
             commit,
             snapshot,
+        }))
+    }
+
+    pub fn render_and_commit_host_output_update_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererUpdatedHostOutput>, TestRendererRootError> {
+        let Some(update) = self.scheduled_updates.last() else {
+            return Ok(None);
+        };
+        if update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: update.kind(),
+            });
+        }
+        let current = self.current_host_output.clone().ok_or(
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update,
+            },
+        )?;
+        let Some(render) = self.render_latest_scheduled_host_root_for_commit_handoff()? else {
+            return Ok(None);
+        };
+        let next_fixture = self
+            .host_output_fixture(render.resulting_element())?
+            .clone();
+        let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let updated = prepare_test_renderer_host_output_update_canary_fibers(
+            &mut self.store,
+            render,
+            current.fibers,
+            next_fixture.canary_fixture,
+            Self::instance_state_node_raw(current.instance),
+            Self::text_state_node_raw(current.text),
+        )?;
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+
+        let container = self.container;
+        let mut instance = current.instance;
+        let mut text = current.text;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        if updated.component_props_changed() {
+            let component_token = updated.component_commit_token().raw();
+            self.renderer.commit_update(
+                HostFiberTokenRef::new(
+                    &component_token,
+                    HostFiberTokenPhase::Commit,
+                    HostFiberTokenTarget::Instance,
+                ),
+                &mut instance,
+                TestUpdatePayload::replace_props(next_fixture.props.clone()),
+                &next_fixture.element_type,
+                &current.fixture.props,
+                &next_fixture.props,
+            )?;
+        }
+        if updated.text_props_changed() || current.fixture.text != next_fixture.text {
+            self.renderer.commit_text_update(
+                &mut text,
+                &current.fixture.text,
+                &next_fixture.text,
+            )?;
+        }
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+        self.current_host_output = Some(TestRendererCurrentHostOutput {
+            fixture: next_fixture,
+            fibers: updated.current(),
+            instance,
+            text,
+        });
+
+        Ok(Some(TestRendererUpdatedHostOutput {
+            render,
+            updated_fibers: updated,
+            commit,
+            commit_diagnostics,
+            previous_snapshot,
+            snapshot,
+        }))
+    }
+
+    pub fn render_and_commit_host_output_unmount_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererUnmountedHostOutput>, TestRendererRootError> {
+        let Some(update) = self.scheduled_updates.last() else {
+            return Ok(None);
+        };
+        if update.kind() != TestRendererRootUpdateKind::Unmount {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Unmount,
+                actual: update.kind(),
+            });
+        }
+        let current = self.current_host_output.clone().ok_or(
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Unmount,
+            },
+        )?;
+        let Some(render) = self.render_latest_scheduled_host_root_for_commit_handoff()? else {
+            return Ok(None);
+        };
+        let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let deleted = prepare_test_renderer_host_output_unmount_canary_fibers(
+            &mut self.store,
+            render,
+            current.fibers,
+        )?;
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+
+        let mut container = self.container;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        self.renderer
+            .remove_child_from_container(&mut container, HostChild::Instance(&current.instance))?;
+        let deletion_token = deleted.component_deletion_token().raw();
+        self.renderer.detach_deleted_instance(
+            HostFiberTokenRef::new(
+                &deletion_token,
+                HostFiberTokenPhase::Deletion,
+                HostFiberTokenTarget::Instance,
+            ),
+            current.instance,
+        )?;
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+        let detached_instance_snapshot = self.renderer.snapshot_instance(&current.instance)?;
+        self.current_host_output = None;
+
+        Ok(Some(TestRendererUnmountedHostOutput {
+            render,
+            deleted_fibers: deleted,
+            commit,
+            commit_diagnostics,
+            previous_snapshot,
+            snapshot,
+            detached_instance_snapshot,
         }))
     }
 
@@ -2191,6 +2477,7 @@ mod tests {
     use fast_react_host_config::{HostOperationErrorKind, HostTreeUpdateMode, MutationRenderer};
     use fast_react_reconciler::{
         RootTaskScheduleOutcome, RootUpdateCallbackRecord, RootUpdateCallbackVisibility,
+        TestRendererHostOutputCanaryMutationKind,
     };
 
     static TEST_HOST_FIBER_TOKEN: TestHostFiberToken = 1;
@@ -2571,6 +2858,180 @@ mod tests {
         assert_eq!(
             root.diagnostic_container_snapshot().unwrap(),
             snapshot.clone()
+        );
+    }
+
+    #[test]
+    fn root_host_output_canary_updates_committed_text_with_update_diagnostics() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let create_current = created.completed_fibers().current();
+        let outcome = root
+            .update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let scheduled = outcome.scheduled().unwrap();
+
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let render = updated.render();
+        let commit = updated.commit();
+        let fibers = updated.updated_fibers();
+        let diagnostics = updated.commit_diagnostics();
+
+        assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Update);
+        assert_eq!(scheduled.element(), root_element(2));
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(render.current(), created.commit().current());
+        assert_eq!(render.resulting_element(), root_element(2));
+        assert_eq!(commit.previous_current(), created.commit().current());
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(fibers.previous(), create_current);
+        assert_eq!(fibers.current().host_root(), render.finished_work());
+        assert_ne!(fibers.current().component(), create_current.component());
+        assert_ne!(fibers.current().text(), create_current.text());
+        assert_eq!(fibers.component_state_node_raw(), 1);
+        assert_eq!(fibers.text_state_node_raw(), 1);
+        assert!(fibers.component_props_changed());
+        assert!(fibers.text_props_changed());
+        assert_eq!(root.store().host_tokens().len(), 3);
+        assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert!(diagnostics.deletion_lists().is_empty());
+        assert_eq!(diagnostics.mutation_records().len(), 1);
+        let mutation = diagnostics.mutation_records()[0];
+        assert_eq!(
+            mutation.kind(),
+            TestRendererHostOutputCanaryMutationKind::Update
+        );
+        assert_eq!(mutation.fiber(), fibers.component());
+        assert_eq!(mutation.host_root(), render.finished_work());
+        assert_eq!(mutation.state_node_raw(), 1);
+        assert_eq!(mutation.pending_props_raw(), 3);
+        assert_eq!(mutation.memoized_props_raw(), 3);
+        assert_eq!(mutation.alternate_memoized_props_raw(), Some(1));
+
+        let TestNodeSnapshot::Element(previous) = &updated.previous_snapshot().children()[0] else {
+            panic!("expected previous host component");
+        };
+        assert_eq!(child_texts(previous), vec!["hello"]);
+        let TestNodeSnapshot::Element(element) = &updated.snapshot().children()[0] else {
+            panic!("expected updated host component");
+        };
+        assert_eq!(element.element_type().as_str(), "span");
+        assert_eq!(child_texts(element), vec!["goodbye"]);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            updated.snapshot().clone()
+        );
+        assert_eq!(current_host_root_element(&root), root_element(2));
+    }
+
+    #[test]
+    fn root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let current = created.completed_fibers().current();
+        let outcome = root.unmount().unwrap();
+        let scheduled = outcome.scheduled().unwrap();
+
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let render = unmounted.render();
+        let commit = unmounted.commit();
+        let deleted = unmounted.deleted_fibers();
+        let diagnostics = unmounted.commit_diagnostics();
+
+        assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Unmount);
+        assert_eq!(scheduled.element(), RootElementHandle::NONE);
+        assert_eq!(
+            root.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(render.current(), created.commit().current());
+        assert_eq!(render.resulting_element(), RootElementHandle::NONE);
+        assert_eq!(commit.previous_current(), created.commit().current());
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(deleted.current(), current);
+        assert_eq!(deleted.host_root(), render.finished_work());
+        assert_eq!(deleted.deleted_component(), current.component());
+        assert_eq!(deleted.deleted_text(), current.text());
+        assert_eq!(root.store().host_tokens().len(), 3);
+        assert!(diagnostics.mutation_records().is_empty());
+        assert_eq!(diagnostics.deletion_lists().len(), 1);
+        assert_eq!(
+            diagnostics.deletion_lists()[0].parent(),
+            render.finished_work()
+        );
+        assert_eq!(
+            diagnostics.deletion_lists()[0].deleted(),
+            &[current.component()]
+        );
+        assert_eq!(unmounted.previous_snapshot().children().len(), 1);
+        assert!(unmounted.snapshot().children().is_empty());
+        assert!(unmounted.detached_instance_snapshot().is_detached());
+        assert!(unmounted.detached_instance_snapshot().children().is_empty());
+        assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_host_output_update_canary_fails_closed_without_committed_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let current = root.store().root(root.root_id()).unwrap().current();
+
+        let error = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update
+            }
+        ));
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().current(),
+            current
+        );
+        assert_eq!(host_storage_counts(&root), (1, 0, 0));
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
         );
     }
 
