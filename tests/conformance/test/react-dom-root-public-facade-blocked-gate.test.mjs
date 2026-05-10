@@ -593,6 +593,158 @@ test("React DOM client private facade preflights marker/listener setup and clean
   );
 });
 
+test("React DOM client private facade unmount cleanup stays private and non-compatible", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-unmount-cleanup",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: "facade-unmount-admission",
+    initialHostOutputIdPrefix: "facade-unmount-initial",
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      "facade-unmount-diagnostic",
+    requestIdPrefix: "facade-unmount-request",
+    rootIdPrefix: "facade-unmount-root",
+    sideEffectIdPrefix: "facade-unmount-side-effect",
+    unmountCleanupIdPrefix: "facade-unmount-cleanup",
+    updateIdPrefix: "facade-unmount-update"
+  });
+  const root = adapter.createRoot(container);
+  const diagnostic = adapter.unmountHostOutput(root, {
+    props: {
+      children: "facade cleanup",
+      id: "facade-cleanup-host"
+    },
+    type: "section"
+  });
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(
+      diagnostic
+    );
+
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED
+  );
+  assert.equal(diagnostic.diagnosticId, "facade-unmount-diagnostic:1");
+  assert.equal(diagnostic.unmountCleanupId, "facade-unmount-cleanup:1");
+  assert.equal(diagnostic.unmountRequestType, "root.unmount");
+  assert.equal(diagnostic.unmountNoOp, false);
+  assert.equal(diagnostic.unmountSync, true);
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-root-render-record",
+      "public-facade-root-unmount-record",
+      "root-marker-setup-cleanup",
+      "root-listener-setup-cleanup",
+      "create-render-admission",
+      "fake-dom-host-output-mutation",
+      "fake-dom-unmount-cleanup",
+      "component-tree-metadata-detach",
+      "latest-props-publication"
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities.map((capability) => capability.id),
+    [
+      "public-root-execution",
+      "public-root-unmount",
+      "native-execution",
+      "reconciler-execution",
+      "browser-dom-compatibility",
+      "hydration",
+      "events",
+      "refs",
+      "compatibility-claims"
+    ]
+  );
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.publicRootUnmounted, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.fakeDomMutation, true);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.rootContainerChildrenCleared, true);
+  assert.equal(diagnostic.componentTreeMetadataDetached, true);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(diagnostic.cleanupRequired, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    hidden.unmountCleanupRecord.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(
+    rootBridge.isPrivateRootUnmountHostOutputCleanupRecord(
+      hidden.unmountCleanupRecord
+    ),
+    true
+  );
+  assert.equal(hidden.renderRecord.requestType, "root.render");
+  assert.equal(hidden.unmountRecord.requestType, "root.unmount");
+  assert.deepEqual(adapter.getRootRequestRecords(root), [
+    hidden.createRecord,
+    hidden.renderRecord,
+    hidden.unmountRecord
+  ]);
+  assert.deepEqual(
+    adapter.getRootHostOutputUnmountCleanupDiagnostics(root),
+    [diagnostic]
+  );
+  assert.equal(container.childNodes.length, 0);
+  assert.deepEqual(
+    container.__mutationLog.map((entry) => entry.type),
+    ["appendChild", "removeChild"]
+  );
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assert.equal(publicBoundary.publicRootLifecycle.unmount.status, "throws");
+  assert.equal(
+    publicBoundary.publicRootLifecycle.unmount.compatibilityClaimed,
+    false
+  );
+  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
+  assert.equal(
+    publicBoundary.createRoot.sideEffects.listenerRegistrationCount,
+    0
+  );
+});
+
 test("React DOM public root facade update and unmount rows stay blocked apart from private request metadata", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
@@ -1154,6 +1306,12 @@ function createPrivateGateDocument(label, domContainer) {
   document.defaultView = createPrivateGateEventTarget({
     label: `${label}-window`
   });
+  document.createElement = function createPrivateGateFakeElement(tagName) {
+    return createPrivateGateElement(String(tagName).toUpperCase(), this, domContainer);
+  };
+  document.createTextNode = function createPrivateGateFakeText(text) {
+    return createPrivateGateTextNode(String(text), this, domContainer);
+  };
   return document;
 }
 
@@ -1165,11 +1323,47 @@ function createPrivateGateElement(nodeName, ownerDocument, domContainer) {
   });
 }
 
+function createPrivateGateTextNode(text, ownerDocument, domContainer) {
+  const target = createPrivateGateEventTarget({
+    nodeName: "#text",
+    nodeType: domContainer.TEXT_NODE,
+    ownerDocument
+  });
+  let textValue = String(text);
+  Object.defineProperties(target, {
+    data: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+      }
+    },
+    nodeValue: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+      }
+    }
+  });
+  return target;
+}
+
 function createPrivateGateEventTarget(fields) {
   const target = {
     ...fields,
+    attributeLog: [],
+    attributes: new Map(),
+    childNodes: [],
     __mutationLog: [],
     __registrations: [],
+    parentNode: null,
     addEventListener(type, listener, options) {
       this.__registrations.push({
         listener,
@@ -1189,13 +1383,51 @@ function createPrivateGateEventTarget(fields) {
       }
     },
     appendChild(child) {
+      detachPrivateGateChild(child);
+      this.childNodes.push(child);
+      child.parentNode = this;
       this.__mutationLog.push({ child, type: "appendChild" });
+      return child;
     },
     insertBefore(child, beforeChild) {
+      if (beforeChild.parentNode !== this) {
+        throw new Error("Cannot insert before a child from another parent.");
+      }
+      detachPrivateGateChild(child);
+      const index = this.childNodes.indexOf(beforeChild);
+      this.childNodes.splice(index, 0, child);
+      child.parentNode = this;
       this.__mutationLog.push({ beforeChild, child, type: "insertBefore" });
+      return child;
     },
     removeChild(child) {
+      if (child.parentNode !== this) {
+        throw new Error("Cannot remove a child from another parent.");
+      }
+      detachPrivateGateChild(child);
       this.__mutationLog.push({ child, type: "removeChild" });
+      return child;
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributes.set(attributeName, stringValue);
+      this.attributeLog.push(["setAttribute", attributeName, stringValue]);
+    },
+    removeAttribute(name) {
+      const attributeName = String(name);
+      const hadAttribute = this.attributes.has(attributeName);
+      this.attributes.delete(attributeName);
+      this.attributeLog.push(["removeAttribute", attributeName, hadAttribute]);
+    },
+    hasAttribute(name) {
+      return this.attributes.has(String(name));
+    },
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
     }
   };
   let textContent = "";
@@ -1203,12 +1435,50 @@ function createPrivateGateEventTarget(fields) {
     configurable: true,
     enumerable: true,
     get() {
+      if (this.childNodes.length > 0) {
+        return this.childNodes.map((child) => child.textContent).join("");
+      }
       return textContent;
     },
     set(value) {
+      for (const child of [...this.childNodes]) {
+        detachPrivateGateChild(child);
+      }
       textContent = value;
       this.__mutationLog.push({ type: "textContent", value });
     }
   });
+  Object.defineProperties(target, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    lastChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[this.childNodes.length - 1] || null;
+      }
+    }
+  });
   return target;
+}
+
+function detachPrivateGateChild(child) {
+  if (child == null || typeof child !== "object") {
+    throw new Error("Expected a fake-DOM child object.");
+  }
+  if (child.parentNode == null) {
+    child.parentNode = null;
+    return;
+  }
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
