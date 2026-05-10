@@ -39,12 +39,17 @@ var privateActQueueTestQueueKind =
   'fast-react.react.private-act-queue-test-queue';
 var privateActQueueTestTaskKind =
   'fast-react.react.private-act-queue-test-task';
+var privateActQueueTestCallbackKind =
+  'fast-react.react.private-act-queue-test-callback';
 var privateActQueueTestQueueVersion = 1;
 var privateActQueueTestQueueBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-queue'
 );
 var privateActQueueTestTaskBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-task'
+);
+var privateActQueueTestCallbackBrand = Symbol.for(
+  'fast-react.react.private-act-queue-test-callback'
 );
 var reactCompatibilityTarget = 'react@19.2.6';
 var schedulerCompatibilityTarget = 'scheduler@0.27.0';
@@ -267,6 +272,47 @@ function includesString(value, expectedValues) {
   return typeof value === 'string' && expectedValues.indexOf(value) !== -1;
 }
 
+function getRejectedPrivateActQueueCallbackReason(callback, index, role) {
+  if (callback === undefined || callback === null) {
+    return null;
+  }
+  if (typeof callback !== 'function') {
+    return 'record-' + index + '-' + role + '-not-function';
+  }
+  if (callback[privateActQueueTestCallbackBrand] !== true) {
+    return 'record-' + index + '-' + role + '-missing-internal-brand';
+  }
+  if (callback.kind !== privateActQueueTestCallbackKind) {
+    return 'record-' + index + '-' + role + '-kind';
+  }
+  if (callback.version !== privateActQueueTestQueueVersion) {
+    return 'record-' + index + '-' + role + '-version';
+  }
+  if (callback.compatibilityTarget !== reactCompatibilityTarget) {
+    return 'record-' + index + '-' + role + '-react-target';
+  }
+  if (callback.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return 'record-' + index + '-' + role + '-scheduler-target';
+  }
+  if (typeof callback.label !== 'string') {
+    return 'record-' + index + '-' + role + '-label';
+  }
+  if (
+    callback.publicCompatibilityClaimed !== false ||
+    callback.publicSchedulerTimingCompatibilityClaimed !== false ||
+    callback.publicReactActCompatibilityClaimed !== false
+  ) {
+    return 'record-' + index + '-' + role + '-public-claim';
+  }
+  if (
+    callback.executesQueuedWork !== false ||
+    callback.executesEffects !== false
+  ) {
+    return 'record-' + index + '-' + role + '-execution-claim';
+  }
+  return null;
+}
+
 function getRejectedPrivateActQueueTaskReason(task, index) {
   if (!isObjectLike(task)) {
     return 'record-' + index + '-not-object';
@@ -302,6 +348,14 @@ function getRejectedPrivateActQueueTaskReason(task, index) {
   }
   if (typeof task.label !== 'string') {
     return 'record-' + index + '-label';
+  }
+  var rejectedCallbackReason = getRejectedPrivateActQueueCallbackReason(
+    task.callback,
+    index,
+    'callback'
+  );
+  if (rejectedCallbackReason !== null) {
+    return rejectedCallbackReason;
   }
   if (
     task.publicCompatibilityClaimed !== false ||
@@ -345,7 +399,9 @@ function getRejectedPrivateActQueueReason(queue) {
   if (
     queue.queueFlushingReady !== false ||
     queue.privateTestQueueFlushDiagnosticsReady !== true ||
-    queue.drainsAcceptedInternalTestQueues !== true
+    queue.drainsAcceptedInternalTestQueues !== true ||
+    queue.executesBrandedInternalTestCallbacks !== true ||
+    queue.recordsBrandedInternalTestContinuations !== true
   ) {
     return 'queue-drain-policy';
   }
@@ -401,6 +457,8 @@ function describeAcceptedInternalActQueue(queue) {
     queueKind: isObjectLike(queue) ? queue.kind : null,
     pendingCount: pendingCount,
     drainsAcceptedInternalTestQueues: rejectionReason === null,
+    executesBrandedInternalTestCallbacks: rejectionReason === null,
+    recordsBrandedInternalTestContinuations: rejectionReason === null,
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
     publicSchedulerTimingCompatibilityClaimed: false,
@@ -410,13 +468,66 @@ function describeAcceptedInternalActQueue(queue) {
   });
 }
 
-function summarizePrivateActQueueTask(task, index) {
+function summarizePrivateActQueueCallback(callback) {
+  return Object.freeze({
+    kind: callback.kind,
+    label: callback.label,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function summarizePrivateActQueueContinuation(task, index, continuation) {
+  return Object.freeze({
+    sourceIndex: index,
+    sourceLabel: task.label,
+    status: 'recorded-branded-internal-test-continuation',
+    continuation: summarizePrivateActQueueCallback(continuation),
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function summarizePrivateActQueueTask(task, index, recordedContinuations) {
+  var callback = task.callback;
+  var hasCallback = callback !== undefined && callback !== null;
+  var callbackSummary = null;
+  var callbackStatus = hasCallback
+    ? 'executed-branded-internal-test-callback'
+    : 'no-callback';
+  var continuationSummary = null;
+
+  if (hasCallback) {
+    callbackSummary = summarizePrivateActQueueCallback(callback);
+    var continuation = callback(false);
+    if (continuation !== undefined && continuation !== null) {
+      var rejectedContinuationReason =
+        getRejectedPrivateActQueueCallbackReason(
+          continuation,
+          index,
+          'continuation'
+        );
+      if (rejectedContinuationReason !== null) {
+        throw createPrivateActQueueFlushError(rejectedContinuationReason);
+      }
+      continuationSummary = summarizePrivateActQueueContinuation(
+        task,
+        index,
+        continuation
+      );
+      recordedContinuations.push(continuationSummary);
+    }
+  }
+
   return Object.freeze({
     index: index,
     label: task.label,
     recordKind: task.recordKind,
     taskKind: task.taskKind,
     continuationStatus: task.continuationStatus,
+    callbackStatus: callbackStatus,
+    callback: callbackSummary,
+    returnedContinuation: continuationSummary,
     executesQueuedWork: false,
     executesEffects: false
   });
@@ -435,14 +546,24 @@ function drainAcceptedInternalActQueue(queue) {
   var mockSchedulerPendingBefore = scheduledCallback !== null;
   var mockSchedulerNowBefore = currentMockTime;
   var drainedRecords = [];
+  var recordedContinuations = [];
 
   isPrivateActQueueDraining = true;
   try {
     while (queue.records.length > 0) {
+      var task = queue.records.shift();
+      var rejectedTaskReason = getRejectedPrivateActQueueTaskReason(
+        task,
+        drainedRecords.length
+      );
+      if (rejectedTaskReason !== null) {
+        throw createPrivateActQueueFlushError(rejectedTaskReason);
+      }
       drainedRecords.push(
         summarizePrivateActQueueTask(
-          queue.records.shift(),
-          drainedRecords.length
+          task,
+          drainedRecords.length,
+          recordedContinuations
         )
       );
     }
@@ -453,14 +574,24 @@ function drainAcceptedInternalActQueue(queue) {
       queueKind: queue.kind,
       pendingBefore: pendingBefore,
       drainedCount: drainedRecords.length,
+      executedCallbackCount: drainedRecords.filter(function (record) {
+        return (
+          record.callbackStatus ===
+          'executed-branded-internal-test-callback'
+        );
+      }).length,
+      recordedContinuationCount: recordedContinuations.length,
       remainingCount: queue.records.length,
       drainedRecords: Object.freeze(drainedRecords),
+      recordedContinuations: Object.freeze(recordedContinuations),
       mockSchedulerPendingWorkBefore: mockSchedulerPendingBefore,
       mockSchedulerPendingWorkAfter: scheduledCallback !== null,
       mockSchedulerNowBefore: mockSchedulerNowBefore,
       mockSchedulerNowAfter: currentMockTime,
       drainsPublicSchedulerTaskQueue: false,
       drainsPublicReactActQueue: false,
+      executesBrandedInternalTestCallbacks: true,
+      recordsBrandedInternalTestContinuations: true,
       publicSchedulerTimingCompatibilityClaimed: false,
       publicReactActCompatibilityClaimed: false,
       executesQueuedWork: false,
@@ -476,6 +607,7 @@ var privateActQueueFlushDiagnostics = Object.freeze({
   exportName: privateActQueueFlushDiagnosticsExport,
   queueKind: privateActQueueTestQueueKind,
   taskKind: privateActQueueTestTaskKind,
+  callbackKind: privateActQueueTestCallbackKind,
   queueVersion: privateActQueueTestQueueVersion,
   compatibilityTarget: schedulerCompatibilityTarget,
   reactCompatibilityTarget: reactCompatibilityTarget,
@@ -483,6 +615,8 @@ var privateActQueueFlushDiagnostics = Object.freeze({
   acceptedTaskKinds: acceptedActQueueTaskKinds,
   acceptedContinuationStatuses: acceptedActQueueContinuationStatuses,
   drainsAcceptedInternalTestQueues: true,
+  executesBrandedInternalTestCallbacks: true,
+  recordsBrandedInternalTestContinuations: true,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
   publicSchedulerTimingCompatibilityClaimed: false,

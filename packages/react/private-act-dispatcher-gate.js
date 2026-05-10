@@ -45,12 +45,17 @@ const privateActQueueTestQueueKind =
   'fast-react.react.private-act-queue-test-queue';
 const privateActQueueTestTaskKind =
   'fast-react.react.private-act-queue-test-task';
+const privateActQueueTestCallbackKind =
+  'fast-react.react.private-act-queue-test-callback';
 const privateActQueueTestQueueVersion = 1;
 const privateActQueueTestQueueBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-queue'
 );
 const privateActQueueTestTaskBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-task'
+);
+const privateActQueueTestCallbackBrand = Symbol.for(
+  'fast-react.react.private-act-queue-test-callback'
 );
 
 function isObjectLike(value) {
@@ -98,6 +103,8 @@ function isAcceptedActQueueMetadata(metadata) {
     metadata.committedHostOutputCanaryRequired === true &&
     metadata.drainsAcceptedInternalActContinuationRecords === true &&
     metadata.drainsPublicReactActQueue === false &&
+    metadata.executesBrandedInternalTestCallbacks === true &&
+    metadata.recordsBrandedInternalTestContinuations === true &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
     metadata.executesQueuedWork === false &&
@@ -142,11 +149,106 @@ function createActQueueMetadata(overrides = {}) {
     drainsPublicReactActQueue: false,
     acceptedPrivateActContinuationDrainRecords,
     acceptedPrivateActContinuationDrainStatuses,
+    executesBrandedInternalTestCallbacks: true,
+    recordsBrandedInternalTestContinuations: true,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
     executesQueuedWork: false,
     executesEffects: false,
     ...overrides
+  });
+}
+
+function isAcceptedInternalActQueueTestCallback(callback) {
+  return (
+    typeof callback === 'function' &&
+    callback[privateActQueueTestCallbackBrand] === true &&
+    callback.kind === privateActQueueTestCallbackKind &&
+    callback.version === privateActQueueTestQueueVersion &&
+    callback.compatibilityTarget === compatibilityTarget &&
+    callback.schedulerCompatibilityTarget === schedulerCompatibilityTarget &&
+    typeof callback.label === 'string' &&
+    callback.publicCompatibilityClaimed === false &&
+    callback.publicSchedulerTimingCompatibilityClaimed === false &&
+    callback.publicReactActCompatibilityClaimed === false &&
+    callback.executesQueuedWork === false &&
+    callback.executesEffects === false
+  );
+}
+
+function createInternalActQueueTestCallback(callback, options = {}) {
+  if (isAcceptedInternalActQueueTestCallback(callback)) {
+    return callback;
+  }
+  if (typeof callback !== 'function') {
+    throw new TypeError(
+      'createInternalActQueueTestCallback requires a function callback.'
+    );
+  }
+
+  const normalizedOptions =
+    typeof options === 'string'
+      ? {
+          label: options
+        }
+      : options ?? {};
+  const testCallback = function () {
+    return callback.apply(this, arguments);
+  };
+
+  Object.defineProperties(testCallback, {
+    [privateActQueueTestCallbackBrand]: {
+      value: true
+    },
+    kind: {
+      value: privateActQueueTestCallbackKind
+    },
+    version: {
+      value: privateActQueueTestQueueVersion
+    },
+    compatibilityTarget: {
+      value: compatibilityTarget
+    },
+    schedulerCompatibilityTarget: {
+      value: schedulerCompatibilityTarget
+    },
+    label: {
+      value: String(
+        normalizedOptions.label ??
+          callback.displayName ??
+          callback.name ??
+          'act-queue-test-callback'
+      )
+    },
+    publicCompatibilityClaimed: {
+      value: false
+    },
+    publicSchedulerTimingCompatibilityClaimed: {
+      value: false
+    },
+    publicReactActCompatibilityClaimed: {
+      value: false
+    },
+    executesQueuedWork: {
+      value: false
+    },
+    executesEffects: {
+      value: false
+    }
+  });
+
+  return Object.freeze(testCallback);
+}
+
+function normalizeInternalActQueueTestCallback(callback, label) {
+  if (callback === undefined || callback === null) {
+    return null;
+  }
+  if (isAcceptedInternalActQueueTestCallback(callback)) {
+    return callback;
+  }
+  return createInternalActQueueTestCallback(callback, {
+    label
   });
 }
 
@@ -165,6 +267,9 @@ function isAcceptedInternalActQueueTestTask(task) {
       acceptedActQueueContinuationStatuses
     ) &&
     typeof task.label === 'string' &&
+    (task.callback === undefined ||
+      task.callback === null ||
+      isAcceptedInternalActQueueTestCallback(task.callback)) &&
     task.publicCompatibilityClaimed === false &&
     task.publicSchedulerTimingCompatibilityClaimed === false &&
     task.publicReactActCompatibilityClaimed === false &&
@@ -179,6 +284,11 @@ function createInternalActQueueTestTask(options = {}) {
       ? {
           label: options
         }
+      : typeof options === 'function'
+        ? {
+            label: options.displayName ?? options.name,
+            callback: options
+          }
       : options ?? {};
   const task = {
     kind: privateActQueueTestTaskKind,
@@ -197,6 +307,14 @@ function createInternalActQueueTestTask(options = {}) {
     executesQueuedWork: false,
     executesEffects: false
   };
+
+  const callback = normalizeInternalActQueueTestCallback(
+    normalizedOptions.callback,
+    `${task.label}:callback`
+  );
+  if (callback !== null) {
+    task.callback = callback;
+  }
 
   Object.defineProperty(task, privateActQueueTestTaskBrand, {
     value: true
@@ -225,6 +343,8 @@ function isAcceptedInternalActQueueTestQueue(queue) {
     queue.queueFlushingReady === false &&
     queue.privateTestQueueFlushDiagnosticsReady === true &&
     queue.drainsAcceptedInternalTestQueues === true &&
+    queue.executesBrandedInternalTestCallbacks === true &&
+    queue.recordsBrandedInternalTestContinuations === true &&
     queue.publicSchedulerTimingCompatibilityClaimed === false &&
     queue.publicReactActCompatibilityClaimed === false &&
     queue.executesQueuedWork === false &&
@@ -245,6 +365,8 @@ function createInternalActQueueTestQueue(records = []) {
     queueFlushingReady: false,
     privateTestQueueFlushDiagnosticsReady: true,
     drainsAcceptedInternalTestQueues: true,
+    executesBrandedInternalTestCallbacks: true,
+    recordsBrandedInternalTestContinuations: true,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
     executesQueuedWork: false,
@@ -308,6 +430,7 @@ module.exports = Object.freeze({
   requiredContinuationStatuses: acceptedActQueueContinuationStatuses,
   internalTestQueueKind: privateActQueueTestQueueKind,
   internalTestTaskKind: privateActQueueTestTaskKind,
+  internalTestCallbackKind: privateActQueueTestCallbackKind,
   internalTestQueueVersion: privateActQueueTestQueueVersion,
   publicCompatibilityClaimed: false,
   queueFlushingReady: false,
@@ -324,15 +447,19 @@ module.exports = Object.freeze({
   drainsPublicReactActQueue: false,
   acceptedPrivateActContinuationDrainRecords,
   acceptedPrivateActContinuationDrainStatuses,
+  executesBrandedInternalTestCallbacks: true,
+  recordsBrandedInternalTestContinuations: true,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
   executesQueuedWork: false,
   executesEffects: false,
   createActQueueMetadata,
+  createInternalActQueueTestCallback,
   createInternalActQueueTestQueue,
   createInternalActQueueTestTask,
   getPrivateActQueueMetadata,
   isAcceptedActQueueMetadata,
+  isAcceptedInternalActQueueTestCallback,
   isAcceptedInternalActQueueTestQueue,
   isAcceptedInternalActQueueTestTask,
   isPrivateActDispatcher,
