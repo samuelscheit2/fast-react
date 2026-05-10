@@ -164,6 +164,11 @@ test("DOM text-content dual-run gate compares only admitted private helper rows"
     DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS
   );
   assert.ok(
+    gate.admittedPrivateShouldSetRows.some(
+      (row) => row.scenarioId === "should-set-bigint-child"
+    )
+  );
+  assert.ok(
     gate.admittedPrivateShouldSetRows.every(
       (row) =>
         row.gateStatus === DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS
@@ -171,14 +176,18 @@ test("DOM text-content dual-run gate compares only admitted private helper rows"
   );
   assert.deepEqual(
     gate.skippedUnsupportedPrivateShouldSetRows.map((row) => row.scenarioId),
-    DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS.map(
-      (scenario) => scenario.scenarioId
-    )
+    ["should-set-textarea-special-case", "should-set-noscript-special-case"]
   );
   assert.ok(
     gate.skippedUnsupportedPrivateShouldSetRows.every(
       (row) =>
-        row.gateStatus === DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS
+        row.gateStatus ===
+          DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS &&
+        row.checkedResult.status === "ok" &&
+        row.checkedResult.value === true &&
+        row.localResult.status === "ok" &&
+        row.localResult.value === false &&
+        row.firstDifferencePath === "$.value"
     )
   );
   assert.ok(
@@ -209,6 +218,34 @@ test("DOM text-content dual-run gate fails closed on admitted private mismatches
   assert.equal(
     mismatchGate.failures[0].gateStatus,
     "admitted-private-should-set-output-mismatch"
+  );
+
+  const unsupportedMatchObservations =
+    runLocalDomTextContentShouldSetObservations();
+  for (const scenarioId of [
+    "should-set-textarea-special-case",
+    "should-set-noscript-special-case"
+  ]) {
+    const observation = unsupportedMatchObservations.observations.find(
+      (candidate) => candidate.scenarioId === scenarioId
+    );
+    assert.ok(observation, scenarioId);
+    observation.result.value = true;
+  }
+  const unsupportedMatchGate = evaluateDomTextContentConformanceGate({
+    checkedOracle: oracle,
+    localShouldSetTextContentObservations: unsupportedMatchObservations
+  });
+  assert.equal(unsupportedMatchGate.ok, false);
+  assert.deepEqual(
+    unsupportedMatchGate.failures
+      .filter(
+        (failure) =>
+          failure.gateStatus ===
+          "private-should-set-row-skipped-despite-local-match"
+      )
+      .map((failure) => failure.scenarioId),
+    ["should-set-textarea-special-case", "should-set-noscript-special-case"]
   );
 
   const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
