@@ -14,7 +14,7 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
-use crate::concurrent_updates::root_for_updated_fiber;
+use crate::concurrent_updates::{mark_update_lane_from_fiber_to_root, root_for_updated_fiber};
 use crate::root_commit::PendingPassiveCommitHandoff;
 use crate::scheduler_bridge::{SchedulerActContinuationRecord, SchedulerActContinuationStatus};
 use crate::{
@@ -29,6 +29,112 @@ use crate::{
 };
 
 pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootErrorCaptureSource {
+    PassiveEffectDestroy,
+    PassiveEffectMountCreate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootErrorCaptureScheduleRecord {
+    source: RootErrorCaptureSource,
+    root: FiberRootId,
+    root_fiber: FiberId,
+    source_fiber: FiberId,
+    lane: Lane,
+    pending_lanes_before: Lanes,
+    pending_lanes_after: Lanes,
+    scheduled_root: ScheduledRootUpdateResult,
+    on_uncaught_error: RootErrorCallbackHandle,
+    on_caught_error: RootErrorCallbackHandle,
+    on_recoverable_error: RootRecoverableErrorCallbackHandle,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root error capture metadata is reserved for passive error workers"
+)]
+impl RootErrorCaptureScheduleRecord {
+    #[must_use]
+    pub(crate) const fn source(self) -> RootErrorCaptureSource {
+        self.source
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn root_fiber(self) -> FiberId {
+        self.root_fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn source_fiber(self) -> FiberId {
+        self.source_fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn lane(self) -> Lane {
+        self.lane
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before(self) -> Lanes {
+        self.pending_lanes_before
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after(self) -> Lanes {
+        self.pending_lanes_after
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled_root(self) -> ScheduledRootUpdateResult {
+        self.scheduled_root
+    }
+
+    #[must_use]
+    pub(crate) const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
+        self.on_uncaught_error
+    }
+
+    #[must_use]
+    pub(crate) const fn on_caught_error(self) -> RootErrorCallbackHandle {
+        self.on_caught_error
+    }
+
+    #[must_use]
+    pub(crate) const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
+        self.on_recoverable_error
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_update_scheduled(self) -> bool {
+        self.pending_lanes_after.contains_lane(self.lane)
+            && self.scheduled_root.root().raw() == self.root.raw()
+            && self.scheduled_root.might_have_pending_sync_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_error_aggregation_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(self) -> bool {
+        self.on_uncaught_error.is_some()
+            || self.on_caught_error.is_some()
+            || self.on_recoverable_error.is_some()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootSchedulerState {
@@ -1004,6 +1110,56 @@ pub fn ensure_root_is_scheduled<H: HostTypes>(
 ) -> Result<ScheduledRootUpdateResult, RootSchedulerError> {
     validate_schedule_record(store, record)?;
     ensure_root_schedule_entry(store, record.root())
+}
+
+pub(crate) fn capture_passive_effect_root_error<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    source_fiber: FiberId,
+    source: RootErrorCaptureSource,
+) -> Result<RootErrorCaptureScheduleRecord, RootSchedulerError> {
+    let (
+        root_fiber,
+        pending_lanes_before,
+        on_uncaught_error,
+        on_caught_error,
+        on_recoverable_error,
+    ) = {
+        let root = store.root(root_id)?;
+        (
+            root.current(),
+            root.lanes().pending_lanes(),
+            root.options().on_uncaught_error(),
+            root.options().on_caught_error(),
+            root.options().on_recoverable_error(),
+        )
+    };
+    let lane = Lane::SYNC;
+    let marked_root = mark_update_lane_from_fiber_to_root(store, source_fiber, lane)?;
+    if marked_root != root_id {
+        return Err(RootSchedulerError::RescheduleRecordWrongRoot {
+            expected: root_id,
+            actual: marked_root,
+            fiber: source_fiber,
+        });
+    }
+
+    let scheduled_root = ensure_root_schedule_entry(store, root_id)?;
+    let pending_lanes_after = store.root(root_id)?.lanes().pending_lanes();
+
+    Ok(RootErrorCaptureScheduleRecord {
+        source,
+        root: root_id,
+        root_fiber,
+        source_fiber,
+        lane,
+        pending_lanes_before,
+        pending_lanes_after,
+        scheduled_root,
+        on_uncaught_error,
+        on_caught_error,
+        on_recoverable_error,
+    })
 }
 
 pub(crate) fn ensure_root_is_rescheduled<H: HostTypes>(
@@ -2796,6 +2952,91 @@ mod tests {
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_passive_root_error_capture_schedules_sync_metadata_without_callbacks() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(
+                FakeContainer::new(1),
+                RootOptions::new()
+                    .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(701))
+                    .with_on_caught_error(RootErrorCallbackHandle::from_raw(702))
+                    .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(703)),
+            )
+            .unwrap();
+        let current = store.root(root_id).unwrap().current();
+        let microtask_count = store.scheduler_bridge().microtask_requests().len();
+
+        let first = capture_passive_effect_root_error(
+            &mut store,
+            root_id,
+            current,
+            RootErrorCaptureSource::PassiveEffectDestroy,
+        )
+        .unwrap();
+
+        assert_eq!(first.source(), RootErrorCaptureSource::PassiveEffectDestroy);
+        assert_eq!(first.root(), root_id);
+        assert_eq!(first.root_fiber(), current);
+        assert_eq!(first.source_fiber(), current);
+        assert_eq!(first.lane(), Lane::SYNC);
+        assert_eq!(first.pending_lanes_before(), Lanes::NO);
+        assert_eq!(first.pending_lanes_after(), Lanes::SYNC);
+        assert_eq!(
+            first.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(701)
+        );
+        assert_eq!(
+            first.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(702)
+        );
+        assert_eq!(
+            first.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(703)
+        );
+        assert!(first.root_error_update_scheduled());
+        assert!(first.has_configured_error_callback());
+        assert!(!first.root_error_callbacks_invoked());
+        assert!(!first.public_act_error_aggregation_enabled());
+        assert!(first.scheduled_root().inserted());
+        assert_eq!(first.scheduled_root().root(), root_id);
+        assert_eq!(
+            store.scheduler_bridge().microtask_requests().len(),
+            microtask_count + 1
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+
+        let second = capture_passive_effect_root_error(
+            &mut store,
+            root_id,
+            current,
+            RootErrorCaptureSource::PassiveEffectMountCreate,
+        )
+        .unwrap();
+
+        assert_eq!(
+            second.source(),
+            RootErrorCaptureSource::PassiveEffectMountCreate
+        );
+        assert_eq!(second.pending_lanes_before(), Lanes::SYNC);
+        assert_eq!(second.pending_lanes_after(), Lanes::SYNC);
+        assert!(!second.scheduled_root().inserted());
+        assert!(second.root_error_update_scheduled());
+        assert!(!second.root_error_callbacks_invoked());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::SYNC
+        );
+        assert_eq!(
+            store.scheduler_bridge().microtask_requests().len(),
+            microtask_count + 1
+        );
+        assert!(host.operations().is_empty());
     }
 
     #[test]

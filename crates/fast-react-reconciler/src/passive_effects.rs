@@ -26,7 +26,8 @@ use crate::root_config::{
     PendingPassiveUnmountOrigin, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
 };
 use crate::root_scheduler::{
-    SyncFlushPostPassiveContinuationExecutionGateRecord,
+    RootErrorCaptureScheduleRecord, RootErrorCaptureSource,
+    SyncFlushPostPassiveContinuationExecutionGateRecord, capture_passive_effect_root_error,
     sync_flush_post_passive_continuation_execution_gate,
 };
 use crate::sync_flush::{
@@ -690,6 +691,7 @@ pub(crate) const PASSIVE_EFFECT_MOUNT_CREATE_CALLBACK_EXECUTION_GATE_BLOCKERS:
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PassiveEffectRootErrorPropagationStatus {
     Blocked,
+    CapturedForRootUpdate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -708,12 +710,19 @@ pub(crate) const PASSIVE_EFFECT_ROOT_ERROR_PROPAGATION_BLOCKERS:
     PassiveEffectRootErrorPropagationBlocker::PublicActErrorAggregation,
 ];
 
+pub(crate) const PASSIVE_EFFECT_ROOT_ERROR_CALLBACK_BLOCKERS:
+    [PassiveEffectRootErrorPropagationBlocker; 2] = [
+    PassiveEffectRootErrorPropagationBlocker::RootErrorCallbackInvocation,
+    PassiveEffectRootErrorPropagationBlocker::PublicActErrorAggregation,
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PassiveEffectRootErrorPropagationRecord {
     root: FiberRootId,
     on_uncaught_error: RootErrorCallbackHandle,
     on_caught_error: RootErrorCallbackHandle,
     on_recoverable_error: RootRecoverableErrorCallbackHandle,
+    scheduled_root_error_count: usize,
 }
 
 impl PassiveEffectRootErrorPropagationRecord {
@@ -739,17 +748,30 @@ impl PassiveEffectRootErrorPropagationRecord {
 
     #[must_use]
     pub const fn status(self) -> PassiveEffectRootErrorPropagationStatus {
-        PassiveEffectRootErrorPropagationStatus::Blocked
+        if self.root_error_update_scheduled() {
+            PassiveEffectRootErrorPropagationStatus::CapturedForRootUpdate
+        } else {
+            PassiveEffectRootErrorPropagationStatus::Blocked
+        }
     }
 
     #[must_use]
-    pub const fn blockers(self) -> &'static [PassiveEffectRootErrorPropagationBlocker; 4] {
-        &PASSIVE_EFFECT_ROOT_ERROR_PROPAGATION_BLOCKERS
+    pub const fn blockers(self) -> &'static [PassiveEffectRootErrorPropagationBlocker] {
+        if self.root_error_update_scheduled() {
+            &PASSIVE_EFFECT_ROOT_ERROR_CALLBACK_BLOCKERS
+        } else {
+            &PASSIVE_EFFECT_ROOT_ERROR_PROPAGATION_BLOCKERS
+        }
     }
 
     #[must_use]
     pub const fn root_error_update_scheduled(self) -> bool {
-        false
+        self.scheduled_root_error_count > 0
+    }
+
+    #[must_use]
+    pub const fn scheduled_root_error_count(self) -> usize {
+        self.scheduled_root_error_count
     }
 
     #[must_use]
@@ -767,6 +789,12 @@ impl PassiveEffectRootErrorPropagationRecord {
         self.on_uncaught_error.is_some()
             || self.on_caught_error.is_some()
             || self.on_recoverable_error.is_some()
+    }
+
+    #[must_use]
+    const fn with_scheduled_root_error_count(mut self, count: usize) -> Self {
+        self.scheduled_root_error_count = count;
+        self
     }
 }
 
@@ -808,6 +836,128 @@ impl PassiveEffectCallbackExecutionErrorHandle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectRootErrorCaptureRecord {
+    capture_order: usize,
+    kind: PassiveEffectCallbackExecutionErrorKind,
+    root: FiberRootId,
+    finished_work: FiberId,
+    committed_lanes: Lanes,
+    fiber: FiberId,
+    effect_lanes: Lanes,
+    phase: PendingPassiveEffectPhase,
+    pending_order: PendingPassiveEffectOrder,
+    flush_index: usize,
+    effect_index: Option<usize>,
+    effect: Option<HookEffectId>,
+    instance: Option<HookEffectInstanceId>,
+    callback: HookEffectCallbackHandle,
+    error: PassiveEffectCallbackExecutionErrorHandle,
+    schedule: RootErrorCaptureScheduleRecord,
+}
+
+impl PassiveEffectRootErrorCaptureRecord {
+    #[must_use]
+    pub const fn capture_order(self) -> usize {
+        self.capture_order
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> PassiveEffectCallbackExecutionErrorKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn committed_lanes(self) -> Lanes {
+        self.committed_lanes
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn effect_lanes(self) -> Lanes {
+        self.effect_lanes
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> PendingPassiveEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn pending_order(self) -> PendingPassiveEffectOrder {
+        self.pending_order
+    }
+
+    #[must_use]
+    pub const fn flush_index(self) -> usize {
+        self.flush_index
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> Option<usize> {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> Option<HookEffectId> {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn effect_instance(self) -> Option<HookEffectInstanceId> {
+        self.instance
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> HookEffectCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn error(self) -> PassiveEffectCallbackExecutionErrorHandle {
+        self.error
+    }
+
+    #[must_use]
+    pub const fn schedule(self) -> RootErrorCaptureScheduleRecord {
+        self.schedule
+    }
+
+    #[must_use]
+    pub const fn root_error_update_scheduled(self) -> bool {
+        self.schedule.root_error_update_scheduled()
+    }
+
+    #[must_use]
+    pub const fn root_error_callbacks_invoked(self) -> bool {
+        self.schedule.root_error_callbacks_invoked()
+    }
+
+    #[must_use]
+    pub const fn public_act_error_aggregation_enabled(self) -> bool {
+        self.schedule.public_act_error_aggregation_enabled()
+    }
+
+    #[must_use]
+    pub const fn has_configured_error_callback(self) -> bool {
+        self.schedule.has_configured_error_callback()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PassiveEffectCallbackExecutionErrorRecord {
     error_order: usize,
     kind: PassiveEffectCallbackExecutionErrorKind,
@@ -824,6 +974,7 @@ pub(crate) struct PassiveEffectCallbackExecutionErrorRecord {
     instance: Option<HookEffectInstanceId>,
     callback: HookEffectCallbackHandle,
     error: PassiveEffectCallbackExecutionErrorHandle,
+    root_error_capture: PassiveEffectRootErrorCaptureRecord,
     root_error_propagation: PassiveEffectRootErrorPropagationRecord,
 }
 
@@ -904,6 +1055,11 @@ impl PassiveEffectCallbackExecutionErrorRecord {
     }
 
     #[must_use]
+    pub const fn root_error_capture(self) -> PassiveEffectRootErrorCaptureRecord {
+        self.root_error_capture
+    }
+
+    #[must_use]
     pub const fn root_error_propagation(self) -> PassiveEffectRootErrorPropagationRecord {
         self.root_error_propagation
     }
@@ -921,6 +1077,7 @@ pub(crate) struct PassiveEffectsFlushResult {
     destroy_callback_errors: Vec<PassiveEffectDestroyCallbackErrorRecord>,
     mount_create_callback_executions: Vec<PassiveEffectMountCreateCallbackExecutionRecord>,
     mount_create_callback_errors: Vec<PassiveEffectMountCreateCallbackErrorRecord>,
+    root_error_captures: Vec<PassiveEffectRootErrorCaptureRecord>,
     callback_execution_errors: Vec<PassiveEffectCallbackExecutionErrorRecord>,
 }
 
@@ -978,6 +1135,11 @@ impl PassiveEffectsFlushResult {
     }
 
     #[must_use]
+    pub fn root_error_captures(&self) -> &[PassiveEffectRootErrorCaptureRecord] {
+        &self.root_error_captures
+    }
+
+    #[must_use]
     pub fn callback_execution_errors(&self) -> &[PassiveEffectCallbackExecutionErrorRecord] {
         &self.callback_execution_errors
     }
@@ -1010,6 +1172,11 @@ impl PassiveEffectsFlushResult {
     #[must_use]
     pub fn did_record_callback_execution_errors(&self) -> bool {
         !self.callback_execution_errors.is_empty()
+    }
+
+    #[must_use]
+    pub fn did_schedule_root_error_captures(&self) -> bool {
+        !self.root_error_captures.is_empty()
     }
 
     #[must_use]
@@ -1614,6 +1781,7 @@ impl PassiveEffectsFlushWithSyncFlushContinuationResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PassiveEffectsFlushError {
     FiberRootStore(FiberRootStoreError),
+    RootScheduler(RootSchedulerError),
     PendingPassiveRootMismatch {
         commit_root: FiberRootId,
         pending_root: Option<FiberRootId>,
@@ -1684,6 +1852,7 @@ impl Display for PassiveEffectsFlushError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::PendingPassiveRootMismatch {
                 commit_root,
                 pending_root,
@@ -1843,6 +2012,7 @@ impl Error for PassiveEffectsFlushError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FiberRootStore(error) => Some(error),
+            Self::RootScheduler(error) => Some(error),
             Self::PendingPassiveRootMismatch { .. }
             | Self::PendingPassiveFinishedWorkMismatch { .. }
             | Self::PendingPassiveLanesMismatch { .. }
@@ -1862,6 +2032,12 @@ impl Error for PassiveEffectsFlushError {
 impl From<FiberRootStoreError> for PassiveEffectsFlushError {
     fn from(error: FiberRootStoreError) -> Self {
         Self::FiberRootStore(error)
+    }
+}
+
+impl From<RootSchedulerError> for PassiveEffectsFlushError {
+    fn from(error: RootSchedulerError) -> Self {
+        Self::RootScheduler(error)
     }
 }
 
@@ -2076,6 +2252,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             destroy_callback_errors: Vec::new(),
             mount_create_callback_executions: Vec::new(),
             mount_create_callback_errors: Vec::new(),
+            root_error_captures: Vec::new(),
             callback_execution_errors: Vec::new(),
         });
     };
@@ -2089,6 +2266,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
                 on_uncaught_error: root.options().on_uncaught_error(),
                 on_caught_error: root.options().on_caught_error(),
                 on_recoverable_error: root.options().on_recoverable_error(),
+                scheduled_root_error_count: 0,
             },
         )
     };
@@ -2123,9 +2301,19 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             }
             None => (Vec::new(), Vec::new()),
         };
-    let callback_execution_errors = build_passive_callback_execution_error_records(
+    let callback_execution_error_metadata = collect_passive_callback_execution_error_metadata(
         &destroy_callback_errors,
         &mount_create_callback_errors,
+    );
+    let root_error_captures = schedule_passive_callback_execution_root_error_captures(
+        store,
+        &callback_execution_error_metadata,
+    )?;
+    let root_error_propagation =
+        root_error_propagation.with_scheduled_root_error_count(root_error_captures.len());
+    let callback_execution_errors = build_passive_callback_execution_error_records(
+        &callback_execution_error_metadata,
+        &root_error_captures,
         root_error_propagation,
     );
 
@@ -2140,6 +2328,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         destroy_callback_errors,
         mount_create_callback_executions,
         mount_create_callback_errors,
+        root_error_captures,
         callback_execution_errors,
     })
 }
@@ -2437,16 +2626,32 @@ fn execute_passive_destroy_callbacks(
     (executions, errors)
 }
 
-fn build_passive_callback_execution_error_records(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PassiveEffectCallbackExecutionErrorMetadata {
+    kind: PassiveEffectCallbackExecutionErrorKind,
+    root: FiberRootId,
+    finished_work: FiberId,
+    committed_lanes: Lanes,
+    fiber: FiberId,
+    effect_lanes: Lanes,
+    phase: PendingPassiveEffectPhase,
+    pending_order: PendingPassiveEffectOrder,
+    flush_index: usize,
+    effect_index: Option<usize>,
+    effect: Option<HookEffectId>,
+    instance: Option<HookEffectInstanceId>,
+    callback: HookEffectCallbackHandle,
+    error: PassiveEffectCallbackExecutionErrorHandle,
+}
+
+fn collect_passive_callback_execution_error_metadata(
     destroy_errors: &[PassiveEffectDestroyCallbackErrorRecord],
     mount_create_errors: &[PassiveEffectMountCreateCallbackErrorRecord],
-    root_error_propagation: PassiveEffectRootErrorPropagationRecord,
-) -> Vec<PassiveEffectCallbackExecutionErrorRecord> {
+) -> Vec<PassiveEffectCallbackExecutionErrorMetadata> {
     let mut records = Vec::with_capacity(destroy_errors.len() + mount_create_errors.len());
     for error in destroy_errors {
         let execution = error.execution();
-        records.push(PassiveEffectCallbackExecutionErrorRecord {
-            error_order: 0,
+        records.push(PassiveEffectCallbackExecutionErrorMetadata {
             kind: PassiveEffectCallbackExecutionErrorKind::Destroy,
             root: execution.root(),
             finished_work: execution.finished_work(),
@@ -2461,13 +2666,11 @@ fn build_passive_callback_execution_error_records(
             instance: execution.effect_instance(),
             callback: execution.destroy_callback(),
             error: PassiveEffectCallbackExecutionErrorHandle::Destroy(error.error()),
-            root_error_propagation,
         });
     }
     for error in mount_create_errors {
         let execution = error.execution();
-        records.push(PassiveEffectCallbackExecutionErrorRecord {
-            error_order: 0,
+        records.push(PassiveEffectCallbackExecutionErrorMetadata {
             kind: PassiveEffectCallbackExecutionErrorKind::MountCreate,
             root: execution.root(),
             finished_work: execution.finished_work(),
@@ -2482,15 +2685,88 @@ fn build_passive_callback_execution_error_records(
             instance: execution.effect_instance(),
             callback: execution.create_callback(),
             error: PassiveEffectCallbackExecutionErrorHandle::MountCreate(error.error()),
-            root_error_propagation,
         });
     }
 
-    records.sort_by_key(|record| (record.pending_order(), record.flush_index()));
-    for (error_order, record) in records.iter_mut().enumerate() {
-        record.error_order = error_order;
-    }
+    records.sort_by_key(|record| (record.pending_order, record.flush_index));
     records
+}
+
+fn schedule_passive_callback_execution_root_error_captures<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    records: &[PassiveEffectCallbackExecutionErrorMetadata],
+) -> Result<Vec<PassiveEffectRootErrorCaptureRecord>, PassiveEffectsFlushError> {
+    records
+        .iter()
+        .enumerate()
+        .map(|(capture_order, record)| {
+            let schedule = capture_passive_effect_root_error(
+                store,
+                record.root,
+                record.fiber,
+                match record.kind {
+                    PassiveEffectCallbackExecutionErrorKind::Destroy => {
+                        RootErrorCaptureSource::PassiveEffectDestroy
+                    }
+                    PassiveEffectCallbackExecutionErrorKind::MountCreate => {
+                        RootErrorCaptureSource::PassiveEffectMountCreate
+                    }
+                },
+            )?;
+
+            Ok(PassiveEffectRootErrorCaptureRecord {
+                capture_order,
+                kind: record.kind,
+                root: record.root,
+                finished_work: record.finished_work,
+                committed_lanes: record.committed_lanes,
+                fiber: record.fiber,
+                effect_lanes: record.effect_lanes,
+                phase: record.phase,
+                pending_order: record.pending_order,
+                flush_index: record.flush_index,
+                effect_index: record.effect_index,
+                effect: record.effect,
+                instance: record.instance,
+                callback: record.callback,
+                error: record.error,
+                schedule,
+            })
+        })
+        .collect()
+}
+
+fn build_passive_callback_execution_error_records(
+    records: &[PassiveEffectCallbackExecutionErrorMetadata],
+    root_error_captures: &[PassiveEffectRootErrorCaptureRecord],
+    root_error_propagation: PassiveEffectRootErrorPropagationRecord,
+) -> Vec<PassiveEffectCallbackExecutionErrorRecord> {
+    records
+        .iter()
+        .zip(root_error_captures)
+        .enumerate()
+        .map(|(error_order, (record, root_error_capture))| {
+            PassiveEffectCallbackExecutionErrorRecord {
+                error_order,
+                kind: record.kind,
+                root: record.root,
+                finished_work: record.finished_work,
+                committed_lanes: record.committed_lanes,
+                fiber: record.fiber,
+                effect_lanes: record.effect_lanes,
+                phase: record.phase,
+                pending_order: record.pending_order,
+                flush_index: record.flush_index,
+                effect_index: record.effect_index,
+                effect: record.effect,
+                instance: record.instance,
+                callback: record.callback,
+                error: record.error,
+                root_error_capture: *root_error_capture,
+                root_error_propagation,
+            }
+        })
+        .collect()
 }
 
 fn execute_passive_mount_create_callbacks(
@@ -2560,7 +2836,7 @@ mod tests {
     };
     use fast_react_core::{
         DependenciesHandle, FiberTag, FiberTypeHandle, HookEffectCallbackHandle,
-        HookEffectDependencies, PropsHandle,
+        HookEffectDependencies, Lane, PropsHandle,
     };
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
@@ -4786,6 +5062,7 @@ mod tests {
         assert_eq!(flush.destroy_callback_errors().len(), 1);
         assert_eq!(flush.mount_create_callback_errors().len(), 1);
         assert!(flush.did_record_callback_execution_errors());
+        assert!(flush.did_schedule_root_error_captures());
         assert!(flush.did_record_blocked_root_error_propagation());
         assert!(!flush.public_effect_execution_enabled());
         assert!(!flush.public_act_compatibility_claimed());
@@ -4807,21 +5084,26 @@ mod tests {
         );
         assert_eq!(
             root_error.status(),
-            PassiveEffectRootErrorPropagationStatus::Blocked
+            PassiveEffectRootErrorPropagationStatus::CapturedForRootUpdate
         );
         assert_eq!(
             root_error.blockers(),
-            &PASSIVE_EFFECT_ROOT_ERROR_PROPAGATION_BLOCKERS
+            &PASSIVE_EFFECT_ROOT_ERROR_CALLBACK_BLOCKERS
         );
         assert!(root_error.has_configured_error_callback());
-        assert!(!root_error.root_error_update_scheduled());
+        assert!(root_error.root_error_update_scheduled());
+        assert_eq!(root_error.scheduled_root_error_count(), 2);
         assert!(!root_error.root_error_callbacks_invoked());
         assert!(!root_error.public_act_error_aggregation_enabled());
 
         let errors = flush.callback_execution_errors();
+        let captures = flush.root_error_captures();
         assert_eq!(errors.len(), 2);
+        assert_eq!(captures.len(), 2);
         assert_eq!(errors[0].error_order(), 0);
         assert_eq!(errors[1].error_order(), 1);
+        assert_eq!(captures[0].capture_order(), 0);
+        assert_eq!(captures[1].capture_order(), 1);
         assert_eq!(
             errors[0].kind(),
             PassiveEffectCallbackExecutionErrorKind::Destroy
@@ -4873,6 +5155,110 @@ mod tests {
         assert!(errors[1].error().is_some());
         assert_eq!(errors[0].root_error_propagation(), root_error);
         assert_eq!(errors[1].root_error_propagation(), root_error);
+        assert_eq!(errors[0].root_error_capture(), captures[0]);
+        assert_eq!(errors[1].root_error_capture(), captures[1]);
+        assert_eq!(
+            captures[0].kind(),
+            PassiveEffectCallbackExecutionErrorKind::Destroy
+        );
+        assert_eq!(
+            captures[1].kind(),
+            PassiveEffectCallbackExecutionErrorKind::MountCreate
+        );
+        assert_eq!(captures[0].root(), root_id);
+        assert_eq!(captures[1].root(), root_id);
+        assert_eq!(captures[0].finished_work(), finished_work);
+        assert_eq!(captures[1].finished_work(), finished_work);
+        assert_eq!(captures[0].committed_lanes(), Lanes::DEFAULT);
+        assert_eq!(captures[1].committed_lanes(), Lanes::DEFAULT);
+        assert_eq!(captures[0].fiber(), finished_function);
+        assert_eq!(captures[1].fiber(), finished_function);
+        assert_eq!(captures[0].effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(captures[1].effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(captures[0].phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(captures[1].phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(captures[0].pending_order(), errors[0].pending_order());
+        assert_eq!(captures[1].pending_order(), errors[1].pending_order());
+        assert_eq!(captures[0].flush_index(), 0);
+        assert_eq!(captures[1].flush_index(), 1);
+        assert_eq!(captures[0].effect_index(), Some(0));
+        assert_eq!(captures[1].effect_index(), Some(0));
+        assert_eq!(captures[0].effect(), Some(registration.effect()));
+        assert_eq!(captures[1].effect(), Some(registration.effect()));
+        assert_eq!(captures[0].effect_instance(), Some(previous.instance()));
+        assert_eq!(captures[1].effect_instance(), Some(registration.instance()));
+        assert_eq!(captures[0].callback(), callback(1008));
+        assert_eq!(captures[1].callback(), callback(1011));
+        assert_eq!(
+            captures[0].error(),
+            PassiveEffectCallbackExecutionErrorHandle::Destroy(destroy_error(1013))
+        );
+        assert_eq!(
+            captures[1].error(),
+            PassiveEffectCallbackExecutionErrorHandle::MountCreate(mount_create_error(1014))
+        );
+        assert!(captures[0].root_error_update_scheduled());
+        assert!(captures[1].root_error_update_scheduled());
+        assert!(!captures[0].root_error_callbacks_invoked());
+        assert!(!captures[1].root_error_callbacks_invoked());
+        assert!(!captures[0].public_act_error_aggregation_enabled());
+        assert!(!captures[1].public_act_error_aggregation_enabled());
+        assert!(captures[0].has_configured_error_callback());
+        assert!(captures[1].has_configured_error_callback());
+        let first_schedule = captures[0].schedule();
+        let second_schedule = captures[1].schedule();
+        assert_eq!(
+            first_schedule.source(),
+            RootErrorCaptureSource::PassiveEffectDestroy
+        );
+        assert_eq!(
+            second_schedule.source(),
+            RootErrorCaptureSource::PassiveEffectMountCreate
+        );
+        assert_eq!(first_schedule.root(), root_id);
+        assert_eq!(second_schedule.root(), root_id);
+        assert_eq!(first_schedule.root_fiber(), finished_work);
+        assert_eq!(second_schedule.root_fiber(), finished_work);
+        assert_eq!(first_schedule.source_fiber(), finished_function);
+        assert_eq!(second_schedule.source_fiber(), finished_function);
+        assert_eq!(first_schedule.lane(), Lane::SYNC);
+        assert_eq!(second_schedule.lane(), Lane::SYNC);
+        assert_eq!(first_schedule.pending_lanes_before(), Lanes::NO);
+        assert!(
+            first_schedule
+                .pending_lanes_after()
+                .contains_lane(Lane::SYNC)
+        );
+        assert!(
+            second_schedule
+                .pending_lanes_before()
+                .contains_lane(Lane::SYNC)
+        );
+        assert!(
+            second_schedule
+                .pending_lanes_after()
+                .contains_lane(Lane::SYNC)
+        );
+        assert_eq!(
+            first_schedule.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(1001)
+        );
+        assert_eq!(
+            second_schedule.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(1002)
+        );
+        assert_eq!(
+            first_schedule.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(1003)
+        );
+        assert!(first_schedule.root_error_update_scheduled());
+        assert!(second_schedule.root_error_update_scheduled());
+        assert!(!first_schedule.root_error_callbacks_invoked());
+        assert!(!second_schedule.root_error_callbacks_invoked());
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::SYNC
+        );
 
         assert_eq!(destroy_executor.calls().len(), 1);
         assert_eq!(mount_create_executor.calls().len(), 1);
