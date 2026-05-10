@@ -45,8 +45,9 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 534-563 is active in `fr-*` tmux sessions
-from isolated `worker/<slug>` branches and worktrees.
+Top-level cap: 30 workers. Workers 534-562 and replacement worker 564 are
+active in `fr-*` tmux sessions from isolated `worker/<slug>` branches and
+worktrees. Worker 563 was accepted and cleaned up.
 
 - 534-538: Root work loop, lane priority, hooks/effects, and context lanes.
 - 539-542: Test-renderer live root, serialization, act, and DOM facade updates.
@@ -54,12 +55,12 @@ from isolated `worker/<slug>` branches and worktrees.
 - 550-552: Scheduler and native batch response sequencing.
 - 553-556: Package surface, benchmark, conformance, and root-render audits.
 - 557-562: Hook dispatcher, Suspense, Offscreen, portal, style, and HTML gates.
-- 563: Master docs accepted-history compaction.
+- 564: React `cloneElement` development child-array freeze parity.
 
 ## Near-Term Sequencing
 
-1. Monitor queue 534-563 and classify completions from tmux pane state,
-   reports, git status, and verification evidence.
+1. Monitor workers 534-562 and 564 and classify completions from tmux pane
+   state, reports, git status, and verification evidence.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
 3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
