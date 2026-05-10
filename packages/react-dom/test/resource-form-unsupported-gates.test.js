@@ -4,14 +4,16 @@ const assert = require('node:assert/strict');
 const { readdirSync, readFileSync, statSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const { pathToFileURL } = require('node:url');
 
 const packageRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(packageRoot, '..', '..');
 const sourceRoot = path.join(packageRoot, 'src');
 const resourceFormGate = require(path.join(
   sourceRoot,
-  'resource-form-internals-gate.js'
+  'resource-form-gates.js'
 ));
+const rootBridge = require(path.join(sourceRoot, 'client', 'root-bridge.js'));
 
 const resourceOracle = require(path.join(
   repoRoot,
@@ -300,6 +302,224 @@ test('private resource/form internals gate errors are deterministic and fail clo
   );
 });
 
+test('resource/form root bridge boundary metadata matches accepted blocked root gates', async () => {
+  const rootFacadeGate = await import(
+    pathToFileURL(
+      path.join(
+        repoRoot,
+        'tests',
+        'conformance',
+        'src',
+        'react-dom-root-render-e2e-conformance-gate.mjs'
+      )
+    ).href
+  );
+  const summary = resourceFormGate.describeResourceFormRootBridgeBlockedGate();
+
+  assert.equal(summary.schemaVersion, 1);
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.resourceFormRootBridgeBlockedGateId
+  );
+  assert.equal(summary.compatibilityTarget, compatibilityTarget);
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(summary.unsupportedCode, unsupportedCode);
+  assert.deepEqual(summary.sideEffects, resourceFormGate.rootBoundarySideEffects);
+
+  assert.deepEqual(summary.publicRootBoundary, {
+    gateId: rootFacadeGate.REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE_ID,
+    gateStatus: rootFacadeGate.REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    rootObjectCreated: false,
+    renderReachable: false,
+    unmountReachable: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(
+    summary.privateRootBridgeBoundary.gateStatus,
+    rootFacadeGate.REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS
+  );
+  assert.equal(
+    summary.privateRootBridgeBoundary.executionStatus,
+    rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
+  );
+  assert.equal(
+    summary.privateRootBridgeBoundary.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.equal(summary.privateRootBridgeBoundary.admittedRootRequest, false);
+  assert.equal(summary.privateRootBridgeBoundary.nativeExecution, false);
+  assert.equal(summary.privateRootBridgeBoundary.reconcilerExecution, false);
+  assert.equal(summary.privateRootBridgeBoundary.domMutation, false);
+  assert.equal(summary.privateRootBridgeBoundary.markerWrites, false);
+  assert.equal(summary.privateRootBridgeBoundary.listenerInstallation, false);
+  assert.equal(summary.privateRootBridgeBoundary.hydration, false);
+  assert.equal(summary.privateRootBridgeBoundary.eventDispatch, false);
+  assert.equal(summary.privateRootBridgeBoundary.compatibilityClaimed, false);
+  assert.deepEqual(
+    summary.privateRootBridgeBoundary.blockedCapabilities,
+    rootBridge.ROOT_BRIDGE_BLOCKED_CAPABILITIES
+  );
+  assert.deepEqual(summary.sourceAdapterBoundary, {
+    gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+    behaviorArea: null,
+    supportedBehaviorAreas: [
+      'resource-hint',
+      'form-action',
+      'controlled-form'
+    ],
+    adaptersInvoked: false,
+    rawTargetCaptured: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+});
+
+test('resource/form requests stay fail-closed with accepted private root bridge admission', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'root-boundary-gate'
+  });
+  const { admission, container, document } = createPrivateRootBridgeAdmission();
+  const requests = [
+    gate.recordResourceHintRequest('preload', [
+      'https://fast-react.invalid/app.js',
+      throwingProxy('resource options')
+    ]),
+    gate.recordFormActionRequest('requestFormReset', [
+      throwingProxy('form element')
+    ]),
+    gate.recordControlledFormRequest('input', [
+      throwingProxy('controlled props')
+    ])
+  ];
+
+  const blockedRecords = requests.map((request) =>
+    resourceFormGate.recordResourceFormRootBridgeBlockedRequest(request, {
+      rootBridgeAdmission: admission
+    })
+  );
+
+  assert.deepEqual(
+    blockedRecords.map((record) => ({
+      behaviorArea: record.behaviorArea,
+      requestType: record.requestType,
+      status: record.status,
+      publicRootStatus: record.publicRootBoundary.gateStatus,
+      rootBridgeStatus: record.rootBridgeBoundary.gateStatus,
+      sourceAdapterStatus: record.sourceAdapterBoundary.gateStatus
+    })),
+    [
+      {
+        behaviorArea: 'resource-hint',
+        requestType: 'resource-hint.preload',
+        status: resourceFormGate.unsupportedStatus,
+        publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
+        rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
+        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus
+      },
+      {
+        behaviorArea: 'form-action',
+        requestType: 'form-action.requestFormReset',
+        status: resourceFormGate.unsupportedStatus,
+        publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
+        rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
+        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus
+      },
+      {
+        behaviorArea: 'controlled-form',
+        requestType: 'controlled-form.input',
+        status: resourceFormGate.unsupportedStatus,
+        publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
+        rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
+        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus
+      }
+    ]
+  );
+
+  for (const blockedRecord of blockedRecords) {
+    assert.equal(Object.isFrozen(blockedRecord), true);
+    assert.equal(
+      resourceFormGate.isResourceFormRootBridgeBlockedRecord(blockedRecord),
+      true
+    );
+    assert.equal(
+      resourceFormGate.getResourceFormRootBridgeBlockedRecordPayload(
+        blockedRecord
+      ),
+      blockedRecord
+    );
+    assert.equal(blockedRecord.compatibilityTarget, compatibilityTarget);
+    assert.equal(blockedRecord.unsupportedCode, unsupportedCode);
+    assert.deepEqual(
+      blockedRecord.sideEffects,
+      resourceFormGate.rootBoundarySideEffects
+    );
+    assert.equal(blockedRecord.publicRootBoundary.rootObjectCreated, false);
+    assert.equal(blockedRecord.publicRootBoundary.renderReachable, false);
+    assert.equal(blockedRecord.publicRootBoundary.unmountReachable, false);
+    assert.equal(blockedRecord.publicRootBoundary.compatibilityClaimed, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.admittedRootRequest, true);
+    assert.equal(
+      blockedRecord.rootBridgeBoundary.admissionStatus,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+    );
+    assert.equal(
+      blockedRecord.rootBridgeBoundary.executionStatus,
+      rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
+    );
+    assert.equal(blockedRecord.rootBridgeBoundary.nativeExecution, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.reconcilerExecution, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.domMutation, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.markerWrites, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.listenerInstallation, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.hydration, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.eventDispatch, false);
+    assert.equal(blockedRecord.rootBridgeBoundary.compatibilityClaimed, false);
+    assert.equal(blockedRecord.sourceAdapterBoundary.adaptersInvoked, false);
+    assert.equal(blockedRecord.sourceAdapterBoundary.rawTargetCaptured, false);
+    assert.equal(blockedRecord.sourceAdapterBoundary.publicRootTouched, false);
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.compatibilityClaimed,
+      false
+    );
+  }
+
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  assert.throws(
+    () =>
+      resourceFormGate.recordResourceFormRootBridgeBlockedRequest(requests[0], {
+        rootBridgeAdmission: {
+          ...admission,
+          compatibilityClaimed: true
+        }
+      }),
+    {
+      code: resourceFormGate.rootBoundaryInvalidRootMetadataCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.recordResourceFormRootBridgeBlockedRequest(requests[0], {
+        publicRootGateStatus: 'matched-react-dom-root'
+      }),
+    {
+      code: resourceFormGate.rootBoundaryInvalidPublicMetadataCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () => resourceFormGate.recordResourceFormRootBridgeBlockedRequest({}),
+    {
+      code: resourceFormGate.rootBoundaryInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('resource hint entrypoints keep accepted public shape but never dispatch resource work', () => {
   for (const entrypoint of [
     {
@@ -560,6 +780,58 @@ function createPrivateGateScenario() {
   return {
     records,
     summary: resourceFormGate.describeResourceFormActionInternalsGate()
+  };
+}
+
+function createPrivateRootBridgeAdmission() {
+  const document = createRootBridgeDocument();
+  const container = createRootBridgeElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    requestIdPrefix: 'root-gate-request',
+    rootIdPrefix: 'root-gate',
+    updateIdPrefix: 'root-gate-update'
+  });
+  const create = bridge.createClientRoot(container, {
+    identifierPrefix: 'resource-form-'
+  });
+  const render = bridge.renderContainer(create.handle, {
+    props: {
+      children: 'blocked'
+    },
+    type: 'span'
+  });
+
+  return {
+    admission: bridge.admitRequest(render),
+    container,
+    document
+  };
+}
+
+function createRootBridgeDocument() {
+  const document = {
+    nodeName: '#document',
+    nodeType: 9,
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener) {
+      this.__registrations.push({ listener, type });
+    }
+  };
+  document.ownerDocument = document;
+  return document;
+}
+
+function createRootBridgeElement(nodeName, ownerDocument) {
+  return {
+    nodeName,
+    nodeType: 1,
+    ownerDocument,
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener) {
+      this.__registrations.push({ listener, type });
+    }
   };
 }
 
