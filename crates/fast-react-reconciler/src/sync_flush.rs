@@ -19,7 +19,7 @@ use crate::{
     commit_finished_host_root, render_host_root_for_lanes,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
     root: FiberRootId,
     render_lanes: Lanes,
@@ -29,47 +29,47 @@ pub struct SyncFlushRootRecord {
 
 impl SyncFlushRootRecord {
     #[must_use]
-    pub const fn root(self) -> FiberRootId {
+    pub const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    pub const fn render_lanes(self) -> Lanes {
+    pub const fn render_lanes(&self) -> Lanes {
         self.render_lanes
     }
 
     #[must_use]
-    pub const fn render_phase(self) -> HostRootRenderPhaseRecord {
+    pub const fn render_phase(&self) -> HostRootRenderPhaseRecord {
         self.render_phase
     }
 
     #[must_use]
-    pub const fn commit(self) -> HostRootCommitRecord {
-        self.commit
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
     }
 
     #[must_use]
-    pub const fn applied_update_count(self) -> usize {
+    pub const fn applied_update_count(&self) -> usize {
         self.render_phase.applied_update_count()
     }
 
     #[must_use]
-    pub const fn skipped_update_count(self) -> usize {
+    pub const fn skipped_update_count(&self) -> usize {
         self.render_phase.skipped_update_count()
     }
 
     #[must_use]
-    pub const fn remaining_lanes(self) -> Lanes {
+    pub const fn remaining_lanes(&self) -> Lanes {
         self.commit.remaining_lanes()
     }
 
     #[must_use]
-    pub const fn pending_lanes(self) -> Lanes {
+    pub const fn pending_lanes(&self) -> Lanes {
         self.commit.pending_lanes()
     }
 
     #[must_use]
-    pub const fn has_remaining_work(self) -> bool {
+    pub const fn has_remaining_work(&self) -> bool {
         self.commit.has_remaining_work()
     }
 }
@@ -292,7 +292,7 @@ mod tests {
 
         assert!(result.did_flush_work());
         assert_eq!(result.records().len(), 1);
-        let record = result.records()[0];
+        let record = &result.records()[0];
         assert_eq!(record.root(), root_id);
         assert_eq!(record.render_lanes(), Lanes::SYNC);
         assert_eq!(record.applied_update_count(), 1);
@@ -364,7 +364,7 @@ mod tests {
         let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
 
         assert_eq!(result.records().len(), 1);
-        let record = result.records()[0];
+        let record = &result.records()[0];
         assert_eq!(record.render_lanes(), Lanes::SYNC);
         assert_eq!(record.applied_update_count(), 1);
         assert_eq!(record.skipped_update_count(), 1);
