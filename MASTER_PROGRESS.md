@@ -137,9 +137,17 @@ sequencing belong in `MASTER_PLAN.md`.
   `root-render-e2e:conformance` command around the React DOM 19.2.6 root
   render/update/unmount oracle so local Fast React placeholder output remains
   blocked until scenarios are explicitly admitted and matched.
+- Worker 164 scheduler regression tests were merged, adding committed local
+  Fast React vs `scheduler@0.27.0` root-entry oracle comparisons with 22
+  matched-but-not-claimed rows while keeping broad Scheduler compatibility and
+  browser post-task ordering claims false.
 
 ## Latest Accepted Verification
 
+- Worker 164 was verified on its integrated worktree and again on `main` with
+  scheduler root syntax checks, byte-stable scheduler root oracle regeneration,
+  focused Scheduler conformance covering 62 tests, `npm run check:js` with 428
+  conformance tests plus benchmark gate coverage, and `git diff --check`.
 - Worker 163 was verified on its integrated worktree and again on `main` with
   focused root E2E syntax checks, the root oracle test, the
   `root-render-e2e:conformance` gate showing 0 admitted and 20 blocked rows,
