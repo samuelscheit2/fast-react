@@ -661,6 +661,33 @@ function runSmokeChecks() {
   }
 
   {
+    const container = createElement('main');
+    const first = createElement('section');
+    const second = createText('outro');
+
+    container.appendChild(first);
+    container.appendChild(second);
+
+    const clearRecord = domHost.clearContainerForRootUnmount(container);
+    const clearPayload =
+      domHost.getClearContainerForRootUnmountRecordPayload(clearRecord);
+
+    assert.equal(
+      clearRecord.kind,
+      domHost.CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD
+    );
+    assert.equal(clearRecord.mutation, 'clearContainer');
+    assert.equal(clearRecord.status, 'cleared');
+    assert.equal(clearRecord.removedChildCount, 2);
+    assert.equal(domHost.isClearContainerForRootUnmountRecord(clearRecord), true);
+    assert.deepEqual(clearPayload.removedChildren, [first, second]);
+    assert.equal(clearPayload.container, container);
+    assert.deepEqual(childNames(container), []);
+    assert.equal(first.parentNode, null);
+    assert.equal(second.parentNode, null);
+  }
+
+  {
     const text = createText('old');
 
     assert.equal(domHost.commitTextUpdate(text, 'old', 'new'), undefined);

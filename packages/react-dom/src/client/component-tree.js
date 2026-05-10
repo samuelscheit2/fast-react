@@ -38,10 +38,14 @@ const INVALID_EVENT_LISTENER_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_LISTENER';
 const HOST_INSTANCE_NODE_RECORD_KIND =
   'FastReactDomComponentTreeHostInstanceNodeRecord';
+const HOST_INSTANCE_SUBTREE_DETACH_RECORD_KIND =
+  'FastReactDomComponentTreeHostInstanceSubtreeDetachRecord';
 const REF_CALLBACK_FAKE_HOST_NODE_RECORD_KIND =
   'FastReactDomRefCallbackFakeHostNodeRecord';
 const privateHostInstanceNodeRecordType =
   'fast.react_dom.private_component_tree_host_instance_node_record';
+const privateHostInstanceSubtreeDetachRecordType =
+  'fast.react_dom.private_component_tree_host_instance_subtree_detach_record';
 const privateRefCallbackFakeHostNodeRecordType =
   'fast.react_dom.private_ref_callback_fake_host_node_record';
 
@@ -49,6 +53,7 @@ const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
 const eventListenerTargetLookupRecordPayloads = new WeakMap();
 const hostInstanceNodeRecordPayloads = new WeakMap();
+const hostInstanceSubtreeDetachRecordPayloads = new WeakMap();
 const refCallbackFakeHostNodeRecordPayloads = new WeakMap();
 
 const disabledMouseEventRegistrationNames = new Set([
@@ -1111,6 +1116,103 @@ function detachHostInstanceToken(token) {
   return token;
 }
 
+function detachHostInstanceSubtree(rootNode, options) {
+  const includeRoot =
+    options != null &&
+    typeof options === 'object' &&
+    options.includeRoot === true;
+  const nodes = [];
+
+  if (includeRoot) {
+    collectHostInstanceSubtreeNodes(rootNode, nodes);
+  } else {
+    for (const child of getChildNodesSnapshot(rootNode)) {
+      collectHostInstanceSubtreeNodes(child, nodes);
+    }
+  }
+
+  const detachedTokens = [];
+  for (const node of nodes) {
+    const token = detachHostInstanceNode(node);
+    if (token !== null) {
+      detachedTokens.push(token);
+    }
+  }
+
+  const record = Object.freeze({
+    $$typeof: privateHostInstanceSubtreeDetachRecordType,
+    kind: HOST_INSTANCE_SUBTREE_DETACH_RECORD_KIND,
+    status: 'detached-host-instance-subtree',
+    detachedHostInstanceCount: detachedTokens.length,
+    includeRoot,
+    rootNodeType:
+      isObjectLike(rootNode) && typeof rootNode.nodeType === 'number'
+        ? rootNode.nodeType
+        : null,
+    visitedNodeCount: nodes.length,
+    exposesHostNodes: false,
+    exposesHostTokens: false
+  });
+
+  hostInstanceSubtreeDetachRecordPayloads.set(
+    record,
+    Object.freeze({
+      detachedTokens: Object.freeze(detachedTokens),
+      rootNode,
+      visitedNodes: Object.freeze(nodes)
+    })
+  );
+
+  return record;
+}
+
+function getPrivateHostInstanceSubtreeDetachRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return hostInstanceSubtreeDetachRecordPayloads.get(record) || null;
+}
+
+function isPrivateHostInstanceSubtreeDetachRecord(value) {
+  return getPrivateHostInstanceSubtreeDetachRecordPayload(value) !== null;
+}
+
+function collectHostInstanceSubtreeNodes(node, nodes) {
+  if (!isObjectLike(node)) {
+    return;
+  }
+
+  for (const child of getChildNodesSnapshot(node)) {
+    collectHostInstanceSubtreeNodes(child, nodes);
+  }
+  nodes.push(node);
+}
+
+function getChildNodesSnapshot(node) {
+  if (!isObjectLike(node)) {
+    return [];
+  }
+
+  const childNodes = node.childNodes;
+  if (Array.isArray(childNodes)) {
+    return childNodes.slice();
+  }
+  if (
+    isObjectLike(childNodes) &&
+    Number.isSafeInteger(childNodes.length) &&
+    childNodes.length >= 0
+  ) {
+    const snapshot = [];
+    for (let index = 0; index < childNodes.length; index += 1) {
+      snapshot.push(childNodes[index]);
+    }
+    return snapshot;
+  }
+
+  return [];
+}
+
 module.exports = {
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
   EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE,
@@ -1120,6 +1222,7 @@ module.exports = {
   EVENT_TARGET_DISPATCH_PATH_RECORD_KIND,
   EVENT_TARGET_NORMALIZATION_RECORD_KIND,
   HOST_INSTANCE_NODE_RECORD_KIND,
+  HOST_INSTANCE_SUBTREE_DETACH_RECORD_KIND,
   INVALID_EVENT_LISTENER_CODE,
   INVALID_EVENT_LISTENER_LATEST_PROPS_CODE,
   INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE,
@@ -1139,6 +1242,7 @@ module.exports = {
   createMountedHostInstanceNodeRecord,
   createRefCallbackFakeHostNodeRecord,
   detachHostInstanceNode,
+  detachHostInstanceSubtree,
   detachHostInstanceToken,
   getAttachedNodeFromHostInstanceToken,
   getClosestMountedHostInstanceNodeFromNode,
@@ -1152,6 +1256,7 @@ module.exports = {
   getMountedHostInstanceNodeFromToken,
   getMountedHostInstanceTokenFromNode,
   getPrivateHostInstanceNodeRecordPayload,
+  getPrivateHostInstanceSubtreeDetachRecordPayload,
   getPrivateRefCallbackFakeHostNodeRecordPayload,
   getRootOwnerFromHostInstanceToken,
   getRootOwnerFromNode,
@@ -1161,10 +1266,12 @@ module.exports = {
   isEventListenerTargetLookupRecord,
   isHostInstanceNode,
   isPrivateHostInstanceNodeRecord,
+  isPrivateHostInstanceSubtreeDetachRecord,
   isPrivateRefCallbackFakeHostNodeRecord,
   isHostInstanceToken,
   latestPropsMarkerPrefix,
   privateHostInstanceNodeRecordType,
+  privateHostInstanceSubtreeDetachRecordType,
   privateRefCallbackFakeHostNodeRecordType,
   updateLatestPropsForHostInstanceToken,
   updateLatestPropsForNode

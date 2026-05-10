@@ -41,9 +41,12 @@ const propertyNamePattern = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const LATEST_PROPS_COMMIT_RECORD = 'latestPropsCommit';
 const DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF =
   'domPropertyUpdateLatestPropsHandoff';
+const CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD =
+  'clearContainerForRootUnmount';
 
 const latestPropsCommitRecordPayloads = new WeakMap();
 const domPropertyUpdateLatestPropsHandoffPayloads = new WeakMap();
+const clearContainerForRootUnmountRecordPayloads = new WeakMap();
 const latestPropsSafePayloadKinds = new Set([
   ENTRY_SET_ATTRIBUTE,
   ENTRY_REMOVE_ATTRIBUTE,
@@ -132,6 +135,35 @@ function clearContainer(container) {
     container.removeChild(firstChild);
     firstChild = getFirstChild(container);
   }
+}
+
+function clearContainerForRootUnmount(container) {
+  assertRemoveParent(container, 'clearContainerForRootUnmount');
+
+  const removedChildren = [];
+  let firstChild = getFirstChild(container);
+  while (firstChild !== null) {
+    removedChildren.push(firstChild);
+    container.removeChild(firstChild);
+    firstChild = getFirstChild(container);
+  }
+
+  const record = Object.freeze({
+    kind: CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
+    mutation: 'clearContainer',
+    removedChildCount: removedChildren.length,
+    status: 'cleared'
+  });
+
+  clearContainerForRootUnmountRecordPayloads.set(
+    record,
+    Object.freeze({
+      container,
+      removedChildren: Object.freeze(removedChildren)
+    })
+  );
+
+  return record;
 }
 
 function commitTextUpdate(textInstance, oldText, newText) {
@@ -342,6 +374,17 @@ function getDomPropertyUpdateLatestPropsHandoffPayload(handoff) {
 
 function isDomPropertyUpdateLatestPropsHandoff(handoff) {
   return getDomPropertyUpdateLatestPropsHandoffPayload(handoff) !== null;
+}
+
+function getClearContainerForRootUnmountRecordPayload(record) {
+  if (!isWeakMapKey(record)) {
+    return null;
+  }
+  return clearContainerForRootUnmountRecordPayloads.get(record) || null;
+}
+
+function isClearContainerForRootUnmountRecord(record) {
+  return getClearContainerForRootUnmountRecordPayload(record) !== null;
 }
 
 function assertAppendParent(parent, operation) {
@@ -1336,6 +1379,7 @@ function applyStylePayloadEntry(instance, entry) {
 module.exports = {
   DOM_HOST_TEXT_COMMIT_GATE_METADATA,
   DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+  CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
   appendChild,
   appendChildToContainer,
   appendInitialChild,
@@ -1344,16 +1388,19 @@ module.exports = {
   applyDomPropertyPayloadForLatestProps,
   applyStyleDangerousHtmlPayload,
   clearContainer,
+  clearContainerForRootUnmount,
   commitDomPropertyUpdateForLatestProps,
   commitTextUpdate,
   commitDomPropertyUpdate,
   createDomHostTextInstance,
   createDomHostMutationError,
   createLatestPropsCommitRecord,
+  getClearContainerForRootUnmountRecordPayload,
   getDomPropertyUpdateLatestPropsHandoffPayload,
   getLatestPropsCommitRecordPayload,
   insertBefore,
   insertInContainerBefore,
+  isClearContainerForRootUnmountRecord,
   isDomPropertyUpdateLatestPropsHandoff,
   isLatestPropsCommitRecord,
   LATEST_PROPS_COMMIT_RECORD,

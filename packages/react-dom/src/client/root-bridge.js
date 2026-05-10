@@ -35,6 +35,13 @@ const {
   REACT_PORTAL_TYPE,
   reactDomPortalImplementation
 } = require('../shared/create-portal.js');
+const {
+  detachHostInstanceSubtree
+} = require('./component-tree.js');
+const {
+  clearContainerForRootUnmount,
+  getClearContainerForRootUnmountRecordPayload
+} = require('../dom-host/mutation.js');
 
 const CLIENT_ROOT_KIND = 'client';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
@@ -63,6 +70,8 @@ const privateRootPortalBoundaryRecordType =
   'fast.react_dom.private_root_portal_boundary_record';
 const privateRootPortalCommitHandoffRecordType =
   'fast.react_dom.private_root_portal_commit_handoff_record';
+const privateRootUnmountHostOutputCleanupRecordType =
+  'fast.react_dom.private_root_unmount_host_output_cleanup_record';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -93,6 +102,8 @@ const ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED =
   'blocked-private-root-portal-fake-dom-commit-apply';
 const ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED =
   'validated-private-root-portal-container-ownership';
+const ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED =
+  'cleaned-private-root-unmount-host-output';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -230,6 +241,57 @@ const ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES = freezeArray([
   }),
   ...ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES
 ]);
+const ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'fake-dom-clear-container',
+    accepted: true,
+    reason: 'The private unmount cleanup cleared fake-DOM root children.'
+  }),
+  freezeRecord({
+    id: 'component-tree-metadata-detach',
+    accepted: true,
+    reason:
+      'The private unmount cleanup detached component-tree host metadata from removed fake-DOM subtrees.'
+  }),
+  freezeRecord({
+    id: 'root-marker-listener-revert',
+    accepted: true,
+    reason:
+      'The private unmount cleanup reused the root marker/listener side-effect reverter.'
+  })
+]);
+const ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'public-root-unmount',
+    blocked: true,
+    reason: 'Public react-dom root unmount behavior remains unimplemented.'
+  }),
+  freezeRecord({
+    id: 'native-execution',
+    blocked: true,
+    reason: 'No native or Rust unmount execution is admitted by this cleanup.'
+  }),
+  freezeRecord({
+    id: 'reconciler-execution',
+    blocked: true,
+    reason: 'No reconciler deletion, ref, passive, or effect traversal runs.'
+  }),
+  freezeRecord({
+    id: 'browser-dom-compatibility',
+    blocked: true,
+    reason: 'Only fake-DOM containers are admitted by this private cleanup.'
+  }),
+  freezeRecord({
+    id: 'events',
+    blocked: true,
+    reason: 'Synthetic event extraction and dispatch are not admitted.'
+  }),
+  freezeRecord({
+    id: 'compatibility-claims',
+    blocked: true,
+    reason: 'React DOM root unmount compatibility remains unclaimed.'
+  })
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -243,6 +305,8 @@ const rootCreateSideEffectRecords = new WeakMap();
 const rootCreateSideEffectCleanupRecords = new WeakMap();
 const rootPortalBoundaryPayloads = new WeakMap();
 const rootPortalCommitHandoffPayloads = new WeakMap();
+const rootUnmountHostOutputCleanupPayloads = new WeakMap();
+const rootUnmountHostOutputCleanupRecords = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -329,6 +393,13 @@ function createPrivateRootBridgeShell(options) {
         record,
         options
       );
+    },
+    cleanupUnmountHostOutput(admissionRecord, unmountRecord) {
+      return cleanupPrivateRootUnmountHostOutputWithBridge(
+        bridgeState,
+        admissionRecord,
+        unmountRecord
+      );
     }
   });
 }
@@ -410,6 +481,14 @@ function createPortalRootBoundaryRecord(record) {
 
 function createPortalCommitHandoffRecord(record, options) {
   return createPortalCommitHandoffRecordWithBridge(null, record, options);
+}
+
+function cleanupPrivateRootUnmountHostOutput(admissionRecord, unmountRecord) {
+  return cleanupPrivateRootUnmountHostOutputWithBridge(
+    null,
+    admissionRecord,
+    unmountRecord
+  );
 }
 
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
@@ -891,6 +970,14 @@ function getPrivateRootPortalCommitHandoffPayload(record) {
 
 function isPrivateRootPortalCommitHandoffRecord(value) {
   return rootPortalCommitHandoffPayloads.has(value);
+}
+
+function getPrivateRootUnmountHostOutputCleanupPayload(record) {
+  return rootUnmountHostOutputCleanupPayloads.get(record) || null;
+}
+
+function isPrivateRootUnmountHostOutputCleanupRecord(value) {
+  return rootUnmountHostOutputCleanupPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -1737,6 +1824,129 @@ function createPortalCommitHandoffRecordWithBridge(
   return handoff;
 }
 
+function cleanupPrivateRootUnmountHostOutputWithBridge(
+  bridgeState,
+  admissionRecord,
+  unmountRecord
+) {
+  const cached = getCachedUnmountHostOutputCleanup(
+    bridgeState,
+    admissionRecord,
+    unmountRecord
+  );
+  if (cached !== null) {
+    return cached;
+  }
+
+  const validation = validateUnmountHostOutputCleanupRecords(
+    admissionRecord,
+    unmountRecord
+  );
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const rootBridgeState = validation.bridgeState;
+  const sequence = rootBridgeState.nextUnmountCleanupSequence++;
+  const cleanupId = `${rootBridgeState.unmountCleanupIdPrefix}:${sequence}`;
+  const clearContainerRecord = clearContainerForRootUnmount(
+    validation.container
+  );
+  const clearContainerPayload =
+    getClearContainerForRootUnmountRecordPayload(clearContainerRecord);
+  const componentTreeDetachRecords =
+    clearContainerPayload === null
+      ? []
+      : clearContainerPayload.removedChildren.map((child) =>
+          detachHostInstanceSubtree(child, {includeRoot: true})
+        );
+  const detachedHostInstanceCount = componentTreeDetachRecords.reduce(
+    (total, record) => total + record.detachedHostInstanceCount,
+    0
+  );
+  const sideEffectCleanup = revertPrivateCreateRootSideEffectsWithBridge(
+    rootBridgeState,
+    validation.sideEffectRecord
+  );
+
+  const cleanupRecord = freezeRecord({
+    $$typeof: privateRootUnmountHostOutputCleanupRecordType,
+    kind: 'FastReactDomPrivateRootUnmountHostOutputCleanupRecord',
+    operation: 'unmount-host-output-cleanup',
+    cleanupId,
+    cleanupSequence: sequence,
+    cleanupStatus: ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED,
+    sourceAdmissionId: admissionRecord.admissionId,
+    sourceAdmissionSequence: admissionRecord.admissionSequence,
+    sourceRenderRequestId: admissionRecord.renderRequestId,
+    sourceRenderRequestSequence: admissionRecord.renderRequestSequence,
+    sourceUnmountRequestId: unmountRecord.requestId,
+    sourceUnmountRequestSequence: unmountRecord.requestSequence,
+    sourceUnmountUpdateId: unmountRecord.updateId,
+    sideEffectId: validation.sideEffectRecord.sideEffectId,
+    sideEffectCleanupStatus: sideEffectCleanup.sideEffectStatus,
+    rootId: unmountRecord.rootId,
+    rootKind: unmountRecord.rootKind,
+    rootTag: unmountRecord.rootTag,
+    lifecyclePrerequisites: freezeRecord({
+      accepted: true,
+      lifecycleStatusBefore: unmountRecord.lifecycleStatusBefore,
+      lifecycleStatusAfter: unmountRecord.lifecycleStatusAfter,
+      lifecycleTransition: `${unmountRecord.lifecycleStatusBefore}->${unmountRecord.lifecycleStatusAfter}`,
+      operation: 'unmount',
+      rootKind: unmountRecord.rootKind,
+      rootTag: unmountRecord.rootTag
+    }),
+    fakeDomCleanup: freezeRecord({
+      clearContainerStatus: clearContainerRecord.status,
+      componentTreeDetachStatus: 'detached-host-instance-subtree',
+      removedRootChildCount: clearContainerRecord.removedChildCount,
+      detachedHostInstanceCount,
+      detachRecordCount: componentTreeDetachRecords.length
+    }),
+    clearContainerRecord,
+    componentTreeDetachRecords: freezeArray(componentTreeDetachRecords),
+    sideEffectCleanup,
+    markerCleanup: sideEffectCleanup.markerCleanup,
+    listenerCleanup: sideEffectCleanup.listenerCleanup,
+    acceptedCapabilities: ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities: ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+    fakeDomMutation: true,
+    rootContainerChildrenCleared: true,
+    componentTreeMetadataDetached: true,
+    rootMarkerReverted: true,
+    rootListenersReverted: true,
+    publicRootUnmounted: false,
+    publicRootBehaviorChanged: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: true,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootUnmountHostOutputCleanupRecords.set(unmountRecord, cleanupRecord);
+  rootUnmountHostOutputCleanupPayloads.set(
+    cleanupRecord,
+    freezeRecord({
+      admissionRecord,
+      clearContainerPayload,
+      clearContainerRecord,
+      componentTreeDetachRecords,
+      container: validation.container,
+      sideEffectCleanup,
+      sideEffectRecord: validation.sideEffectRecord,
+      unmountRecord
+    })
+  );
+
+  return cleanupRecord;
+}
+
 function createNativeBridgeHandle(bridgeState, kind) {
   return freezeRecord({
     $$typeof: privateRootNativeBridgeHandleType,
@@ -1854,6 +2064,10 @@ function createBridgeState(options) {
       options && options.sideEffectIdPrefix,
       'side-effect'
     ),
+    unmountCleanupIdPrefix: getIdPrefix(
+      options && options.unmountCleanupIdPrefix,
+      'unmount-cleanup'
+    ),
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
     nextNativeHandleSlot: 1,
     nextNativeRootId: 1,
@@ -1863,6 +2077,7 @@ function createBridgeState(options) {
     nextPortalCommitSequence: 1,
     nextRootSequence: 1,
     nextSideEffectSequence: 1,
+    nextUnmountCleanupSequence: 1,
     nextUpdateSequence: 1,
     validationOptions: options && options.validationOptions
   };
@@ -2053,6 +2268,161 @@ function validatePortalCommitHandoffBoundaryRecord(record) {
   };
 }
 
+function getCachedUnmountHostOutputCleanup(
+  bridgeState,
+  admissionRecord,
+  unmountRecord
+) {
+  if (!isWeakMapKey(unmountRecord)) {
+    return null;
+  }
+
+  const existing = rootUnmountHostOutputCleanupRecords.get(unmountRecord);
+  if (existing === undefined) {
+    return null;
+  }
+
+  const payload = rootUnmountHostOutputCleanupPayloads.get(existing);
+  if (payload === undefined || payload.admissionRecord !== admissionRecord) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup records must match their source admission.'
+    );
+  }
+  if (bridgeState !== null && payload.unmountRecord !== unmountRecord) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup records must match their source unmount request.'
+    );
+  }
+  if (bridgeState !== null) {
+    const validation = validateRootBridgeRequestRecord(unmountRecord);
+    if (validation.bridgeState !== bridgeState) {
+      throwForeignRootBridgeRequest();
+    }
+  }
+
+  return existing;
+}
+
+function validateUnmountHostOutputCleanupRecords(
+  admissionRecord,
+  unmountRecord
+) {
+  const admissionPayload =
+    rootCreateRenderAdmissionPayloads.get(admissionRecord);
+  if (admissionPayload === undefined) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Expected a private create/render admission record for unmount host-output cleanup.'
+    );
+  }
+
+  validateCreateRenderAdmissionStillIntact(
+    admissionRecord,
+    admissionPayload
+  );
+
+  const unmountValidation = validateRootBridgeRequestRecord(unmountRecord);
+  if (unmountValidation.operation !== 'unmount') {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Expected a private root.unmount request record for host-output cleanup.'
+    );
+  }
+  if (unmountRecord.noOp) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Cannot run host-output cleanup from a no-op private root.unmount request.'
+    );
+  }
+  if (unmountRecord.lifecycleStatusBefore !== ROOT_LIFECYCLE_RENDERED) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires a previously rendered root.'
+    );
+  }
+
+  const createValidation = validateRootBridgeRequestRecord(
+    admissionPayload.createRecord
+  );
+  const sideEffectValidation = validateCreateRenderSideEffectRecord(
+    admissionPayload.sideEffectRecord,
+    admissionPayload.createRecord,
+    createValidation
+  );
+  const unmountPayload = rootRecordPayloads.get(unmountRecord);
+  if (unmountPayload.rootHandle !== admissionPayload.createRecord.handle) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires an unmount request for the admitted root handle.'
+    );
+  }
+  if (createValidation.bridgeState !== unmountValidation.bridgeState) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup records must belong to the same root bridge shell.'
+    );
+  }
+  if (sideEffectValidation.bridgeState !== unmountValidation.bridgeState) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup side effects must belong to the same root bridge shell.'
+    );
+  }
+  if (
+    admissionPayload.renderRecord.rootId !== unmountRecord.rootId ||
+    admissionPayload.renderRecord.rootKind !== unmountRecord.rootKind ||
+    admissionPayload.renderRecord.rootTag !== unmountRecord.rootTag
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup root identity must match the admitted render.'
+    );
+  }
+  if (
+    admissionPayload.renderRecord.requestSequence >=
+    unmountRecord.requestSequence
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires root.unmount after the admitted render.'
+    );
+  }
+
+  return {
+    bridgeState: unmountValidation.bridgeState,
+    container: sideEffectValidation.container,
+    sideEffectRecord: admissionPayload.sideEffectRecord
+  };
+}
+
+function validateCreateRenderAdmissionStillIntact(
+  admissionRecord,
+  admissionPayload
+) {
+  if (
+    admissionRecord.$$typeof !== privateRootCreateRenderAdmissionRecordType ||
+    admissionRecord.kind !==
+      'FastReactDomPrivateRootCreateRenderAdmissionRecord' ||
+    admissionRecord.operation !== 'create-render' ||
+    admissionRecord.admissionStatus !== ROOT_BRIDGE_CREATE_RENDER_ADMITTED ||
+    admissionRecord.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
+    admissionRecord.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
+    admissionRecord.nativeExecution !== false ||
+    admissionRecord.reconcilerExecution !== false ||
+    admissionRecord.domMutation !== false ||
+    admissionRecord.hydration !== false ||
+    admissionRecord.eventDispatch !== false ||
+    admissionRecord.compatibilityClaimed !== false
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Expected an intact private create/render admission record.'
+    );
+  }
+
+  if (
+    admissionRecord.createAdmission?.operation !== 'create' ||
+    admissionRecord.renderAdmission?.operation !== 'render' ||
+    admissionRecord.markerRecord !== admissionPayload.sideEffectRecord.markerRecord ||
+    admissionRecord.listenerRegistration !==
+      admissionPayload.sideEffectRecord.listenerRegistration
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup admission payload does not match the admission record.'
+    );
+  }
+}
+
 function assertPortalBoundaryStillBlocked(record) {
   if (
     record.nativeExecution !== false ||
@@ -2203,6 +2573,12 @@ function throwInvalidPortalCommitHandoffRecord(message) {
   throw error;
 }
 
+function throwInvalidUnmountHostOutputCleanupRecord(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD';
+  throw error;
+}
+
 function describeCreateRootMarkerGuard(container, options) {
   const warningMessage = getCreateRootWarning(container, options);
   return freezeRecord({
@@ -2319,6 +2695,13 @@ function freezeArray(array) {
   return Object.freeze(array.slice());
 }
 
+function isWeakMapKey(value) {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function')
+  );
+}
+
 module.exports = {
   CLIENT_ROOT_KIND,
   CONCURRENT_ROOT_TAG,
@@ -2339,6 +2722,9 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED,
   ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
+  ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED,
   ROOT_LIFECYCLE_CREATED,
   ROOT_LIFECYCLE_RENDERED,
   ROOT_LIFECYCLE_UNMOUNTED,
@@ -2354,6 +2740,7 @@ module.exports = {
   admitPrivateCreateRenderPath,
   admitRootBridgeRequestRecord,
   applyPrivateCreateRootSideEffects,
+  cleanupPrivateRootUnmountHostOutput,
   createClientRootRecord,
   createHydrateRootRecord,
   createNativeRootBridgeHandoffRecord,
@@ -2373,11 +2760,13 @@ module.exports = {
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootRecordPayload,
+  getPrivateRootUnmountHostOutputCleanupPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
   isPrivateRootCreateRenderAdmissionRecord,
   isPrivateRootPortalCommitHandoffRecord,
   isPrivateRootPortalBoundaryRecord,
+  isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootHandle,
   isPrivateRootOwner,
   privateRootAdmissionRecordType,
@@ -2388,6 +2777,7 @@ module.exports = {
   privateRootNativeHandoffRecordType,
   privateRootPortalBoundaryRecordType,
   privateRootPortalCommitHandoffRecordType,
+  privateRootUnmountHostOutputCleanupRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootHydrateRecordType,
