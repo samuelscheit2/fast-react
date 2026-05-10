@@ -1425,6 +1425,57 @@ const privateToJSONFacadeResultDiagnosticName =
   'fast-react-test-renderer.tojson.private-facade-result';
 const privateToJSONFacadeResultStatus =
   'private-tojson-facade-result-backed-by-rust-host-output-public-blocked';
+const privateToJSONUpdateHostOutputRowId =
+  'react-test-renderer-tojson-update-host-output-private-diagnostic';
+const privateToJSONUnmountHostOutputRowId =
+  'react-test-renderer-tojson-unmount-host-output-private-diagnostic';
+const privateToJSONUpdateUnmountRowStatus =
+  'private-tojson-update-unmount-host-output-rows-public-tojson-blocked';
+const privateToJSONUpdateUnmountDependencyIds = Object.freeze([
+  'react-test-renderer-update-route-private-diagnostic',
+  'react-test-renderer-unmount-route-private-diagnostic',
+  'react-test-renderer-serialization-private-json-diagnostic'
+]);
+const privateToJSONUpdateUnmountDependencyMetadata = Object.freeze({
+  acceptedPrivateDiagnosticDependencyIds:
+    privateToJSONUpdateUnmountDependencyIds,
+  updateRouteDiagnosticsAvailable: true,
+  unmountRouteDiagnosticsAvailable: true,
+  serializationDiagnosticsAvailable: true,
+  hostOutputSnapshotFreshnessRequired: true,
+  staleSnapshotRejection: true,
+  mismatchedUpdateUnmountRecordRejection: true,
+  publicToJSONAvailable: false,
+  publicTestInstanceAvailable: false,
+  nativeExecutionAvailable: false,
+  compatibilityClaimed: false
+});
+const privateToJSONUpdateUnmountHostOutputRows = Object.freeze([
+  Object.freeze({
+    id: privateToJSONUpdateHostOutputRowId,
+    status: privateToJSONUpdateUnmountRowStatus,
+    hostOutputUpdateKind: 'Update',
+    acceptedPrivateDiagnosticDependencyIds:
+      privateToJSONUpdateUnmountDependencyIds,
+    dependencyMetadata: privateToJSONUpdateUnmountDependencyMetadata,
+    publicToJSONAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
+    id: privateToJSONUnmountHostOutputRowId,
+    status: privateToJSONUpdateUnmountRowStatus,
+    hostOutputUpdateKind: 'Unmount',
+    acceptedPrivateDiagnosticDependencyIds:
+      privateToJSONUpdateUnmountDependencyIds,
+    dependencyMetadata: privateToJSONUpdateUnmountDependencyMetadata,
+    publicToJSONAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  })
+]);
 const toJSONPrivateSerializationFacadeGate = Object.freeze({
   id: 'react-test-renderer-tojson-private-serialization-facade-gate',
   publicSurface: 'create().toJSON',
@@ -1439,6 +1490,13 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateDiagnosticResultStatus: privateToJSONFacadeResultStatus,
   acceptedRustPrivateJsonDiagnostics: true,
   acceptedRustPrivateToJSONFacadeResult: true,
+  privateUpdateUnmountHostOutputRows:
+    privateToJSONUpdateUnmountHostOutputRows,
+  privateUpdateUnmountDependencyMetadata:
+    privateToJSONUpdateUnmountDependencyMetadata,
+  privateUpdateHostOutputRowId: privateToJSONUpdateHostOutputRowId,
+  privateUnmountHostOutputRowId: privateToJSONUnmountHostOutputRowId,
+  mismatchedUpdateUnmountRecordRejection: true,
   publicSerializationAvailable: false,
   publicRouteAvailable: false,
   nativeBridgeAvailable: false,
@@ -1455,10 +1513,14 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
     'TestRendererRoot::describe_private_to_json_facade_result_for_canary',
     'TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary',
+    'TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary',
+    'TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary',
     'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
     'TestRendererPrivateJsonSerializationReport',
     'TestRendererPrivateJsonRenderedRoot',
     'TestRendererPrivateToJsonFacadeResult',
+    'TestRendererPrivateToJsonHostOutputRow',
+    'TestRendererPrivateToJsonHostOutputDependencyDiagnostics',
     'TestRendererPrivateJsonPublicSurfaceBlockers'
   ]),
   acceptedRustNodeKinds: Object.freeze([
@@ -1473,7 +1535,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   ]),
   acceptedHostOutputUpdateKinds: Object.freeze([
     'Create',
-    'Update'
+    'Update',
+    'Unmount'
   ]),
   propElisionFromSerializedProps: true,
   hostOutputSnapshotFreshnessRequired: true,
@@ -1489,10 +1552,15 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_shape_diagnostics_serialize_multiple_host_children_and_text_siblings',
     'root_private_to_json_shape_diagnostics_elide_children_prop',
     'root_private_to_json_facade_result_canary_wraps_create_serialization_evidence',
-    'root_private_to_json_facade_result_canary_wraps_update_serialization_evidence'
+    'root_private_to_json_facade_result_canary_wraps_update_serialization_evidence',
+    'root_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers',
+    'root_private_to_json_unmount_host_output_row_rejects_stale_snapshot',
+    'root_private_to_json_update_host_output_row_rejects_mismatched_row_kind'
   ]),
   acceptedFacadeResultWorker:
     'worker-391-test-renderer-public-tojson-private-facade',
+  updateUnmountRefreshWorker:
+    'worker-540-test-renderer-tojson-update-unmount-refresh',
   blockedPublicSurfaces: Object.freeze([
     'create().toJSON',
     'create().toTree',
@@ -2909,9 +2977,17 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     createApi: 'TestRendererRoot::describe_private_json_serialization_for_canary',
     updateApi:
       'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
+    updateHostOutputRowApi:
+      'TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary',
+    unmountHostOutputRowApi:
+      'TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary',
+    updateHostOutputRowId: privateToJSONUpdateHostOutputRowId,
+    unmountHostOutputRowId: privateToJSONUnmountHostOutputRowId,
+    updateUnmountDependencyMetadata:
+      privateToJSONUpdateUnmountDependencyMetadata,
     hostShapeApi:
       'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
-    acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update']),
+    acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update', 'Unmount']),
     acceptedHostRootShapes: freezeArray([
       'EmptyRoot',
       'SingleHostChild',
@@ -2921,6 +2997,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     propElisionFromSerializedProps: true,
     hostOutputSnapshotFreshnessRequired: true,
     staleSnapshotRejection: true,
+    mismatchedUpdateUnmountRecordRejection: true,
     publicSerializationAvailable: false
   }),
   testInstanceQuery: freezeRecord({
@@ -6704,6 +6781,11 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     rootRequest,
     privateHostOutputDiagnosticsSerializable: true,
     privateDiagnosticResultAvailable: true,
+    privateUpdateUnmountHostOutputRows:
+      privateToJSONUpdateUnmountHostOutputRows,
+    privateUpdateUnmountDependencyMetadata:
+      privateToJSONUpdateUnmountDependencyMetadata,
+    mismatchedUpdateUnmountRecordRejection: true,
     publicSerializationAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -8355,6 +8437,9 @@ function createPrivateToJSONHostOutputDiagnosticResult(report) {
     publicSurface: 'create().toJSON',
     sourceDiagnostic: privateToJSONAcceptedDiagnosticName,
     hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
+    hostOutputRowId:
+      diagnostic.hostOutputRow === null ? null : diagnostic.hostOutputRow.id,
+    hostOutputRow: diagnostic.hostOutputRow,
     hostOutputSnapshotCurrent: true,
     sourceNodeCount: diagnostic.sourceNodeCount,
     result: diagnostic.result,
@@ -8392,6 +8477,11 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
     'host_output_snapshot_current',
     true
   );
+  const hostOutputRow = validatePrivateToJSONUpdateUnmountRowMetadata(
+    report,
+    hostOutputUpdateKind,
+    rootChildCount
+  );
   assertPrivateToJSONPublicBlockers(
     readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
   );
@@ -8413,9 +8503,18 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
     diagnosticNodes,
     rootOrdinals
   );
+  if (
+    hostOutputUpdateKind === 'Unmount' &&
+    (rootChildCount !== 0 || diagnosticNodes.length !== 0 || result !== null)
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON unmount diagnostic to serialize an empty root.'
+    );
+  }
 
   return {
     hostOutputUpdateKind,
+    hostOutputRow,
     result,
     sourceNodeCount: diagnosticNodes.length
   };
@@ -8726,12 +8825,205 @@ function assertPrivateToJSONHostOutputUpdateKind(report) {
     'hostOutputUpdateKind',
     'host_output_update_kind'
   );
-  if (actual !== 'Create' && actual !== 'Update') {
+  if (actual !== 'Create' && actual !== 'Update' && actual !== 'Unmount') {
     throwPrivateToJSONSerializationError(
-      'Expected private JSON diagnostic host output update kind to be Create or Update.'
+      'Expected private JSON diagnostic host output update kind to be Create, Update, or Unmount.'
     );
   }
   return actual;
+}
+
+function validatePrivateToJSONUpdateUnmountRowMetadata(
+  report,
+  hostOutputUpdateKind,
+  rootChildCount
+) {
+  const row = readPrivateToJSONField(
+    report,
+    'hostOutputRow',
+    'host_output_row'
+  ) ?? readPrivateToJSONField(report, 'privateHostOutputRow');
+  const directRowId =
+    readPrivateToJSONField(report, 'hostOutputRowId', 'host_output_row_id') ??
+    readPrivateToJSONField(report, 'privateRowId', 'private_row_id');
+
+  if (hostOutputUpdateKind === 'Create') {
+    if (row === undefined && directRowId === undefined) {
+      return null;
+    }
+    throwPrivateToJSONSerializationError(
+      'Create diagnostics must not claim update or unmount private row metadata.'
+    );
+  }
+
+  const expectedRowId =
+    hostOutputUpdateKind === 'Unmount'
+      ? privateToJSONUnmountHostOutputRowId
+      : privateToJSONUpdateHostOutputRowId;
+  if (directRowId !== undefined && directRowId !== expectedRowId) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${hostOutputUpdateKind} row id to be ${expectedRowId}.`
+    );
+  }
+  if (row === undefined || row === null) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${hostOutputUpdateKind} diagnostic to include explicit host output row metadata.`
+    );
+  }
+
+  assertPrivateToJSONRecord(row, 'hostOutputRow');
+  const rowId = readPrivateToJSONStringField(row, 'id');
+  if (rowId !== expectedRowId) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${hostOutputUpdateKind} row id to be ${expectedRowId}.`
+    );
+  }
+  assertPrivateToJSONStringField(
+    row,
+    'status',
+    undefined,
+    privateToJSONUpdateUnmountRowStatus
+  );
+  assertPrivateToJSONStringField(
+    row,
+    'hostOutputUpdateKind',
+    'host_output_update_kind',
+    hostOutputUpdateKind
+  );
+  if (
+    hostOutputUpdateKind === 'Unmount' &&
+    readPrivateToJSONField(row, 'currentRootChildCount', 'current_root_child_count') !==
+      0
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON unmount row currentRootChildCount to be 0.'
+    );
+  }
+  if (hostOutputUpdateKind === 'Unmount' && rootChildCount !== 0) {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON unmount diagnostic rootChildCount to be 0.'
+    );
+  }
+
+  const dependencyMetadata =
+    readPrivateToJSONField(row, 'dependencyMetadata', 'dependency_metadata') ??
+    readPrivateToJSONField(row, 'dependencyDiagnostics', 'dependency_diagnostics');
+  assertPrivateToJSONRecord(dependencyMetadata, 'hostOutputRow.dependencyMetadata');
+  assertPrivateToJSONUpdateUnmountDependencyMetadata(
+    dependencyMetadata,
+    hostOutputUpdateKind
+  );
+
+  return freezeRecord({
+    id: rowId,
+    status: privateToJSONUpdateUnmountRowStatus,
+    hostOutputUpdateKind,
+    dependencyMetadata
+  });
+}
+
+function assertPrivateToJSONUpdateUnmountDependencyMetadata(
+  metadata,
+  hostOutputUpdateKind
+) {
+  const dependencyIds = readPrivateToJSONField(
+    metadata,
+    'acceptedPrivateDiagnosticDependencyIds',
+    'accepted_private_diagnostic_dependency_ids'
+  );
+  if (dependencyIds !== undefined) {
+    if (!Array.isArray(dependencyIds)) {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON update/unmount dependency ids to be an array.'
+      );
+    }
+    if (
+      dependencyIds.length !== privateToJSONUpdateUnmountDependencyIds.length ||
+      dependencyIds.some(
+        (dependencyId, index) =>
+          dependencyId !== privateToJSONUpdateUnmountDependencyIds[index]
+      )
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON update/unmount dependency ids to match accepted private rows.'
+      );
+    }
+  } else {
+    const expectedRouteId =
+      hostOutputUpdateKind === 'Unmount'
+        ? 'react-test-renderer-unmount-route-private-diagnostic'
+        : 'react-test-renderer-update-route-private-diagnostic';
+    if (
+      readPrivateToJSONField(metadata, 'routeRowId', 'route_row_id') !==
+      expectedRouteId
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON update/unmount route dependency id to match the row kind.'
+      );
+    }
+    if (
+      readPrivateToJSONField(
+        metadata,
+        'serializationRowId',
+        'serialization_row_id'
+      ) !== 'react-test-renderer-serialization-private-json-diagnostic'
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON update/unmount serialization dependency id.'
+      );
+    }
+  }
+  for (const [camelName, snakeName] of [
+    ['serializationDiagnosticsAvailable', 'serialization_diagnostics_available']
+  ]) {
+    if (readPrivateToJSONField(metadata, camelName, snakeName) !== true) {
+      throwPrivateToJSONSerializationError(
+        `Expected private JSON dependency metadata ${camelName} to be true.`
+      );
+    }
+  }
+  const snapshotFreshness =
+    readPrivateToJSONField(
+      metadata,
+      'hostOutputSnapshotFreshnessRequired',
+      'host_output_snapshot_freshness_required'
+    ) ??
+    readPrivateToJSONField(
+      metadata,
+      'hostOutputSnapshotCurrent',
+      'host_output_snapshot_current'
+    );
+  if (snapshotFreshness !== true) {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON dependency metadata host output snapshot freshness to be true.'
+    );
+  }
+  for (const [camelName, snakeName] of [
+    ['staleSnapshotRejection', 'stale_snapshot_rejection'],
+    [
+      'mismatchedUpdateUnmountRecordRejection',
+      'mismatched_update_unmount_record_rejection'
+    ]
+  ]) {
+    const value = readPrivateToJSONField(metadata, camelName, snakeName);
+    if (value !== undefined && value !== true) {
+      throwPrivateToJSONSerializationError(
+        `Expected private JSON dependency metadata ${camelName} to be true.`
+      );
+    }
+  }
+  for (const [camelName, snakeName] of [
+    ['publicToJSONAvailable', 'public_to_json_available'],
+    ['publicTestInstanceAvailable', 'public_test_instance_available'],
+    ['nativeExecutionAvailable', 'native_execution_available'],
+    ['compatibilityClaimed', 'compatibility_claimed']
+  ]) {
+    if (readPrivateToJSONField(metadata, camelName, snakeName) !== false) {
+      throwPrivateToJSONSerializationError(
+        `Expected private JSON dependency metadata ${camelName} to be false.`
+      );
+    }
+  }
 }
 
 function assertPrivateToJSONBooleanField(

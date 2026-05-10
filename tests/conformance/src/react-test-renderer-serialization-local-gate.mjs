@@ -79,6 +79,12 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
       "The private toJSON facade must expose an evidence-backed diagnostic result record without turning the public toJSON method on."
   },
   {
+    id: "js-tojson-update-unmount-host-output-rows",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON facade must expose explicit update and unmount host-output rows with dependency metadata while public serialization stays blocked."
+  },
+  {
     id: "js-tojson-public-serialization-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -302,6 +308,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics &&
     localChecks.privateToJSONSerializationFacadeCoversBroaderHostShapes &&
     localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult &&
+    localChecks.privateToJSONUpdateUnmountRowsPresent &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
   const privateToTreeMetadataGateReady =
     privateDiagnosticsReady &&
@@ -406,6 +413,11 @@ export function evaluateReactTestRendererSerializationLocalGate({
           requirement.id === "js-tojson-exposes-private-diagnostic-result"
         ) {
           return !localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult;
+        }
+        if (
+          requirement.id === "js-tojson-update-unmount-host-output-rows"
+        ) {
+          return !localChecks.privateToJSONUpdateUnmountRowsPresent;
         }
         if (requirement.id === "js-tojson-public-serialization-blocked") {
           return !localChecks.privateToJSONSerializationFacadePubliclyBlocked;
@@ -842,6 +854,64 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       testRendererSource,
       /\bTestRendererPrivateToJsonFacadeResult\b/u
+    );
+  const privateToJSONUpdateUnmountRowsPresent =
+    privateToJSONSerializationFacadeExposesDiagnosticResult &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-tojson-update-host-output-private-diagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-tojson-unmount-host-output-private-diagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateToJSONUpdateUnmountDependencyMetadata\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bmismatchedUpdateUnmountRecordRejection\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedHostOutputUpdateKinds\b[\s\S]*\bUnmount\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateToJSONUpdateUnmountRowMetadata\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicTestInstanceAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bnativeExecutionAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateToJsonHostOutputRow\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateToJsonHostOutputDependencyDiagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_json_host_output_update_row_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_json_host_output_unmount_row_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_update_host_output_row_rejects_mismatched_row_kind\b/u
     );
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
@@ -1406,6 +1476,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
     privateToJSONSerializationFacadeCoversBroaderHostShapes,
     privateToJSONSerializationFacadeExposesDiagnosticResult,
+    privateToJSONUpdateUnmountRowsPresent,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
     privateToTreePrivateFacadeGatePresent,

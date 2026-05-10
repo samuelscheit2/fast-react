@@ -1764,6 +1764,18 @@ pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-json-canary";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.private-facade-result";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
+    "react-test-renderer-tojson-update-host-output-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID: &str =
+    "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS: &str =
+    "private-tojson-update-unmount-host-output-rows-public-tojson-blocked";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID: &str =
+    "react-test-renderer-update-route-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID: &str =
+    "react-test-renderer-unmount-route-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID: &str =
+    "react-test-renderer-serialization-private-json-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
 pub const TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
@@ -2689,6 +2701,130 @@ impl TestRendererPrivateJsonPublicSurfaceBlockers {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
+    route_row_id: &'static str,
+    serialization_row_id: &'static str,
+    route_diagnostics_available: bool,
+    serialization_diagnostics_available: bool,
+    host_output_snapshot_current: bool,
+    public_to_json_available: bool,
+    public_test_instance_available: bool,
+    native_execution_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
+    #[must_use]
+    pub const fn route_row_id(self) -> &'static str {
+        self.route_row_id
+    }
+
+    #[must_use]
+    pub const fn serialization_row_id(self) -> &'static str {
+        self.serialization_row_id
+    }
+
+    #[must_use]
+    pub const fn route_diagnostics_available(self) -> bool {
+        self.route_diagnostics_available
+    }
+
+    #[must_use]
+    pub const fn serialization_diagnostics_available(self) -> bool {
+        self.serialization_diagnostics_available
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_surfaces_blocked(self) -> bool {
+        !self.public_to_json_available
+            && !self.public_test_instance_available
+            && !self.native_execution_available
+            && !self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonHostOutputRow {
+    id: &'static str,
+    diagnostic_name: &'static str,
+    status: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    previous_root_child_count: usize,
+    current_root_child_count: usize,
+    dependency_diagnostics: TestRendererPrivateToJsonHostOutputDependencyDiagnostics,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+}
+
+impl TestRendererPrivateToJsonHostOutputRow {
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn previous_root_child_count(self) -> usize {
+        self.previous_root_child_count
+    }
+
+    #[must_use]
+    pub const fn current_root_child_count(self) -> usize {
+        self.current_root_child_count
+    }
+
+    #[must_use]
+    pub const fn dependency_diagnostics(
+        self,
+    ) -> TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
+        self.dependency_diagnostics
+    }
+
+    #[must_use]
+    pub const fn public_blockers(self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererPrivateJsonFiberDiagnostic {
     fiber: TestRendererFiberHandleDiagnostics,
     parent: Option<TestRendererFiberHandleDiagnostics>,
@@ -2986,6 +3122,7 @@ pub struct TestRendererPrivateToJsonFacadeResult {
     diagnostic_name: &'static str,
     source_diagnostic_name: &'static str,
     host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_row: Option<TestRendererPrivateToJsonHostOutputRow>,
     host_output_snapshot_current: bool,
     element_type: TestElementType,
     props: TestProps,
@@ -3011,6 +3148,11 @@ impl TestRendererPrivateToJsonFacadeResult {
     #[must_use]
     pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
         self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_row(&self) -> Option<TestRendererPrivateToJsonHostOutputRow> {
+        self.host_output_row
     }
 
     #[must_use]
@@ -3069,6 +3211,7 @@ pub struct TestRendererPrivateJsonSerializationReport {
     diagnostic_name: &'static str,
     gate: TestRendererSerializationGateReport,
     host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_row: Option<TestRendererPrivateToJsonHostOutputRow>,
     host_output_snapshot_current: bool,
     root_child_count: usize,
     root_node_kind: TestRendererPrivateJsonNodeKind,
@@ -3091,6 +3234,11 @@ impl TestRendererPrivateJsonSerializationReport {
     #[must_use]
     pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
         self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_row(&self) -> Option<TestRendererPrivateToJsonHostOutputRow> {
+        self.host_output_row
     }
 
     #[must_use]
@@ -4643,6 +4791,14 @@ pub enum TestRendererPrivateJsonSerializationError {
     HostComponentChildIsElement {
         element_type: TestElementType,
     },
+    HostOutputRowMismatch {
+        row_id: &'static str,
+        expected: TestRendererRootUpdateKind,
+        actual: TestRendererRootUpdateKind,
+    },
+    UnmountSnapshotNotEmpty {
+        actual: usize,
+    },
 }
 
 impl Display for TestRendererPrivateJsonSerializationError {
@@ -4690,6 +4846,19 @@ impl Display for TestRendererPrivateJsonSerializationError {
                 formatter,
                 "private JSON serialization canary expected host component '{}' child to be text, found host component",
                 element_type.as_str()
+            ),
+            Self::HostOutputRowMismatch {
+                row_id,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "private JSON serialization canary row '{row_id}' expected {:?} host output, found {:?}",
+                expected, actual
+            ),
+            Self::UnmountSnapshotNotEmpty { actual } => write!(
+                formatter,
+                "private JSON serialization canary expected unmount host output to be empty, found {actual} root child nodes",
             ),
         }
     }
@@ -5394,6 +5563,7 @@ impl TestRendererRoot {
             output.completed_fibers().current(),
             output.snapshot(),
             TestRendererRootUpdateKind::Create,
+            None,
         )
     }
 
@@ -5401,12 +5571,82 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererUpdatedHostOutput,
     ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
+        let host_output_row = Self::private_to_json_host_output_row(
+            TestRendererRootUpdateKind::Update,
+            output.previous_snapshot(),
+            output.snapshot(),
+        )?;
         self.describe_private_json_serialization_from_current_fibers_for_canary(
             output.commit(),
             Some(output.fiber_inspection()),
             output.updated_fibers().current(),
             output.snapshot(),
             TestRendererRootUpdateKind::Update,
+            Some(host_output_row),
+        )
+    }
+
+    pub fn describe_private_to_json_host_output_update_row_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        let report = self.describe_private_json_serialization_after_update_for_canary(output)?;
+        report.host_output_row().ok_or_else(|| {
+            TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                row_id: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID,
+                expected: TestRendererRootUpdateKind::Update,
+                actual: TestRendererRootUpdateKind::Create,
+            }
+            .into()
+        })
+    }
+
+    pub fn describe_private_to_json_host_output_unmount_row_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        self.validate_serialization_gate_commit(output.commit())?;
+
+        let Some(last_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Unmount,
+                actual: TestRendererRootUpdateKind::Create,
+            });
+        };
+        if last_update.kind() != TestRendererRootUpdateKind::Unmount {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Unmount,
+                actual: last_update.kind(),
+            });
+        }
+
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
+        }
+        if !output.snapshot().children().is_empty() {
+            return Err(
+                TestRendererPrivateJsonSerializationError::UnmountSnapshotNotEmpty {
+                    actual: output.snapshot().children().len(),
+                }
+                .into(),
+            );
+        }
+        if output.deleted_fibers().host_root() != output.commit().current() {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                    row_id: TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID,
+                    expected: TestRendererRootUpdateKind::Unmount,
+                    actual: TestRendererRootUpdateKind::Update,
+                }
+                .into(),
+            );
+        }
+
+        Self::private_to_json_host_output_row(
+            TestRendererRootUpdateKind::Unmount,
+            output.previous_snapshot(),
+            output.snapshot(),
         )
     }
 
@@ -5415,7 +5655,7 @@ impl TestRendererRoot {
         output: &TestRendererCommittedHostOutput,
     ) -> Result<TestRendererPrivateToJsonFacadeResult, TestRendererRootError> {
         let report = self.describe_private_json_serialization_for_canary(output)?;
-        Ok(Self::private_to_json_facade_result_from_report(&report))
+        Self::private_to_json_facade_result_from_report(&report)
     }
 
     pub fn describe_private_to_json_facade_result_after_update_for_canary(
@@ -5423,7 +5663,7 @@ impl TestRendererRoot {
         output: &TestRendererUpdatedHostOutput,
     ) -> Result<TestRendererPrivateToJsonFacadeResult, TestRendererRootError> {
         let report = self.describe_private_json_serialization_after_update_for_canary(output)?;
-        Ok(Self::private_to_json_facade_result_from_report(&report))
+        Self::private_to_json_facade_result_from_report(&report)
     }
 
     pub fn describe_private_tree_metadata_for_canary(
@@ -5563,6 +5803,7 @@ impl TestRendererRoot {
         current_fibers: TestRendererHostOutputCanaryCurrentFibers,
         snapshot: &TestContainerSnapshot,
         host_output_update_kind: TestRendererRootUpdateKind,
+        host_output_row: Option<TestRendererPrivateToJsonHostOutputRow>,
     ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
         let gate = self.require_serialization_gate_ready_for_canary(commit)?;
         let fiber_inspection = gate
@@ -5580,6 +5821,7 @@ impl TestRendererRoot {
         if current_snapshot != *snapshot {
             return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
         }
+        Self::validate_private_to_json_host_output_row(host_output_update_kind, host_output_row)?;
 
         Self::validate_private_json_canary_current_fibers(&fiber_inspection, current_fibers)?;
         let component = Self::private_json_component_from_snapshot(snapshot)?;
@@ -5590,6 +5832,7 @@ impl TestRendererRoot {
             diagnostic_name: TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
             gate,
             host_output_update_kind,
+            host_output_row,
             host_output_snapshot_current: true,
             root_child_count: snapshot.children().len(),
             root_node_kind: component.node_kind(),
@@ -5599,15 +5842,121 @@ impl TestRendererRoot {
         })
     }
 
+    fn private_to_json_host_output_row(
+        host_output_update_kind: TestRendererRootUpdateKind,
+        previous_snapshot: &TestContainerSnapshot,
+        current_snapshot: &TestContainerSnapshot,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        let (id, route_row_id) = match host_output_update_kind {
+            TestRendererRootUpdateKind::Update => (
+                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID,
+                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID,
+            ),
+            TestRendererRootUpdateKind::Unmount => (
+                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID,
+                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID,
+            ),
+            TestRendererRootUpdateKind::Create => {
+                return Err(
+                    TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                        row_id: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID,
+                        expected: TestRendererRootUpdateKind::Update,
+                        actual: TestRendererRootUpdateKind::Create,
+                    }
+                    .into(),
+                );
+            }
+        };
+
+        if host_output_update_kind == TestRendererRootUpdateKind::Unmount
+            && !current_snapshot.children().is_empty()
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::UnmountSnapshotNotEmpty {
+                    actual: current_snapshot.children().len(),
+                }
+                .into(),
+            );
+        }
+
+        Ok(TestRendererPrivateToJsonHostOutputRow {
+            id,
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS,
+            host_output_update_kind,
+            previous_root_child_count: previous_snapshot.children().len(),
+            current_root_child_count: current_snapshot.children().len(),
+            dependency_diagnostics: TestRendererPrivateToJsonHostOutputDependencyDiagnostics {
+                route_row_id,
+                serialization_row_id: TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID,
+                route_diagnostics_available: true,
+                serialization_diagnostics_available: true,
+                host_output_snapshot_current: true,
+                public_to_json_available: false,
+                public_test_instance_available: false,
+                native_execution_available: false,
+                compatibility_claimed: false,
+            },
+            public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers::blocked(),
+        })
+    }
+
+    fn validate_private_to_json_host_output_row(
+        expected: TestRendererRootUpdateKind,
+        row: Option<TestRendererPrivateToJsonHostOutputRow>,
+    ) -> Result<(), TestRendererRootError> {
+        let Some(row) = row else {
+            return Ok(());
+        };
+
+        if row.host_output_update_kind() != expected {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                    row_id: row.id(),
+                    expected,
+                    actual: row.host_output_update_kind(),
+                }
+                .into(),
+            );
+        }
+
+        let expected_row_id = match expected {
+            TestRendererRootUpdateKind::Update => {
+                TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+            }
+            TestRendererRootUpdateKind::Unmount => {
+                TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+            }
+            TestRendererRootUpdateKind::Create => return Ok(()),
+        };
+        if row.id() != expected_row_id {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                    row_id: row.id(),
+                    expected,
+                    actual: row.host_output_update_kind(),
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
     fn private_to_json_facade_result_from_report(
         report: &TestRendererPrivateJsonSerializationReport,
-    ) -> TestRendererPrivateToJsonFacadeResult {
+    ) -> Result<TestRendererPrivateToJsonFacadeResult, TestRendererRootError> {
+        Self::validate_private_to_json_host_output_row(
+            report.host_output_update_kind(),
+            report.host_output_row(),
+        )?;
         let component = report.component();
 
-        TestRendererPrivateToJsonFacadeResult {
+        Ok(TestRendererPrivateToJsonFacadeResult {
             diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME,
             source_diagnostic_name: report.diagnostic_name(),
             host_output_update_kind: report.host_output_update_kind(),
+            host_output_row: report.host_output_row(),
             host_output_snapshot_current: report.host_output_snapshot_current(),
             element_type: component.element_type().clone(),
             props: component.props().clone(),
@@ -5617,7 +5966,7 @@ impl TestRendererRoot {
             public_blockers: report.public_blockers(),
             public_serialization_available: false,
             compatibility_claimed: false,
-        }
+        })
     }
 
     pub fn render_and_commit_host_output_for_canary(
@@ -8520,6 +8869,35 @@ mod tests {
             report.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
         );
+        let row = report.host_output_row().unwrap();
+        let dependencies = row.dependency_diagnostics();
+        assert_eq!(
+            row.id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            row.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS
+        );
+        assert_eq!(
+            row.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(row.previous_root_child_count(), 1);
+        assert_eq!(row.current_root_child_count(), 1);
+        assert_eq!(
+            dependencies.route_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
+        );
+        assert_eq!(
+            dependencies.serialization_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID
+        );
+        assert!(dependencies.route_diagnostics_available());
+        assert!(dependencies.serialization_diagnostics_available());
+        assert!(dependencies.host_output_snapshot_current());
+        assert!(dependencies.public_surfaces_blocked());
+        assert!(row.public_blockers().all_blocked());
         assert!(report.host_output_snapshot_current());
         assert_eq!(
             gate.status(),
@@ -8650,6 +9028,10 @@ mod tests {
             result.host_output_update_kind(),
             TestRendererRootUpdateKind::Update
         );
+        assert_eq!(
+            result.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+        );
         assert!(result.host_output_snapshot_current());
         assert_eq!(result.element_type().as_str(), "span");
         assert_eq!(result.props(), &TestProps::new());
@@ -8663,6 +9045,142 @@ mod tests {
         assert!(result.public_blockers().all_blocked());
         assert!(!result.public_serialization_available());
         assert!(!result.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let row = root
+            .describe_private_to_json_host_output_unmount_row_for_canary(&unmounted)
+            .unwrap();
+        let dependencies = row.dependency_diagnostics();
+
+        assert_eq!(
+            row.id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            row.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            row.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_UNMOUNT_ROW_STATUS
+        );
+        assert_eq!(
+            row.host_output_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(row.previous_root_child_count(), 1);
+        assert_eq!(row.current_root_child_count(), 0);
+        assert_eq!(
+            dependencies.route_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+        );
+        assert_eq!(
+            dependencies.serialization_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID
+        );
+        assert!(dependencies.route_diagnostics_available());
+        assert!(dependencies.serialization_diagnostics_available());
+        assert!(dependencies.host_output_snapshot_current());
+        assert!(!dependencies.public_to_json_available());
+        assert!(!dependencies.public_test_instance_available());
+        assert!(!dependencies.native_execution_available());
+        assert!(!dependencies.compatibility_claimed());
+        assert!(dependencies.public_surfaces_blocked());
+        assert!(row.public_blockers().all_blocked());
+        assert!(unmounted.snapshot().children().is_empty());
+        assert!(
+            !unmounted
+                .host_node_cleanup()
+                .public_unmount_compatibility_claimed()
+        );
+    }
+
+    #[test]
+    fn root_private_to_json_unmount_host_output_row_rejects_stale_snapshot() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.unmount().unwrap();
+        let mut unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        unmounted.snapshot = unmounted.previous_snapshot.clone();
+
+        let error = root
+            .describe_private_to_json_host_output_unmount_row_for_canary(&unmounted)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
+    fn root_private_to_json_update_host_output_row_rejects_mismatched_row_kind() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut report = root
+            .describe_private_json_serialization_after_update_for_canary(&updated)
+            .unwrap();
+        let mut row = report.host_output_row().unwrap();
+        row.host_output_update_kind = TestRendererRootUpdateKind::Unmount;
+        report.host_output_row = Some(row);
+
+        let error =
+            TestRendererRoot::private_to_json_facade_result_from_report(&report).unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputRowMismatch {
+                row_id,
+                expected: TestRendererRootUpdateKind::Update,
+                actual: TestRendererRootUpdateKind::Unmount,
+            } if *row_id == TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+        ));
     }
 
     #[test]
