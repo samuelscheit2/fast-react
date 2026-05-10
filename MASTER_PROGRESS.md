@@ -29,6 +29,18 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 295, 296, and 305 were accepted from the 293-322 queue. The batch
+  added a private HostRoot visible-callback invocation metadata gate, threaded
+  passive effect create/destroy callback handles through data-only commit and
+  flush records, and added a private react-test-renderer `toJSON` facade gate
+  while keeping public serialization blocked.
+- Workers 295 and 296 were verified on `main` with
+  `cargo fmt --all --check`, focused `fast-react-reconciler` tests for
+  `root_callbacks`, `function_component`, `root_commit`, and
+  `passive_effects`, the full `cargo test -p fast-react-reconciler
+  --all-features` suite, and `git diff --check`. Worker 305 was verified on
+  `main` with the focused react-test-renderer serialization local gate test and
+  `git diff --check`.
 - Workers 263-292 were accepted as a complete implementation batch. The batch
   added root commit update/deletion apply canaries, private test-renderer JSON,
   routing, TestInstance, serialization, and act gates, DOM root bridge/public

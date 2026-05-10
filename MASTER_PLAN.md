@@ -45,15 +45,13 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue workers 293-322 from current `main`, each in
-its matching `/Users/user/Developer/Developer/fast-react-worker-*` worktree.
+Top-level cap: 30 workers. Remaining active workers from the 293-322 queue run
+in matching `/Users/user/Developer/Developer/fast-react-worker-*` worktrees.
 
 | Worker | Focus |
 | --- | --- |
 | 293 | Root commit host-parent placement apply canary |
 | 294 | Root commit host sibling insertion canary |
-| 295 | Root commit visible callback invocation gate |
-| 296 | Passive effect callback handle flush gate |
 | 297 | Begin-work Fragment single-child handoff |
 | 298 | Context provider nested stack handoff |
 | 299 | Function component useReducer render canary |
@@ -62,7 +60,6 @@ its matching `/Users/user/Developer/Developer/fast-react-worker-*` worktree.
 | 302 | Root scheduler ping/retry lane gate |
 | 303 | Sync flush passive continuation execution gate |
 | 304 | Test renderer JS private root request bridge |
-| 305 | Test renderer toJSON private serialization facade |
 | 306 | Test renderer TestInstance private wrapper skeleton |
 | 307 | Test renderer update/unmount private JS bridge |
 | 308 | Test renderer act scheduler private gate |
