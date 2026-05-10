@@ -16,6 +16,7 @@ const ReactSharedInternals = {
   H: null
 };
 
+const privateEffectHookDispatchers = new WeakSet();
 const privateStateHookDispatchers = new WeakSet();
 
 const ReactCurrentDispatcher = {};
@@ -54,6 +55,10 @@ function isPrivateStateHookDispatcher(dispatcher) {
   return isObjectLike(dispatcher) && privateStateHookDispatchers.has(dispatcher);
 }
 
+function isPrivateEffectHookDispatcher(dispatcher) {
+  return isObjectLike(dispatcher) && privateEffectHookDispatchers.has(dispatcher);
+}
+
 function validatePrivateStateHookDispatcher(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -66,9 +71,32 @@ function validatePrivateStateHookDispatcher(dispatcher) {
   }
 }
 
+function validatePrivateEffectHookDispatcher(dispatcher) {
+  if (!isObjectLike(dispatcher)) {
+    throw createInvalidHookCallError('useEffect');
+  }
+
+  for (const hookName of [
+    'useEffect',
+    'useImperativeHandle',
+    'useInsertionEffect',
+    'useLayoutEffect'
+  ]) {
+    if (typeof dispatcher[hookName] !== 'function') {
+      throw createInvalidHookCallError(hookName);
+    }
+  }
+}
+
 function markPrivateStateHookDispatcher(dispatcher) {
   validatePrivateStateHookDispatcher(dispatcher);
   privateStateHookDispatchers.add(dispatcher);
+  return dispatcher;
+}
+
+function markPrivateEffectHookDispatcher(dispatcher) {
+  validatePrivateEffectHookDispatcher(dispatcher);
+  privateEffectHookDispatchers.add(dispatcher);
   return dispatcher;
 }
 
@@ -83,6 +111,20 @@ function resolveDispatcher(hookName) {
 }
 
 function getDispatcherHook(dispatcher, hookName) {
+  const hook = dispatcher[hookName];
+
+  if (typeof hook !== 'function') {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  return hook;
+}
+
+function getPrivateEffectDispatcherHook(dispatcher, hookName) {
+  if (!isPrivateEffectHookDispatcher(dispatcher)) {
+    throw createInvalidHookCallError(hookName);
+  }
+
   const hook = dispatcher[hookName];
 
   if (typeof hook !== 'function') {
@@ -111,8 +153,23 @@ function callDispatcherHook(hookName, args) {
     return callPrivateStateDispatcherHook(hookName, args);
   }
 
+  if (
+    hookName === 'useEffect' ||
+    hookName === 'useImperativeHandle' ||
+    hookName === 'useInsertionEffect' ||
+    hookName === 'useLayoutEffect'
+  ) {
+    return callPrivateEffectDispatcherHook(hookName, args);
+  }
+
   const dispatcher = resolveDispatcher(hookName);
   const hook = getDispatcherHook(dispatcher, hookName);
+  return hook.apply(dispatcher, args);
+}
+
+function callPrivateEffectDispatcherHook(hookName, args) {
+  const dispatcher = resolveDispatcher(hookName);
+  const hook = getPrivateEffectDispatcherHook(dispatcher, hookName);
   return hook.apply(dispatcher, args);
 }
 
@@ -150,11 +207,19 @@ const useContext = defineHookFunctionShape(function (Context) {
 }, 1);
 
 const useEffect = defineHookFunctionShape(function (create, deps) {
-  return callDispatcherHook('useEffect', arguments);
+  return callPrivateEffectDispatcherHook('useEffect', arguments);
+}, 2);
+
+const useImperativeHandle = defineHookFunctionShape(function (ref, create, deps) {
+  return callPrivateEffectDispatcherHook('useImperativeHandle', arguments);
+}, 3);
+
+const useInsertionEffect = defineHookFunctionShape(function (create, deps) {
+  return callPrivateEffectDispatcherHook('useInsertionEffect', arguments);
 }, 2);
 
 const useLayoutEffect = defineHookFunctionShape(function (create, deps) {
-  return callDispatcherHook('useLayoutEffect', arguments);
+  return callPrivateEffectDispatcherHook('useLayoutEffect', arguments);
 }, 2);
 
 const useMemo = defineHookFunctionShape(function (create, deps) {
@@ -177,18 +242,23 @@ module.exports = {
   ReactCurrentDispatcher,
   ReactSharedInternals,
   callDispatcherHook,
+  callPrivateEffectDispatcherHook,
   callPrivateStateDispatcherHook,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
+  isPrivateEffectHookDispatcher,
   isPrivateStateHookDispatcher,
+  markPrivateEffectHookDispatcher,
   markPrivateStateHookDispatcher,
   resolveDispatcher,
   use,
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
+  useInsertionEffect,
   useLayoutEffect,
   useMemo,
   useReducer,

@@ -27,6 +27,8 @@ const selectedDefaultHooks = [
   ["useCallback", 2, ["callback", ["dep"]]],
   ["useContext", 1, [{ $$typeof: Symbol.for("react.context") }]],
   ["useEffect", 2, [() => undefined, []]],
+  ["useImperativeHandle", 3, [{ current: null }, () => "handle", []]],
+  ["useInsertionEffect", 2, [() => undefined, []]],
   ["useLayoutEffect", 2, [() => undefined, []]],
   ["useMemo", 2, [() => "memo", []]],
   ["useReducer", 3, [(state) => state, 0, undefined]],
@@ -39,10 +41,21 @@ const statefulDefaultHooks = [
   ["useState", 1, [0]]
 ];
 
+const effectDefaultHooks = [
+  ["useEffect", 2, [() => undefined, []]],
+  ["useImperativeHandle", 3, [{ current: null }, () => "handle", []]],
+  ["useInsertionEffect", 2, [() => undefined, []]],
+  ["useLayoutEffect", 2, [() => undefined, []]]
+];
+
+const invalidHookCallDefaultHooks = selectedDefaultHooks.filter(
+  ([hookName]) => !hasHookName(statefulDefaultHooks, hookName)
+);
+
 const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
-  ([hookName]) => !statefulDefaultHooks.some(
-    ([statefulHookName]) => statefulHookName === hookName
-  )
+  ([hookName]) =>
+    !hasHookName(statefulDefaultHooks, hookName) &&
+    !hasHookName(effectDefaultHooks, hookName)
 );
 
 const selectedServerHooks = [
@@ -70,7 +83,7 @@ test("selected public React hooks preserve React 19.2.6 function names and lengt
 });
 
 test("selected public React hooks throw the invalid-hook-call boundary without a dispatcher", () => {
-  for (const [hookName, , args] of dispatcherForwardedDefaultHooks) {
+  for (const [hookName, , args] of invalidHookCallDefaultHooks) {
     assertInvalidHookCall(() => React[hookName](...args), hookName);
   }
 
@@ -105,6 +118,31 @@ test("useState and useReducer fail closed without a private state-hook dispatche
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateStateHookDispatcher(genericDispatcher),
+    false
+  );
+});
+
+test("effect hooks fail closed without a marked private effect-hook dispatcher", () => {
+  const calls = [];
+  const genericDispatcher = Object.fromEntries(
+    effectDefaultHooks.map(([hookName]) => [
+      hookName,
+      function (...args) {
+        calls.push([hookName, args]);
+        return `return:${hookName}`;
+      }
+    ])
+  );
+
+  hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
+
+  for (const [hookName, , args] of effectDefaultHooks) {
+    assertInvalidHookCall(() => React[hookName](...args), hookName);
+  }
+
+  assert.deepEqual(calls, []);
+  assert.equal(
+    hookDispatcher.isPrivateEffectHookDispatcher(genericDispatcher),
     false
   );
 });
@@ -190,6 +228,107 @@ test("useState and useReducer forward only to a marked private state-hook dispat
   assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), true);
 });
 
+test("effect hooks forward only to a marked private effect-hook dispatcher", () => {
+  const calls = [];
+  const createdEffects = [];
+  const passiveCreate = () => {
+    createdEffects.push("passive");
+  };
+  const imperativeRef = { current: null };
+  const imperativeCreate = () => {
+    createdEffects.push("imperative");
+    return "handle";
+  };
+  const insertionCreate = () => {
+    createdEffects.push("insertion");
+  };
+  const layoutCreate = () => {
+    createdEffects.push("layout");
+  };
+  const dispatcher = hookDispatcher.markPrivateEffectHookDispatcher({
+    useEffect(create, deps) {
+      calls.push({
+        args: [create, deps],
+        hookName: "useEffect",
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return "return:useEffect";
+    },
+    useImperativeHandle(ref, create, deps) {
+      calls.push({
+        args: [ref, create, deps],
+        hookName: "useImperativeHandle",
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return "return:useImperativeHandle";
+    },
+    useInsertionEffect(create, deps) {
+      calls.push({
+        args: [create, deps],
+        hookName: "useInsertionEffect",
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return "return:useInsertionEffect";
+    },
+    useLayoutEffect(create, deps) {
+      calls.push({
+        args: [create, deps],
+        hookName: "useLayoutEffect",
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return "return:useLayoutEffect";
+    }
+  });
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assert.equal(
+    React.useEffect(passiveCreate, ["passive-dep"]),
+    "return:useEffect"
+  );
+  assert.equal(
+    React.useImperativeHandle(
+      imperativeRef,
+      imperativeCreate,
+      ["imperative-dep"]
+    ),
+    "return:useImperativeHandle"
+  );
+  assert.equal(
+    React.useInsertionEffect(insertionCreate, ["insertion-dep"]),
+    "return:useInsertionEffect"
+  );
+  assert.equal(
+    React.useLayoutEffect(layoutCreate, ["layout-dep"]),
+    "return:useLayoutEffect"
+  );
+  assert.deepEqual(createdEffects, []);
+  assert.deepEqual(imperativeRef, { current: null });
+  assert.deepEqual(calls, [
+    {
+      args: [passiveCreate, ["passive-dep"]],
+      hookName: "useEffect",
+      thisMatchesDispatcher: true
+    },
+    {
+      args: [imperativeRef, imperativeCreate, ["imperative-dep"]],
+      hookName: "useImperativeHandle",
+      thisMatchesDispatcher: true
+    },
+    {
+      args: [insertionCreate, ["insertion-dep"]],
+      hookName: "useInsertionEffect",
+      thisMatchesDispatcher: true
+    },
+    {
+      args: [layoutCreate, ["layout-dep"]],
+      hookName: "useLayoutEffect",
+      thisMatchesDispatcher: true
+    }
+  ]);
+  assert.equal(hookDispatcher.isPrivateEffectHookDispatcher(dispatcher), true);
+});
+
 test("react-server hooks share the dispatcher guard with the default React entrypoint", () => {
   const calls = [];
   const dispatcher = {
@@ -221,6 +360,10 @@ test("react-server hooks share the dispatcher guard with the default React entry
     ["useMemo", create, ["dep"]]
   ]);
 });
+
+function hasHookName(hooks, hookName) {
+  return hooks.some(([candidateHookName]) => candidateHookName === hookName);
+}
 
 function assertInvalidHookCall(callback, label) {
   assert.throws(

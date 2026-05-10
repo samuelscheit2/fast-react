@@ -11,6 +11,8 @@ const {
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
+  useInsertionEffect,
   useLayoutEffect,
   useMemo,
   useReducer,
@@ -94,14 +96,8 @@ exports.useEffectEvent = createUnimplementedFunction(
   'useEffectEvent'
 );
 exports.useId = createUnimplementedFunction(entrypoint, 'useId');
-exports.useImperativeHandle = createUnimplementedFunction(
-  entrypoint,
-  'useImperativeHandle'
-);
-exports.useInsertionEffect = createUnimplementedFunction(
-  entrypoint,
-  'useInsertionEffect'
-);
+exports.useImperativeHandle = useImperativeHandle;
+exports.useInsertionEffect = useInsertionEffect;
 exports.useLayoutEffect = useLayoutEffect;
 exports.useMemo = useMemo;
 exports.useOptimistic = createUnimplementedFunction(
