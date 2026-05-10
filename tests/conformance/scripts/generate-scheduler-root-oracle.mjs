@@ -13,8 +13,9 @@ if (args.has("--help") || args.has("-h")) {
   process.stdout.write(`Usage: node scripts/generate-scheduler-root-oracle.mjs [--write]
 
 Generate the pinned scheduler 0.27.0 public root behavior oracle from exact npm
-package artifacts. Generation uses temporary directories, does not run lifecycle
-scripts, omits raw wall-clock timestamps, and does not claim Fast React
+package artifacts and the local scheduler implementation copied under an
+isolated alias. Generation uses temporary directories, does not run lifecycle
+scripts, omits raw wall-clock timestamps, and does not claim broad Fast React
 scheduler compatibility.
 
 Without --write, the generated JSON is printed to stdout.
