@@ -684,7 +684,12 @@
               "functionName": "hydrateRoot",
               "length": 0
             }
-          ]
+          ],
+          "privateRuntimeFacadeSymbols": {
+            "createRoot": [
+              "fast.react_dom.client.private_root_public_facade_adapter"
+            ]
+          }
         },
         {
           "file": "client.react-server.js",
@@ -1172,6 +1177,23 @@
                 "fast.react_test_renderer.private_totree_host_output_metadata"
               ]
             },
+            "schedulerPrivateRuntimeFacadeStringProperties": {
+              "unstable_flushAll": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushAllWithoutAsserting": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushExpired": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushNumberOfYields": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushUntilNextPaint": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ]
+            },
             "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
             "rendererKeySet": "reactTestRenderer.renderer",
             "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
@@ -1262,6 +1284,23 @@
                 "fast.react_test_renderer.private_totree_host_output_metadata"
               ]
             },
+            "schedulerPrivateRuntimeFacadeStringProperties": {
+              "unstable_flushAll": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushAllWithoutAsserting": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushExpired": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushNumberOfYields": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushUntilNextPaint": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ]
+            },
             "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
             "rendererKeySet": "reactTestRenderer.renderer",
             "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
@@ -1348,6 +1387,23 @@
               "toTree": [
                 "fast.react_test_renderer.private_totree_facade",
                 "fast.react_test_renderer.private_totree_host_output_metadata"
+              ]
+            },
+            "schedulerPrivateRuntimeFacadeStringProperties": {
+              "unstable_flushAll": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushAllWithoutAsserting": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushExpired": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushNumberOfYields": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+              ],
+              "unstable_flushUntilNextPaint": [
+                "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
               ]
             },
             "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
@@ -1470,6 +1526,23 @@
           "keySet": "scheduler.mock",
           "metadata": {
             "placeholder": false
+          },
+          "privateRuntimeFacadeStringProperties": {
+            "unstable_flushAll": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushAllWithoutAsserting": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushExpired": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushNumberOfYields": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushUntilNextPaint": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ]
           }
         },
         {
@@ -1512,6 +1585,23 @@
           "keySet": "scheduler.mock",
           "metadata": {
             "placeholder": false
+          },
+          "privateRuntimeFacadeStringProperties": {
+            "unstable_flushAll": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushAllWithoutAsserting": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushExpired": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushNumberOfYields": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushUntilNextPaint": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ]
           }
         },
         {
@@ -1519,6 +1609,23 @@
           "keySet": "scheduler.mock",
           "metadata": {
             "placeholder": false
+          },
+          "privateRuntimeFacadeStringProperties": {
+            "unstable_flushAll": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushAllWithoutAsserting": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushExpired": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushNumberOfYields": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ],
+            "unstable_flushUntilNextPaint": [
+              "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__"
+            ]
           }
         },
         {

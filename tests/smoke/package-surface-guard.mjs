@@ -369,6 +369,176 @@ function assertPrivateRuntimeFacadeSymbols(
   }
 }
 
+function assertPrivateRuntimeFacadeStringProperties(
+  target,
+  expectedProperties = [],
+  label
+) {
+  assert.deepEqual(
+    [...expectedProperties].sort(),
+    expectedProperties,
+    `${label} private runtime facade string properties snapshot must stay sorted`
+  );
+  assert.equal(
+    new Set(expectedProperties).size,
+    expectedProperties.length,
+    `${label} private runtime facade string properties snapshot must stay unique`
+  );
+
+  assert.notEqual(target, null, `${label} private runtime facade target`);
+  assert.equal(
+    typeof target === 'object' || typeof target === 'function',
+    true,
+    `${label} private runtime facade target type`
+  );
+
+  const actualProperties = Reflect.ownKeys(target)
+    .filter(
+      (key) =>
+        typeof key === 'string' &&
+        !allowedRuntimeMetadataKeys.has(key) &&
+        privateDiagnosticRuntimeExportPattern.test(key)
+    )
+    .sort();
+
+  assert.deepEqual(
+    actualProperties,
+    expectedProperties,
+    `${label} private runtime facade string properties`
+  );
+
+  for (const propertyName of expectedProperties) {
+    assert.equal(
+      Object.keys(target).includes(propertyName),
+      false,
+      `${label} must not expose private runtime facade ${propertyName} as a public key`
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(target, propertyName);
+    assert.notEqual(
+      descriptor,
+      undefined,
+      `${label} private runtime facade ${propertyName} descriptor`
+    );
+    assert.equal(
+      descriptor.enumerable,
+      false,
+      `${label} private runtime facade ${propertyName} enumerable`
+    );
+    assert.equal(
+      descriptor.configurable,
+      false,
+      `${label} private runtime facade ${propertyName} configurable`
+    );
+    assert.equal(
+      descriptor.writable,
+      false,
+      `${label} private runtime facade ${propertyName} writable`
+    );
+    assert.notEqual(
+      descriptor.value,
+      undefined,
+      `${label} private runtime facade ${propertyName} value`
+    );
+    assert.equal(
+      descriptor.value !== null && typeof descriptor.value === 'object',
+      true,
+      `${label} private runtime facade ${propertyName} value type`
+    );
+    assert.equal(
+      Object.isFrozen(descriptor.value),
+      true,
+      `${label} private runtime facade ${propertyName} value frozen`
+    );
+    if (Object.hasOwn(descriptor.value, 'exportName')) {
+      assert.equal(
+        descriptor.value.exportName,
+        propertyName,
+        `${label} private runtime facade ${propertyName} export name`
+      );
+    }
+  }
+}
+
+function assertPrivateRuntimeFacadeStringPropertyMap(
+  container,
+  expectedPropertiesByName = {},
+  label
+) {
+  const expectedNames = Object.keys(expectedPropertiesByName);
+  assert.deepEqual(
+    [...expectedNames].sort(),
+    expectedNames,
+    `${label} private runtime facade string property map snapshot must stay sorted`
+  );
+  assert.equal(
+    new Set(expectedNames).size,
+    expectedNames.length,
+    `${label} private runtime facade string property map snapshot must stay unique`
+  );
+
+  for (const expectedName of expectedNames) {
+    assert.equal(
+      Object.hasOwn(container, expectedName),
+      true,
+      `${label}.${expectedName} private runtime facade owner`
+    );
+    assert.equal(
+      typeof container[expectedName],
+      'function',
+      `${label}.${expectedName} private runtime facade owner type`
+    );
+  }
+
+  for (const publicName of Object.keys(container)) {
+    if (typeof container[publicName] !== 'function') {
+      continue;
+    }
+
+    assertPrivateRuntimeFacadeStringProperties(
+      container[publicName],
+      expectedPropertiesByName[publicName] ?? [],
+      `${label}.${publicName}`
+    );
+  }
+}
+
+function assertRuntimeEntrypointPrivateFacades(moduleExports, entry, label) {
+  const expectedSymbolsByName = entry.privateRuntimeFacadeSymbols ?? {};
+  const expectedSymbolNames = Object.keys(expectedSymbolsByName);
+  assert.deepEqual(
+    [...expectedSymbolNames].sort(),
+    expectedSymbolNames,
+    `${label} private runtime facade symbol map snapshot must stay sorted`
+  );
+  assert.equal(
+    new Set(expectedSymbolNames).size,
+    expectedSymbolNames.length,
+    `${label} private runtime facade symbol map snapshot must stay unique`
+  );
+
+  for (const publicName of expectedSymbolNames) {
+    assert.equal(
+      Object.hasOwn(moduleExports, publicName),
+      true,
+      `${label}.${publicName} private runtime facade owner`
+    );
+    assertPrivateRuntimeFacadeSymbols(
+      moduleExports[publicName],
+      expectedSymbolsByName[publicName],
+      `${label}.${publicName}`
+    );
+  }
+
+  if (entry.privateRuntimeFacadeStringProperties !== undefined) {
+    assertPrivateRuntimeFacadeStringPropertyMap(
+      moduleExports,
+      entry.privateRuntimeFacadeStringProperties,
+      label
+    );
+  }
+}
+
 function assertPlaceholderMetadata(moduleExports, expected, label) {
   const placeholder = Object.getOwnPropertyDescriptor(
     moduleExports,
@@ -729,6 +899,9 @@ function assertReactTestRendererSchedulerPlaceholder(
 ) {
   const propertyName = exportName.slice('_Scheduler.'.length);
   const expectedSchedulerKeys = snapshot.keySets['scheduler.mock'];
+  const expectedPrivateStringProperties =
+    entry.reactTestRendererRoot?.schedulerPrivateRuntimeFacadeStringProperties ??
+    {};
 
   assert.deepEqual(
     Object.keys(scheduler),
@@ -741,6 +914,11 @@ function assertReactTestRendererSchedulerPlaceholder(
     `${label} scheduler ownKeys`
   );
   assertNoPrivateDiagnosticRuntimeExports(scheduler, `${label} scheduler`);
+  assertPrivateRuntimeFacadeStringPropertyMap(
+    scheduler,
+    expectedPrivateStringProperties,
+    `${label} scheduler`
+  );
   assert.equal(
     typeof scheduler[propertyName],
     'function',
@@ -1139,6 +1317,7 @@ async function assertRuntimeEntrypoint(packageRoot, entry, packageName) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeysFor(entry), label);
   assertRuntimeOwnStringKeys(moduleExports, entry, label);
   assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
+  assertRuntimeEntrypointPrivateFacades(moduleExports, entry, label);
   assertPlaceholderMetadata(moduleExports, entry.metadata, label);
   assertRuntimeVersion(moduleExports, entry, label);
   assertUndefinedExports(moduleExports, entry, label);
