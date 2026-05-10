@@ -2,7 +2,7 @@
 
 ## Goal
 
-- Status: active
+- Status: complete
 - Objective: add core root lane selection helpers needed by scheduler, sync flush, and future Suspense/Offscreen work, without touching reconciler root commit or public Scheduler code
 - Final pre-completion `get_goal` check: status `active` for the same objective.
 
@@ -12,6 +12,7 @@
 - Read `WORKER_BRIEF.md`; did not read `ORCHESTRATOR.md`.
 - Implemented core-only root lane selection helpers and tests.
 - Ran all required verification commands successfully.
+- Integrated with current `main` and reran the core verification gates.
 
 ## Summary
 
