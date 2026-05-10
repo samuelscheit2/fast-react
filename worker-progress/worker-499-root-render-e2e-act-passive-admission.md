@@ -5,7 +5,7 @@
 - `create_goal` was called as the first action before research, file reads,
   implementation, or verification.
 - `get_goal` was available after setup and again before this report.
-- Active goal status from latest `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active goal objective from latest `get_goal`: Add private root-render E2E
   admission rows for accepted act/passive diagnostics while public root render
   and act compatibility remain blocked.

@@ -6564,7 +6564,7 @@ function inspectActPassiveSourceDiagnostics({ workspaceRoot }) {
         ) &&
         /consumeRendererBackedActDrainDiagnostics/u.test(reactActGateSource),
       reactDomTestUtilsActPrivateRoutingGatePresent:
-        /react-dom-test-utils-act-private-routing-gate-4/u.test(
+        /react-dom-test-utils-act-private-routing-gate-5/u.test(
           reactDomTestUtilsActGateSource
         ) &&
         /blocked-public-test-utils-act-private-routing/u.test(
@@ -8258,7 +8258,7 @@ function expectedPrivateActEvidence() {
       status: "consumed-accepted-renderer-backed-act-drain-diagnostics"
     },
     reactDomTestUtilsActGate: {
-      id: "react-dom-test-utils-act-private-routing-gate-4",
+      id: "react-dom-test-utils-act-private-routing-gate-5",
       privatePrerequisitesPresent: true,
       privateRoutingReady: false,
       publicCompatibilityClaimed: false,
