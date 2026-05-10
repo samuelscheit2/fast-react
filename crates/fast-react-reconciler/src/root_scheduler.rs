@@ -19,6 +19,13 @@ use fast_react_host_config::HostTypes;
 use crate::begin_work::UnsupportedSuspenseChildShapeRecord;
 use crate::concurrent_updates::{mark_update_lane_from_fiber_to_root, root_for_updated_fiber};
 use crate::root_commit::{HostRootCommitRecord, PendingPassiveCommitHandoff};
+#[cfg(test)]
+use crate::root_commit::{
+    HostRootFinishedWorkCommitHandoffErrorForCanary,
+    HostRootFinishedWorkCommitHandoffRecordForCanary,
+    commit_finished_host_root_with_finished_work_handoff_for_canary,
+    record_host_root_finished_work_pending_commit_for_canary,
+};
 use crate::root_config::{RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord};
 use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
 use crate::scheduler_bridge::{
@@ -33,9 +40,8 @@ use crate::{
     RootUpdateLaneSourcePriority, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
     SchedulerCallbackRequest, SchedulerCallbackValidationRecord, SchedulerCancellationRecord,
     SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
-    SyncFlushExecutionContextRecord, UpdateContainerResult, UpdateId, commit_finished_host_root,
-    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
-    validate_scheduled_host_root_callback,
+    SyncFlushExecutionContextRecord, UpdateContainerResult, UpdateId, render_host_root_for_lanes,
+    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
 
 pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
@@ -1093,6 +1099,8 @@ pub(crate) struct RootSyncSchedulerContinuationExecutionRecord {
     pending_passive_blocker: Option<RootSyncSchedulerPendingPassiveBlockerRecord>,
     status: RootSyncSchedulerContinuationExecutionStatus,
     commit: Option<HostRootCommitRecord>,
+    #[cfg(test)]
+    root_commit_handoff: Option<HostRootFinishedWorkCommitHandoffRecordForCanary>,
 }
 
 #[allow(
@@ -1145,6 +1153,14 @@ impl RootSyncSchedulerContinuationExecutionRecord {
     #[must_use]
     pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
         self.commit.as_ref()
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn root_commit_handoff_for_canary(
+        &self,
+    ) -> Option<&HostRootFinishedWorkCommitHandoffRecordForCanary> {
+        self.root_commit_handoff.as_ref()
     }
 
     #[must_use]
@@ -1207,6 +1223,33 @@ impl RootSyncSchedulerContinuationExecutionRecord {
     #[must_use]
     pub(crate) const fn executes_public_effects(&self) -> bool {
         false
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn accepted_root_scheduler_execution_evidence_for_canary(&self) -> bool {
+        self.did_execute_private_sync_scheduler_continuation()
+            && self.consumed_accepted_render_handoff()
+            && self.selected_lanes == self.handoff.lanes()
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn accepted_root_commit_execution_evidence_for_canary(&self) -> bool {
+        self.root_commit_handoff
+            .as_ref()
+            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_finished_work_commit_execution)
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn routed_through_root_scheduler_and_commit_evidence_for_canary(&self) -> bool {
+        self.accepted_root_scheduler_execution_evidence_for_canary()
+            && self.accepted_root_commit_execution_evidence_for_canary()
+            && self.async_callback_execution_blocked()
+            && self.public_update_scheduling_blocked()
+            && !self.public_root_compatibility_claimed()
+            && !self.executes_public_effects()
     }
 }
 
@@ -1488,6 +1531,8 @@ pub(crate) struct SchedulerBridgeActContinuationExecutionRecord {
     status: SchedulerBridgeActContinuationExecutionStatus,
     render_phase: Option<HostRootRenderPhaseRecord>,
     commit: Option<HostRootCommitRecord>,
+    #[cfg(test)]
+    root_commit_handoff: Option<HostRootFinishedWorkCommitHandoffRecordForCanary>,
 }
 
 #[allow(
@@ -1528,6 +1573,14 @@ impl SchedulerBridgeActContinuationExecutionRecord {
     #[must_use]
     pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
         self.commit.as_ref()
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn root_commit_handoff_for_canary(
+        &self,
+    ) -> Option<&HostRootFinishedWorkCommitHandoffRecordForCanary> {
+        self.root_commit_handoff.as_ref()
     }
 
     #[must_use]
@@ -1572,6 +1625,34 @@ impl SchedulerBridgeActContinuationExecutionRecord {
     #[must_use]
     pub(crate) const fn executes_effects(&self) -> bool {
         false
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn accepted_root_scheduler_execution_evidence_for_canary(&self) -> bool {
+        self.did_execute_accepted_internal_act_continuation()
+            && self.render_phase.is_some()
+            && self.commit.is_some()
+            && self.selected_lanes == self.continuation.continuation_lanes()
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn accepted_root_commit_execution_evidence_for_canary(&self) -> bool {
+        self.root_commit_handoff
+            .as_ref()
+            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_finished_work_commit_execution)
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn routed_through_root_scheduler_and_commit_evidence_for_canary(&self) -> bool {
+        self.accepted_root_scheduler_execution_evidence_for_canary()
+            && self.accepted_root_commit_execution_evidence_for_canary()
+            && !self.drains_public_react_act_queue()
+            && !self.public_act_compatibility_claimed()
+            && !self.public_scheduler_timing_compatibility_claimed()
+            && !self.executes_effects()
     }
 }
 
@@ -2080,6 +2161,8 @@ impl From<RootWorkLoopError> for RootSchedulerError {
 pub(crate) enum SchedulerBridgeActContinuationExecutionError {
     RootScheduler(RootSchedulerError),
     RootCommit(RootCommitError),
+    #[cfg(test)]
+    RootCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
 }
 
 impl Display for SchedulerBridgeActContinuationExecutionError {
@@ -2087,6 +2170,8 @@ impl Display for SchedulerBridgeActContinuationExecutionError {
         match self {
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
+            #[cfg(test)]
+            Self::RootCommitHandoff(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -2096,6 +2181,8 @@ impl Error for SchedulerBridgeActContinuationExecutionError {
         match self {
             Self::RootScheduler(error) => Some(error),
             Self::RootCommit(error) => Some(error),
+            #[cfg(test)]
+            Self::RootCommitHandoff(error) => Some(error),
         }
     }
 }
@@ -2112,10 +2199,21 @@ impl From<RootCommitError> for SchedulerBridgeActContinuationExecutionError {
     }
 }
 
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for SchedulerBridgeActContinuationExecutionError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::RootCommitHandoff(error)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RootSyncSchedulerContinuationExecutionError {
     RootScheduler(RootSchedulerError),
     RootCommit(RootCommitError),
+    #[cfg(test)]
+    RootCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
 }
 
 impl Display for RootSyncSchedulerContinuationExecutionError {
@@ -2123,6 +2221,8 @@ impl Display for RootSyncSchedulerContinuationExecutionError {
         match self {
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
+            #[cfg(test)]
+            Self::RootCommitHandoff(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -2132,6 +2232,8 @@ impl Error for RootSyncSchedulerContinuationExecutionError {
         match self {
             Self::RootScheduler(error) => Some(error),
             Self::RootCommit(error) => Some(error),
+            #[cfg(test)]
+            Self::RootCommitHandoff(error) => Some(error),
         }
     }
 }
@@ -2145,6 +2247,15 @@ impl From<RootSchedulerError> for RootSyncSchedulerContinuationExecutionError {
 impl From<RootCommitError> for RootSyncSchedulerContinuationExecutionError {
     fn from(error: RootCommitError) -> Self {
         Self::RootCommit(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for RootSyncSchedulerContinuationExecutionError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::RootCommitHandoff(error)
     }
 }
 
@@ -3114,16 +3225,39 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
 
     let render_phase = render_host_root_for_lanes(store, continuation.root(), selected_lanes)
         .map_err(RootSchedulerError::from)?;
-    let commit = commit_finished_host_root(store, render_phase)?;
+    #[cfg(test)]
+    let root_commit_handoff = {
+        let pending = record_host_root_finished_work_pending_commit_for_canary(
+            store,
+            render_phase,
+            continuation.sync_flush_order(),
+        )?;
+        commit_finished_host_root_with_finished_work_handoff_for_canary(
+            store,
+            render_phase,
+            Some(pending),
+            continuation.sync_flush_order().saturating_add(1),
+        )?
+    };
+    #[cfg(test)]
+    let commit = root_commit_handoff.commit().clone();
+    #[cfg(not(test))]
+    let commit = crate::commit_finished_host_root(store, render_phase)?;
     recompute_might_have_pending_sync_work(store)?;
 
-    Ok(scheduler_bridge_act_continuation_execution_record(
+    let mut record = scheduler_bridge_act_continuation_execution_record(
         continuation,
         selected_lanes,
         SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted,
         Some(render_phase),
         Some(commit),
-    ))
+    );
+    #[cfg(test)]
+    {
+        record.root_commit_handoff = Some(root_commit_handoff);
+    }
+
+    Ok(record)
 }
 
 fn scheduler_bridge_act_continuation_execution_record(
@@ -3139,6 +3273,8 @@ fn scheduler_bridge_act_continuation_execution_record(
         status,
         render_phase,
         commit,
+        #[cfg(test)]
+        root_commit_handoff: None,
     }
 }
 
@@ -3204,10 +3340,27 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
         ));
     }
 
-    let commit = commit_finished_host_root(store, handoff.render_phase())?;
+    #[cfg(test)]
+    let root_commit_handoff = {
+        let pending = record_host_root_finished_work_pending_commit_for_canary(
+            store,
+            handoff.render_phase(),
+            handoff.order(),
+        )?;
+        commit_finished_host_root_with_finished_work_handoff_for_canary(
+            store,
+            handoff.render_phase(),
+            Some(pending),
+            handoff.order().saturating_add(1),
+        )?
+    };
+    #[cfg(test)]
+    let commit = root_commit_handoff.commit().clone();
+    #[cfg(not(test))]
+    let commit = crate::commit_finished_host_root(store, handoff.render_phase())?;
     recompute_might_have_pending_sync_work(store)?;
 
-    Ok(sync_scheduler_continuation_execution_record(
+    let mut record = sync_scheduler_continuation_execution_record(
         handoff,
         requested_callback_node,
         current_callback_node,
@@ -3215,7 +3368,13 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
         None,
         RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted,
         Some(commit),
-    ))
+    );
+    #[cfg(test)]
+    {
+        record.root_commit_handoff = Some(root_commit_handoff);
+    }
+
+    Ok(record)
 }
 
 fn sync_scheduler_pending_passive_blocker_for_root<H: HostTypes>(
@@ -3254,6 +3413,8 @@ fn sync_scheduler_continuation_execution_record(
         pending_passive_blocker,
         status,
         commit,
+        #[cfg(test)]
+        root_commit_handoff: None,
     }
 }
 
@@ -5900,10 +6061,19 @@ mod tests {
         assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
         assert_eq!(record.selected_lanes(), Lanes::DEFAULT);
         assert!(record.did_execute_accepted_internal_act_continuation());
+        assert!(record.accepted_root_scheduler_execution_evidence_for_canary());
+        assert!(record.accepted_root_commit_execution_evidence_for_canary());
+        assert!(record.routed_through_root_scheduler_and_commit_evidence_for_canary());
         assert!(!record.drains_public_react_act_queue());
         assert!(!record.public_act_compatibility_claimed());
         assert!(!record.public_scheduler_timing_compatibility_claimed());
         assert!(!record.executes_effects());
+        let handoff = record.root_commit_handoff_for_canary().unwrap();
+        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert_eq!(handoff.pending().root(), root_id);
+        assert_eq!(handoff.pending().render_lanes(), Lanes::DEFAULT);
+        assert_eq!(handoff.execution_request().render_lanes(), Lanes::DEFAULT);
+        assert!(handoff.execution_request().compatibility_claim_blocked());
         let render_phase = record.render_phase().unwrap();
         assert_eq!(render_phase.root(), root_id);
         assert_eq!(render_phase.render_lanes(), Lanes::DEFAULT);
@@ -6053,10 +6223,26 @@ mod tests {
         assert_eq!(execution.selected_lanes(), Lanes::SYNC);
         assert!(execution.did_execute_private_sync_scheduler_continuation());
         assert!(execution.consumed_accepted_render_handoff());
+        assert!(execution.accepted_root_scheduler_execution_evidence_for_canary());
+        assert!(execution.accepted_root_commit_execution_evidence_for_canary());
+        assert!(execution.routed_through_root_scheduler_and_commit_evidence_for_canary());
         assert!(execution.async_callback_execution_blocked());
         assert!(execution.public_update_scheduling_blocked());
         assert!(!execution.public_root_compatibility_claimed());
         assert!(!execution.executes_public_effects());
+        let handoff_record = execution.root_commit_handoff_for_canary().unwrap();
+        assert!(handoff_record.proves_private_finished_work_commit_execution());
+        assert_eq!(handoff_record.pending().root(), root_id);
+        assert_eq!(handoff_record.pending().render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            handoff_record.execution_request().render_lanes(),
+            Lanes::SYNC
+        );
+        assert!(
+            handoff_record
+                .execution_request()
+                .compatibility_claim_blocked()
+        );
         let commit = execution.commit().unwrap();
         assert_eq!(commit.root(), root_id);
         assert_eq!(commit.previous_current(), current);
