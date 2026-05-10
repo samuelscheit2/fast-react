@@ -224,6 +224,144 @@ test('private root click event delegation dispatch gate rejects unsupported phas
   }
 });
 
+test('private root click event delegation dispatch gate invokes a portal child listener after owner-root validation', () => {
+  const fixture = createPrivateClickPortalDelegationFixture(
+    'click-gate-portal-child'
+  );
+  const calls = [];
+  const childListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-click-portal-child-test'
+      }
+    );
+  const parentListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.parentNode,
+      'click',
+      false,
+      () => {
+        calls.push('parent-listener-invoked');
+      },
+      {
+        listenerType: 'rejected-private-click-portal-parent-test'
+      }
+    );
+  const portalDispatch = createPrivateClickDispatchRecord(
+    fixture,
+    'bubble'
+  );
+  const portalOwnerGate =
+    pluginEventSystem.createPortalEventOwnerRootGateRecord(
+      portalDispatch.targetDispatchPathRecord,
+      {
+        domEventName: 'click',
+        ownerRoot: fixture.rootOwner,
+        portalContainer: fixture.portalContainer,
+        portalKey: 'click-gate-portal-child',
+        rootContainer: fixture.container
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+
+  try {
+    const gate =
+      rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+        rootRegistration,
+        fixture.hostOutputPayload,
+        childListenerRecord,
+        {
+          portalEventOwnerRootGateRecord: portalOwnerGate
+        }
+      );
+    const payload =
+      rootListeners.getPrivateRootClickEventDelegationDispatchGatePayload(
+        gate
+      );
+    const pluginPayload =
+      pluginEventSystem.getPrivateClickEventDelegationDispatchGatePayload(
+        payload.pluginGateRecord
+      );
+
+    assert.equal(gate.listenerInvocationCount, 1);
+    assert.equal(gate.privateListenerInvoked, true);
+    assert.equal(gate.portalOwnerRootAvailable, true);
+    assert.equal(
+      gate.portalOwnerRootStatus,
+      pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS
+    );
+    assert.equal(gate.portalContainerContainsTarget, true);
+    assert.equal(gate.rootContainerContainsTarget, false);
+    assert.equal(gate.publicPortalBubblingEnabled, false);
+    assert.equal(gate.publicPortalBubblingBlocked, true);
+    assert.equal(gate.publicDispatchEnabled, false);
+    assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+    assert.equal(gate.syntheticEventCount, 0);
+    assert.equal(gate.targetDispatchPathLength, 2);
+    assert.equal(
+      gate.targetDispatchPathStatus,
+      'resolved-component-tree-dispatch-path'
+    );
+    assert.equal(payload.dispatchRecord.targetDispatchPathLength, 2);
+    assert.equal(payload.pluginGateRecord.portalContainerContainsTarget, true);
+    assert.equal(
+      payload.pluginGateRecord.portalOwnerRoot.dispatchPathRootOwnerMatchCount,
+      2
+    );
+    assert.equal(
+      payload.pluginGateRecord.portalOwnerRoot
+        .dispatchPathRootOwnerMismatchCount,
+      0
+    );
+    assert.equal(
+      pluginPayload.portalEventOwnerRootGateRecord,
+      portalOwnerGate
+    );
+    assert.equal(
+      pluginPayload.dispatchListenerRecord.currentTarget,
+      fixture.targetNode
+    );
+
+    assert.deepEqual(calls, [
+      {
+        currentTarget: fixture.targetNode,
+        registrationName: 'onClick',
+        target: fixture.targetNode,
+        targetInst: fixture.childToken,
+        type: 'click'
+      }
+    ]);
+    assert.equal(fixture.portalContainer.__registrations.length, 0);
+    assert.equal(fixture.parentNode.__registrations.length, 0);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      childListenerRecord
+    );
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      parentListenerRecord
+    );
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.childToken);
+    componentTree.detachHostInstanceToken(fixture.parentToken);
+  }
+});
+
 test('private click event delegation dispatch gate rejects portal owner mismatch before invoking', () => {
   const source = createPrivateClickDelegationFixture('click-gate-portal-a');
   const foreign = createPrivateClickDelegationFixture('click-gate-portal-b');
@@ -1041,6 +1179,48 @@ function createPrivateClickDelegationFixture(label) {
     rootOwner,
     targetNode,
     token
+  };
+}
+
+function createPrivateClickPortalDelegationFixture(label) {
+  const document = installEventTargetMethods(createDocument());
+  const container = installEventTargetMethods(createNode('DIV', document));
+  const portalContainer = installEventTargetMethods(
+    createNode('SECTION', document)
+  );
+  const parentNode = installEventTargetMethods(createNode('DIV', document));
+  const targetNode = installEventTargetMethods(createNode('BUTTON', document));
+  portalContainer.parentNode = document;
+  parentNode.parentNode = portalContainer;
+  targetNode.parentNode = parentNode;
+
+  const rootOwner = {kind: `${label}:root`};
+  const parentToken = componentTree.createHostInstanceToken(
+    {kind: `${label}:parent-host`},
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    {kind: `${label}:child-host`},
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parentNode, parentToken, {});
+  componentTree.attachHostInstanceNode(targetNode, childToken, {});
+
+  return {
+    childToken,
+    container,
+    document,
+    hostOutputPayload: {
+      hostNode: targetNode,
+      hostToken: childToken,
+      rootOwner
+    },
+    parentNode,
+    parentToken,
+    portalContainer,
+    rootOwner,
+    targetNode,
+    token: childToken
   };
 }
 

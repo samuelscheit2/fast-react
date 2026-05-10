@@ -271,6 +271,77 @@ test("click dispatch gate records one private listener route without widening th
   );
 });
 
+test("click dispatch gate invokes a portal child listener with owner-root metadata without widening the delegation oracle", () => {
+  const fixture = createPrivateClickPortalDelegationDispatchGateFixture();
+  const gate = fixture.gate;
+
+  assert.equal(
+    gate.kind,
+    pluginEventSystem.PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND
+  );
+  assert.equal(
+    gate.status,
+    pluginEventSystem.PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS
+  );
+  assert.equal(gate.domEventName, "click");
+  assert.equal(gate.listenerInvocationCount, 1);
+  assert.equal(gate.privateListenerInvoked, true);
+  assert.equal(gate.portalOwnerRootAvailable, true);
+  assert.equal(
+    gate.portalOwnerRootStatus,
+    pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS
+  );
+  assert.equal(gate.portalContainerContainsTarget, true);
+  assert.equal(gate.rootContainerContainsTarget, false);
+  assert.equal(gate.publicPortalBubblingEnabled, false);
+  assert.equal(gate.publicPortalBubblingBlocked, true);
+  assert.equal(gate.publicDispatchEnabled, false);
+  assert.equal(gate.publicDispatchBlocked, true);
+  assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.equal(gate.syntheticEventCount, 0);
+  assert.equal(gate.targetDispatchPathLength, 2);
+  assert.equal(
+    gate.targetDispatchPathStatus,
+    "resolved-component-tree-dispatch-path"
+  );
+  assert.equal(gate.listenerQueueIndex, fixture.childQueue.listenerQueueIndex);
+  assert.equal(
+    gate.portalOwnerRoot.dispatchPathRootOwnerMatchCount,
+    2
+  );
+  assert.equal(
+    gate.portalOwnerRoot.dispatchPathRootOwnerMismatchCount,
+    0
+  );
+  assert.equal(
+    gate.portalOwnerRoot.publicPortalBubblingEnabled,
+    false
+  );
+  assert.deepEqual(fixture.calls, [
+    {
+      currentTarget: fixture.child,
+      target: fixture.child,
+      targetInst: fixture.childToken
+    }
+  ]);
+  assert.equal(fixture.rootContainer.__registrations.length, 0);
+  assert.equal(fixture.portalContainer.__registrations.length, 0);
+  assert.equal(fixture.parent.__registrations.length, 0);
+  assert.equal(fixture.child.__registrations.length, 0);
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(fixture.parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(fixture.childQueue);
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.childToken),
+    fixture.childToken
+  );
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.parentToken),
+    fixture.parentToken
+  );
+});
+
 test("delegated click capture and bubble listeners fire in React DOM order", () => {
   for (const mode of DOM_EVENT_DELEGATION_PROBE_MODES) {
     const observation = findDomEventDelegationDispatch(
@@ -804,6 +875,97 @@ function createPrivateClickDelegationDispatchGateFixture() {
     parent,
     parentQueue,
     parentToken,
+    rootContainer
+  };
+}
+
+function createPrivateClickPortalDelegationDispatchGateFixture() {
+  const document = createFakeDocument(
+    "click-portal-delegation-gate-conformance"
+  );
+  const rootContainer = createFakeElement("DIV", document);
+  const portalContainer = createFakeElement("SECTION", document);
+  const parent = createFakeElement("DIV", document);
+  const child = createFakeElement("BUTTON", document);
+  const rootOwner = { kind: "ClickPortalDelegationGateConformanceRoot" };
+  const parentToken = componentTree.createHostInstanceToken(
+    { kind: "ClickPortalDelegationGateConformanceParent" },
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    { kind: "ClickPortalDelegationGateConformanceChild" },
+    rootOwner
+  );
+  const calls = [];
+
+  appendFakeChild(portalContainer, parent);
+  appendFakeChild(parent, child);
+  componentTree.attachHostInstanceNode(parent, parentToken, {});
+  componentTree.attachHostInstanceNode(child, childToken, {});
+  const childQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          target: event.target,
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const parentQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      parent,
+      "click",
+      false,
+      () => {
+        calls.push("parent");
+      }
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        rootContainer,
+        "click",
+        0
+      ),
+      {
+        target: child,
+        type: "click"
+      }
+    );
+  const portalOwnerGate =
+    pluginEventSystem.createPortalEventOwnerRootGateRecord(
+      dispatchRecord.targetDispatchPathRecord,
+      {
+        domEventName: "click",
+        ownerRoot: rootOwner,
+        portalContainer,
+        portalKey: "click-portal-delegation-gate-conformance",
+        rootContainer
+      }
+    );
+  const gate =
+    pluginEventSystem.createPrivateClickEventDelegationDispatchGate(
+      dispatchRecord,
+      childQueue,
+      {
+        portalEventOwnerRootGateRecord: portalOwnerGate
+      }
+    );
+
+  return {
+    calls,
+    child,
+    childQueue,
+    childToken,
+    gate,
+    parent,
+    parentQueue,
+    parentToken,
+    portalContainer,
     rootContainer
   };
 }
