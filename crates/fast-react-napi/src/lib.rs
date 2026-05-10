@@ -592,6 +592,7 @@ mod root_bridge_requests {
         schema_version: u32,
         request_records: Vec<NativeRootBridgeJsonTransportRecord>,
         admission_smoke: NativeRootBridgeHandleTableAdmissionSmoke,
+        batched_record_gate: NativeRootBridgeBatchedJsonTransportGate,
         error_diagnostic_rows: Vec<NativeRootBridgeJsonTransportErrorDiagnosticRow>,
         native_execution: bool,
         renderer_execution: bool,
@@ -620,6 +621,11 @@ mod root_bridge_requests {
         }
 
         #[must_use]
+        pub(crate) fn batched_record_gate(&self) -> &NativeRootBridgeBatchedJsonTransportGate {
+            &self.batched_record_gate
+        }
+
+        #[must_use]
         pub(crate) fn error_diagnostic_rows(
             &self,
         ) -> &[NativeRootBridgeJsonTransportErrorDiagnosticRow] {
@@ -640,6 +646,419 @@ mod root_bridge_requests {
         pub(crate) const fn reconciler_execution(&self) -> bool {
             self.reconciler_execution
         }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeBatchedJsonTransportGate {
+        status: &'static str,
+        request_count: usize,
+        lifecycle_rows: Vec<NativeRootBridgeBatchedJsonTransportLifecycleRow>,
+        error_rows: Vec<NativeRootBridgeBatchedJsonTransportLifecycleRow>,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+    }
+
+    impl NativeRootBridgeBatchedJsonTransportGate {
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn request_count(&self) -> usize {
+            self.request_count
+        }
+
+        #[must_use]
+        pub(crate) fn lifecycle_rows(&self) -> &[NativeRootBridgeBatchedJsonTransportLifecycleRow] {
+            &self.lifecycle_rows
+        }
+
+        #[must_use]
+        pub(crate) fn error_rows(&self) -> &[NativeRootBridgeBatchedJsonTransportLifecycleRow] {
+            &self.error_rows
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeBatchedJsonTransportLifecycleState {
+        None,
+        Active,
+        Retired,
+    }
+
+    impl NativeRootBridgeBatchedJsonTransportLifecycleState {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::None => "none",
+                Self::Active => "active",
+                Self::Retired => "retired",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeBatchedJsonTransportLifecycleStatus {
+        Accepted,
+        Error,
+    }
+
+    impl NativeRootBridgeBatchedJsonTransportLifecycleStatus {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::Accepted => "accepted",
+                Self::Error => "error",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeBatchedJsonTransportLifecycleRow {
+        id: String,
+        batch_index: usize,
+        request_id: u64,
+        kind: &'static str,
+        lifecycle_before: NativeRootBridgeBatchedJsonTransportLifecycleState,
+        lifecycle_after: NativeRootBridgeBatchedJsonTransportLifecycleState,
+        lifecycle_transition: Option<NativeRootBridgeLifecycleTransition>,
+        status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
+        code: Option<&'static str>,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeBatchedJsonTransportLifecycleRow {
+        fn accepted(
+            batch_index: usize,
+            request: NativeRootBridgeRequestRecord,
+            lifecycle_before: NativeRootBridgeBatchedJsonTransportLifecycleState,
+            lifecycle_after: NativeRootBridgeBatchedJsonTransportLifecycleState,
+            lifecycle_transition: NativeRootBridgeLifecycleTransition,
+        ) -> Self {
+            Self {
+                id: format!("batch-record-{batch_index}-{}", request.kind().code()),
+                batch_index,
+                request_id: request.request_id(),
+                kind: request.kind().code(),
+                lifecycle_before,
+                lifecycle_after,
+                lifecycle_transition: Some(lifecycle_transition),
+                status: NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
+                code: None,
+                source_error_code: None,
+                boundary_error_code: None,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                react_behavior_error: false,
+            }
+        }
+
+        fn error(
+            id: String,
+            batch_index: usize,
+            record: NativeRootBridgeJsonTransportRecord,
+            lifecycle: NativeRootBridgeBatchedJsonTransportLifecycleState,
+            error: &NativeRootBridgeRequestError,
+        ) -> Self {
+            Self {
+                id,
+                batch_index,
+                request_id: record.request_id,
+                kind: record.kind,
+                lifecycle_before: lifecycle,
+                lifecycle_after: lifecycle,
+                lifecycle_transition: None,
+                status: NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error,
+                code: Some(error.code()),
+                source_error_code: Some(error.code()),
+                boundary_error_code: Some(boundary_code_for_batch_lifecycle_error(error)),
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) fn id(&self) -> &str {
+            &self.id
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_index(&self) -> usize {
+            self.batch_index
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(&self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(&self) -> &'static str {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_before(
+            &self,
+        ) -> NativeRootBridgeBatchedJsonTransportLifecycleState {
+            self.lifecycle_before
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_after(
+            &self,
+        ) -> NativeRootBridgeBatchedJsonTransportLifecycleState {
+            self.lifecycle_after
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_transition(
+            &self,
+        ) -> Option<NativeRootBridgeLifecycleTransition> {
+            self.lifecycle_transition
+        }
+
+        #[must_use]
+        pub(crate) const fn status(&self) -> NativeRootBridgeBatchedJsonTransportLifecycleStatus {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn code(&self) -> Option<&'static str> {
+            self.code
+        }
+
+        #[must_use]
+        pub(crate) const fn source_error_code(&self) -> Option<&'static str> {
+            self.source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn boundary_error_code(&self) -> Option<&'static str> {
+            self.boundary_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+
+        fn with_id(mut self, id: &'static str) -> Self {
+            self.id = id.to_owned();
+            self
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct NativeRootBridgeBatchedJsonTransportLifecycleValidator {
+        lifecycle: NativeRootBridgeBatchedJsonTransportLifecycleState,
+        root_handle: Option<BridgeHandle>,
+        root_id: Option<u64>,
+        last_request_id: Option<u64>,
+    }
+
+    impl NativeRootBridgeBatchedJsonTransportLifecycleValidator {
+        const fn new() -> Self {
+            Self {
+                lifecycle: NativeRootBridgeBatchedJsonTransportLifecycleState::None,
+                root_handle: None,
+                root_id: None,
+                last_request_id: None,
+            }
+        }
+
+        fn validate_record(
+            &mut self,
+            batch_index: usize,
+            record: NativeRootBridgeJsonTransportRecord,
+        ) -> NativeRootBridgeBatchedJsonTransportLifecycleRow {
+            let lifecycle_before = self.lifecycle;
+            let request = match record.decode() {
+                Ok(request) => request,
+                Err(error) => {
+                    return NativeRootBridgeBatchedJsonTransportLifecycleRow::error(
+                        format!("batch-record-{batch_index}-error"),
+                        batch_index,
+                        record,
+                        lifecycle_before,
+                        &error,
+                    );
+                }
+            };
+
+            match self.validate_request(request) {
+                Ok((lifecycle_transition, lifecycle_after)) => {
+                    NativeRootBridgeBatchedJsonTransportLifecycleRow::accepted(
+                        batch_index,
+                        request,
+                        lifecycle_before,
+                        lifecycle_after,
+                        lifecycle_transition,
+                    )
+                }
+                Err(error) => NativeRootBridgeBatchedJsonTransportLifecycleRow::error(
+                    format!("batch-record-{batch_index}-error"),
+                    batch_index,
+                    record,
+                    lifecycle_before,
+                    &error,
+                ),
+            }
+        }
+
+        fn validate_request(
+            &mut self,
+            request: NativeRootBridgeRequestRecord,
+        ) -> Result<
+            (
+                NativeRootBridgeLifecycleTransition,
+                NativeRootBridgeBatchedJsonTransportLifecycleState,
+            ),
+            NativeRootBridgeRequestError,
+        > {
+            if let Some(previous_request_id) = self.last_request_id
+                && request.request_id() <= previous_request_id
+            {
+                return Err(NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
+                    previous_request_id,
+                    request_id: request.request_id(),
+                });
+            }
+
+            match self.lifecycle {
+                NativeRootBridgeBatchedJsonTransportLifecycleState::None => {
+                    if request.kind() != NativeRootBridgeRequestKind::Create {
+                        return Err(NativeRootBridgeRequestError::SequenceMustStartWithCreate {
+                            actual: request.kind(),
+                        });
+                    }
+                }
+                NativeRootBridgeBatchedJsonTransportLifecycleState::Active => {
+                    if request.kind() == NativeRootBridgeRequestKind::Create {
+                        return Err(NativeRootBridgeRequestError::CreateAfterRootCreated {
+                            request_id: request.request_id(),
+                        });
+                    }
+
+                    validate_sequence_root_identity(
+                        request,
+                        self.root_handle
+                            .expect("root handle is set for active batched JSON lifecycle"),
+                        self.root_id
+                            .expect("root id is set for active batched JSON lifecycle"),
+                    )?;
+                }
+                NativeRootBridgeBatchedJsonTransportLifecycleState::Retired => {
+                    return Err(NativeRootBridgeRequestError::RequestAfterUnmount {
+                        request_id: request.request_id(),
+                    });
+                }
+            }
+
+            let expected_root_handle_state = match request.kind() {
+                NativeRootBridgeRequestKind::Create | NativeRootBridgeRequestKind::Render => {
+                    NativeRootBridgeRootHandleState::Active
+                }
+                NativeRootBridgeRequestKind::Unmount => NativeRootBridgeRootHandleState::Retired,
+            };
+            if request.root_handle_state() != expected_root_handle_state {
+                return Err(
+                    NativeRootBridgeRequestError::RecordRootHandleStateMismatch {
+                        expected: expected_root_handle_state,
+                        actual: request.root_handle_state(),
+                    },
+                );
+            }
+
+            if request.kind() == NativeRootBridgeRequestKind::Unmount
+                && let Some(value_handle) = request.value_handle()
+            {
+                return Err(NativeRootBridgeRequestError::UnexpectedValueHandle {
+                    kind: request.kind(),
+                    value_handle,
+                });
+            }
+
+            let lifecycle_transition = get_lifecycle_transition_for_request(request.kind());
+            let lifecycle_after = match request.kind() {
+                NativeRootBridgeRequestKind::Create | NativeRootBridgeRequestKind::Render => {
+                    NativeRootBridgeBatchedJsonTransportLifecycleState::Active
+                }
+                NativeRootBridgeRequestKind::Unmount => {
+                    NativeRootBridgeBatchedJsonTransportLifecycleState::Retired
+                }
+            };
+
+            self.last_request_id = Some(request.request_id());
+            if self.root_handle.is_none() {
+                self.root_handle = Some(request.root_handle());
+                self.root_id = Some(request.root_id());
+            }
+            self.lifecycle = lifecycle_after;
+
+            Ok((lifecycle_transition, lifecycle_after))
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NativeRootBridgeBatchedJsonTransportDiagnosticCase {
+        id: &'static str,
+        json: &'static str,
+        expected_code: &'static str,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1329,6 +1748,9 @@ mod root_bridge_requests {
         Ok(NativeRootBridgeJsonTransportParserGate {
             transport: envelope.transport,
             schema_version: envelope.schema_version,
+            batched_record_gate: native_root_bridge_batched_json_transport_gate(
+                &envelope.request_records,
+            ),
             request_records: envelope.request_records,
             admission_smoke,
             error_diagnostic_rows: native_root_bridge_json_transport_error_diagnostic_rows(),
@@ -1336,6 +1758,65 @@ mod root_bridge_requests {
             renderer_execution: false,
             reconciler_execution: false,
         })
+    }
+
+    pub(crate) fn native_root_bridge_batched_json_transport_gate(
+        records: &[NativeRootBridgeJsonTransportRecord],
+    ) -> NativeRootBridgeBatchedJsonTransportGate {
+        NativeRootBridgeBatchedJsonTransportGate {
+            status: super::NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_GATE_STATUS,
+            request_count: records.len(),
+            lifecycle_rows: validate_batched_json_transport_lifecycle_rows(records),
+            error_rows: native_root_bridge_batched_json_transport_error_rows(),
+            native_addon_loaded: false,
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+        }
+    }
+
+    pub(crate) fn native_root_bridge_batched_json_transport_error_rows()
+    -> Vec<NativeRootBridgeBatchedJsonTransportLifecycleRow> {
+        deterministic_batched_json_transport_diagnostic_cases()
+            .iter()
+            .copied()
+            .map(|case| {
+                let value = serde_json::from_str::<Value>(case.json)
+                    .expect("deterministic batched JSON diagnostic payload parses");
+                let envelope = parse_json_transport_envelope(&value)
+                    .expect("deterministic batched JSON diagnostic payload has valid schema");
+                validate_batched_json_transport_lifecycle_rows(&envelope.request_records)
+                    .into_iter()
+                    .find(|row| {
+                        row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error
+                    })
+                    .filter(|row| row.code() == Some(case.expected_code))
+                    .expect(
+                        "deterministic batched JSON diagnostic payload produces expected error row",
+                    )
+                    .with_id(case.id)
+            })
+            .collect()
+    }
+
+    fn validate_batched_json_transport_lifecycle_rows(
+        records: &[NativeRootBridgeJsonTransportRecord],
+    ) -> Vec<NativeRootBridgeBatchedJsonTransportLifecycleRow> {
+        let mut validator = NativeRootBridgeBatchedJsonTransportLifecycleValidator::new();
+        let mut rows = Vec::with_capacity(records.len());
+
+        for (batch_index, record) in records.iter().copied().enumerate() {
+            let row = validator.validate_record(batch_index, record);
+            let is_error =
+                row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error;
+            rows.push(row);
+
+            if is_error {
+                break;
+            }
+        }
+
+        rows
     }
 
     pub(crate) fn native_root_bridge_json_transport_error_diagnostic_rows()
@@ -1403,6 +1884,37 @@ mod root_bridge_requests {
                 phase: "validation",
                 json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"render","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
                 boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+            },
+        ]
+    }
+
+    fn deterministic_batched_json_transport_diagnostic_cases()
+    -> &'static [NativeRootBridgeBatchedJsonTransportDiagnosticCase] {
+        &[
+            NativeRootBridgeBatchedJsonTransportDiagnosticCase {
+                id: "batch-render-before-create-lifecycle-order",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+                expected_code: "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE",
+            },
+            NativeRootBridgeBatchedJsonTransportDiagnosticCase {
+                id: "batch-root-handle-state-mismatch",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#,
+                expected_code: "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH",
+            },
+            NativeRootBridgeBatchedJsonTransportDiagnosticCase {
+                id: "batch-create-after-create-lifecycle-order",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"},{"request_id":2,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+                expected_code: "FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED",
+            },
+            NativeRootBridgeBatchedJsonTransportDiagnosticCase {
+                id: "batch-request-after-unmount-lifecycle-order",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"},{"request_id":2,"kind":"unmount","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"},{"request_id":3,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+                expected_code: "FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT",
+            },
+            NativeRootBridgeBatchedJsonTransportDiagnosticCase {
+                id: "batch-request-id-out-of-order",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":2,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"},{"request_id":1,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+                expected_code: "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER",
             },
         ]
     }
@@ -1584,6 +2096,55 @@ mod root_bridge_requests {
                 Err(NativeRootBridgeRequestError::CreateAfterRootCreated {
                     request_id: request.request_id(),
                 })
+            }
+        }
+    }
+
+    const fn get_lifecycle_transition_for_request(
+        kind: NativeRootBridgeRequestKind,
+    ) -> NativeRootBridgeLifecycleTransition {
+        match kind {
+            NativeRootBridgeRequestKind::Create => {
+                NativeRootBridgeLifecycleTransition::NoneToActive
+            }
+            NativeRootBridgeRequestKind::Render => {
+                NativeRootBridgeLifecycleTransition::ActiveToActive
+            }
+            NativeRootBridgeRequestKind::Unmount => {
+                NativeRootBridgeLifecycleTransition::ActiveToRetired
+            }
+        }
+    }
+
+    fn boundary_code_for_batch_lifecycle_error(
+        error: &NativeRootBridgeRequestError,
+    ) -> &'static str {
+        match error {
+            NativeRootBridgeRequestError::HandleTable(
+                BridgeHandleTableError::WrongEnvironment { .. },
+            )
+            | NativeRootBridgeRequestError::RecordEnvironmentMismatch { .. } => {
+                super::NativeBoundaryErrorKind::RootBridgeWrongEnvironment.code()
+            }
+            NativeRootBridgeRequestError::HandleTable(
+                BridgeHandleTableError::StaleHandle { .. }
+                | BridgeHandleTableError::DisposedHandle { .. },
+            ) => super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code(),
+            NativeRootBridgeRequestError::RecordRootHandleStateMismatch { .. }
+            | NativeRootBridgeRequestError::RootHandleStillActive { .. }
+            | NativeRootBridgeRequestError::SequenceMustStartWithCreate { .. }
+            | NativeRootBridgeRequestError::CreateAfterRootCreated { .. }
+            | NativeRootBridgeRequestError::RequestAfterUnmount { .. }
+            | NativeRootBridgeRequestError::RequestSequenceOutOfOrder { .. }
+            | NativeRootBridgeRequestError::RequestSequenceExhausted => {
+                super::NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder.code()
+            }
+            NativeRootBridgeRequestError::HandleTable(_)
+            | NativeRootBridgeRequestError::RecordRootHandleMismatch { .. }
+            | NativeRootBridgeRequestError::RecordRootIdMismatch { .. }
+            | NativeRootBridgeRequestError::UnexpectedValueHandle { .. }
+            | NativeRootBridgeRequestError::JsonTransportRecordInvalid { .. } => {
+                super::NativeBoundaryErrorKind::RootBridgeValidationFailed.code()
             }
         }
     }
@@ -2759,6 +3320,8 @@ pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS: &str =
     "smoked-native-root-bridge-js-to-rust-json-transport";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSER_GATE_STATUS: &str =
     "parsed-native-root-bridge-json-transport-schema";
+pub const NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_GATE_STATUS: &str =
+    "validated-native-root-bridge-batched-json-transport-records";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT: &str = "json";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION: u32 = 1;
 pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS: &str =
@@ -2831,6 +3394,24 @@ pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_RECORD_FIELDS: &[
 ];
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS: &[&str] =
     &["transport", "schemaVersion", "requestRecords"];
+pub const NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_LIFECYCLE_ROW_FIELDS: &[&str] = &[
+    "id",
+    "batch_index",
+    "request_id",
+    "kind",
+    "lifecycle_before",
+    "lifecycle_after",
+    "lifecycle_transition",
+    "status",
+    "code",
+    "source_error_code",
+    "boundary_error_code",
+    "native_addon_loaded",
+    "native_execution",
+    "renderer_execution",
+    "reconciler_execution",
+    "react_behavior_error",
+];
 pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_RECORD_FIELDS: &[&str] = &[
     "request_id",
     "operation",
@@ -3248,13 +3829,15 @@ mod tests {
         BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
-        NativeRootBridgeCreateRequest, NativeRootBridgeHandleAdmissionAction,
-        NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportParseError,
-        NativeRootBridgeJsonTransportRecord, NativeRootBridgeJsonTransportValueKind,
-        NativeRootBridgeLifecycleTransition, NativeRootBridgeRenderRequest,
-        NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
-        NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
-        NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
+        NativeRootBridgeBatchedJsonTransportLifecycleState,
+        NativeRootBridgeBatchedJsonTransportLifecycleStatus, NativeRootBridgeCreateRequest,
+        NativeRootBridgeHandleAdmissionAction, NativeRootBridgeJsonTransportHandle,
+        NativeRootBridgeJsonTransportParseError, NativeRootBridgeJsonTransportRecord,
+        NativeRootBridgeJsonTransportValueKind, NativeRootBridgeLifecycleTransition,
+        NativeRootBridgeRenderRequest, NativeRootBridgeRequestError, NativeRootBridgeRequestKind,
+        NativeRootBridgeRequestRecord, NativeRootBridgeRequestRecorder,
+        NativeRootBridgeRequestSequenceValidator, NativeRootBridgeRootHandleState,
+        NativeRootBridgeUnmountRequest, native_root_bridge_batched_json_transport_error_rows,
         native_root_bridge_json_transport_error_diagnostic_rows,
         parse_native_root_bridge_json_transport_for_gate,
         smoke_admit_js_native_root_bridge_handoff_records,
@@ -4134,6 +4717,17 @@ mod tests {
             admission_records[2].retired_root_source_error_code(),
             Some("FAST_REACT_NAPI_STALE_HANDLE")
         );
+        assert_eq!(
+            gate.batched_record_gate().status(),
+            NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_GATE_STATUS
+        );
+        assert_eq!(gate.batched_record_gate().request_count(), 3);
+        assert_eq!(gate.batched_record_gate().lifecycle_rows().len(), 3);
+        assert_eq!(gate.batched_record_gate().error_rows().len(), 5);
+        assert!(!gate.batched_record_gate().native_addon_loaded());
+        assert!(!gate.batched_record_gate().native_execution());
+        assert!(!gate.batched_record_gate().renderer_execution());
+        assert!(!gate.batched_record_gate().reconciler_execution());
         assert_eq!(gate.error_diagnostic_rows().len(), 4);
         assert!(gate.error_diagnostic_rows().iter().all(|row| {
             !row.native_addon_loaded()
@@ -4257,6 +4851,154 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_batched_json_transport_reports_per_record_lifecycle_rows() {
+        let json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":495,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":495,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+
+        let gate = parse_native_root_bridge_json_transport_for_gate(json).unwrap();
+        let rows = gate.batched_record_gate().lifecycle_rows();
+
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "batch-record-0-create",
+                "batch-record-1-render",
+                "batch-record-2-unmount"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.batch_index()).collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.request_id()).collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.kind()).collect::<Vec<_>>(),
+            ["create", "render", "unmount"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.lifecycle_before().code())
+                .collect::<Vec<_>>(),
+            ["none", "active", "active"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.lifecycle_after().code())
+                .collect::<Vec<_>>(),
+            ["active", "active", "retired"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row
+                    .lifecycle_transition()
+                    .map(|transition| transition.code()))
+                .collect::<Vec<_>>(),
+            [
+                Some("none->active"),
+                Some("active->active"),
+                Some("active->retired")
+            ]
+        );
+        assert!(rows.iter().all(|row| {
+            row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted
+                && row.code().is_none()
+                && row.source_error_code().is_none()
+                && row.boundary_error_code().is_none()
+                && !row.native_addon_loaded()
+                && !row.native_execution()
+                && !row.renderer_execution()
+                && !row.reconciler_execution()
+                && !row.react_behavior_error()
+        }));
+    }
+
+    #[test]
+    fn native_root_bridge_batched_json_transport_reports_deterministic_lifecycle_error_rows() {
+        let rows = native_root_bridge_batched_json_transport_error_rows();
+
+        assert_eq!(rows.len(), 5);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "batch-render-before-create-lifecycle-order",
+                "batch-root-handle-state-mismatch",
+                "batch-create-after-create-lifecycle-order",
+                "batch-request-after-unmount-lifecycle-order",
+                "batch-request-id-out-of-order"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.batch_index()).collect::<Vec<_>>(),
+            [0, 0, 1, 2, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.lifecycle_before().code())
+                .collect::<Vec<_>>(),
+            ["none", "none", "active", "retired", "active"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.lifecycle_after().code())
+                .collect::<Vec<_>>(),
+            ["none", "none", "active", "retired", "active"]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.code()).collect::<Vec<_>>(),
+            [
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_error_code())
+                .collect::<Vec<_>>(),
+            [
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.boundary_error_code())
+                .collect::<Vec<_>>(),
+            [
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER")
+            ]
+        );
+        assert!(rows.iter().all(|row| {
+            row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error
+                && row.lifecycle_transition().is_none()
+                && !row.native_addon_loaded()
+                && !row.native_execution()
+                && !row.renderer_execution()
+                && !row.reconciler_execution()
+                && !row.react_behavior_error()
+        }));
+        assert_eq!(
+            NativeRootBridgeBatchedJsonTransportLifecycleState::None.code(),
+            "none"
+        );
+        assert_eq!(
+            NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error.code(),
+            "error"
+        );
+    }
+
+    #[test]
     fn native_root_bridge_json_transport_parser_gate_reports_error_diagnostic_rows() {
         let rows = native_root_bridge_json_transport_error_diagnostic_rows();
 
@@ -4344,6 +5086,10 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSER_GATE_STATUS,
             "parsed-native-root-bridge-json-transport-schema"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_GATE_STATUS,
+            "validated-native-root-bridge-batched-json-transport-records"
         );
         assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT, "json");
         assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION, 1);
@@ -4457,6 +5203,27 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS,
             &["transport", "schemaVersion", "requestRecords"]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_LIFECYCLE_ROW_FIELDS,
+            &[
+                "id",
+                "batch_index",
+                "request_id",
+                "kind",
+                "lifecycle_before",
+                "lifecycle_after",
+                "lifecycle_transition",
+                "status",
+                "code",
+                "source_error_code",
+                "boundary_error_code",
+                "native_addon_loaded",
+                "native_execution",
+                "renderer_execution",
+                "reconciler_execution",
+                "react_behavior_error"
+            ]
         );
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSE_ERROR_CODES,

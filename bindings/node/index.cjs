@@ -20,6 +20,8 @@ const nativeRootBridgeJsonTransportSmokeStatus =
   'smoked-native-root-bridge-js-to-rust-json-transport';
 const nativeRootBridgeJsonTransportParserGateStatus =
   'parsed-native-root-bridge-json-transport-schema';
+const nativeRootBridgeBatchedJsonTransportGateStatus =
+  'validated-native-root-bridge-batched-json-transport-records';
 const nativeRootBridgeJsonTransportFormat = 'json';
 const nativeRootBridgeJsonTransportSchemaVersion = 1;
 const nativeRootBridgeRequestValidationModel =
@@ -37,6 +39,11 @@ const nativeRootBridgeRootHandleStateRetired = 'retired';
 const nativeRootBridgeLifecycleTransitionNoneToActive = 'none->active';
 const nativeRootBridgeLifecycleTransitionActiveToActive = 'active->active';
 const nativeRootBridgeLifecycleTransitionActiveToRetired = 'active->retired';
+const nativeRootBridgeJsonTransportBatchLifecycleStateNone = 'none';
+const nativeRootBridgeJsonTransportBatchLifecycleStateActive = 'active';
+const nativeRootBridgeJsonTransportBatchLifecycleStateRetired = 'retired';
+const nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted = 'accepted';
+const nativeRootBridgeJsonTransportBatchLifecycleStatusError = 'error';
 const nativeRootBridgeRequestKinds = Object.freeze([
   nativeRootBridgeRequestKindCreate,
   nativeRootBridgeRequestKindRender,
@@ -122,6 +129,33 @@ const nativeRootBridgeJsonTransportEnvelopeFields = Object.freeze([
   'schemaVersion',
   'requestRecords'
 ]);
+const nativeRootBridgeJsonTransportBatchLifecycleStates = Object.freeze([
+  nativeRootBridgeJsonTransportBatchLifecycleStateNone,
+  nativeRootBridgeJsonTransportBatchLifecycleStateActive,
+  nativeRootBridgeJsonTransportBatchLifecycleStateRetired
+]);
+const nativeRootBridgeJsonTransportBatchLifecycleStatuses = Object.freeze([
+  nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted,
+  nativeRootBridgeJsonTransportBatchLifecycleStatusError
+]);
+const nativeRootBridgeJsonTransportBatchLifecycleRowFields = Object.freeze([
+  'id',
+  'batchIndex',
+  'requestId',
+  'kind',
+  'lifecycleBefore',
+  'lifecycleAfter',
+  'lifecycleTransition',
+  'status',
+  'code',
+  'sourceErrorCode',
+  'boundaryErrorCode',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'reactBehaviorError'
+]);
 const nativeRootBridgeJsonTransportParseErrorCodes = Object.freeze({
   expectedObject:
     'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT',
@@ -155,6 +189,13 @@ const nativeRootBridgeJsonTransportErrorDiagnosticCaseIds = Object.freeze([
   'wrong-environment-root-handle',
   'stale-value-handle-generation',
   'render-before-create-lifecycle-order'
+]);
+const nativeRootBridgeJsonTransportBatchErrorCaseIds = Object.freeze([
+  'batch-render-before-create-lifecycle-order',
+  'batch-root-handle-state-mismatch',
+  'batch-create-after-create-lifecycle-order',
+  'batch-request-after-unmount-lifecycle-order',
+  'batch-request-id-out-of-order'
 ]);
 const nativeRootBridgeValidationErrorCodes = Object.freeze({
   createAfterRootCreated:
@@ -199,6 +240,20 @@ const nativeRootBridgeRustHandleTableAdmissionSmoke = Object.freeze({
   rendererExecution: false,
   reconcilerExecution: false
 });
+const nativeRootBridgeBatchedJsonTransportGate = Object.freeze({
+  batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  lifecycleStates: nativeRootBridgeJsonTransportBatchLifecycleStates,
+  lifecycleStatuses: nativeRootBridgeJsonTransportBatchLifecycleStatuses,
+  jsonTransportBatchLifecycleRowFields:
+    nativeRootBridgeJsonTransportBatchLifecycleRowFields,
+  jsonTransportBatchErrorCaseIds:
+    nativeRootBridgeJsonTransportBatchErrorCaseIds,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false
+});
 const nativeRootBridgeJsonTransportParserGate = Object.freeze({
   parserGateStatus: nativeRootBridgeJsonTransportParserGateStatus,
   transport: nativeRootBridgeJsonTransportFormat,
@@ -211,6 +266,7 @@ const nativeRootBridgeJsonTransportParserGate = Object.freeze({
     nativeRootBridgeJsonTransportErrorDiagnosticRowFields,
   jsonTransportErrorDiagnosticCaseIds:
     nativeRootBridgeJsonTransportErrorDiagnosticCaseIds,
+  batchedRecordGate: nativeRootBridgeBatchedJsonTransportGate,
   nativeAddonLoaded: false,
   nativeExecution: false,
   rendererExecution: false,
@@ -673,12 +729,7 @@ function normalizeNativeRootBridgeHandle(
 }
 
 function validateSameNativeRootBridgeHandle(expected, actual, index, requestId) {
-  if (
-    expected.environmentId === actual.environmentId &&
-    expected.slot === actual.slot &&
-    expected.generation === actual.generation &&
-    expected.kind === actual.kind
-  ) {
+  if (isSameNativeRootBridgeHandle(expected, actual)) {
     return;
   }
 
@@ -686,6 +737,15 @@ function validateSameNativeRootBridgeHandle(expected, actual, index, requestId) 
     `Native root bridge request record uses root handle slot ${actual.slot}, expected slot ${expected.slot}.`,
     nativeRootBridgeValidationErrorCodes.handleMismatch,
     { actual, expected, index, requestId }
+  );
+}
+
+function isSameNativeRootBridgeHandle(expected, actual) {
+  return (
+    expected.environmentId === actual.environmentId &&
+    expected.slot === actual.slot &&
+    expected.generation === actual.generation &&
+    expected.kind === actual.kind
   );
 }
 
@@ -874,6 +934,8 @@ function freezeNativeRootBridgeJsonTransportHandle(handle) {
 function createNativeRootBridgeJsonTransportParserGate(json) {
   const decodedRequestRecords =
     parseNativeRootBridgeJsonTransportRequestRecords(json);
+  const batchedRecordGate =
+    createNativeRootBridgeBatchedJsonTransportGate(decodedRequestRecords);
 
   return Object.freeze({
     parserGateStatus: nativeRootBridgeJsonTransportParserGateStatus,
@@ -894,6 +956,7 @@ function createNativeRootBridgeJsonTransportParserGate(json) {
       createNativeRootBridgeJsonTransportParseErrorEvidence(),
     deterministicErrorRows:
       createNativeRootBridgeJsonTransportErrorDiagnosticRows(),
+    batchedRecordGate,
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -1054,6 +1117,296 @@ function createNativeRootBridgeJsonTransportErrorDiagnosticRows() {
       );
     })
   );
+}
+
+function createNativeRootBridgeBatchedJsonTransportGate(decodedRequestRecords) {
+  const lifecycleRows =
+    createNativeRootBridgeBatchedJsonTransportLifecycleRows(
+      decodedRequestRecords
+    );
+
+  return Object.freeze({
+    batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    requestCount: decodedRequestRecords.length,
+    lifecycleStates: nativeRootBridgeJsonTransportBatchLifecycleStates,
+    lifecycleStatuses: nativeRootBridgeJsonTransportBatchLifecycleStatuses,
+    jsonTransportBatchLifecycleRowFields:
+      nativeRootBridgeJsonTransportBatchLifecycleRowFields,
+    jsonTransportBatchErrorCaseIds:
+      nativeRootBridgeJsonTransportBatchErrorCaseIds,
+    lifecycleRows,
+    errorRows: createNativeRootBridgeBatchedJsonTransportErrorRows(),
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false
+  });
+}
+
+function createNativeRootBridgeBatchedJsonTransportErrorRows() {
+  const cases = [
+    {
+      id: 'batch-render-before-create-lifecycle-order',
+      expectedCode:
+        nativeRootBridgeValidationErrorCodes.sequenceMustStartWithCreate,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}'
+    },
+    {
+      id: 'batch-root-handle-state-mismatch',
+      expectedCode:
+        nativeRootBridgeValidationErrorCodes.rootHandleStateMismatch,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}'
+    },
+    {
+      id: 'batch-create-after-create-lifecycle-order',
+      expectedCode:
+        nativeRootBridgeValidationErrorCodes.createAfterRootCreated,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"},{"request_id":2,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}'
+    },
+    {
+      id: 'batch-request-after-unmount-lifecycle-order',
+      expectedCode: nativeRootBridgeValidationErrorCodes.requestAfterUnmount,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"},{"request_id":2,"kind":"unmount","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"},{"request_id":3,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}'
+    },
+    {
+      id: 'batch-request-id-out-of-order',
+      expectedCode: nativeRootBridgeValidationErrorCodes.sequenceOutOfOrder,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":2,"kind":"create","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"},{"request_id":1,"kind":"render","environment_id":495,"root_handle":{"environment_id":495,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}'
+    }
+  ];
+
+  return Object.freeze(
+    cases.map((diagnosticCase) => {
+      const records = parseNativeRootBridgeJsonTransportRequestRecords(
+        diagnosticCase.json
+      );
+      const row = createNativeRootBridgeBatchedJsonTransportLifecycleRows(
+        records
+      ).find(
+        (lifecycleRow) =>
+          lifecycleRow.status ===
+          nativeRootBridgeJsonTransportBatchLifecycleStatusError
+      );
+
+      if (row?.code === diagnosticCase.expectedCode) {
+        return Object.freeze({
+          ...row,
+          id: diagnosticCase.id
+        });
+      }
+
+      throw new Error(
+        `Expected native root bridge batched JSON transport diagnostic case ${diagnosticCase.id} to fail.`
+      );
+    })
+  );
+}
+
+function createNativeRootBridgeBatchedJsonTransportLifecycleRows(records) {
+  const state = {
+    lastRequestId: null,
+    lifecycle: nativeRootBridgeJsonTransportBatchLifecycleStateNone,
+    rootHandle: null,
+    rootId: null
+  };
+  const rows = [];
+
+  for (const [batchIndex, record] of records.entries()) {
+    rows.push(
+      createNativeRootBridgeBatchedJsonTransportLifecycleRow(
+        record,
+        batchIndex,
+        state
+      )
+    );
+
+    if (
+      rows[rows.length - 1].status ===
+      nativeRootBridgeJsonTransportBatchLifecycleStatusError
+    ) {
+      break;
+    }
+  }
+
+  return Object.freeze(rows);
+}
+
+function createNativeRootBridgeBatchedJsonTransportLifecycleRow(
+  record,
+  batchIndex,
+  state
+) {
+  const lifecycleBefore = state.lifecycle;
+  const errorCode = getNativeRootBridgeBatchedJsonTransportLifecycleErrorCode(
+    record,
+    state
+  );
+
+  if (errorCode !== null) {
+    return freezeNativeRootBridgeBatchedJsonTransportLifecycleRow({
+      id: `batch-record-${batchIndex}-error`,
+      batchIndex,
+      requestId: record.requestId,
+      kind: record.kind,
+      lifecycleBefore,
+      lifecycleAfter: lifecycleBefore,
+      lifecycleTransition: null,
+      status: nativeRootBridgeJsonTransportBatchLifecycleStatusError,
+      code: errorCode,
+      sourceErrorCode: errorCode,
+      boundaryErrorCode:
+        getNativeRootBridgeBatchedJsonTransportBoundaryErrorCode(errorCode)
+    });
+  }
+
+  const lifecycleTransition = getNativeRootBridgeLifecycleTransition(
+    record.kind
+  );
+  const lifecycleAfter =
+    record.kind === nativeRootBridgeRequestKindUnmount
+      ? nativeRootBridgeJsonTransportBatchLifecycleStateRetired
+      : nativeRootBridgeJsonTransportBatchLifecycleStateActive;
+
+  state.lastRequestId = record.requestId;
+  if (state.rootHandle === null) {
+    state.rootHandle = record.rootHandle;
+    state.rootId = record.rootId;
+  }
+  state.lifecycle = lifecycleAfter;
+
+  return freezeNativeRootBridgeBatchedJsonTransportLifecycleRow({
+    id: `batch-record-${batchIndex}-${record.kind}`,
+    batchIndex,
+    requestId: record.requestId,
+    kind: record.kind,
+    lifecycleBefore,
+    lifecycleAfter,
+    lifecycleTransition,
+    status: nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted,
+    code: null,
+    sourceErrorCode: null,
+    boundaryErrorCode: null
+  });
+}
+
+function getNativeRootBridgeBatchedJsonTransportLifecycleErrorCode(
+  record,
+  state
+) {
+  if (
+    state.lastRequestId !== null &&
+    record.requestId <= state.lastRequestId
+  ) {
+    return nativeRootBridgeValidationErrorCodes.sequenceOutOfOrder;
+  }
+
+  if (state.lifecycle === nativeRootBridgeJsonTransportBatchLifecycleStateRetired) {
+    return nativeRootBridgeValidationErrorCodes.requestAfterUnmount;
+  }
+
+  if (
+    state.lifecycle === nativeRootBridgeJsonTransportBatchLifecycleStateNone &&
+    record.kind !== nativeRootBridgeRequestKindCreate
+  ) {
+    return nativeRootBridgeValidationErrorCodes.sequenceMustStartWithCreate;
+  }
+
+  if (
+    state.lifecycle === nativeRootBridgeJsonTransportBatchLifecycleStateActive &&
+    record.kind === nativeRootBridgeRequestKindCreate
+  ) {
+    return nativeRootBridgeValidationErrorCodes.createAfterRootCreated;
+  }
+
+  if (
+    state.rootHandle !== null &&
+    !isSameNativeRootBridgeHandle(state.rootHandle, record.rootHandle)
+  ) {
+    return nativeRootBridgeValidationErrorCodes.handleMismatch;
+  }
+
+  if (state.rootId !== null && record.rootId !== state.rootId) {
+    return nativeRootBridgeValidationErrorCodes.rootIdMismatch;
+  }
+
+  const expectedRootHandleState =
+    record.kind === nativeRootBridgeRequestKindUnmount
+      ? nativeRootBridgeRootHandleStateRetired
+      : nativeRootBridgeRootHandleStateActive;
+  if (record.rootHandleState !== expectedRootHandleState) {
+    return nativeRootBridgeValidationErrorCodes.rootHandleStateMismatch;
+  }
+
+  if (
+    record.kind === nativeRootBridgeRequestKindUnmount &&
+    record.valueHandle !== null
+  ) {
+    return nativeRootBridgeValidationErrorCodes.unexpectedValueHandle;
+  }
+
+  return null;
+}
+
+function getNativeRootBridgeBatchedJsonTransportBoundaryErrorCode(code) {
+  if (
+    code === nativeRootBridgeValidationErrorCodes.sequenceMustStartWithCreate ||
+    code === nativeRootBridgeValidationErrorCodes.createAfterRootCreated ||
+    code === nativeRootBridgeValidationErrorCodes.requestAfterUnmount ||
+    code === nativeRootBridgeValidationErrorCodes.sequenceOutOfOrder ||
+    code === nativeRootBridgeValidationErrorCodes.rootHandleStateMismatch ||
+    code === nativeRootBridgeValidationErrorCodes.rootHandleStillActive
+  ) {
+    return nativeBoundaryErrorCodeMap.rootBridgeWrongLifecycleOrder;
+  }
+
+  if (code === nativeRootBridgeValidationErrorCodes.wrongEnvironment) {
+    return nativeBoundaryErrorCodeMap.rootBridgeWrongEnvironment;
+  }
+
+  if (code === nativeRootBridgeValidationErrorCodes.staleHandle) {
+    return nativeBoundaryErrorCodeMap.rootBridgeStaleHandle;
+  }
+
+  return null;
+}
+
+function freezeNativeRootBridgeBatchedJsonTransportLifecycleRow({
+  id,
+  batchIndex,
+  requestId,
+  kind,
+  lifecycleBefore,
+  lifecycleAfter,
+  lifecycleTransition,
+  status,
+  code,
+  sourceErrorCode,
+  boundaryErrorCode
+}) {
+  return Object.freeze({
+    id,
+    batchIndex,
+    requestId,
+    kind,
+    lifecycleBefore,
+    lifecycleAfter,
+    lifecycleTransition,
+    status,
+    code,
+    sourceErrorCode,
+    boundaryErrorCode,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  });
 }
 
 function validateNativeRootBridgeJsonTransportDiagnosticPayload(json) {
