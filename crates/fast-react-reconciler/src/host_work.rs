@@ -1779,6 +1779,7 @@ fn complete_fiber_common(
 ) -> Result<(), HostWorkError> {
     let bubbled = bubble_properties(store.fiber_arena(), fiber)?;
     let node = store.fiber_arena_mut().get_mut(fiber)?;
+    node.set_lanes(Lanes::NO);
     node.set_state_node(state_node);
     node.set_memoized_props(memoized_props);
     node.set_child_lanes(bubbled.child_lanes());
@@ -2345,14 +2346,14 @@ mod tests {
         let root = store.fiber_arena().get(work_in_progress).unwrap();
         let component = root.child().unwrap();
         assert_eq!(result.root_child, Some(component));
-        assert_eq!(root.child_lanes(), Lanes::DEFAULT);
+        assert_eq!(root.child_lanes(), Lanes::NO);
         assert!(root.subtree_flags().contains_all(FiberFlags::PLACEMENT));
 
         let component_node = store.fiber_arena().get(component).unwrap();
         let text = component_node.child().unwrap();
         assert_eq!(component_node.tag(), FiberTag::HostComponent);
         assert!(component_node.flags().contains_all(FiberFlags::PLACEMENT));
-        assert_eq!(component_node.child_lanes(), Lanes::DEFAULT);
+        assert_eq!(component_node.child_lanes(), Lanes::NO);
         assert_eq!(component_node.sibling(), None);
         assert!(component_node.state_node().is_some());
 
@@ -2524,7 +2525,7 @@ mod tests {
         assert_eq!(result.completed_child, Some(first));
         assert_eq!(result.root_children(), &[first, second]);
         assert_eq!(result.completed_children(), &[first, second]);
-        assert_eq!(root.child_lanes(), Lanes::DEFAULT);
+        assert_eq!(root.child_lanes(), Lanes::NO);
         assert!(root.subtree_flags().contains_all(FiberFlags::PLACEMENT));
 
         assert_eq!(first_node.tag(), FiberTag::HostText);
@@ -2804,7 +2805,7 @@ mod tests {
         assert_eq!(text_node.tag(), FiberTag::HostText);
         assert_eq!(text_node.return_fiber(), Some(render.work_in_progress()));
         assert!(text_node.flags().contains_all(FiberFlags::PLACEMENT));
-        assert_eq!(root.child_lanes(), Lanes::DEFAULT);
+        assert_eq!(root.child_lanes(), Lanes::NO);
         assert!(root.subtree_flags().contains_all(FiberFlags::PLACEMENT));
 
         let text_instance = result
