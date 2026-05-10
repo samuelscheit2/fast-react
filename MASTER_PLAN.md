@@ -45,8 +45,7 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 194: function component begin-work handoff in
-  `/Users/user/Developer/Developer/fast-react-worker-194-function-component-begin-work-handoff`.
+- No active workers.
 
 ## Near-Term Sequencing
 
