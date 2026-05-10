@@ -98,7 +98,10 @@ use crate::{
         commit_finished_host_root_with_finished_work_handoff_for_canary,
         record_host_root_finished_work_pending_commit_for_canary,
     },
-    root_scheduler::{RootPingedRetryExecutionStatus, execute_pinged_retry_root_callback},
+    root_scheduler::{
+        RootPingedRetryExecutionStatus, RootSyncSchedulerContinuationExecutionStatus,
+        execute_pinged_retry_root_callback, execute_sync_scheduler_continuation_for_render_handoff,
+    },
     test_support::{RecordingHost, TestHostNode, TestHostTree},
 };
 
@@ -3842,12 +3845,13 @@ mod tests {
         VIEW_TRANSITION_UNSUPPORTED_FEATURE,
     };
     use crate::{
-        HostRootHydrationState, MUTATION_RENDER_PLACEHOLDER_FEATURE, PendingChildrenHandle,
-        PendingCommitHandle, ReconcilerError, RootContextHandle, RootElementHandle,
-        RootHydrationCallbacksHandle, RootKind, RootOptions, RootSchedulerCallbackExecutionStatus,
-        RootSuspenseBoundarySetHandle, RootTaskScheduleOutcome, RootTransitionCallbacksHandle,
-        RootUpdateError, RootUpdateLaneSourcePriority, SchedulerCallbackRequest,
-        ensure_root_is_scheduled, execute_scheduled_root_callback,
+        ExecutionContextState, HostRootHydrationState, MUTATION_RENDER_PLACEHOLDER_FEATURE,
+        PendingChildrenHandle, PendingCommitHandle, ReconcilerError, RootContextHandle,
+        RootElementHandle, RootHydrationCallbacksHandle, RootKind, RootOptions,
+        RootSchedulerCallbackExecutionStatus, RootSuspenseBoundarySetHandle,
+        RootTaskScheduleOutcome, RootTransitionCallbacksHandle, RootUpdateError,
+        RootUpdateLaneSourcePriority, SchedulerCallbackRequest, ensure_root_is_scheduled,
+        execute_scheduled_root_callback, flush_sync_work_on_all_roots,
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
@@ -8179,6 +8183,93 @@ mod tests {
         assert_eq!(
             host.operations().len(),
             record.host_operation_count_after_commit()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_complete_work_handoff_feeds_private_sync_scheduler_continuation() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("section", "scheduler commit");
+        let current = store.root(root_id).unwrap().current();
+        let sync_update = update_container_sync(&mut store, root_id, element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, sync_update.schedule()).unwrap();
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let sync_handoff = rendered.records()[0];
+        let render = sync_handoff.render_phase();
+
+        let complete_work = handoff_completed_host_root_render_to_test_complete_work(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap();
+        let pending_finished_work =
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, 596).unwrap();
+        let host_operation_count_after_complete_work = host.operations().len();
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            sync_handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(complete_work.root(), root_id);
+        assert_eq!(
+            complete_work.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(
+            complete_work.root_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(complete_work.completed_child_count(), 1);
+        assert_eq!(pending_finished_work.root(), root_id);
+        assert_eq!(pending_finished_work.previous_current(), current);
+        assert_eq!(
+            pending_finished_work.finished_work(),
+            render.finished_work()
+        );
+        assert_eq!(pending_finished_work.render_lanes(), Lanes::SYNC);
+        assert_eq!(pending_finished_work.finished_lanes(), Lanes::SYNC);
+        assert_eq!(pending_finished_work.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            pending_finished_work.pending_lanes_before_commit(),
+            Lanes::SYNC
+        );
+        assert!(pending_finished_work.records_finished_work());
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert_eq!(execution.handoff(), sync_handoff);
+        assert_eq!(execution.selected_lanes(), Lanes::SYNC);
+        assert!(execution.did_execute_private_sync_scheduler_continuation());
+        assert!(execution.consumed_accepted_render_handoff());
+        assert!(execution.async_callback_execution_blocked());
+        assert!(execution.public_update_scheduling_blocked());
+        assert!(!execution.public_root_compatibility_claimed());
+        assert!(!execution.executes_public_effects());
+        let commit = execution.commit().unwrap();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), Lanes::SYNC);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(commit.mutation_log().len(), 1);
+        assert_eq!(commit.mutation_apply_log().len(), 1);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(
+            host.operations().len(),
+            host_operation_count_after_complete_work
         );
     }
 
