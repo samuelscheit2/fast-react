@@ -56,6 +56,20 @@ sequencing belong in `MASTER_PLAN.md`.
   full React DOM package checks; scheduler postTask and package-surface checks;
   private-admission, benchmark, and conformance workspace checks;
   conflict-marker scanning; and `git diff --check`.
+- Workers 599, 602-603, 609-611, 614-616, 620, and 622 were accepted from the
+  active queue. The batch added `useState` dispatch-to-commit metadata,
+  layout-effect commit-order execution, broad context-provider subtree
+  traversal, deletion subtree host detachment execution, test-renderer
+  create/update native-bridge admission, React DOM root property/text update
+  execution, root unmount cleanup admission, private click dispatch,
+  stylesheet load-state resource diagnostics, and scheduler mock act/root work
+  handoff diagnostics while keeping public compatibility blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, focused
+  reconciler checks for `useState`, function components, layout/effect lists,
+  context, deletion, and host nodes; test-renderer create/update Rust and JS
+  gates plus workspace checks; React DOM root bridge, event, resource, package,
+  and conformance checks; scheduler mock/act checks; conflict-marker scanning;
+  and `git diff --check`.
 
 ### Queue 565-594
 
