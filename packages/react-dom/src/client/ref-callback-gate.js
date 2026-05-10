@@ -4,10 +4,23 @@ const componentTree = require('./component-tree.js');
 
 const REF_CALLBACK_COMPONENT_TREE_GATE_STATUS =
   'blocked-until-ref-callback-execution-boundary';
+const REF_CALLBACK_ATTACH_DETACH_GATE_STATUS =
+  'blocked-until-ref-callback-attach-detach-execution';
+const REF_CALLBACK_ERROR_PROPAGATION_STATUS =
+  'blocked-until-root-error-routing';
 const REF_ACTION_ATTACH = 'attach';
 const REF_ACTION_DETACH = 'detach';
 const REF_DETACH_REASON_DELETED = 'deleted';
 const REF_DETACH_REASON_REF_CHANGED = 'ref-changed';
+const REF_KIND_CALLBACK = 'callback';
+const REF_KIND_OBJECT = 'object';
+const REF_OPERATION_CALLBACK_ATTACH =
+  'invoke-callback-ref-with-host-instance';
+const REF_OPERATION_CALLBACK_DETACH =
+  'invoke-callback-ref-with-null-or-cleanup';
+const REF_OPERATION_OBJECT_ATTACH =
+  'set-object-ref-current-to-host-instance';
+const REF_OPERATION_OBJECT_DETACH = 'clear-object-ref-current-to-null';
 const REF_TOKEN_PHASE_COMMIT = 'commit';
 const REF_TOKEN_PHASE_DELETION = 'deletion';
 const REF_TOKEN_TARGET_INSTANCE = 'instance';
@@ -18,6 +31,10 @@ const privateDomRefCallbackComponentTreeGateSnapshotType =
   'fast.react_dom.private_ref_callback_component_tree_gate_snapshot';
 const privateDomRefCallbackComponentTreeGateRecordType =
   'fast.react_dom.private_ref_callback_component_tree_gate_record';
+const privateDomRefCallbackAttachDetachGateSnapshotType =
+  'fast.react_dom.private_ref_callback_attach_detach_gate_snapshot';
+const privateDomRefCallbackAttachDetachGateRecordType =
+  'fast.react_dom.private_ref_callback_attach_detach_gate_record';
 
 const blockedCapabilities = freezeArray([
   blockedCapability(
@@ -41,6 +58,10 @@ const blockedCapabilities = freezeArray([
     'Public React DOM roots remain placeholder-gated and do not route refs.'
   ),
   blockedCapability(
+    'root-error-propagation',
+    'Ref callback errors require root error callback routing before reporting.'
+  ),
+  blockedCapability(
     'react-dom-ref-compatibility-claim',
     'React DOM ref compatibility is not claimed by this private gate.'
   )
@@ -52,12 +73,27 @@ const noSideEffects = freezeRecord({
   layoutEffectsRun: false,
   domMutated: false,
   publicRootsTouched: false,
+  rootErrorsReported: false,
   compatibilityClaimed: false
+});
+
+const blockedErrorPropagation = freezeRecord({
+  status: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+  willReportRootErrors: false,
+  reason: 'Root error callback routing is not connected to this private gate.'
+});
+
+const attachDetachOrdering = freezeRecord({
+  source: 'root-commit-ref-metadata',
+  deterministic: true,
+  detachRecordsBeforeAttachRecords: true
 });
 
 const metadataRecordPayloads = new WeakMap();
 const gateSnapshotPayloads = new WeakMap();
 const gateRecordPayloads = new WeakMap();
+const attachDetachGateSnapshotPayloads = new WeakMap();
+const attachDetachGateRecordPayloads = new WeakMap();
 
 function createRefAttachMetadataRecord(options) {
   return createRefCallbackMetadataRecord({
@@ -78,27 +114,9 @@ function createRefDetachMetadataRecord(options) {
 
 function createRefCallbackComponentTreeGateSnapshot(snapshot) {
   const metadata = normalizeMetadataSnapshot(snapshot);
-  const validatedRecords = [];
-
-  for (const payload of metadata.detach) {
-    validatedRecords.push(
-      validateMetadataPayloadAgainstComponentTree(
-        payload,
-        REF_ACTION_DETACH,
-        validatedRecords.length
-      )
-    );
-  }
-
-  for (const payload of metadata.attach) {
-    validatedRecords.push(
-      validateMetadataPayloadAgainstComponentTree(
-        payload,
-        REF_ACTION_ATTACH,
-        validatedRecords.length
-      )
-    );
-  }
+  const validatedRecords = validateMetadataSnapshotAgainstComponentTree(
+    metadata
+  );
 
   const records = freezeArray(
     validatedRecords.map(({payload, componentTreeRecord}, sequence) =>
@@ -136,6 +154,63 @@ function createRefCallbackComponentTreeGateSnapshot(snapshot) {
   return gateSnapshot;
 }
 
+function createRefCallbackAttachDetachGateSnapshot(snapshot) {
+  const metadata = normalizeRootCommitRefMetadataSnapshot(snapshot);
+  const validatedRecords = validateMetadataSnapshotAgainstComponentTree(
+    metadata
+  );
+  const records = freezeArray(
+    validatedRecords.map((validatedRecord, sequence) =>
+      createAttachDetachGateRecord(sequence, validatedRecord)
+    )
+  );
+
+  let callbackRefRecordCount = 0;
+  let objectRefRecordCount = 0;
+  for (const record of records) {
+    if (record.refKind === REF_KIND_CALLBACK) {
+      callbackRefRecordCount++;
+    } else if (record.refKind === REF_KIND_OBJECT) {
+      objectRefRecordCount++;
+    }
+  }
+
+  const gateSnapshot = freezeRecord({
+    $$typeof: privateDomRefCallbackAttachDetachGateSnapshotType,
+    kind: 'FastReactDomPrivateRefCallbackAttachDetachGateSnapshot',
+    status: REF_CALLBACK_ATTACH_DETACH_GATE_STATUS,
+    recordCount: records.length,
+    detachCount: metadata.detach.length,
+    attachCount: metadata.attach.length,
+    callbackRefRecordCount,
+    objectRefRecordCount,
+    records,
+    ordering: attachDetachOrdering,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    blockedCapabilities,
+    sideEffects: noSideEffects,
+    callbackRefsInvoked: false,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false
+  });
+
+  attachDetachGateSnapshotPayloads.set(
+    gateSnapshot,
+    freezeRecord({
+      detach: metadata.detach,
+      attach: metadata.attach,
+      records: validatedRecords
+    })
+  );
+
+  return gateSnapshot;
+}
+
 function getPrivateRefCallbackMetadataRecordPayload(record) {
   return isWeakMapKey(record)
     ? metadataRecordPayloads.get(record) || null
@@ -152,6 +227,18 @@ function getPrivateRefCallbackComponentTreeGateRecordPayload(record) {
   return isWeakMapKey(record) ? gateRecordPayloads.get(record) || null : null;
 }
 
+function getPrivateRefCallbackAttachDetachGateSnapshotPayload(snapshot) {
+  return isWeakMapKey(snapshot)
+    ? attachDetachGateSnapshotPayloads.get(snapshot) || null
+    : null;
+}
+
+function getPrivateRefCallbackAttachDetachGateRecordPayload(record) {
+  return isWeakMapKey(record)
+    ? attachDetachGateRecordPayloads.get(record) || null
+    : null;
+}
+
 function isPrivateRefCallbackMetadataRecord(value) {
   return getPrivateRefCallbackMetadataRecordPayload(value) !== null;
 }
@@ -162,6 +249,14 @@ function isPrivateRefCallbackComponentTreeGateSnapshot(value) {
 
 function isPrivateRefCallbackComponentTreeGateRecord(value) {
   return getPrivateRefCallbackComponentTreeGateRecordPayload(value) !== null;
+}
+
+function isPrivateRefCallbackAttachDetachGateSnapshot(value) {
+  return getPrivateRefCallbackAttachDetachGateSnapshotPayload(value) !== null;
+}
+
+function isPrivateRefCallbackAttachDetachGateRecord(value) {
+  return getPrivateRefCallbackAttachDetachGateRecordPayload(value) !== null;
 }
 
 function createRefCallbackMetadataRecord(options) {
@@ -210,7 +305,7 @@ function createRefCallbackMetadataRecord(options) {
     detachReason,
     tokenPhase: payload.tokenPhase,
     tokenTarget: payload.tokenTarget,
-    status: 'accepted-private-ref-metadata',
+    status: 'accepted-private-root-commit-ref-metadata',
     exposesRefValue: false,
     exposesHostNode: false,
     exposesLatestProps: false
@@ -232,6 +327,22 @@ function normalizeMetadataSnapshot(snapshot) {
     detach: normalizeMetadataRecordList(snapshot.detach, REF_ACTION_DETACH),
     attach: normalizeMetadataRecordList(snapshot.attach, REF_ACTION_ATTACH)
   };
+}
+
+function normalizeRootCommitRefMetadataSnapshot(snapshot) {
+  if (snapshot == null || typeof snapshot !== 'object') {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_SNAPSHOT',
+      'Cannot validate root commit ref metadata without a snapshot object.'
+    );
+  }
+
+  const metadataSnapshot =
+    'rootCommitRefMetadata' in snapshot
+      ? snapshot.rootCommitRefMetadata
+      : snapshot;
+
+  return normalizeMetadataSnapshot(metadataSnapshot);
 }
 
 function normalizeMetadataRecordList(records, expectedAction) {
@@ -270,6 +381,32 @@ function assertPrivateMetadataPayload(record, expectedAction) {
   return payload;
 }
 
+function validateMetadataSnapshotAgainstComponentTree(metadata) {
+  const validatedRecords = [];
+
+  for (const payload of metadata.detach) {
+    validatedRecords.push(
+      validateMetadataPayloadAgainstComponentTree(
+        payload,
+        REF_ACTION_DETACH,
+        validatedRecords.length
+      )
+    );
+  }
+
+  for (const payload of metadata.attach) {
+    validatedRecords.push(
+      validateMetadataPayloadAgainstComponentTree(
+        payload,
+        REF_ACTION_ATTACH,
+        validatedRecords.length
+      )
+    );
+  }
+
+  return validatedRecords;
+}
+
 function validateMetadataPayloadAgainstComponentTree(
   payload,
   expectedAction,
@@ -277,19 +414,35 @@ function validateMetadataPayloadAgainstComponentTree(
 ) {
   assertTokenScope(payload, expectedAction);
 
-  const node = componentTree.getMountedHostInstanceNodeFromToken(
-    payload.hostInstanceToken
-  );
-  if (node === null) {
+  let hostNodeRecord;
+  try {
+    hostNodeRecord = componentTree.createMountedHostInstanceNodeRecord(
+      payload.hostInstanceToken
+    );
+  } catch (error) {
+    if (
+      error &&
+      (error.code === 'FAST_REACT_DOM_UNMOUNTED_HOST_INSTANCE_TOKEN' ||
+        error.code === 'FAST_REACT_DOM_INVALID_HOST_INSTANCE_TOKEN')
+    ) {
+      throw createRefCallbackGateError(
+        'FAST_REACT_DOM_REF_CALLBACK_GATE_UNMOUNTED_HOST_INSTANCE',
+        'Cannot validate ref metadata for an unmounted React DOM host instance token.'
+      );
+    }
+    throw error;
+  }
+
+  const hostNodePayload =
+    componentTree.getPrivateHostInstanceNodeRecordPayload(hostNodeRecord);
+  if (hostNodePayload === null) {
     throw createRefCallbackGateError(
-      'FAST_REACT_DOM_REF_CALLBACK_GATE_UNMOUNTED_HOST_INSTANCE',
-      'Cannot validate ref metadata for an unmounted React DOM host instance token.'
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_HOST_NODE_RECORD',
+      'Cannot validate ref metadata without a private component-tree host node record.'
     );
   }
 
-  const rootOwner = componentTree.getRootOwnerFromHostInstanceToken(
-    payload.hostInstanceToken
-  );
+  const rootOwner = hostNodePayload.rootOwner;
   if (rootOwner !== payload.rootOwner) {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_ROOT_OWNER_MISMATCH',
@@ -297,9 +450,7 @@ function validateMetadataPayloadAgainstComponentTree(
     );
   }
 
-  const hostOwner = componentTree.getHostInstanceOwnerFromToken(
-    payload.hostInstanceToken
-  );
+  const hostOwner = hostNodePayload.hostOwner;
   if (hostOwner !== payload.hostOwner) {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_HOST_OWNER_MISMATCH',
@@ -307,9 +458,7 @@ function validateMetadataPayloadAgainstComponentTree(
     );
   }
 
-  const latestProps = componentTree.getLatestPropsFromHostInstanceToken(
-    payload.hostInstanceToken
-  );
+  const latestProps = hostNodePayload.latestProps;
   if (latestProps == null || typeof latestProps !== 'object') {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_MISSING_LATEST_PROPS',
@@ -317,14 +466,14 @@ function validateMetadataPayloadAgainstComponentTree(
     );
   }
 
-  if (!Object.prototype.hasOwnProperty.call(latestProps, 'ref')) {
+  if (!hostNodePayload.hasLatestRef) {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_MISSING_LATEST_REF',
       'Cannot validate ref metadata when latest props have no ref field.'
     );
   }
 
-  if (latestProps.ref !== payload.expectedLatestRef) {
+  if (hostNodePayload.latestRef !== payload.expectedLatestRef) {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_LATEST_REF_MISMATCH',
       'Ref metadata does not match the component-tree latest-props ref.'
@@ -333,15 +482,21 @@ function validateMetadataPayloadAgainstComponentTree(
 
   const componentTreeRecord = freezeRecord({
     sequence,
-    node,
+    node: hostNodePayload.node,
+    hostNodeRecord,
     rootOwner,
     hostOwner,
     latestProps,
-    latestRef: latestProps.ref,
+    latestRef: hostNodePayload.latestRef,
     status: 'mounted-latest-props-validated'
   });
 
-  return {payload, componentTreeRecord};
+  return {
+    payload,
+    componentTreeRecord,
+    hostNodeRecord,
+    hostNodePayload
+  };
 }
 
 function assertTokenScope(payload, expectedAction) {
@@ -380,6 +535,7 @@ function createGateRecord(sequence, payload, componentTreeRecord) {
     tokenPhase: payload.tokenPhase,
     tokenTarget: payload.tokenTarget,
     componentTreeStatus: componentTreeRecord.status,
+    hostNodeRecordKind: componentTreeRecord.hostNodeRecord.kind,
     latestRefStatus: 'matches-private-metadata',
     blockedCapabilities,
     sideEffects: noSideEffects,
@@ -403,6 +559,73 @@ function createGateRecord(sequence, payload, componentTreeRecord) {
   );
 
   return record;
+}
+
+function createAttachDetachGateRecord(sequence, validatedRecord) {
+  const {payload, componentTreeRecord, hostNodeRecord, hostNodePayload} =
+    validatedRecord;
+  const refKind = refKindForValue(payload.ref);
+  const operation = operationForRefAction(refKind, payload.action);
+  const ordering = createOperationOrderingRecord(sequence, payload.action);
+  const record = freezeRecord({
+    $$typeof: privateDomRefCallbackAttachDetachGateRecordType,
+    kind: 'FastReactDomPrivateRefCallbackAttachDetachGateRecord',
+    sequence,
+    action: payload.action,
+    detachReason: payload.detachReason,
+    refKind,
+    operation,
+    status: REF_CALLBACK_ATTACH_DETACH_GATE_STATUS,
+    rootCommitMetadataStatus: 'accepted-private-root-commit-ref-metadata',
+    componentTreeStatus: componentTreeRecord.status,
+    hostNodeRecord,
+    hostNodeRecordKind: hostNodeRecord.kind,
+    latestRefStatus: 'matches-private-metadata',
+    tokenPhase: payload.tokenPhase,
+    tokenTarget: payload.tokenTarget,
+    ordering,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    blockedCapabilities,
+    sideEffects: noSideEffects,
+    callbackRefsInvoked: false,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesHostNode: false,
+    exposesLatestProps: false
+  });
+
+  attachDetachGateRecordPayloads.set(
+    record,
+    freezeRecord({
+      metadata: payload,
+      componentTree: componentTreeRecord,
+      hostNode: hostNodePayload,
+      ref: payload.ref
+    })
+  );
+
+  return record;
+}
+
+function createOperationOrderingRecord(sequence, action) {
+  return freezeRecord({
+    sequence,
+    action,
+    phase:
+      action === REF_ACTION_DETACH
+        ? 'mutation-ref-detach'
+        : 'layout-ref-attach',
+    source: attachDetachOrdering.source,
+    detachRecordsBeforeAttachRecords:
+      attachDetachOrdering.detachRecordsBeforeAttachRecords,
+    deterministic: attachDetachOrdering.deterministic
+  });
 }
 
 function assertOptionsObject(options, label) {
@@ -461,6 +684,22 @@ function normalizeRefValue(ref) {
   );
 }
 
+function refKindForValue(ref) {
+  return typeof ref === 'function' ? REF_KIND_CALLBACK : REF_KIND_OBJECT;
+}
+
+function operationForRefAction(refKind, action) {
+  if (refKind === REF_KIND_CALLBACK) {
+    return action === REF_ACTION_ATTACH
+      ? REF_OPERATION_CALLBACK_ATTACH
+      : REF_OPERATION_CALLBACK_DETACH;
+  }
+
+  return action === REF_ACTION_ATTACH
+    ? REF_OPERATION_OBJECT_ATTACH
+    : REF_OPERATION_OBJECT_DETACH;
+}
+
 function tokenPhaseForAction(action) {
   return action === REF_ACTION_ATTACH
     ? REF_TOKEN_PHASE_COMMIT
@@ -500,23 +739,40 @@ function freezeRecord(value) {
 module.exports = {
   REF_ACTION_ATTACH,
   REF_ACTION_DETACH,
+  REF_CALLBACK_ATTACH_DETACH_GATE_STATUS,
   REF_CALLBACK_COMPONENT_TREE_GATE_STATUS,
+  REF_CALLBACK_ERROR_PROPAGATION_STATUS,
   REF_DETACH_REASON_DELETED,
   REF_DETACH_REASON_REF_CHANGED,
+  REF_KIND_CALLBACK,
+  REF_KIND_OBJECT,
+  REF_OPERATION_CALLBACK_ATTACH,
+  REF_OPERATION_CALLBACK_DETACH,
+  REF_OPERATION_OBJECT_ATTACH,
+  REF_OPERATION_OBJECT_DETACH,
   REF_TOKEN_PHASE_COMMIT,
   REF_TOKEN_PHASE_DELETION,
   REF_TOKEN_TARGET_INSTANCE,
+  attachDetachOrdering,
+  blockedErrorPropagation,
   blockedCapabilities,
   createRefAttachMetadataRecord,
+  createRefCallbackAttachDetachGateSnapshot,
   createRefCallbackComponentTreeGateSnapshot,
   createRefDetachMetadataRecord,
+  getPrivateRefCallbackAttachDetachGateRecordPayload,
+  getPrivateRefCallbackAttachDetachGateSnapshotPayload,
   getPrivateRefCallbackComponentTreeGateRecordPayload,
   getPrivateRefCallbackComponentTreeGateSnapshotPayload,
   getPrivateRefCallbackMetadataRecordPayload,
+  isPrivateRefCallbackAttachDetachGateRecord,
+  isPrivateRefCallbackAttachDetachGateSnapshot,
   isPrivateRefCallbackComponentTreeGateRecord,
   isPrivateRefCallbackComponentTreeGateSnapshot,
   isPrivateRefCallbackMetadataRecord,
   noSideEffects,
+  privateDomRefCallbackAttachDetachGateRecordType,
+  privateDomRefCallbackAttachDetachGateSnapshotType,
   privateDomRefCallbackComponentTreeGateRecordType,
   privateDomRefCallbackComponentTreeGateSnapshotType,
   privateDomRefCallbackMetadataRecordType

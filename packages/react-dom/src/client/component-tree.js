@@ -14,9 +14,14 @@ const internalLatestPropsKey = latestPropsMarkerPrefix + randomKey;
 const hostInstanceTokenBrand = Symbol('fast.react.dom.hostInstanceToken');
 const EVENT_TARGET_NORMALIZATION_RECORD_KIND =
   'FastReactDomEventTargetNormalizationRecord';
+const HOST_INSTANCE_NODE_RECORD_KIND =
+  'FastReactDomComponentTreeHostInstanceNodeRecord';
+const privateHostInstanceNodeRecordType =
+  'fast.react_dom.private_component_tree_host_instance_node_record';
 
 const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
+const hostInstanceNodeRecordPayloads = new WeakMap();
 
 function isObjectLike(value) {
   return (
@@ -230,6 +235,66 @@ function createEventTargetNormalizationRecord(targetNode) {
   });
 }
 
+function createMountedHostInstanceNodeRecord(token) {
+  assertKnownHostInstanceToken(token);
+
+  const node = getMountedHostInstanceNodeFromToken(token);
+  if (node === null) {
+    throw createComponentTreeError(
+      'Cannot create a React DOM host instance node record from an unmounted token.',
+      'FAST_REACT_DOM_UNMOUNTED_HOST_INSTANCE_TOKEN'
+    );
+  }
+
+  const hostOwner = getHostInstanceOwnerFromToken(token);
+  const rootOwner = getRootOwnerFromHostInstanceToken(token);
+  const latestProps = getLatestPropsFromNode(node);
+  const hasLatestRef =
+    latestProps !== null &&
+    typeof latestProps === 'object' &&
+    Object.prototype.hasOwnProperty.call(latestProps, 'ref');
+  const latestRef = hasLatestRef ? latestProps.ref : undefined;
+
+  const record = Object.freeze({
+    $$typeof: privateHostInstanceNodeRecordType,
+    kind: HOST_INSTANCE_NODE_RECORD_KIND,
+    status: 'mounted-host-instance-node',
+    hostInstanceToken: token,
+    hostOwner,
+    rootOwner,
+    nodeType: typeof node.nodeType === 'number' ? node.nodeType : null,
+    latestPropsStatus: latestProps === null ? 'missing' : 'present',
+    latestRefStatus: hasLatestRef ? 'present' : 'missing',
+    exposesHostNode: false,
+    exposesLatestProps: false
+  });
+
+  hostInstanceNodeRecordPayloads.set(
+    record,
+    Object.freeze({
+      node,
+      token,
+      hostOwner,
+      rootOwner,
+      latestProps,
+      hasLatestRef,
+      latestRef
+    })
+  );
+
+  return record;
+}
+
+function getPrivateHostInstanceNodeRecordPayload(record) {
+  return isObjectLike(record)
+    ? hostInstanceNodeRecordPayloads.get(record) || null
+    : null;
+}
+
+function isPrivateHostInstanceNodeRecord(value) {
+  return getPrivateHostInstanceNodeRecordPayload(value) !== null;
+}
+
 function getHostInstanceOwnerFromToken(token) {
   const metadata = getHostInstanceMetadata(token);
   return metadata === null ? null : metadata.hostOwner;
@@ -396,6 +461,7 @@ function detachHostInstanceToken(token) {
 
 module.exports = {
   EVENT_TARGET_NORMALIZATION_RECORD_KIND,
+  HOST_INSTANCE_NODE_RECORD_KIND,
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
@@ -403,6 +469,7 @@ module.exports = {
   commitLatestPropsFromMutationRecords,
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
+  createMountedHostInstanceNodeRecord,
   detachHostInstanceNode,
   detachHostInstanceToken,
   getAttachedNodeFromHostInstanceToken,
@@ -415,14 +482,17 @@ module.exports = {
   getLatestPropsFromNode,
   getMountedHostInstanceNodeFromToken,
   getMountedHostInstanceTokenFromNode,
+  getPrivateHostInstanceNodeRecordPayload,
   getRootOwnerFromHostInstanceToken,
   getRootOwnerFromNode,
   hostInstanceMarkerPrefix,
   internalHostInstanceTokenKey,
   internalLatestPropsKey,
   isHostInstanceNode,
+  isPrivateHostInstanceNodeRecord,
   isHostInstanceToken,
   latestPropsMarkerPrefix,
+  privateHostInstanceNodeRecordType,
   updateLatestPropsForHostInstanceToken,
   updateLatestPropsForNode
 };

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   DOM_REF_CALLBACK_ORACLE_ARTIFACT_PATH,
@@ -20,6 +23,19 @@ import {
 } from "../src/dom-ref-callback-oracle.mjs";
 
 const oracle = readCheckedDomRefCallbackOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const componentTree = require(
+  path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+);
+const refCallbackGate = require(
+  path.join(repoRoot, "packages/react-dom/src/client/ref-callback-gate.js")
+);
 
 test("checked React DOM ref callback oracle artifact has expected schema and targets", () => {
   assert.equal(
@@ -286,6 +302,143 @@ test("callback ref attach and cleanup errors propagate through root onUncaughtEr
   }
 });
 
+test("private DOM ref callback attach/detach gate records callback and object refs without side effects", () => {
+  const rootOwner = {kind: "PrivateAttachDetachRoot"};
+  const hostOwner = {kind: "PrivateAttachDetachHost"};
+  const node = createElement("DIV");
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  let callbackCallCount = 0;
+  function callbackRef() {
+    callbackCallCount++;
+    throw new Error("private gate must not invoke callback refs");
+  }
+  const objectRef = {current: "unchanged"};
+  const latestProps = {id: "next", ref: objectRef};
+
+  componentTree.attachHostInstanceNode(node, token, latestProps);
+
+  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "current-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "callback-ref-handle"},
+    ref: callbackRef,
+    expectedLatestRef: objectRef,
+    sourceToken: "deletion-token:callback-ref",
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+    detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
+  });
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "finished-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "object-ref-handle"},
+    ref: objectRef,
+    sourceToken: "commit-token:object-ref",
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_COMMIT,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE
+  });
+
+  const snapshot =
+    refCallbackGate.createRefCallbackAttachDetachGateSnapshot({
+      rootCommitRefMetadata: {
+        detach: [detachRecord],
+        attach: [attachRecord]
+      }
+    });
+
+  assert.equal(
+    snapshot.$$typeof,
+    refCallbackGate.privateDomRefCallbackAttachDetachGateSnapshotType
+  );
+  assert.equal(
+    snapshot.status,
+    refCallbackGate.REF_CALLBACK_ATTACH_DETACH_GATE_STATUS
+  );
+  assert.equal(snapshot.recordCount, 2);
+  assert.equal(snapshot.callbackRefRecordCount, 1);
+  assert.equal(snapshot.objectRefRecordCount, 1);
+  assert.equal(snapshot.callbackRefsInvoked, false);
+  assert.equal(snapshot.objectRefsMutated, false);
+  assert.equal(snapshot.rootErrorsReported, false);
+  assert.equal(
+    snapshot.errorPropagationStatus,
+    refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS
+  );
+  assert.equal(snapshot.errorPropagation.willReportRootErrors, false);
+  assert.equal(
+    snapshot.blockedCapabilities.some(
+      (capability) => capability.id === "root-error-propagation"
+    ),
+    true
+  );
+  assert.deepEqual(
+    snapshot.records.map((record) => [
+      record.sequence,
+      record.action,
+      record.refKind,
+      record.operation,
+      record.ordering.phase,
+      record.hostNodeRecordKind,
+      record.errorPropagationStatus,
+      record.callbackRefsInvoked,
+      record.objectRefsMutated
+    ]),
+    [
+      [
+        0,
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_KIND_CALLBACK,
+        refCallbackGate.REF_OPERATION_CALLBACK_DETACH,
+        "mutation-ref-detach",
+        componentTree.HOST_INSTANCE_NODE_RECORD_KIND,
+        refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+        false,
+        false
+      ],
+      [
+        1,
+        refCallbackGate.REF_ACTION_ATTACH,
+        refCallbackGate.REF_KIND_OBJECT,
+        refCallbackGate.REF_OPERATION_OBJECT_ATTACH,
+        "layout-ref-attach",
+        componentTree.HOST_INSTANCE_NODE_RECORD_KIND,
+        refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+        false,
+        false
+      ]
+    ]
+  );
+
+  for (const record of snapshot.records) {
+    assert.equal(
+      refCallbackGate.isPrivateRefCallbackAttachDetachGateRecord(record),
+      true
+    );
+    assert.equal(Object.hasOwn(record, "ref"), false);
+    assert.equal(Object.hasOwn(record, "node"), false);
+    assert.equal(Object.hasOwn(record, "latestProps"), false);
+    assert.equal(record.hostNodeRecord.exposesHostNode, false);
+    assert.equal(record.hostNodeRecord.exposesLatestProps, false);
+  }
+
+  const attachPayload =
+    refCallbackGate.getPrivateRefCallbackAttachDetachGateRecordPayload(
+      snapshot.records[1]
+    );
+  assert.equal(attachPayload.hostNode.node, node);
+  assert.equal(attachPayload.hostNode.latestProps, latestProps);
+  assert.equal(attachPayload.ref, objectRef);
+  assert.equal(callbackCallCount, 0);
+  assert.equal(objectRef.current, "unchanged");
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("React DOM ref callback oracle artifact has no temp or local path leaks", () => {
   const oracleText = readCheckedDomRefCallbackOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
@@ -361,4 +514,12 @@ function operationByLabel(value, label) {
 
 function rootErrorMessages(value) {
   return value.rootErrors.map((error) => error.error.message);
+}
+
+function createElement(localName) {
+  return {
+    localName: localName.toLowerCase(),
+    nodeType: 1,
+    parentNode: null
+  };
 }
