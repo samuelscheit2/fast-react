@@ -1,7 +1,9 @@
 //! Deterministic HostRoot update callback records.
 //!
-//! These records are a data-only handoff for a future commit layout phase.
-//! They never invoke callback handles and do not model root error callbacks.
+//! These records are a data-only handoff for a future commit layout phase. The
+//! private test-control execution gate consumes accepted callback handles as
+//! opaque metadata only; it does not call public JS callbacks or model root
+//! error callbacks.
 
 use fast_react_core::UpdateQueueHandle;
 
@@ -162,6 +164,11 @@ impl RootUpdateCallbackInvocationGateSnapshot {
     }
 
     #[must_use]
+    pub(crate) fn drain_records(&mut self) -> Vec<RootUpdateCallbackInvocationGateRecord> {
+        std::mem::take(&mut self.records)
+    }
+
+    #[must_use]
     pub(crate) const fn hidden_record_count(&self) -> usize {
         self.hidden_record_count
     }
@@ -262,6 +269,302 @@ pub(crate) const ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS:
     RootUpdateCallbackInvocationGateBlocker::PublicRootCallbackBehavior,
 ];
 
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct RootUpdateCallbackInvocationErrorHandle(u64);
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback invocation test-control errors are reserved for future commit workers"
+)]
+impl RootUpdateCallbackInvocationErrorHandle {
+    pub(crate) const NONE: Self = Self(0);
+
+    #[must_use]
+    pub(crate) const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub(crate) const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub(crate) const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+
+    #[must_use]
+    pub(crate) const fn is_some(self) -> bool {
+        self.0 != 0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootUpdateCallbackInvocationRequest {
+    source: RootUpdateCallbackInvocationGateRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback invocation requests are reserved for private test-control execution"
+)]
+impl RootUpdateCallbackInvocationRequest {
+    #[must_use]
+    pub(crate) const fn source(self) -> RootUpdateCallbackInvocationGateRecord {
+        self.source
+    }
+
+    #[must_use]
+    pub(crate) const fn invocation_order(self) -> usize {
+        self.source.invocation_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.source.queue()
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.source.update()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> RootUpdateCallbackHandle {
+        self.source.callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted_sequence(self) -> usize {
+        self.source.accepted_sequence()
+    }
+
+    #[must_use]
+    pub(crate) const fn visibility(self) -> RootUpdateCallbackVisibility {
+        self.source.visibility()
+    }
+}
+
+pub(crate) trait RootUpdateCallbackInvocationTestControl {
+    fn invoke_root_update_callback(
+        &mut self,
+        request: RootUpdateCallbackInvocationRequest,
+    ) -> Result<(), RootUpdateCallbackInvocationErrorHandle>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootUpdateCallbackInvocationStatus {
+    Completed,
+    Errored,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootUpdateCallbackInvocationExecutionGateStatus {
+    TestControlOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootUpdateCallbackInvocationExecutionGateBlocker {
+    PublicJsCallbackInvocation,
+    PublicRootCallbackBehavior,
+    RootErrorCallbackInvocation,
+}
+
+pub(crate) const ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS:
+    [RootUpdateCallbackInvocationExecutionGateBlocker; 3] = [
+    RootUpdateCallbackInvocationExecutionGateBlocker::PublicJsCallbackInvocation,
+    RootUpdateCallbackInvocationExecutionGateBlocker::PublicRootCallbackBehavior,
+    RootUpdateCallbackInvocationExecutionGateBlocker::RootErrorCallbackInvocation,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootUpdateCallbackInvocationExecutionRecord {
+    request: RootUpdateCallbackInvocationRequest,
+    status: RootUpdateCallbackInvocationStatus,
+    error: Option<RootUpdateCallbackInvocationErrorHandle>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback invocation execution metadata is reserved for private test-control execution"
+)]
+impl RootUpdateCallbackInvocationExecutionRecord {
+    #[must_use]
+    pub(crate) const fn request(self) -> RootUpdateCallbackInvocationRequest {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn invocation_order(self) -> usize {
+        self.request.invocation_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.request.queue()
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.request.update()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> RootUpdateCallbackHandle {
+        self.request.callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted_sequence(self) -> usize {
+        self.request.accepted_sequence()
+    }
+
+    #[must_use]
+    pub(crate) const fn visibility(self) -> RootUpdateCallbackVisibility {
+        self.request.visibility()
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> RootUpdateCallbackInvocationStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn error(self) -> Option<RootUpdateCallbackInvocationErrorHandle> {
+        self.error
+    }
+
+    #[must_use]
+    pub(crate) const fn completed(self) -> bool {
+        matches!(self.status, RootUpdateCallbackInvocationStatus::Completed)
+    }
+
+    #[must_use]
+    pub(crate) const fn errored(self) -> bool {
+        matches!(self.status, RootUpdateCallbackInvocationStatus::Errored)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootUpdateCallbackInvocationExecutionGateSnapshot {
+    source_visible_record_count: usize,
+    hidden_record_count: usize,
+    deferred_hidden_record_count: usize,
+    records: Vec<RootUpdateCallbackInvocationExecutionRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback invocation execution metadata is reserved for private test-control execution"
+)]
+impl RootUpdateCallbackInvocationExecutionGateSnapshot {
+    #[must_use]
+    pub(crate) const fn source_visible_record_count(&self) -> usize {
+        self.source_visible_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_record_count(&self) -> usize {
+        self.hidden_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn deferred_hidden_record_count(&self) -> usize {
+        self.deferred_hidden_record_count
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[RootUpdateCallbackInvocationExecutionRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn completed_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.completed())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn error_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.errored())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn has_errors(&self) -> bool {
+        self.records.iter().any(|record| record.errored())
+    }
+
+    #[must_use]
+    pub(crate) fn errors(&self) -> Vec<RootUpdateCallbackInvocationErrorHandle> {
+        self.records
+            .iter()
+            .filter_map(|record| record.error())
+            .collect()
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> RootUpdateCallbackInvocationExecutionGateStatus {
+        RootUpdateCallbackInvocationExecutionGateStatus::TestControlOnly
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(&self) -> &[RootUpdateCallbackInvocationExecutionGateBlocker; 3] {
+        &ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS
+    }
+
+    #[must_use]
+    pub(crate) fn did_drain_accepted_visible_callbacks(&self) -> bool {
+        self.source_visible_record_count > 0
+            && self.records.len() == self.source_visible_record_count
+            && self
+                .records
+                .iter()
+                .all(|record| record.visibility().is_visible())
+    }
+
+    #[must_use]
+    pub(crate) fn test_control_invoked_callback_handles(&self) -> bool {
+        !self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_js_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
+        false
+    }
+}
+
 #[must_use]
 pub(crate) fn materialize_root_update_callback_invocation_gate(
     snapshot: &RootUpdateCallbackSnapshot,
@@ -292,6 +595,38 @@ pub(crate) fn materialize_root_update_callback_invocation_gate(
     }
 }
 
+#[must_use]
+pub(crate) fn invoke_root_update_callbacks_under_test_control(
+    gate: &mut RootUpdateCallbackInvocationGateSnapshot,
+    control: &mut impl RootUpdateCallbackInvocationTestControl,
+) -> RootUpdateCallbackInvocationExecutionGateSnapshot {
+    let source_visible_records = gate.drain_records();
+    let source_visible_record_count = source_visible_records.len();
+    let hidden_record_count = gate.hidden_record_count();
+    let deferred_hidden_record_count = gate.deferred_hidden_record_count();
+    let mut records = Vec::with_capacity(source_visible_record_count);
+
+    for source in source_visible_records {
+        let request = RootUpdateCallbackInvocationRequest { source };
+        let (status, error) = match control.invoke_root_update_callback(request) {
+            Ok(()) => (RootUpdateCallbackInvocationStatus::Completed, None),
+            Err(error) => (RootUpdateCallbackInvocationStatus::Errored, Some(error)),
+        };
+        records.push(RootUpdateCallbackInvocationExecutionRecord {
+            request,
+            status,
+            error,
+        });
+    }
+
+    RootUpdateCallbackInvocationExecutionGateSnapshot {
+        source_visible_record_count,
+        hidden_record_count,
+        deferred_hidden_record_count,
+        records,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,6 +652,54 @@ mod tests {
         update_record.set_payload(RootUpdatePayload::new(RootElementHandle::from_raw(element)));
         update_record.set_callback(RootUpdateCallbackHandle::from_raw(callback));
         update
+    }
+
+    fn callback_error(raw: u64) -> RootUpdateCallbackInvocationErrorHandle {
+        RootUpdateCallbackInvocationErrorHandle::from_raw(raw)
+    }
+
+    #[derive(Default)]
+    struct TestRootUpdateCallbackControl {
+        calls: Vec<RootUpdateCallbackInvocationRequest>,
+        results: Vec<(
+            RootUpdateCallbackHandle,
+            Result<(), RootUpdateCallbackInvocationErrorHandle>,
+        )>,
+    }
+
+    impl TestRootUpdateCallbackControl {
+        fn with_result(
+            mut self,
+            callback: RootUpdateCallbackHandle,
+            result: Result<(), RootUpdateCallbackInvocationErrorHandle>,
+        ) -> Self {
+            self.results.push((callback, result));
+            self
+        }
+
+        fn calls(&self) -> &[RootUpdateCallbackInvocationRequest] {
+            &self.calls
+        }
+
+        fn result(
+            &self,
+            callback: RootUpdateCallbackHandle,
+        ) -> Result<(), RootUpdateCallbackInvocationErrorHandle> {
+            self.results
+                .iter()
+                .find(|(accepted, _)| *accepted == callback)
+                .map_or(Ok(()), |(_, result)| *result)
+        }
+    }
+
+    impl RootUpdateCallbackInvocationTestControl for TestRootUpdateCallbackControl {
+        fn invoke_root_update_callback(
+            &mut self,
+            request: RootUpdateCallbackInvocationRequest,
+        ) -> Result<(), RootUpdateCallbackInvocationErrorHandle> {
+            self.calls.push(request);
+            self.result(request.callback())
+        }
     }
 
     #[test]
@@ -577,6 +960,109 @@ mod tests {
             callback_handles(after_take.deferred_hidden()),
             vec![RootUpdateCallbackHandle::from_raw(11)]
         );
+    }
+
+    #[test]
+    fn root_callbacks_invocation_execution_gate_drains_visible_records_under_test_control() {
+        let mut store = UpdateQueueStore::new();
+        let queue = store.initialize_host_root_queue(state(0));
+        let first = update_with_callback(&mut store, Lane::DEFAULT, 1, 20);
+        let hidden = update_with_callback(&mut store, Lane::DEFAULT, 2, 21);
+        let second = update_with_callback(&mut store, Lane::DEFAULT, 3, 22);
+        store.mark_update_hidden(hidden).unwrap();
+        store.append_pending_update(queue, first).unwrap();
+        store.append_pending_update(queue, hidden).unwrap();
+        store.append_pending_update(queue, second).unwrap();
+
+        store
+            .process_host_root_update_queue(queue, None, Lanes::DEFAULT, Lanes::DEFAULT)
+            .unwrap();
+        let taken = store.take_root_update_callback_records(queue).unwrap();
+        let mut gate = materialize_root_update_callback_invocation_gate(&taken);
+        let second_error = callback_error(900);
+        let mut control = TestRootUpdateCallbackControl::default()
+            .with_result(RootUpdateCallbackHandle::from_raw(22), Err(second_error));
+
+        let execution = invoke_root_update_callbacks_under_test_control(&mut gate, &mut control);
+
+        assert_eq!(execution.source_visible_record_count(), 2);
+        assert_eq!(execution.hidden_record_count(), 0);
+        assert_eq!(execution.deferred_hidden_record_count(), 1);
+        assert_eq!(execution.len(), 2);
+        assert_eq!(execution.completed_count(), 1);
+        assert_eq!(execution.error_count(), 1);
+        assert!(execution.has_errors());
+        assert_eq!(execution.errors(), vec![second_error]);
+        assert_eq!(
+            execution.status(),
+            RootUpdateCallbackInvocationExecutionGateStatus::TestControlOnly
+        );
+        assert_eq!(
+            execution.blockers(),
+            &ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS
+        );
+        assert!(execution.did_drain_accepted_visible_callbacks());
+        assert!(execution.test_control_invoked_callback_handles());
+        assert!(!execution.public_js_callbacks_invoked());
+        assert!(!execution.public_root_callback_behavior_exposed());
+        assert!(!execution.hidden_callbacks_invoked());
+        assert!(!execution.root_error_callbacks_invoked());
+
+        let records = execution.records();
+        assert_eq!(records[0].invocation_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].queue(), queue);
+        assert_eq!(records[0].update(), first);
+        assert_eq!(
+            records[0].callback(),
+            RootUpdateCallbackHandle::from_raw(20)
+        );
+        assert_eq!(
+            records[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(
+            records[0].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+        assert!(records[0].completed());
+        assert!(!records[0].errored());
+        assert_eq!(records[0].error(), None);
+        assert_eq!(records[0].request().source().update(), first);
+
+        assert_eq!(records[1].invocation_order(), 1);
+        assert_eq!(records[1].accepted_sequence(), 2);
+        assert_eq!(records[1].queue(), queue);
+        assert_eq!(records[1].update(), second);
+        assert_eq!(
+            records[1].callback(),
+            RootUpdateCallbackHandle::from_raw(22)
+        );
+        assert_eq!(
+            records[1].status(),
+            RootUpdateCallbackInvocationStatus::Errored
+        );
+        assert!(!records[1].completed());
+        assert!(records[1].errored());
+        assert_eq!(records[1].error(), Some(second_error));
+
+        assert_eq!(control.calls().len(), 2);
+        assert_eq!(
+            control.calls()[0].callback(),
+            RootUpdateCallbackHandle::from_raw(20)
+        );
+        assert_eq!(
+            control.calls()[1].callback(),
+            RootUpdateCallbackHandle::from_raw(22)
+        );
+        assert!(gate.records().is_empty());
+
+        let repeated = invoke_root_update_callbacks_under_test_control(&mut gate, &mut control);
+        assert_eq!(repeated.source_visible_record_count(), 0);
+        assert!(repeated.is_empty());
+        assert!(!repeated.did_drain_accepted_visible_callbacks());
+        assert!(!repeated.test_control_invoked_callback_handles());
+        assert_eq!(control.calls().len(), 2);
     }
 
     fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {

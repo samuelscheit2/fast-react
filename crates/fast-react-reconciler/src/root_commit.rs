@@ -2,10 +2,10 @@
 //!
 //! This module consumes a completed HostRoot render-phase record and switches
 //! `root.current` to that HostRoot work-in-progress fiber. It deliberately
-//! stops before broad host mutation, callback execution, public facade
-//! behavior, DOM wiring, or test-renderer serialization. Narrow traversal
-//! canaries in this module emit private metadata for renderer-owned handoffs
-//! without claiming public renderer compatibility.
+//! stops before broad host mutation, public callback execution, public facade
+//! behavior, DOM wiring, or test-renderer serialization. Narrow traversal and
+//! test-control canaries in this module emit or consume private metadata for
+//! renderer-owned handoffs without claiming public renderer compatibility.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -23,7 +23,9 @@ use crate::function_component::{
     FunctionComponentPassiveEffectMetadata,
 };
 use crate::root_callbacks::{
-    RootUpdateCallbackInvocationGateSnapshot, materialize_root_update_callback_invocation_gate,
+    RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationGateSnapshot,
+    RootUpdateCallbackInvocationTestControl, invoke_root_update_callbacks_under_test_control,
+    materialize_root_update_callback_invocation_gate,
 };
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveUnmountOrigin,
@@ -1710,6 +1712,20 @@ impl HostRootCommitRecord {
         &self,
     ) -> &RootUpdateCallbackInvocationGateSnapshot {
         &self.root_update_callback_invocation_gate
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private root callback invocation execution gate is reserved for private commit tests"
+    )]
+    pub(crate) fn drain_root_update_callbacks_under_test_control(
+        &mut self,
+        control: &mut impl RootUpdateCallbackInvocationTestControl,
+    ) -> RootUpdateCallbackInvocationExecutionGateSnapshot {
+        invoke_root_update_callbacks_under_test_control(
+            &mut self.root_update_callback_invocation_gate,
+            control,
+        )
     }
 
     #[must_use]
@@ -5234,8 +5250,11 @@ mod tests {
         FunctionComponentHookRenderStore,
     };
     use crate::root_callbacks::{
-        ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS, RootUpdateCallbackInvocationGateSnapshot,
-        RootUpdateCallbackInvocationGateStatus,
+        ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS,
+        ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS, RootUpdateCallbackInvocationErrorHandle,
+        RootUpdateCallbackInvocationExecutionGateStatus, RootUpdateCallbackInvocationGateSnapshot,
+        RootUpdateCallbackInvocationGateStatus, RootUpdateCallbackInvocationRequest,
+        RootUpdateCallbackInvocationStatus, RootUpdateCallbackInvocationTestControl,
     };
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
@@ -5355,6 +5374,54 @@ mod tests {
 
     fn callback(raw: u64) -> HookEffectCallbackHandle {
         HookEffectCallbackHandle::from_raw(raw)
+    }
+
+    fn root_callback_error(raw: u64) -> RootUpdateCallbackInvocationErrorHandle {
+        RootUpdateCallbackInvocationErrorHandle::from_raw(raw)
+    }
+
+    #[derive(Default)]
+    struct TestRootUpdateCallbackControl {
+        calls: Vec<RootUpdateCallbackInvocationRequest>,
+        results: Vec<(
+            RootUpdateCallbackHandle,
+            Result<(), RootUpdateCallbackInvocationErrorHandle>,
+        )>,
+    }
+
+    impl TestRootUpdateCallbackControl {
+        fn with_result(
+            mut self,
+            callback: RootUpdateCallbackHandle,
+            result: Result<(), RootUpdateCallbackInvocationErrorHandle>,
+        ) -> Self {
+            self.results.push((callback, result));
+            self
+        }
+
+        fn calls(&self) -> &[RootUpdateCallbackInvocationRequest] {
+            &self.calls
+        }
+
+        fn result(
+            &self,
+            callback: RootUpdateCallbackHandle,
+        ) -> Result<(), RootUpdateCallbackInvocationErrorHandle> {
+            self.results
+                .iter()
+                .find(|(accepted, _)| *accepted == callback)
+                .map_or(Ok(()), |(_, result)| *result)
+        }
+    }
+
+    impl RootUpdateCallbackInvocationTestControl for TestRootUpdateCallbackControl {
+        fn invoke_root_update_callback(
+            &mut self,
+            request: RootUpdateCallbackInvocationRequest,
+        ) -> Result<(), RootUpdateCallbackInvocationErrorHandle> {
+            self.calls.push(request);
+            self.result(request.callback())
+        }
     }
 
     fn deps(raw: u64) -> HookEffectDependencies {
@@ -8702,6 +8769,151 @@ mod tests {
         assert_eq!(
             callback_handles(after_commit.deferred_hidden()),
             vec![hidden_callback]
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_invocation_execution_gate_drains_visible_callbacks_once_under_test_control() {
+        let (mut store, root_id, host) = root_store();
+        let first_callback = RootUpdateCallbackHandle::from_raw(277);
+        let second_callback = RootUpdateCallbackHandle::from_raw(279);
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(27),
+            Some(first_callback),
+        )
+        .unwrap();
+        let second = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(29),
+            Some(second_callback),
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut control = TestRootUpdateCallbackControl::default();
+
+        let execution = commit.drain_root_update_callbacks_under_test_control(&mut control);
+
+        assert_eq!(execution.source_visible_record_count(), 2);
+        assert_eq!(execution.hidden_record_count(), 0);
+        assert_eq!(execution.deferred_hidden_record_count(), 0);
+        assert_eq!(execution.len(), 2);
+        assert_eq!(execution.completed_count(), 2);
+        assert_eq!(execution.error_count(), 0);
+        assert!(!execution.has_errors());
+        assert_eq!(execution.errors(), Vec::new());
+        assert_eq!(
+            execution.status(),
+            RootUpdateCallbackInvocationExecutionGateStatus::TestControlOnly
+        );
+        assert_eq!(
+            execution.blockers(),
+            &ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS
+        );
+        assert!(execution.did_drain_accepted_visible_callbacks());
+        assert!(execution.test_control_invoked_callback_handles());
+        assert!(!execution.public_js_callbacks_invoked());
+        assert!(!execution.public_root_callback_behavior_exposed());
+        assert!(!execution.hidden_callbacks_invoked());
+        assert!(!execution.root_error_callbacks_invoked());
+
+        let records = execution.records();
+        assert_eq!(records[0].invocation_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert_eq!(
+            records[0].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+        assert_eq!(records[1].invocation_order(), 1);
+        assert_eq!(records[1].accepted_sequence(), 1);
+        assert_eq!(records[1].update(), second.update());
+        assert_eq!(records[1].callback(), second_callback);
+        assert_eq!(
+            records[1].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+        assert_eq!(control.calls().len(), 2);
+        assert_eq!(control.calls()[0].callback(), first_callback);
+        assert_eq!(control.calls()[1].callback(), second_callback);
+        assert!(commit.root_update_callback_invocation_gate().is_empty());
+
+        let repeated = commit.drain_root_update_callbacks_under_test_control(&mut control);
+
+        assert_eq!(repeated.source_visible_record_count(), 0);
+        assert!(repeated.is_empty());
+        assert!(!repeated.did_drain_accepted_visible_callbacks());
+        assert_eq!(control.calls().len(), 2);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_invocation_execution_gate_records_test_control_errors_without_public_callbacks()
+    {
+        let (mut store, root_id, host) = root_store();
+        let first_callback = RootUpdateCallbackHandle::from_raw(377);
+        let second_callback = RootUpdateCallbackHandle::from_raw(379);
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(37),
+            Some(first_callback),
+        )
+        .unwrap();
+        let second = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(39),
+            Some(second_callback),
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let second_error = root_callback_error(990);
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let mut control = TestRootUpdateCallbackControl::default()
+            .with_result(second_callback, Err(second_error));
+
+        let execution = commit.drain_root_update_callbacks_under_test_control(&mut control);
+
+        assert_eq!(execution.len(), 2);
+        assert_eq!(execution.completed_count(), 1);
+        assert_eq!(execution.error_count(), 1);
+        assert!(execution.has_errors());
+        assert_eq!(execution.errors(), vec![second_error]);
+        assert!(!execution.public_js_callbacks_invoked());
+        assert!(!execution.public_root_callback_behavior_exposed());
+        assert!(!execution.root_error_callbacks_invoked());
+        let records = execution.records();
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert!(records[0].completed());
+        assert_eq!(records[0].error(), None);
+        assert_eq!(records[1].update(), second.update());
+        assert_eq!(records[1].callback(), second_callback);
+        assert!(records[1].errored());
+        assert_eq!(records[1].error(), Some(second_error));
+        assert_eq!(control.calls().len(), 2);
+        assert!(commit.root_update_callback_invocation_gate().is_empty());
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
