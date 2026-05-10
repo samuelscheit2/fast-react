@@ -1844,6 +1844,8 @@ mod tests {
         assert_eq!(record.last_child_tag(), FiberTag::HostText);
         assert_eq!(record.child_lanes(), Lanes::DEFAULT);
         assert!(record.subtree_flags().contains_all(FiberFlags::PLACEMENT));
+        assert_eq!(arena.get(first).unwrap().sibling(), Some(second));
+        assert_eq!(arena.get(second).unwrap().sibling(), None);
 
         let root_node = arena.get(host_root).unwrap();
         assert_eq!(root_node.child_lanes(), Lanes::DEFAULT);

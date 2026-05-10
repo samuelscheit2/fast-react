@@ -6035,6 +6035,261 @@ mod tests {
     }
 
     #[test]
+    fn host_work_applies_two_root_host_sibling_placements_in_commit_order() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let component_element = source.insert_host_element_with_text("article", "ignored");
+        let component_source = element_from_root(&source, component_element);
+        let render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(75));
+        let component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            render.finished_work(),
+            component_source,
+            FiberFlags::PLACEMENT,
+        );
+        let component_state_node = store.fiber_arena().get(component).unwrap().state_node();
+        let text = create_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            render.finished_work(),
+            "second root child",
+            FiberFlags::PLACEMENT,
+        );
+        let text_state_node = store.fiber_arena().get(text).unwrap().state_node();
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[component, text])
+            .unwrap();
+        complete_host_root(&mut store, render.finished_work()).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let diagnostics = commit.host_root_placement_apply_diagnostics_for_canary();
+        let operations_before_apply = host.operations();
+        let apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics[0].fiber(), component);
+        assert_eq!(diagnostics[0].tag_name(), "HostComponent");
+        assert_eq!(diagnostics[0].state_node(), component_state_node);
+        assert_eq!(diagnostics[0].apply_kind(), "append-placement-to-container");
+        assert_eq!(diagnostics[0].sibling_status(), "append");
+        assert_eq!(diagnostics[0].sibling(), None);
+        assert_eq!(diagnostics[0].skipped_pending_sibling_count(), 1);
+        assert!(!diagnostics[0].can_insert_before());
+        assert_eq!(diagnostics[1].fiber(), text);
+        assert_eq!(diagnostics[1].tag_name(), "HostText");
+        assert_eq!(diagnostics[1].state_node(), text_state_node);
+        assert_eq!(diagnostics[1].apply_kind(), "append-placement-to-container");
+        assert_eq!(diagnostics[1].sibling_status(), "append");
+        assert_eq!(diagnostics[1].sibling(), None);
+        assert_eq!(diagnostics[1].skipped_pending_sibling_count(), 0);
+        assert!(!diagnostics[1].can_insert_before());
+
+        assert_eq!(apply.records().len(), 2);
+        assert_eq!(apply.records()[0].mutation().fiber(), component);
+        assert_eq!(
+            apply.records()[0].mutation().state_node(),
+            component_state_node
+        );
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        );
+        assert_eq!(
+            apply.records()[0]
+                .mutation()
+                .placement_sibling()
+                .unwrap()
+                .skipped_pending_sibling_count(),
+            1
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::AppendChildToContainer
+            )
+        );
+        assert_eq!(apply.records()[1].mutation().fiber(), text);
+        assert_eq!(apply.records()[1].mutation().state_node(), text_state_node);
+        assert_eq!(
+            apply.records()[1].mutation().kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        );
+        assert_eq!(
+            apply.records()[1].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::AppendChildToContainer
+            )
+        );
+        assert_eq!(apply.applied_host_call_count(), 2);
+        let mut expected_operations = operations_before_apply;
+        expected_operations.push("append_child_to_container");
+        expected_operations.push("append_child_to_container");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_inserts_two_root_host_sibling_placements_before_stable_sibling() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let component_element = source.insert_host_element_with_text("article", "ignored");
+        let component_source = element_from_root(&source, component_element);
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(76));
+        let current_stable = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "stable sibling",
+            FiberFlags::PLACEMENT,
+        );
+        let stable_state_node = store
+            .fiber_arena()
+            .get(current_stable)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(77), None).unwrap();
+        let insert_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            insert_render.finished_work(),
+            component_source,
+            FiberFlags::PLACEMENT,
+        );
+        let component_state_node = store.fiber_arena().get(component).unwrap().state_node();
+        let text = create_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            insert_render.finished_work(),
+            "inserted text",
+            FiberFlags::PLACEMENT,
+        );
+        let text_state_node = store.fiber_arena().get(text).unwrap().state_node();
+        let stable_work = stable_root_text_work_in_progress_for_commit(
+            &mut store,
+            current_stable,
+            PropsHandle::from_raw(9013),
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(
+                insert_render.finished_work(),
+                &[component, text, stable_work],
+            )
+            .unwrap();
+        complete_host_root(&mut store, insert_render.finished_work()).unwrap();
+
+        let insert_commit = commit_finished_host_root(&mut store, insert_render).unwrap();
+        let diagnostics = insert_commit.host_root_placement_apply_diagnostics_for_canary();
+        let operations_before_apply = host.operations();
+        let apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &insert_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics[0].fiber(), component);
+        assert_eq!(diagnostics[0].tag_name(), "HostComponent");
+        assert_eq!(
+            diagnostics[0].apply_kind(),
+            "insert-placement-in-container-before"
+        );
+        assert_eq!(diagnostics[0].sibling_status(), "insert-before");
+        assert_eq!(diagnostics[0].sibling(), Some(stable_work));
+        assert_eq!(diagnostics[0].sibling_tag_name(), Some("HostText"));
+        assert_eq!(diagnostics[0].sibling_state_node(), stable_state_node);
+        assert_eq!(diagnostics[0].skipped_pending_sibling_count(), 1);
+        assert!(diagnostics[0].can_insert_before());
+        assert_eq!(diagnostics[1].fiber(), text);
+        assert_eq!(diagnostics[1].tag_name(), "HostText");
+        assert_eq!(
+            diagnostics[1].apply_kind(),
+            "insert-placement-in-container-before"
+        );
+        assert_eq!(diagnostics[1].sibling_status(), "insert-before");
+        assert_eq!(diagnostics[1].sibling(), Some(stable_work));
+        assert_eq!(diagnostics[1].sibling_state_node(), stable_state_node);
+        assert_eq!(diagnostics[1].skipped_pending_sibling_count(), 0);
+        assert!(diagnostics[1].can_insert_before());
+
+        assert_eq!(apply.records().len(), 2);
+        assert_eq!(apply.records()[0].mutation().fiber(), component);
+        assert_eq!(
+            apply.records()[0].mutation().state_node(),
+            component_state_node
+        );
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::InsertPlacementInContainerBefore
+        );
+        assert_eq!(
+            apply.records()[0]
+                .mutation()
+                .placement_sibling()
+                .unwrap()
+                .skipped_pending_sibling_count(),
+            1
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::InsertInContainerBefore
+            )
+        );
+        assert_eq!(apply.records()[1].mutation().fiber(), text);
+        assert_eq!(apply.records()[1].mutation().state_node(), text_state_node);
+        assert_eq!(
+            apply.records()[1].mutation().kind(),
+            HostRootMutationApplyRecordKind::InsertPlacementInContainerBefore
+        );
+        assert_eq!(
+            apply.records()[1].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::InsertInContainerBefore
+            )
+        );
+        assert_eq!(apply.applied_host_call_count(), 2);
+        let mut expected_operations = operations_before_apply;
+        expected_operations.push("insert_in_container_before");
+        expected_operations.push("insert_in_container_before");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
     fn host_work_leaves_unproven_root_text_insertion_recorded_only() {
         let (mut store, root_id) = root_store();
         let mut host = RecordingHost::default();
