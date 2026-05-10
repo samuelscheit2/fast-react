@@ -531,6 +531,7 @@
       "privateImplementationFiles": [
         "placeholder-utils.js",
         "src/client/component-tree.js",
+        "src/client/controlled-restore-queue.js",
         "src/client/dom-container.js",
         "src/client/dom-host-context.js",
         "src/client/dom-namespaces.js",
@@ -687,7 +688,8 @@
           ],
           "privateRuntimeFacadeSymbols": {
             "createRoot": [
-              "fast.react_dom.client.private_root_public_facade_adapter"
+              "fast.react_dom.client.private_root_public_facade_adapter",
+              "fast.react_dom.client.private_root_public_facade_preflight"
             ]
           }
         },

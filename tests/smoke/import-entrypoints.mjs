@@ -246,7 +246,10 @@ const reactServerReactDomKeys = [
 
 const reactDomClientKeys = ['createRoot', 'hydrateRoot', 'version'];
 const reactDomClientPrivateRuntimeFacadeSymbols = {
-  createRoot: ['fast.react_dom.client.private_root_public_facade_adapter']
+  createRoot: [
+    'fast.react_dom.client.private_root_public_facade_adapter',
+    'fast.react_dom.client.private_root_public_facade_preflight'
+  ]
 };
 const reactDomServerNodeKeys = [
   'version',
