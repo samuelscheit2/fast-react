@@ -21,6 +21,9 @@ import {
   readCheckedReactActOracleText
 } from "../src/react-act-oracle.mjs";
 import {
+  inspectSchedulerPostTaskPriorityDiagnostics
+} from "../src/scheduler-post-task-oracle.mjs";
+import {
   REACT_ACT_PUBLIC_BLOCKED_GATE_STATUS,
   REACT_ACT_PUBLIC_SCENARIO_ADMISSIONS,
   REACT_ACT_PUBLIC_UNBLOCKING_REQUIREMENTS,
@@ -34,6 +37,15 @@ const repoRoot = path.resolve(
   "..",
   "..",
   ".."
+);
+const {
+  ROOT_CONTINUATION_REJECTED_STATUS,
+  createPrivatePostTaskRootContinuationMetadataRow
+} = require(
+  path.join(
+    repoRoot,
+    "tests/conformance/src/scheduler-post-task-root-continuation.cjs"
+  )
 );
 const privateActDispatcherGateExport =
   "__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__";
@@ -300,6 +312,30 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   );
   assert.equal(gate.rendererBackedActDrainDiagnosticVersion, 1);
   assert.equal(gate.drainsAcceptedRendererBackedActDiagnostics, true);
+  assert.equal(
+    gate.schedulerPostTaskYieldActRootHandoffDiagnosticsReady,
+    true
+  );
+  assert.equal(
+    gate.consumesSchedulerPostTaskYieldActRootHandoffDiagnostics,
+    true
+  );
+  assert.equal(
+    gate.schedulerPostTaskYieldActRootHandoffConsumptionStatus,
+    "consumed-accepted-scheduler-post-task-yield-act-root-handoff-diagnostics"
+  );
+  assert.equal(
+    gate.schedulerPostTaskPriorityDiagnosticsExportName,
+    "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__"
+  );
+  assert.equal(
+    gate.schedulerPostTaskPriorityDiagnosticsSymbolDescription,
+    "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+  );
+  assert.equal(
+    gate.schedulerPostTaskActRootWorkHandoffKind,
+    "fast-react.scheduler.post_task.private-act-root-work-handoff"
+  );
   assert.equal(gate.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(gate.publicReactActCompatibilityClaimed, false);
   assert.equal(gate.executesQueuedWork, false);
@@ -364,6 +400,10 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     "TestRendererHostOutputDiagnostics",
     "TestRendererCommittedFiberTreeInspection"
   ]);
+  assert.deepEqual(gate.acceptedSchedulerPostTaskRootWorkRecordKinds, [
+    "RootLaneSchedulingSnapshot",
+    "RootTaskScheduleRecord"
+  ]);
   assert.equal(
     gate.internalTestQueueKind,
     "fast-react.react.private-act-queue-test-queue"
@@ -404,6 +444,14 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(metadata.rendererBackedActDrainDiagnosticsReady, true);
   assert.equal(metadata.consumesRendererBackedActDrainDiagnostics, true);
   assert.equal(metadata.drainsAcceptedRendererBackedActDiagnostics, true);
+  assert.equal(
+    metadata.schedulerPostTaskYieldActRootHandoffDiagnosticsReady,
+    true
+  );
+  assert.equal(
+    metadata.consumesSchedulerPostTaskYieldActRootHandoffDiagnostics,
+    true
+  );
   assert.equal(metadata.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(metadata.publicReactActCompatibilityClaimed, false);
   assert.equal(metadata.executesRendererRoots, false);
@@ -810,6 +858,12 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
       drainsAcceptedRendererBackedActDiagnostics: false
     }),
     gate.createActQueueMetadata({
+      schedulerPostTaskYieldActRootHandoffDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      consumesSchedulerPostTaskYieldActRootHandoffDiagnostics: false
+    }),
+    gate.createActQueueMetadata({
       publicSchedulerTimingCompatibilityClaimed: true
     }),
     gate.createActQueueMetadata({
@@ -844,6 +898,265 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
       }
     );
     assert.equal(gate.isPrivateActDispatcher(rejectedDispatcher), false);
+  }
+});
+
+test("package-private React act dispatcher gate consumes Scheduler postTask scheduler.yield handoff diagnostics without root admission", () => {
+  const gate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+  const report = inspectSchedulerPostTaskPriorityDiagnostics({
+    nodeEnv: "development",
+    withYield: true
+  });
+  const diagnostics =
+    report.delayedContinuationActRootHandoff.diagnosticsAfterFallback;
+  const rootContinuationRow =
+    createPrivatePostTaskRootContinuationMetadataRow(diagnostics);
+
+  assert.equal(
+    rootContinuationRow.status,
+    ROOT_CONTINUATION_REJECTED_STATUS
+  );
+  assert.equal(rootContinuationRow.rejectionReason, "stale-continuation");
+  assert.equal(rootContinuationRow.compatibilityClaimed, false);
+  assert.equal(
+    rootContinuationRow.blockedRootExecution.publicRootExecution,
+    false
+  );
+
+  assert.equal(
+    gate.isAcceptedSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      diagnostics
+    ),
+    true
+  );
+
+  const bridgeReport =
+    gate.consumeSchedulerPostTaskYieldActRootHandoffDiagnostics(diagnostics);
+  assert.equal(
+    bridgeReport.status,
+    gate.schedulerPostTaskYieldActRootHandoffConsumptionStatus
+  );
+  assert.equal(bridgeReport.accepted, true);
+  assert.equal(
+    bridgeReport.schedulerDiagnosticsExportName,
+    "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__"
+  );
+  assert.equal(
+    bridgeReport.schedulerDiagnosticsSymbolDescription,
+    "fast-react.scheduler.unstable_post_task.priority-diagnostics"
+  );
+  assert.equal(bridgeReport.selectedFallback, "scheduler.yield");
+  assert.equal(bridgeReport.schedulerYieldAvailable, true);
+  assert.equal(bridgeReport.controlledTaskSchedulingApiShim, true);
+  assert.equal(bridgeReport.callbackRunCountAtSchedule, 1);
+  assert.equal(bridgeReport.currentCallbackRunCount, 2);
+  assert.equal(bridgeReport.controlledYieldThenContinuationAlreadyRan, true);
+  assert.equal(bridgeReport.staleContinuationEvidenceRejected, true);
+  assert.equal(
+    bridgeReport.staleContinuationRejectionReason,
+    "stale-continuation"
+  );
+  assert.equal(bridgeReport.rootContinuationExecutionAdmitted, false);
+  assert.equal(bridgeReport.rootSchedulingAdmitted, false);
+  assert.equal(bridgeReport.rootWorkMetadataOnly, true);
+  assert.equal(bridgeReport.actQueueHandoffOnly, true);
+  assert.equal(bridgeReport.rendererWorkExecutionBlocked, true);
+  assert.deepEqual(bridgeReport.rootWorkRecordKinds, [
+    "RootLaneSchedulingSnapshot",
+    "RootTaskScheduleRecord"
+  ]);
+  assert.equal(bridgeReport.priorityLevel, 4);
+  assert.equal(bridgeReport.schedulerPriorityName, "unstable_LowPriority");
+  assert.equal(bridgeReport.postTaskPriority, "user-visible");
+  assert.equal(bridgeReport.timeoutMs, 10000);
+  assert.equal(bridgeReport.timeoutReason, "low-priority-timeout");
+  assert.equal(bridgeReport.sourceCallbackDidTimeout, false);
+  assert.equal(bridgeReport.queueFlushingReady, false);
+  assert.equal(bridgeReport.rendererRootsReady, false);
+  assert.equal(bridgeReport.passiveEffectsReady, false);
+  assert.equal(bridgeReport.continuationFlushingReady, false);
+  assert.equal(bridgeReport.publicCompatibilityClaimed, false);
+  assert.equal(bridgeReport.browserPostTaskCompatibilityClaimed, false);
+  assert.equal(bridgeReport.browserTaskOrderingCompatibilityClaimed, false);
+  assert.equal(
+    bridgeReport.publicSchedulerTimingCompatibilityClaimed,
+    false
+  );
+  assert.equal(bridgeReport.publicReactActCompatibilityClaimed, false);
+  assert.equal(bridgeReport.publicRootSchedulerCompatibilityClaimed, false);
+  assert.equal(bridgeReport.publicRendererCompatibilityClaimed, false);
+  assert.equal(bridgeReport.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(bridgeReport.drainsPublicReactActQueue, false);
+  assert.equal(bridgeReport.executesQueuedWork, false);
+  assert.equal(bridgeReport.executesEffects, false);
+  assert.equal(bridgeReport.executesRendererWork, false);
+  assert.equal(bridgeReport.executesRendererRoots, false);
+  assert.equal(bridgeReport.packageCompatibilityClaimed, false);
+
+  const postTaskFallbackDiagnostics =
+    inspectSchedulerPostTaskPriorityDiagnostics({
+      nodeEnv: "development",
+      withYield: false
+    }).delayedContinuationActRootHandoff.diagnosticsAfterFallback;
+
+  for (const mutablePath of [
+    ["priorityMapping"],
+    ["priorityTimeout"],
+    ["schedule", "delay"],
+    ["callbackRuns"],
+    ["callbackRuns", "0"],
+    ["continuationFallbacks", "0", "continuationMetadata"],
+    [
+      "rootContinuationExecutionRoute",
+      "privateRootContinuationExecution"
+    ],
+    [
+      "rootContinuationExecutionRoute",
+      "actRootWorkHandoff",
+      "priorityTimeout"
+    ],
+    [
+      "rootContinuationExecutionRoute",
+      "actRootWorkHandoff",
+      "actQueueHandoff"
+    ],
+    [
+      "rootContinuationExecutionRoute",
+      "actRootWorkHandoff",
+      "actQueueHandoff",
+      "priorityTimeout"
+    ],
+    [
+      "rootContinuationExecutionRoute",
+      "actRootWorkHandoff",
+      "rootWorkRecords"
+    ],
+    [
+      "rootContinuationExecutionRoute",
+      "actRootWorkHandoff",
+      "rootWorkRecords",
+      "0"
+    ],
+    [
+      "rootContinuationExecutionRoute",
+      "actRootWorkHandoff",
+      "rootWorkRecords",
+      "0",
+      "priorityTimeout"
+    ]
+  ]) {
+    assertSchedulerPostTaskYieldHandoffRejected(
+      gate,
+      deepFreezeDiagnosticCloneExcept(diagnostics, mutablePath),
+      "mutable-private-post-task-diagnostics"
+    );
+  }
+
+  for (const rejected of [
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.version = 2;
+      }),
+      reason: "private-post-task-diagnostics-shape"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        delete clone.rootContinuationExecutionRoute.actRootWorkHandoff
+          .handoffKind;
+      }),
+      reason: "private-post-task-handoff-shape"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.actRootWorkHandoff.priorityTimeout.timeoutMs =
+          1;
+      }),
+      reason: "private-post-task-handoff-shape"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.actRootWorkHandoff.actQueueHandoff.priorityTimeout.timeoutMs =
+          1;
+      }),
+      reason: "private-post-task-handoff-shape"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.actRootWorkHandoff.rootWorkRecords[0].priorityTimeout.timeoutMs =
+          1;
+      }),
+      reason: "private-post-task-handoff-shape"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.callbackRuns[0].returnedContinuationType = "undefined";
+      }),
+      reason: "ambiguous-post-task-report"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.publicSchedulerTimingCompatibilityClaimed = true;
+      }),
+      reason: "public-or-execution-claim"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.packageCompatibilityClaimed = true;
+      }),
+      reason: "public-or-execution-claim"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.environmentCapabilities.browserPostTaskCompatibilityClaimed =
+          true;
+      }),
+      reason: "public-or-execution-claim"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.actRootWorkHandoff.publicReactActCompatibilityClaimed =
+          true;
+      }),
+      reason: "public-or-execution-claim"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.privateRootContinuationExecution.publicRootExecution =
+          true;
+      }),
+      reason: "public-or-execution-claim"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.actRootWorkHandoff.rootWorkRecords[0].executesRendererWork =
+          true;
+      }),
+      reason: "public-or-execution-claim"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.rootContinuationExecutionRoute.continuationIndex = 1;
+      }),
+      reason: "stale-continuation-evidence"
+    },
+    {
+      diagnostics: deepFreezeDiagnosticClone(diagnostics, (clone) => {
+        clone.continuationFallbacks.push({
+          ...clone.continuationFallbacks[0]
+        });
+      }),
+      reason: "ambiguous-post-task-report"
+    },
+    {
+      diagnostics: postTaskFallbackDiagnostics,
+      reason: "scheduler-yield-not-selected"
+    }
+  ]) {
+    assertSchedulerPostTaskYieldHandoffRejected(
+      gate,
+      rejected.diagnostics,
+      rejected.reason
+    );
   }
 });
 
@@ -892,6 +1205,8 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
     "sync-flush-post-passive-continuation-execution-gate",
+    "sync-flush-nested-act-root-continuation-evidence",
+    "sync-flush-root-scheduler-finished-work-handoff-evidence",
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
     "passive-effects-committed-fiber-traversal",
@@ -1305,6 +1620,93 @@ function countFastReactComparisonStatuses(comparisons) {
       "known-mismatch": 0,
       "matched-but-compatibility-not-claimed": 0,
       "unsupported-placeholder": 0
+    }
+  );
+}
+
+function deepFreezeDiagnosticClone(value, mutate) {
+  const clone = JSON.parse(JSON.stringify(value));
+  if (typeof mutate === "function") {
+    mutate(clone);
+  }
+  return deepFreeze(clone);
+}
+
+function deepFreezeDiagnosticCloneExcept(value, mutablePath) {
+  const clone = JSON.parse(JSON.stringify(value));
+  return deepFreezeExceptPath(clone, mutablePath.map(String));
+}
+
+function deepFreeze(value) {
+  if (value === null || typeof value !== "object" || Object.isFrozen(value)) {
+    return value;
+  }
+
+  for (const key of Object.keys(value)) {
+    deepFreeze(value[key]);
+  }
+
+  return Object.freeze(value);
+}
+
+function deepFreezeExceptPath(value, mutablePath, currentPath = []) {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  for (const key of Object.keys(value)) {
+    deepFreezeExceptPath(value[key], mutablePath, currentPath.concat(key));
+  }
+
+  if (!isSamePath(currentPath, mutablePath)) {
+    Object.freeze(value);
+  }
+
+  return value;
+}
+
+function isSamePath(left, right) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((segment, index) => segment === right[index]);
+}
+
+function assertSchedulerPostTaskYieldHandoffRejected(
+  gate,
+  diagnostics,
+  reason
+) {
+  assert.equal(
+    gate.isAcceptedSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      diagnostics
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      gate.consumeSchedulerPostTaskYieldActRootHandoffDiagnostics(
+        diagnostics
+      ),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError");
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+      assert.equal(error.entrypoint, "react");
+      assert.equal(
+        error.exportName,
+        `${privateActDispatcherGateExport}.consumeSchedulerPostTaskYieldActRootHandoffDiagnostics`
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6");
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicCompatibilityClaimed, false);
+      assert.equal(error.browserPostTaskCompatibilityClaimed, false);
+      assert.equal(error.browserTaskOrderingCompatibilityClaimed, false);
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.publicRootSchedulerCompatibilityClaimed, false);
+      assert.equal(error.publicRendererCompatibilityClaimed, false);
+      return true;
     }
   );
 }
