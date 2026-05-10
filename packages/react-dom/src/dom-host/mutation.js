@@ -1,5 +1,13 @@
 'use strict';
 
+const ENTRY_SET_ATTRIBUTE = 'setAttribute';
+const ENTRY_REMOVE_ATTRIBUTE = 'removeAttribute';
+const ENTRY_SET_STYLE = 'setStyle';
+const ENTRY_REMOVE_STYLE = 'removeStyle';
+const ENTRY_SET_INNER_HTML = 'setInnerHTML';
+const ENTRY_NON_PAYLOAD = 'nonPayload';
+const ENTRY_UNSUPPORTED = 'unsupported';
+
 function createDomHostMutationError(code, message) {
   const error = new Error(message);
   error.code = code;
@@ -75,6 +83,27 @@ function resetTextContent(instance) {
 
 function setTextContent(instance, text) {
   setNodeTextContent(instance, text, 'setTextContent');
+}
+
+function applyStyleDangerousHtmlPayload(instance, payload) {
+  assertDomLikeObject(instance, 'applyStyleDangerousHtmlPayload', 'parent');
+
+  if (!Array.isArray(payload)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PAYLOAD',
+      'Cannot apply style/dangerous HTML payload without an array.'
+    );
+  }
+
+  const entries = payload.map((entry) =>
+    validateStyleDangerousHtmlPayloadEntry(instance, entry)
+  );
+
+  for (const entry of entries) {
+    applyStyleDangerousHtmlPayloadEntry(instance, entry);
+  }
+
+  return entries;
 }
 
 function assertAppendParent(parent, operation) {
@@ -236,10 +265,170 @@ function isTextNode(node) {
   );
 }
 
+function validateStyleDangerousHtmlPayloadEntry(instance, entry) {
+  if (entry == null || typeof entry !== 'object') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+      'Cannot apply a malformed style/dangerous HTML payload entry.'
+    );
+  }
+
+  switch (entry.kind) {
+    case ENTRY_SET_STYLE:
+      return validateStylePayloadEntry(instance, entry, ENTRY_SET_STYLE);
+    case ENTRY_REMOVE_STYLE:
+      return validateStylePayloadEntry(instance, entry, ENTRY_REMOVE_STYLE);
+    case ENTRY_SET_INNER_HTML:
+      return validateInnerHtmlPayloadEntry(instance, entry);
+    case ENTRY_SET_ATTRIBUTE:
+    case ENTRY_REMOVE_ATTRIBUTE:
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_UNSUPPORTED_PAYLOAD_ENTRY',
+        'Ordinary attribute payload entries are reserved for the DOM attribute applier.'
+      );
+    case ENTRY_NON_PAYLOAD:
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_NON_PAYLOAD_ENTRY',
+        'Cannot apply a non-payload entry through the style/dangerous HTML applier.'
+      );
+    case ENTRY_UNSUPPORTED:
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_UNSUPPORTED_PAYLOAD_ENTRY',
+        'Cannot apply an unsupported style/dangerous HTML payload entry.'
+      );
+    default:
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+        'Cannot apply an unknown style/dangerous HTML payload entry.'
+      );
+  }
+}
+
+function validateStylePayloadEntry(instance, entry, kind) {
+  assertStyleTarget(instance);
+
+  const styleName = entry.styleName;
+  if (entry.propName !== 'style' || typeof styleName !== 'string') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+      'Cannot apply a malformed style payload entry.'
+    );
+  }
+
+  if (
+    entry.mutation !== 'propertyAssignment' &&
+    entry.mutation !== 'setProperty'
+  ) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+      'Cannot apply a style payload entry with an unsupported mutation target.'
+    );
+  }
+
+  if (entry.mutation === 'setProperty') {
+    assertStyleSetPropertyTarget(instance);
+  }
+
+  if (kind === ENTRY_REMOVE_STYLE) {
+    if (entry.value !== '') {
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+        'Cannot apply a removeStyle payload entry without an empty string value.'
+      );
+    }
+  } else if (typeof entry.value !== 'string') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+      'Cannot apply a setStyle payload entry without a string value.'
+    );
+  }
+
+  return {
+    kind,
+    propName: 'style',
+    styleName,
+    mutation: entry.mutation,
+    value: entry.value
+  };
+}
+
+function validateInnerHtmlPayloadEntry(instance, entry) {
+  if (
+    entry.propName !== 'dangerouslySetInnerHTML' ||
+    entry.propertyName !== 'innerHTML' ||
+    typeof entry.value !== 'string'
+  ) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+      'Cannot apply a malformed innerHTML payload entry.'
+    );
+  }
+
+  if (!('innerHTML' in instance)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_INNER_HTML_TARGET',
+      'Cannot apply an innerHTML payload entry to a node without innerHTML.'
+    );
+  }
+
+  return {
+    kind: ENTRY_SET_INNER_HTML,
+    propName: 'dangerouslySetInnerHTML',
+    propertyName: 'innerHTML',
+    value: entry.value
+  };
+}
+
+function assertStyleTarget(instance) {
+  if (instance.style == null || typeof instance.style !== 'object') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_STYLE_TARGET',
+      'Cannot apply a style payload entry to a node without a style object.'
+    );
+  }
+}
+
+function assertStyleSetPropertyTarget(instance) {
+  if (typeof instance.style.setProperty !== 'function') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_STYLE_TARGET',
+      'Cannot apply a custom style payload entry without style.setProperty.'
+    );
+  }
+}
+
+function applyStyleDangerousHtmlPayloadEntry(instance, entry) {
+  switch (entry.kind) {
+    case ENTRY_SET_STYLE:
+    case ENTRY_REMOVE_STYLE:
+      applyStylePayloadEntry(instance, entry);
+      return;
+    case ENTRY_SET_INNER_HTML:
+      instance.innerHTML = entry.value;
+      return;
+    default:
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_INVALID_PAYLOAD_ENTRY',
+        'Cannot apply a non-style/dangerous HTML payload entry.'
+      );
+  }
+}
+
+function applyStylePayloadEntry(instance, entry) {
+  const style = instance.style;
+  if (entry.mutation === 'setProperty') {
+    style.setProperty(entry.styleName, entry.value);
+    return;
+  }
+
+  style[entry.styleName] = entry.value;
+}
+
 module.exports = {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
+  applyStyleDangerousHtmlPayload,
   clearContainer,
   commitTextUpdate,
   createDomHostMutationError,

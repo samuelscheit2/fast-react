@@ -209,6 +209,75 @@ function runSmokeChecks() {
     assert.deepEqual(childNames(child), ['em']);
   }
 
+  {
+    const element = createElement('div');
+    const payload = [
+      {
+        kind: 'setStyle',
+        propName: 'style',
+        styleName: 'color',
+        mutation: 'propertyAssignment',
+        value: 'red'
+      },
+      {
+        kind: 'setStyle',
+        propName: 'style',
+        styleName: '--gap',
+        mutation: 'setProperty',
+        value: '4px'
+      },
+      {
+        kind: 'removeStyle',
+        propName: 'style',
+        styleName: 'color',
+        mutation: 'propertyAssignment',
+        value: ''
+      },
+      {
+        kind: 'setInnerHTML',
+        propName: 'dangerouslySetInnerHTML',
+        propertyName: 'innerHTML',
+        value: '<span>raw</span>'
+      }
+    ];
+
+    assert.deepEqual(
+      domHost.applyStyleDangerousHtmlPayload(element, payload),
+      payload
+    );
+    assert.deepEqual(element.styleLog, [
+      ['stylePropertyAssignment', 'color', 'red'],
+      ['styleSetProperty', '--gap', '4px'],
+      ['stylePropertyAssignment', 'color', ''],
+      ['setInnerHTML', '<span>raw</span>']
+    ]);
+    assert.deepEqual(element.activeStyleProperties(), [['--gap', '4px']]);
+    assert.equal(element.assignedInnerHTML, '<span>raw</span>');
+    assert.deepEqual(childNames(element), []);
+  }
+
+  {
+    const element = createElement('div');
+
+    assert.throws(
+      () =>
+        domHost.applyStyleDangerousHtmlPayload(element, [
+          {
+            kind: 'setAttribute',
+            propName: 'id',
+            attributeName: 'id',
+            value: 'ordinary-attribute'
+          }
+        ]),
+      {
+        code: 'FAST_REACT_DOM_UNSUPPORTED_PAYLOAD_ENTRY'
+      }
+    );
+    assert.deepEqual(element.styleLog, []);
+    assert.deepEqual(element.activeStyleProperties(), []);
+    assert.equal(element.assignedInnerHTML, null);
+  }
+
   console.log('React DOM private mutation adapter shell smoke checks passed.');
 }
 
@@ -281,6 +350,9 @@ class FakeElement extends FakeNode {
   constructor(nodeName) {
     super(nodeName, 1);
     this._textContent = '';
+    this.assignedInnerHTML = null;
+    this.styleLog = [];
+    this.style = new FakeStyle(this);
   }
 
   get textContent() {
@@ -295,6 +367,59 @@ class FakeElement extends FakeNode {
       detachFromParent(child);
     }
     this._textContent = String(value);
+    this.assignedInnerHTML = null;
+  }
+
+  get innerHTML() {
+    return this.assignedInnerHTML ?? '';
+  }
+
+  set innerHTML(value) {
+    const html = String(value);
+    for (const child of [...this.childNodes]) {
+      detachFromParent(child);
+    }
+    this.assignedInnerHTML = html;
+    this.styleLog.push(['setInnerHTML', html]);
+  }
+
+  activeStyleProperties() {
+    return Array.from(this.style.properties.entries())
+      .filter(([, value]) => value !== '')
+      .sort(([left], [right]) => left.localeCompare(right));
+  }
+}
+
+class FakeStyle {
+  constructor(ownerElement) {
+    this.ownerElement = ownerElement;
+    this.properties = new Map();
+
+    return new Proxy(this, {
+      set(target, property, value, receiver) {
+        if (shouldRecordStyleProperty(property)) {
+          const stringValue = String(value);
+          target.properties.set(property, stringValue);
+          target.ownerElement.styleLog.push([
+            'stylePropertyAssignment',
+            property,
+            stringValue
+          ]);
+        }
+        return Reflect.set(target, property, value, receiver);
+      }
+    });
+  }
+
+  setProperty(name, value) {
+    const propertyName = String(name);
+    const stringValue = String(value);
+    this.properties.set(propertyName, stringValue);
+    this.ownerElement.styleLog.push([
+      'styleSetProperty',
+      propertyName,
+      stringValue
+    ]);
   }
 }
 
@@ -363,6 +488,14 @@ function detachFromParent(child) {
     siblings.splice(index, 1);
   }
   child.parentNode = null;
+}
+
+function shouldRecordStyleProperty(property) {
+  return (
+    typeof property === 'string' &&
+    !property.startsWith('_') &&
+    !['ownerElement', 'properties', 'setProperty'].includes(property)
+  );
 }
 
 runSmokeChecks();
