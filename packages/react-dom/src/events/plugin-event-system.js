@@ -47,6 +47,8 @@ const SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
   'FastReactDomSyntheticEventShapeGateRecord';
 const DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND =
   'FastReactDomDispatchPropagationStopDiagnosticRecord';
+const DISPATCH_DEFAULT_PREVENTED_DIAGNOSTIC_RECORD_KIND =
+  'FastReactDomDispatchDefaultPreventedDiagnosticRecord';
 const DISPATCH_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_RECORD_KIND =
   'FastReactDomDispatchNativeStopImmediatePropagationDiagnosticRecord';
 const DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND =
@@ -79,6 +81,8 @@ const PUBLIC_EVENT_DISPATCH_BLOCKED_CODE =
   'FAST_REACT_DOM_PUBLIC_EVENT_DISPATCH_BLOCKED';
 const PROPAGATION_STOP_DIAGNOSTIC_BLOCKED_CODE =
   'FAST_REACT_DOM_PROPAGATION_STOP_DIAGNOSTIC_BLOCKED';
+const DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED_CODE =
+  'FAST_REACT_DOM_DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED';
 const NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED_CODE =
   'FAST_REACT_DOM_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED';
 const LISTENER_ERROR_ROUTING_BLOCKED_CODE =
@@ -109,6 +113,8 @@ const PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS =
   'validated-private-synthetic-event-shape';
 const PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS =
   'controlled-private-propagation-stop-diagnostic';
+const PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS =
+  'controlled-private-default-prevented-diagnostic';
 const PRIVATE_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_STATUS =
   'controlled-private-native-stop-immediate-propagation-diagnostic';
 const PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS =
@@ -783,8 +789,11 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
   const useProcessingOrder = normalizedOptions.useProcessingOrder;
   const propagationState =
     createDispatchQueuePropagationDiagnosticState(normalizedOptions);
+  const defaultPreventedState =
+    createDispatchQueueDefaultPreventedDiagnosticState(normalizedOptions);
   const invocationRecords = [];
   const listenerErrorRoutes = [];
+  const defaultPreventedDiagnostics = [];
   const propagationStopDiagnostics = [];
   const nativeStopImmediatePropagationDiagnostics = [];
   let dispatchQueueEntryCount = 0;
@@ -820,7 +829,8 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
         dispatchQueueEntry,
         entryPayload,
         normalizedOptions,
-        propagationState
+        propagationState,
+        defaultPreventedState
       );
       dispatchQueueEntryCount++;
       listenerCandidateCount += listenerRecords.length;
@@ -905,6 +915,8 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
           propagationState === null
             ? 0
             : propagationState.stopPropagationCallCount;
+        const preventDefaultCountBefore =
+          getDefaultPreventedDiagnosticCallCount(defaultPreventedState);
         const nativeStopImmediateCountBefore =
           getNativeStopImmediatePropagationDiagnosticCallCount(
             propagationState
@@ -933,6 +945,21 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
               )
             );
           }
+        }
+        if (
+          defaultPreventedState !== null &&
+          defaultPreventedState.preventDefaultCallCount >
+            preventDefaultCountBefore
+        ) {
+          defaultPreventedDiagnostics.push(
+            createDispatchDefaultPreventedDiagnosticRecord({
+              action: 'prevent-default',
+              dispatchQueueEntry,
+              dispatchRecord,
+              listenerRecord,
+              defaultPreventedState
+            })
+          );
         }
         if (
           propagationState !== null &&
@@ -974,6 +1001,9 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
   const frozenInvocationRecords = Object.freeze(invocationRecords.slice());
   const frozenListenerErrorRoutes = Object.freeze(
     listenerErrorRoutes.slice()
+  );
+  const frozenDefaultPreventedDiagnostics = Object.freeze(
+    defaultPreventedDiagnostics.slice()
   );
   const frozenPropagationStopDiagnostics = Object.freeze(
     propagationStopDiagnostics.slice()
@@ -1018,10 +1048,15 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
           invocationRecord.currentTargetDuringInvocation,
         currentTargetResetAfterInvocation:
           invocationRecord.currentTargetResetAfterInvocation,
+        defaultPreventedAfterInvocation:
+          invocationRecord.defaultPreventedAfterInvocation,
+        defaultPreventedBeforeInvocation:
+          invocationRecord.defaultPreventedBeforeInvocation,
         dispatchPathIndex: invocationRecord.dispatchPathIndex,
         index,
         invocationStatus: invocationRecord.invocationStatus,
         listenerErrorCaptured: invocationRecord.listenerErrorCaptured,
+        preventDefaultInvoked: invocationRecord.preventDefaultInvoked,
         phase: invocationRecord.phase,
         registrationName: invocationRecord.registrationName,
         skippedByNativeStopImmediatePropagation:
@@ -1050,6 +1085,42 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
     currentTargetResetAfterDispatch:
       listenerInvocationCount === currentTargetResetCount,
     currentTargetResetCount,
+    defaultPrevented:
+      defaultPreventedState !== null &&
+      defaultPreventedState.defaultPrevented,
+    defaultPreventedBlockedReason: DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED_CODE,
+    defaultPreventedDiagnosticEnabled:
+      normalizedOptions.enableDefaultPreventedDiagnostics,
+    defaultPreventedDiagnosticStatus:
+      frozenDefaultPreventedDiagnostics.length === 0
+        ? 'not-applicable'
+        : PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS,
+    defaultPreventedDiagnostics: frozenDefaultPreventedDiagnostics,
+    isDefaultPrevented:
+      defaultPreventedState !== null &&
+      defaultPreventedState.defaultPrevented,
+    nativeDefaultPreventedAfterDispatch:
+      defaultPreventedState !== null &&
+      getNativeEventDefaultPrevented(defaultPreventedState.nativeEvent),
+    nativeDefaultPreventedBeforeDispatch:
+      defaultPreventedState !== null &&
+      defaultPreventedState.initialDefaultPrevented,
+    nativeEventPreventDefaultCallCount:
+      defaultPreventedState === null
+        ? 0
+        : getNativeEventPreventDefaultDiagnosticCallCount(
+            defaultPreventedState.nativeEvent
+          ),
+    nativeEventPreventDefaultCallCountDelta:
+      defaultPreventedState === null
+        ? 0
+        : getNativeEventPreventDefaultDiagnosticCallCount(
+            defaultPreventedState.nativeEvent
+          ) - defaultPreventedState.initialNativePreventDefaultCallCount,
+    preventDefaultCallCount:
+      defaultPreventedState === null
+        ? 0
+        : defaultPreventedState.preventDefaultCallCount,
     dispatchQueueEntryCount,
     dispatchQueueProcessed: false,
     dispatchRecordCount: normalizedDispatchRecords.length,
@@ -1143,6 +1214,8 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
       invocationRecords: frozenInvocationRecords,
       listenerErrorRoutes: frozenListenerErrorRoutes,
       options: Object.freeze({
+        enableDefaultPreventedDiagnostics:
+          normalizedOptions.enableDefaultPreventedDiagnostics,
         enableListenerErrorRoutingDiagnostics:
           normalizedOptions.enableListenerErrorRoutingDiagnostics,
         enableNativeStopImmediatePropagationDiagnostics:
@@ -1152,6 +1225,7 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
         useProcessingOrder
       }),
       currentTargetProgression,
+      defaultPreventedDiagnostics: frozenDefaultPreventedDiagnostics,
       nativeStopImmediatePropagationDiagnostics:
         frozenNativeStopImmediatePropagationDiagnostics,
       propagationStopDiagnostics: frozenPropagationStopDiagnostics
@@ -1165,6 +1239,8 @@ function normalizeDispatchQueueCanaryOptions(options) {
   const normalizedOptions = isObjectLike(options) ? options : {};
 
   return {
+    enableDefaultPreventedDiagnostics:
+      normalizedOptions.enableDefaultPreventedDiagnostics === true,
     enableListenerErrorRoutingDiagnostics:
       normalizedOptions.enableListenerErrorRoutingDiagnostics === true,
     enableNativeStopImmediatePropagationDiagnostics:
@@ -1204,12 +1280,33 @@ function createDispatchQueuePropagationDiagnosticState(options) {
   };
 }
 
+function createDispatchQueueDefaultPreventedDiagnosticState(options) {
+  if (!options.enableDefaultPreventedDiagnostics) {
+    return null;
+  }
+
+  return {
+    currentDispatchListenerRecord: null,
+    currentTarget: null,
+    defaultPrevented: false,
+    enableDefaultPreventedDiagnostics:
+      options.enableDefaultPreventedDiagnostics,
+    initialDefaultPrevented: false,
+    initialNativePreventDefaultCallCount: 0,
+    nativeEvent: null,
+    nativeEventPreventDefaultCallCount: 0,
+    preventDefaultCallCount: 0,
+    preventDefaultSourceListenerRecord: null
+  };
+}
+
 function createDispatchQueueCanaryEventContext(
   dispatchRecord,
   dispatchQueueEntry,
   entryPayload,
   options,
-  propagationState
+  propagationState,
+  defaultPreventedState
 ) {
   const listenerRecords = options.useProcessingOrder
     ? entryPayload.processingListenerRecords
@@ -1253,6 +1350,12 @@ function createDispatchQueueCanaryEventContext(
         firstListenerPayload.nativeEvent
       );
   }
+  if (defaultPreventedState !== null) {
+    initializeDefaultPreventedDiagnosticStateForNativeEvent(
+      defaultPreventedState,
+      firstListenerPayload.nativeEvent
+    );
+  }
 
   return {
     canaryEvent: createDispatchListenerCanaryEvent(
@@ -1260,11 +1363,13 @@ function createDispatchQueueCanaryEventContext(
       firstListenerPayload,
       {
         currentTargetState,
+        defaultPreventedState,
         propagationState,
         targetInst: dispatchRecord.targetInst
       }
     ),
     currentTargetState,
+    defaultPreventedState,
     dispatchQueueEntry,
     propagationState
   };
@@ -1287,6 +1392,11 @@ function prepareDispatchQueueCanaryEventForListener(
     propagationState.currentDispatchListenerRecord = listenerRecord;
     propagationState.currentTarget = listenerRecord.currentTarget;
   }
+  const defaultPreventedState = canaryEventContext.defaultPreventedState;
+  if (defaultPreventedState !== null) {
+    defaultPreventedState.currentDispatchListenerRecord = listenerRecord;
+    defaultPreventedState.currentTarget = listenerRecord.currentTarget;
+  }
 }
 
 function resetDispatchQueueCanaryEventAfterListener(canaryEventContext) {
@@ -1302,6 +1412,11 @@ function resetDispatchQueueCanaryEventAfterListener(canaryEventContext) {
   if (propagationState !== null) {
     propagationState.currentDispatchListenerRecord = null;
     propagationState.currentTarget = null;
+  }
+  const defaultPreventedState = canaryEventContext.defaultPreventedState;
+  if (defaultPreventedState !== null) {
+    defaultPreventedState.currentDispatchListenerRecord = null;
+    defaultPreventedState.currentTarget = null;
   }
 }
 
@@ -1411,6 +1526,65 @@ function createDispatchPropagationStopDiagnosticRecord({
       propagationState.stopSourceListenerRecord !== null &&
       propagationState.stopSourceListenerRecord.targetInst ===
         listenerRecord.targetInst,
+    syntheticEventCount: 0,
+    targetInst: listenerRecord.targetInst
+  });
+}
+
+function createDispatchDefaultPreventedDiagnosticRecord({
+  action,
+  dispatchQueueEntry,
+  dispatchRecord,
+  listenerRecord,
+  defaultPreventedState
+}) {
+  const sourceListenerRecord =
+    defaultPreventedState.preventDefaultSourceListenerRecord;
+  const nativeDefaultPrevented = getNativeEventDefaultPrevented(
+    defaultPreventedState.nativeEvent
+  );
+  const nativePreventDefaultCallCount =
+    getNativeEventPreventDefaultDiagnosticCallCount(
+      defaultPreventedState.nativeEvent
+    );
+
+  return Object.freeze({
+    action,
+    blockedReason: DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    currentTarget: listenerRecord.currentTarget,
+    defaultPrevented: defaultPreventedState.defaultPrevented,
+    diagnosticOnly: true,
+    dispatchPathIndex: listenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind: dispatchQueueEntry.kind,
+    dispatchRecordKind: dispatchRecord.kind,
+    domEventName: listenerRecord.domEventName,
+    isDefaultPrevented: defaultPreventedState.defaultPrevented,
+    kind: DISPATCH_DEFAULT_PREVENTED_DIAGNOSTIC_RECORD_KIND,
+    nativeDefaultPrevented,
+    nativeEventPreventDefaultCallCount: nativePreventDefaultCallCount,
+    phase: listenerRecord.phase,
+    preventDefaultCallCount:
+      defaultPreventedState.preventDefaultCallCount,
+    preventedByCurrentTarget:
+      sourceListenerRecord === null ? null : sourceListenerRecord.currentTarget,
+    preventedByDispatchPathIndex:
+      sourceListenerRecord === null
+        ? null
+        : sourceListenerRecord.dispatchPathIndex,
+    preventedByPhase:
+      sourceListenerRecord === null ? null : sourceListenerRecord.phase,
+    preventedByRegistrationName:
+      sourceListenerRecord === null
+        ? null
+        : sourceListenerRecord.registrationName,
+    preventedByTargetInst:
+      sourceListenerRecord === null ? null : sourceListenerRecord.targetInst,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName: listenerRecord.registrationName,
+    status: PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS,
     syntheticEventCount: 0,
     targetInst: listenerRecord.targetInst
   });
@@ -1675,10 +1849,27 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     canaryEventContext === null
       ? null
       : canaryEventContext.propagationState;
+  const defaultPreventedState =
+    canaryEventContext === null
+      ? null
+      : canaryEventContext.defaultPreventedState;
   const propagationStoppedBeforeInvocation =
     propagationState !== null && propagationState.propagationStopped;
   const stopPropagationCallCountBefore =
     propagationState === null ? 0 : propagationState.stopPropagationCallCount;
+  const defaultPreventedBeforeInvocation =
+    defaultPreventedState !== null && defaultPreventedState.defaultPrevented;
+  const preventDefaultCallCountBefore =
+    getDefaultPreventedDiagnosticCallCount(defaultPreventedState);
+  const nativeDefaultPreventedBeforeInvocation =
+    defaultPreventedState !== null &&
+    getNativeEventDefaultPrevented(defaultPreventedState.nativeEvent);
+  const nativeEventPreventDefaultCallCountBeforeInvocation =
+    defaultPreventedState === null
+      ? 0
+      : getNativeEventPreventDefaultDiagnosticCallCount(
+          defaultPreventedState.nativeEvent
+        );
   const nativeImmediatePropagationStoppedBeforeInvocation =
     propagationState !== null &&
     propagationState.nativeImmediatePropagationStopped;
@@ -1745,6 +1936,23 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
         currentTargetAfterInvocation === null;
     }
   }
+  if (defaultPreventedState !== null) {
+    syncDefaultPreventedDiagnosticStateFromNative(defaultPreventedState);
+  }
+
+  const defaultPreventedAfterInvocation =
+    defaultPreventedState !== null && defaultPreventedState.defaultPrevented;
+  const preventDefaultCallCountAfter =
+    getDefaultPreventedDiagnosticCallCount(defaultPreventedState);
+  const nativeDefaultPreventedAfterInvocation =
+    defaultPreventedState !== null &&
+    getNativeEventDefaultPrevented(defaultPreventedState.nativeEvent);
+  const nativeEventPreventDefaultCallCountAfterInvocation =
+    defaultPreventedState === null
+      ? 0
+      : getNativeEventPreventDefaultDiagnosticCallCount(
+          defaultPreventedState.nativeEvent
+        );
 
   const record = Object.freeze({
     admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
@@ -1759,6 +1967,15 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
       currentTargetResetAfterInvocation === true
         ? PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
         : 'not-applicable',
+    defaultPreventedAfterInvocation,
+    defaultPreventedBeforeInvocation,
+    defaultPreventedDiagnosticEnabled:
+      defaultPreventedState !== null &&
+      defaultPreventedState.enableDefaultPreventedDiagnostics,
+    defaultPreventedDiagnosticStatus:
+      defaultPreventedState === null
+        ? 'not-applicable'
+        : PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS,
     dispatchPathIndex: normalizedListenerRecord.dispatchPathIndex,
     dispatchQueueEntryKind:
       dispatchQueueEntry === null ? null : dispatchQueueEntry.kind,
@@ -1795,7 +2012,18 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     listenerReturnStatus:
       error === null ? describeReturnValue(returnValue) : 'not-applicable',
     listenerStatus: normalizedListenerRecord.listenerStatus,
+    isDefaultPreventedAfterInvocation: defaultPreventedAfterInvocation,
+    isDefaultPreventedBeforeInvocation: defaultPreventedBeforeInvocation,
+    nativeDefaultPreventedAfterInvocation,
+    nativeDefaultPreventedBeforeInvocation,
     nativeEventTarget: normalizedListenerRecord.nativeEventTarget,
+    nativeEventPreventDefaultCallCountAfterInvocation:
+      nativeEventPreventDefaultCallCountAfterInvocation,
+    nativeEventPreventDefaultCallCountBeforeInvocation:
+      nativeEventPreventDefaultCallCountBeforeInvocation,
+    nativeEventPreventDefaultCallCountDelta:
+      nativeEventPreventDefaultCallCountAfterInvocation -
+      nativeEventPreventDefaultCallCountBeforeInvocation,
     nativeEventType: normalizedListenerRecord.nativeEventType,
     nativeImmediatePropagationStoppedAfterInvocation:
       propagationState !== null &&
@@ -1846,6 +2074,11 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     propagationStoppedAfterInvocation:
       propagationState !== null && propagationState.propagationStopped,
     propagationStoppedBeforeInvocation,
+    preventDefaultCallCount: preventDefaultCallCountAfter,
+    preventDefaultCallCountDelta:
+      preventDefaultCallCountAfter - preventDefaultCallCountBefore,
+    preventDefaultInvoked:
+      preventDefaultCallCountAfter > preventDefaultCallCountBefore,
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
     publicRootBehaviorChanged: false,
@@ -1877,6 +2110,7 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
       nativeEvent: payload.nativeEvent,
       nativeEventTarget: payload.nativeEventTarget,
       pathEntry: payload.pathEntry,
+      defaultPreventedState,
       propagationState,
       returnValue,
       targetListenerLookupRecord: payload.targetListenerLookupRecord
@@ -1913,6 +2147,10 @@ function createSkippedSingleListenerInvocationCanaryRecord(
     currentTargetDuringInvocation: null,
     currentTargetResetAfterInvocation: false,
     currentTargetResetDiagnosticStatus: 'not-applicable',
+    defaultPreventedAfterInvocation: false,
+    defaultPreventedBeforeInvocation: false,
+    defaultPreventedDiagnosticEnabled: false,
+    defaultPreventedDiagnosticStatus: 'not-applicable',
     dispatchPathIndex:
       dispatchListenerRecord === null
         ? null
@@ -1951,12 +2189,19 @@ function createSkippedSingleListenerInvocationCanaryRecord(
       dispatchListenerRecord === null
         ? 'not-applicable'
         : dispatchListenerRecord.listenerStatus,
+    isDefaultPreventedAfterInvocation: false,
+    isDefaultPreventedBeforeInvocation: false,
+    nativeDefaultPreventedAfterInvocation: false,
+    nativeDefaultPreventedBeforeInvocation: false,
     nativeEventTarget:
       dispatchListenerRecord === null
         ? dispatchRecord === null
           ? null
           : dispatchRecord.nativeEventTarget
         : dispatchListenerRecord.nativeEventTarget,
+    nativeEventPreventDefaultCallCountAfterInvocation: 0,
+    nativeEventPreventDefaultCallCountBeforeInvocation: 0,
+    nativeEventPreventDefaultCallCountDelta: 0,
     nativeEventType:
       dispatchListenerRecord === null
         ? dispatchRecord === null
@@ -2000,6 +2245,9 @@ function createSkippedSingleListenerInvocationCanaryRecord(
         : 'not-applicable',
     propagationStoppedAfterInvocation: skippedByPropagationStop,
     propagationStoppedBeforeInvocation: skippedByPropagationStop,
+    preventDefaultCallCount: 0,
+    preventDefaultCallCountDelta: 0,
+    preventDefaultInvoked: false,
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
     publicRootBehaviorChanged: false,
@@ -2047,6 +2295,7 @@ function createSkippedSingleListenerInvocationCanaryRecord(
             : dispatchRecord.nativeEventTarget
           : dispatchListenerRecord.nativeEventTarget,
       pathEntry: null,
+      defaultPreventedState: null,
       propagationState,
       returnValue: undefined,
       targetListenerLookupRecord: null
@@ -2070,6 +2319,11 @@ function createDispatchListenerCanaryEvent(
   const propagationState = isObjectLike(normalizedOptions.propagationState)
     ? normalizedOptions.propagationState
     : null;
+  const defaultPreventedState = isObjectLike(
+    normalizedOptions.defaultPreventedState
+  )
+    ? normalizedOptions.defaultPreventedState
+    : null;
   const targetInst =
     Object.prototype.hasOwnProperty.call(normalizedOptions, 'targetInst')
       ? normalizedOptions.targetInst
@@ -2080,8 +2334,12 @@ function createDispatchListenerCanaryEvent(
   const nativeStopImmediatePropagationDiagnosticEnabled =
     propagationState !== null &&
     propagationState.enableNativeStopImmediatePropagationDiagnostics;
+  const defaultPreventedDiagnosticEnabled =
+    defaultPreventedState !== null &&
+    defaultPreventedState.enableDefaultPreventedDiagnostics;
   const event = {
     browserDomEventCompatibilityClaimed: false,
+    defaultPreventedDiagnosticEnabled,
     domEventName: dispatchListenerRecord.domEventName,
     kind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
     nativeStopImmediatePropagationDiagnosticEnabled,
@@ -2133,6 +2391,38 @@ function createDispatchListenerCanaryEvent(
     });
   }
 
+  if (defaultPreventedDiagnosticEnabled) {
+    Object.defineProperties(event, {
+      defaultPrevented: {
+        enumerable: true,
+        get() {
+          return defaultPreventedState.defaultPrevented;
+        }
+      },
+      isDefaultPrevented: {
+        enumerable: true,
+        value() {
+          return defaultPreventedState.defaultPrevented;
+        }
+      },
+      preventDefault: {
+        enumerable: true,
+        value() {
+          defaultPreventedState.defaultPrevented = true;
+          defaultPreventedState.preventDefaultCallCount++;
+          defaultPreventedState.preventDefaultSourceListenerRecord =
+            defaultPreventedState.currentDispatchListenerRecord;
+          routeCanaryPreventDefaultToNativeEvent(
+            defaultPreventedState.nativeEvent
+          );
+          syncDefaultPreventedDiagnosticStateFromNative(
+            defaultPreventedState
+          );
+        }
+      }
+    });
+  }
+
   if (propagationStopDiagnosticEnabled) {
     Object.defineProperties(event, {
       isPropagationStopped: {
@@ -2163,6 +2453,61 @@ function createDispatchListenerCanaryEvent(
   }
 
   return Object.freeze(event);
+}
+
+function initializeDefaultPreventedDiagnosticStateForNativeEvent(
+  defaultPreventedState,
+  nativeEvent
+) {
+  if (defaultPreventedState.nativeEvent !== nativeEvent) {
+    defaultPreventedState.nativeEvent = nativeEvent;
+    defaultPreventedState.initialDefaultPrevented =
+      getNativeEventDefaultPrevented(nativeEvent);
+    defaultPreventedState.initialNativePreventDefaultCallCount =
+      getNativeEventPreventDefaultDiagnosticCallCount(nativeEvent);
+    defaultPreventedState.defaultPrevented =
+      defaultPreventedState.initialDefaultPrevented;
+    defaultPreventedState.nativeEventPreventDefaultCallCount =
+      defaultPreventedState.initialNativePreventDefaultCallCount;
+  } else {
+    syncDefaultPreventedDiagnosticStateFromNative(defaultPreventedState);
+  }
+}
+
+function syncDefaultPreventedDiagnosticStateFromNative(
+  defaultPreventedState
+) {
+  const nativeDefaultPrevented = getNativeEventDefaultPrevented(
+    defaultPreventedState.nativeEvent
+  );
+  defaultPreventedState.nativeEventPreventDefaultCallCount =
+    getNativeEventPreventDefaultDiagnosticCallCount(
+      defaultPreventedState.nativeEvent
+    );
+  if (nativeDefaultPrevented) {
+    defaultPreventedState.defaultPrevented = true;
+  }
+}
+
+function routeCanaryPreventDefaultToNativeEvent(nativeEvent) {
+  if (!isObjectLike(nativeEvent)) {
+    return;
+  }
+
+  if (typeof nativeEvent.preventDefault === 'function') {
+    nativeEvent.preventDefault();
+    return;
+  }
+
+  if (typeof nativeEvent.returnValue !== 'unknown') {
+    nativeEvent.returnValue = false;
+  }
+}
+
+function getDefaultPreventedDiagnosticCallCount(defaultPreventedState) {
+  return defaultPreventedState === null
+    ? 0
+    : defaultPreventedState.preventDefaultCallCount;
 }
 
 function routeCanaryStopPropagationToNativeEvent(nativeEvent) {
@@ -2606,6 +2951,11 @@ function getNativeEventPreventDefaultCallCount(nativeEvent) {
     typeof nativeEvent.preventDefaultCallCount === 'number'
     ? nativeEvent.preventDefaultCallCount
     : null;
+}
+
+function getNativeEventPreventDefaultDiagnosticCallCount(nativeEvent) {
+  const nativeCallCount = getNativeEventPreventDefaultCallCount(nativeEvent);
+  return typeof nativeCallCount === 'number' ? nativeCallCount : 0;
 }
 
 function normalizePreventDefaultAtPhase(value) {
@@ -4339,6 +4689,8 @@ function getSimpleEventRegistrationName(domEventName, eventSystemFlags) {
 
 module.exports = {
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
+  DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED_CODE,
+  DISPATCH_DEFAULT_PREVENTED_DIAGNOSTIC_RECORD_KIND,
   DISPATCH_LISTENER_RECORD_KIND,
   DISPATCH_LISTENER_CANARY_EVENT_KIND,
   DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND,
@@ -4375,6 +4727,7 @@ module.exports = {
   POLYFILL_EVENT_PLUGIN_NAMES,
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
   PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS,
+  PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS,
   PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
   PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS,
   PRIVATE_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_STATUS,

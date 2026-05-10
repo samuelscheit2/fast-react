@@ -224,6 +224,8 @@ function invokePrivateRootHostOutputClickDispatchCanary(
   const queueInvocationRecord = invokeDispatchQueueCanaryFromDispatchRecords(
     [captureDispatchRecord, bubbleDispatchRecord],
     {
+      enableDefaultPreventedDiagnostics:
+        diagnosticOptions.enableDefaultPreventedDiagnostics,
       enableListenerErrorRoutingDiagnostics:
         diagnosticOptions.enableListenerErrorRoutingDiagnostics,
       enableNativeStopImmediatePropagationDiagnostics:
@@ -243,6 +245,14 @@ function invokePrivateRootHostOutputClickDispatchCanary(
     browserDomEventCompatibilityClaimed: false,
     captureDispatchRecordKind: captureDispatchRecord.kind,
     clickDispatchOrder: freezeArray(['capture', 'bubble']),
+    defaultPrevented: queueInvocationRecord.defaultPrevented,
+    defaultPreventedDiagnosticEnabled:
+      queueInvocationRecord.defaultPreventedDiagnosticEnabled,
+    defaultPreventedDiagnosticStatus:
+      queueInvocationRecord.defaultPreventedDiagnosticStatus,
+    defaultPreventedDiagnostics: freezeArray(
+      queueInvocationRecord.defaultPreventedDiagnostics
+    ),
     dispatchQueueInvocationRecordKind: queueInvocationRecord.kind,
     dispatchRecordCount: 2,
     domEventName: 'click',
@@ -259,8 +269,14 @@ function invokePrivateRootHostOutputClickDispatchCanary(
     listenerErrorRoutingStatus:
       queueInvocationRecord.listenerErrorRoutingStatus,
     listenerInvocationCount: queueInvocationRecord.listenerInvocationCount,
+    nativeDefaultPreventedAfterDispatch:
+      queueInvocationRecord.nativeDefaultPreventedAfterDispatch,
+    nativeDefaultPreventedBeforeDispatch:
+      queueInvocationRecord.nativeDefaultPreventedBeforeDispatch,
     nativeEventPreventDefaultCallCount:
       nativeEvent.preventDefaultCallCount,
+    preventDefaultCallCount:
+      queueInvocationRecord.preventDefaultCallCount,
     nativeEventStopImmediatePropagationCallCount:
       nativeEvent.stopImmediatePropagationCallCount,
     nativeEventStopPropagationCallCount:
@@ -1252,6 +1268,8 @@ function normalizePrivateRootHostOutputClickDispatchCanaryOptions(options) {
       : {};
 
   return freezeRecord({
+    enableDefaultPreventedDiagnostics:
+      normalizedOptions.enableDefaultPreventedDiagnostics === true,
     enableListenerErrorRoutingDiagnostics:
       normalizedOptions.enableListenerErrorRoutingDiagnostics === true,
     enableNativeStopImmediatePropagationDiagnostics:
