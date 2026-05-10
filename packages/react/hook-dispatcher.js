@@ -16,6 +16,7 @@ const ReactSharedInternals = {
   H: null
 };
 
+const privateEffectHookDispatchers = new WeakSet();
 const privateStateHookDispatchers = new WeakSet();
 const privateContextHookDispatchers = new WeakSet();
 
@@ -59,6 +60,10 @@ function isPrivateContextHookDispatcher(dispatcher) {
   return isObjectLike(dispatcher) && privateContextHookDispatchers.has(dispatcher);
 }
 
+function isPrivateEffectHookDispatcher(dispatcher) {
+  return isObjectLike(dispatcher) && privateEffectHookDispatchers.has(dispatcher);
+}
+
 function validatePrivateStateHookDispatcher(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -77,6 +82,23 @@ function validatePrivateContextHookDispatcher(dispatcher) {
   }
 }
 
+function validatePrivateEffectHookDispatcher(dispatcher) {
+  if (!isObjectLike(dispatcher)) {
+    throw createInvalidHookCallError('useEffect');
+  }
+
+  for (const hookName of [
+    'useEffect',
+    'useImperativeHandle',
+    'useInsertionEffect',
+    'useLayoutEffect'
+  ]) {
+    if (typeof dispatcher[hookName] !== 'function') {
+      throw createInvalidHookCallError(hookName);
+    }
+  }
+}
+
 function markPrivateStateHookDispatcher(dispatcher) {
   validatePrivateStateHookDispatcher(dispatcher);
   privateStateHookDispatchers.add(dispatcher);
@@ -86,6 +108,12 @@ function markPrivateStateHookDispatcher(dispatcher) {
 function markPrivateContextHookDispatcher(dispatcher) {
   validatePrivateContextHookDispatcher(dispatcher);
   privateContextHookDispatchers.add(dispatcher);
+  return dispatcher;
+}
+
+function markPrivateEffectHookDispatcher(dispatcher) {
+  validatePrivateEffectHookDispatcher(dispatcher);
+  privateEffectHookDispatchers.add(dispatcher);
   return dispatcher;
 }
 
@@ -100,6 +128,20 @@ function resolveDispatcher(hookName) {
 }
 
 function getDispatcherHook(dispatcher, hookName) {
+  const hook = dispatcher[hookName];
+
+  if (typeof hook !== 'function') {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  return hook;
+}
+
+function getPrivateEffectDispatcherHook(dispatcher, hookName) {
+  if (!isPrivateEffectHookDispatcher(dispatcher)) {
+    throw createInvalidHookCallError(hookName);
+  }
+
   const hook = dispatcher[hookName];
 
   if (typeof hook !== 'function') {
@@ -146,6 +188,15 @@ function callDispatcherHook(hookName, args) {
     return callPrivateContextDispatcherHook(hookName, args);
   }
 
+  if (
+    hookName === 'useEffect' ||
+    hookName === 'useImperativeHandle' ||
+    hookName === 'useInsertionEffect' ||
+    hookName === 'useLayoutEffect'
+  ) {
+    return callPrivateEffectDispatcherHook(hookName, args);
+  }
+
   const dispatcher = resolveDispatcher(hookName);
   const hook = getDispatcherHook(dispatcher, hookName);
   return hook.apply(dispatcher, args);
@@ -154,6 +205,12 @@ function callDispatcherHook(hookName, args) {
 function callPrivateContextDispatcherHook(hookName, args) {
   const dispatcher = resolveDispatcher(hookName);
   const hook = getPrivateContextDispatcherHook(dispatcher, hookName);
+  return hook.apply(dispatcher, args);
+}
+
+function callPrivateEffectDispatcherHook(hookName, args) {
+  const dispatcher = resolveDispatcher(hookName);
+  const hook = getPrivateEffectDispatcherHook(dispatcher, hookName);
   return hook.apply(dispatcher, args);
 }
 
@@ -191,11 +248,19 @@ const useContext = defineHookFunctionShape(function (Context) {
 }, 1);
 
 const useEffect = defineHookFunctionShape(function (create, deps) {
-  return callDispatcherHook('useEffect', arguments);
+  return callPrivateEffectDispatcherHook('useEffect', arguments);
+}, 2);
+
+const useImperativeHandle = defineHookFunctionShape(function (ref, create, deps) {
+  return callPrivateEffectDispatcherHook('useImperativeHandle', arguments);
+}, 3);
+
+const useInsertionEffect = defineHookFunctionShape(function (create, deps) {
+  return callPrivateEffectDispatcherHook('useInsertionEffect', arguments);
 }, 2);
 
 const useLayoutEffect = defineHookFunctionShape(function (create, deps) {
-  return callDispatcherHook('useLayoutEffect', arguments);
+  return callPrivateEffectDispatcherHook('useLayoutEffect', arguments);
 }, 2);
 
 const useMemo = defineHookFunctionShape(function (create, deps) {
@@ -219,20 +284,25 @@ module.exports = {
   ReactSharedInternals,
   callDispatcherHook,
   callPrivateContextDispatcherHook,
+  callPrivateEffectDispatcherHook,
   callPrivateStateDispatcherHook,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
   isPrivateContextHookDispatcher,
+  isPrivateEffectHookDispatcher,
   isPrivateStateHookDispatcher,
   markPrivateContextHookDispatcher,
+  markPrivateEffectHookDispatcher,
   markPrivateStateHookDispatcher,
   resolveDispatcher,
   use,
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
+  useInsertionEffect,
   useLayoutEffect,
   useMemo,
   useReducer,
