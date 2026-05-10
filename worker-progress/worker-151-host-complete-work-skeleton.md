@@ -2,7 +2,7 @@
 
 ## Goal Evidence
 
-- Goal status after setup: active
+- Goal status after setup: active. Final worker status: complete.
 - Goal objective after setup: implement a private, test-only HostRoot/HostComponent/HostText begin/complete-work skeleton that can create detached host records and attach them under a HostRoot WIP, without committing to containers or exposing public renderers
 - `create_goal` and `get_goal` were available and called before research, file reads, implementation, or verification.
 
@@ -74,7 +74,7 @@ git diff --stat
 - `cargo fmt --all --check`: passed
 - `cargo test -p fast-react-reconciler --all-features host_work`: passed, 3 tests
 - `cargo test -p fast-react-reconciler --all-features work_in_progress`: passed, 4 filtered tests
-- `cargo test -p fast-react-reconciler --all-features`: passed, 66 unit tests plus 1 doctest
+- `cargo test -p fast-react-reconciler --all-features`: passed, 82 unit tests plus 1 doctest after orchestrator integration with `main`
 - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`: passed
 - `git diff --check`: passed
 
