@@ -245,6 +245,51 @@ assert.equal(
     ),
   true
 );
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.streamRoundtripGate.streamRoundtripGateStatus,
+  'diagnosed-native-root-bridge-json-stream-batch-roundtrip'
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.streamRoundtripGate.streamId,
+  'native-root-bridge-json-stream-batch-roundtrip-587'
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.streamRoundtripGate.rows.map(
+      (row) => row.batchSequence
+    ),
+  [0, 1, 2, 3, 4, 5]
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.streamRoundtripGate.rows.map(
+      (row) => row.assemblyState
+    ),
+  ['partial', 'assembled', 'partial', 'assembled', 'partial', 'assembled']
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.streamRoundtripGate.errorRows.map((row) => row.code),
+  [
+    'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_OUT_OF_ORDER',
+    'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_DUPLICATE_CHUNK',
+    'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_MISSING_CHUNK',
+    'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_AFTER_TEARDOWN'
+  ]
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.streamRoundtripGate.errorRows.every(
+      (row) =>
+        row.chunkStatus === 'error' &&
+        row.nativeExecution === false &&
+        row.crossEnvironmentHandleReuseBlocked === true &&
+        row.publicNativeCompatibility === false
+    ),
+  true
+);
 assert.deepEqual(
   nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.map(
     (row) => row.id

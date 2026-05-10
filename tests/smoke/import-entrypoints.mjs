@@ -4566,6 +4566,7 @@ async function runNativePackageProbe(tempRoot) {
       );
       const batchGate =
         runtimeGate.jsonTransportSmoke.parserGate.batchedRecordGate;
+      const streamGate = batchGate.responseSequenceGate.streamRoundtripGate;
       const teardownGate = requestShape.crossEnvironmentTeardownGate;
 
       assert.equal(
@@ -4597,6 +4598,47 @@ async function runNativePackageProbe(tempRoot) {
         );
         assertNoExecution(row, label + ' batched JSON ' + row.id);
       }
+      assert.equal(
+        streamGate.streamRoundtripGateStatus,
+        'diagnosed-native-root-bridge-json-stream-batch-roundtrip',
+        label + ' stream batch roundtrip status'
+      );
+      assert.deepEqual(
+        streamGate.rows.map((row) => row.batchSequence),
+        [0, 1, 2, 3, 4, 5],
+        label + ' stream batch roundtrip sequence'
+      );
+      assert.deepEqual(
+        streamGate.errorRows.map((row) => row.code),
+        [
+          'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_OUT_OF_ORDER',
+          'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_DUPLICATE_CHUNK',
+          'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_MISSING_CHUNK',
+          'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_AFTER_TEARDOWN'
+        ],
+        label + ' stream batch roundtrip rejects'
+      );
+      for (const row of [...streamGate.rows, ...streamGate.errorRows]) {
+        assert.deepEqual(
+          Object.keys(row),
+          streamGate.jsonTransportStreamBatchRoundtripChunkRowFields,
+          label + ' stream batch roundtrip row fields ' + row.id
+        );
+        assertNoExecution(row, label + ' stream batch roundtrip ' + row.id);
+        assert.equal(
+          row.crossEnvironmentHandleReuseBlocked,
+          true,
+          label + ' stream batch roundtrip cross-environment ' + row.id
+        );
+        assert.equal(
+          row.publicNativeCompatibility,
+          false,
+          label + ' stream batch roundtrip public compatibility ' + row.id
+        );
+      }
+      assertNoExecution(streamGate, label + ' stream batch roundtrip gate');
+      assert.equal(streamGate.crossEnvironmentHandleReuseBlocked, true);
+      assert.equal(streamGate.publicNativeCompatibility, false);
 
       assert.equal(
         teardownGate.teardownGateStatus,

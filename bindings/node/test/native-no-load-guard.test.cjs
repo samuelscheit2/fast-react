@@ -133,6 +133,30 @@ async function main() {
         .batchedRecordGate.responseSequenceGate.nativeExecution,
       false
     );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.streamRoundtripGate
+        .streamRoundtripGateStatus,
+      'diagnosed-native-root-bridge-json-stream-batch-roundtrip'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.streamRoundtripGate
+        .nativeExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.streamRoundtripGate
+        .crossEnvironmentHandleReuseBlocked,
+      true
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.streamRoundtripGate
+        .publicNativeCompatibility,
+      false
+    );
     assert.ok(Object.isFrozen(actualRootBridgeEvidence));
     for (const evidence of actualRootBridgeEvidence) {
       assert.ok(Object.isFrozen(evidence));
