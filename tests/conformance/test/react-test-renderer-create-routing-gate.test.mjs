@@ -1229,116 +1229,122 @@ test("react-test-renderer private update native bridge admission consumes Rust h
   }
 });
 
-test("react-test-renderer CJS development private act diagnostics consume update execution with passive drain metadata", () => {
-  const entry = entrypoints.find(
-    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
-  );
-  assert.notEqual(entry, undefined);
+test("react-test-renderer CJS private act diagnostics consume update execution with passive drain metadata", () => {
+  for (const entry of cjsEntrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const diagnostics =
+      moduleExports._Scheduler.unstable_flushAllWithoutAsserting[
+        privateActQueueFlushDiagnosticsExport
+      ].privateActPassiveEffectDrainDiagnostics;
+    assert.equal(
+      diagnostics.nativeUpdatePassiveEffectDrainDiagnosticId,
+      actNativeUpdatePassiveDrainRecordId,
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.consumesAcceptedNativeUpdateExecution,
+      true,
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.drainsAcceptedPendingPassiveFlushMetadata,
+      true,
+      entry.entrypoint
+    );
 
-  const moduleExports = loadFresh(entry.modulePath);
-  const bridge = assertPrivateRootRequestBridge(
-    moduleExports,
-    entry.entrypoint
-  );
-  const diagnostics =
-    moduleExports._Scheduler.unstable_flushAllWithoutAsserting[
-      privateActQueueFlushDiagnosticsExport
-    ].privateActPassiveEffectDrainDiagnostics;
-  assert.equal(
-    diagnostics.nativeUpdatePassiveEffectDrainDiagnosticId,
-    actNativeUpdatePassiveDrainRecordId
-  );
-  assert.equal(diagnostics.consumesAcceptedNativeUpdateExecution, true);
-  assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
-
-  const renderer = moduleExports.create({
-    props: { "data-state": "old", children: "hello" },
-    type: "span"
-  });
-  const updateError = captureThrown(() =>
-    renderer.update({
-      props: { "data-state": "new", children: "goodbye" },
+    const renderer = moduleExports.create({
+      props: { "data-state": "old", children: "hello" },
       type: "span"
-    })
-  );
-  const updateExecutionResult = bridge.consumeRootExecutionResult(
-    updateError.rootRequest,
-    createRustUpdateNativeBridgeAdmissionEvidence(updateError.rootRequest)
-  );
-  assertPrivateUpdateNativeBridgeAdmission(
-    updateExecutionResult.privateUpdateNativeBridgeAdmission,
-    updateError.rootRequest
-  );
-
-  const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
-    diagnostics.createAcceptedPendingPassiveFlushRecord({
-      label: "private-update-passive-execution",
-      recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
-      root: updateError.rootRequest.rootId,
-      finishedWork: "updated-finished-work",
-      lanes: "Default",
-      pendingUnmountCount: 0,
-      pendingMountCount: 1,
-      schedulerRequestOrder: 3
-    })
-  ]);
-  const described =
-    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-      updateExecutionResult,
-      metadata
+    });
+    const updateError = captureThrown(() =>
+      renderer.update({
+        props: { "data-state": "new", children: "goodbye" },
+        type: "span"
+      })
     );
-  assert.equal(described.id, actNativeUpdatePassiveDrainRecordId);
-  assert.equal(described.accepted, true);
-  assert.equal(described.rejectionReason, null);
-  assert.equal(described.updateExecutionAccepted, true);
-  assert.equal(described.passiveMetadataAccepted, true);
-  assert.equal(described.publicActCompatibilityClaimed, false);
-  assert.equal(described.publicUpdateCompatibilityClaimed, false);
-
-  const report =
-    diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-      updateExecutionResult,
-      metadata
+    const updateExecutionResult = bridge.consumeRootExecutionResult(
+      updateError.rootRequest,
+      createRustUpdateNativeBridgeAdmissionEvidence(updateError.rootRequest)
     );
-  assert.equal(report.id, actNativeUpdatePassiveDrainRecordId);
-  assert.equal(
-    report.status,
-    "private-act-native-update-passive-effect-drain-public-act-blocked"
-  );
-  assert.equal(report.nativeUpdateExecutionConsumed, true);
-  assert.equal(report.privateRootRequestExecutionConsumed, true);
-  assert.equal(report.rustExecution, true);
-  assert.equal(report.reconcilerExecution, true);
-  assert.equal(report.hostOutputProduced, true);
-  assert.equal(report.pendingBefore, 1);
-  assert.equal(report.drainedCount, 1);
-  assert.equal(report.remainingCount, 0);
-  assert.equal(
-    report.drainedRecords[0].recordKind,
-    "PassiveEffectSchedulerFlushExecutionRecord"
-  );
-  assert.equal(report.consumesAcceptedNativeUpdateExecution, true);
-  assert.equal(report.consumesPrivateUpdateNativeBridgeAdmission, true);
-  assert.equal(report.consumesAcceptedNativeUpdateHostOutput, true);
-  assert.equal(report.drainsAcceptedPendingPassiveFlushMetadata, true);
-  assert.equal(report.publicActCompatibilityClaimed, false);
-  assert.equal(report.publicUpdateCompatibilityClaimed, false);
-  assert.equal(report.executesPassiveEffects, false);
-  assert.equal(report.invokesEffectCallbacks, false);
-  assert.equal(report.executesRendererRoots, false);
-  assert.equal(report.mutatesHostOutput, false);
-  assert.equal(metadata.records.length, 0);
-
-  const rejected =
-    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-      {
-        ...updateExecutionResult,
-        hostOutputProduced: false
-      },
-      diagnostics.createAcceptedPendingPassiveFlushMetadata([])
+    assertPrivateUpdateNativeBridgeAdmission(
+      updateExecutionResult.privateUpdateNativeBridgeAdmission,
+      updateError.rootRequest
     );
-  assert.equal(rejected.accepted, false);
-  assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
+
+    const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
+      diagnostics.createAcceptedPendingPassiveFlushRecord({
+        label: "private-update-passive-execution",
+        recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
+        root: updateError.rootRequest.rootId,
+        finishedWork: "updated-finished-work",
+        lanes: "Default",
+        pendingUnmountCount: 0,
+        pendingMountCount: 1,
+        schedulerRequestOrder: 3
+      })
+    ]);
+    const described =
+      diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+        updateExecutionResult,
+        metadata
+      );
+    assert.equal(described.id, actNativeUpdatePassiveDrainRecordId);
+    assert.equal(described.accepted, true);
+    assert.equal(described.rejectionReason, null);
+    assert.equal(described.updateExecutionAccepted, true);
+    assert.equal(described.passiveMetadataAccepted, true);
+    assert.equal(described.publicActCompatibilityClaimed, false);
+    assert.equal(described.publicUpdateCompatibilityClaimed, false);
+
+    const report =
+      diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+        updateExecutionResult,
+        metadata
+      );
+    assert.equal(report.id, actNativeUpdatePassiveDrainRecordId);
+    assert.equal(
+      report.status,
+      "private-act-native-update-passive-effect-drain-public-act-blocked"
+    );
+    assert.equal(report.nativeUpdateExecutionConsumed, true);
+    assert.equal(report.privateRootRequestExecutionConsumed, true);
+    assert.equal(report.rustExecution, true);
+    assert.equal(report.reconcilerExecution, true);
+    assert.equal(report.hostOutputProduced, true);
+    assert.equal(report.pendingBefore, 1);
+    assert.equal(report.drainedCount, 1);
+    assert.equal(report.remainingCount, 0);
+    assert.equal(
+      report.drainedRecords[0].recordKind,
+      "PassiveEffectSchedulerFlushExecutionRecord"
+    );
+    assert.equal(report.consumesAcceptedNativeUpdateExecution, true);
+    assert.equal(report.consumesPrivateUpdateNativeBridgeAdmission, true);
+    assert.equal(report.consumesAcceptedNativeUpdateHostOutput, true);
+    assert.equal(report.drainsAcceptedPendingPassiveFlushMetadata, true);
+    assert.equal(report.publicActCompatibilityClaimed, false);
+    assert.equal(report.publicUpdateCompatibilityClaimed, false);
+    assert.equal(report.executesPassiveEffects, false);
+    assert.equal(report.invokesEffectCallbacks, false);
+    assert.equal(report.executesRendererRoots, false);
+    assert.equal(report.mutatesHostOutput, false);
+    assert.equal(metadata.records.length, 0);
+
+    const rejected =
+      diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+        {
+          ...updateExecutionResult,
+          hostOutputProduced: false
+        },
+        diagnostics.createAcceptedPendingPassiveFlushMetadata([])
+      );
+    assert.equal(rejected.accepted, false);
+    assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
+  }
 });
 
 test("react-test-renderer CJS development private unmount route records deletion commit handoff blockers", () => {
@@ -2551,191 +2557,188 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   });
 });
 
-test("react-test-renderer CJS development private act route flushes accepted scheduler mock create-root evidence", () => {
-  const entry = entrypoints.find(
-    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
-  );
-  assert.notEqual(entry, undefined);
+test("react-test-renderer CJS private act route flushes accepted scheduler mock create-root evidence", () => {
+  for (const entry of cjsEntrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const Scheduler = loadFresh("packages/scheduler/unstable_mock.js");
+    const reactGate = loadFresh(privateActDispatcherGateModule);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const renderer = moduleExports.create(
+      { props: { children: "hello" }, type: "div" },
+      {}
+    );
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
+    const diagnostics =
+      moduleExports._Scheduler.unstable_flushExpired[
+        privateActQueueFlushDiagnosticsExport
+      ];
 
-  const moduleExports = loadFresh(entry.modulePath);
-  const Scheduler = loadFresh("packages/scheduler/unstable_mock.js");
-  const reactGate = loadFresh(privateActDispatcherGateModule);
-  const bridge = assertPrivateRootRequestBridge(
-    moduleExports,
-    entry.entrypoint
-  );
-  const renderer = moduleExports.create(
-    { props: { children: "hello" }, type: "div" },
-    {}
-  );
-  const [createRequest] = bridge.getRendererRootRequests(renderer);
-  const diagnostics =
-    moduleExports._Scheduler.unstable_flushExpired[
-      privateActQueueFlushDiagnosticsExport
-    ];
-
-  Scheduler.reset();
-  const privateEvents = [];
-  const expiredCallback = reactGate.createInternalActQueueTestCallback(
-    (didTimeout) => {
-      privateEvents.push([
-        "expired-create-root-callback",
-        didTimeout,
-        Scheduler.unstable_getCurrentPriorityLevel(),
-        Scheduler.unstable_now()
-      ]);
-      Scheduler.log("expired-create-root-callback");
-    },
-    { label: "expired-create-root-callback" }
-  );
-  const expiredHandle = Scheduler.unstable_scheduleCallback(
-    Scheduler.unstable_UserBlockingPriority,
-    expiredCallback
-  );
-  let publicSchedulerCallbackRan = false;
-  Scheduler.unstable_scheduleCallback(
-    Scheduler.unstable_NormalPriority,
-    () => {
-      publicSchedulerCallbackRan = true;
-      Scheduler.log("public-renderer-work");
-    }
-  );
-  const actQueue = reactGate.createInternalActQueueTestQueue([
-    reactGate.createInternalActQueueTestTask({
-      label: "create-root-schedule",
-      recordKind: "SchedulerActQueueRequest",
-      taskKind: "RootSchedule",
-      continuationStatus: "NoContinuation",
-      callback: reactGate.createInternalActQueueTestCallback(
-        (didTimeout) => {
-          privateEvents.push([
-            "create-root-schedule",
-            didTimeout,
-            Scheduler.unstable_now()
-          ]);
-          Scheduler.log("create-root-schedule");
-        },
-        { label: "create-root-schedule" }
-      )
-    }),
-    reactGate.createInternalActQueueTestTask({
-      label: "create-root-callback",
-      recordKind: "SyncFlushActContinuationRecord",
-      taskKind: "SchedulerCallback",
-      continuationStatus: "PendingContinuation",
-      callback: reactGate.createInternalActQueueTestCallback(
-        (didTimeout) => {
-          privateEvents.push([
-            "create-root-callback",
-            didTimeout,
-            Scheduler.unstable_now()
-          ]);
-          Scheduler.log("create-root-callback");
-        },
-        { label: "create-root-callback" }
-      )
-    })
-  ]);
-
-  Scheduler.unstable_advanceTime(251);
-  const metadata =
-    diagnostics.createExpiredActRootWorkMetadataFromPrivateRootRequest(
-      createRequest,
-      expiredHandle,
-      actQueue,
-      {
-        priorityLevel: Scheduler.unstable_UserBlockingPriority,
-        schedulerPriority: "UserBlocking"
+    Scheduler.reset();
+    const privateEvents = [];
+    const expiredCallback = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        privateEvents.push([
+          "expired-create-root-callback",
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log("expired-create-root-callback");
+      },
+      { label: "expired-create-root-callback" }
+    );
+    const expiredHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      expiredCallback
+    );
+    let publicSchedulerCallbackRan = false;
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        publicSchedulerCallbackRan = true;
+        Scheduler.log("public-renderer-work");
       }
     );
-  assert.equal(Object.isFrozen(metadata), true);
-  assert.equal(
-    metadata[privateSchedulerMockExpiredActRootWorkMetadataBrand],
-    true
-  );
-  assert.equal(metadata.kind, privateSchedulerMockExpiredActRootWorkMetadataKind);
-  assert.equal(metadata.rootRequestId, createRequest.requestId);
-  assert.equal(metadata.rootOperation, "create");
-  assert.deepEqual(
-    metadata.rootWorkRecords.map((record) => record.recordKind),
-    [
-      "RootLaneSchedulingSnapshot",
-      "UpdateContainerResult",
-      "RootTaskScheduleRecord",
-      "HostRootFinishedWorkPendingCommitRecordForCanary"
-    ]
-  );
+    const actQueue = reactGate.createInternalActQueueTestQueue([
+      reactGate.createInternalActQueueTestTask({
+        label: "create-root-schedule",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "RootSchedule",
+        continuationStatus: "NoContinuation",
+        callback: reactGate.createInternalActQueueTestCallback(
+          (didTimeout) => {
+            privateEvents.push([
+              "create-root-schedule",
+              didTimeout,
+              Scheduler.unstable_now()
+            ]);
+            Scheduler.log("create-root-schedule");
+          },
+          { label: "create-root-schedule" }
+        )
+      }),
+      reactGate.createInternalActQueueTestTask({
+        label: "create-root-callback",
+        recordKind: "SyncFlushActContinuationRecord",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "PendingContinuation",
+        callback: reactGate.createInternalActQueueTestCallback(
+          (didTimeout) => {
+            privateEvents.push([
+              "create-root-callback",
+              didTimeout,
+              Scheduler.unstable_now()
+            ]);
+            Scheduler.log("create-root-callback");
+          },
+          { label: "create-root-callback" }
+        )
+      })
+    ]);
 
-  const described =
-    diagnostics.describeAcceptedMockSchedulerExpiredActRootWorkMetadata(
-      Scheduler.unstable_flushExpired,
-      metadata
+    Scheduler.unstable_advanceTime(251);
+    const metadata =
+      diagnostics.createExpiredActRootWorkMetadataFromPrivateRootRequest(
+        createRequest,
+        expiredHandle,
+        actQueue,
+        {
+          priorityLevel: Scheduler.unstable_UserBlockingPriority,
+          schedulerPriority: "UserBlocking"
+        }
+      );
+    assert.equal(Object.isFrozen(metadata), true);
+    assert.equal(
+      metadata[privateSchedulerMockExpiredActRootWorkMetadataBrand],
+      true
     );
-  assert.equal(described.accepted, true);
-  assert.equal(described.rejectionReason, null);
-  assert.equal(described.rootWorkRecordCount, 4);
-  assert.equal(described.drainsExpiredMockSchedulerWork, false);
-  assert.equal(described.executesRendererWork, false);
+    assert.equal(metadata.kind, privateSchedulerMockExpiredActRootWorkMetadataKind);
+    assert.equal(metadata.rootRequestId, createRequest.requestId);
+    assert.equal(metadata.rootOperation, "create");
+    assert.deepEqual(
+      metadata.rootWorkRecords.map((record) => record.recordKind),
+      [
+        "RootLaneSchedulingSnapshot",
+        "UpdateContainerResult",
+        "RootTaskScheduleRecord",
+        "HostRootFinishedWorkPendingCommitRecordForCanary"
+      ]
+    );
 
-  const report =
-    diagnostics.routeAcceptedMockSchedulerExpiredActRootWorkMetadata(
-      Scheduler.unstable_flushExpired,
-      metadata
+    const described =
+      diagnostics.describeAcceptedMockSchedulerExpiredActRootWorkMetadata(
+        Scheduler.unstable_flushExpired,
+        metadata
+      );
+    assert.equal(described.accepted, true);
+    assert.equal(described.rejectionReason, null);
+    assert.equal(described.rootWorkRecordCount, 4);
+    assert.equal(described.drainsExpiredMockSchedulerWork, false);
+    assert.equal(described.executesRendererWork, false);
+
+    const report =
+      diagnostics.routeAcceptedMockSchedulerExpiredActRootWorkMetadata(
+        Scheduler.unstable_flushExpired,
+        metadata
+      );
+    assert.equal(report.status, mockSchedulerExpiredActRootWorkRoutingStatus);
+    assert.equal(report.accepted, true);
+    assert.equal(report.metadataKind, privateSchedulerMockExpiredActRootWorkMetadataKind);
+    assert.equal(report.diagnosticsKind, privateSchedulerMockExpiredActRootWorkDiagnosticsKind);
+    assert.equal(
+      report.schedulerDrainReport[
+        privateSchedulerMockExpiredActRootWorkDiagnosticsBrand
+      ],
+      true
     );
-  assert.equal(report.status, mockSchedulerExpiredActRootWorkRoutingStatus);
-  assert.equal(report.accepted, true);
-  assert.equal(report.metadataKind, privateSchedulerMockExpiredActRootWorkMetadataKind);
-  assert.equal(report.diagnosticsKind, privateSchedulerMockExpiredActRootWorkDiagnosticsKind);
-  assert.equal(
-    report.schedulerDrainReport[
-      privateSchedulerMockExpiredActRootWorkDiagnosticsBrand
-    ],
-    true
-  );
-  assert.equal(report.rootWorkRecordCount, 4);
-  assert.equal(report.actQueuePendingBefore, 2);
-  assert.equal(report.actQueuePendingAfter, 0);
-  assert.equal(report.sourceDrainFlushedExpiredWork, true);
-  assert.equal(report.drainsExpiredMockSchedulerWork, true);
-  assert.equal(report.drainsAcceptedInternalTestQueues, true);
-  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
-  assert.equal(report.drainsPublicReactActQueue, false);
-  assert.equal(report.publicSchedulerTimingCompatibilityClaimed, false);
-  assert.equal(report.publicReactActCompatibilityClaimed, false);
-  assert.equal(report.publicActCompatibilityClaimed, false);
-  assert.equal(report.compatibilityClaimed, false);
-  assert.equal(report.executesAcceptedInternalTestCallbacks, true);
-  assert.equal(report.executesQueuedWork, false);
-  assert.equal(report.executesEffects, false);
-  assert.equal(report.executesScheduledCallbacks, true);
-  assert.equal(report.executesRendererWork, false);
-  assert.equal(report.executesRendererRoots, false);
-  assert.equal(report.publicActBehaviorAvailable, false);
-  assert.deepEqual(privateEvents, [
-    [
+    assert.equal(report.rootWorkRecordCount, 4);
+    assert.equal(report.actQueuePendingBefore, 2);
+    assert.equal(report.actQueuePendingAfter, 0);
+    assert.equal(report.sourceDrainFlushedExpiredWork, true);
+    assert.equal(report.drainsExpiredMockSchedulerWork, true);
+    assert.equal(report.drainsAcceptedInternalTestQueues, true);
+    assert.equal(report.drainsPublicSchedulerTaskQueue, false);
+    assert.equal(report.drainsPublicReactActQueue, false);
+    assert.equal(report.publicSchedulerTimingCompatibilityClaimed, false);
+    assert.equal(report.publicReactActCompatibilityClaimed, false);
+    assert.equal(report.publicActCompatibilityClaimed, false);
+    assert.equal(report.compatibilityClaimed, false);
+    assert.equal(report.executesAcceptedInternalTestCallbacks, true);
+    assert.equal(report.executesQueuedWork, false);
+    assert.equal(report.executesEffects, false);
+    assert.equal(report.executesScheduledCallbacks, true);
+    assert.equal(report.executesRendererWork, false);
+    assert.equal(report.executesRendererRoots, false);
+    assert.equal(report.publicActBehaviorAvailable, false);
+    assert.deepEqual(privateEvents, [
+      [
+        "expired-create-root-callback",
+        true,
+        Scheduler.unstable_UserBlockingPriority,
+        251
+      ],
+      ["create-root-schedule", false, 251],
+      ["create-root-callback", false, 251]
+    ]);
+    assert.equal(publicSchedulerCallbackRan, false);
+    assert.deepEqual(Scheduler.unstable_clearLog(), [
       "expired-create-root-callback",
-      true,
-      Scheduler.unstable_UserBlockingPriority,
-      251
-    ],
-    ["create-root-schedule", false, 251],
-    ["create-root-callback", false, 251]
-  ]);
-  assert.equal(publicSchedulerCallbackRan, false);
-  assert.deepEqual(Scheduler.unstable_clearLog(), [
-    "expired-create-root-callback",
-    "create-root-schedule",
-    "create-root-callback"
-  ]);
-  assert.equal(Scheduler.unstable_hasPendingWork(), true);
+      "create-root-schedule",
+      "create-root-callback"
+    ]);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true);
 
-  const stale =
-    diagnostics.describeAcceptedMockSchedulerExpiredActRootWorkMetadata(
-      Scheduler.unstable_flushExpired,
-      metadata
-  );
-  assert.equal(stale.accepted, false);
-  assert.equal(stale.rejectionReason, "expired-act-root-work-metadata-stale-act-queue");
+    const stale =
+      diagnostics.describeAcceptedMockSchedulerExpiredActRootWorkMetadata(
+        Scheduler.unstable_flushExpired,
+        metadata
+      );
+    assert.equal(stale.accepted, false);
+    assert.equal(stale.rejectionReason, "expired-act-root-work-metadata-stale-act-queue");
+  }
 });
 
 test("react-test-renderer development private error-boundary diagnostics follow update requests", () => {
@@ -10517,7 +10520,7 @@ function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
 
 function assertActSchedulerGate(gate, entrypoint) {
   const isCjs = entrypoint.includes("/cjs/");
-  const cjsDevelopmentOnly = entrypoint === cjsDevelopmentEntrypoint;
+  const cjsPrivateMetadataParity = isCjs;
   const expectedRootFlushRecordIds = isCjs
     ? [
         ...actSchedulerRootFlushRecordIds,
@@ -10527,12 +10530,12 @@ function assertActSchedulerGate(gate, entrypoint) {
   const expectedPassiveRecordIds = isCjs
     ? actSchedulerCjsPassiveRecordIds
     : actSchedulerPassiveRecordIds;
-  const expectedAcceptedPrerequisiteIds = cjsDevelopmentOnly
+  const expectedAcceptedPrerequisiteIds = cjsPrivateMetadataParity
     ? acceptedPrivateActFlushCjsDevelopmentPrerequisiteIds
     : isCjs
       ? acceptedPrivateActFlushCjsPrerequisiteIds
       : acceptedPrivateActFlushPrerequisiteIds;
-  const expectedReactQueueDiagnosticRecordIds = cjsDevelopmentOnly
+  const expectedReactQueueDiagnosticRecordIds = cjsPrivateMetadataParity
     ? actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds
     : actSchedulerReactQueueDiagnosticRecordIds;
   const expectedAcceptedWorkers = [
@@ -10561,7 +10564,7 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-473-test-renderer-act-passive-effect-drain"
     );
   }
-  if (cjsDevelopmentOnly) {
+  if (cjsPrivateMetadataParity) {
     expectedAcceptedWorkers.push(
       "worker-404-scheduler-mock-private-callback-execution",
       "worker-436-scheduler-mock-continuation-execution",
@@ -10601,7 +10604,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.schedulerReactActQueueDiagnosticsAccepted, true);
   assert.equal(gate.privateSchedulerActQueueDiagnosticsConsumed, true);
   assert.equal(gate.privateActQueueDiagnosticConsumptionReady, true);
-  if (cjsDevelopmentOnly) {
+  if (cjsPrivateMetadataParity) {
     assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
     assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
     assert.equal(gate.privateMockSchedulerExpiredWorkMetadataRouted, true);
@@ -10654,31 +10657,31 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.equal(
     gate.warningThenableBlockerDiagnosticsAccepted,
-    cjsDevelopmentOnly ? true : undefined
+    cjsPrivateMetadataParity ? true : undefined
   );
   assert.equal(
     gate.nestedScopeBlockerDiagnosticsAccepted,
-    cjsDevelopmentOnly ? true : undefined
+    cjsPrivateMetadataParity ? true : undefined
   );
   assert.equal(
     gate.privateRootPassivePrerequisiteSequenceAccepted,
-    cjsDevelopmentOnly ? true : undefined
+    cjsPrivateMetadataParity ? true : undefined
   );
   assert.equal(
     gate.publicActScopeDepthTrackingAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    cjsPrivateMetadataParity ? false : undefined
   );
   assert.equal(
     gate.publicNestedActQueueReuseAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    cjsPrivateMetadataParity ? false : undefined
   );
   assert.equal(
     gate.publicOverlappingActWarningEmissionAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    cjsPrivateMetadataParity ? false : undefined
   );
   assert.equal(
     gate.publicActThenableSettlementAvailable,
-    cjsDevelopmentOnly ? false : undefined
+    cjsPrivateMetadataParity ? false : undefined
   );
   assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
@@ -10730,7 +10733,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.missingBeforeExecution,
-    cjsDevelopmentOnly
+    cjsPrivateMetadataParity
       ? [
           ...actSchedulerMissingBeforeExecution,
           ...actSchedulerWarningThenableMissingBeforeExecution,
@@ -10739,7 +10742,7 @@ function assertActSchedulerGate(gate, entrypoint) {
       : actSchedulerMissingBeforeExecution
   );
 
-  if (cjsDevelopmentOnly) {
+  if (cjsPrivateMetadataParity) {
     const nestedScopeRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
         (record) =>
