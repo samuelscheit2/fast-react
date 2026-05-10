@@ -231,6 +231,9 @@ function cloneElementImpl(element, config, args, options) {
     for (let index = 0; index < childrenLength; index += 1) {
       childArray[index] = args[index + 2];
     }
+    if (isDevelopment && Object.freeze) {
+      Object.freeze(childArray);
+    }
     props.children = childArray;
   }
 

@@ -46941,8 +46941,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "startTransition",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -46973,8 +46973,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "use",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -47005,8 +47005,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useCallback",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -47021,8 +47021,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useContext",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -47069,8 +47069,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useEffect",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -47117,8 +47117,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useImperativeHandle",
-                      "length": 0,
+                      "name": "",
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -47133,8 +47133,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useInsertionEffect",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -47149,8 +47149,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useLayoutEffect",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -47165,8 +47165,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useMemo",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -47197,8 +47197,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useReducer",
-                      "length": 0,
+                      "name": "",
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -47213,8 +47213,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useRef",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -47229,8 +47229,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useState",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -55583,9 +55583,9 @@
                             "value": "0"
                           },
                           "enumerable": true,
-                          "configurable": true,
+                          "configurable": false,
                           "kind": "data",
-                          "writable": true,
+                          "writable": false,
                           "value": {
                             "type": "string",
                             "value": "first"
@@ -55597,9 +55597,9 @@
                             "value": "1"
                           },
                           "enumerable": true,
-                          "configurable": true,
+                          "configurable": false,
                           "kind": "data",
-                          "writable": true,
+                          "writable": false,
                           "value": {
                             "type": "string",
                             "value": "second"
@@ -55613,7 +55613,7 @@
                           "enumerable": false,
                           "configurable": false,
                           "kind": "data",
-                          "writable": true,
+                          "writable": false,
                           "value": {
                             "type": "number",
                             "value": 2
@@ -55621,9 +55621,9 @@
                         }
                       ],
                       "state": {
-                        "frozen": false,
-                        "sealed": false,
-                        "extensible": true,
+                        "frozen": true,
+                        "sealed": true,
+                        "extensible": false,
                         "objectTag": "[object Array]",
                         "prototype": "Array.prototype"
                       }
@@ -55688,9 +55688,9 @@
                         "value": "0"
                       },
                       "enumerable": true,
-                      "configurable": true,
+                      "configurable": false,
                       "kind": "data",
-                      "writable": true,
+                      "writable": false,
                       "value": {
                         "type": "string",
                         "value": "first"
@@ -55702,9 +55702,9 @@
                         "value": "1"
                       },
                       "enumerable": true,
-                      "configurable": true,
+                      "configurable": false,
                       "kind": "data",
-                      "writable": true,
+                      "writable": false,
                       "value": {
                         "type": "string",
                         "value": "second"
@@ -55718,7 +55718,7 @@
                       "enumerable": false,
                       "configurable": false,
                       "kind": "data",
-                      "writable": true,
+                      "writable": false,
                       "value": {
                         "type": "number",
                         "value": 2
@@ -55726,9 +55726,9 @@
                     }
                   ],
                   "state": {
-                    "frozen": false,
-                    "sealed": false,
-                    "extensible": true,
+                    "frozen": true,
+                    "sealed": true,
+                    "extensible": false,
                     "objectTag": "[object Array]",
                     "prototype": "Array.prototype"
                   }
@@ -61186,8 +61186,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "startTransition",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -61218,8 +61218,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "use",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -61250,8 +61250,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useCallback",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -61266,8 +61266,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useContext",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -61314,8 +61314,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useEffect",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -61362,8 +61362,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useImperativeHandle",
-                      "length": 0,
+                      "name": "",
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -61378,8 +61378,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useInsertionEffect",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -61394,8 +61394,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useLayoutEffect",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -61410,8 +61410,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useMemo",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -61442,8 +61442,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useReducer",
-                      "length": 0,
+                      "name": "",
+                      "length": 3,
                       "isReactWarning": false
                     }
                   },
@@ -61458,8 +61458,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useRef",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -61474,8 +61474,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useState",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -70430,8 +70430,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "use",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -70446,8 +70446,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useCallback",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -70494,8 +70494,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useMemo",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -78879,9 +78879,9 @@
                             "value": "0"
                           },
                           "enumerable": true,
-                          "configurable": true,
+                          "configurable": false,
                           "kind": "data",
-                          "writable": true,
+                          "writable": false,
                           "value": {
                             "type": "string",
                             "value": "first"
@@ -78893,9 +78893,9 @@
                             "value": "1"
                           },
                           "enumerable": true,
-                          "configurable": true,
+                          "configurable": false,
                           "kind": "data",
-                          "writable": true,
+                          "writable": false,
                           "value": {
                             "type": "string",
                             "value": "second"
@@ -78909,7 +78909,7 @@
                           "enumerable": false,
                           "configurable": false,
                           "kind": "data",
-                          "writable": true,
+                          "writable": false,
                           "value": {
                             "type": "number",
                             "value": 2
@@ -78917,9 +78917,9 @@
                         }
                       ],
                       "state": {
-                        "frozen": false,
-                        "sealed": false,
-                        "extensible": true,
+                        "frozen": true,
+                        "sealed": true,
+                        "extensible": false,
                         "objectTag": "[object Array]",
                         "prototype": "Array.prototype"
                       }
@@ -78984,9 +78984,9 @@
                         "value": "0"
                       },
                       "enumerable": true,
-                      "configurable": true,
+                      "configurable": false,
                       "kind": "data",
-                      "writable": true,
+                      "writable": false,
                       "value": {
                         "type": "string",
                         "value": "first"
@@ -78998,9 +78998,9 @@
                         "value": "1"
                       },
                       "enumerable": true,
-                      "configurable": true,
+                      "configurable": false,
                       "kind": "data",
-                      "writable": true,
+                      "writable": false,
                       "value": {
                         "type": "string",
                         "value": "second"
@@ -79014,7 +79014,7 @@
                       "enumerable": false,
                       "configurable": false,
                       "kind": "data",
-                      "writable": true,
+                      "writable": false,
                       "value": {
                         "type": "number",
                         "value": 2
@@ -79022,9 +79022,9 @@
                     }
                   ],
                   "state": {
-                    "frozen": false,
-                    "sealed": false,
-                    "extensible": true,
+                    "frozen": true,
+                    "sealed": true,
+                    "extensible": false,
                     "objectTag": "[object Array]",
                     "prototype": "Array.prototype"
                   }
@@ -84277,8 +84277,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "use",
-                      "length": 0,
+                      "name": "",
+                      "length": 1,
                       "isReactWarning": false
                     }
                   },
@@ -84293,8 +84293,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useCallback",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -84341,8 +84341,8 @@
                     "writable": true,
                     "value": {
                       "type": "function",
-                      "name": "useMemo",
-                      "length": 0,
+                      "name": "",
+                      "length": 2,
                       "isReactWarning": false
                     }
                   },
@@ -93069,12 +93069,12 @@
         "scenarioId": "clone-multiple-children",
         "nodeEnv": "development",
         "condition": "default",
-        "status": "unexpected-match-compatibility-not-claimed",
+        "status": "known-mismatch",
         "compatibilityClaimed": false,
-        "firstDifferencePath": null,
+        "firstDifferencePath": "$.result.value.value.clone.children.object.descriptors[0].configurable",
         "reactResultStatus": "ok",
         "fastReactResultStatus": "ok",
-        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+        "reason": "Fast React normalized observation differs from the React 19.2.6 oracle."
       },
       {
         "scenarioId": "jsx-no-key-reuses-config",
@@ -93557,12 +93557,12 @@
         "scenarioId": "clone-multiple-children",
         "nodeEnv": "development",
         "condition": "react-server",
-        "status": "unexpected-match-compatibility-not-claimed",
+        "status": "known-mismatch",
         "compatibilityClaimed": false,
-        "firstDifferencePath": null,
+        "firstDifferencePath": "$.result.value.value.clone.children.object.descriptors[0].configurable",
         "reactResultStatus": "ok",
         "fastReactResultStatus": "ok",
-        "reason": "Normalized observations matched, but this oracle does not claim Fast React compatibility."
+        "reason": "Fast React normalized observation differs from the React 19.2.6 oracle."
       },
       {
         "scenarioId": "jsx-no-key-reuses-config",
