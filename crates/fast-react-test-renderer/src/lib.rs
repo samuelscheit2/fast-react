@@ -5145,7 +5145,7 @@ mod tests {
         assert_eq!(cleanup_records[0].subtree_index(), 0);
         assert_eq!(
             cleanup_records[0].target(),
-            Some(TestRendererHostNodeCleanupTarget::Instance)
+            Some(TestRendererHostNodeCleanupTarget::Text)
         );
         assert_eq!(
             cleanup_records[0].status(),
@@ -5161,7 +5161,7 @@ mod tests {
         );
         assert_eq!(
             cleanup_records[0].fiber().slot(),
-            current.component().slot().get()
+            current.text().slot().get()
         );
         assert_eq!(cleanup_records[0].state_node_raw(), 1);
         assert_eq!(cleanup_records[0].token_raw(), 4);
@@ -5175,7 +5175,7 @@ mod tests {
         assert_eq!(cleanup_records[1].subtree_index(), 1);
         assert_eq!(
             cleanup_records[1].target(),
-            Some(TestRendererHostNodeCleanupTarget::Text)
+            Some(TestRendererHostNodeCleanupTarget::Instance)
         );
         assert_eq!(
             cleanup_records[1].status(),
@@ -5187,7 +5187,7 @@ mod tests {
         );
         assert_eq!(
             cleanup_records[1].fiber().slot(),
-            current.text().slot().get()
+            current.component().slot().get()
         );
         assert_eq!(cleanup_records[1].state_node_raw(), 1);
         assert_eq!(cleanup_records[1].token_raw(), 5);
