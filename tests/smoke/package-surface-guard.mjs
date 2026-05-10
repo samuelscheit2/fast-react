@@ -11,6 +11,7 @@ const repoRoot = path.resolve(
   '..'
 );
 const packagesRoot = path.join(repoRoot, 'packages');
+const nativePackageRoot = path.join(repoRoot, 'bindings', 'node');
 const snapshotPath = path.join(
   repoRoot,
   'tests',
@@ -29,24 +30,165 @@ const allowedRuntimeMetadataKeys = new Set([
   '__FAST_REACT_PLACEHOLDER__',
   'compatibilityTarget'
 ]);
+const acceptedNativeDiagnosticRuntimeKeys = new Set([
+  'createNativeRootBridgeRequestShapeGate',
+  'nativeRootBridgeRequestShape'
+]);
 const privateDiagnosticRuntimeExportPattern =
-  /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+  /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu;
 const privateDiagnosticPublicFileGuards = {
   react: [
-    /(?:^|\/)(?:.*act.*dispatcher.*|.*act.*queue.*|.*dispatcher.*|.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*route.*|.*secret.*)\.(?:js|json|node)$/iu
+    /(?:^|\/)(?:.*act.*dispatcher.*|.*act.*queue.*|.*dispatcher.*|.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*route.*|.*secret.*|.*source.*)\.(?:js|json|node)$/iu
   ],
   'react-dom': [
-    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*root-bridge.*|.*route.*|.*secret.*)\.(?:js|json|node)$/iu,
+    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*root-bridge.*|.*route.*|.*secret.*|.*source.*)\.(?:js|json|node)$/iu,
     /^src\//u
   ],
   'react-test-renderer': [
-    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*route.*|.*secret.*)\.(?:js|json|node)$/iu,
+    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*route.*|.*secret.*|.*source.*)\.(?:js|json|node)$/iu,
     /^src\//u
   ],
   scheduler: [
-    /(?:^|\/)(?:.*diagnostic.*|.*flush-helper.*|.*gate.*|.*metadata.*|.*private.*|.*react-test-renderer.*helper.*|.*secret.*)\.(?:js|json|node)$/iu,
+    /(?:^|\/)(?:.*diagnostic.*|.*flush-helper.*|.*gate.*|.*metadata.*|.*private.*|.*react-test-renderer.*helper.*|.*secret.*|.*source.*)\.(?:js|json|node)$/iu,
+    /^src\//u
+  ],
+  native: [
+    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*root-bridge.*|.*route.*|.*secret.*|.*source.*)\.(?:cjs|js|json|mjs|node)$/iu,
     /^src\//u
   ]
+};
+const exactPrivatePublicFileGuards = {
+  react: [
+    'cjs/react.development.js',
+    'cjs/react.production.js',
+    'hook-dispatcher.js',
+    'private-act-dispatcher-gate.js'
+  ],
+  'react-dom': [
+    'placeholder-utils.js',
+    'src/client/component-tree.js',
+    'src/client/dom-container.js',
+    'src/client/dom-host-context.js',
+    'src/client/dom-namespaces.js',
+    'src/client/hydration-boundary-gate.js',
+    'src/client/hydration-marker-parser.js',
+    'src/client/ref-callback-gate.js',
+    'src/client/root-bridge.js',
+    'src/client/root-markers.js',
+    'src/dom-host/index.js',
+    'src/dom-host/mutation.js',
+    'src/dom-host/property-payload.js',
+    'src/dom-host/text-content.js',
+    'src/events/dispatch.js',
+    'src/events/event-names.js',
+    'src/events/event-priorities.js',
+    'src/events/event-system-flags.js',
+    'src/events/get-event-target.js',
+    'src/events/listener-registry.js',
+    'src/events/plugin-event-system.js',
+    'src/events/react-dom-event-listener.js',
+    'src/events/root-listeners.js',
+    'src/resource-form-gates.js',
+    'src/resource-form-internals-gate.js',
+    'src/shared/create-portal.js',
+    'src/shared/flush-sync-guard.js'
+  ],
+  'react-test-renderer': [
+    'cjs/react-test-renderer-private-routes.development.js',
+    'cjs/react-test-renderer-private-routes.production.js',
+    'create-routing-gate.js',
+    'diagnostics.js',
+    'private-routes.js',
+    'src/act-scheduler-private-gate.js',
+    'src/error-surface-local-gate.js',
+    'src/private-root-request-bridge.js',
+    'src/private-serialization-facade.js',
+    'src/test-instance-private-wrapper.js',
+    'src/update-unmount-private-bridge.js'
+  ],
+  scheduler: [
+    'cjs/scheduler-unstable_mock.flush-helpers.development.js',
+    'cjs/scheduler-unstable_mock.flush-helpers.production.js',
+    'src/unstable_mock.js',
+    'unstable_mock-flush-helpers.js'
+  ],
+  native: [
+    'native-root-bridge.js',
+    'private-root-bridge.js',
+    'src/native-root-bridge.js',
+    'src/private-root-bridge.js'
+  ]
+};
+const nativeRuntimeKeys = [
+  'FastReactNativeBindingUnavailableError',
+  'bindingStatus',
+  'createNativeRootBridgeRequestShapeGate',
+  'getNativeBindingLoadPlan',
+  'loadNativeBinding',
+  'nativeAddonName',
+  'nativeBindingManifest',
+  'nativeRootBridgeRequestShape',
+  'nativeTargetMatrix',
+  'nodeApiVersionFloor',
+  'optionalPackagePrefix',
+  'packageName',
+  'platformArtifactPolicy',
+  'platformPackages',
+  'supportedNativeTargets',
+  'supportedNodeEngineRange',
+  'unavailableErrorCode'
+];
+const expectedNativePackage = {
+  packageJsonKeys: [
+    'name',
+    'version',
+    'private',
+    'description',
+    'type',
+    'main',
+    'exports',
+    'scripts',
+    'engines'
+  ],
+  manifest: {
+    name: '@fast-react/native',
+    version: '0.0.0',
+    private: true,
+    type: 'module',
+    main: './index.cjs',
+    exports: {
+      '.': {
+        import: './index.mjs',
+        require: './index.cjs',
+        default: './index.mjs'
+      },
+      './package.json': './package.json'
+    },
+    types: null,
+    typings: null,
+    typesVersions: null,
+    files: null,
+    bin: null,
+    browser: null,
+    module: null,
+    'react-native': null,
+    dependencies: null,
+    peerDependencies: null
+  },
+  packageMetadata: {
+    description: 'Node loader placeholder for the Fast React native binding.',
+    scripts: {
+      build: 'cargo build -p fast-react-napi',
+      check:
+        'node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs',
+      test: 'npm run check'
+    },
+    engines: {
+      node: '>=22.0.0'
+    }
+  },
+  publicResolverFiles: ['index.cjs', 'index.mjs', 'package.json'],
+  declarationFiles: []
 };
 
 function normalizeRelativePath(filePath) {
@@ -170,7 +312,11 @@ function assertPlaceholderMetadata(moduleExports, expected, label) {
   );
 }
 
-function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
+function assertNoPrivateDiagnosticRuntimeExports(
+  moduleExports,
+  label,
+  allowedPrivateDiagnosticKeys = new Set()
+) {
   if (
     moduleExports === null ||
     (typeof moduleExports !== 'object' && typeof moduleExports !== 'function')
@@ -179,7 +325,11 @@ function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
   }
 
   for (const key of Reflect.ownKeys(moduleExports)) {
-    if (typeof key !== 'string' || allowedRuntimeMetadataKeys.has(key)) {
+    if (
+      typeof key !== 'string' ||
+      allowedRuntimeMetadataKeys.has(key) ||
+      allowedPrivateDiagnosticKeys.has(key)
+    ) {
       continue;
     }
 
@@ -740,12 +890,35 @@ function assertPhysicalNoExportsSubpaths(
 
 function assertNoPrivateDiagnosticPublicFiles(publicResolverFiles, packageName) {
   const guards = privateDiagnosticPublicFileGuards[packageName] ?? [];
+  const exactPrivateFiles = exactPrivatePublicFileGuards[packageName] ?? [];
   for (const publicFile of publicResolverFiles) {
+    assert.equal(
+      exactPrivateFiles.includes(publicFile),
+      false,
+      `${packageName}/${publicFile} must remain a direct-file-only private fixture`
+    );
+
     for (const guard of guards) {
       assert.equal(
         guard.test(publicFile),
         false,
         `${packageName}/${publicFile} must not be a public private-diagnostic subpath`
+      );
+    }
+  }
+}
+
+function assertNoPrivateDiagnosticExportKeys(exportsMap, packageName) {
+  if (exportsMap === null) {
+    return;
+  }
+
+  for (const key of Object.keys(exportsMap)) {
+    if (key.startsWith('.')) {
+      assert.equal(
+        privateDiagnosticRuntimeExportPattern.test(key),
+        false,
+        `${packageName} package exports must not expose private diagnostic subpath ${key}`
       );
     }
   }
@@ -830,6 +1003,7 @@ for (const packageName of snapshot.packageDirectories) {
     expectedPackage.manifest,
     `${packageName} package.json public surface`
   );
+  assertNoPrivateDiagnosticExportKeys(surfaceManifest.exports, packageName);
 
   const actualPublicFiles = await publicResolverFiles(
     packageRoot,
@@ -866,5 +1040,46 @@ for (const packageName of snapshot.packageDirectories) {
     await assertRuntimeEntrypoint(packageRoot, entry, packageName);
   }
 }
+
+const nativePackageJson = JSON.parse(
+  await readFile(path.join(nativePackageRoot, 'package.json'), 'utf8')
+);
+const nativeSurfaceManifest = manifestSurface(nativePackageJson);
+assertPackageMetadata(nativePackageJson, expectedNativePackage, 'native');
+assert.deepEqual(
+  nativeSurfaceManifest,
+  expectedNativePackage.manifest,
+  'native package.json public surface'
+);
+assertNoPrivateDiagnosticExportKeys(nativeSurfaceManifest.exports, 'native');
+
+const nativePublicFiles = await publicResolverFiles(
+  nativePackageRoot,
+  nativeSurfaceManifest
+);
+assert.deepEqual(
+  nativePublicFiles,
+  expectedNativePackage.publicResolverFiles,
+  'native public resolver files'
+);
+assertNoPrivateDiagnosticPublicFiles(nativePublicFiles, 'native');
+
+for (const publicFile of expectedNativePackage.publicResolverFiles) {
+  await assertFileExists(nativePackageRoot, publicFile, `native/${publicFile}`);
+}
+
+assert.deepEqual(
+  await listFiles(nativePackageRoot, declarationFilePattern),
+  expectedNativePackage.declarationFiles,
+  'native declaration files'
+);
+
+const nativeRuntime = loadFresh(path.join(nativePackageRoot, 'index.cjs'));
+assert.deepEqual(Object.keys(nativeRuntime), nativeRuntimeKeys, 'native/index.cjs');
+assertNoPrivateDiagnosticRuntimeExports(
+  nativeRuntime,
+  'native/index.cjs',
+  acceptedNativeDiagnosticRuntimeKeys
+);
 
 console.log('package surface snapshot guard passed');
