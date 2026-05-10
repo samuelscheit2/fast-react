@@ -268,6 +268,12 @@ impl<H: HostTypes> RootSchedulingState<H> {
         self.work_in_progress_root_render_lanes = render_lanes;
         self.render_exit_status = render_exit_status;
     }
+
+    pub(crate) fn clear_render_phase_work(&mut self) {
+        self.work_in_progress = None;
+        self.work_in_progress_root_render_lanes = Lanes::NO;
+        self.render_exit_status = RootRenderExitStatus::NoWork;
+    }
 }
 
 impl<H: HostTypes> Default for RootSchedulingState<H> {
@@ -349,6 +355,10 @@ impl<H: HostTypes> FiberRoot<H> {
         self.current
     }
 
+    pub(crate) fn set_current(&mut self, current: FiberId) {
+        self.current = current;
+    }
+
     #[must_use]
     pub const fn options(&self) -> &RootOptions {
         &self.options
@@ -405,6 +415,11 @@ impl<H: HostTypes> FiberRoot<H> {
     #[must_use]
     pub const fn finished_lanes(&self) -> Lanes {
         self.finished_lanes
+    }
+
+    pub(crate) fn clear_finished_work(&mut self) {
+        self.finished_work = None;
+        self.finished_lanes = Lanes::NO;
     }
 
     #[must_use]

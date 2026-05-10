@@ -122,6 +122,11 @@ impl HostRootRenderPhaseRecord {
     }
 
     #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.work_in_progress
+    }
+
+    #[must_use]
     pub const fn current_update_queue(self) -> UpdateQueueHandle {
         self.current_update_queue
     }
