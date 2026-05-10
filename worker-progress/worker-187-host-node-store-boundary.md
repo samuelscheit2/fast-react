@@ -111,6 +111,22 @@ git status --short --untracked-files=all
   passed
 - `git diff --check`: passed after the progress-report update
 
+## Post-Merge Orchestrator Verification
+
+- Orchestrator merged current `main` into this branch and resolved the
+  `crates/fast-react-reconciler/src/lib.rs` module-list conflict by preserving
+  accepted main modules and adding private `host_nodes`.
+- Post-merge verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features host_nodes`: 8
+    filtered tests
+  - `cargo test -p fast-react-reconciler --all-features host_work`: 3
+    filtered tests
+  - `cargo test -p fast-react-reconciler --all-features`: 125 unit tests plus
+    1 doc test
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+
 ## Risks Or Blockers
 
 - `host_nodes` is intentionally private and not yet consumed by complete work
