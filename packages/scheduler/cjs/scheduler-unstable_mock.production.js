@@ -618,6 +618,155 @@ function drainExpiredMockSchedulerWork() {
   });
 }
 
+function getMockSchedulerYieldedValuesSnapshot() {
+  if (yieldedValues === null) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(yieldedValues.slice());
+}
+
+function getMockSchedulerYieldPaintSnapshot() {
+  var yieldedValuesSnapshot = getMockSchedulerYieldedValuesSnapshot();
+  return Object.freeze({
+    now: currentMockTime,
+    pendingWork: scheduledCallback !== null,
+    yieldedValues: yieldedValuesSnapshot,
+    yieldedValueCount: yieldedValuesSnapshot.length,
+    expectedNumberOfYields: expectedNumberOfYields,
+    didStop: didStop,
+    needsPaint: needsPaint,
+    shouldYieldForPaint: shouldYieldForPaint
+  });
+}
+
+function getMockSchedulerYieldedValuesAdded(beforeValues, afterValues) {
+  if (afterValues.length < beforeValues.length) {
+    return Object.freeze(afterValues.slice());
+  }
+  return Object.freeze(afterValues.slice(beforeValues.length));
+}
+
+function describeMockSchedulerYieldPaintState() {
+  var snapshot = getMockSchedulerYieldPaintSnapshot();
+  return Object.freeze({
+    status: 'mock-scheduler-yield-paint-state-for-diagnostics',
+    now: snapshot.now,
+    pendingWork: snapshot.pendingWork,
+    yieldedValues: snapshot.yieldedValues,
+    yieldedValueCount: snapshot.yieldedValueCount,
+    expectedNumberOfYields: snapshot.expectedNumberOfYields,
+    didStop: snapshot.didStop,
+    needsPaint: snapshot.needsPaint,
+    shouldYieldForPaint: snapshot.shouldYieldForPaint,
+    recordsMockSchedulerYieldedValues: true,
+    recordsMockSchedulerRequestPaint: true,
+    recordsMockSchedulerContinuationOrdering: true,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false
+  });
+}
+
+function requestPaintForDiagnostics() {
+  var before = getMockSchedulerYieldPaintSnapshot();
+  var requestPaintReturnValue = unstable_requestPaint();
+  var after = getMockSchedulerYieldPaintSnapshot();
+  return Object.freeze({
+    status: 'requested-paint-for-diagnostics',
+    requestPaintReturnedUndefined: requestPaintReturnValue === undefined,
+    nowBefore: before.now,
+    nowAfter: after.now,
+    pendingBefore: before.pendingWork,
+    pendingAfter: after.pendingWork,
+    yieldedValuesBefore: before.yieldedValues,
+    yieldedValuesAfter: after.yieldedValues,
+    yieldedValuesAdded: getMockSchedulerYieldedValuesAdded(
+      before.yieldedValues,
+      after.yieldedValues
+    ),
+    yieldedValueCountBefore: before.yieldedValueCount,
+    yieldedValueCountAfter: after.yieldedValueCount,
+    needsPaintBefore: before.needsPaint,
+    needsPaintAfter: after.needsPaint,
+    shouldYieldForPaintBefore: before.shouldYieldForPaint,
+    shouldYieldForPaintAfter: after.shouldYieldForPaint,
+    drainsMockSchedulerWork: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false
+  });
+}
+
+function flushNumberOfYieldsForDiagnostics(count) {
+  var before = getMockSchedulerYieldPaintSnapshot();
+  var taskQueueBefore = getMockSchedulerTaskQueueSnapshot(before.now);
+  var flushReturnValue = unstable_flushNumberOfYields(count);
+  var after = getMockSchedulerYieldPaintSnapshot();
+  var taskQueueAfter = getMockSchedulerTaskQueueSnapshot(after.now);
+  return Object.freeze({
+    status: 'flushed-number-of-yields-for-diagnostics',
+    count: count,
+    flushReturnedUndefined: flushReturnValue === undefined,
+    nowBefore: before.now,
+    nowAfter: after.now,
+    pendingBefore: before.pendingWork,
+    pendingAfter: after.pendingWork,
+    yieldedValuesBefore: before.yieldedValues,
+    yieldedValuesAfter: after.yieldedValues,
+    yieldedValuesAdded: getMockSchedulerYieldedValuesAdded(
+      before.yieldedValues,
+      after.yieldedValues
+    ),
+    yieldedValueCountBefore: before.yieldedValueCount,
+    yieldedValueCountAfter: after.yieldedValueCount,
+    needsPaintBefore: before.needsPaint,
+    needsPaintAfter: after.needsPaint,
+    taskQueueBefore: taskQueueBefore,
+    taskQueueAfter: taskQueueAfter,
+    recordsMockSchedulerYieldedValues: true,
+    recordsMockSchedulerContinuationOrdering: true,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false
+  });
+}
+
+function flushUntilNextPaintForDiagnostics() {
+  var before = getMockSchedulerYieldPaintSnapshot();
+  var taskQueueBefore = getMockSchedulerTaskQueueSnapshot(before.now);
+  var flushReturnValue = unstable_flushUntilNextPaint();
+  var after = getMockSchedulerYieldPaintSnapshot();
+  var taskQueueAfter = getMockSchedulerTaskQueueSnapshot(after.now);
+  return Object.freeze({
+    status: 'flushed-until-next-paint-for-diagnostics',
+    flushReturnValue: flushReturnValue,
+    nowBefore: before.now,
+    nowAfter: after.now,
+    pendingBefore: before.pendingWork,
+    pendingAfter: after.pendingWork,
+    yieldedValuesBefore: before.yieldedValues,
+    yieldedValuesAfter: after.yieldedValues,
+    yieldedValuesAdded: getMockSchedulerYieldedValuesAdded(
+      before.yieldedValues,
+      after.yieldedValues
+    ),
+    yieldedValueCountBefore: before.yieldedValueCount,
+    yieldedValueCountAfter: after.yieldedValueCount,
+    needsPaintBefore: before.needsPaint,
+    needsPaintAfter: after.needsPaint,
+    shouldYieldForPaintBefore: before.shouldYieldForPaint,
+    shouldYieldForPaintAfter: after.shouldYieldForPaint,
+    taskQueueBefore: taskQueueBefore,
+    taskQueueAfter: taskQueueAfter,
+    recordsMockSchedulerYieldedValues: true,
+    recordsMockSchedulerRequestPaint: true,
+    recordsMockSchedulerContinuationOrdering: true,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false
+  });
+}
+
 function executePrivateActQueueContinuation(task, index, continuation) {
   var returnedContinuation = continuation(false);
   var returnedContinuationSummary = null;
@@ -791,6 +940,10 @@ var privateActQueueFlushDiagnostics = Object.freeze({
   executesBrandedInternalTestContinuations: true,
   mockSchedulerExpiredWorkDiagnosticsReady: true,
   drainsExpiredMockSchedulerWork: true,
+  mockSchedulerYieldPaintDiagnosticsReady: true,
+  recordsMockSchedulerYieldedValues: true,
+  recordsMockSchedulerRequestPaint: true,
+  recordsMockSchedulerContinuationOrdering: true,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
   publicSchedulerTimingCompatibilityClaimed: false,
@@ -799,7 +952,14 @@ var privateActQueueFlushDiagnostics = Object.freeze({
   executesEffects: false,
   describeAcceptedInternalActQueue: describeAcceptedInternalActQueue,
   drainAcceptedInternalActQueue: drainAcceptedInternalActQueue,
-  drainExpiredMockSchedulerWork: drainExpiredMockSchedulerWork
+  drainExpiredMockSchedulerWork: drainExpiredMockSchedulerWork,
+  describeMockSchedulerYieldPaintState:
+    describeMockSchedulerYieldPaintState,
+  requestPaintForDiagnostics: requestPaintForDiagnostics,
+  flushNumberOfYieldsForDiagnostics:
+    flushNumberOfYieldsForDiagnostics,
+  flushUntilNextPaintForDiagnostics:
+    flushUntilNextPaintForDiagnostics
 });
 
 function attachPrivateActQueueFlushDiagnostics(fn) {
