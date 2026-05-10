@@ -70,6 +70,21 @@ const EXPECTED_TARBALL_FILES = [
   "unstable_post_task.js"
 ];
 
+const REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA = [
+  ["unstable_flushAll", { type: "function", name: "", length: 0 }],
+  [
+    "unstable_flushAllWithoutAsserting",
+    {
+      type: "function",
+      name: "unstable_flushAllWithoutAsserting",
+      length: 0
+    }
+  ],
+  ["unstable_flushExpired", { type: "function", name: "", length: 0 }],
+  ["unstable_flushNumberOfYields", { type: "function", name: "", length: 1 }],
+  ["unstable_flushUntilNextPaint", { type: "function", name: "", length: 0 }]
+];
+
 test("checked scheduler mock oracle artifact has the expected schema and targets", () => {
   assert.equal(
     SCHEDULER_MOCK_ORACLE_ARTIFACT_PATH,
@@ -226,6 +241,54 @@ test("scheduler mock oracle captures export keys, constants, descriptors, and pa
       name: "",
       length: 1
     });
+  }
+});
+
+test("scheduler mock oracle exposes react-test-renderer flush helper metadata from checked export rows", () => {
+  assert.equal(oracle.coverage.flushHelpers, true);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  for (const mode of SCHEDULER_MOCK_PROBE_MODES) {
+    const schedulerValue = operationValue(
+      mode.id,
+      "scheduler-mock-export-shape"
+    );
+    const fastReactValue = fastReactOperationValue(
+      mode.id,
+      "scheduler-mock-export-shape"
+    );
+
+    const scenarioComparison = comparison(
+      mode.id,
+      "scheduler-mock-export-shape"
+    );
+    assert.equal(
+      scenarioComparison.status,
+      "matched-but-compatibility-not-claimed"
+    );
+    assert.equal(scenarioComparison.compatibilityClaimed, false);
+
+    for (const [key, expectedValue] of
+      REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA) {
+      assert.equal(schedulerValue.exportKeys.includes(key), true, key);
+      assert.equal(fastReactValue.exportKeys.includes(key), true, key);
+
+      const schedulerDescriptor = descriptorFor(
+        schedulerValue.descriptors,
+        key
+      );
+      const fastReactDescriptor = descriptorFor(
+        fastReactValue.descriptors,
+        key
+      );
+
+      assert.equal(schedulerDescriptor.kind, "data", key);
+      assert.equal(schedulerDescriptor.configurable, true, key);
+      assert.equal(schedulerDescriptor.enumerable, true, key);
+      assert.equal(schedulerDescriptor.writable, true, key);
+      assert.deepEqual(schedulerDescriptor.value, expectedValue, key);
+      assert.deepEqual(fastReactDescriptor, schedulerDescriptor, key);
+    }
   }
 });
 
@@ -535,6 +598,12 @@ function comparison(modeId, scenarioId) {
 
 function operationValue(modeId, scenarioId) {
   const result = observation(modeId, scenarioId).result.result;
+  assert.equal(result.status, "returned", `${modeId}:${scenarioId}`);
+  return result.value;
+}
+
+function fastReactOperationValue(modeId, scenarioId) {
+  const result = fastReactObservation(modeId, scenarioId).result.result;
   assert.equal(result.status, "returned", `${modeId}:${scenarioId}`);
   return result.value;
 }
