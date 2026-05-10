@@ -1,9 +1,10 @@
 //! Internal FiberRoot scheduler foundation.
 //!
 //! This module models the React-style scheduled-root list and per-root
-//! callback bookkeeping on top of HostRoot update records. It deliberately
-//! stops before the render work loop: no work is rendered, committed, flushed,
-//! or applied to host containers here.
+//! callback bookkeeping on top of HostRoot update records. Most scheduler
+//! helpers remain planning-only; the sync-flush record path may render HostRoot
+//! lanes for a later commit handoff, but it still does not commit, flush host
+//! effects, or apply host containers.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

@@ -2,7 +2,7 @@
 
 ## Goal Evidence
 
-Goal status: active
+Initial goal status from `get_goal`: active. Final worker status: complete.
 
 Goal objective: add the first reconciler sync-flush execution context foundation: guarded execution-context state, deterministic cross-root sync flush records, and tests that can later call worker 149's commit path without owning commit or public facade behavior.
 
@@ -149,8 +149,9 @@ Security:
 
 ## Risks Or Blockers
 
-- Because worker 149's commit API is not present in this branch, the new path
-  stops at `RenderedAwaitingCommit`. It intentionally does not mark lanes
+- The worker branch originally did not contain worker 149's commit API. After
+  orchestrator integration with `main`, that API is present, but this slice
+  still intentionally stops at `RenderedAwaitingCommit`. It does not mark lanes
   finished, so repeated calls can re-render the same pending sync work until a
   later commit handoff consumes the records.
 - The legacy `collect_sync_flush_plan` still exists for compatibility with the
@@ -159,7 +160,7 @@ Security:
 
 ## Recommended Next Tasks
 
-- Wire worker 149's HostRoot commit/current-switch API to consume
+- Wire the HostRoot commit/current-switch API to consume
   `RootSyncFlushRecord::render_phase()` and clear finished sync lanes after a
   successful commit.
 - Add the microtask-end call to the sync-flush path once scheduler callback
