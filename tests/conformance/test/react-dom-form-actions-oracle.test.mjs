@@ -94,7 +94,7 @@ test("Fast React form-action APIs stay unsupported placeholders until form adapt
   assertFastReactFormActionsUnsupportedGate();
 });
 
-test("Fast React form-action event extraction stays private metadata-only", () => {
+test("Fast React form-action private submit/reset/callback gates stay metadata-only", () => {
   assertPrivateFormActionResetDispatcherGate();
 });
 

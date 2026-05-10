@@ -727,6 +727,153 @@ export function assertPrivateFormActionSubmitDispatchGate(
   assert.equal(execution.sideEffects.actionInvoked, false);
   assert.equal(execution.sideEffects.realFormReset, false);
 
+  const preflightGate =
+    formActions.createFormActionCallbackActionPreflightDiagnosticGate({
+      requestIdPrefix: "conformance-callback-action-preflight"
+    });
+  const preflight = preflightGate.recordCallbackActionInvocationPreflight(
+    actionCompletionDispatch,
+    execution,
+    {
+      explicitFormActionCallbackActionPreflight: true
+    }
+  );
+  const preflightSummary =
+    formActions.describePrivateFormActionCallbackActionPreflightGate();
+
+  assert.equal(
+    preflightSummary.gateId,
+    formActions.privateFormActionCallbackActionPreflightGateId
+  );
+  assert.equal(
+    preflightSummary.status,
+    formActions.privateFormActionCallbackActionPreflightStatus
+  );
+  assert.equal(preflightSummary.consumesSubmitDispatchMetadata, true);
+  assert.equal(preflightSummary.consumesSubmitResetExecutionMetadata, true);
+  assert.equal(preflightSummary.recordsCallbackQueuePreflight, true);
+  assert.equal(preflightSummary.recordsActionInvocationPreflight, true);
+  assert.equal(preflightSummary.provesCallbacksRemainUninvoked, true);
+  assert.equal(preflightSummary.provesActionsRemainUninvoked, true);
+  assert.equal(preflightSummary.acceptsRealForms, false);
+  assert.equal(preflightSummary.constructsFormData, false);
+  assert.equal(preflightSummary.createsSyntheticEvents, false);
+  assert.equal(preflightSummary.dispatchesSubmitCallbacks, false);
+  assert.equal(preflightSummary.invokesActions, false);
+  assert.equal(preflightSummary.startsHostTransition, false);
+  assert.equal(preflightSummary.queuesReactUpdates, false);
+  assert.equal(preflightSummary.resetsForms, false);
+  assert.deepEqual(
+    preflightSummary.sideEffects,
+    formActions.formActionCallbackActionPreflightBlockedSideEffects
+  );
+  assert.equal(
+    executionSummary.callbackActionPreflightGateAvailable,
+    true
+  );
+  assert.equal(
+    formActions.isPrivateFormActionCallbackActionPreflightRecord(preflight),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionCallbackActionPreflightRecordPayload(
+      preflight
+    ),
+    preflight
+  );
+  assert.equal(
+    preflight.status,
+    formActions.privateFormActionCallbackActionPreflightRecordedStatus
+  );
+  assert.equal(
+    preflight.sourceSubmitDispatchId,
+    actionCompletionDispatch.dispatchId
+  );
+  assert.equal(
+    preflight.sourceSubmitResetExecutionId,
+    execution.executionId
+  );
+  assert.equal(
+    preflight.acceptedMetadataIds.submitDispatchId,
+    actionCompletionDispatch.dispatchId
+  );
+  assert.equal(
+    preflight.acceptedMetadataIds.submitResetExecutionId,
+    execution.executionId
+  );
+  assert.equal(preflight.admission.metadataOnly, true);
+  assert.equal(preflight.sourceSubmitDispatch.callbackDispatchExecuted, false);
+  assert.equal(preflight.sourceSubmitDispatch.actionInvoked, false);
+  assert.equal(
+    preflight.sourceSubmitResetExecution.fakeFormResetPathExecuted,
+    true
+  );
+  assert.equal(
+    preflight.sourceSubmitResetExecution.callbackDispatchExecuted,
+    false
+  );
+  assert.equal(preflight.sourceSubmitResetExecution.actionInvoked, false);
+  assert.equal(
+    preflight.submitDispatchMetadataConsumption
+      .submitDispatchMetadataConsumed,
+    true
+  );
+  assert.equal(
+    preflight.submitResetExecutionMetadataConsumption
+      .submitResetExecutionMetadataConsumed,
+    true
+  );
+  assert.equal(
+    preflight.callbackDispatchPreflight.callbackDispatchPreflighted,
+    true
+  );
+  assert.equal(preflight.callbackDispatchPreflight.syntheticEventCreated, false);
+  assert.equal(
+    preflight.callbackDispatchPreflight.callbackDispatchExecuted,
+    false
+  );
+  assert.equal(
+    preflight.callbackDispatchPreflight.submitCallbackInvoked,
+    false
+  );
+  assert.equal(
+    preflight.actionInvocationPreflight.actionInvocationWouldBeScheduled,
+    true
+  );
+  assert.equal(preflight.actionInvocationPreflight.formDataConstructed, false);
+  assert.equal(preflight.actionInvocationPreflight.actionInvoked, false);
+  assert.equal(
+    preflight.actionInvocationPreflight.hostTransitionStarted,
+    false
+  );
+  assert.deepEqual(
+    preflight.sideEffects,
+    formActions.formActionCallbackActionPreflightDiagnosticSideEffects
+  );
+  assert.equal(preflight.sideEffects.submitDispatchMetadataConsumed, true);
+  assert.equal(
+    preflight.sideEffects.submitResetExecutionMetadataConsumed,
+    true
+  );
+  assert.equal(preflight.sideEffects.callbackDispatchExecuted, false);
+  assert.equal(preflight.sideEffects.submitCallbackInvoked, false);
+  assert.equal(preflight.sideEffects.actionInvoked, false);
+  assert.equal(preflight.sideEffects.realFormReset, false);
+
+  const preflightError =
+    formActions.createUnsupportedFormActionCallbackActionPreflightError(
+      preflight
+    );
+  assert.equal(
+    preflightError.code,
+    formActions.privateFormActionCallbackActionPreflightGateErrorCode
+  );
+  assert.equal(preflightError.preflightId, preflight.preflightId);
+  assert.deepEqual(
+    preflightError.actionInvocationPreflight,
+    preflight.actionInvocationPreflight
+  );
+
   const executionError =
     formActions.createUnsupportedFormActionSubmitResetExecutionError(
       execution
@@ -782,6 +929,63 @@ export function assertPrivateFormActionSubmitDispatchGate(
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
       reason:
         "form must not be passed to the submit reset execution fake form gate"
+    }
+  );
+  let preflightCallbackCalls = 0;
+  const preflightCallback = () => {
+    preflightCallbackCalls++;
+  };
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        actionCompletionDispatch,
+        execution,
+        {
+          explicitFormActionCallbackActionPreflight: true,
+          callback: preflightCallback
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "callback must not be passed to the callback/action invocation preflight gate"
+    }
+  );
+  assert.equal(preflightCallbackCalls, 0);
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        actionCompletionDispatch,
+        execution,
+        {
+          explicitFormActionCallbackActionPreflight: true,
+          actionInvocationRequested: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "action invocation must remain blocked"
+    }
+  );
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        execution,
+        execution,
+        {
+          explicitFormActionCallbackActionPreflight: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source submit dispatch must be accepted metadata-only submit dispatch"
     }
   );
 }
