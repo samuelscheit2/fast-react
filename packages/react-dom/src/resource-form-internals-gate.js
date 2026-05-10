@@ -588,8 +588,15 @@ const resourceHintPreloadPreinitOrderBlockedSideEffects = freezeRecord({
   resourceHintDedupeRowsRecorded: false,
   resourceHintPrecedenceRowsRecorded: false,
   resourceHintHeadOrderRowsRecorded: false,
+  scriptModulePreinitRowsRecorded: false,
+  scriptModuleFakeHeadOrderRowsRecorded: false,
   preloadPreinitResourceMapCreated: false,
   preloadPreinitResourceMapMutated: false,
+  modulePreloadStarted: false,
+  scriptPreinitStarted: false,
+  moduleScriptPreinitStarted: false,
+  scriptExecutionStarted: false,
+  publicScriptModuleResourceDispatch: false,
   publicPreloadPreinitDedupeBehavior: false
 });
 
@@ -603,11 +610,18 @@ const resourceHintPreloadPreinitOrderSideEffects = freezeRecord({
   resourceHintDedupeRowsRecorded: true,
   resourceHintPrecedenceRowsRecorded: true,
   resourceHintHeadOrderRowsRecorded: true,
+  scriptModulePreinitRowsRecorded: true,
+  scriptModuleFakeHeadOrderRowsRecorded: true,
   stylesheetPrecedenceBlockedCapabilitiesRecorded: true,
   stylesheetPrecedenceOrderQueried: true,
   stylesheetPrecedenceOrderMutated: false,
   preloadPreinitResourceMapCreated: false,
   preloadPreinitResourceMapMutated: false,
+  modulePreloadStarted: false,
+  scriptPreinitStarted: false,
+  moduleScriptPreinitStarted: false,
+  scriptExecutionStarted: false,
+  publicScriptModuleResourceDispatch: false,
   publicPreloadPreinitDedupeBehavior: false
 });
 
@@ -655,6 +669,11 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   stylesheetRecordOwnershipClaimed: false,
   preloadRecordStarted: false,
   scriptRecordLoaded: false,
+  modulePreloadStarted: false,
+  scriptPreinitStarted: false,
+  moduleScriptPreinitStarted: false,
+  scriptExecutionStarted: false,
+  publicScriptModuleResourceDispatch: false,
   resourceLoadStateMutated: false,
   publicResourceMapCommitBehavior: false
 });
@@ -676,6 +695,11 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   stylesheetRecordOwnershipClaimed: false,
   preloadRecordStarted: false,
   scriptRecordLoaded: false,
+  modulePreloadStarted: false,
+  scriptPreinitStarted: false,
+  moduleScriptPreinitStarted: false,
+  scriptExecutionStarted: false,
+  publicScriptModuleResourceDispatch: false,
   resourceLoadStateMutated: false,
   publicResourceMapCommitBehavior: false
 });
@@ -1030,6 +1054,11 @@ const resourceHintPreloadPreinitOrderMissingPrerequisites = freezeArray([
     'Real document head ordering, querySelector, and insertBefore behavior remain blocked.'
   ),
   prerequisite(
+    'no-script-module-resource-dispatch',
+    'react-dom-resource',
+    'Script, modulepreload, and preinitModule diagnostics do not dispatch public resource work or execute scripts.'
+  ),
+  prerequisite(
     'no-public-resource-hint-dom-insertion',
     'react-dom-resource',
     'Public resource hint APIs remain placeholders and do not reach this diagnostic.'
@@ -1187,6 +1216,10 @@ const resourceHintPreloadPreinitOrderBlockedCapabilities = freezeArray([
   blockedCapability(
     'real-document-head-ordering',
     'Real document head query and insertion order behavior remains blocked.'
+  ),
+  blockedCapability(
+    'script-module-resource-dispatch',
+    'Script, modulepreload, and preinitModule rows are recorded without public dispatch, network fetches, or script execution.'
   ),
   blockedCapability(
     'public-resource-compatibility',
@@ -1366,6 +1399,12 @@ const resourceHintDispatcherMetadataContracts = freezeArray([
     ['href', 'as', 'options']
   ),
   resourceHintDispatcherMetadataContract(
+    'preload-module',
+    'preloadModule',
+    'm',
+    ['href', 'options']
+  ),
+  resourceHintDispatcherMetadataContract(
     'preinit-style',
     'preinit',
     'S',
@@ -1375,6 +1414,12 @@ const resourceHintDispatcherMetadataContracts = freezeArray([
     'preinit-script',
     'preinit',
     'X',
+    ['href', 'options']
+  ),
+  resourceHintDispatcherMetadataContract(
+    'preinit-module-script',
+    'preinitModule',
+    'M',
     ['href', 'options']
   )
 ]);
@@ -1408,6 +1453,13 @@ const resourceHintFakeDomAdapterContracts = freezeArray([
     ]
   ),
   resourceHintFakeDomAdapterContract(
+    'preload-module',
+    'm',
+    'link',
+    'modulepreload',
+    ['rel', 'href', 'as', 'crossOrigin', 'integrity']
+  ),
+  resourceHintFakeDomAdapterContract(
     'preinit-style',
     'S',
     'link',
@@ -1420,6 +1472,13 @@ const resourceHintFakeDomAdapterContracts = freezeArray([
     'script',
     'script',
     ['src', 'async', 'crossOrigin', 'integrity', 'fetchPriority', 'nonce']
+  ),
+  resourceHintFakeDomAdapterContract(
+    'preinit-module-script',
+    'M',
+    'script',
+    'module-script',
+    ['src', 'async', 'type', 'crossOrigin', 'integrity', 'nonce']
   )
 ]);
 
@@ -1507,6 +1566,22 @@ const resourceHintPreloadPreinitOrderContracts = freezeArray([
     ['style', 'script', 'font', 'image', 'other']
   ),
   resourceHintPreloadPreinitOrderContract(
+    'preload-preinit-order-preload-module',
+    'preload-module',
+    'm',
+    'link',
+    'modulepreload',
+    [
+      'script',
+      'worker',
+      'serviceworker',
+      'sharedworker',
+      'audioworklet',
+      'paintworklet',
+      'other'
+    ]
+  ),
+  resourceHintPreloadPreinitOrderContract(
     'preload-preinit-order-preinit-style',
     'preinit-style',
     'S',
@@ -1520,6 +1595,14 @@ const resourceHintPreloadPreinitOrderContracts = freezeArray([
     'X',
     'script',
     'script',
+    ['script']
+  ),
+  resourceHintPreloadPreinitOrderContract(
+    'preload-preinit-order-preinit-module-script',
+    'preinit-module-script',
+    'M',
+    'script',
+    'module-script',
     ['script']
   )
 ]);
@@ -2791,8 +2874,10 @@ function describePrivateResourceHintPreloadPreinitOrderGate() {
     acceptsFakeDomAdapterAdmissions: true,
     acceptsContractIds: freezeArray([
       'preload',
+      'preload-module',
       'preinit-style',
-      'preinit-script'
+      'preinit-script',
+      'preinit-module-script'
     ]),
     deterministicFakeDomOnly: true,
     mutatesFakeHead: false,
@@ -2800,8 +2885,11 @@ function describePrivateResourceHintPreloadPreinitOrderGate() {
     recordsDedupeRows: true,
     recordsPrecedenceRows: true,
     recordsHeadOrderRows: true,
+    recordsScriptModulePreinitRows: true,
+    recordsScriptModuleHeadOrderRows: true,
     rawValuesRetained: false,
     publicResourceHintDomInsertion: false,
+    publicScriptModuleResourceDispatch: false,
     publicStylesheetPrecedenceBehavior: false,
     stylesheetPrecedenceBoundary:
       createStylesheetPrecedenceOrderDiagnosticBoundary(
@@ -2877,15 +2965,19 @@ function describePrivateResourceHintResourceMapCommitGate() {
     recordsStylesheetRows: true,
     recordsPreloadRows: true,
     recordsScriptRows: true,
+    recordsModulePreloadRows: true,
+    recordsModuleScriptRows: true,
     mutatesRealResourceMaps: false,
     mutatesFakeResourceMaps: false,
     mutatesFakeHead: false,
     mutatesRealHead: false,
     claimsSingletonOwnership: false,
     startsFetchOrPreload: false,
+    startsScriptExecution: false,
     mutatesLoadState: false,
     rawValuesRetained: false,
     publicResourceHintDomInsertion: false,
+    publicScriptModuleResourceDispatch: false,
     publicResourceMapCommitBehavior: false,
     blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities,
     contracts: resourceHintResourceMapCommitContracts,
@@ -4001,11 +4093,15 @@ function recordResourceHintPreloadPreinitOrderWithGate(
     orderAdmission: diagnosticAdmission.admission,
     dedupeRows: orderPlan.dedupeRows,
     precedenceRows: orderPlan.precedenceRows,
+    scriptModulePreinitRows: orderPlan.scriptModulePreinitRows,
     plannedHeadInsertionOrder: orderPlan.plannedHeadInsertionOrder,
     observedHeadOrder: orderPlan.observedHeadOrder,
+    scriptModuleHeadOrder: orderPlan.scriptModuleHeadOrder,
     resourceMapPlan: orderPlan.resourceMapPlan,
     stylesheetPrecedenceBoundary:
       orderPlan.stylesheetPrecedenceBoundary,
+    publicScriptModuleDispatchBoundary:
+      orderPlan.publicScriptModuleDispatchBoundary,
     publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
     publicHeadBoundary: createPublicHeadSingletonBoundary(),
     blockedCapabilities: resourceHintPreloadPreinitOrderBlockedCapabilities,
@@ -5516,10 +5612,19 @@ function validateResourceHintDispatcherShape(contract, args) {
     );
   }
 
-  if (args.length !== contract.argumentNames.length) {
+  const optionalOptionsDispatcher =
+    contract.privateDispatcherKey === 'm' ||
+    contract.privateDispatcherKey === 'M';
+  if (
+    optionalOptionsDispatcher
+      ? args.length < 1 || args.length > contract.argumentNames.length
+      : args.length !== contract.argumentNames.length
+  ) {
     throwInvalidResourceHintDispatcherShape(
       contract,
-      `expected ${contract.argumentNames.length} arguments`
+      optionalOptionsDispatcher
+        ? `expected between 1 and ${contract.argumentNames.length} arguments`
+        : `expected ${contract.argumentNames.length} arguments`
     );
   }
 
@@ -5541,10 +5646,14 @@ function validateResourceHintDispatcherShape(contract, args) {
       });
     case 'L':
       return validatePreloadDispatcherShape(contract, args);
+    case 'm':
+      return validatePreloadModuleDispatcherShape(contract, args);
     case 'S':
       return validatePreinitStyleDispatcherShape(contract, args);
     case 'X':
       return validatePreinitScriptDispatcherShape(contract, args);
+    case 'M':
+      return validatePreinitModuleScriptDispatcherShape(contract, args);
     default:
       throwInvalidResourceHintDispatcherShape(
         contract,
@@ -5581,6 +5690,29 @@ function validatePreloadDispatcherShape(contract, args) {
         fieldSpec('imageSrcSet', describeOptionalStringField),
         fieldSpec('imageSizes', describeOptionalStringField),
         fieldSpec('media', describeOptionalStringField)
+      ])
+    ])
+  });
+}
+
+function validatePreloadModuleDispatcherShape(contract, args) {
+  return freezeRecord({
+    accepted: true,
+    normalized: true,
+    privateDispatcherKey: contract.privateDispatcherKey,
+    argumentNames: contract.argumentNames,
+    arguments: freezeArray([
+      describeRequiredStringArgument(contract, args[0], 'href'),
+      describeOptionalOptionsObject(contract, args[1], [
+        fieldSpec('as', describeOptionalStringField),
+        fieldSpec('crossOrigin', (fieldContract, value) =>
+          describeCrossOriginArgument(fieldContract, value, {
+            allowNull: false,
+            fieldName: 'crossOrigin',
+            fontResource: false
+          })
+        ),
+        fieldSpec('integrity', describeOptionalStringField)
       ])
     ])
   });
@@ -5628,6 +5760,29 @@ function validatePreinitScriptDispatcherShape(contract, args) {
         ),
         fieldSpec('integrity', describeOptionalStringField),
         fieldSpec('fetchPriority', describeOptionalStringField),
+        fieldSpec('nonce', describeOptionalStringField)
+      ])
+    ])
+  });
+}
+
+function validatePreinitModuleScriptDispatcherShape(contract, args) {
+  return freezeRecord({
+    accepted: true,
+    normalized: true,
+    privateDispatcherKey: contract.privateDispatcherKey,
+    argumentNames: contract.argumentNames,
+    arguments: freezeArray([
+      describeRequiredStringArgument(contract, args[0], 'href'),
+      describeOptionalOptionsObject(contract, args[1], [
+        fieldSpec('crossOrigin', (fieldContract, value) =>
+          describeCrossOriginArgument(fieldContract, value, {
+            allowNull: false,
+            fieldName: 'crossOrigin',
+            fontResource: false
+          })
+        ),
+        fieldSpec('integrity', describeOptionalStringField),
         fieldSpec('nonce', describeOptionalStringField)
       ])
     ])
@@ -5696,6 +5851,17 @@ function describeCrossOriginArgument(contract, value, options) {
     type: 'string',
     empty: value.length === 0
   });
+}
+
+function describeOptionalOptionsObject(contract, value, fieldSpecs) {
+  if (value === undefined) {
+    return freezeRecord({
+      name: 'options',
+      type: 'undefined'
+    });
+  }
+
+  return describeOptionsObject(contract, value, fieldSpecs);
 }
 
 function describeOptionsObject(contract, value, fieldSpecs) {
@@ -6019,16 +6185,15 @@ function createResourceHintFakeDomInsertionAttributePlan(
     return freezeArray(attributes);
   }
 
-  const as = getDispatcherArgumentSummary(
-    adapterAdmission.dispatcherShape,
-    'as'
-  );
-  appendStringAttributeIfPresent(attributes, 'as', as);
-
   const options = getDispatcherArgumentSummary(
     adapterAdmission.dispatcherShape,
     'options'
   );
+  const as =
+    getDispatcherArgumentSummary(adapterAdmission.dispatcherShape, 'as') ||
+    getDispatcherOptionFieldSummary(options, 'as');
+  appendStringAttributeIfPresent(attributes, 'as', as);
+
   for (const name of contract.attributeNames) {
     if (name === 'rel' || name === 'href' || name === 'as') {
       continue;
@@ -6988,6 +7153,11 @@ function getPreloadPreinitResourceKind(descriptor) {
   if (
     resourceKind === 'style' ||
     resourceKind === 'script' ||
+    resourceKind === 'worker' ||
+    resourceKind === 'serviceworker' ||
+    resourceKind === 'sharedworker' ||
+    resourceKind === 'audioworklet' ||
+    resourceKind === 'paintworklet' ||
     resourceKind === 'font' ||
     resourceKind === 'image' ||
     resourceKind === 'other'
@@ -6996,7 +7166,7 @@ function getPreloadPreinitResourceKind(descriptor) {
   }
 
   throwInvalidResourceHintPreloadPreinitOrderAdmission(
-    'resourceKind must be style, script, font, image, or other'
+    'resourceKind must be style, script, worker, serviceworker, sharedworker, audioworklet, paintworklet, font, image, or other'
   );
 }
 
@@ -7108,12 +7278,20 @@ function createResourceHintPreloadPreinitOrderPlan(
     );
   const observedHeadOrder =
     createObservedPreloadPreinitFakeHeadOrder(fakeDocument, fakeHead);
+  const scriptModulePreinitRows =
+    createScriptModulePreinitRows(dedupeRows);
+  const scriptModuleHeadOrder = createScriptModuleHeadOrder(
+    plannedHeadInsertionOrder.rows,
+    observedHeadOrder.rows
+  );
 
   return freezeRecord({
     dedupeRows: freezeArray(dedupeRows),
     precedenceRows,
+    scriptModulePreinitRows,
     plannedHeadInsertionOrder,
     observedHeadOrder,
+    scriptModuleHeadOrder,
     stylesheetPrecedenceBoundary:
       createStylesheetPrecedenceOrderDiagnosticBoundary(
         precedenceRows,
@@ -7122,7 +7300,11 @@ function createResourceHintPreloadPreinitOrderPlan(
     resourceMapPlan: createPreloadPreinitResourceMapPlan(
       stateByResourceKey,
       dedupeRows
-    )
+    ),
+    publicScriptModuleDispatchBoundary:
+      createPublicScriptModuleResourceDispatchBoundary(
+        scriptModulePreinitRows
+      )
   });
 }
 
@@ -7399,7 +7581,16 @@ function createObservedPreloadPreinitFakeHeadRow(
     node,
     'data-fast-react-precedence-key'
   );
-  const resourceKind = getObservedFakeHeadResourceKind(nodeName, relationship);
+  const resourceKind = getObservedFakeHeadResourceKind(
+    nodeName,
+    relationship,
+    node
+  );
+  const scriptKind = getObservedFakeHeadScriptKind(
+    nodeName,
+    relationship,
+    node
+  );
 
   return freezeRecord({
     rowId: `observed-head-child-${childIndex}`,
@@ -7408,6 +7599,7 @@ function createObservedPreloadPreinitFakeHeadRow(
     nodeName,
     relationship,
     resourceKind,
+    scriptKind,
     resourceKey,
     precedenceKey,
     deterministicFakeResourceElement:
@@ -7425,7 +7617,7 @@ function createObservedPreloadPreinitFakeHeadRow(
   });
 }
 
-function getObservedFakeHeadResourceKind(nodeName, relationship) {
+function getObservedFakeHeadResourceKind(nodeName, relationship, node) {
   if (nodeName === 'SCRIPT') {
     return 'script';
   }
@@ -7435,10 +7627,231 @@ function getObservedFakeHeadResourceKind(nodeName, relationship) {
   if (relationship === 'stylesheet') {
     return 'style';
   }
+  if (
+    relationship === 'preload' &&
+    getFakeHeadNodeAttribute(node, 'as') === 'script'
+  ) {
+    return 'script';
+  }
   if (relationship === 'preload') {
     return 'preload';
   }
+  if (relationship === 'modulepreload') {
+    return 'script';
+  }
   return null;
+}
+
+function getObservedFakeHeadScriptKind(nodeName, relationship, node) {
+  if (relationship === 'modulepreload') {
+    return 'module';
+  }
+  if (
+    relationship === 'preload' &&
+    getFakeHeadNodeAttribute(node, 'as') === 'script'
+  ) {
+    return 'classic';
+  }
+  if (nodeName !== 'SCRIPT') {
+    return null;
+  }
+  const type = getFakeHeadNodeAttribute(node, 'type');
+  return type === 'module' ? 'module' : 'classic';
+}
+
+function createScriptModulePreinitRows(dedupeRows) {
+  const rows = [];
+  for (const row of dedupeRows) {
+    const scriptKind = getScriptModulePreinitRowScriptKind(row);
+    if (scriptKind === null) {
+      continue;
+    }
+
+    rows.push(
+      freezeRecord({
+        rowId: `script-module-preinit-${rows.length}`,
+        rowType: 'script-module-resource-hint',
+        sourceDedupeRowId: row.rowId,
+        inputIndex: row.inputIndex,
+        sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+        sourceRequestId: row.sourceRequestId,
+        sourceRequestType: row.sourceRequestType,
+        contractId: row.contractId,
+        privateDispatcherKey: row.privateDispatcherKey,
+        publicName: row.publicName,
+        resourceStage: row.resourceStage,
+        resourceKind: row.resourceKind,
+        scriptKind,
+        relationship: row.relationship,
+        dedupeKey: row.resourceKey,
+        resourceKey: row.resourceKey,
+        opaqueResourceKey: row.opaqueResourceKey,
+        dedupeAction: row.dedupeAction,
+        dedupeMatched: row.dedupeMatched,
+        matchedSourceAdapterAdmissionId:
+          row.matchedSourceAdapterAdmissionId,
+        preloadSeenBefore: row.preloadSeenBefore,
+        preinitSeenBefore: row.preinitSeenBefore,
+        wouldInsertIntoHead: row.wouldInsertIntoHead,
+        modulePreload:
+          row.contractId === 'preload-module',
+        classicScriptPreinit:
+          row.contractId === 'preinit-script',
+        moduleScriptPreinit:
+          row.contractId === 'preinit-module-script',
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false,
+        networkFetchStarted: false,
+        loadEventSubscribed: false,
+        resourceMapCreated: false,
+        resourceMapMutated: false,
+        rawValuesRetained: false,
+        compatibilityClaimed: false
+      })
+    );
+  }
+
+  return freezeArray(rows);
+}
+
+function getScriptModulePreinitRowScriptKind(row) {
+  if (row.contractId === 'preload-module') {
+    return 'module';
+  }
+  if (row.contractId === 'preinit-module-script') {
+    return 'module';
+  }
+  if (row.contractId === 'preinit-script') {
+    return 'classic';
+  }
+  if (row.contractId === 'preload' && row.resourceKind === 'script') {
+    return 'classic';
+  }
+  return null;
+}
+
+function createScriptModuleHeadOrder(plannedRows, observedRows) {
+  const plannedScriptModuleRows = freezeArray(
+    plannedRows
+      .filter(isScriptModuleHeadOrderPlannedRow)
+      .map((row, scriptModuleHeadOrderIndex) =>
+        freezeRecord({
+          rowId: `script-module-planned-head-${scriptModuleHeadOrderIndex}`,
+          sourceDedupeRowId: row.sourceDedupeRowId,
+          headOrderIndex: row.headOrderIndex,
+          inputIndex: row.inputIndex,
+          sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+          contractId: row.contractId,
+          resourceStage: row.resourceStage,
+          resourceKind: row.resourceKind,
+          scriptKind: getScriptModuleHeadOrderScriptKind(row),
+          resourceKey: row.resourceKey,
+          relationship: row.relationship,
+          placementKind: row.placementKind,
+          insertionMethod: row.insertionMethod,
+          insertionApplied: false,
+          publicResourceDispatchBlocked: true,
+          publicScriptModuleResourceDispatch: false,
+          scriptExecutionStarted: false,
+          rawValuesRetained: false,
+          compatibilityClaimed: false
+        })
+      )
+  );
+  const observedScriptModuleRows = freezeArray(
+    observedRows
+      .filter(isScriptModuleHeadOrderObservedRow)
+      .map((row, scriptModuleHeadOrderIndex) =>
+        freezeRecord({
+          rowId: `script-module-observed-head-${scriptModuleHeadOrderIndex}`,
+          sourceObservedHeadRowId: row.rowId,
+          childIndex: row.childIndex,
+          nodeName: row.nodeName,
+          relationship: row.relationship,
+          resourceKind: row.resourceKind,
+          scriptKind: row.scriptKind,
+          resourceKey: row.resourceKey,
+          orderObserved: row.orderObserved,
+          orderMutated: false,
+          publicResourceDispatchBlocked: true,
+          publicScriptModuleResourceDispatch: false,
+          scriptExecutionStarted: false,
+          rawValuesRetained: false,
+          compatibilityClaimed: false
+        })
+      )
+  );
+
+  return freezeRecord({
+    targetKind: 'document-head',
+    hostTag: 'head',
+    orderKind:
+      'react-19.2.6-script-modulepreload-preinit-head-order-diagnostic',
+    plannedRowCount: plannedScriptModuleRows.length,
+    observedRowCount: observedScriptModuleRows.length,
+    plannedRows: plannedScriptModuleRows,
+    observedRows: observedScriptModuleRows,
+    fakeHeadRead: true,
+    fakeHeadMutated: false,
+    realHeadMutated: false,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    scriptExecutionStarted: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function isScriptModuleHeadOrderPlannedRow(row) {
+  return getScriptModuleHeadOrderScriptKind(row) !== null;
+}
+
+function getScriptModuleHeadOrderScriptKind(row) {
+  if (row.contractId === 'preload-module') {
+    return 'module';
+  }
+  if (row.contractId === 'preinit-module-script') {
+    return 'module';
+  }
+  if (row.contractId === 'preinit-script') {
+    return 'classic';
+  }
+  if (row.contractId === 'preload' && row.resourceKind === 'script') {
+    return 'classic';
+  }
+  return null;
+}
+
+function isScriptModuleHeadOrderObservedRow(row) {
+  return row.resourceKind === 'script' || row.scriptKind !== null;
+}
+
+function createPublicScriptModuleResourceDispatchBoundary(
+  scriptModulePreinitRows
+) {
+  return freezeRecord({
+    status: 'blocked-public-script-module-resource-dispatch',
+    scriptModuleRowCount: scriptModulePreinitRows.length,
+    scriptModuleRowsRecorded: scriptModulePreinitRows.length > 0,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    publicDispatcherInvoked: false,
+    publicResourceApisReachable: false,
+    previousDispatcherInvoked: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    networkFetchStarted: false,
+    realDocumentMutated: false,
+    realHeadMutated: false,
+    compatibilityClaimed: false,
+    blockedCapabilities: resourceHintPreloadPreinitOrderBlockedCapabilities
+  });
 }
 
 function getOptionalOpaqueFakeHeadAttribute(node, attributeName) {
@@ -7498,14 +7911,30 @@ function createStylesheetPrecedenceOrderDiagnosticBoundary(
 function createPreloadPreinitResourceMapPlan(stateByResourceKey, dedupeRows) {
   let preloadResourceCount = 0;
   let preinitResourceCount = 0;
+  let modulePreloadResourceCount = 0;
+  let scriptPreinitResourceCount = 0;
+  let moduleScriptPreinitResourceCount = 0;
   for (const state of stateByResourceKey.values()) {
     if (state.preloadRow !== null) {
       preloadResourceCount++;
+      if (state.preloadRow.contractId === 'preload-module') {
+        modulePreloadResourceCount++;
+      }
     }
     if (state.preinitRow !== null) {
       preinitResourceCount++;
+      if (state.preinitRow.contractId === 'preinit-script') {
+        scriptPreinitResourceCount++;
+      }
+      if (state.preinitRow.contractId === 'preinit-module-script') {
+        moduleScriptPreinitResourceCount++;
+      }
     }
   }
+
+  const scriptModuleRowCount = dedupeRows.filter(
+    (row) => getScriptModulePreinitRowScriptKind(row) !== null
+  ).length;
 
   return freezeRecord({
     resourceMapKind:
@@ -7516,9 +7945,15 @@ function createPreloadPreinitResourceMapPlan(stateByResourceKey, dedupeRows) {
     uniqueResourceCount: stateByResourceKey.size,
     preloadResourceCount,
     preinitResourceCount,
+    scriptModuleRowCount,
+    modulePreloadResourceCount,
+    scriptPreinitResourceCount,
+    moduleScriptPreinitResourceCount,
     dedupedRowCount: dedupeRows.filter(
       (row) => row.wouldInsertIntoHead === false
     ).length,
+    publicScriptModuleResourceDispatch: false,
+    scriptExecutionStarted: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
@@ -8805,6 +9240,10 @@ function createPrivateResourceMapCommitRecord(
     publicName: row.publicName,
     resourceStage: row.resourceStage,
     resourceKind: row.resourceKind,
+    scriptKind: getScriptModulePreinitRowScriptKind(row),
+    modulePreload: row.contractId === 'preload-module',
+    moduleScript: row.contractId === 'preinit-module-script',
+    classicScriptPreinit: row.contractId === 'preinit-script',
     resourceKey: row.resourceKey,
     opaqueResourceKey: row.opaqueResourceKey,
     precedenceKey: row.precedenceKey,
@@ -8829,8 +9268,14 @@ function createPrivateResourceMapCommitRecord(
     hostNodeInserted: false,
     fetchStarted: false,
     preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
     loadEventSubscribed: false,
     loadingStateMutated: false,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
     rawResourceKeyRetained: false,
     rawPrecedenceValueRetained: false,
     rawValuesRetained: false,
@@ -8852,10 +9297,13 @@ function getResourceMapCommitRecordKind(row) {
   if (row.contractId === 'preinit-style') {
     return 'stylesheet';
   }
-  if (row.contractId === 'preinit-script') {
+  if (
+    row.contractId === 'preinit-script' ||
+    row.contractId === 'preinit-module-script'
+  ) {
     return 'script';
   }
-  if (row.contractId === 'preload') {
+  if (row.contractId === 'preload' || row.contractId === 'preload-module') {
     return 'preload';
   }
   return null;
@@ -8886,6 +9334,12 @@ function createResourceMapCommitPlanSummary(privateResourceMapRecords) {
   const scriptRecordCount = privateResourceMapRecords.filter(
     (row) => row.recordKind === 'script'
   ).length;
+  const modulePreloadRecordCount = privateResourceMapRecords.filter(
+    (row) => row.modulePreload === true
+  ).length;
+  const moduleScriptRecordCount = privateResourceMapRecords.filter(
+    (row) => row.moduleScript === true
+  ).length;
 
   return freezeRecord({
     resourceMapKind:
@@ -8897,6 +9351,8 @@ function createResourceMapCommitPlanSummary(privateResourceMapRecords) {
     stylesheetRecordCount,
     preloadRecordCount,
     scriptRecordCount,
+    modulePreloadRecordCount,
+    moduleScriptRecordCount,
     dedupedRecordCount: privateResourceMapRecords.filter(
       (row) => row.wouldInsertIntoHead === false
     ).length,
@@ -8913,6 +9369,11 @@ function createResourceMapCommitPlanSummary(privateResourceMapRecords) {
     hoistableScriptsMapMutated: false,
     preloadPropsMapCreated: false,
     preloadPropsMapMutated: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    publicScriptModuleResourceDispatch: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
@@ -8951,15 +9412,24 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
       commitPlan.resourceMapCommitPlan.stylesheetRecordCount,
     preloadRecordCount: commitPlan.resourceMapCommitPlan.preloadRecordCount,
     scriptRecordCount: commitPlan.resourceMapCommitPlan.scriptRecordCount,
+    modulePreloadRecordCount:
+      commitPlan.resourceMapCommitPlan.modulePreloadRecordCount,
+    moduleScriptRecordCount:
+      commitPlan.resourceMapCommitPlan.moduleScriptRecordCount,
     singletonOwnershipClaimed: false,
     resourceCountIncremented: false,
     resourceInstanceCreated: false,
     hostNodeInserted: false,
     fetchStarted: false,
     preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
     loadEventSubscribed: false,
     loadStateMutated: false,
     suspendedCommitWaitStarted: false,
+    publicScriptModuleResourceDispatch: false,
     publicResourceApisReachable: false,
     compatibilityClaimed: false,
     blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities
@@ -8981,8 +9451,16 @@ function createResourceHintResourceMapCommitSourceOrder(order) {
     uniqueResourceCount: order.resourceMapPlan.uniqueResourceCount,
     preloadResourceCount: order.resourceMapPlan.preloadResourceCount,
     preinitResourceCount: order.resourceMapPlan.preinitResourceCount,
+    scriptModuleRowCount: order.scriptModulePreinitRows.length,
+    scriptModuleHeadPlannedRowCount:
+      order.scriptModuleHeadOrder.plannedRowCount,
+    scriptModuleHeadObservedRowCount:
+      order.scriptModuleHeadOrder.observedRowCount,
     resourceMapCreated: order.resourceMapPlan.resourceMapCreated,
     resourceMapMutated: order.resourceMapPlan.resourceMapMutated,
+    publicScriptModuleResourceDispatch:
+      order.publicScriptModuleDispatchBoundary
+        .publicScriptModuleResourceDispatch,
     publicResourceHintDomInsertion:
       order.publicResourceBoundary.publicResourceHintCallsReachable,
     compatibilityClaimed: false
@@ -10990,7 +11468,9 @@ function resourceHintPreloadPreinitOrderContract(
     relationship,
     resourceKinds: freezeArray(resourceKinds),
     resourceStage:
-      sourceContractId === 'preload' ? 'preload' : 'preinit',
+      sourceContractId === 'preload' || sourceContractId === 'preload-module'
+        ? 'preload'
+        : 'preinit',
     capability: 'react-dom-resource-preload-preinit-dedupe-order-diagnostic',
     oracleKind: resourceHintOracleKind,
     deterministicFakeDomOnly: true,

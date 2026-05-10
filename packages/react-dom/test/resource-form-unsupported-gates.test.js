@@ -4066,6 +4066,14 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
         media: 'print'
       }
     ]),
+    gate.recordResourceHintDispatcherRequest('m', [
+      '/module-worker.mjs',
+      {
+        as: 'worker',
+        crossOrigin: '',
+        integrity: 'sha256-module-worker'
+      }
+    ]),
     gate.recordResourceHintDispatcherRequest('S', [
       '/style.css',
       'theme',
@@ -4082,6 +4090,14 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
         integrity: 'sha256-script',
         fetchPriority: 'high',
         nonce: 'nonce-script'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('M', [
+      '/module-entry.mjs',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-module',
+        nonce: 'nonce-module'
       }
     ])
   ];
@@ -4141,6 +4157,27 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
     },
     {
       requestId: 'resource-dispatcher-gate:3',
+      requestType: 'resource-hint-dispatcher.preload-module',
+      contractId: 'preload-module',
+      publicName: 'preloadModule',
+      privateDispatcherKey: 'm',
+      argumentNames: ['href', 'options'],
+      argumentSummaries: [
+        {name: 'href', type: 'string', empty: false},
+        {
+          name: 'options',
+          type: 'object',
+          exactOwnKeys: ['as', 'crossOrigin', 'integrity'],
+          fields: [
+            {name: 'as', type: 'string', empty: false},
+            {name: 'crossOrigin', type: 'string', empty: true},
+            {name: 'integrity', type: 'string', empty: false}
+          ]
+        }
+      ]
+    },
+    {
+      requestId: 'resource-dispatcher-gate:4',
       requestType: 'resource-hint-dispatcher.preinit-style',
       contractId: 'preinit-style',
       publicName: 'preinit',
@@ -4162,7 +4199,7 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
       ]
     },
     {
-      requestId: 'resource-dispatcher-gate:4',
+      requestId: 'resource-dispatcher-gate:5',
       requestType: 'resource-hint-dispatcher.preinit-script',
       contractId: 'preinit-script',
       publicName: 'preinit',
@@ -4183,6 +4220,27 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
             {name: 'crossOrigin', type: 'string', empty: false},
             {name: 'integrity', type: 'string', empty: false},
             {name: 'fetchPriority', type: 'string', empty: false},
+            {name: 'nonce', type: 'string', empty: false}
+          ]
+        }
+      ]
+    },
+    {
+      requestId: 'resource-dispatcher-gate:6',
+      requestType: 'resource-hint-dispatcher.preinit-module-script',
+      contractId: 'preinit-module-script',
+      publicName: 'preinitModule',
+      privateDispatcherKey: 'M',
+      argumentNames: ['href', 'options'],
+      argumentSummaries: [
+        {name: 'href', type: 'string', empty: false},
+        {
+          name: 'options',
+          type: 'object',
+          exactOwnKeys: ['crossOrigin', 'integrity', 'nonce'],
+          fields: [
+            {name: 'crossOrigin', type: 'string', empty: true},
+            {name: 'integrity', type: 'string', empty: false},
             {name: 'nonce', type: 'string', empty: false}
           ]
         }
@@ -4244,6 +4302,12 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
         argumentNames: ['href', 'as', 'options']
       },
       {
+        id: 'preload-module',
+        publicName: 'preloadModule',
+        privateDispatcherKey: 'm',
+        argumentNames: ['href', 'options']
+      },
+      {
         id: 'preinit-style',
         publicName: 'preinit',
         privateDispatcherKey: 'S',
@@ -4254,11 +4318,19 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
         publicName: 'preinit',
         privateDispatcherKey: 'X',
         argumentNames: ['href', 'options']
+      },
+      {
+        id: 'preinit-module-script',
+        publicName: 'preinitModule',
+        privateDispatcherKey: 'M',
+        argumentNames: ['href', 'options']
       }
     ]
   );
   assert.equal(JSON.stringify(records).includes('/font.woff2'), false);
   assert.equal(JSON.stringify(records).includes('sha256-script'), false);
+  assert.equal(JSON.stringify(records).includes('/module-entry.mjs'), false);
+  assert.equal(JSON.stringify(records).includes('nonce-module'), false);
 });
 
 test('private resource hint fake-DOM adapter gate admits normalized dispatcher records without side effects', () => {
@@ -4291,6 +4363,14 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
         media: 'print'
       }
     ]),
+    dispatcherGate.recordResourceHintDispatcherRequest('m', [
+      '/module-worker.mjs',
+      {
+        as: 'worker',
+        crossOrigin: '',
+        integrity: 'sha256-module-worker'
+      }
+    ]),
     dispatcherGate.recordResourceHintDispatcherRequest('S', [
       '/style.css',
       'theme',
@@ -4307,6 +4387,14 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
         integrity: 'sha256-script',
         fetchPriority: 'high',
         nonce: 'nonce-script'
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest('M', [
+      '/module-entry.mjs',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-module',
+        nonce: 'nonce-module'
       }
     ])
   ];
@@ -4371,6 +4459,22 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
     {
       adapterAdmissionId: 'fake-dom-adapter:3',
       sourceRequestId: 'resource-dispatcher-adapter-source:3',
+      requestType: 'resource-hint-fake-dom-adapter.preload-module',
+      contractId: 'preload-module',
+      privateDispatcherKey: 'm',
+      admissionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus,
+      executionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus,
+      elementPlan: {
+        elementTag: 'link',
+        relationship: 'modulepreload',
+        attributeNames: ['rel', 'href', 'as', 'crossOrigin', 'integrity']
+      }
+    },
+    {
+      adapterAdmissionId: 'fake-dom-adapter:4',
+      sourceRequestId: 'resource-dispatcher-adapter-source:4',
       requestType: 'resource-hint-fake-dom-adapter.preinit-style',
       contractId: 'preinit-style',
       privateDispatcherKey: 'S',
@@ -4392,8 +4496,8 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
       }
     },
     {
-      adapterAdmissionId: 'fake-dom-adapter:4',
-      sourceRequestId: 'resource-dispatcher-adapter-source:4',
+      adapterAdmissionId: 'fake-dom-adapter:5',
+      sourceRequestId: 'resource-dispatcher-adapter-source:5',
       requestType: 'resource-hint-fake-dom-adapter.preinit-script',
       contractId: 'preinit-script',
       privateDispatcherKey: 'X',
@@ -4410,6 +4514,29 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
           'crossOrigin',
           'integrity',
           'fetchPriority',
+          'nonce'
+        ]
+      }
+    },
+    {
+      adapterAdmissionId: 'fake-dom-adapter:6',
+      sourceRequestId: 'resource-dispatcher-adapter-source:6',
+      requestType: 'resource-hint-fake-dom-adapter.preinit-module-script',
+      contractId: 'preinit-module-script',
+      privateDispatcherKey: 'M',
+      admissionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus,
+      executionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus,
+      elementPlan: {
+        elementTag: 'script',
+        relationship: 'module-script',
+        attributeNames: [
+          'src',
+          'async',
+          'type',
+          'crossOrigin',
+          'integrity',
           'nonce'
         ]
       }
@@ -4510,6 +4637,12 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
         relationship: 'preload'
       },
       {
+        id: 'preload-module',
+        privateDispatcherKey: 'm',
+        elementTag: 'link',
+        relationship: 'modulepreload'
+      },
+      {
         id: 'preinit-style',
         privateDispatcherKey: 'S',
         elementTag: 'link',
@@ -4520,12 +4653,20 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
         privateDispatcherKey: 'X',
         elementTag: 'script',
         relationship: 'script'
+      },
+      {
+        id: 'preinit-module-script',
+        privateDispatcherKey: 'M',
+        elementTag: 'script',
+        relationship: 'module-script'
       }
     ]
   );
   assert.equal(JSON.stringify(admissions).includes('/font.woff2'), false);
   assert.equal(JSON.stringify(admissions).includes('sha256-style'), false);
   assert.equal(JSON.stringify(admissions).includes('nonce-script'), false);
+  assert.equal(JSON.stringify(admissions).includes('/module-entry.mjs'), false);
+  assert.equal(JSON.stringify(admissions).includes('nonce-module'), false);
 });
 
 test('private resource hint fake-DOM insertion gate admits one deterministic preload record only', () => {
@@ -5537,6 +5678,22 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
         nonce: 'nonce-script'
       }
     ]),
+    gate.recordResourceHintDispatcherRequest('m', [
+      '/module.mjs',
+      {
+        as: undefined,
+        crossOrigin: '',
+        integrity: 'sha256-module-preload'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('M', [
+      '/module.mjs',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-module',
+        nonce: 'nonce-module'
+      }
+    ]),
     gate.recordResourceHintDispatcherRequest('L', [
       '/font.woff2',
       'font',
@@ -5578,6 +5735,14 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
   });
   appendFakeHeadChild(fakeDom, 'script', {
     'data-fast-react-resource-key': 'script-main'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'modulepreload',
+    'data-fast-react-resource-key': 'module-main'
+  });
+  appendFakeHeadChild(fakeDom, 'script', {
+    type: 'module',
+    'data-fast-react-resource-key': 'module-main'
   });
   appendFakeHeadChild(fakeDom, 'link', {
     rel: 'preload',
@@ -5624,6 +5789,16 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
         },
         {
           sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'module-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[6].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'module-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[7].adapterAdmissionId,
           resourceKind: 'font',
           resourceKey: 'font-main'
         }
@@ -5659,6 +5834,8 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
       'dedupe-preinit',
       'insert-preload',
       'preinit-adopts-preload',
+      'insert-preload',
+      'preinit-adopts-preload',
       'insert-preload'
     ],
     plannedContractIds: [
@@ -5666,13 +5843,24 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
       'preload',
       'preload',
       'preinit-script',
+      'preload-module',
+      'preinit-module-script',
       'preload'
     ],
-    observedNodeNames: ['LINK', 'LINK', 'LINK', 'SCRIPT', 'LINK'],
+    observedNodeNames: [
+      'LINK',
+      'LINK',
+      'LINK',
+      'SCRIPT',
+      'LINK',
+      'SCRIPT',
+      'LINK'
+    ],
     resourceMapPlan: {
-      uniqueResourceCount: 3,
-      preloadResourceCount: 3,
-      preinitResourceCount: 2,
+      uniqueResourceCount: 4,
+      preloadResourceCount: 4,
+      preinitResourceCount: 3,
+      scriptModuleRowCount: 4,
       dedupedRowCount: 1
     }
   });
@@ -5711,6 +5899,19 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
   assert.equal(
     diagnostic.sideEffects.resourceHintHeadOrderRowsRecorded,
     true
+  );
+  assert.equal(diagnostic.sideEffects.scriptModulePreinitRowsRecorded, true);
+  assert.equal(
+    diagnostic.sideEffects.scriptModuleFakeHeadOrderRowsRecorded,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.modulePreloadStarted, false);
+  assert.equal(diagnostic.sideEffects.scriptPreinitStarted, false);
+  assert.equal(diagnostic.sideEffects.moduleScriptPreinitStarted, false);
+  assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
+  assert.equal(
+    diagnostic.sideEffects.publicScriptModuleResourceDispatch,
+    false
   );
   assert.equal(diagnostic.sideEffects.preloadPreinitResourceMapCreated, false);
   assert.equal(diagnostic.sideEffects.preloadPreinitResourceMapMutated, false);
@@ -5802,6 +6003,30 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
       },
       {
         inputIndex: 5,
+        contractId: 'preload-module',
+        resourceStage: 'preload',
+        resourceKind: 'script',
+        resourceKey: 'script:module-main',
+        precedenceKey: null,
+        dedupeAction: 'insert-preload',
+        dedupeMatched: false,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 6,
+        contractId: 'preinit-module-script',
+        resourceStage: 'preinit',
+        resourceKind: 'script',
+        resourceKey: 'script:module-main',
+        precedenceKey: null,
+        dedupeAction: 'preinit-adopts-preload',
+        dedupeMatched: true,
+        wouldInsertIntoHead: true,
+        resourceMapMutated: false
+      },
+      {
+        inputIndex: 7,
         contractId: 'preload',
         resourceStage: 'preload',
         resourceKind: 'font',
@@ -5874,6 +6099,22 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
       {
         headOrderIndex: 4,
         inputIndex: 5,
+        contractId: 'preload-module',
+        placementKind: 'append',
+        insertionMethod: 'appendChild',
+        insertionApplied: false
+      },
+      {
+        headOrderIndex: 5,
+        inputIndex: 6,
+        contractId: 'preinit-module-script',
+        placementKind: 'append',
+        insertionMethod: 'appendChild',
+        insertionApplied: false
+      },
+      {
+        headOrderIndex: 6,
+        inputIndex: 7,
         contractId: 'preload',
         placementKind: 'append',
         insertionMethod: 'appendChild',
@@ -5931,6 +6172,24 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
       {
         childIndex: 4,
         nodeName: 'LINK',
+        relationship: 'modulepreload',
+        resourceKey: 'module-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        orderMutated: false
+      },
+      {
+        childIndex: 5,
+        nodeName: 'SCRIPT',
+        relationship: null,
+        resourceKey: 'module-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        orderMutated: false
+      },
+      {
+        childIndex: 6,
+        nodeName: 'LINK',
         relationship: 'preload',
         resourceKey: 'font-main',
         precedenceKey: null,
@@ -5939,6 +6198,210 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
       }
     ]
   );
+  assert.deepEqual(
+    diagnostic.scriptModulePreinitRows.map((row) => ({
+      inputIndex: row.inputIndex,
+      contractId: row.contractId,
+      resourceStage: row.resourceStage,
+      resourceKind: row.resourceKind,
+      scriptKind: row.scriptKind,
+      dedupeKey: row.dedupeKey,
+      dedupeAction: row.dedupeAction,
+      modulePreload: row.modulePreload,
+      moduleScriptPreinit: row.moduleScriptPreinit,
+      publicResourceDispatchBlocked: row.publicResourceDispatchBlocked,
+      publicScriptModuleResourceDispatch:
+        row.publicScriptModuleResourceDispatch,
+      scriptExecutionStarted: row.scriptExecutionStarted
+    })),
+    [
+      {
+        inputIndex: 3,
+        contractId: 'preload',
+        resourceStage: 'preload',
+        resourceKind: 'script',
+        scriptKind: 'classic',
+        dedupeKey: 'script:script-main',
+        dedupeAction: 'insert-preload',
+        modulePreload: false,
+        moduleScriptPreinit: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        inputIndex: 4,
+        contractId: 'preinit-script',
+        resourceStage: 'preinit',
+        resourceKind: 'script',
+        scriptKind: 'classic',
+        dedupeKey: 'script:script-main',
+        dedupeAction: 'preinit-adopts-preload',
+        modulePreload: false,
+        moduleScriptPreinit: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        inputIndex: 5,
+        contractId: 'preload-module',
+        resourceStage: 'preload',
+        resourceKind: 'script',
+        scriptKind: 'module',
+        dedupeKey: 'script:module-main',
+        dedupeAction: 'insert-preload',
+        modulePreload: true,
+        moduleScriptPreinit: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        inputIndex: 6,
+        contractId: 'preinit-module-script',
+        resourceStage: 'preinit',
+        resourceKind: 'script',
+        scriptKind: 'module',
+        dedupeKey: 'script:module-main',
+        dedupeAction: 'preinit-adopts-preload',
+        modulePreload: false,
+        moduleScriptPreinit: true,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.scriptModuleHeadOrder.plannedRows.map((row) => ({
+      headOrderIndex: row.headOrderIndex,
+      inputIndex: row.inputIndex,
+      contractId: row.contractId,
+      resourceKind: row.resourceKind,
+      scriptKind: row.scriptKind,
+      resourceKey: row.resourceKey,
+      insertionApplied: row.insertionApplied,
+      publicResourceDispatchBlocked: row.publicResourceDispatchBlocked
+    })),
+    [
+      {
+        headOrderIndex: 2,
+        inputIndex: 3,
+        contractId: 'preload',
+        resourceKind: 'script',
+        scriptKind: 'classic',
+        resourceKey: 'script:script-main',
+        insertionApplied: false,
+        publicResourceDispatchBlocked: true
+      },
+      {
+        headOrderIndex: 3,
+        inputIndex: 4,
+        contractId: 'preinit-script',
+        resourceKind: 'script',
+        scriptKind: 'classic',
+        resourceKey: 'script:script-main',
+        insertionApplied: false,
+        publicResourceDispatchBlocked: true
+      },
+      {
+        headOrderIndex: 4,
+        inputIndex: 5,
+        contractId: 'preload-module',
+        resourceKind: 'script',
+        scriptKind: 'module',
+        resourceKey: 'script:module-main',
+        insertionApplied: false,
+        publicResourceDispatchBlocked: true
+      },
+      {
+        headOrderIndex: 5,
+        inputIndex: 6,
+        contractId: 'preinit-module-script',
+        resourceKind: 'script',
+        scriptKind: 'module',
+        resourceKey: 'script:module-main',
+        insertionApplied: false,
+        publicResourceDispatchBlocked: true
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.scriptModuleHeadOrder.observedRows.map((row) => ({
+      childIndex: row.childIndex,
+      nodeName: row.nodeName,
+      relationship: row.relationship,
+      resourceKind: row.resourceKind,
+      scriptKind: row.scriptKind,
+      resourceKey: row.resourceKey,
+      orderMutated: row.orderMutated
+    })),
+    [
+      {
+        childIndex: 2,
+        nodeName: 'LINK',
+        relationship: 'preload',
+        resourceKind: 'script',
+        scriptKind: 'classic',
+        resourceKey: 'script-main',
+        orderMutated: false
+      },
+      {
+        childIndex: 3,
+        nodeName: 'SCRIPT',
+        relationship: null,
+        resourceKind: 'script',
+        scriptKind: 'classic',
+        resourceKey: 'script-main',
+        orderMutated: false
+      },
+      {
+        childIndex: 4,
+        nodeName: 'LINK',
+        relationship: 'modulepreload',
+        resourceKind: 'script',
+        scriptKind: 'module',
+        resourceKey: 'module-main',
+        orderMutated: false
+      },
+      {
+        childIndex: 5,
+        nodeName: 'SCRIPT',
+        relationship: null,
+        resourceKind: 'script',
+        scriptKind: 'module',
+        resourceKey: 'module-main',
+        orderMutated: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.scriptModuleHeadOrder.fakeHeadMutated, false);
+  assert.equal(
+    diagnostic.scriptModuleHeadOrder.publicScriptModuleResourceDispatch,
+    false
+  );
+  assert.equal(diagnostic.scriptModuleHeadOrder.scriptExecutionStarted, false);
+  assert.deepEqual(diagnostic.publicScriptModuleDispatchBoundary, {
+    status: 'blocked-public-script-module-resource-dispatch',
+    scriptModuleRowCount: 4,
+    scriptModuleRowsRecorded: true,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    publicDispatcherInvoked: false,
+    publicResourceApisReachable: false,
+    previousDispatcherInvoked: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    networkFetchStarted: false,
+    realDocumentMutated: false,
+    realHeadMutated: false,
+    compatibilityClaimed: false,
+    blockedCapabilities:
+      resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
+  });
   assert.equal(
     diagnostic.stylesheetPrecedenceBoundary.status,
     resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
@@ -5970,7 +6433,7 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
     false
   );
   assert.equal(diagnostic.publicHeadBoundary.realDocumentMutated, false);
-  assert.equal(fakeDom.head.childNodes.length, 5);
+  assert.equal(fakeDom.head.childNodes.length, 7);
   assert.equal(
     JSON.stringify(diagnostic).includes('/style.css'),
     false
@@ -5979,6 +6442,8 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
     JSON.stringify(diagnostic).includes('sha256-style'),
     false
   );
+  assert.equal(JSON.stringify(diagnostic).includes('/module.mjs'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('nonce-module'), false);
   assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
 
   assert.equal(
@@ -5993,14 +6458,19 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
   );
   assert.deepEqual(summary.acceptsContractIds, [
     'preload',
+    'preload-module',
     'preinit-style',
-    'preinit-script'
+    'preinit-script',
+    'preinit-module-script'
   ]);
   assert.equal(summary.mutatesFakeHead, false);
   assert.equal(summary.mutatesRealHead, false);
   assert.equal(summary.recordsDedupeRows, true);
   assert.equal(summary.recordsPrecedenceRows, true);
   assert.equal(summary.recordsHeadOrderRows, true);
+  assert.equal(summary.recordsScriptModulePreinitRows, true);
+  assert.equal(summary.recordsScriptModuleHeadOrderRows, true);
+  assert.equal(summary.publicScriptModuleResourceDispatch, false);
   assert.deepEqual(
     summary.blockedCapabilities,
     resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
@@ -6631,7 +7101,7 @@ test('private resource hint stylesheet precedence diagnostic records style dedup
   );
 });
 
-test('private resource hint resource-map commit diagnostic records stylesheet preload and script rows only', () => {
+test('private resource hint resource-map commit diagnostic records stylesheet preload script and module rows only', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-map-commit-source'
   });
@@ -6709,6 +7179,22 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
         nonce: 'nonce-script'
       }
     ]),
+    gate.recordResourceHintDispatcherRequest('m', [
+      '/module.mjs',
+      {
+        as: undefined,
+        crossOrigin: '',
+        integrity: 'sha256-module-preload'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('M', [
+      '/module.mjs',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-module',
+        nonce: 'nonce-module'
+      }
+    ]),
     gate.recordResourceHintDispatcherRequest('L', [
       '/font.woff2',
       'font',
@@ -6744,6 +7230,14 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   });
   appendFakeHeadChild(fakeDom, 'script', {
     'data-fast-react-resource-key': 'script-main'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'modulepreload',
+    'data-fast-react-resource-key': 'module-main'
+  });
+  appendFakeHeadChild(fakeDom, 'script', {
+    type: 'module',
+    'data-fast-react-resource-key': 'module-main'
   });
 
   const order = orderGate.recordPreloadPreinitOrderDiagnostic(
@@ -6782,6 +7276,16 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
         },
         {
           sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'module-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[6].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'module-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[7].adapterAdmissionId,
           resourceKind: 'font',
           resourceKey: 'font-main'
         }
@@ -6862,6 +7366,14 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   );
   assert.equal(diagnostic.sideEffects.preloadRecordStarted, false);
   assert.equal(diagnostic.sideEffects.scriptRecordLoaded, false);
+  assert.equal(diagnostic.sideEffects.modulePreloadStarted, false);
+  assert.equal(diagnostic.sideEffects.scriptPreinitStarted, false);
+  assert.equal(diagnostic.sideEffects.moduleScriptPreinitStarted, false);
+  assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
+  assert.equal(
+    diagnostic.sideEffects.publicScriptModuleResourceDispatch,
+    false
+  );
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
   assert.equal(diagnostic.sideEffects.resourceFetchStarted, false);
   assert.equal(diagnostic.commitAdmission.rawResourceMapCaptured, false);
@@ -6879,20 +7391,28 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   );
   assert.deepEqual(
     diagnostic.acceptedContractIds,
-    ['preload', 'preinit-style', 'preinit-script']
+    [
+      'preload',
+      'preinit-style',
+      'preinit-script',
+      'preload-module',
+      'preinit-module-script'
+    ]
   );
   assert.deepEqual(diagnostic.resourceMapCommitPlan, {
     resourceMapKind:
       'react-19.2.6-resource-map-commit-diagnostic',
     targetKind: 'document-head',
     hostTag: 'head',
-    privateResourceMapRecordCount: 6,
-    uniquePrivateResourceRecordCount: 5,
+    privateResourceMapRecordCount: 8,
+    uniquePrivateResourceRecordCount: 7,
     stylesheetRecordCount: 2,
-    preloadRecordCount: 3,
-    scriptRecordCount: 1,
+    preloadRecordCount: 4,
+    scriptRecordCount: 2,
+    modulePreloadRecordCount: 1,
+    moduleScriptRecordCount: 1,
     dedupedRecordCount: 1,
-    wouldInsertRecordCount: 5,
+    wouldInsertRecordCount: 7,
     realResourceMapsCreated: false,
     realResourceMapsMutated: false,
     fakeResourceMapsCreated: false,
@@ -6903,6 +7423,11 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     hoistableScriptsMapMutated: false,
     preloadPropsMapCreated: false,
     preloadPropsMapMutated: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    publicScriptModuleResourceDispatch: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
@@ -6995,6 +7520,34 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         recordKind: 'preload',
         mapKind: 'preload-props',
+        contractId: 'preload-module',
+        resourceKey: 'script:module-main',
+        precedenceKey: null,
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'script',
+        mapKind: 'hoistable-scripts',
+        contractId: 'preinit-module-script',
+        resourceKey: 'script:module-main',
+        precedenceKey: null,
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'preload',
+        mapKind: 'preload-props',
         contractId: 'preload',
         resourceKey: 'font:font-main',
         precedenceKey: null,
@@ -7008,9 +7561,114 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       }
     ]
   );
+  assert.deepEqual(
+    diagnostic.privateResourceMapRecords
+      .filter((row) =>
+        [
+          'preload',
+          'preinit-script',
+          'preload-module',
+          'preinit-module-script'
+        ].includes(row.contractId)
+      )
+      .map((row) => ({
+        contractId: row.contractId,
+        resourceKey: row.resourceKey,
+        scriptKind: row.scriptKind,
+        modulePreload: row.modulePreload,
+        moduleScript: row.moduleScript,
+        publicResourceDispatchBlocked: row.publicResourceDispatchBlocked,
+        publicScriptModuleResourceDispatch:
+          row.publicScriptModuleResourceDispatch,
+        modulePreloadStarted: row.modulePreloadStarted,
+        scriptPreinitStarted: row.scriptPreinitStarted,
+        moduleScriptPreinitStarted: row.moduleScriptPreinitStarted,
+        scriptExecutionStarted: row.scriptExecutionStarted
+      })),
+    [
+      {
+        contractId: 'preload',
+        resourceKey: 'style:style-main',
+        scriptKind: null,
+        modulePreload: false,
+        moduleScript: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: 'preload',
+        resourceKey: 'script:script-main',
+        scriptKind: 'classic',
+        modulePreload: false,
+        moduleScript: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: 'preinit-script',
+        resourceKey: 'script:script-main',
+        scriptKind: 'classic',
+        modulePreload: false,
+        moduleScript: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: 'preload-module',
+        resourceKey: 'script:module-main',
+        scriptKind: 'module',
+        modulePreload: true,
+        moduleScript: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: 'preinit-module-script',
+        resourceKey: 'script:module-main',
+        scriptKind: 'module',
+        modulePreload: false,
+        moduleScript: true,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: 'preload',
+        resourceKey: 'font:font-main',
+        scriptKind: null,
+        modulePreload: false,
+        moduleScript: false,
+        publicResourceDispatchBlocked: true,
+        publicScriptModuleResourceDispatch: false,
+        modulePreloadStarted: false,
+        scriptPreinitStarted: false,
+        moduleScriptPreinitStarted: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
   assert.equal(diagnostic.stylesheetResourceMapRecords.length, 2);
-  assert.equal(diagnostic.preloadResourceMapRecords.length, 3);
-  assert.equal(diagnostic.scriptResourceMapRecords.length, 1);
+  assert.equal(diagnostic.preloadResourceMapRecords.length, 4);
+  assert.equal(diagnostic.scriptResourceMapRecords.length, 2);
   assert.equal(
     diagnostic.stylesheetPrecedenceBoundary.status,
     resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
@@ -7023,8 +7681,16 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     diagnostic.resourceLifecycleBoundary.singletonOwnershipClaimed,
     false
   );
+  assert.equal(diagnostic.resourceLifecycleBoundary.modulePreloadRecordCount, 1);
+  assert.equal(diagnostic.resourceLifecycleBoundary.moduleScriptRecordCount, 1);
   assert.equal(diagnostic.resourceLifecycleBoundary.fetchStarted, false);
   assert.equal(diagnostic.resourceLifecycleBoundary.preloadStarted, false);
+  assert.equal(diagnostic.resourceLifecycleBoundary.modulePreloadStarted, false);
+  assert.equal(diagnostic.resourceLifecycleBoundary.scriptExecutionStarted, false);
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.publicScriptModuleResourceDispatch,
+    false
+  );
   assert.equal(
     diagnostic.resourceLifecycleBoundary.loadEventSubscribed,
     false
@@ -7046,11 +7712,13 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     diagnostic.blockedCapabilities,
     resourceFormGate.resourceHintResourceMapCommitBlockedCapabilities
   );
-  assert.equal(fakeDom.head.childNodes.length, 2);
+  assert.equal(fakeDom.head.childNodes.length, 4);
   assert.equal(JSON.stringify(diagnostic).includes('/style.css'), false);
   assert.equal(JSON.stringify(diagnostic).includes('/script.js'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('/module.mjs'), false);
   assert.equal(JSON.stringify(diagnostic).includes('sha256-style'), false);
   assert.equal(JSON.stringify(diagnostic).includes('sha256-script'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('nonce-module'), false);
   assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
 
   assert.equal(
@@ -7066,7 +7734,11 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   assert.equal(summary.mutatesFakeResourceMaps, false);
   assert.equal(summary.claimsSingletonOwnership, false);
   assert.equal(summary.startsFetchOrPreload, false);
+  assert.equal(summary.startsScriptExecution, false);
   assert.equal(summary.mutatesLoadState, false);
+  assert.equal(summary.recordsModulePreloadRows, true);
+  assert.equal(summary.recordsModuleScriptRows, true);
+  assert.equal(summary.publicScriptModuleResourceDispatch, false);
   assert.deepEqual(
     summary.sideEffects,
     resourceFormGate.resourceHintResourceMapCommitBlockedSideEffects
@@ -7604,11 +8276,12 @@ test('private resource hint dispatcher metadata rejects malformed or dispatching
     }
   );
   assert.throws(
-    () => gate.recordResourceHintDispatcherRequest('M', ['/module.mjs']),
+    () => gate.recordResourceHintDispatcherRequest('M', ['/module.mjs', null]),
     {
-      code: resourceFormGate.privateResourceHintDispatcherMetadataUnknownRequestCode,
+      code: resourceFormGate.privateResourceHintDispatcherMetadataInvalidShapeCode,
       compatibilityTarget,
-      requestName: 'M'
+      contractId: 'preinit-module-script',
+      privateDispatcherKey: 'M'
     }
   );
   assert.throws(
@@ -9521,6 +10194,7 @@ function summarizePreloadPreinitOrder(diagnostic) {
       uniqueResourceCount: diagnostic.resourceMapPlan.uniqueResourceCount,
       preloadResourceCount: diagnostic.resourceMapPlan.preloadResourceCount,
       preinitResourceCount: diagnostic.resourceMapPlan.preinitResourceCount,
+      scriptModuleRowCount: diagnostic.resourceMapPlan.scriptModuleRowCount,
       dedupedRowCount: diagnostic.resourceMapPlan.dedupedRowCount
     }
   };
