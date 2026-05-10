@@ -5,18 +5,29 @@
 //! child reconciliation, commit, host mutation, passive effects, sync flushing,
 //! or switching `root.current`.
 
+#![cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "private HostRoot child begin-work preflight is reserved until a real fiber traversal consumes it"
+    )
+)]
+
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberId, FiberTopologyError, Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
+    FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
+    begin_work::{BeginWorkError, BeginWorkRequest, BeginWorkResult, begin_work},
     create_host_root_work_in_progress,
+    function_component::FunctionComponentInvoker,
+    unsupported_features::unsupported_reconciler_feature_for_fiber_tag,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,6 +99,221 @@ impl From<WorkInProgressError> for RootWorkLoopError {
     fn from(error: WorkInProgressError) -> Self {
         Self::WorkInProgress(error)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootChildBeginWorkPreflightRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    child: Option<FiberId>,
+    child_tag: Option<FiberTag>,
+    render_lanes: Lanes,
+    begin_work: Option<BeginWorkResult>,
+}
+
+impl HostRootChildBeginWorkPreflightRecord {
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn child(self) -> Option<FiberId> {
+        self.child
+    }
+
+    #[must_use]
+    const fn child_tag(self) -> Option<FiberTag> {
+        self.child_tag
+    }
+
+    #[must_use]
+    const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    const fn requires_begin_work(self) -> bool {
+        self.begin_work.is_some()
+    }
+
+    #[must_use]
+    const fn begin_work(self) -> Option<BeginWorkResult> {
+        self.begin_work
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootChildBeginWorkPreflightError {
+    FiberRootStore(FiberRootStoreError),
+    FiberTopology(FiberTopologyError),
+    BeginWork(BeginWorkError),
+    ExpectedHostRootWorkInProgress {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    WorkInProgressNotLinkedToRootCurrent {
+        root: FiberRootId,
+        current: FiberId,
+        work_in_progress: FiberId,
+        current_alternate: Option<FiberId>,
+        work_in_progress_alternate: Option<FiberId>,
+    },
+    UnsupportedReconcilerFiberFeature {
+        fiber: FiberId,
+        tag: FiberTag,
+        feature: &'static str,
+    },
+}
+
+impl Display for HostRootChildBeginWorkPreflightError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::BeginWork(error) => Display::fmt(error, formatter),
+            Self::ExpectedHostRootWorkInProgress { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be HostRoot work-in-progress for root child begin-work preflight, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::WorkInProgressNotLinkedToRootCurrent {
+                root,
+                current,
+                work_in_progress,
+                current_alternate,
+                work_in_progress_alternate,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} is not the reciprocal alternate of current {}; current alternate {:?}, work-in-progress alternate {:?}",
+                root.raw(),
+                work_in_progress.slot().get(),
+                current.slot().get(),
+                current_alternate.map(|fiber| fiber.slot().get()),
+                work_in_progress_alternate.map(|fiber| fiber.slot().get())
+            ),
+            Self::UnsupportedReconcilerFiberFeature {
+                fiber,
+                tag,
+                feature,
+            } => write!(
+                formatter,
+                "fiber {} has unsupported root work-loop child tag {:?}: {feature}",
+                fiber.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+impl Error for HostRootChildBeginWorkPreflightError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::BeginWork(error) => Some(error),
+            Self::ExpectedHostRootWorkInProgress { .. }
+            | Self::WorkInProgressNotLinkedToRootCurrent { .. }
+            | Self::UnsupportedReconcilerFiberFeature { .. } => None,
+        }
+    }
+}
+
+impl From<FiberRootStoreError> for HostRootChildBeginWorkPreflightError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+impl From<FiberTopologyError> for HostRootChildBeginWorkPreflightError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+impl From<BeginWorkError> for HostRootChildBeginWorkPreflightError {
+    fn from(error: BeginWorkError) -> Self {
+        Self::BeginWork(error)
+    }
+}
+
+fn preflight_host_root_child_begin_work<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    render_lanes: Lanes,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<HostRootChildBeginWorkPreflightRecord, HostRootChildBeginWorkPreflightError> {
+    let current = store.root(root_id)?.current();
+    let current_alternate = store.fiber_arena().get(current)?.alternate();
+    let work_node = store.fiber_arena().get(host_root_work_in_progress)?;
+    let work_tag = work_node.tag();
+    if work_tag != FiberTag::HostRoot {
+        return Err(
+            HostRootChildBeginWorkPreflightError::ExpectedHostRootWorkInProgress {
+                fiber: host_root_work_in_progress,
+                tag: work_tag,
+            },
+        );
+    }
+
+    let work_in_progress_alternate = work_node.alternate();
+    if current_alternate != Some(host_root_work_in_progress)
+        || work_in_progress_alternate != Some(current)
+    {
+        return Err(
+            HostRootChildBeginWorkPreflightError::WorkInProgressNotLinkedToRootCurrent {
+                root: root_id,
+                current,
+                work_in_progress: host_root_work_in_progress,
+                current_alternate,
+                work_in_progress_alternate,
+            },
+        );
+    }
+
+    let Some(child) = work_node.child() else {
+        return Ok(HostRootChildBeginWorkPreflightRecord {
+            root: root_id,
+            host_root_work_in_progress,
+            child: None,
+            child_tag: None,
+            render_lanes,
+            begin_work: None,
+        });
+    };
+
+    let child_tag = store.fiber_arena().get(child)?.tag();
+    if let Some(feature) = unsupported_reconciler_feature_for_fiber_tag(child_tag) {
+        return Err(
+            HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                fiber: child,
+                tag: feature.tag(),
+                feature: feature.feature(),
+            },
+        );
+    }
+
+    let begin_work = begin_work(
+        store.fiber_arena_mut(),
+        BeginWorkRequest::new(child, render_lanes),
+        invoker,
+    )?;
+
+    Ok(HostRootChildBeginWorkPreflightRecord {
+        root: root_id,
+        host_root_work_in_progress,
+        child: Some(child),
+        child_tag: Some(child_tag),
+        render_lanes,
+        begin_work: Some(begin_work),
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -349,12 +575,66 @@ fn refresh_update_queue_for_work_in_progress<H: HostTypes>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::begin_work::BeginWorkError;
+    use crate::function_component::{
+        FunctionComponentInvocationError, FunctionComponentInvocationRequest,
+        FunctionComponentOutputHandle,
+    };
     use crate::test_support::{FakeContainer, RecordingHost};
+    use crate::unsupported_features::SUSPENSE_UNSUPPORTED_FEATURE;
     use crate::{
         RootElementHandle, RootOptions, RootTaskScheduleOutcome, ensure_root_is_scheduled,
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
-    use fast_react_core::{Lane, Lanes};
+    use fast_react_core::{
+        FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, StateHandle,
+        UpdateQueueHandle,
+    };
+
+    #[derive(Debug, Clone)]
+    struct RegisteredComponent {
+        component: FiberTypeHandle,
+        result: Result<FunctionComponentOutputHandle, FunctionComponentInvocationError>,
+    }
+
+    #[derive(Debug, Default)]
+    struct TestFunctionComponentRegistry {
+        components: Vec<RegisteredComponent>,
+        calls: Vec<FunctionComponentInvocationRequest>,
+    }
+
+    impl TestFunctionComponentRegistry {
+        fn register(
+            &mut self,
+            component: FiberTypeHandle,
+            result: Result<FunctionComponentOutputHandle, FunctionComponentInvocationError>,
+        ) {
+            self.components
+                .push(RegisteredComponent { component, result });
+        }
+
+        fn calls(&self) -> &[FunctionComponentInvocationRequest] {
+            &self.calls
+        }
+    }
+
+    impl FunctionComponentInvoker for TestFunctionComponentRegistry {
+        fn invoke_function_component(
+            &mut self,
+            request: FunctionComponentInvocationRequest,
+        ) -> Result<FunctionComponentOutputHandle, FunctionComponentInvocationError> {
+            self.calls.push(request);
+            self.components
+                .iter()
+                .find(|component| component.component == request.component())
+                .map(|component| component.result.clone())
+                .unwrap_or_else(|| {
+                    Err(FunctionComponentInvocationError::component_error(
+                        "missing test component registration",
+                    ))
+                })
+        }
+    }
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -388,6 +668,50 @@ mod tests {
             RootTaskScheduleOutcome::Scheduled
         );
         store.root(root_id).unwrap().scheduling().callback_node()
+    }
+
+    fn attach_function_component_wip_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberTypeHandle) {
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(501),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(601);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(502))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[work_in_progress])
+            .unwrap();
+
+        (current, work_in_progress, component)
+    }
+
+    fn attach_wip_child_with_tag(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+        tag: FiberTag,
+    ) -> FiberId {
+        let child =
+            store
+                .fiber_arena_mut()
+                .create_fiber(tag, None, PropsHandle::NONE, FiberMode::NO);
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[child])
+            .unwrap();
+        child
     }
 
     #[test]
@@ -560,6 +884,150 @@ mod tests {
         assert!(!result.validation().is_stale());
         assert_eq!(render.applied_update_count(), 1);
         assert_eq!(render.resulting_element(), RootElementHandle::from_raw(1));
+    }
+
+    #[test]
+    fn root_work_loop_preflight_reports_host_root_wip_without_child() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(17), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let record = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(record.child(), None);
+        assert_eq!(record.child_tag(), None);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert!(!record.requires_begin_work());
+        assert_eq!(record.begin_work(), None);
+        assert!(registry.calls().is_empty());
+    }
+
+    #[test]
+    fn root_work_loop_preflight_delegates_function_component_child_to_begin_work() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(18), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (current_child, child_work_in_progress, component) =
+            attach_function_component_wip_child(&mut store, render.work_in_progress());
+        let output = FunctionComponentOutputHandle::from_raw(701);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let record = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let begin_work_record = record.begin_work().unwrap().function_component();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(record.child(), Some(child_work_in_progress));
+        assert_eq!(record.child_tag(), Some(FiberTag::FunctionComponent));
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert!(record.requires_begin_work());
+        assert_eq!(begin_work_record.current(), Some(current_child));
+        assert_eq!(begin_work_record.work_in_progress(), child_work_in_progress);
+        assert_eq!(begin_work_record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(begin_work_record.output(), output);
+        assert_eq!(begin_work_record.render().component(), component);
+        assert_eq!(
+            begin_work_record.render().props(),
+            PropsHandle::from_raw(502)
+        );
+        assert_eq!(registry.calls().len(), 1);
+        let call = registry.calls()[0];
+        assert_eq!(call.fiber(), child_work_in_progress);
+        assert_eq!(call.component(), component);
+        assert_eq!(call.props(), PropsHandle::from_raw(502));
+        assert_eq!(call.render_lanes(), Lanes::DEFAULT);
+
+        let child_node = store.fiber_arena().get(child_work_in_progress).unwrap();
+        assert_eq!(child_node.memoized_props(), PropsHandle::from_raw(502));
+        assert_eq!(child_node.memoized_state(), StateHandle::NONE);
+        assert_eq!(child_node.update_queue(), UpdateQueueHandle::NONE);
+        assert_eq!(child_node.lanes(), Lanes::NO);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn root_work_loop_preflight_fails_closed_for_explicit_unsupported_child_tags() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(19), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let child =
+            attach_wip_child_with_tag(&mut store, render.work_in_progress(), FiberTag::Suspense);
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                fiber: child,
+                tag: FiberTag::Suspense,
+                feature: SUSPENSE_UNSUPPORTED_FEATURE,
+            }
+        );
+        assert!(registry.calls().is_empty());
+    }
+
+    #[test]
+    fn root_work_loop_preflight_fails_closed_through_begin_work_for_unhandled_child_tags() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(20), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let child =
+            attach_wip_child_with_tag(&mut store, render.work_in_progress(), FiberTag::HostText);
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootChildBeginWorkPreflightError::BeginWork(BeginWorkError::UnsupportedFiberTag {
+                fiber: child,
+                tag: FiberTag::HostText,
+            },)
+        );
+        assert!(registry.calls().is_empty());
     }
 
     #[test]
