@@ -89,6 +89,100 @@ test("private hydration boundary gate accepts the checked marker oracle", () => 
   );
 });
 
+test("private hydration boundary gate parses accepted container marker evidence read-only", () => {
+  const { container, contractIds } = createAcceptedHydrationMarkerFixture(
+    "parser"
+  );
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    markerOracle: oracle
+  });
+  const diagnostics = gate.inspectContainerMarkers(container);
+
+  assert.equal(
+    diagnostics.kind,
+    "FastReactDomHydrationContainerMarkerDiagnostics"
+  );
+  assert.equal(diagnostics.status, "diagnostic-only");
+  assert.equal(diagnostics.diagnosticOnly, true);
+  assert.equal(diagnostics.readOnly, true);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.canHydrate, false);
+  assert.equal(diagnostics.hydrateRootSupported, false);
+  assert.equal(diagnostics.rootSchedulingSupported, false);
+  assert.equal(diagnostics.eventReplaySupported, false);
+  assert.equal(diagnostics.domMutationSupported, false);
+  assert.equal(diagnostics.suspenseHydrationSupported, false);
+  assert.equal(diagnostics.formMarkerClaimingSupported, false);
+  assert.equal(diagnostics.markerContractCount, oracle.markerContracts.length);
+  assert.equal(diagnostics.acceptedMarkerCount, oracle.markerContracts.length);
+  assert.equal(diagnostics.commentMarkerCount, 12);
+  assert.equal(diagnostics.templateMarkerCount, 5);
+  assert.equal(diagnostics.unrecognizedMarkerCount, 0);
+  assert.deepEqual(
+    diagnostics.markers.map((marker) => marker.contractId),
+    contractIds
+  );
+  assert.deepEqual(
+    diagnostics.summaryByContract,
+    oracle.markerContracts.map((contract) => ({
+      id: contract.id,
+      count: 1
+    }))
+  );
+
+  const pendingMarker = diagnostics.markers.find(
+    (marker) => marker.contractId === "suspense-pending-start"
+  );
+  assert.equal(pendingMarker.companion.status, "matched");
+  assert.equal(pendingMarker.companion.templateInfo.id, "parser-B:1a");
+  assert.equal(pendingMarker.companion.acceptedEvidence, true);
+
+  const clientRenderedMarker = diagnostics.markers.find(
+    (marker) => marker.contractId === "suspense-client-rendered-start"
+  );
+  assert.deepEqual(clientRenderedMarker.companion.templateInfo.errorEvidence, {
+    componentStack: "component-stack",
+    digest: "digest",
+    message: "message",
+    stack: "stack"
+  });
+
+  const styledBoundaryMarker = diagnostics.markers.find(
+    (marker) =>
+      marker.contractId === "external-runtime-complete-boundary-with-styles"
+  );
+  assert.equal(
+    styledBoundaryMarker.templateInfo.attributes["data-sty"],
+    "[\"main\"]"
+  );
+
+  assert.deepEqual(
+    container.childNodes.map((node) => node.nodeName || "#comment"),
+    [
+      "#comment",
+      "#comment",
+      "#comment",
+      "#comment",
+      "TEMPLATE",
+      "#comment",
+      "TEMPLATE",
+      "#comment",
+      "TEMPLATE",
+      "#comment",
+      "#comment",
+      "#comment",
+      "#comment",
+      "#comment",
+      "#comment",
+      "TEMPLATE",
+      "TEMPLATE",
+      "TEMPLATE",
+      "TEMPLATE",
+      "TEMPLATE"
+    ]
+  );
+});
+
 test("private hydration boundary gate records unsupported hydrateRoot deterministically", () => {
   const first = createUnsupportedRecordScenario("deterministic");
   const second = createUnsupportedRecordScenario("deterministic");
@@ -131,7 +225,8 @@ test("private hydration boundary gate records unsupported hydrateRoot determinis
     [
       "no-hydration-root-constructor",
       "no-hydration-context",
-      "no-dom-marker-parser",
+      "no-hydration-root-scheduling",
+      "no-hydration-marker-consumption",
       "no-boundary-dom-operations",
       "no-event-replay",
       "no-form-marker-claiming"
@@ -141,6 +236,14 @@ test("private hydration boundary gate records unsupported hydrateRoot determinis
     first.record.oracleInfo.markerContractIds,
     oracle.markerContracts.map((contract) => contract.id)
   );
+  assert.equal(first.record.markerDiagnostics.status, "diagnostic-only");
+  assert.equal(first.record.markerDiagnostics.acceptedMarkerCount, 2);
+  assert.deepEqual(
+    first.record.markerDiagnostics.markers.map((marker) => marker.contractId),
+    ["suspense-completed-start", "suspense-end"]
+  );
+  assert.equal(first.record.rootScheduled, false);
+  assert.equal(first.record.suspenseHydrationScheduled, false);
 
   const payload = hydrationGate.getPrivateHydrationBoundaryRecordPayload(
     first.record
@@ -171,6 +274,9 @@ test("private hydration boundary gate does not mark containers, install listener
     { data: "$", nodeType: domContainer.COMMENT_NODE },
     { data: "/$", nodeType: domContainer.COMMENT_NODE }
   ]);
+  assert.equal(record.markerDiagnostics.diagnosticOnly, true);
+  assert.equal(record.markerDiagnostics.domMutationSupported, false);
+  assert.equal(record.markerDiagnostics.eventReplaySupported, false);
 });
 
 test("private hydration boundary gate fails closed for invalid containers and oracle drift", () => {
@@ -187,6 +293,17 @@ test("private hydration boundary gate fails closed for invalid containers and or
         },
         "child"
       ),
+    {
+      code: "FAST_REACT_DOM_INVALID_CONTAINER"
+    }
+  );
+  assert.throws(
+    () =>
+      gate.inspectContainerMarkers({
+        nodeName: "#text",
+        nodeType: domContainer.TEXT_NODE,
+        ownerDocument: createDocument("invalid-parser")
+      }),
     {
       code: "FAST_REACT_DOM_INVALID_CONTAINER"
     }
@@ -308,6 +425,94 @@ function createUnsupportedRecordScenario(label) {
     hydrationOptions,
     initialChildren,
     record
+  };
+}
+
+function createAcceptedHydrationMarkerFixture(label) {
+  const document = createDocument(label);
+  const container = createElement("DIV", document);
+  const prefix = `${label}-`;
+  container.childNodes = [
+    createComment("&"),
+    createComment("/&"),
+    createComment("$"),
+    createComment("$?"),
+    createTemplate({ id: `${prefix}B:1a` }),
+    createComment("$~"),
+    createTemplate({ id: `${prefix}B:2b` }),
+    createComment("$!"),
+    createTemplate({
+      "data-cstck": "component-stack",
+      "data-dgst": "digest",
+      "data-msg": "message",
+      "data-stck": "stack"
+    }),
+    createComment("/$"),
+    createComment("F!"),
+    createComment("F"),
+    createComment("html"),
+    createComment("head"),
+    createComment("body"),
+    createTemplate({ id: `${prefix}P:3c` }),
+    createTemplate({
+      "data-pid": `${prefix}P:3c`,
+      "data-rsi": "",
+      "data-sid": `${prefix}S:4d`
+    }),
+    createTemplate({
+      "data-bid": `${prefix}B:1a`,
+      "data-rci": "",
+      "data-sid": `${prefix}S:4d`
+    }),
+    createTemplate({
+      "data-bid": `${prefix}B:1a`,
+      "data-rri": "",
+      "data-sid": `${prefix}S:4d`,
+      "data-sty": "[\"main\"]"
+    }),
+    createTemplate({
+      "data-bid": `${prefix}B:1a`,
+      "data-cstck": "component-stack",
+      "data-dgst": "digest",
+      "data-msg": "message",
+      "data-rxi": "",
+      "data-stck": "stack"
+    })
+  ];
+  for (const node of container.childNodes) {
+    if (node.attributes) {
+      Object.freeze(node.attributes);
+    }
+    Object.freeze(node);
+  }
+  Object.freeze(container.childNodes);
+  Object.freeze(container);
+
+  return {
+    container,
+    document,
+    contractIds: oracle.markerContracts.map((contract) => contract.id)
+  };
+}
+
+function createComment(data) {
+  return {
+    data,
+    nodeType: domContainer.COMMENT_NODE
+  };
+}
+
+function createTemplate(attributes) {
+  return {
+    attributes,
+    childNodes: [],
+    nodeName: "TEMPLATE",
+    nodeType: domContainer.ELEMENT_NODE,
+    getAttribute(name) {
+      return Object.prototype.hasOwnProperty.call(attributes, name)
+        ? attributes[name]
+        : null;
+    }
   };
 }
 
