@@ -12397,6 +12397,10 @@ mod tests {
             &mut store, &mut host, render, &source,
         )
         .unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(render.finished_work(), render.render_lanes());
         let pending_finished_work =
             record_host_root_finished_work_pending_commit_for_canary(&store, render, 625).unwrap();
         let host_operation_count_after_complete_work = host.operations().len();

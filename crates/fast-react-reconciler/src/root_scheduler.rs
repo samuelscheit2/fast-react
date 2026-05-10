@@ -24,6 +24,8 @@ use crate::root_commit::{
     HostRootFinishedWorkCommitHandoffErrorForCanary,
     HostRootFinishedWorkCommitHandoffRecordForCanary,
     commit_completed_host_root_render_with_finished_work_handoff_for_canary,
+    commit_finished_host_root_with_finished_work_handoff_for_canary,
+    record_host_root_finished_work_pending_commit_for_canary,
 };
 use crate::root_config::{RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord};
 use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
@@ -1186,6 +1188,11 @@ pub(crate) enum RootSyncSchedulerContinuationExecutionStatus {
     BlockedByPendingPassive,
     NoSyncWork,
     BlockedByLaneMismatch,
+    #[allow(
+        dead_code,
+        reason = "constructed by test-only finished-work handoff validation"
+    )]
+    BlockedByFinishedWorkHandoffMismatch,
     RenderedAndCommitted,
 }
 
@@ -1197,7 +1204,115 @@ pub(crate) enum RootExpiredLaneSyncSchedulerContinuationStatus {
     BlockedByPendingPassive,
     NoContinuationWork,
     BlockedByLaneMismatch,
+    #[allow(
+        dead_code,
+        reason = "mirrors the test-only sync continuation finished-work blocker"
+    )]
+    BlockedByFinishedWorkHandoffMismatch,
     RenderedAndCommitted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootSyncSchedulerFinishedWorkHandoffIdentityForCanary {
+    root: FiberRootId,
+    render_phase_root: FiberRootId,
+    selected_lanes: Lanes,
+    previous_current: FiberId,
+    current_before_commit: FiberId,
+    pending_work_before_commit: Option<FiberId>,
+    root_finished_work_before_commit: Option<FiberId>,
+    finished_work: FiberId,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    root_finished_lanes_before_commit: Lanes,
+    pending_lanes_before_commit: Lanes,
+    render_phase_lanes_before_commit: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root scheduler finished-work identity is reserved for canary continuation checks"
+)]
+impl RootSyncSchedulerFinishedWorkHandoffIdentityForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_root(self) -> FiberRootId {
+        self.render_phase_root
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn current_before_commit(self) -> FiberId {
+        self.current_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_work_before_commit(self) -> Option<FiberId> {
+        self.pending_work_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn root_finished_work_before_commit(self) -> Option<FiberId> {
+        self.root_finished_work_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn root_finished_lanes_before_commit(self) -> Lanes {
+        self.root_finished_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before_commit(self) -> Lanes {
+        self.pending_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_lanes_before_commit(self) -> Lanes {
+        self.render_phase_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_for_root_scheduler_commit_handoff(self) -> bool {
+        self.root == self.render_phase_root
+            && self.current_before_commit == self.previous_current
+            && self.pending_work_before_commit == Some(self.finished_work)
+            && self.root_finished_work_before_commit == Some(self.finished_work)
+            && self.render_lanes == self.selected_lanes
+            && self.finished_lanes == self.selected_lanes
+            && self.root_finished_lanes_before_commit == self.finished_lanes
+            && self.render_phase_lanes_before_commit == self.render_lanes
+            && self
+                .pending_lanes_before_commit
+                .contains_all(self.selected_lanes)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1252,6 +1367,7 @@ pub(crate) struct RootSyncSchedulerContinuationExecutionRecord {
     current_callback_node: RootSchedulerCallbackHandle,
     selected_lanes: Lanes,
     pending_passive_blocker: Option<RootSyncSchedulerPendingPassiveBlockerRecord>,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
     status: RootSyncSchedulerContinuationExecutionStatus,
     commit: Option<HostRootCommitRecord>,
     #[cfg(test)]
@@ -1298,6 +1414,13 @@ impl RootSyncSchedulerContinuationExecutionRecord {
         &self,
     ) -> Option<RootSyncSchedulerPendingPassiveBlockerRecord> {
         self.pending_passive_blocker
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff_identity(
+        &self,
+    ) -> Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary> {
+        self.finished_work_handoff_identity
     }
 
     #[must_use]
@@ -1351,12 +1474,23 @@ impl RootSyncSchedulerContinuationExecutionRecord {
     }
 
     #[must_use]
+    pub(crate) const fn blocked_by_finished_work_handoff_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch
+        )
+    }
+
+    #[must_use]
     pub(crate) fn consumed_accepted_render_handoff(&self) -> bool {
         self.commit.as_ref().is_some_and(|commit| {
             self.did_execute_private_sync_scheduler_continuation()
                 && commit.root() == self.root()
                 && commit.current() == self.handoff.render_phase().finished_work()
                 && commit.finished_lanes() == self.handoff.lanes()
+                && self
+                    .finished_work_handoff_identity
+                    .is_some_and(RootSyncSchedulerFinishedWorkHandoffIdentityForCanary::accepted_for_root_scheduler_commit_handoff)
         })
     }
 
@@ -1534,6 +1668,14 @@ impl RootExpiredLaneSyncSchedulerContinuationRecord {
         matches!(
             self.status,
             RootExpiredLaneSyncSchedulerContinuationStatus::BlockedByLaneMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_finished_work_handoff_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootExpiredLaneSyncSchedulerContinuationStatus::BlockedByFinishedWorkHandoffMismatch
         )
     }
 
@@ -3822,6 +3964,8 @@ pub(crate) fn execute_expired_lane_sync_scheduler_continuation_for_root_for_cana
 
     let render_phase = render_host_root_for_lanes(store, root_id, selected_render_lanes)
         .map_err(RootSchedulerError::from)?;
+    #[cfg(test)]
+    record_root_finished_work_for_scheduler_handoff_for_canary(store, render_phase)?;
     let handoff = RootSyncFlushRecord {
         order: 0,
         root: root_id,
@@ -3866,6 +4010,9 @@ fn expired_lane_sync_scheduler_status_from_sync_continuation(
         }
         RootSyncSchedulerContinuationExecutionStatus::BlockedByLaneMismatch => {
             RootExpiredLaneSyncSchedulerContinuationStatus::BlockedByLaneMismatch
+        }
+        RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch => {
+            RootExpiredLaneSyncSchedulerContinuationStatus::BlockedByFinishedWorkHandoffMismatch
         }
         RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted => {
             RootExpiredLaneSyncSchedulerContinuationStatus::RenderedAndCommitted
@@ -3920,6 +4067,7 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
             current_callback_node,
             Lanes::NO,
             None,
+            None,
             RootSyncSchedulerContinuationExecutionStatus::StaleCallbackNode,
             None,
         ));
@@ -3935,6 +4083,7 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
             current_callback_node,
             selected_lanes,
             pending_passive_blocker,
+            None,
             RootSyncSchedulerContinuationExecutionStatus::BlockedByPendingPassive,
             None,
         ));
@@ -3946,6 +4095,7 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
             requested_callback_node,
             current_callback_node,
             selected_lanes,
+            None,
             None,
             RootSyncSchedulerContinuationExecutionStatus::NoSyncWork,
             None,
@@ -3959,23 +4109,51 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
             current_callback_node,
             selected_lanes,
             None,
+            None,
             RootSyncSchedulerContinuationExecutionStatus::BlockedByLaneMismatch,
             None,
         ));
     }
 
     #[cfg(test)]
-    let root_commit_handoff =
-        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+    let finished_work_handoff_identity =
+        root_sync_scheduler_finished_work_handoff_identity_for_canary(store, handoff)?;
+    #[cfg(test)]
+    if !finished_work_handoff_identity.accepted_for_root_scheduler_commit_handoff() {
+        return Ok(sync_scheduler_continuation_execution_record(
+            handoff,
+            requested_callback_node,
+            current_callback_node,
+            selected_lanes,
+            None,
+            Some(finished_work_handoff_identity),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch,
+            None,
+        ));
+    }
+
+    #[cfg(test)]
+    let root_commit_handoff = {
+        let pending = record_host_root_finished_work_pending_commit_for_canary(
             store,
             handoff.render_phase(),
             handoff.order(),
-            handoff.order().saturating_add(1),
         )?;
+        commit_finished_host_root_with_finished_work_handoff_for_canary(
+            store,
+            handoff.render_phase(),
+            Some(pending),
+            handoff.order().saturating_add(1),
+        )?
+    };
     #[cfg(test)]
     let commit = root_commit_handoff.commit().clone();
     #[cfg(not(test))]
     let commit = crate::commit_finished_host_root(store, handoff.render_phase())?;
+    #[cfg(test)]
+    let finished_work_identity_for_record = Some(finished_work_handoff_identity);
+    #[cfg(not(test))]
+    let finished_work_identity_for_record = None;
     recompute_might_have_pending_sync_work(store)?;
 
     let record = sync_scheduler_continuation_execution_record(
@@ -3984,6 +4162,7 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
         current_callback_node,
         selected_lanes,
         None,
+        finished_work_identity_for_record,
         RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted,
         Some(commit),
     );
@@ -4037,12 +4216,17 @@ fn sync_scheduler_pending_passive_blocker_for_root<H: HostTypes>(
     }))
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private sync scheduler continuation evidence mirrors the canary assertion shape"
+)]
 fn sync_scheduler_continuation_execution_record(
     handoff: RootSyncFlushRecord,
     requested_callback_node: RootSchedulerCallbackHandle,
     current_callback_node: RootSchedulerCallbackHandle,
     selected_lanes: Lanes,
     pending_passive_blocker: Option<RootSyncSchedulerPendingPassiveBlockerRecord>,
+    finished_work_handoff_identity: Option<RootSyncSchedulerFinishedWorkHandoffIdentityForCanary>,
     status: RootSyncSchedulerContinuationExecutionStatus,
     commit: Option<HostRootCommitRecord>,
 ) -> RootSyncSchedulerContinuationExecutionRecord {
@@ -4052,11 +4236,43 @@ fn sync_scheduler_continuation_execution_record(
         current_callback_node,
         selected_lanes,
         pending_passive_blocker,
+        finished_work_handoff_identity,
         status,
         commit,
         #[cfg(test)]
         root_commit_handoff: None,
     }
+}
+
+#[cfg(test)]
+fn root_sync_scheduler_finished_work_handoff_identity_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    handoff: RootSyncFlushRecord,
+) -> Result<
+    RootSyncSchedulerFinishedWorkHandoffIdentityForCanary,
+    RootSyncSchedulerContinuationExecutionError,
+> {
+    let root = store
+        .root(handoff.root())
+        .map_err(RootSchedulerError::from)?;
+    let scheduling = root.scheduling();
+    let render_phase = handoff.render_phase();
+
+    Ok(RootSyncSchedulerFinishedWorkHandoffIdentityForCanary {
+        root: handoff.root(),
+        render_phase_root: render_phase.root(),
+        selected_lanes: handoff.lanes(),
+        previous_current: render_phase.current(),
+        current_before_commit: root.current(),
+        pending_work_before_commit: scheduling.work_in_progress(),
+        root_finished_work_before_commit: root.finished_work(),
+        finished_work: render_phase.finished_work(),
+        render_lanes: render_phase.render_lanes(),
+        finished_lanes: render_phase.render_lanes(),
+        root_finished_lanes_before_commit: root.finished_lanes(),
+        pending_lanes_before_commit: root.lanes().pending_lanes(),
+        render_phase_lanes_before_commit: scheduling.work_in_progress_root_render_lanes(),
+    })
 }
 
 pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
@@ -4220,6 +4436,8 @@ pub fn flush_sync_work_on_all_roots<H: HostTypes>(
 
             if next_lanes.is_non_empty() {
                 let render_phase = render_host_root_for_lanes(store, root_id, next_lanes)?;
+                #[cfg(test)]
+                record_root_finished_work_for_scheduler_handoff_for_canary(store, render_phase)?;
                 records.push(RootSyncFlushRecord {
                     order: records.len(),
                     root: root_id,
@@ -4242,6 +4460,17 @@ pub fn flush_sync_work_on_all_roots<H: HostTypes>(
         exit_status: RootSyncFlushExitStatus::Completed,
         records,
     })
+}
+
+#[cfg(test)]
+fn record_root_finished_work_for_scheduler_handoff_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render_phase: HostRootRenderPhaseRecord,
+) -> Result<(), RootSchedulerError> {
+    store
+        .root_mut(render_phase.root())?
+        .record_finished_work_for_canary(render_phase.finished_work(), render_phase.render_lanes());
+    Ok(())
 }
 
 pub fn scheduled_roots<H: HostTypes>(
@@ -7098,6 +7327,30 @@ mod tests {
         );
         assert_eq!(execution.handoff_lanes(), Lanes::SYNC);
         assert_eq!(execution.selected_lanes(), Lanes::SYNC);
+        let identity = execution.finished_work_handoff_identity().unwrap();
+        assert_eq!(identity.root(), root_id);
+        assert_eq!(identity.render_phase_root(), root_id);
+        assert_eq!(identity.previous_current(), current);
+        assert_eq!(identity.current_before_commit(), current);
+        assert_eq!(
+            identity.pending_work_before_commit(),
+            Some(handoff.render_phase().finished_work())
+        );
+        assert_eq!(
+            identity.root_finished_work_before_commit(),
+            Some(handoff.render_phase().finished_work())
+        );
+        assert_eq!(
+            identity.finished_work(),
+            handoff.render_phase().finished_work()
+        );
+        assert_eq!(identity.selected_lanes(), Lanes::SYNC);
+        assert_eq!(identity.render_lanes(), Lanes::SYNC);
+        assert_eq!(identity.finished_lanes(), Lanes::SYNC);
+        assert_eq!(identity.root_finished_lanes_before_commit(), Lanes::SYNC);
+        assert_eq!(identity.pending_lanes_before_commit(), Lanes::SYNC);
+        assert_eq!(identity.render_phase_lanes_before_commit(), Lanes::SYNC);
+        assert!(identity.accepted_for_root_scheduler_commit_handoff());
         assert!(execution.did_execute_private_sync_scheduler_continuation());
         assert!(execution.consumed_accepted_render_handoff());
         assert!(execution.accepted_root_scheduler_execution_evidence_for_canary());
@@ -7280,6 +7533,138 @@ mod tests {
         );
         assert!(execution.commit().is_none());
         assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_rejects_missing_finished_work_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5966));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let handoff = rendered.records()[0];
+        store.root_mut(root_id).unwrap().clear_finished_work();
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch
+        );
+        assert!(execution.blocked_by_finished_work_handoff_mismatch());
+        assert_eq!(execution.selected_lanes(), Lanes::SYNC);
+        assert!(execution.commit().is_none());
+        assert!(execution.root_commit_handoff_for_canary().is_none());
+        let identity = execution.finished_work_handoff_identity().unwrap();
+        assert_eq!(identity.root(), root_id);
+        assert_eq!(identity.render_phase_root(), root_id);
+        assert_eq!(
+            identity.pending_work_before_commit(),
+            Some(handoff.render_phase().finished_work())
+        );
+        assert_eq!(identity.root_finished_work_before_commit(), None);
+        assert_eq!(identity.root_finished_lanes_before_commit(), Lanes::NO);
+        assert!(!identity.accepted_for_root_scheduler_commit_handoff());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(handoff.render_phase().finished_work())
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_rejects_stale_finished_work_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5967));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let handoff = rendered.records()[0];
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(current, Lanes::SYNC);
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch
+        );
+        assert!(execution.blocked_by_finished_work_handoff_mismatch());
+        assert!(execution.commit().is_none());
+        let identity = execution.finished_work_handoff_identity().unwrap();
+        assert_eq!(identity.root_finished_work_before_commit(), Some(current));
+        assert_eq!(
+            identity.finished_work(),
+            handoff.render_phase().finished_work()
+        );
+        assert_eq!(identity.root_finished_lanes_before_commit(), Lanes::SYNC);
+        assert!(!identity.accepted_for_root_scheduler_commit_handoff());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_rejects_foreign_finished_work_handoff() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first_current = store.root(first).unwrap().current();
+        let second_current = store.root(second).unwrap().current();
+        schedule_sync_update(&mut store, first, RootElementHandle::from_raw(5968));
+        schedule_sync_update(&mut store, second, RootElementHandle::from_raw(5969));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let first_handoff = rendered
+            .records()
+            .iter()
+            .copied()
+            .find(|record| record.root() == first)
+            .unwrap();
+        let foreign_handoff =
+            root_sync_flush_record_for_canary(0, second, Lanes::SYNC, first_handoff.render_phase());
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            foreign_handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch
+        );
+        assert!(execution.blocked_by_finished_work_handoff_mismatch());
+        assert!(execution.commit().is_none());
+        let identity = execution.finished_work_handoff_identity().unwrap();
+        assert_eq!(identity.root(), second);
+        assert_eq!(identity.render_phase_root(), first);
+        assert_ne!(
+            identity.root_finished_work_before_commit(),
+            Some(identity.finished_work())
+        );
+        assert!(!identity.accepted_for_root_scheduler_commit_handoff());
+        assert_eq!(store.root(first).unwrap().current(), first_current);
+        assert_eq!(store.root(second).unwrap().current(), second_current);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -7874,8 +8259,22 @@ mod tests {
             store.root(first_scheduled).unwrap().current(),
             first_current
         );
-        assert_eq!(store.root(second_scheduled).unwrap().finished_work(), None);
-        assert_eq!(store.root(first_scheduled).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(second_scheduled).unwrap().finished_work(),
+            Some(result.records()[0].render_phase().finished_work())
+        );
+        assert_eq!(
+            store.root(second_scheduled).unwrap().finished_lanes(),
+            Lanes::SYNC
+        );
+        assert_eq!(
+            store.root(first_scheduled).unwrap().finished_work(),
+            Some(result.records()[1].render_phase().finished_work())
+        );
+        assert_eq!(
+            store.root(first_scheduled).unwrap().finished_lanes(),
+            Lanes::SYNC
+        );
         assert!(!store.root_scheduler().is_flushing_work());
     }
 }
