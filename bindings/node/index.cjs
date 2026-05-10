@@ -12,8 +12,11 @@ const platformArtifactPolicy =
 const optionalPackagePrefix = '@fast-react/native-';
 const nativeRootBridgeRequestShapeGateStatus =
   'admitted-native-root-bridge-js-request-shape';
+const nativeRootBridgeHandleAdmissionPreflightStatus =
+  'preflighted-native-root-bridge-real-handle-admission';
 const nativeRootBridgeRequestValidationModel =
   'fast-react-napi.NativeRootBridgeRequestSequenceValidator';
+const nativeRootBridgeHandleTableModel = 'fast-react-napi.BridgeHandleTable';
 const nativeRootBridgeRequestShapeErrorCode =
   'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID';
 const nativeRootBridgeRequestKindCreate = 'create';
@@ -62,6 +65,18 @@ const nativeRootBridgeRustRequestRecordFields = Object.freeze([
   'value_handle',
   'root_handle_state'
 ]);
+const nativeRootBridgeRustValidationRecordFields = Object.freeze([
+  'request_id',
+  'kind',
+  'environment_id',
+  'root_handle',
+  'root_id',
+  'value_handle',
+  'root_handle_state',
+  'lifecycle_transition',
+  'root_handle_validated',
+  'value_handle_validated'
+]);
 const nativeRootBridgeJsHandleFields = Object.freeze([
   'environmentId',
   'slot',
@@ -74,23 +89,43 @@ const nativeRootBridgeRustHandleFields = Object.freeze([
   'generation',
   'kind'
 ]);
+const nativeRootBridgeHandleAdmissionActions = Object.freeze([
+  'admit-root-handle',
+  'admit-value-handle',
+  'validate-active-root-handle',
+  'validate-value-handle',
+  'retire-root-handle',
+  'validate-retired-root-handle'
+]);
 const nativeRootBridgeValidationErrorCodes = Object.freeze({
   createAfterRootCreated:
     'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
   handleMismatch: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_MISMATCH',
+  invalidHandle: 'FAST_REACT_NAPI_INVALID_HANDLE',
+  recordEnvironmentMismatch:
+    'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ENVIRONMENT_MISMATCH',
   requestAfterUnmount: 'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
   rootHandleStateMismatch:
     'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+  rootHandleStillActive:
+    'FAST_REACT_NAPI_ROOT_REQUEST_RETIRED_HANDLE_STILL_ACTIVE',
   rootIdMismatch: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ROOT_ID_MISMATCH',
   sequenceMustStartWithCreate:
     'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
   sequenceOutOfOrder:
     'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER',
   shapeInvalid: nativeRootBridgeRequestShapeErrorCode,
+  staleHandle: 'FAST_REACT_NAPI_STALE_HANDLE',
   unexpectedValueHandle:
     'FAST_REACT_NAPI_ROOT_REQUEST_UNEXPECTED_VALUE_HANDLE',
   wrongEnvironment: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
   wrongHandleKind: 'FAST_REACT_NAPI_WRONG_HANDLE_KIND'
+});
+const nativeRootBridgeHandleAdmissionPreflight = Object.freeze({
+  preflightStatus: nativeRootBridgeHandleAdmissionPreflightStatus,
+  handleTableModel: nativeRootBridgeHandleTableModel,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  admissionActions: nativeRootBridgeHandleAdmissionActions
 });
 
 function freezeNativeTarget({ target, platform, arch, libc, toolchain }) {
@@ -209,14 +244,17 @@ const nativeRootBridgeValidationEvidence = Object.freeze([
 const nativeRootBridgeRequestShape = Object.freeze({
   gateStatus: nativeRootBridgeRequestShapeGateStatus,
   validationModel: nativeRootBridgeRequestValidationModel,
+  handleTableModel: nativeRootBridgeHandleTableModel,
   jsRequestRecordFields: nativeRootBridgeJsRequestRecordFields,
   rustRequestRecordFields: nativeRootBridgeRustRequestRecordFields,
+  rustValidationRecordFields: nativeRootBridgeRustValidationRecordFields,
   jsHandleFields: nativeRootBridgeJsHandleFields,
   rustHandleFields: nativeRootBridgeRustHandleFields,
   requestKinds: nativeRootBridgeRequestKinds,
   handleKinds: nativeRootBridgeHandleKinds,
   rootHandleStates: nativeRootBridgeRootHandleStates,
   lifecycleTransitions: nativeRootBridgeLifecycleTransitions,
+  handleAdmissionPreflight: nativeRootBridgeHandleAdmissionPreflight,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 
@@ -251,12 +289,16 @@ function createNativeRootBridgeRequestShapeGate(requests) {
   const validationRecords = requestList.map((request, index) =>
     validateNativeRootBridgeRequestShapeRecord(request, sequenceState, index)
   );
+  const handleAdmissionPreflight =
+    createNativeRootBridgeHandleAdmissionPreflight(validationRecords);
 
   return Object.freeze({
     gateStatus: nativeRootBridgeRequestShapeGateStatus,
     validationModel: nativeRootBridgeRequestValidationModel,
+    handleTableModel: nativeRootBridgeHandleTableModel,
     requestCount: validationRecords.length,
     validationRecords: Object.freeze(validationRecords),
+    handleAdmissionPreflight,
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -548,6 +590,475 @@ function toRustNativeRootBridgeHandle(handle) {
     slot: handle.slot,
     generation: handle.generation,
     kind: handle.kind
+  });
+}
+
+function createNativeRootBridgeHandleAdmissionPreflight(validationRecords) {
+  const table = createNativeRootBridgeHandleAdmissionTable();
+  const admissionRecords = validationRecords.map((record, index) =>
+    preflightNativeRootBridgeHandleAdmissionRecord(record, table, index)
+  );
+
+  return Object.freeze({
+    preflightStatus: nativeRootBridgeHandleAdmissionPreflightStatus,
+    handleTableModel: nativeRootBridgeHandleTableModel,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    requestCount: admissionRecords.length,
+    tableEnvironmentId: table.environmentId,
+    rootId: table.rootId,
+    rootHandle: table.rootHandle,
+    rootRetired: table.rootRetired,
+    admissionRecords: Object.freeze(admissionRecords),
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false
+  });
+}
+
+function createNativeRootBridgeHandleAdmissionTable() {
+  return {
+    environmentId: null,
+    rootHandle: null,
+    rootId: null,
+    rootRetired: false,
+    slots: new Map()
+  };
+}
+
+function preflightNativeRootBridgeHandleAdmissionRecord(record, table, index) {
+  ensureNativeRootBridgeHandleTableEnvironment(
+    table,
+    record.environmentId,
+    index,
+    record.requestId
+  );
+
+  let rootHandleAdmission = null;
+  let valueHandleAdmission = null;
+  let retiredRootHandleValidation = null;
+
+  if (record.kind === nativeRootBridgeRequestKindCreate) {
+    rootHandleAdmission = admitNativeRootBridgeHandleTableRecord({
+      action: 'admit-root-handle',
+      expectedKind: nativeRootBridgeHandleKindRoot,
+      field: 'rootHandle',
+      handle: record.rootHandle,
+      index,
+      requestId: record.requestId,
+      rootId: record.rootId,
+      table
+    });
+    if (record.valueHandle !== null) {
+      valueHandleAdmission = admitNativeRootBridgeHandleTableRecord({
+        action: 'admit-value-handle',
+        expectedKind: nativeRootBridgeHandleKindValue,
+        field: 'valueHandle',
+        handle: record.valueHandle,
+        index,
+        requestId: record.requestId,
+        rootId: null,
+        table
+      });
+    }
+  } else if (record.kind === nativeRootBridgeRequestKindRender) {
+    rootHandleAdmission = validateActiveNativeRootBridgeHandleTableRecord({
+      action: 'validate-active-root-handle',
+      expectedKind: nativeRootBridgeHandleKindRoot,
+      field: 'rootHandle',
+      handle: record.rootHandle,
+      index,
+      requestId: record.requestId,
+      rootId: record.rootId,
+      table
+    });
+    if (record.valueHandle !== null) {
+      valueHandleAdmission = admitNativeRootBridgeHandleTableRecord({
+        action: 'admit-value-handle',
+        expectedKind: nativeRootBridgeHandleKindValue,
+        field: 'valueHandle',
+        handle: record.valueHandle,
+        index,
+        requestId: record.requestId,
+        rootId: null,
+        table
+      });
+    }
+  } else {
+    rootHandleAdmission = retireNativeRootBridgeRootHandle({
+      handle: record.rootHandle,
+      index,
+      requestId: record.requestId,
+      rootId: record.rootId,
+      table
+    });
+    retiredRootHandleValidation = validateRetiredNativeRootBridgeRootHandle({
+      handle: record.rootHandle,
+      index,
+      requestId: record.requestId,
+      table
+    });
+  }
+
+  return Object.freeze({
+    requestId: record.requestId,
+    kind: record.kind,
+    environmentId: record.environmentId,
+    rootId: record.rootId,
+    lifecycleTransition: record.lifecycleTransition,
+    rootHandleAdmission,
+    valueHandleAdmission,
+    retiredRootHandleValidation,
+    rustValidationRecord: record.rustValidationRecord
+  });
+}
+
+function ensureNativeRootBridgeHandleTableEnvironment(
+  table,
+  environmentId,
+  index,
+  requestId
+) {
+  if (table.environmentId === null) {
+    table.environmentId = environmentId;
+    return;
+  }
+
+  if (table.environmentId === environmentId) {
+    return;
+  }
+
+  throwNativeRootBridgeRequestShapeError(
+    `Native root bridge request record belongs to environment ${environmentId}, expected environment ${table.environmentId}.`,
+    nativeRootBridgeValidationErrorCodes.recordEnvironmentMismatch,
+    {
+      expectedEnvironmentId: table.environmentId,
+      index,
+      recordEnvironmentId: environmentId,
+      requestId
+    }
+  );
+}
+
+function admitNativeRootBridgeHandleTableRecord({
+  action,
+  expectedKind,
+  field,
+  handle,
+  index,
+  requestId,
+  rootId,
+  table
+}) {
+  validateNativeRootBridgeHandleEnvironment(table, handle, field, index, requestId);
+  const existing = getNativeRootBridgeHandleTableSlot(table, handle);
+
+  if (existing === null) {
+    table.slots.set(handle.slot, {
+      generation: handle.generation,
+      handle,
+      kind: expectedKind,
+      rootId,
+      state: 'occupied'
+    });
+    if (expectedKind === nativeRootBridgeHandleKindRoot) {
+      table.rootHandle = handle;
+      table.rootId = rootId;
+    }
+    return freezeNativeRootBridgeHandleAdmissionRecord({
+      action,
+      currentGeneration: handle.generation,
+      handle,
+      rootHandleState: expectedKind === nativeRootBridgeHandleKindRoot ? 'active' : null,
+      rootId,
+      sourceErrorCode: null
+    });
+  }
+
+  validateNativeRootBridgeHandleTableSlot({
+    expectedKind,
+    field,
+    handle,
+    index,
+    requestId,
+    slot: existing
+  });
+
+  if (
+    expectedKind === nativeRootBridgeHandleKindRoot &&
+    existing.rootId !== rootId
+  ) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge request record has root id ${rootId}, expected ${existing.rootId}.`,
+      nativeRootBridgeValidationErrorCodes.rootIdMismatch,
+      {
+        actual: rootId,
+        expected: existing.rootId,
+        index,
+        requestId
+      }
+    );
+  }
+  if (
+    expectedKind === nativeRootBridgeHandleKindRoot &&
+    table.rootHandle === null
+  ) {
+    table.rootHandle = handle;
+    table.rootId = rootId;
+  }
+
+  return freezeNativeRootBridgeHandleAdmissionRecord({
+    action: action === 'admit-value-handle' ? 'validate-value-handle' : action,
+    currentGeneration: existing.generation,
+    handle,
+    rootHandleState: expectedKind === nativeRootBridgeHandleKindRoot ? 'active' : null,
+    rootId: existing.rootId,
+    sourceErrorCode: null
+  });
+}
+
+function validateActiveNativeRootBridgeHandleTableRecord({
+  action,
+  expectedKind,
+  field,
+  handle,
+  index,
+  requestId,
+  rootId,
+  table
+}) {
+  validateNativeRootBridgeHandleEnvironment(table, handle, field, index, requestId);
+  const slot = getNativeRootBridgeHandleTableSlot(table, handle);
+  if (slot === null) {
+    throwNativeRootBridgeInvalidHandleError(handle, field, index, requestId);
+  }
+
+  validateNativeRootBridgeHandleTableSlot({
+    expectedKind,
+    field,
+    handle,
+    index,
+    requestId,
+    slot
+  });
+
+  if (expectedKind === nativeRootBridgeHandleKindRoot && slot.rootId !== rootId) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge request record has root id ${rootId}, expected ${slot.rootId}.`,
+      nativeRootBridgeValidationErrorCodes.rootIdMismatch,
+      {
+        actual: rootId,
+        expected: slot.rootId,
+        index,
+        requestId
+      }
+    );
+  }
+
+  return freezeNativeRootBridgeHandleAdmissionRecord({
+    action,
+    currentGeneration: slot.generation,
+    handle,
+    rootHandleState: expectedKind === nativeRootBridgeHandleKindRoot ? 'active' : null,
+    rootId: slot.rootId,
+    sourceErrorCode: null
+  });
+}
+
+function retireNativeRootBridgeRootHandle({
+  handle,
+  index,
+  requestId,
+  rootId,
+  table
+}) {
+  const activeAdmission = validateActiveNativeRootBridgeHandleTableRecord({
+    action: 'retire-root-handle',
+    expectedKind: nativeRootBridgeHandleKindRoot,
+    field: 'rootHandle',
+    handle,
+    index,
+    requestId,
+    rootId,
+    table
+  });
+  const nextGeneration = handle.generation + 1;
+  if (!Number.isSafeInteger(nextGeneration)) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge root handle slot ${handle.slot} cannot allocate another generation.`,
+      nativeRootBridgeRequestShapeErrorCode,
+      { index, requestId, slot: handle.slot }
+    );
+  }
+
+  table.slots.set(handle.slot, {
+    kind: nativeRootBridgeHandleKindRoot,
+    nextGeneration,
+    previousGeneration: handle.generation,
+    rootId,
+    state: 'vacant'
+  });
+  table.rootRetired = true;
+
+  return Object.freeze({
+    ...activeAdmission,
+    currentGeneration: nextGeneration,
+    rootHandleState: nativeRootBridgeRootHandleStateRetired
+  });
+}
+
+function validateRetiredNativeRootBridgeRootHandle({
+  handle,
+  index,
+  requestId,
+  table
+}) {
+  const slot = getNativeRootBridgeHandleTableSlot(table, handle);
+  if (slot === null) {
+    throwNativeRootBridgeInvalidHandleError(handle, 'rootHandle', index, requestId);
+  }
+
+  if (slot.state !== 'vacant') {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge unmount record did not retire root handle slot ${handle.slot}.`,
+      nativeRootBridgeValidationErrorCodes.rootHandleStillActive,
+      { index, requestId, slot: handle.slot }
+    );
+  }
+
+  if (slot.nextGeneration === handle.generation) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge retired root handle slot ${handle.slot} still matches the active generation.`,
+      nativeRootBridgeValidationErrorCodes.rootHandleStillActive,
+      { index, requestId, slot: handle.slot }
+    );
+  }
+
+  return freezeNativeRootBridgeHandleAdmissionRecord({
+    action: 'validate-retired-root-handle',
+    currentGeneration: slot.nextGeneration,
+    handle,
+    rootHandleState: nativeRootBridgeRootHandleStateRetired,
+    rootId: slot.rootId,
+    sourceErrorCode: nativeRootBridgeValidationErrorCodes.staleHandle
+  });
+}
+
+function validateNativeRootBridgeHandleEnvironment(
+  table,
+  handle,
+  field,
+  index,
+  requestId
+) {
+  if (handle.environmentId === table.environmentId) {
+    return;
+  }
+
+  throwNativeRootBridgeRequestShapeError(
+    `Native root bridge ${field} belongs to environment ${handle.environmentId}, expected ${table.environmentId}.`,
+    nativeRootBridgeValidationErrorCodes.wrongEnvironment,
+    {
+      environmentId: handle.environmentId,
+      expectedEnvironmentId: table.environmentId,
+      field,
+      index,
+      requestId
+    }
+  );
+}
+
+function getNativeRootBridgeHandleTableSlot(table, handle) {
+  return table.slots.get(handle.slot) ?? null;
+}
+
+function validateNativeRootBridgeHandleTableSlot({
+  expectedKind,
+  field,
+  handle,
+  index,
+  requestId,
+  slot
+}) {
+  if (slot.state === 'vacant') {
+    throwNativeRootBridgeStaleHandleError(
+      handle,
+      slot.nextGeneration,
+      field,
+      index,
+      requestId
+    );
+  }
+
+  if (handle.generation !== slot.generation) {
+    throwNativeRootBridgeStaleHandleError(
+      handle,
+      slot.generation,
+      field,
+      index,
+      requestId
+    );
+  }
+
+  if (slot.kind !== expectedKind) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge ${field} has kind ${slot.kind}, expected ${expectedKind}.`,
+      nativeRootBridgeValidationErrorCodes.wrongHandleKind,
+      {
+        actual: slot.kind,
+        expected: expectedKind,
+        field,
+        index,
+        requestId
+      }
+    );
+  }
+}
+
+function throwNativeRootBridgeInvalidHandleError(handle, field, index, requestId) {
+  throwNativeRootBridgeRequestShapeError(
+    `Native root bridge ${field} slot ${handle.slot} is invalid.`,
+    nativeRootBridgeValidationErrorCodes.invalidHandle,
+    { field, handle, index, requestId }
+  );
+}
+
+function throwNativeRootBridgeStaleHandleError(
+  handle,
+  currentGeneration,
+  field,
+  index,
+  requestId
+) {
+  throwNativeRootBridgeRequestShapeError(
+    `Native root bridge ${field} slot ${handle.slot} generation ${handle.generation} is stale; current generation is ${currentGeneration}.`,
+    nativeRootBridgeValidationErrorCodes.staleHandle,
+    {
+      currentGeneration,
+      field,
+      handle,
+      index,
+      requestId
+    }
+  );
+}
+
+function freezeNativeRootBridgeHandleAdmissionRecord({
+  action,
+  currentGeneration,
+  handle,
+  rootHandleState,
+  rootId,
+  sourceErrorCode
+}) {
+  return Object.freeze({
+    action,
+    currentGeneration,
+    handle,
+    rustHandle: toRustNativeRootBridgeHandle(handle),
+    rootHandleState,
+    rootId,
+    sourceErrorCode
   });
 }
 

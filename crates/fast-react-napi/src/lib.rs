@@ -837,8 +837,11 @@ pub const PLATFORM_ARTIFACT_POLICY: &str =
 pub const OPTIONAL_PACKAGE_PREFIX: &str = "@fast-react/native-";
 pub const NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS: &str =
     "admitted-native-root-bridge-js-request-shape";
+pub const NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_PREFLIGHT_STATUS: &str =
+    "preflighted-native-root-bridge-real-handle-admission";
 pub const NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL: &str =
     "fast-react-napi.NativeRootBridgeRequestSequenceValidator";
+pub const NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL: &str = "fast-react-napi.BridgeHandleTable";
 pub const NATIVE_ROOT_BRIDGE_JS_REQUEST_RECORD_FIELDS: &[&str] = &[
     "requestId",
     "kind",
@@ -857,6 +860,18 @@ pub const NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS: &[&str] = &[
     "value_handle",
     "root_handle_state",
 ];
+pub const NATIVE_ROOT_BRIDGE_RUST_VALIDATION_RECORD_FIELDS: &[&str] = &[
+    "request_id",
+    "kind",
+    "environment_id",
+    "root_handle",
+    "root_id",
+    "value_handle",
+    "root_handle_state",
+    "lifecycle_transition",
+    "root_handle_validated",
+    "value_handle_validated",
+];
 pub const NATIVE_ROOT_BRIDGE_JS_HANDLE_FIELDS: &[&str] =
     &["environmentId", "slot", "generation", "kind"];
 pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS: &[&str] =
@@ -866,6 +881,14 @@ pub const NATIVE_ROOT_BRIDGE_HANDLE_KIND_CODES: &[&str] = &["root", "value"];
 pub const NATIVE_ROOT_BRIDGE_ROOT_HANDLE_STATE_CODES: &[&str] = &["active", "retired"];
 pub const NATIVE_ROOT_BRIDGE_LIFECYCLE_TRANSITION_CODES: &[&str] =
     &["none->active", "active->active", "active->retired"];
+pub const NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_ACTION_CODES: &[&str] = &[
+    "admit-root-handle",
+    "admit-value-handle",
+    "validate-active-root-handle",
+    "validate-value-handle",
+    "retire-root-handle",
+    "validate-retired-root-handle",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeTargetMetadata {
@@ -1829,8 +1852,16 @@ mod tests {
             "admitted-native-root-bridge-js-request-shape"
         );
         assert_eq!(
+            NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_PREFLIGHT_STATUS,
+            "preflighted-native-root-bridge-real-handle-admission"
+        );
+        assert_eq!(
             NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
             "fast-react-napi.NativeRootBridgeRequestSequenceValidator"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL,
+            "fast-react-napi.BridgeHandleTable"
         );
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JS_REQUEST_RECORD_FIELDS,
@@ -1854,6 +1885,21 @@ mod tests {
                 "root_id",
                 "value_handle",
                 "root_handle_state"
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_RUST_VALIDATION_RECORD_FIELDS,
+            &[
+                "request_id",
+                "kind",
+                "environment_id",
+                "root_handle",
+                "root_id",
+                "value_handle",
+                "root_handle_state",
+                "lifecycle_transition",
+                "root_handle_validated",
+                "value_handle_validated"
             ]
         );
         assert_eq!(
@@ -1888,6 +1934,17 @@ mod tests {
                 NativeRootBridgeLifecycleTransition::NoneToActive.code(),
                 NativeRootBridgeLifecycleTransition::ActiveToActive.code(),
                 NativeRootBridgeLifecycleTransition::ActiveToRetired.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_ACTION_CODES,
+            &[
+                "admit-root-handle",
+                "admit-value-handle",
+                "validate-active-root-handle",
+                "validate-value-handle",
+                "retire-root-handle",
+                "validate-retired-root-handle"
             ]
         );
     }
