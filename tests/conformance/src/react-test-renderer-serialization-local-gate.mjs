@@ -1159,6 +1159,48 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bpublicPredicateExecutionAvailable\s*:\s*false\b/u
     );
+  const privateTestInstanceFindByQueryDiagnosticsPresent =
+    privateTestInstanceFindAllQueryDiagnosticsPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceFindByQueryDiagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast-react-test-renderer\.testinstance\.find-by-private-query/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bReactTestInstancePrivateFindByQueryMetadata\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_test_instance_find_by_query_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-484-test-instance-find-by-private-query-gate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bexpectOneSource\s*:\s*['"]ReactTestRenderer\.js expectOne['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bbasedOnFindAllPredicateDiagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfindByEffectiveDeep\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfindByExpectOne\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfindByPredicateExecution\s*:\s*false\b/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -1213,6 +1255,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateRecordOnlyTestInstanceQueryPathPresent,
     privateTestInstanceBridgeQueryDiagnosticsPresent,
     privateTestInstanceFindAllQueryDiagnosticsPresent,
+    privateTestInstanceFindByQueryDiagnosticsPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,
