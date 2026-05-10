@@ -1,6 +1,10 @@
 'use strict';
 
-const {DOCUMENT_NODE, getOwnerDocument} = require('../client/dom-container.js');
+const {
+  DOCUMENT_NODE,
+  describeContainer,
+  getOwnerDocument
+} = require('../client/dom-container.js');
 const {
   allNativeEvents,
   isKnownNativeEvent,
@@ -11,6 +15,7 @@ const {
   assertEventTarget,
   getEventListenerSet,
   getListenerSetKey,
+  hasListeningMarker,
   markTargetAsListening
 } = require('./listener-registry.js');
 const {
@@ -195,10 +200,41 @@ function listenToPortalContainerEvents(portalContainer, options) {
   listenToAllSupportedEvents(portalContainer, options);
 }
 
+function describeRootListenerGuard(rootContainerElement, options) {
+  const ownerDocument = getOwnerDocument(rootContainerElement);
+  return freezeRecord({
+    action:
+      options && typeof options.action === 'string'
+        ? options.action
+        : 'defer-listen-to-all-supported-events',
+    canInstallRootListeners: canInstallListener(rootContainerElement),
+    hasRootListeningMarker: hasListeningMarker(rootContainerElement),
+    ownerDocumentCanInstallSelectionChange: canInstallListener(ownerDocument),
+    ownerDocumentHasSelectionChangeMarker: hasListeningMarker(ownerDocument),
+    ownerDocumentInfo:
+      ownerDocument === null
+        ? null
+        : freezeRecord(describeContainer(ownerDocument)),
+    rootEventTargetInfo: freezeRecord(describeContainer(rootContainerElement))
+  });
+}
+
 function getRootEventTargetOwnerDocument(rootContainerElement) {
   return rootContainerElement && rootContainerElement.nodeType === DOCUMENT_NODE
     ? rootContainerElement
     : getOwnerDocument(rootContainerElement);
+}
+
+function canInstallListener(target) {
+  return !!(
+    target != null &&
+    (typeof target === 'object' || typeof target === 'function') &&
+    typeof target.addEventListener === 'function'
+  );
+}
+
+function freezeRecord(record) {
+  return Object.freeze(record);
 }
 
 module.exports = {
@@ -206,6 +242,7 @@ module.exports = {
   IS_NON_DELEGATED,
   addTrappedEventListener,
   createEventListenerShell,
+  describeRootListenerGuard,
   getAddEventListenerOptions,
   getRootEventTargetOwnerDocument,
   listenToAllSupportedEvents,

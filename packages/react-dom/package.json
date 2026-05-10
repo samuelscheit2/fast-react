@@ -71,8 +71,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "check": "node --test test/resource-form-unsupported-gates.test.js && node ../../tests/smoke/import-entrypoints.mjs",
-    "test": "node --test test/resource-form-unsupported-gates.test.js && node ../../tests/smoke/import-entrypoints.mjs"
+    "check": "node --test test/*.test.js && node ../../tests/smoke/import-entrypoints.mjs",
+    "test": "node --test test/*.test.js && node ../../tests/smoke/import-entrypoints.mjs"
   },
   "dependencies": {
     "scheduler": "^0.27.0"

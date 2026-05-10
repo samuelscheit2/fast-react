@@ -5,6 +5,17 @@ const {
   inspectHydrationContainerMarkers:
     inspectHydrationContainerMarkersWithContracts
 } = require('./hydration-marker-parser.js');
+const {
+  duplicateCreateRootWarning,
+  getCreateRootWarning,
+  hasLegacyRootMarker,
+  inspectContainerRootMarker,
+  isContainerMarkedAsRoot,
+  legacyRootWarning
+} = require('./root-markers.js');
+const {
+  describeRootListenerGuard
+} = require('../events/root-listeners.js');
 
 const HYDRATION_MARKER_ORACLE_KIND =
   'react-19.2.6-react-dom-hydration-marker-oracle';
@@ -297,6 +308,13 @@ function createUnsupportedHydrateRootRecordWithGate(
 
   const sequence = gateState.nextRecordSequence++;
   const recordId = `${gateState.recordIdPrefix}:${sequence}`;
+  const markerGuard = describeHydrationRootMarkerGuard(
+    container,
+    gateState.markerOptions
+  );
+  const listenerGuard = describeRootListenerGuard(container, {
+    action: 'defer-listen-to-all-supported-events-for-hydrate-root'
+  });
   const record = freezeRecord({
     $$typeof: privateHydrationBoundaryRecordType,
     kind: 'FastReactDomUnsupportedHydrationBoundaryRecord',
@@ -311,6 +329,8 @@ function createUnsupportedHydrateRootRecordWithGate(
     optionsInfo: describeHydrationValue(hydrationOptions),
     oracleInfo: gateState.markerOracleInfo,
     blockedOn: unsupportedHydrationPrerequisites,
+    markerGuard,
+    listenerGuard,
     markerDiagnostics,
     canHydrate: false,
     publicRootCreated: false,
@@ -333,6 +353,7 @@ function createUnsupportedHydrateRootRecordWithGate(
 
 function createGateState(options) {
   return {
+    markerOptions: options && options.markerOptions,
     markerOracleInfo:
       options && Object.prototype.hasOwnProperty.call(options, 'markerOracle')
         ? assertAcceptedHydrationMarkerOracle(options.markerOracle)
@@ -344,6 +365,48 @@ function createGateState(options) {
     ),
     validationOptions: options && options.validationOptions
   };
+}
+
+function describeHydrationRootMarkerGuard(container, options) {
+  const warningMessage = getCreateRootWarning(container, options);
+  return freezeRecord({
+    action: 'defer-mark-container-as-root-for-hydrate-root',
+    hasLegacyRootMarker: hasLegacyRootMarker(container),
+    isContainerMarkedAsRoot: isContainerMarkedAsRoot(container),
+    rootMarkerSnapshot: describeContainerRootMarkerSnapshot(container),
+    warning: describeCreateRootWarning(warningMessage)
+  });
+}
+
+function describeContainerRootMarkerSnapshot(container) {
+  const snapshot = inspectContainerRootMarker(container);
+  return freezeRecord({
+    inspectable: snapshot.inspectable,
+    nullCount: snapshot.nullCount,
+    properties: freezeArray(
+      snapshot.properties.map((property) => freezeRecord({...property}))
+    ),
+    propertyCount: snapshot.propertyCount,
+    truthyCount: snapshot.truthyCount
+  });
+}
+
+function describeCreateRootWarning(message) {
+  if (message === null) {
+    return null;
+  }
+
+  let warningType = 'unknown';
+  if (message === duplicateCreateRootWarning) {
+    warningType = 'duplicate-create-root';
+  } else if (message === legacyRootWarning) {
+    warningType = 'legacy-root-container';
+  }
+
+  return freezeRecord({
+    message,
+    type: warningType
+  });
 }
 
 function createMarkerOracleInfo(source) {
