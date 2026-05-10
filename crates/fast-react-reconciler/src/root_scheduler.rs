@@ -18,6 +18,8 @@ use crate::{
     SchedulerPriority,
 };
 
+pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootSchedulerState {
     first_scheduled_root: Option<FiberRootId>,
@@ -485,8 +487,7 @@ pub fn collect_sync_flush_plan<H: HostTypes>(
         let mut sync_roots = Vec::new();
         let mut root = store.root_scheduler().first_scheduled_root();
         while let Some(root_id) = root {
-            let next_lanes = next_lanes_for_root(store, root_id)?;
-            if next_lanes.includes_sync_lane() {
+            if sync_flush_lanes_for_root(store, root_id)?.is_non_empty() {
                 sync_roots.push(root_id);
             }
             root = store.root(root_id)?.scheduling().next_scheduled_root();
@@ -501,6 +502,32 @@ pub fn collect_sync_flush_plan<H: HostTypes>(
         skipped_no_sync_work: false,
         sync_roots,
     })
+}
+
+pub(crate) fn sync_flush_lanes_for_root<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<Lanes, RootSchedulerError> {
+    Ok(next_lanes_for_root(store, root_id)?.intersect(SYNC_FLUSH_LANES))
+}
+
+pub(crate) fn recompute_might_have_pending_sync_work<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+) -> Result<bool, RootSchedulerError> {
+    let mut has_pending_sync_work = false;
+    let mut root = store.root_scheduler().first_scheduled_root();
+    while let Some(root_id) = root {
+        if sync_flush_lanes_for_root(store, root_id)?.is_non_empty() {
+            has_pending_sync_work = true;
+            break;
+        }
+        root = store.root(root_id)?.scheduling().next_scheduled_root();
+    }
+
+    store
+        .root_scheduler_mut()
+        .set_might_have_pending_sync_work(has_pending_sync_work);
+    Ok(has_pending_sync_work)
 }
 
 pub fn scheduled_roots<H: HostTypes>(
@@ -847,5 +874,37 @@ mod tests {
 
         assert!(reentrant_plan.skipped_reentrant_flush());
         assert!(reentrant_plan.sync_roots().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_lanes_filter_non_sync_lanes_and_recompute_flag() {
+        let (mut store, root_id, _host) = root_store();
+        let sync_result =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(1), None)
+                .unwrap();
+        ensure_root_is_scheduled(&mut store, sync_result.schedule()).unwrap();
+        schedule_default_update(&mut store, root_id);
+
+        let sync_lanes = sync_flush_lanes_for_root(&store, root_id).unwrap();
+
+        assert_eq!(sync_lanes, Lanes::SYNC);
+        assert!(
+            !sync_lanes.contains_lane(Lane::DEFAULT),
+            "default work must stay out of the sync flush lane set"
+        );
+
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_finished(RootFinishedLanes::new(Lanes::SYNC, Lanes::DEFAULT));
+        let still_has_sync = recompute_might_have_pending_sync_work(&mut store).unwrap();
+
+        assert!(!still_has_sync);
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
     }
 }
