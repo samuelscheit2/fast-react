@@ -132,6 +132,32 @@ assert.equal(
 );
 assert.equal(shapeGate.jsonTransportSmoke.transport, 'json');
 assert.equal(shapeGate.jsonTransportSmoke.schemaVersion, 1);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.parserGateStatus,
+  nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parserGateStatus
+);
+assert.equal(shapeGate.jsonTransportSmoke.parserGate.nativeExecution, false);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.deterministicParseErrors.map(
+    (error) => error.code
+  ),
+  [
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .invalidJson,
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .expectedObject,
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .missingField,
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .unexpectedField,
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .invalidFieldType,
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .unsupportedFieldValue,
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .unsupportedFieldValue
+  ]
+);
 assert.equal(shapeGate.handleAdmissionPreflight.tableEnvironmentId, 418);
 assert.equal(shapeGate.handleAdmissionPreflight.rootRetired, true);
 assert.equal(shapeGate.rustHandleTableAdmissionSmoke.tableEnvironmentId, 418);
