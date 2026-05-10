@@ -157,6 +157,14 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       privateCrossRootSchedulingEvidence: "separate"
     }),
     Object.freeze({
+      id: "public-act-passive-root-render-compatibility",
+      publicApi: "React act/passive effects through public React DOM roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateActPassiveEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
       admission: "blocked",
@@ -228,6 +236,15 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_ST
 
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_BLOCKED_STATUS =
   "blocked-private-cross-root-scheduling-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_GATE_ID =
+  "root-render-private-act-passive-diagnostic-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS =
+  "accepted-private-root-act-passive-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_BLOCKED_STATUS =
+  "blocked-private-root-act-passive-diagnostic";
 
 export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID =
   "react-dom-portal-root-render-blocked-gate-1";
@@ -511,6 +528,19 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS 
     )
   );
 
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS =
+  Object.freeze(
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.map((scenarioId) =>
+      Object.freeze({
+        scenarioId,
+        admission: "private-act-passive-diagnostic",
+        gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS,
+        reason:
+          "Private React act, React DOM test-utils act, and reconciler passive diagnostics are admitted only as metadata/source evidence while public root render, public act, and scheduler-driven passive effect compatibility remain blocked."
+      })
+    )
+  );
+
 export async function runReactDomRootRenderE2EConformanceGate({
   checkedOracle = readCheckedReactDomRootRenderE2EOracle(),
   currentOracle,
@@ -531,6 +561,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
       }),
     privateCrossRootSchedulingDiagnostics:
       inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics({
+        workspaceRoot
+      }),
+    privateActPassiveDiagnostics:
+      inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics({
         workspaceRoot
       }),
     portalRootRenderObservations: inspectReactDomPortalRootRenderBlockedBoundary({
@@ -572,6 +606,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics(),
   privateCrossRootSchedulingDiagnostics =
     inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics(),
+  privateActPassiveDiagnostics =
+    inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics(),
   portalRootRenderObservations =
     inspectReactDomPortalRootRenderBlockedBoundary()
 }) {
@@ -586,6 +622,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   const privateWarningBoundaryBlockedRows = [];
   const privateCrossRootSchedulingDiagnosticRows = [];
   const privateCrossRootSchedulingBlockedRows = [];
+  const privateActPassiveDiagnosticRows = [];
+  const privateActPassiveBlockedRows = [];
   const behaviorByScenario = new Map(
     REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR.map((behavior) => [
       behavior.scenarioId,
@@ -636,6 +674,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       row
     ])
   );
+  const privateActPassiveAdmissionByScenario = new Map(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS.map(
+      (admission) => [admission.scenarioId, admission]
+    )
+  );
+  const privateActPassiveObservationByRow = new Map(
+    (privateActPassiveDiagnostics.rows ?? []).map((row) => [
+      formatScenarioModeKey(row),
+      row
+    ])
+  );
 
   validateOracleShape({
     checkedOracle,
@@ -662,6 +711,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateCrossRootSchedulingAdmissionByScenario,
     failures
   });
+  validatePrivateActPassiveAdmissionMetadata({
+    privateActPassiveAdmissionByScenario,
+    failures
+  });
 
   if (privateBridgeObservations.loadError) {
     failures.push({
@@ -685,6 +738,12 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     failures.push({
       gateStatus: "private-cross-root-scheduling-diagnostic-load-failed",
       error: privateCrossRootSchedulingDiagnostics.loadError
+    });
+  }
+  if (privateActPassiveDiagnostics.loadError) {
+    failures.push({
+      gateStatus: "private-root-act-passive-diagnostic-load-failed",
+      error: privateActPassiveDiagnostics.loadError
     });
   }
 
@@ -1014,6 +1073,85 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         });
       }
 
+      const privateActPassiveAdmission =
+        privateActPassiveAdmissionByScenario.get(scenarioId);
+      if (!privateActPassiveAdmission) {
+        failures.push({
+          ...context,
+          gateStatus: "missing-private-root-act-passive-admission"
+        });
+      } else if (
+        privateActPassiveAdmission.admission ===
+        "private-act-passive-diagnostic"
+      ) {
+        const privateActPassiveObservation =
+          privateActPassiveObservationByRow.get(formatScenarioModeKey(context));
+
+        if (!privateActPassiveObservation) {
+          failures.push({
+            ...context,
+            gateStatus: "missing-private-root-act-passive-diagnostic"
+          });
+        } else {
+          const validationFailure =
+            validatePrivateActPassiveDiagnosticObservation({
+              observation: privateActPassiveObservation
+            });
+
+          if (validationFailure === null) {
+            privateActPassiveDiagnosticRows.push({
+              ...context,
+              gateStatus: privateActPassiveAdmission.gateStatus,
+              oracleRowAccepted,
+              publicFacadeGateStatus: behavior.gateStatus,
+              publicRootCompatibilitySurface: false,
+              comparedToReactDomOracle: false,
+              compatibilityClaimed: false,
+              publicReactActCompatibilityClaimed: false,
+              publicReactDomTestUtilsActCompatibilityClaimed: false,
+              publicRootRenderCompatibilityClaimed: false,
+              publicPassiveEffectCompatibilityClaimed: false,
+              diagnosticKind:
+                privateActPassiveObservation.evidence.diagnosticKind,
+              actEvidence: privateActPassiveObservation.evidence.actEvidence,
+              passiveEvidence:
+                privateActPassiveObservation.evidence.passiveEvidence,
+              blockedPublicPrerequisites:
+                privateActPassiveObservation.evidence
+                  .blockedPublicPrerequisites,
+              sourceDiagnostics:
+                privateActPassiveObservation.evidence.sourceDiagnostics
+            });
+          } else {
+            failures.push({
+              ...context,
+              ...validationFailure
+            });
+          }
+        }
+      } else if (privateActPassiveAdmission.admission === "unsupported") {
+        privateActPassiveBlockedRows.push({
+          ...context,
+          gateStatus: privateActPassiveAdmission.gateStatus,
+          oracleRowAccepted,
+          publicFacadeGateStatus: behavior.gateStatus,
+          publicRootCompatibilitySurface: false,
+          reason: privateActPassiveAdmission.reason,
+          comparedToReactDomOracle: false,
+          compatibilityClaimed: false,
+          publicReactActCompatibilityClaimed: false,
+          publicReactDomTestUtilsActCompatibilityClaimed: false,
+          publicRootRenderCompatibilityClaimed: false,
+          publicPassiveEffectCompatibilityClaimed: false
+        });
+      } else {
+        failures.push({
+          ...context,
+          gateStatus: "unknown-private-root-act-passive-admission",
+          admission: privateActPassiveAdmission.admission
+        });
+      }
+
       const privateHostOutputAdmission =
         privateHostOutputAdmissionByScenario.get(scenarioId);
       if (!privateHostOutputAdmission) {
@@ -1179,6 +1317,25 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       publicFlushSyncCompatibilityClaimed: false,
       compatibilityClaimed: false
     },
+    privateActPassiveGate: {
+      id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_GATE_ID,
+      localEntrypoint:
+        "packages/react/private-act-dispatcher-gate.js + packages/react-dom/src/test-utils-act-gate.js + crates/fast-react-reconciler/src/passive_effects.rs private diagnostics",
+      admittedPrivateActPassiveScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS.filter(
+          (admission) =>
+            admission.admission === "private-act-passive-diagnostic"
+        ).map((admission) => admission.scenarioId),
+      unsupportedPrivateActPassiveScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS.filter(
+          (admission) => admission.admission === "unsupported"
+        ).map((admission) => admission.scenarioId),
+      publicReactActCompatibilityClaimed: false,
+      publicReactDomTestUtilsActCompatibilityClaimed: false,
+      publicRootRenderCompatibilityClaimed: false,
+      publicPassiveEffectCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
     privateHostOutputDiagnosticScenarioModeRows:
       privateHostOutputDiagnosticRows,
     privateHostOutputBlockedScenarioModeRows: privateHostOutputBlockedRows,
@@ -1190,6 +1347,9 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateCrossRootSchedulingDiagnosticRows,
     privateCrossRootSchedulingBlockedScenarioModeRows:
       privateCrossRootSchedulingBlockedRows,
+    privateActPassiveDiagnosticScenarioModeRows:
+      privateActPassiveDiagnosticRows,
+    privateActPassiveBlockedScenarioModeRows: privateActPassiveBlockedRows,
     portalRootRenderGate,
     portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
     portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
@@ -1213,6 +1373,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateCrossRootSchedulingDiagnosticRows.length,
       privateCrossRootSchedulingBlockedScenarioModeRowCount:
         privateCrossRootSchedulingBlockedRows.length,
+      privateActPassiveDiagnosticScenarioModeRowCount:
+        privateActPassiveDiagnosticRows.length,
+      privateActPassiveBlockedScenarioModeRowCount:
+        privateActPassiveBlockedRows.length,
       portalRootRenderPrerequisiteRowCount:
         portalRootRenderGate.summary.prerequisiteRowCount,
       portalRootRenderBlockedRowCount:
@@ -1231,6 +1395,11 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateWarningBoundaryConsoleOutputUsedAsEvidence: false,
       privateCrossRootSchedulingCompatibilityClaimed: false,
       privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed: false,
+      privateActPassiveCompatibilityClaimed: false,
+      privateActPassivePublicReactActCompatibilityClaimed: false,
+      privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed: false,
+      privateActPassivePublicRootRenderCompatibilityClaimed: false,
+      privateActPassivePublicPassiveEffectCompatibilityClaimed: false,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -1409,6 +1578,8 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Private warning-boundary diagnostic rows blocked: ${result.summary.privateWarningBoundaryBlockedScenarioModeRowCount}`,
     `Private cross-root scheduling diagnostic rows admitted: ${result.summary.privateCrossRootSchedulingDiagnosticScenarioModeRowCount}`,
     `Private cross-root scheduling diagnostic rows blocked: ${result.summary.privateCrossRootSchedulingBlockedScenarioModeRowCount}`,
+    `Private act/passive diagnostic rows admitted: ${result.summary.privateActPassiveDiagnosticScenarioModeRowCount}`,
+    `Private act/passive diagnostic rows blocked: ${result.summary.privateActPassiveBlockedScenarioModeRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
     `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
@@ -1437,6 +1608,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateCrossRootSchedulingDiagnosticScenarioModeRows.length > 0) {
     lines.push(
       "Private cross-root scheduling diagnostics use private bridge, flush guard, and reconciler canary evidence only; public flushSync and public root compatibility remain blocked."
+    );
+  }
+  if (result.privateActPassiveDiagnosticScenarioModeRows.length > 0) {
+    lines.push(
+      "Private act/passive diagnostics use accepted metadata and source evidence only; public React act, React DOM test-utils act, passive effects, and public root compatibility remain blocked."
     );
   }
   if (result.portalRootRenderBlockedRows.length > 0) {
@@ -1494,6 +1670,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateCrossRootSchedulingBlockedScenarioModeRowCount ?? 0
     }`,
+    `Root-render private act/passive diagnostic rows admitted: ${
+      result.rootRenderGate?.summary
+        .privateActPassiveDiagnosticScenarioModeRowCount ?? 0
+    }`,
+    `Root-render private act/passive diagnostic rows blocked: ${
+      result.rootRenderGate?.summary
+        .privateActPassiveBlockedScenarioModeRowCount ?? 0
+    }`,
     `Root-render portal rows blocked: ${
       result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0
     }`,
@@ -1532,6 +1716,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private cross-root scheduling diagnostics remain private flush evidence only and do not unblock public flushSync or public root compatibility."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary
+      .privateActPassiveDiagnosticScenarioModeRowCount ?? 0) > 0
+  ) {
+    lines.push(
+      "Private act/passive diagnostics remain metadata evidence only and do not unblock public act, passive effect, or public root compatibility."
     );
   }
   if ((result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0) > 0) {
@@ -1760,6 +1952,41 @@ export function inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostic
 
         rows.push(
           runPrivateCrossRootSchedulingDiagnosticScenario({
+            mode,
+            modules,
+            scenarioId: admission.scenarioId
+          })
+        );
+      }
+    }
+
+    return {
+      loadError: null,
+      rows
+    };
+  } catch (error) {
+    return {
+      loadError: describePrivateBridgeError(error),
+      rows: []
+    };
+  }
+}
+
+export function inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const modules = loadPrivateActPassiveModules(workspaceRoot);
+    const rows = [];
+
+    for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+      for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS) {
+        if (admission.admission !== "private-act-passive-diagnostic") {
+          continue;
+        }
+
+        rows.push(
+          runPrivateActPassiveDiagnosticScenario({
             mode,
             modules,
             scenarioId: admission.scenarioId
@@ -2140,6 +2367,10 @@ function validateRootRenderGatePrerequisites({
     failures
   });
   validateRootRenderPrivateCrossRootSchedulingBlockers({
+    rootRenderGateResult,
+    failures
+  });
+  validateRootRenderPrivateActPassiveBlockers({
     rootRenderGateResult,
     failures
   });
@@ -2585,6 +2816,166 @@ function validateRootRenderPrivateCrossRootSchedulingBlockers({
   }
 }
 
+function validateRootRenderPrivateActPassiveBlockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const admittedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS.filter(
+      (admission) =>
+        admission.admission === "private-act-passive-diagnostic"
+    ).map((admission) => admission.scenarioId);
+  const unsupportedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS.filter(
+      (admission) => admission.admission === "unsupported"
+    ).map((admission) => admission.scenarioId);
+  const expectedAdmittedRows =
+    admittedScenarioIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+  const expectedBlockedRows =
+    unsupportedScenarioIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderGateResult.summary
+      .privateActPassiveDiagnosticScenarioModeRowCount !==
+      expectedAdmittedRows ||
+    rootRenderGateResult.summary.privateActPassiveBlockedScenarioModeRowCount !==
+      expectedBlockedRows
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-act-passive-row-count-mismatch",
+      actualAdmitted:
+        rootRenderGateResult.summary
+          .privateActPassiveDiagnosticScenarioModeRowCount ?? null,
+      actualBlocked:
+        rootRenderGateResult.summary
+          .privateActPassiveBlockedScenarioModeRowCount ?? null,
+      expectedAdmitted: expectedAdmittedRows,
+      expectedBlocked: expectedBlockedRows
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary.privateActPassiveCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateActPassivePublicReactActCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateActPassivePublicRootRenderCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateActPassivePublicPassiveEffectCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateActPassiveGate?.compatibilityClaimed !== false ||
+    rootRenderGateResult.privateActPassiveGate
+      ?.publicReactActCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateActPassiveGate
+      ?.publicReactDomTestUtilsActCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateActPassiveGate
+      ?.publicRootRenderCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateActPassiveGate
+      ?.publicPassiveEffectCompatibilityClaimed !== false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-act-passive-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary.privateActPassiveCompatibilityClaimed ??
+        null,
+      summaryPublicReactActClaim:
+        rootRenderGateResult.summary
+          .privateActPassivePublicReactActCompatibilityClaimed ?? null,
+      summaryPublicTestUtilsActClaim:
+        rootRenderGateResult.summary
+          .privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed ??
+        null,
+      summaryPublicRootClaim:
+        rootRenderGateResult.summary
+          .privateActPassivePublicRootRenderCompatibilityClaimed ?? null,
+      summaryPublicPassiveClaim:
+        rootRenderGateResult.summary
+          .privateActPassivePublicPassiveEffectCompatibilityClaimed ?? null
+    });
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privateActPassiveGate
+        ?.admittedPrivateActPassiveScenarioIds ?? [],
+      admittedScenarioIds
+    ) !== null ||
+    findFirstDifferencePath(
+      rootRenderGateResult.privateActPassiveGate
+        ?.unsupportedPrivateActPassiveScenarioIds ?? [],
+      unsupportedScenarioIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-act-passive-admission-set-mismatch",
+      admitted:
+        rootRenderGateResult.privateActPassiveGate
+          ?.admittedPrivateActPassiveScenarioIds ?? null,
+      unsupported:
+        rootRenderGateResult.privateActPassiveGate
+          ?.unsupportedPrivateActPassiveScenarioIds ?? null
+    });
+  }
+
+  for (const row of rootRenderGateResult.privateActPassiveDiagnosticScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.publicReactActCompatibilityClaimed !== false ||
+      row.publicReactDomTestUtilsActCompatibilityClaimed !== false ||
+      row.publicRootRenderCompatibilityClaimed !== false ||
+      row.publicPassiveEffectCompatibilityClaimed !== false ||
+      row.diagnosticKind !== "private-root-render-act-passive-diagnostic"
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus: "root-render-private-act-passive-row-not-private",
+        row
+      });
+    }
+  }
+
+  for (const row of rootRenderGateResult.privateActPassiveBlockedScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_BLOCKED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.publicReactActCompatibilityClaimed !== false ||
+      row.publicReactDomTestUtilsActCompatibilityClaimed !== false ||
+      row.publicRootRenderCompatibilityClaimed !== false ||
+      row.publicPassiveEffectCompatibilityClaimed !== false
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus:
+          "root-render-private-act-passive-blocked-row-not-fail-closed",
+        row
+      });
+    }
+  }
+}
+
 function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
   if (!rootRenderGateResult) {
     return;
@@ -2862,6 +3253,15 @@ function validatePublicFacadeBoundary({
       "Private cross-root scheduling diagnostics remain separate from public ReactDOM.flushSync compatibility while public roots are placeholders.",
     compatibilityClaimed: false,
     privateCrossRootSchedulingEvidence: "separate"
+  });
+
+  blockedPublicFacadeRows.push({
+    id: "public-act-passive-root-render-compatibility",
+    gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    reason:
+      "Private act/passive diagnostics remain separate from public React act, React DOM test-utils act, passive effect, and public root compatibility while public roots are placeholders.",
+    compatibilityClaimed: false,
+    privateActPassiveEvidence: "separate"
   });
 
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
@@ -3765,6 +4165,18 @@ function loadPrivateCrossRootSchedulingModules(workspaceRoot) {
   };
 }
 
+function loadPrivateActPassiveModules(workspaceRoot) {
+  return {
+    reactActGate: require(
+      join(workspaceRoot, "packages/react/private-act-dispatcher-gate.js")
+    ),
+    reactDomTestUtilsActGate: require(
+      join(workspaceRoot, "packages/react-dom/src/test-utils-act-gate.js")
+    ),
+    sourceDiagnostics: inspectActPassiveSourceDiagnostics({ workspaceRoot })
+  };
+}
+
 function runPrivateBridgeRequestScenario({ mode, modules, scenarioId }) {
   try {
     const plan = getPrivateBridgeRequestPlan(scenarioId);
@@ -4163,6 +4575,150 @@ function runPrivateCrossRootSchedulingDiagnosticScenario({
       error: describePrivateBridgeError(error)
     };
   }
+}
+
+function runPrivateActPassiveDiagnosticScenario({ mode, modules, scenarioId }) {
+  try {
+    const testUtilsActGate =
+      modules.reactDomTestUtilsActGate.evaluateReactDomTestUtilsActPrivateRoutingGate();
+    const rendererBackedDiagnostics =
+      modules.reactActGate.createRendererBackedActDrainDiagnostics();
+    const rendererBackedConsumption =
+      modules.reactActGate.consumeRendererBackedActDrainDiagnostics(
+        rendererBackedDiagnostics
+      );
+    const actQueueMetadata = modules.reactActGate.createActQueueMetadata();
+
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "ok",
+      evidence: {
+        compatibilityClaimed: false,
+        comparedToReactDomOracle: false,
+        diagnosticKind: "private-root-render-act-passive-diagnostic",
+        publicPassiveEffectCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false,
+        publicReactDomTestUtilsActCompatibilityClaimed: false,
+        publicRootCompatibilitySurface: false,
+        publicRootRenderCompatibilityClaimed: false,
+        actEvidence: summarizePrivateActEvidence({
+          actQueueMetadata,
+          rendererBackedConsumption,
+          rendererBackedDiagnostics,
+          testUtilsActGate
+        }),
+        passiveEvidence: summarizePrivatePassiveEvidence(testUtilsActGate),
+        blockedPublicPrerequisites:
+          testUtilsActGate.publicPrerequisitesStillBlocked,
+        sourceDiagnostics: modules.sourceDiagnostics
+      }
+    };
+  } catch (error) {
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "throws",
+      error: describePrivateBridgeError(error)
+    };
+  }
+}
+
+function summarizePrivateActEvidence({
+  actQueueMetadata,
+  rendererBackedConsumption,
+  rendererBackedDiagnostics,
+  testUtilsActGate
+}) {
+  return {
+    reactActPrivateDispatcher: {
+      status: testUtilsActGate.reactActPrivateDispatcher.status,
+      publicCompatibilityClaimed:
+        testUtilsActGate.reactActPrivateDispatcher.publicCompatibilityClaimed,
+      queueFlushingReady:
+        testUtilsActGate.reactActPrivateDispatcher.queueFlushingReady,
+      rendererRootsReady:
+        testUtilsActGate.reactActPrivateDispatcher.rendererRootsReady,
+      passiveEffectsReady:
+        testUtilsActGate.reactActPrivateDispatcher.passiveEffectsReady,
+      continuationFlushingReady:
+        testUtilsActGate.reactActPrivateDispatcher.continuationFlushingReady,
+      executesQueuedWork:
+        testUtilsActGate.reactActPrivateDispatcher.executesQueuedWork,
+      executesEffects: testUtilsActGate.reactActPrivateDispatcher.executesEffects
+    },
+    reactActQueueMetadata: {
+      rendererBackedActDrainDiagnosticsReady:
+        actQueueMetadata.rendererBackedActDrainDiagnosticsReady,
+      consumesRendererBackedActDrainDiagnostics:
+        actQueueMetadata.consumesRendererBackedActDrainDiagnostics,
+      drainsAcceptedRendererBackedActDiagnostics:
+        actQueueMetadata.drainsAcceptedRendererBackedActDiagnostics,
+      drainsPublicReactActQueue: actQueueMetadata.drainsPublicReactActQueue,
+      publicReactActCompatibilityClaimed:
+        actQueueMetadata.publicReactActCompatibilityClaimed,
+      executesQueuedWork: actQueueMetadata.executesQueuedWork,
+      executesEffects: actQueueMetadata.executesEffects,
+      executesRendererRoots: actQueueMetadata.executesRendererRoots,
+      acceptedRendererBackedActDrainReconcilerRecords:
+        actQueueMetadata.acceptedRendererBackedActDrainReconcilerRecords
+    },
+    rendererBackedActDrainDiagnostics: {
+      status: rendererBackedDiagnostics.status,
+      kind: rendererBackedDiagnostics.kind,
+      renderer: rendererBackedDiagnostics.renderer,
+      acceptedSchedulerRecords:
+        rendererBackedDiagnostics.acceptedSchedulerRecords,
+      acceptedReconcilerRecords:
+        rendererBackedDiagnostics.acceptedReconcilerRecords,
+      acceptedRendererRecords: rendererBackedDiagnostics.acceptedRendererRecords,
+      drainsPublicReactActQueue:
+        rendererBackedDiagnostics.drainsPublicReactActQueue,
+      publicReactActCompatibilityClaimed:
+        rendererBackedDiagnostics.publicReactActCompatibilityClaimed,
+      executesQueuedWork: rendererBackedDiagnostics.executesQueuedWork,
+      executesEffects: rendererBackedDiagnostics.executesEffects,
+      executesRendererRoots: rendererBackedDiagnostics.executesRendererRoots
+    },
+    rendererBackedActDrainConsumption: {
+      status: rendererBackedConsumption.status,
+      accepted: rendererBackedConsumption.accepted,
+      renderer: rendererBackedConsumption.renderer,
+      drainsPublicReactActQueue:
+        rendererBackedConsumption.drainsPublicReactActQueue,
+      publicReactActCompatibilityClaimed:
+        rendererBackedConsumption.publicReactActCompatibilityClaimed,
+      executesQueuedWork: rendererBackedConsumption.executesQueuedWork,
+      executesEffects: rendererBackedConsumption.executesEffects,
+      executesRendererRoots: rendererBackedConsumption.executesRendererRoots,
+      drainSummary: rendererBackedConsumption.drainSummary
+    },
+    reactDomTestUtilsActGate: {
+      id: testUtilsActGate.id,
+      status: testUtilsActGate.status,
+      privatePrerequisitesPresent: testUtilsActGate.privatePrerequisitesPresent,
+      privateRoutingReady: testUtilsActGate.privateRoutingReady,
+      publicReactActReady: testUtilsActGate.publicReactActReady,
+      publicTestUtilsActReady: testUtilsActGate.publicTestUtilsActReady,
+      publicCompatibilityClaimed: testUtilsActGate.publicCompatibilityClaimed,
+      acceptedPrivatePrerequisiteIds:
+        testUtilsActGate.acceptedPrivatePrerequisiteIds,
+      blockedPublicPrerequisiteIds:
+        testUtilsActGate.blockedPublicPrerequisiteIds,
+      publicPrerequisitesStillBlocked:
+        testUtilsActGate.publicPrerequisitesStillBlocked,
+      sideEffectPolicy: testUtilsActGate.sideEffectPolicy
+    }
+  };
+}
+
+function summarizePrivatePassiveEvidence(testUtilsActGate) {
+  return {
+    passiveEffects: testUtilsActGate.passiveEffects,
+    passiveEffectCallbackHandles: testUtilsActGate.passiveEffectCallbackHandles,
+    syncFlushPostPassiveContinuationExecution:
+      testUtilsActGate.syncFlushPostPassiveContinuationExecution
+  };
 }
 
 function runPrivateWarningBoundaryDiagnosticScenario({
@@ -5981,6 +6537,70 @@ function inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot }) {
   }
 }
 
+function inspectActPassiveSourceDiagnostics({ workspaceRoot }) {
+  try {
+    const reactActGateSource = readWorkspaceFile(
+      workspaceRoot,
+      "packages/react/private-act-dispatcher-gate.js"
+    );
+    const reactDomTestUtilsActGateSource = readWorkspaceFile(
+      workspaceRoot,
+      "packages/react-dom/src/test-utils-act-gate.js"
+    );
+    const passiveEffectsSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/passive_effects.rs"
+    );
+    const rootSchedulerSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_scheduler.rs"
+    );
+
+    return {
+      loadError: null,
+      reactActRendererBackedDrainDiagnosticPresent:
+        /private-renderer-backed-act-drain-diagnostic/u.test(
+          reactActGateSource
+        ) &&
+        /consumeRendererBackedActDrainDiagnostics/u.test(reactActGateSource),
+      reactDomTestUtilsActPrivateRoutingGatePresent:
+        /react-dom-test-utils-act-private-routing-gate-4/u.test(
+          reactDomTestUtilsActGateSource
+        ) &&
+        /blocked-public-test-utils-act-private-routing/u.test(
+          reactDomTestUtilsActGateSource
+        ),
+      reactDomTestUtilsPublicActBlockedPresent:
+        /public-react-act-delegation/u.test(reactDomTestUtilsActGateSource) &&
+        /public-react-dom-root-execution/u.test(
+          reactDomTestUtilsActGateSource
+        ),
+      passiveCallbackInvocationGatePresent:
+        /PassiveEffectCallbackInvocationGateSnapshot/u.test(
+          passiveEffectsSource
+        ) &&
+        /invoke_passive_effect_callbacks_under_test_control/u.test(
+          passiveEffectsSource
+        ),
+      passiveDestroyExecutorPresent:
+        /flush_passive_effects_after_commit_with_destroy_executor/u.test(
+          passiveEffectsSource
+        ),
+      passiveErrorCaptureRecordPresent:
+        /PassiveEffectRootErrorCaptureRecord/u.test(passiveEffectsSource),
+      passiveSchedulerFlushGatePresent:
+        /passive_effect_scheduler_flush_gate/u.test(rootSchedulerSource) &&
+        /root_scheduler_passive_effect_scheduler_flush_gate_records_request_without_consuming/u.test(
+          rootSchedulerSource
+        )
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error)
+    };
+  }
+}
+
 function createGateDocument(label, domContainer) {
   const document = createGateEventTarget({
     label,
@@ -6808,6 +7428,85 @@ function validatePrivateCrossRootSchedulingDiagnosticObservation({
   return null;
 }
 
+function validatePrivateActPassiveDiagnosticObservation({ observation }) {
+  if (observation.status !== "ok") {
+    return {
+      gateStatus: "private-root-act-passive-diagnostic-failed",
+      status: observation.status,
+      error: observation.error ?? null
+    };
+  }
+
+  const evidence = observation.evidence;
+  const commonDifference = findFirstDifferencePath(
+    {
+      compatibilityClaimed: false,
+      comparedToReactDomOracle: false,
+      diagnosticKind: "private-root-render-act-passive-diagnostic",
+      publicPassiveEffectCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      publicReactDomTestUtilsActCompatibilityClaimed: false,
+      publicRootCompatibilitySurface: false,
+      publicRootRenderCompatibilityClaimed: false
+    },
+    {
+      compatibilityClaimed: evidence.compatibilityClaimed,
+      comparedToReactDomOracle: evidence.comparedToReactDomOracle,
+      diagnosticKind: evidence.diagnosticKind,
+      publicPassiveEffectCompatibilityClaimed:
+        evidence.publicPassiveEffectCompatibilityClaimed,
+      publicReactActCompatibilityClaimed:
+        evidence.publicReactActCompatibilityClaimed,
+      publicReactDomTestUtilsActCompatibilityClaimed:
+        evidence.publicReactDomTestUtilsActCompatibilityClaimed,
+      publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+      publicRootRenderCompatibilityClaimed:
+        evidence.publicRootRenderCompatibilityClaimed
+    }
+  );
+  if (commonDifference !== null) {
+    return {
+      gateStatus: "private-root-act-passive-common-evidence-mismatch",
+      firstDifferencePath: commonDifference
+    };
+  }
+
+  const actDifference = findFirstDifferencePath(
+    expectedPrivateActEvidence(),
+    comparablePrivateActEvidence(evidence.actEvidence)
+  );
+  if (actDifference !== null) {
+    return {
+      gateStatus: "private-root-act-passive-act-evidence-mismatch",
+      firstDifferencePath: actDifference
+    };
+  }
+
+  const passiveDifference = findFirstDifferencePath(
+    expectedPrivatePassiveEvidence(),
+    comparablePrivatePassiveEvidence(evidence.passiveEvidence)
+  );
+  if (passiveDifference !== null) {
+    return {
+      gateStatus: "private-root-act-passive-passive-evidence-mismatch",
+      firstDifferencePath: passiveDifference
+    };
+  }
+
+  const sourceDifference = findFirstDifferencePath(
+    expectedActPassiveSourceDiagnostics(),
+    comparableActPassiveSourceDiagnostics(evidence.sourceDiagnostics)
+  );
+  if (sourceDifference !== null) {
+    return {
+      gateStatus: "private-root-act-passive-source-diagnostic-mismatch",
+      firstDifferencePath: sourceDifference
+    };
+  }
+
+  return null;
+}
+
 function validatePrivateWarningBoundaryDiagnosticObservation({
   mode,
   observation,
@@ -7504,6 +8203,131 @@ function expectedSyncFlushCrossRootReconcilerDiagnostics() {
   };
 }
 
+function expectedPrivateActEvidence() {
+  return {
+    reactActPrivateDispatcher: {
+      continuationFlushingReady: false,
+      executesEffects: false,
+      executesQueuedWork: false,
+      passiveEffectsReady: false,
+      publicCompatibilityClaimed: false,
+      queueFlushingReady: false,
+      rendererRootsReady: false,
+      status: "blocked-until-renderer-roots-passive-effects-and-act-continuations"
+    },
+    reactActQueueMetadata: {
+      acceptedRendererBackedActDrainReconcilerRecords: [
+        "SyncFlushActContinuationDrainRecord",
+        "SyncFlushActPrivateExecutionDiagnosticsForCanary",
+        "SyncFlushPostPassiveContinuationExecutionRecord",
+        "PassiveEffectsFlushWithSyncFlushContinuationResult"
+      ],
+      consumesRendererBackedActDrainDiagnostics: true,
+      drainsAcceptedRendererBackedActDiagnostics: true,
+      drainsPublicReactActQueue: false,
+      executesEffects: false,
+      executesQueuedWork: false,
+      executesRendererRoots: false,
+      publicReactActCompatibilityClaimed: false,
+      rendererBackedActDrainDiagnosticsReady: true
+    },
+    rendererBackedActDrainDiagnostics: {
+      acceptedReconcilerRecords: [
+        "SyncFlushActContinuationDrainRecord",
+        "SyncFlushActPrivateExecutionDiagnosticsForCanary",
+        "SyncFlushPostPassiveContinuationExecutionRecord",
+        "PassiveEffectsFlushWithSyncFlushContinuationResult"
+      ],
+      drainsPublicReactActQueue: false,
+      executesEffects: false,
+      executesQueuedWork: false,
+      executesRendererRoots: false,
+      kind: "fast-react.react.private-renderer-backed-act-drain-diagnostic",
+      publicReactActCompatibilityClaimed: false,
+      renderer: "fast-react-test-renderer",
+      status: "private-renderer-backed-act-drain-diagnostics"
+    },
+    rendererBackedActDrainConsumption: {
+      accepted: true,
+      drainsPublicReactActQueue: false,
+      executesEffects: false,
+      executesQueuedWork: false,
+      executesRendererRoots: false,
+      publicReactActCompatibilityClaimed: false,
+      renderer: "fast-react-test-renderer",
+      status: "consumed-accepted-renderer-backed-act-drain-diagnostics"
+    },
+    reactDomTestUtilsActGate: {
+      id: "react-dom-test-utils-act-private-routing-gate-4",
+      privatePrerequisitesPresent: true,
+      privateRoutingReady: false,
+      publicCompatibilityClaimed: false,
+      publicReactActReady: false,
+      publicTestUtilsActReady: false,
+      status: "blocked-public-test-utils-act-private-routing",
+      sideEffectPolicy: {
+        invokesActCallback: false,
+        executesQueuedWork: false,
+        executesPassiveEffects: false,
+        executesRendererRoots: false,
+        executesPublicRendererRoots: false,
+        executesPublicDomMutation: false,
+        executesSyncFlush: false,
+        emitsDeprecationWarning: false,
+        delegatesToReactAct: false
+      }
+    }
+  };
+}
+
+function expectedPrivatePassiveEvidence() {
+  return {
+    passiveEffectCallbackHandles: {
+      effectCallbackExecutionReady: false,
+      invokesCreateCallbacks: false,
+      invokesCreateCallbacksUnderTestControl: true,
+      invokesDestroyCallbacks: false,
+      invokesDestroyCallbacksUnderTestControl: true,
+      publicActCompatibilityClaimed: false,
+      publicEffectExecutionEnabled: false,
+      schedulerDrivenPassiveExecutionEnabled: false,
+      status: "private-passive-effect-callback-invocation-test-control-only",
+      testControlledInvocationOnly: true
+    },
+    passiveEffects: {
+      consumesPendingPassiveMetadata: true,
+      discoversCommittedFiberEffects: false,
+      executesPassiveEffects: false,
+      hasSyncFlushContinuationWrapper: true,
+      invokesCreateCallbacks: false,
+      invokesDestroyCallbacks: false,
+      status: "metadata-only-passive-flush-without-callback-execution"
+    },
+    syncFlushPostPassiveContinuationExecution: {
+      consumesPendingPassive: true,
+      executesPassiveEffects: false,
+      executesSyncFlush: true,
+      invokesCallbacks: false,
+      privateExecution: true,
+      status:
+        "private-sync-flush-post-passive-continuation-executes-follow-up-sync-flush"
+    }
+  };
+}
+
+function expectedActPassiveSourceDiagnostics() {
+  return {
+    loadError: null,
+    passiveCallbackInvocationGatePresent: true,
+    passiveDestroyExecutorPresent: true,
+    passiveErrorCaptureRecordPresent: true,
+    passiveSchedulerFlushGatePresent: true,
+    reactActRendererBackedDrainDiagnosticPresent: true,
+    reactDomTestUtilsActPrivateRoutingGatePresent: true,
+    reactDomTestUtilsPublicActBlockedPresent: true
+  };
+}
+
 function expectedPrivateCrossRootSchedulingEvidence() {
   const afterApply = expectedPrivateRootSideEffectStateAfterApply();
   return {
@@ -7599,6 +8423,176 @@ function comparablePrivateCrossRootSchedulingDiagnosticEvidence(evidence) {
         evidence.schedulingEvidence.rootSideEffectStateAfterFlush,
       scheduledRootCount: evidence.schedulingEvidence.scheduledRootCount
     }
+  };
+}
+
+function comparablePrivateActEvidence(evidence) {
+  return {
+    reactActPrivateDispatcher: {
+      continuationFlushingReady:
+        evidence.reactActPrivateDispatcher?.continuationFlushingReady,
+      executesEffects: evidence.reactActPrivateDispatcher?.executesEffects,
+      executesQueuedWork:
+        evidence.reactActPrivateDispatcher?.executesQueuedWork,
+      passiveEffectsReady:
+        evidence.reactActPrivateDispatcher?.passiveEffectsReady,
+      publicCompatibilityClaimed:
+        evidence.reactActPrivateDispatcher?.publicCompatibilityClaimed,
+      queueFlushingReady:
+        evidence.reactActPrivateDispatcher?.queueFlushingReady,
+      rendererRootsReady:
+        evidence.reactActPrivateDispatcher?.rendererRootsReady,
+      status: evidence.reactActPrivateDispatcher?.status
+    },
+    reactActQueueMetadata: {
+      acceptedRendererBackedActDrainReconcilerRecords:
+        evidence.reactActQueueMetadata
+          ?.acceptedRendererBackedActDrainReconcilerRecords,
+      consumesRendererBackedActDrainDiagnostics:
+        evidence.reactActQueueMetadata
+          ?.consumesRendererBackedActDrainDiagnostics,
+      drainsAcceptedRendererBackedActDiagnostics:
+        evidence.reactActQueueMetadata
+          ?.drainsAcceptedRendererBackedActDiagnostics,
+      drainsPublicReactActQueue:
+        evidence.reactActQueueMetadata?.drainsPublicReactActQueue,
+      executesEffects: evidence.reactActQueueMetadata?.executesEffects,
+      executesQueuedWork:
+        evidence.reactActQueueMetadata?.executesQueuedWork,
+      executesRendererRoots:
+        evidence.reactActQueueMetadata?.executesRendererRoots,
+      publicReactActCompatibilityClaimed:
+        evidence.reactActQueueMetadata?.publicReactActCompatibilityClaimed,
+      rendererBackedActDrainDiagnosticsReady:
+        evidence.reactActQueueMetadata
+          ?.rendererBackedActDrainDiagnosticsReady
+    },
+    rendererBackedActDrainDiagnostics: {
+      acceptedReconcilerRecords:
+        evidence.rendererBackedActDrainDiagnostics?.acceptedReconcilerRecords,
+      drainsPublicReactActQueue:
+        evidence.rendererBackedActDrainDiagnostics?.drainsPublicReactActQueue,
+      executesEffects:
+        evidence.rendererBackedActDrainDiagnostics?.executesEffects,
+      executesQueuedWork:
+        evidence.rendererBackedActDrainDiagnostics?.executesQueuedWork,
+      executesRendererRoots:
+        evidence.rendererBackedActDrainDiagnostics?.executesRendererRoots,
+      kind: evidence.rendererBackedActDrainDiagnostics?.kind,
+      publicReactActCompatibilityClaimed:
+        evidence.rendererBackedActDrainDiagnostics
+          ?.publicReactActCompatibilityClaimed,
+      renderer: evidence.rendererBackedActDrainDiagnostics?.renderer,
+      status: evidence.rendererBackedActDrainDiagnostics?.status
+    },
+    rendererBackedActDrainConsumption: {
+      accepted: evidence.rendererBackedActDrainConsumption?.accepted,
+      drainsPublicReactActQueue:
+        evidence.rendererBackedActDrainConsumption?.drainsPublicReactActQueue,
+      executesEffects:
+        evidence.rendererBackedActDrainConsumption?.executesEffects,
+      executesQueuedWork:
+        evidence.rendererBackedActDrainConsumption?.executesQueuedWork,
+      executesRendererRoots:
+        evidence.rendererBackedActDrainConsumption?.executesRendererRoots,
+      publicReactActCompatibilityClaimed:
+        evidence.rendererBackedActDrainConsumption
+          ?.publicReactActCompatibilityClaimed,
+      renderer: evidence.rendererBackedActDrainConsumption?.renderer,
+      status: evidence.rendererBackedActDrainConsumption?.status
+    },
+    reactDomTestUtilsActGate: {
+      id: evidence.reactDomTestUtilsActGate?.id,
+      privatePrerequisitesPresent:
+        evidence.reactDomTestUtilsActGate?.privatePrerequisitesPresent,
+      privateRoutingReady:
+        evidence.reactDomTestUtilsActGate?.privateRoutingReady,
+      publicCompatibilityClaimed:
+        evidence.reactDomTestUtilsActGate?.publicCompatibilityClaimed,
+      publicReactActReady:
+        evidence.reactDomTestUtilsActGate?.publicReactActReady,
+      publicTestUtilsActReady:
+        evidence.reactDomTestUtilsActGate?.publicTestUtilsActReady,
+      status: evidence.reactDomTestUtilsActGate?.status,
+      sideEffectPolicy: evidence.reactDomTestUtilsActGate?.sideEffectPolicy
+    }
+  };
+}
+
+function comparablePrivatePassiveEvidence(evidence) {
+  return {
+    passiveEffectCallbackHandles: {
+      effectCallbackExecutionReady:
+        evidence.passiveEffectCallbackHandles?.effectCallbackExecutionReady,
+      invokesCreateCallbacks:
+        evidence.passiveEffectCallbackHandles?.invokesCreateCallbacks,
+      invokesCreateCallbacksUnderTestControl:
+        evidence.passiveEffectCallbackHandles
+          ?.invokesCreateCallbacksUnderTestControl,
+      invokesDestroyCallbacks:
+        evidence.passiveEffectCallbackHandles?.invokesDestroyCallbacks,
+      invokesDestroyCallbacksUnderTestControl:
+        evidence.passiveEffectCallbackHandles
+          ?.invokesDestroyCallbacksUnderTestControl,
+      publicActCompatibilityClaimed:
+        evidence.passiveEffectCallbackHandles?.publicActCompatibilityClaimed,
+      publicEffectExecutionEnabled:
+        evidence.passiveEffectCallbackHandles?.publicEffectExecutionEnabled,
+      schedulerDrivenPassiveExecutionEnabled:
+        evidence.passiveEffectCallbackHandles
+          ?.schedulerDrivenPassiveExecutionEnabled,
+      status: evidence.passiveEffectCallbackHandles?.status,
+      testControlledInvocationOnly:
+        evidence.passiveEffectCallbackHandles?.testControlledInvocationOnly
+    },
+    passiveEffects: {
+      consumesPendingPassiveMetadata:
+        evidence.passiveEffects?.consumesPendingPassiveMetadata,
+      discoversCommittedFiberEffects:
+        evidence.passiveEffects?.discoversCommittedFiberEffects,
+      executesPassiveEffects: evidence.passiveEffects?.executesPassiveEffects,
+      hasSyncFlushContinuationWrapper:
+        evidence.passiveEffects?.hasSyncFlushContinuationWrapper,
+      invokesCreateCallbacks: evidence.passiveEffects?.invokesCreateCallbacks,
+      invokesDestroyCallbacks:
+        evidence.passiveEffects?.invokesDestroyCallbacks,
+      status: evidence.passiveEffects?.status
+    },
+    syncFlushPostPassiveContinuationExecution: {
+      consumesPendingPassive:
+        evidence.syncFlushPostPassiveContinuationExecution
+          ?.consumesPendingPassive,
+      executesPassiveEffects:
+        evidence.syncFlushPostPassiveContinuationExecution
+          ?.executesPassiveEffects,
+      executesSyncFlush:
+        evidence.syncFlushPostPassiveContinuationExecution?.executesSyncFlush,
+      invokesCallbacks:
+        evidence.syncFlushPostPassiveContinuationExecution?.invokesCallbacks,
+      privateExecution:
+        evidence.syncFlushPostPassiveContinuationExecution?.privateExecution,
+      status: evidence.syncFlushPostPassiveContinuationExecution?.status
+    }
+  };
+}
+
+function comparableActPassiveSourceDiagnostics(diagnostics) {
+  return {
+    loadError: diagnostics?.loadError,
+    passiveCallbackInvocationGatePresent:
+      diagnostics?.passiveCallbackInvocationGatePresent,
+    passiveDestroyExecutorPresent:
+      diagnostics?.passiveDestroyExecutorPresent,
+    passiveErrorCaptureRecordPresent:
+      diagnostics?.passiveErrorCaptureRecordPresent,
+    passiveSchedulerFlushGatePresent:
+      diagnostics?.passiveSchedulerFlushGatePresent,
+    reactActRendererBackedDrainDiagnosticPresent:
+      diagnostics?.reactActRendererBackedDrainDiagnosticPresent,
+    reactDomTestUtilsActPrivateRoutingGatePresent:
+      diagnostics?.reactDomTestUtilsActPrivateRoutingGatePresent,
+    reactDomTestUtilsPublicActBlockedPresent:
+      diagnostics?.reactDomTestUtilsPublicActBlockedPresent
   };
 }
 
@@ -7962,6 +8956,55 @@ function validatePrivateCrossRootSchedulingAdmissionMetadata({
         gateStatus: "unexpected-private-cross-root-scheduling-admission"
       });
     }
+  }
+}
+
+function validatePrivateActPassiveAdmissionMetadata({
+  privateActPassiveAdmissionByScenario,
+  failures
+}) {
+  for (const scenarioId of REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS) {
+    if (!privateActPassiveAdmissionByScenario.has(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "missing-private-root-act-passive-admission-metadata"
+      });
+    }
+  }
+
+  for (const [
+    scenarioId,
+    admission
+  ] of privateActPassiveAdmissionByScenario) {
+    if (!REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.includes(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-root-act-passive-admission-scenario"
+      });
+      continue;
+    }
+
+    if (
+      admission.admission === "private-act-passive-diagnostic" &&
+      admission.gateStatus ===
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS
+    ) {
+      continue;
+    }
+
+    if (
+      admission.admission === "unsupported" &&
+      admission.gateStatus ===
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_BLOCKED_STATUS
+    ) {
+      continue;
+    }
+
+    failures.push({
+      scenarioId,
+      gateStatus: "invalid-private-root-act-passive-admission-metadata",
+      admission
+    });
   }
 }
 
