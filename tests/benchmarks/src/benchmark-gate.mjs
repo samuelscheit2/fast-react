@@ -22,6 +22,12 @@ export const TIMING_STATUSES = Object.freeze([
   "improvement"
 ]);
 
+export const BENCHMARK_READINESS_STATUSES = Object.freeze([
+  "blocked-by-conformance",
+  "diagnostic-admitted",
+  "comparable-admitted"
+]);
+
 export const CLAIM_CAPABLE_TIMING_STATUSES = Object.freeze([
   "comparable",
   "noise-bound",
@@ -29,6 +35,7 @@ export const CLAIM_CAPABLE_TIMING_STATUSES = Object.freeze([
   "improvement"
 ]);
 
+export const COMPARABLE_ADMITTED_READINESS_STATUS = "comparable-admitted";
 export const GREEN_COMPATIBILITY_STATUS = "green";
 export const TIMING_DATA_POLICY = "diagnostic-until-compatible";
 
@@ -94,6 +101,11 @@ export function checkBenchmarkGate(options = {}) {
     scenarioCount: manifests.reduce(
       (count, entry) =>
         count + (Array.isArray(entry.manifest?.scenarios) ? entry.manifest.scenarios.length : 0),
+      0
+    ),
+    milestoneCount: manifests.reduce(
+      (count, entry) =>
+        count + (Array.isArray(entry.manifest?.milestones) ? entry.manifest.milestones.length : 0),
       0
     ),
     resultCount: results.length,
@@ -194,6 +206,12 @@ export function validateBenchmarkManifest(manifest, options = {}) {
       errors.push(`${label}: unexpected scenario ${scenarioId}`);
     }
   }
+
+  validateMilestones(manifest.milestones, {
+    label,
+    scenarioIdSet,
+    gateById
+  }, errors);
 
   return errors;
 }
@@ -301,6 +319,9 @@ function validateSchemaFiles({ benchmarkRoot }, errors) {
   const timingStatusIds = (vocabulary.timingStatuses ?? []).map(
     (status) => status.id
   );
+  const benchmarkReadinessStatusIds = (
+    vocabulary.benchmarkReadinessStatuses ?? []
+  ).map((status) => status.id);
 
   requireExactArray(
     compatibilityStatusIds,
@@ -330,6 +351,18 @@ function validateSchemaFiles({ benchmarkRoot }, errors) {
     resultSchema.$defs?.timingStatus?.enum,
     TIMING_STATUSES,
     "benchmark result schema: timingStatus enum",
+    errors
+  );
+  requireExactArray(
+    benchmarkReadinessStatusIds,
+    BENCHMARK_READINESS_STATUSES,
+    "benchmark status vocabulary: benchmarkReadinessStatuses",
+    errors
+  );
+  requireExactArray(
+    manifestSchema.$defs?.benchmarkReadinessStatus?.enum,
+    BENCHMARK_READINESS_STATUSES,
+    "benchmark manifest schema: benchmarkReadinessStatus enum",
     errors
   );
 }
@@ -461,6 +494,117 @@ function validateScenario(scenario, { label, requiredScenarioIdSet, gateById }, 
               gate.artifactObject?.conformanceClaims?.[claim]
             )}`
           );
+        }
+      }
+    }
+  }
+}
+
+function validateMilestones(milestones, { label, scenarioIdSet, gateById }, errors) {
+  if (milestones === undefined) {
+    return;
+  }
+  if (!Array.isArray(milestones)) {
+    errors.push(`${label}: milestones must be an array`);
+    return;
+  }
+
+  const milestoneIds = new Set();
+  for (const milestone of milestones) {
+    if (!isPlainObject(milestone)) {
+      errors.push(`${label}: every milestone must be an object`);
+      continue;
+    }
+
+    const milestoneLabel = `${label}: milestone ${String(milestone.id)}`;
+    requireString(milestone.id, `${milestoneLabel} id`, errors);
+    requireString(milestone.description, `${milestoneLabel} description`, errors);
+    requireString(milestone.blockedReason, `${milestoneLabel} blockedReason`, errors);
+
+    if (typeof milestone.id === "string") {
+      if (milestoneIds.has(milestone.id)) {
+        errors.push(`${label}: duplicate milestone id ${milestone.id}`);
+      }
+      milestoneIds.add(milestone.id);
+    }
+
+    const scenarioIds = validateStringArray(
+      milestone.scenarioIds,
+      `${milestoneLabel} scenarioIds`,
+      errors
+    );
+    const gateIds = validateStringArray(
+      milestone.conformanceGateIds,
+      `${milestoneLabel} conformanceGateIds`,
+      errors
+    );
+
+    for (const scenarioId of scenarioIds) {
+      if (!scenarioIdSet.has(scenarioId)) {
+        errors.push(`${milestoneLabel}: unknown scenario ${String(scenarioId)}`);
+      }
+    }
+
+    const gates = [];
+    for (const gateId of gateIds) {
+      const gate = gateById.get(gateId);
+      if (!gate) {
+        errors.push(`${milestoneLabel}: unknown conformance gate ${gateId}`);
+        continue;
+      }
+      gates.push(gate);
+    }
+
+    if (!COMPATIBILITY_STATUSES.includes(milestone.compatibilityStatus)) {
+      errors.push(
+        `${milestoneLabel}: unknown compatibilityStatus ${String(
+          milestone.compatibilityStatus
+        )}`
+      );
+    }
+    if (!TIMING_STATUSES.includes(milestone.timingStatus)) {
+      errors.push(
+        `${milestoneLabel}: unknown timingStatus ${String(milestone.timingStatus)}`
+      );
+    } else {
+      validateTimingCompatibilityPair(
+        milestone.compatibilityStatus,
+        milestone.timingStatus,
+        milestoneLabel,
+        errors
+      );
+    }
+
+    if (
+      !BENCHMARK_READINESS_STATUSES.includes(
+        milestone.benchmarkReadinessStatus
+      )
+    ) {
+      errors.push(
+        `${milestoneLabel}: unknown benchmarkReadinessStatus ${String(
+          milestone.benchmarkReadinessStatus
+        )}`
+      );
+    } else if (
+      milestone.benchmarkReadinessStatus ===
+        COMPARABLE_ADMITTED_READINESS_STATUS &&
+      milestone.compatibilityStatus !== GREEN_COMPATIBILITY_STATUS
+    ) {
+      errors.push(
+        `${milestoneLabel}: benchmarkReadinessStatus ${COMPARABLE_ADMITTED_READINESS_STATUS} requires compatibilityStatus ${GREEN_COMPATIBILITY_STATUS}`
+      );
+    }
+
+    if (milestone.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
+      for (const gate of gates) {
+        for (const claim of gate.requiredClaims) {
+          if (gate.artifactObject?.conformanceClaims?.[claim] !== true) {
+            errors.push(
+              `${milestoneLabel}: unsupported green compatibility claim; ${gate.id} has conformanceClaims.${claim}=${String(
+                gate.artifactObject?.conformanceClaims?.[claim]
+              )}`
+            );
+          }
         }
       }
     }
