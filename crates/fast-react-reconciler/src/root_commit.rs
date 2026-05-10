@@ -4573,6 +4573,7 @@ mod tests {
         second_deleted_state_node: StateNodeHandle,
         nested_deleted_component: FiberId,
         nested_deleted_component_state_node: StateNodeHandle,
+        nested_deleted_component_ref: RefHandle,
         nested_deleted_text: FiberId,
         nested_deleted_text_state_node: StateNodeHandle,
         second_parent: FiberId,
@@ -4769,6 +4770,7 @@ mod tests {
         let first_deleted_state_node = StateNodeHandle::from_raw(8202);
         let second_deleted_state_node = StateNodeHandle::from_raw(8203);
         let nested_deleted_component_state_node = StateNodeHandle::from_raw(8204);
+        let nested_deleted_component_ref = RefHandle::from_raw(8206);
         let nested_deleted_text_state_node = StateNodeHandle::from_raw(8205);
         store
             .fiber_arena_mut()
@@ -4785,6 +4787,11 @@ mod tests {
             .get_mut(nested_deleted_component)
             .unwrap()
             .set_state_node(nested_deleted_component_state_node);
+        store
+            .fiber_arena_mut()
+            .get_mut(nested_deleted_component)
+            .unwrap()
+            .set_ref_handle(nested_deleted_component_ref);
         store
             .fiber_arena_mut()
             .get_mut(nested_deleted_text)
@@ -4834,6 +4841,7 @@ mod tests {
             .fiber_arena_mut()
             .mark_child_for_deletion(second_parent, third_deleted)
             .unwrap();
+        bubble_test_fiber(store, host_root_work_in_progress);
 
         DeletionMetadataFixture {
             first_parent,
@@ -4845,6 +4853,7 @@ mod tests {
             second_deleted_state_node,
             nested_deleted_component,
             nested_deleted_component_state_node,
+            nested_deleted_component_ref,
             nested_deleted_text,
             nested_deleted_text_state_node,
             second_parent,
@@ -6049,6 +6058,51 @@ mod tests {
         assert_eq!(
             cleanup_records[4].state_node(),
             fixture.third_deleted_state_node
+        );
+        let refs = commit.ref_commit_metadata();
+        let gate = commit.dom_ref_callback_commit_gate();
+        assert_eq!(refs.attach().len(), 0);
+        assert_eq!(refs.detach().len(), 1);
+        assert_eq!(refs.detach()[0].fiber(), fixture.nested_deleted_component);
+        assert_eq!(
+            refs.detach()[0].state_node(),
+            fixture.nested_deleted_component_state_node
+        );
+        assert_eq!(
+            refs.detach()[0].ref_handle(),
+            fixture.nested_deleted_component_ref
+        );
+        assert_eq!(
+            refs.detach()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_eq!(
+            refs.detach()[0].token_phase(),
+            HostFiberTokenPhase::Deletion
+        );
+        assert_eq!(
+            refs.detach()[0].token_target(),
+            HostFiberTokenTarget::Instance
+        );
+        store
+            .host_tokens()
+            .validate(
+                refs.detach()[0].token(),
+                refs.detach()[0].root(),
+                refs.detach()[0].fiber(),
+                refs.detach()[0].token_phase(),
+                refs.detach()[0].token_target(),
+            )
+            .unwrap();
+        assert_dom_ref_callback_gate_is_inert(gate);
+        assert_eq!(gate.len(), 1);
+        assert_eq!(gate.records()[0].sequence(), 0);
+        assert_eq!(gate.records()[0].fiber(), fixture.nested_deleted_component);
+        assert_eq!(gate.records()[0].token(), refs.detach()[0].token());
+        assert_eq!(gate.records()[0].action(), HostRootRefCommitAction::Detach);
+        assert_eq!(
+            gate.records()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
         );
         for record in cleanup_records {
             store
