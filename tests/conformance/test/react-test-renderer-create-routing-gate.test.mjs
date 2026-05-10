@@ -62,6 +62,10 @@ const privateTestInstanceQueryBridgePreflightDiagnosticName =
   "fast-react-test-renderer.testinstance.query-bridge-preflight";
 const privateTestInstanceQueryBridgePreflightStatus =
   "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked";
+const privateTestInstanceNativeQueryExecutionDiagnosticName =
+  "fast-react-test-renderer.testinstance.private-native-query-execution-evidence";
+const privateTestInstanceNativeQueryExecutionStatus =
+  "private-test-instance-native-create-update-execution-records-consumed-public-test-instance-blocked";
 const privateErrorBoundaryDiagnosticsSymbolDescription =
   "fast.react_test_renderer.private_error_boundary_diagnostics";
 const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
@@ -2955,6 +2959,135 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
     entry.entrypoint
   );
   assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+});
+
+test("react-test-renderer CJS development private TestInstance query consumes accepted native create/update execution records", () => {
+  const entry = cjsEntrypoints.find((candidate) =>
+    candidate.entrypoint.endsWith("react-test-renderer.development")
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    { props: { children: "hello" }, type: "span" },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
+  const record = Object.getOwnPropertyDescriptor(
+    renderer,
+    privateTestInstanceWrapperRecordSymbol
+  ).value;
+  const updateError = captureThrown(() =>
+    renderer.update({ props: { children: "goodbye" }, type: "span" })
+  );
+  const unmountError = captureThrown(() => renderer.unmount());
+  const executor = (handoff) => {
+    const request =
+      handoff.requestSequence === createRequest.requestSequence
+        ? createRequest
+        : handoff.requestSequence === updateError.rootRequest.requestSequence
+          ? updateError.rootRequest
+          : unmountError.rootRequest;
+    if (request.operation === "update") {
+      return createRustUpdateNativeBridgeAdmissionEvidence(request);
+    }
+    if (request.operation === "unmount") {
+      return {
+        ...createRustUnmountNativeBridgeAdmissionEvidence(request),
+        nativeAddonLoaded: false,
+        nativeExecution: false,
+        rustExecution: true
+      };
+    }
+    return {
+      rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+      privateCreateNativeBridgeHostOutputHandoff:
+        createRustCreateNativeBridgeHostOutputHandoffSource(
+          request,
+          createAdmission
+        ),
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+  };
+
+  const createResult = bridge.executeRootRequest(createRequest, executor);
+  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
+  const unmountResult = bridge.executeRootRequest(
+    unmountError.rootRequest,
+    executor
+  );
+
+  assert.equal(record.privateNativeQueryExecutionEvidenceAvailable, true);
+  assert.equal(
+    record.privateNativeQueryExecutionDiagnosticName,
+    privateTestInstanceNativeQueryExecutionDiagnosticName
+  );
+  assert.equal(
+    record.privateNativeQueryExecutionStatus,
+    privateTestInstanceNativeQueryExecutionStatus
+  );
+  assert.deepEqual(record.acceptedNativeExecutionOperations, [
+    "create",
+    "update"
+  ]);
+  assert.equal(
+    typeof record.createAcceptedNativeQueryExecutionDiagnosticResult,
+    "function"
+  );
+  assert.equal(
+    typeof record.canCreateAcceptedNativeQueryExecutionDiagnosticResult,
+    "function"
+  );
+
+  const createEvidence =
+    record.createAcceptedNativeQueryExecutionDiagnosticResult(createResult);
+  assertPrivateTestInstanceNativeQueryExecutionEvidence(
+    createEvidence,
+    record,
+    createResult,
+    {
+      consumesCreate: true,
+      consumesUpdate: false,
+      hostOutputUpdateKind: "Create",
+      operation: "create"
+    },
+    entry.entrypoint
+  );
+
+  const updateEvidence =
+    record.createAcceptedNativeQueryExecutionDiagnosticResult(updateResult);
+  assertPrivateTestInstanceNativeQueryExecutionEvidence(
+    updateEvidence,
+    record,
+    updateResult,
+    {
+      consumesCreate: false,
+      consumesUpdate: true,
+      hostOutputUpdateKind: "Update",
+      operation: "update"
+    },
+    entry.entrypoint
+  );
+
+  assert.equal(
+    record.canCreateAcceptedNativeQueryExecutionDiagnosticResult(
+      unmountResult
+    ),
+    false,
+    entry.entrypoint
+  );
+  assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+  assert.throws(() => renderer.root, {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    name: "FastReactTestRendererUnimplementedError"
+  });
 });
 
 test("react-test-renderer create routing gate does not load native bridge artifacts", () => {
@@ -8525,6 +8658,118 @@ function assertPrivateTestInstanceQueryBridgePreflight(
     entrypoint
   );
   assert.equal(queryMetadata.queryBridgeRustExecutionFromJs, false, entrypoint);
+}
+
+function assertPrivateTestInstanceNativeQueryExecutionEvidence(
+  evidence,
+  owner,
+  execution,
+  expected,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(evidence), true, entrypoint);
+  assert.equal(
+    evidence.id,
+    "react-test-renderer-private-test-instance-native-query-execution-result",
+    entrypoint
+  );
+  assert.equal(
+    evidence.diagnosticName,
+    privateTestInstanceNativeQueryExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    evidence.status,
+    privateTestInstanceNativeQueryExecutionStatus,
+    entrypoint
+  );
+  assert.equal(
+    evidence.gate.id,
+    "react-test-renderer-private-test-instance-native-query-execution-gate",
+    entrypoint
+  );
+  assert.equal(
+    evidence.gate.acceptedWorker,
+    "worker-668-test-renderer-testinstance-native-query-execution",
+    entrypoint
+  );
+  assert.deepEqual(evidence.gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_test_instance_query_after_create_native_execution_for_canary",
+    "TestRendererRoot::describe_private_test_instance_query_after_update_native_execution_for_canary",
+    "TestRendererPrivateTestInstanceNativeQueryExecutionEvidence"
+  ]);
+  assert.deepEqual(evidence.gate.acceptedRustTests, [
+    "root_private_test_instance_native_query_execution_consumes_create_and_update_records",
+    "root_private_test_instance_native_query_execution_rejects_public_testinstance_claim"
+  ]);
+  assert.deepEqual(evidence.gate.acceptedNativeExecutionOperations, [
+    "create",
+    "update"
+  ]);
+  assert.equal(evidence.rootRequest, owner.rootRequest, entrypoint);
+  assert.equal(evidence.rootExecutionResult, execution, entrypoint);
+  assert.equal(evidence.operation, expected.operation, entrypoint);
+  assert.equal(evidence.requestId, execution.requestId, entrypoint);
+  assert.equal(evidence.requestSequence, execution.requestSequence, entrypoint);
+  assert.equal(evidence.rootId, execution.request.rootId, entrypoint);
+  assert.equal(
+    evidence.hostOutputUpdateKind,
+    expected.hostOutputUpdateKind,
+    entrypoint
+  );
+  assert.equal(
+    evidence.sourceQueryDiagnosticName,
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    evidence.sourceQueryBridgePreflight,
+    owner.queryBridgePreflight,
+    entrypoint
+  );
+  assert.equal(evidence.query, "findByType", entrypoint);
+  assert.equal(evidence.querySurface, "ReactTestInstance.findByType", entrypoint);
+  assert.equal(
+    evidence.queryRecord,
+    owner.queryMethodRecords.findByType,
+    entrypoint
+  );
+  assert.equal(
+    evidence.queryResult,
+    owner.rootQueryRecord.result.children[1],
+    entrypoint
+  );
+  assert.equal(evidence.resultKind, "single", entrypoint);
+  assert.equal(evidence.resultFiberTag, "HostComponent", entrypoint);
+  assert.equal(evidence.matchedCandidateCount, 1, entrypoint);
+  assert.equal(evidence.queryPathCandidateCount, 1, entrypoint);
+  assert.equal(evidence.skippedTextChildCount, 2, entrypoint);
+  assert.equal(evidence.consumesAcceptedNativeExecutionRecord, true, entrypoint);
+  assert.equal(
+    evidence.consumesAcceptedNativeCreateExecutionRecord,
+    expected.consumesCreate,
+    entrypoint
+  );
+  assert.equal(
+    evidence.consumesAcceptedNativeUpdateExecutionRecord,
+    expected.consumesUpdate,
+    entrypoint
+  );
+  assert.equal(
+    evidence.consumesPrivateTestInstanceQueryDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(evidence.consumesQueryBridgePreflight, true, entrypoint);
+  assert.equal(evidence.consumesAcceptedRustFindAllDiagnostics, true, entrypoint);
+  assert.equal(evidence.consumesAcceptedRustFindByDiagnostics, true, entrypoint);
+  assert.equal(evidence.minimalHostComponentQueryPath, true, entrypoint);
+  assert.equal(evidence.publicRootAvailable, false, entrypoint);
+  assert.equal(evidence.publicQueryMethodsAvailable, false, entrypoint);
+  assert.equal(evidence.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(evidence.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(evidence.nativeExecution, false, entrypoint);
+  assert.equal(evidence.compatibilityClaimed, false, entrypoint);
 }
 
 function assertPrivateQueryMethodRecord(queryRecord, expected, owner, entrypoint) {
