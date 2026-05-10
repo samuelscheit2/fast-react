@@ -48,9 +48,15 @@ sequencing belong in `MASTER_PLAN.md`.
   `update_container_sync` was merged.
 - Worker 125 scheduler `unstable_post_task` implementation and smoke behavior
   was merged.
+- Worker 126 scheduler native entrypoint implementation was merged through
+  worker 127's integration branch.
+- Worker 127 scheduler native smoke integration was merged.
 
 ## Latest Accepted Verification
 
+- Workers 126 and 127 were verified on `main` with the focused scheduler native
+  oracle test, `npm run check:js` with 415 conformance tests, `git diff
+  --check`, and clean git status.
 - Workers 124 and 125 were verified on `main` with `cargo fmt --all --check`,
   full `fast-react-reconciler` tests, `npm run check:js` with 414 conformance
   tests, reconciler clippy, `git diff --check`, and clean git status.
