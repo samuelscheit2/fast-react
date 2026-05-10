@@ -64,6 +64,12 @@ const errorSurfacePrivateRoutingRowIds = [
   "react-test-renderer-update-route-private-diagnostic",
   "react-test-renderer-unmount-route-private-diagnostic"
 ];
+const errorSurfacePrivateDiagnosticRowIds = [
+  ...errorSurfacePrivateRoutingRowIds,
+  "react-test-renderer-serialization-private-json-diagnostic",
+  "react-test-renderer-test-instance-private-fiber-diagnostic",
+  "react-test-renderer-act-scheduler-private-diagnostic"
+];
 const expectedPrivateRoutes = [
   {
     acceptedRustApis: [
@@ -684,6 +690,10 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
   });
 
   assert.deepEqual(
+    gate.privateDiagnosticRows.map((row) => row.id),
+    errorSurfacePrivateDiagnosticRowIds
+  );
+  assert.deepEqual(
     gate.privateDiagnosticRows
       .filter(
         (row) =>
@@ -698,8 +708,27 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
   assert.equal(gate.localChecks.createRoutingGatePresent, true);
   assert.equal(gate.localChecks.updatePrivateRoutePresent, true);
   assert.equal(gate.localChecks.unmountPrivateRoutePresent, true);
+  assert.equal(
+    gate.localChecks.privateToJSONSerializationFacadeGatePresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateToJSONSerializationFacadePubliclyBlocked,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateRecordOnlyTestInstanceWrapperPresent,
+    true
+  );
+  assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
+  assert.equal(gate.localChecks.passiveEffectMetadataOnly, true);
   assert.equal(gate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked, true);
   assert.equal(gate.localChecks.publicCreateUpdateUnmountErrorSurfaceReady, false);
+  assert.equal(gate.localChecks.publicSerializationErrorSurfaceReady, false);
+  assert.equal(gate.localChecks.publicTestInstanceErrorSurfaceReady, false);
+  assert.equal(gate.localChecks.publicActSchedulerErrorSurfaceReady, false);
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.equal(gate.publicCompatibilityClaimed, false);
 
   const invalidCreateUpdateScenario = gate.publicScenarioAdmissions.find(
     (scenario) => scenario.scenarioId === "invalid-create-update-inputs"
