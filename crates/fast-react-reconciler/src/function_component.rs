@@ -2302,41 +2302,6 @@ impl FunctionComponentCommittedEffectQueue {
     }
 
     #[must_use]
-    pub fn layout_effect_metadata(
-        &self,
-        flags: HookEffectFlags,
-    ) -> Vec<FunctionComponentLayoutEffectMetadata> {
-        if self.lanes.is_empty() {
-            return Vec::new();
-        }
-
-        let mut accepted = Vec::new();
-        for record in &self.records {
-            if record.phase() != FunctionComponentEffectPhase::Layout {
-                continue;
-            }
-
-            if !record.matches_flags(flags) {
-                continue;
-            }
-
-            accepted.push(FunctionComponentLayoutEffectMetadata {
-                fiber: self.fiber,
-                hook_list: record.hook_list(),
-                effect_index: accepted.len(),
-                effect: record.effect(),
-                instance: record.instance(),
-                tag: record.tag(),
-                create: record.create(),
-                destroy: record.destroy(),
-                dependencies: record.dependencies(),
-                lanes: self.lanes,
-            });
-        }
-        accepted
-    }
-
-    #[must_use]
     pub fn passive_effect_metadata(
         &self,
         flags: HookEffectFlags,
@@ -2359,6 +2324,40 @@ impl FunctionComponentCommittedEffectQueue {
                 fiber: self.fiber,
                 hook_list: record.hook_list(),
                 effect_index: accepted.len(),
+                effect: record.effect(),
+                instance: record.instance(),
+                tag: record.tag(),
+                create: record.create(),
+                destroy: record.destroy(),
+                dependencies: record.dependencies(),
+                lanes: self.lanes,
+            });
+        }
+        accepted
+    }
+
+    #[must_use]
+    pub fn layout_effect_metadata(
+        &self,
+        flags: HookEffectFlags,
+    ) -> Vec<FunctionComponentLayoutEffectMetadata> {
+        if self.lanes.is_empty() {
+            return Vec::new();
+        }
+
+        let mut accepted = Vec::new();
+        for record in &self.records {
+            if record.phase() != FunctionComponentEffectPhase::Layout
+                || !record.matches_flags(flags)
+            {
+                continue;
+            }
+
+            accepted.push(FunctionComponentLayoutEffectMetadata {
+                fiber: self.fiber,
+                render_phase: self.phase,
+                hook_list: record.hook_list(),
+                effect_index: record.effect_index(),
                 effect: record.effect(),
                 instance: record.instance(),
                 tag: record.tag(),
@@ -2562,6 +2561,7 @@ impl FunctionComponentHookRenderStore {
                 })?;
             records.push(FunctionComponentLayoutEffectMetadata {
                 fiber: state.render_fiber(),
+                render_phase: state.phase(),
                 hook_list: list,
                 effect_index,
                 effect: effect.id(),
@@ -2677,6 +2677,7 @@ impl FunctionComponentHookRenderStore {
 
             accepted.push(FunctionComponentLayoutEffectMetadata {
                 fiber: record.fiber(),
+                render_phase: state.phase(),
                 hook_list: record.hook_list(),
                 effect_index: accepted.len(),
                 effect: record.effect(),
@@ -4396,7 +4397,7 @@ impl FunctionComponentEffectRegistration {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct FunctionComponentLayoutEffectMetadata {
+pub(crate) struct FunctionComponentPassiveEffectMetadata {
     fiber: FiberId,
     hook_list: HookListId,
     effect_index: usize,
@@ -4409,7 +4410,7 @@ pub(crate) struct FunctionComponentLayoutEffectMetadata {
     lanes: Lanes,
 }
 
-impl FunctionComponentLayoutEffectMetadata {
+impl FunctionComponentPassiveEffectMetadata {
     #[must_use]
     pub const fn fiber(self) -> FiberId {
         self.fiber
@@ -4462,8 +4463,9 @@ impl FunctionComponentLayoutEffectMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct FunctionComponentPassiveEffectMetadata {
+pub(crate) struct FunctionComponentLayoutEffectMetadata {
     fiber: FiberId,
+    render_phase: FunctionComponentHookRenderPhase,
     hook_list: HookListId,
     effect_index: usize,
     effect: HookEffectId,
@@ -4475,10 +4477,15 @@ pub(crate) struct FunctionComponentPassiveEffectMetadata {
     lanes: Lanes,
 }
 
-impl FunctionComponentPassiveEffectMetadata {
+impl FunctionComponentLayoutEffectMetadata {
     #[must_use]
     pub const fn fiber(self) -> FiberId {
         self.fiber
+    }
+
+    #[must_use]
+    pub const fn render_phase(self) -> FunctionComponentHookRenderPhase {
+        self.render_phase
     }
 
     #[must_use]
@@ -7727,6 +7734,10 @@ mod tests {
         assert_eq!(layout_metadata.len(), 1);
         assert_eq!(layout_metadata[0].fiber(), work_in_progress);
         assert_eq!(
+            layout_metadata[0].render_phase(),
+            FunctionComponentHookRenderPhase::Mount
+        );
+        assert_eq!(
             layout_metadata[0].hook_list(),
             state.work_in_progress_list()
         );
@@ -10123,6 +10134,10 @@ mod tests {
             .unwrap();
         assert_eq!(layout.len(), 1);
         assert_eq!(layout[0].fiber(), work_in_progress);
+        assert_eq!(
+            layout[0].render_phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
         assert_eq!(layout[0].hook_list(), state.work_in_progress_list());
         assert_eq!(layout[0].effect_index(), 0);
         assert_eq!(layout[0].effect(), changed.effect());
@@ -10184,8 +10199,18 @@ mod tests {
         let firing_layout = hook_store
             .committed_layout_effect_metadata(work_in_progress, HookEffectFlags::LAYOUT_EFFECT);
         assert_eq!(firing_layout.len(), 1);
+        assert_eq!(
+            firing_layout[0].render_phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(firing_layout[0].effect_index(), 0);
         assert_eq!(firing_layout[0].effect(), changed.effect());
+        assert_eq!(firing_layout[0].instance(), previous_changed.instance());
+        assert_eq!(firing_layout[0].create(), callback(1023));
         assert_eq!(firing_layout[0].destroy(), Some(callback(1022)));
+        assert_eq!(firing_layout[0].dependencies(), deps(1024));
+        assert_eq!(firing_layout[0].lanes(), Lanes::DEFAULT);
+
         let all_layout =
             hook_store.committed_layout_effect_metadata(work_in_progress, HookEffectFlags::LAYOUT);
         assert_eq!(all_layout.len(), 2);

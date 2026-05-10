@@ -12,15 +12,16 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
     DeletionListId, ElementTypeHandle, FiberArena, FiberFlags, FiberId, FiberTag,
-    FiberTopologyError, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes,
-    PropsHandle, RefHandle, RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
+    FiberTopologyError, HookEffectCallbackHandle, HookEffectDependencies, HookEffectFlags,
+    HookEffectId, HookEffectInstanceId, HookListId, Lanes, PropsHandle, RefHandle,
+    RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 use crate::function_component::{
     FunctionComponentCommittedEffectQueue, FunctionComponentHookRenderPhase,
     FunctionComponentHookRenderState, FunctionComponentHookRenderStore,
-    FunctionComponentPassiveEffectMetadata,
+    FunctionComponentLayoutEffectMetadata, FunctionComponentPassiveEffectMetadata,
 };
 use crate::root_callbacks::{
     RootUpdateCallbackInvocationGateSnapshot, materialize_root_update_callback_invocation_gate,
@@ -70,6 +71,15 @@ pub enum RootCommitError {
     FunctionComponentCommittedEffectQueue {
         fiber: FiberId,
         message: String,
+    },
+    FunctionComponentLayoutEffectQueue {
+        fiber: FiberId,
+        message: String,
+    },
+    LayoutEffectHandoffCurrentMismatch {
+        root: FiberRootId,
+        commit_current: FiberId,
+        store_current: FiberId,
     },
     CommittedPassiveEffectsWithoutPendingPassiveHandoff {
         root: FiberRootId,
@@ -223,6 +233,23 @@ impl Display for RootCommitError {
                 "function component fiber {} committed hook-effect queue failed before passive traversal: {}",
                 fiber.slot().get(),
                 message
+            ),
+            Self::FunctionComponentLayoutEffectQueue { fiber, message } => write!(
+                formatter,
+                "function component fiber {} committed hook-effect queue failed before layout handoff: {}",
+                fiber.slot().get(),
+                message
+            ),
+            Self::LayoutEffectHandoffCurrentMismatch {
+                root,
+                commit_current,
+                store_current,
+            } => write!(
+                formatter,
+                "root {} layout effect handoff expected committed current fiber slot {}, found store current fiber slot {}",
+                root.raw(),
+                commit_current.slot().get(),
+                store_current.slot().get()
             ),
             Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { root } => write!(
                 formatter,
@@ -441,6 +468,8 @@ impl Error for RootCommitError {
             | Self::PendingPassiveQueueRejected { .. }
             | Self::ExpectedFunctionComponentPassiveEffectFiber { .. }
             | Self::FunctionComponentCommittedEffectQueue { .. }
+            | Self::FunctionComponentLayoutEffectQueue { .. }
+            | Self::LayoutEffectHandoffCurrentMismatch { .. }
             | Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { .. }
             | Self::CommittedPassiveEffectHandoffRootMismatch { .. }
             | Self::CommittedPassiveEffectHandoffLanesMismatch { .. }
@@ -878,6 +907,114 @@ impl FunctionComponentCommittedPassiveEffectsSnapshot {
             .iter()
             .flat_map(|fiber| fiber.records().iter().copied())
             .collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentLayoutEffectCommitRecord {
+    commit_order: usize,
+    fiber: FiberId,
+    render_phase: FunctionComponentHookRenderPhase,
+    hook_list: HookListId,
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    tag: HookEffectFlags,
+    create: HookEffectCallbackHandle,
+    destroy: Option<HookEffectCallbackHandle>,
+    dependencies: HookEffectDependencies,
+    lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private layout hook-effect handoff metadata for deterministic canaries"
+)]
+impl FunctionComponentLayoutEffectCommitRecord {
+    #[must_use]
+    pub(crate) const fn commit_order(self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(self) -> FunctionComponentHookRenderPhase {
+        self.render_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub(crate) const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub(crate) const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub(crate) const fn create(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+
+    #[must_use]
+    pub(crate) const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub(crate) const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentLayoutEffectsSnapshot {
+    records: Vec<FunctionComponentLayoutEffectCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private layout hook-effect handoff metadata for deterministic canaries"
+)]
+impl FunctionComponentLayoutEffectsSnapshot {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[FunctionComponentLayoutEffectCommitRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
     }
 }
 
@@ -1648,6 +1785,7 @@ pub struct HostRootCommitRecord {
     root_update_callback_invocation_gate: RootUpdateCallbackInvocationGateSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
     function_component_committed_passive_effects: FunctionComponentCommittedPassiveEffectsSnapshot,
+    function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot,
     deletion_lists: Vec<HostRootDeletionListRecord>,
     host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
     ref_commit_metadata: HostRootRefCommitSnapshot,
@@ -2025,6 +2163,46 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "crate-private layout hook-effect handoff metadata for deterministic canaries"
+    )]
+    #[must_use]
+    pub(crate) const fn function_component_layout_effects(
+        &self,
+    ) -> &FunctionComponentLayoutEffectsSnapshot {
+        &self.function_component_layout_effects
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private layout hook-effect handoff metadata for deterministic canaries"
+    )]
+    pub(crate) fn record_function_component_layout_effects_for_canary<H: HostTypes>(
+        &mut self,
+        store: &FiberRootStore<H>,
+        hook_store: &mut FunctionComponentHookRenderStore,
+    ) -> Result<&FunctionComponentLayoutEffectsSnapshot, RootCommitError> {
+        let store_current = store.root(self.root)?.current();
+        if store_current != self.current {
+            return Err(RootCommitError::LayoutEffectHandoffCurrentMismatch {
+                root: self.root,
+                commit_current: self.current,
+                store_current,
+            });
+        }
+
+        self.function_component_layout_effects =
+            record_function_component_layout_effects_for_committed_root(
+                store,
+                self.root,
+                hook_store,
+                self.finished_lanes,
+            )?;
+
+        Ok(&self.function_component_layout_effects)
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private deletion metadata for future mutation/passive deletion workers"
     )]
     #[must_use]
@@ -2113,6 +2291,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
         pending_passive_handoff,
         function_component_committed_passive_effects:
             FunctionComponentCommittedPassiveEffectsSnapshot::default(),
+        function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot::default(),
         deletion_lists,
         host_node_deletion_cleanup_log,
         ref_commit_metadata,
@@ -2223,6 +2402,98 @@ fn commit_function_component_effect_queues_for_committed_subtree(
     }
 
     Ok(())
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private layout hook-effect handoff helper exercised by deterministic canaries"
+)]
+pub(crate) fn record_function_component_layout_effects_for_committed_root<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    lanes: Lanes,
+) -> Result<FunctionComponentLayoutEffectsSnapshot, RootCommitError> {
+    let current = store.root(root)?.current();
+    let mut records = Vec::new();
+    record_function_component_layout_effects_for_committed_subtree(
+        store.fiber_arena(),
+        current,
+        hook_store,
+        lanes,
+        &mut records,
+    )?;
+    Ok(FunctionComponentLayoutEffectsSnapshot { records })
+}
+
+fn record_function_component_layout_effects_for_committed_subtree(
+    arena: &FiberArena,
+    fiber: FiberId,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    lanes: Lanes,
+    records: &mut Vec<FunctionComponentLayoutEffectCommitRecord>,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(fiber)?;
+    let tag = node.tag();
+    let flags = node.flags();
+    let child = node.child();
+    let sibling = node.sibling();
+
+    if let Some(child) = child {
+        record_function_component_layout_effects_for_committed_subtree(
+            arena, child, hook_store, lanes, records,
+        )?;
+    }
+
+    if tag == FiberTag::FunctionComponent && flags.contains_any(FiberFlags::UPDATE) {
+        if hook_store.committed_effect_queue(fiber).is_none() {
+            hook_store
+                .commit_pending_effect_queue_for_fiber(fiber, lanes)
+                .map_err(
+                    |error| RootCommitError::FunctionComponentLayoutEffectQueue {
+                        fiber,
+                        message: error.to_string(),
+                    },
+                )?;
+        }
+
+        for metadata in
+            hook_store.committed_layout_effect_metadata(fiber, HookEffectFlags::LAYOUT_EFFECT)
+        {
+            records.push(function_component_layout_effect_commit_record(
+                records.len(),
+                metadata,
+            ));
+        }
+    }
+
+    if let Some(sibling) = sibling {
+        record_function_component_layout_effects_for_committed_subtree(
+            arena, sibling, hook_store, lanes, records,
+        )?;
+    }
+
+    Ok(())
+}
+
+const fn function_component_layout_effect_commit_record(
+    commit_order: usize,
+    metadata: FunctionComponentLayoutEffectMetadata,
+) -> FunctionComponentLayoutEffectCommitRecord {
+    FunctionComponentLayoutEffectCommitRecord {
+        commit_order,
+        fiber: metadata.fiber(),
+        render_phase: metadata.render_phase(),
+        hook_list: metadata.hook_list(),
+        effect_index: metadata.effect_index(),
+        effect: metadata.effect(),
+        instance: metadata.instance(),
+        tag: metadata.tag(),
+        create: metadata.create(),
+        destroy: metadata.destroy(),
+        dependencies: metadata.dependencies(),
+        lanes: metadata.lanes(),
+    }
 }
 
 #[allow(
@@ -5337,20 +5608,30 @@ mod tests {
         component: FiberTypeHandle,
     ) -> FiberId {
         let mode = store.fiber_arena().get(parent).unwrap().mode();
-        let child =
-            store
-                .fiber_arena_mut()
-                .create_fiber(FiberTag::FunctionComponent, None, props, mode);
-        store
-            .fiber_arena_mut()
-            .get_mut(child)
-            .unwrap()
-            .set_fiber_type(component);
+        let child = create_function_component_fiber(store, mode, props, component);
         store
             .fiber_arena_mut()
             .set_children(parent, &[child])
             .unwrap();
         child
+    }
+
+    fn create_function_component_fiber(
+        store: &mut FiberRootStore<RecordingHost>,
+        mode: FiberMode,
+        props: PropsHandle,
+        component: FiberTypeHandle,
+    ) -> FiberId {
+        let fiber =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::FunctionComponent, None, props, mode);
+        store
+            .fiber_arena_mut()
+            .get_mut(fiber)
+            .unwrap()
+            .set_fiber_type(component);
+        fiber
     }
 
     fn callback(raw: u64) -> HookEffectCallbackHandle {
@@ -5791,6 +6072,7 @@ mod tests {
         assert_eq!(commit.remaining_lanes(), Lanes::NO);
         assert_eq!(commit.pending_lanes(), Lanes::NO);
         assert_eq!(commit.pending_passive_handoff(), None);
+        assert!(commit.function_component_layout_effects().is_empty());
         assert!(commit.mutation_log().is_empty());
         assert!(commit.mutation_apply_log().is_empty());
         assert!(commit.deletion_lists().is_empty());
@@ -8027,6 +8309,151 @@ mod tests {
         assert_eq!(all_passive.len(), 2);
         assert_eq!(all_passive[0].effect(), changed.effect());
         assert_eq!(all_passive[1].effect(), unchanged.effect());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_layout_effect_handoff_in_react_order_without_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(47), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mode = store
+            .fiber_arena()
+            .get(render.finished_work())
+            .unwrap()
+            .mode();
+        let parent = create_function_component_fiber(
+            &mut store,
+            mode,
+            PropsHandle::from_raw(740),
+            FiberTypeHandle::from_raw(741),
+        );
+        let child = create_function_component_fiber(
+            &mut store,
+            mode,
+            PropsHandle::from_raw(742),
+            FiberTypeHandle::from_raw(743),
+        );
+        let sibling = create_function_component_fiber(
+            &mut store,
+            mode,
+            PropsHandle::from_raw(744),
+            FiberTypeHandle::from_raw(745),
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(parent, &[child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[parent, sibling])
+            .unwrap();
+
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let parent_state = hook_store
+            .prepare_render_state(store.fiber_arena(), parent)
+            .unwrap();
+        let mut parent_cursor = hook_store.begin_render_cursor(parent_state).unwrap();
+        let parent_layout = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut parent_cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(746),
+                deps(747),
+            )
+            .unwrap();
+        let parent_passive = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut parent_cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(748),
+                deps(749),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(parent_cursor).unwrap();
+
+        let child_state = hook_store
+            .prepare_render_state(store.fiber_arena(), child)
+            .unwrap();
+        let mut child_cursor = hook_store.begin_render_cursor(child_state).unwrap();
+        let child_layout = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut child_cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(750),
+                deps(751),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(child_cursor).unwrap();
+
+        let sibling_state = hook_store
+            .prepare_render_state(store.fiber_arena(), sibling)
+            .unwrap();
+        let mut sibling_cursor = hook_store.begin_render_cursor(sibling_state).unwrap();
+        let sibling_layout = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut sibling_cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(752),
+                deps(753),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(sibling_cursor).unwrap();
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        assert!(commit.function_component_layout_effects().is_empty());
+        let snapshot = commit
+            .record_function_component_layout_effects_for_canary(&store, &mut hook_store)
+            .unwrap()
+            .clone();
+
+        assert_eq!(snapshot.len(), 3);
+        assert_eq!(commit.function_component_layout_effects(), &snapshot);
+        let records = snapshot.records();
+        assert_eq!(records[0].commit_order(), 0);
+        assert_eq!(records[0].fiber(), child);
+        assert_eq!(
+            records[0].render_phase(),
+            FunctionComponentHookRenderPhase::Mount
+        );
+        assert_eq!(records[0].hook_list(), child_state.work_in_progress_list());
+        assert_eq!(records[0].effect_index(), 0);
+        assert_eq!(records[0].effect(), child_layout.effect());
+        assert_eq!(records[0].instance(), child_layout.instance());
+        assert_eq!(records[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(records[0].create(), callback(750));
+        assert_eq!(records[0].destroy(), None);
+        assert_eq!(records[0].dependencies(), deps(751));
+        assert_eq!(records[0].lanes(), Lanes::DEFAULT);
+
+        assert_eq!(records[1].commit_order(), 1);
+        assert_eq!(records[1].fiber(), parent);
+        assert_eq!(records[1].effect(), parent_layout.effect());
+        assert_eq!(records[1].create(), callback(746));
+        assert_eq!(records[1].dependencies(), deps(747));
+        assert_eq!(records[2].commit_order(), 2);
+        assert_eq!(records[2].fiber(), sibling);
+        assert_eq!(records[2].effect(), sibling_layout.effect());
+        assert_eq!(records[2].create(), callback(752));
+        assert_eq!(records[2].dependencies(), deps(753));
+
+        let parent_queue = hook_store.committed_effect_queue(parent).unwrap();
+        assert_eq!(parent_queue.accepted_layout_count(), 1);
+        assert_eq!(parent_queue.accepted_passive_count(), 1);
+        assert_eq!(parent_queue.records()[1].effect(), parent_passive.effect());
+        assert_eq!(commit.pending_passive_handoff(), None);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
