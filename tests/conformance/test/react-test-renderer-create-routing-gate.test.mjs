@@ -103,6 +103,10 @@ const privateCreateRouteAdmissionMetadataId =
   "fast-react-test-renderer-create-route-admission-metadata";
 const privateCreateRouteAdmissionMetadataStatus =
   "accepted-create-route-rust-root-create-work-loop-admission-metadata";
+const privateCreateNativeBridgeHostOutputHandoffDiagnosticId =
+  "react-test-renderer-create-native-bridge-host-output-handoff-private-diagnostic";
+const privateCreateNativeBridgeHostOutputHandoffStatus =
+  "private-create-native-bridge-host-output-handoff-public-create-blocked";
 const privateRootCreatePreflightSymbolDescription =
   "fast.react_test_renderer.private_root_create_preflight";
 const privateRootCreatePreflightSymbol = Symbol.for(
@@ -218,10 +222,14 @@ const expectedPrivateRoutes = [
       "TestRendererRoot::create",
       "TestRendererRoot::describe_private_root_create_preflight_for_canary",
       "TestRendererRoot::describe_private_create_route_admission_for_canary",
-      "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
+      "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+      "TestRendererRoot::render_and_commit_host_output_for_canary",
+      "TestRendererRoot::describe_private_create_native_bridge_host_output_handoff_for_canary"
     ],
     acceptedRustTests: [
       "root_private_create_route_admission_consumes_create_and_work_loop_evidence",
+      "root_private_create_native_bridge_handoff_consumes_actual_host_output",
+      "root_private_create_native_bridge_handoff_rejects_stale_admission",
       "root_private_create_route_admission_rejects_missing_rust_admission_record",
       "root_private_create_route_admission_rejects_stale_rust_admission_record",
       "root_private_create_route_admission_rejects_missing_root_create_preflight"
@@ -230,7 +238,8 @@ const expectedPrivateRoutes = [
       "worker-153-test-renderer-root-canary",
       "worker-539-test-renderer-live-rust-root-create-preflight",
       "worker-573-test-renderer-private-root-work-loop-preflight",
-      "worker-610-test-renderer-create-native-bridge-admission"
+      "worker-610-test-renderer-create-native-bridge-admission",
+      "worker-636-test-renderer-create-native-execution"
     ],
     acceptedWorker: "worker-610-test-renderer-create-native-bridge-admission",
     rootWorkLoopUpdateRoute: false,
@@ -1325,6 +1334,27 @@ test("react-test-renderer CJS development private root-create preflight validate
     createRequest,
     entry.entrypoint
   );
+  const createHostOutputHandoff =
+    createRustCreateNativeBridgeHostOutputHandoffSource(
+      createRequest,
+      admission
+    );
+  assert.equal(
+    bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+      createRequest,
+      createHostOutputHandoff
+    ),
+    true
+  );
+  const consumedHostOutputHandoff =
+    bridge.consumePrivateCreateNativeBridgeHostOutputHandoff(
+      createRequest,
+      createHostOutputHandoff
+    );
+  assertPrivateCreateNativeBridgeHostOutputHandoff(
+    consumedHostOutputHandoff,
+    createRequest
+  );
 
   const missingAdmissionRecord = {
     id: rustAdmissionDiagnostic.id,
@@ -1471,6 +1501,19 @@ test("react-test-renderer CJS development private root-create preflight validate
       code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
       name: "FastReactTestRendererPrivateRootRequestError"
     }
+  );
+  assert.equal(
+    bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+      createRequest,
+      {
+        ...createHostOutputHandoff,
+        hostOutput: {
+          ...createHostOutputHandoff.hostOutput,
+          textCount: 0
+        }
+      }
+    ),
+    false
   );
 
   const rootError = captureThrown(() => renderer.root);
@@ -1663,6 +1706,56 @@ test("react-test-renderer private root request bridge can call a private Rust ex
     assertCreateRoutingGate(publicUpdateError, entry.entrypoint);
     assert.equal(publicUpdateError.rootRequest.rustExecution, false);
   }
+});
+
+test("react-test-renderer development private create execution can consume Rust host-output handoff", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    { props: { children: "hello" }, type: "span" },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const admission = bridge.getRootCreateRouteAdmission(createRequest);
+  const createHostOutputHandoff =
+    createRustCreateNativeBridgeHostOutputHandoffSource(
+      createRequest,
+      admission
+    );
+  const result = bridge.executeRootRequest(createRequest, (handoff) => {
+    assertRootExecutionHandoff(handoff, createRequest);
+    return {
+      rustLifecycleDiagnostic:
+        createRustLifecycleDiagnosticSource(createRequest),
+      privateCreateNativeBridgeHostOutputHandoff:
+        createHostOutputHandoff,
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+  });
+
+  assertRootExecutionResult(result, createRequest);
+  assertPrivateCreateNativeBridgeHostOutputHandoff(
+    result.privateCreateNativeBridgeHostOutputHandoff,
+    createRequest
+  );
+  assert.equal(result.hostOutputProduced, true);
+  assert.equal(result.serializationAvailable, false);
+  assert.equal(result.publicRouteAvailable, false);
+  assert.equal(result.compatibilityClaimed, false);
+  assert.throws(() => renderer.toJSON(), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    name: "FastReactTestRendererUnimplementedError"
+  });
 });
 
 test("react-test-renderer development private error-boundary diagnostics follow update requests", () => {
@@ -2607,6 +2700,14 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
       typeof bridge.consumeAcceptedRustRootCreateRouteAdmission,
       "function"
     );
+    assert.equal(
+      typeof bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff,
+      "function"
+    );
+    assert.equal(
+      typeof bridge.consumePrivateCreateNativeBridgeHostOutputHandoff,
+      "function"
+    );
   }
   assert.equal(typeof bridge.getTestInstanceQueryDiagnostics, "function");
   assert.equal(typeof bridge.getRootTestInstanceQueryDiagnostics, "function");
@@ -2703,6 +2804,26 @@ function assertRootRequest(request, expected) {
   assert.equal(request.hostOutputProduced, false);
   assert.equal(request.serializationAvailable, false);
   assert.equal(request.compatibilityClaimed, false);
+  if (
+    request.privateCreateNativeBridgeHostOutputHandoffAvailable !==
+    undefined
+  ) {
+    assert.equal(
+      request.privateCreateNativeBridgeHostOutputHandoffAvailable,
+      expected.operation === "create"
+    );
+    if (expected.operation === "create") {
+      assertPrivateCreateRouteAdmissionGate(
+        request.privateCreateNativeBridgeHostOutputHandoffGate,
+        expected.entrypoint
+      );
+    } else {
+      assert.equal(
+        request.privateCreateNativeBridgeHostOutputHandoffGate,
+        null
+      );
+    }
+  }
   assert.equal(request.sync, expected.sync);
   assertRustCanaryMetadata(request.rustCanaryMetadata, expected.entrypoint);
   assert.equal(
@@ -2787,6 +2908,16 @@ function assertRootExecutionHandoff(handoff, request) {
     );
     assert.equal(handoff.privateUnmountNativeBridgeAdmissionAvailable, true);
   }
+  if (request.privateCreateNativeBridgeHostOutputHandoffGate != null) {
+    assert.equal(
+      handoff.privateCreateNativeBridgeHostOutputHandoffGate,
+      request.privateCreateNativeBridgeHostOutputHandoffGate
+    );
+    assert.equal(
+      handoff.privateCreateNativeBridgeHostOutputHandoffAvailable,
+      true
+    );
+  }
   assert.equal(
     handoff.rustRootExecutionBoundary,
     "fast-react-test-renderer.TestRendererRoot"
@@ -2839,6 +2970,12 @@ function assertRootExecutionResult(result, request) {
       request
     );
   }
+  if (result.privateCreateNativeBridgeHostOutputHandoff != null) {
+    assertPrivateCreateNativeBridgeHostOutputHandoff(
+      result.privateCreateNativeBridgeHostOutputHandoff,
+      request
+    );
+  }
   assert.equal(result.privateExecutorInvoked, true);
   assert.equal(result.privateRootRequestExecution, true);
   assert.equal(
@@ -2855,7 +2992,10 @@ function assertRootExecutionResult(result, request) {
   assert.equal(result.nativeExecution, false);
   assert.equal(result.rustExecution, true);
   assert.equal(result.reconcilerExecution, request.scheduled);
-  assert.equal(result.hostOutputProduced, false);
+  assert.equal(
+    result.hostOutputProduced,
+    result.privateCreateNativeBridgeHostOutputHandoff != null
+  );
   assert.equal(result.serializationAvailable, false);
   assert.equal(result.publicRouteAvailable, false);
   assert.equal(
@@ -3186,6 +3326,8 @@ function assertPrivateRootCreatePreflightGate(gate, entrypoint) {
 
 function assertPrivateCreateRouteAdmissionGate(gate, label) {
   assert.equal(Object.isFrozen(gate), true, label);
+  const supportsCreateHostOutputHandoff =
+    gate.hostOutputHandoffDiagnosticId !== undefined;
   assert.equal(gate.id, privateCreateRouteAdmissionRecordId, label);
   assert.equal(gate.status, privateCreateRouteAdmissionStatus, label);
   assert.equal(gate.publicSurface, "create()", label);
@@ -3201,24 +3343,58 @@ function assertPrivateCreateRouteAdmissionGate(gate, label) {
     "worker-610-test-renderer-create-native-bridge-admission",
     label
   );
-  assert.deepEqual(gate.acceptedRustRecords, [
+  const expectedAcceptedRustRecords = [
     "TestRendererRootScheduledUpdate",
     "TestRendererRootCreatePreflightDiagnostics",
     "TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics",
     "TestRendererPrivateCreateRouteAdmissionDiagnostics"
-  ]);
-  assert.deepEqual(gate.acceptedRustApis, [
+  ];
+  if (supportsCreateHostOutputHandoff) {
+    expectedAcceptedRustRecords.push(
+      "TestRendererPrivateCreateNativeBridgeHostOutputHandoff"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustRecords, expectedAcceptedRustRecords);
+  const expectedAcceptedRustApis = [
     "TestRendererRoot::create",
     "TestRendererRoot::describe_private_root_create_preflight_for_canary",
     "TestRendererRoot::describe_private_create_route_admission_for_canary",
     "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
-  ]);
-  assert.deepEqual(gate.acceptedRustTests, [
-    "root_private_create_route_admission_consumes_create_and_work_loop_evidence",
+  ];
+  if (supportsCreateHostOutputHandoff) {
+    expectedAcceptedRustApis.push(
+      "TestRendererRoot::render_and_commit_host_output_for_canary",
+      "TestRendererRoot::describe_private_create_native_bridge_host_output_handoff_for_canary"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustApis, expectedAcceptedRustApis);
+  const expectedAcceptedRustTests = [
+    "root_private_create_route_admission_consumes_create_and_work_loop_evidence"
+  ];
+  if (supportsCreateHostOutputHandoff) {
+    expectedAcceptedRustTests.push(
+      "root_private_create_native_bridge_handoff_consumes_actual_host_output",
+      "root_private_create_native_bridge_handoff_rejects_stale_admission"
+    );
+  }
+  expectedAcceptedRustTests.push(
     "root_private_create_route_admission_rejects_missing_rust_admission_record",
     "root_private_create_route_admission_rejects_stale_rust_admission_record",
     "root_private_create_route_admission_rejects_missing_root_create_preflight"
-  ]);
+  );
+  assert.deepEqual(gate.acceptedRustTests, expectedAcceptedRustTests);
+  if (supportsCreateHostOutputHandoff) {
+    assert.equal(
+      gate.hostOutputHandoffDiagnosticId,
+      privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+      label
+    );
+    assert.equal(
+      gate.hostOutputHandoffStatus,
+      privateCreateNativeBridgeHostOutputHandoffStatus,
+      label
+    );
+  }
   assert.equal(gate.consumesJsFacadeCreateMetadata, true, label);
   assert.equal(
     gate.consumesAcceptedRustRootCreateExecutionEvidence,
@@ -3235,6 +3411,15 @@ function assertPrivateCreateRouteAdmissionGate(gate, label) {
     true,
     label
   );
+  if (supportsCreateHostOutputHandoff) {
+    assert.equal(
+      gate.consumesAcceptedRustCreateHostOutputHandoff,
+      true,
+      label
+    );
+    assert.equal(gate.acceptedHostOutputShape, "SingleHostText", label);
+    assert.equal(gate.hostOutputProducedByRust, true, label);
+  }
   assert.equal(gate.missingRustAdmissionRecordRejection, true, label);
   assert.equal(gate.staleRustAdmissionRecordRejection, true, label);
   assert.equal(gate.publicRouteAvailable, false, label);
@@ -3480,6 +3665,51 @@ function assertPrivateCreateRouteAdmissionConsumption(
   assert.equal(consumed.compatibilityClaimed, false);
 }
 
+function assertPrivateCreateNativeBridgeHostOutputHandoff(handoff, request) {
+  assert.equal(Object.isFrozen(handoff), true, request.entrypoint);
+  assert.equal(
+    handoff.kind,
+    "FastReactTestRendererPrivateCreateNativeBridgeHostOutputHandoff"
+  );
+  assert.equal(
+    handoff.id,
+    privateCreateNativeBridgeHostOutputHandoffDiagnosticId
+  );
+  assert.equal(
+    handoff.status,
+    privateCreateNativeBridgeHostOutputHandoffStatus
+  );
+  assert.equal(handoff.entrypoint, request.entrypoint);
+  assert.equal(handoff.compatibilityTarget, compatibilityTarget);
+  assert.equal(handoff.request, request);
+  assert.equal(
+    handoff.createRouteAdmission.kind,
+    "FastReactTestRendererPrivateCreateRouteAdmissionConsumption"
+  );
+  assert.equal(handoff.operation, "create");
+  assert.equal(handoff.publicSurface, "create()");
+  assert.equal(handoff.hostOutputUpdateKind, "Create");
+  assert.equal(handoff.hostOutputShape, "SingleHostText");
+  assert.equal(Object.isFrozen(handoff.hostOutput), true);
+  assert.equal(handoff.hostOutput.containerChildCount, 1);
+  assert.equal(handoff.hostOutput.instanceCount, 1);
+  assert.equal(handoff.hostOutput.textCount, 1);
+  assert.equal(handoff.hostOutput.realHostOutputAvailable, true);
+  assert.equal(handoff.createRouteAdmissionAccepted, true);
+  assert.equal(handoff.hostOutputHandoffAccepted, true);
+  assert.equal(handoff.actualRustCreateHostOutputHandoff, true);
+  assert.equal(handoff.hostOutputProducedByRust, true);
+  assert.equal(handoff.publicCreateBehaviorAvailable, false);
+  assert.equal(handoff.publicSerializationAvailable, false);
+  assert.equal(handoff.publicTestInstanceAvailable, false);
+  assert.equal(handoff.nativeAddonLoaded, false);
+  assert.equal(handoff.nativeBridgeAvailable, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.rustExecutionFromJs, false);
+  assert.equal(handoff.hostOutputProducedFromJs, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+}
+
 function createRustRootCreatePreflightDiagnosticSource(preflight) {
   return {
     diagnosticName: privateRootCreatePreflightDiagnosticName,
@@ -3509,6 +3739,52 @@ function createRustCreateRouteAdmissionDiagnosticSource(admission) {
     consumesAcceptedRustRootCreateExecutionEvidence: true,
     consumesAcceptedRustRootCreatePreflightDiagnostics: true,
     consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true
+  };
+}
+
+function createRustCreateNativeBridgeHostOutputHandoffSource(
+  request,
+  admission
+) {
+  return {
+    id: privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+    status: privateCreateNativeBridgeHostOutputHandoffStatus,
+    operation: "create",
+    publicSurface: "create()",
+    rootRequestId: request.requestId,
+    rootRequestSequence: request.requestSequence,
+    rootApi: "TestRendererRoot::create",
+    updateKind: "Create",
+    rustOutcome: "Scheduled",
+    scheduled: true,
+    createRouteAdmission:
+      createRustCreateRouteAdmissionDiagnosticSource(admission),
+    createRouteAdmissionRecordId: privateCreateRouteAdmissionRecordId,
+    createRouteAdmissionStatus: privateCreateRouteAdmissionStatus,
+    hostOutputUpdateKind: "Create",
+    hostOutputShape: "SingleHostText",
+    hostOutputSnapshotCurrent: true,
+    hostOutput: {
+      containerChildCount: 1,
+      instanceCount: 1,
+      textCount: 1,
+      realHostOutputAvailable: true
+    },
+    serializationGateStatus:
+      "ReadyForPrivateSerializationDiagnostics",
+    createRouteAdmissionAccepted: true,
+    hostOutputHandoffAccepted: true,
+    actualRustCreateHostOutputHandoff: true,
+    hostOutputProducedByRust: true,
+    publicCreateBehaviorAvailable: false,
+    publicSerializationAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
   };
 }
 
@@ -3842,6 +4118,15 @@ function assertRustCanaryMetadata(metadata, label) {
     expectedAcceptedRustWorkers.push(
       "worker-610-test-renderer-create-native-bridge-admission"
     );
+    if (
+      metadata.acceptedRustWorkers.includes(
+        "worker-636-test-renderer-create-native-execution"
+      )
+    ) {
+      expectedAcceptedRustWorkers.push(
+        "worker-636-test-renderer-create-native-execution"
+      );
+    }
   }
   if (metadata.unmountNativeBridgeAdmission !== undefined) {
     expectedAcceptedRustWorkers.push(
@@ -3866,6 +4151,15 @@ function assertRustCanaryMetadata(metadata, label) {
     expectedAcceptedJsBridgeWorkers.push(
       "worker-610-test-renderer-create-native-bridge-admission"
     );
+    if (
+      metadata.acceptedJsBridgeWorkers.includes(
+        "worker-636-test-renderer-create-native-execution"
+      )
+    ) {
+      expectedAcceptedJsBridgeWorkers.push(
+        "worker-636-test-renderer-create-native-execution"
+      );
+    }
   }
   if (metadata.unmountNativeBridgeAdmission !== undefined) {
     expectedAcceptedJsBridgeWorkers.push(
@@ -4263,6 +4557,20 @@ function assertRustCanaryMetadata(metadata, label) {
       admission.executionResultRecord,
       "TestRendererPrivateCreateRouteAdmissionDiagnostics"
     );
+    if (admission.hostOutputHandoffRecord !== undefined) {
+      assert.equal(
+        admission.hostOutputHandoffRecord,
+        "TestRendererPrivateCreateNativeBridgeHostOutputHandoff"
+      );
+      assert.equal(
+        admission.hostOutputHandoffDiagnosticId,
+        privateCreateNativeBridgeHostOutputHandoffDiagnosticId
+      );
+      assert.equal(
+        admission.hostOutputHandoffStatus,
+        privateCreateNativeBridgeHostOutputHandoffStatus
+      );
+    }
     assert.equal(admission.acceptedInputShape, "HostComponentWithTextChild");
     assert.equal(admission.consumesJsFacadeCreateMetadata, true);
     assert.equal(
@@ -4278,6 +4586,14 @@ function assertRustCanaryMetadata(metadata, label) {
         .consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
       true
     );
+    if (admission.hostOutputHandoffRecord !== undefined) {
+      assert.equal(
+        admission.consumesAcceptedRustCreateHostOutputHandoff,
+        true
+      );
+      assert.equal(admission.acceptedHostOutputShape, "SingleHostText");
+      assert.equal(admission.hostOutputProducedByRust, true);
+    }
     assert.equal(admission.missingRustAdmissionRecordRejection, true);
     assert.equal(admission.staleRustAdmissionRecordRejection, true);
     assert.equal(admission.publicRendererRootCreated, false);
@@ -4594,6 +4910,19 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
     );
   }
   if (
+    expected.operation === "create" &&
+    metadata.acceptedWorkers.includes(
+      "worker-636-test-renderer-create-native-execution"
+    )
+  ) {
+    expectedWorkersByOperation.create.push(
+      "worker-636-test-renderer-create-native-execution"
+    );
+    expectedTestsByOperation.create.push(
+      "root_private_create_native_bridge_handoff_consumes_actual_host_output"
+    );
+  }
+  if (
     expected.operation === "unmount" &&
     metadata.deletionCommitHandoffApi !== undefined
   ) {
@@ -4896,6 +5225,16 @@ function assertPrivateRoute(privateRoute, expected) {
     privateRoute.acceptedWorker,
     expected.acceptedWorker ?? expected.acceptedWorkers[0]
   );
+  const expectedRouteWorkers =
+    privateRoute.acceptedWorkers !== undefined &&
+    !privateRoute.acceptedWorkers.includes(
+      "worker-636-test-renderer-create-native-execution"
+    )
+      ? expected.acceptedWorkers.filter(
+          (worker) =>
+            worker !== "worker-636-test-renderer-create-native-execution"
+        )
+      : expected.acceptedWorkers;
   if (privateRoute.acceptedWorkers === undefined) {
     assert.equal(
       privateRoute.acceptedWorker,
@@ -4903,7 +5242,7 @@ function assertPrivateRoute(privateRoute, expected) {
     );
   } else {
     assert.equal(Object.isFrozen(privateRoute.acceptedWorkers), true);
-    assert.deepEqual(privateRoute.acceptedWorkers, expected.acceptedWorkers);
+    assert.deepEqual(privateRoute.acceptedWorkers, expectedRouteWorkers);
   }
   assert.equal(privateRoute.acceptedRustCrate, "fast-react-test-renderer");
   const hasRootWorkLoopUpdateRoute =
@@ -4938,6 +5277,9 @@ function assertPrivateRoute(privateRoute, expected) {
     assert.equal(privateRoute.rootWorkLoopUpdateRouteGate, undefined);
   }
   if (privateRoute.createRouteAdmissionGate !== undefined) {
+    const hasCreateHostOutputHandoff =
+      privateRoute.createRouteAdmissionGate
+        .hostOutputHandoffDiagnosticId !== undefined;
     assertPrivateCreateRouteAdmissionGate(
       privateRoute.createRouteAdmissionGate,
       privateRoute.createRouteAdmissionGate.entrypoint ?? privateRoute.publicSurface
@@ -4956,19 +5298,52 @@ function assertPrivateRoute(privateRoute, expected) {
         .consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
       true
     );
+    if (
+      privateRoute.consumesAcceptedRustCreateHostOutputHandoff !==
+      undefined
+    ) {
+      assert.equal(
+        privateRoute.consumesAcceptedRustCreateHostOutputHandoff,
+        true
+      );
+      assert.equal(privateRoute.acceptedHostOutputShape, "SingleHostText");
+      assert.equal(privateRoute.hostOutputProducedByRust, true);
+    }
   }
   assert.equal(Object.isFrozen(privateRoute.acceptedRustApis), true);
+  const supportsCreateHostOutputHandoff =
+    privateRoute.createRouteAdmissionGate === undefined ||
+    privateRoute.createRouteAdmissionGate.hostOutputHandoffDiagnosticId !==
+      undefined;
+  const expectedRustApis = supportsCreateHostOutputHandoff
+    ? expected.acceptedRustApis
+    : expected.acceptedRustApis.filter(
+        (api) =>
+          api !==
+            "TestRendererRoot::render_and_commit_host_output_for_canary" &&
+          api !==
+            "TestRendererRoot::describe_private_create_native_bridge_host_output_handoff_for_canary"
+      );
   assert.deepEqual(
     privateRoute.acceptedRustApis,
     expected.rootWorkLoopUpdateRoute && !hasRootWorkLoopUpdateRoute
-      ? expected.acceptedRustApis.slice(2)
-      : expected.acceptedRustApis
+      ? expectedRustApis.slice(2)
+      : expectedRustApis
   );
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   let expectedAcceptedRustTests =
     expected.rootWorkLoopUpdateRoute && !hasRootWorkLoopUpdateRoute
       ? expected.acceptedRustTests.slice(6)
       : expected.acceptedRustTests;
+  if (!supportsCreateHostOutputHandoff) {
+    expectedAcceptedRustTests = expectedAcceptedRustTests.filter(
+      (testName) =>
+        testName !==
+          "root_private_create_native_bridge_handoff_consumes_actual_host_output" &&
+        testName !==
+          "root_private_create_native_bridge_handoff_rejects_stale_admission"
+    );
+  }
   if (privateRoute.deletionCommitHandoff !== undefined) {
     expectedAcceptedRustTests = [
       "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics"
