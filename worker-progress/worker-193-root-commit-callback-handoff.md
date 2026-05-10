@@ -100,6 +100,28 @@ git diff --check
 
 Full reconciler result: 97 unit tests passed plus 1 compile-fail doctest.
 
+## Post-Merge Orchestrator Verification
+
+- Merged current `main` into `worker/193-root-commit-callback-handoff`; no
+  textual conflicts were reported.
+- Fixed the post-merge API integration in `sync_flush.rs`: `SyncFlushRootRecord`
+  no longer derives `Copy`, its accessors borrow, and tests borrow records
+  because `HostRootCommitRecord` now owns a callback snapshot.
+- `cargo fmt --all --check`: passed.
+- `cargo test -p fast-react-reconciler --all-features root_commit`: passed, 7
+  tests.
+- `cargo test -p fast-react-reconciler --all-features root_callbacks`: passed,
+  4 tests.
+- `cargo test -p fast-react-reconciler --all-features update_queue`: passed, 9
+  tests.
+- `cargo test -p fast-react-reconciler --all-features sync_flush`: passed, 12
+  matching tests.
+- `cargo test -p fast-react-reconciler --all-features`: passed, 134 unit tests
+  plus 1 compile-fail doctest.
+- `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
 ## Risks Or Blockers
 
 - This is still a record handoff only. Future layout/reveal work must decide
