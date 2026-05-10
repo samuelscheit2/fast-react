@@ -33,7 +33,7 @@ const rootRequestBridgeSymbol = Symbol.for(
 const rootRequestStatus =
   "admitted-private-test-renderer-root-request-record";
 const rootRequestExecutionStatus =
-  "blocked-private-test-renderer-root-request-execution";
+  "admitted-private-test-renderer-root-execution-bridge";
 const rootRequestCompatibilityStatus =
   "blocked-private-test-renderer-root-compatibility";
 const privateTestInstanceWrapperRecordSymbolDescription =
@@ -52,7 +52,7 @@ const privateToTreeFacadeSymbol = Symbol.for(
   privateToTreeFacadeSymbolDescription
 );
 const missingPrerequisites = [
-  "rust-native-test-renderer-create-bridge",
+  "public-react-test-renderer-root-lifecycle-routing",
   "react-test-renderer-host-output-serialization"
 ];
 const actSchedulerMissingBeforeExecution = [
@@ -758,6 +758,100 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
   }
 });
 
+test("react-test-renderer private root request bridge can call a private Rust execution boundary shape", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const renderer = moduleExports.create({ type: "initial" });
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
+    const updateError = captureThrown(() =>
+      renderer.update({ type: "updated" })
+    );
+    const unmountError = captureThrown(() => renderer.unmount());
+    const calls = [];
+    const executor = {
+      executeTestRendererRootRequest(handoff) {
+        calls.push(handoff);
+        return {
+          rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(
+            handoff.requestSequence === 1
+              ? createRequest
+              : handoff.requestSequence === 2
+                ? updateError.rootRequest
+                : unmountError.rootRequest
+          ),
+          nativeAddonLoaded: false,
+          nativeExecution: false,
+          rustExecution: true
+        };
+      }
+    };
+
+    assert.equal(
+      bridge.canConsumeAcceptedRustLifecycleDiagnostic(
+        createRequest,
+        createRustLifecycleDiagnosticSource(createRequest)
+      ),
+      true,
+      entry.entrypoint
+    );
+
+    const createHandoff = bridge.createRootExecutionHandoff(createRequest);
+    assertRootExecutionHandoff(createHandoff, createRequest);
+    const createResult = bridge.executeRootRequest(createRequest, executor);
+    const updateResult = bridge.executeRootRequest(
+      updateError.rootRequest,
+      executor
+    );
+    const unmountResult = bridge.executeRootRequest(
+      unmountError.rootRequest,
+      executor
+    );
+
+    assert.deepEqual(
+      calls.map((handoff) => handoff.operation),
+      ["create", "update", "unmount"],
+      entry.entrypoint
+    );
+    assertRootExecutionResult(createResult, createRequest);
+    assertRootExecutionResult(updateResult, updateError.rootRequest);
+    assertRootExecutionResult(unmountResult, unmountError.rootRequest);
+    assert.equal(
+      bridge.canConsumeRootExecutionResult(
+        updateError.rootRequest,
+        createRustLifecycleDiagnosticSource(updateError.rootRequest)
+      ),
+      true,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.canConsumeRootExecutionResult(
+        updateError.rootRequest,
+        {
+          ...createRustLifecycleDiagnosticSource(updateError.rootRequest),
+          updateOutcome: rootUpdateOutcomeAlreadyUnmountScheduled
+        }
+      ),
+      false,
+      entry.entrypoint
+    );
+
+    const publicUpdateError = captureThrown(() =>
+      renderer.update({ type: "still-publicly-blocked" })
+    );
+    assertReactTestRendererUnimplemented(
+      publicUpdateError,
+      entry.entrypoint,
+      "create().update"
+    );
+    assertCreateRoutingGate(publicUpdateError, entry.entrypoint);
+    assert.equal(publicUpdateError.rootRequest.rustExecution, false);
+  }
+});
+
 test("react-test-renderer private root request bridge consumes accepted Rust lifecycle diagnostics", () => {
   for (const entry of entrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
@@ -1120,7 +1214,17 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(bridge.nativeBridgeAvailable, false);
   assert.equal(bridge.nativeExecution, false);
   assert.equal(bridge.rustExecution, false);
-  assert.equal(bridge.recordOnlyBridge, true);
+  assert.equal(bridge.recordOnlyBridge, false);
+  assert.equal(bridge.privateRootExecutionBridgeAvailable, true);
+  assert.equal(bridge.rustRootExecutionBoundaryCallable, true);
+  assert.equal(
+    bridge.rustRootExecutionBoundary,
+    "fast-react-test-renderer.TestRendererRoot"
+  );
+  assert.equal(
+    bridge.rustRootExecutionBridgeStatus,
+    "admitted-private-test-renderer-native-root-execution-bridge"
+  );
   assertRustCanaryMetadata(bridge.rustCanaryMetadata, entrypoint);
   assert.equal(typeof bridge.createRootRequest, "function");
   assert.equal(typeof bridge.updateRootRequest, "function");
@@ -1137,6 +1241,10 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
     typeof bridge.consumeAcceptedRustLifecycleDiagnostic,
     "function"
   );
+  assert.equal(typeof bridge.createRootExecutionHandoff, "function");
+  assert.equal(typeof bridge.canConsumeRootExecutionResult, "function");
+  assert.equal(typeof bridge.consumeRootExecutionResult, "function");
+  assert.equal(typeof bridge.executeRootRequest, "function");
   assert.equal(bridge.getRustCanaryMetadata(), bridge.rustCanaryMetadata);
 
   return bridge;
@@ -1224,7 +1332,9 @@ function assertRootRequest(request, expected) {
     request.canaryShape.currentRustCanaryMetadataId,
     request.rustCanaryMetadata.id
   );
-  assert.equal(request.canaryShape.recordOnlyPrivateBridge, true);
+  assert.equal(request.canaryShape.recordOnlyPrivateBridge, false);
+  assert.equal(request.canaryShape.privateRootExecutionBridgeAvailable, true);
+  assert.equal(request.canaryShape.rustRootExecutionBoundaryCallable, true);
   assert.equal(request.canaryShape.nativeBridgeAvailable, false);
   assert.equal(Object.isFrozen(request.blockedCapabilities), true);
   assert.deepEqual(
@@ -1236,6 +1346,110 @@ function assertRootRequest(request, expected) {
       "public-compatibility"
     ]
   );
+}
+
+function assertRootExecutionHandoff(handoff, request) {
+  assert.equal(Object.isFrozen(handoff), true, request.entrypoint);
+  assert.equal(
+    handoff.kind,
+    "FastReactTestRendererPrivateRootExecutionHandoff"
+  );
+  assert.equal(handoff.status, rootRequestExecutionStatus);
+  assert.equal(handoff.compatibilityStatus, rootRequestCompatibilityStatus);
+  assert.equal(handoff.entrypoint, request.entrypoint);
+  assert.equal(handoff.compatibilityTarget, compatibilityTarget);
+  assert.equal(handoff.operation, request.operation);
+  assert.equal(handoff.requestId, request.requestId);
+  assert.equal(handoff.requestSequence, request.requestSequence);
+  assert.equal(handoff.rootId, request.rootId);
+  assert.equal(handoff.rootHandle, request.rootHandle);
+  assert.equal(handoff.rootElementHandle, request.rootElementHandle);
+  assert.equal(handoff.updateKind, request.updateKind);
+  assert.equal(handoff.rustUpdateKind, request.rustUpdateKind);
+  assert.equal(handoff.rootApi, request.rootApi);
+  assert.equal(
+    handoff.containerUpdateApi,
+    request.scheduled ? request.containerUpdateApi : null
+  );
+  assert.equal(
+    handoff.schedulerApi,
+    request.scheduled ? "ensure_root_is_scheduled" : null
+  );
+  assert.equal(handoff.sync, request.scheduled ? request.sync : null);
+  assert.equal(handoff.scheduled, request.scheduled);
+  assert.equal(handoff.expectedOutcome, request.rustOutcome);
+  assert.equal(handoff.payloadAvailable, true);
+  assert.deepEqual(handoff.elementInfo, request.elementInfo);
+  assert.equal(
+    handoff.rustRootExecutionBoundary,
+    "fast-react-test-renderer.TestRendererRoot"
+  );
+  assert.equal(
+    handoff.rustRootExecutionBridgeStatus,
+    "admitted-private-test-renderer-native-root-execution-bridge"
+  );
+  assert.equal(handoff.rustRootExecutionBoundaryCallable, true);
+  assert.equal(handoff.nativeAddonLoaded, false);
+  assert.equal(handoff.nativeBridgeAvailable, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.publicRouteAvailable, false);
+  assert.equal(
+    handoff.publicCreateUpdateUnmountBehaviorAvailable,
+    false
+  );
+  assert.equal(handoff.compatibilityClaimed, false);
+}
+
+function assertRootExecutionResult(result, request) {
+  assert.equal(Object.isFrozen(result), true, request.entrypoint);
+  assert.equal(
+    result.kind,
+    "FastReactTestRendererPrivateRootExecutionResult"
+  );
+  assert.equal(
+    result.status,
+    "accepted-private-test-renderer-root-execution-result"
+  );
+  assert.equal(result.executionStatus, rootRequestExecutionStatus);
+  assert.equal(result.compatibilityStatus, rootRequestCompatibilityStatus);
+  assert.equal(result.entrypoint, request.entrypoint);
+  assert.equal(result.compatibilityTarget, compatibilityTarget);
+  assert.equal(result.request, request);
+  assertRootExecutionHandoff(result.handoff, request);
+  assert.equal(result.operation, request.operation);
+  assert.equal(result.requestId, request.requestId);
+  assert.equal(result.requestSequence, request.requestSequence);
+  assert.equal(result.updateKind, request.updateKind);
+  assert.equal(result.rustOutcome, request.rustOutcome);
+  assert.equal(result.scheduled, request.scheduled);
+  assertRootRequestRustLifecycleDiagnostic(
+    result.rustLifecycleDiagnostic,
+    expectedRootRequestDiagnosticFromRecord(request)
+  );
+  assert.equal(result.privateExecutorInvoked, true);
+  assert.equal(result.privateRootRequestExecution, true);
+  assert.equal(
+    result.rustRootExecutionBoundary,
+    "fast-react-test-renderer.TestRendererRoot"
+  );
+  assert.equal(
+    result.rustRootExecutionBridgeStatus,
+    "admitted-private-test-renderer-native-root-execution-bridge"
+  );
+  assert.equal(result.rustRootExecutionBoundaryCalled, true);
+  assert.equal(result.nativeAddonLoaded, false);
+  assert.equal(result.nativeBridgeAvailable, false);
+  assert.equal(result.nativeExecution, false);
+  assert.equal(result.rustExecution, true);
+  assert.equal(result.reconcilerExecution, request.scheduled);
+  assert.equal(result.hostOutputProduced, false);
+  assert.equal(result.serializationAvailable, false);
+  assert.equal(result.publicRouteAvailable, false);
+  assert.equal(
+    result.publicCreateUpdateUnmountBehaviorAvailable,
+    false
+  );
+  assert.equal(result.compatibilityClaimed, false);
 }
 
 function createRustLifecycleDiagnosticSource(request) {
@@ -1355,14 +1569,8 @@ function assertRootRequestRustLifecycleDiagnostic(diagnostic, expected) {
   );
   assert.equal(diagnostic.sync, expected.scheduled ? expected.sync : null);
   assert.equal(diagnostic.schedulesRootUpdate, expected.scheduled);
-  assert.equal(
-    diagnostic.consumesAcceptedRustLifecycleDiagnostics,
-    expected.operation === "update" || expected.operation === "unmount"
-  );
-  assert.equal(
-    diagnostic.privateDiagnosticConsumed,
-    expected.operation === "update" || expected.operation === "unmount"
-  );
+  assert.equal(diagnostic.consumesAcceptedRustLifecycleDiagnostics, true);
+  assert.equal(diagnostic.privateDiagnosticConsumed, true);
   assert.equal(diagnostic.publicRouteAvailable, false);
   assert.equal(
     diagnostic.publicCreateUpdateUnmountBehaviorAvailable,
@@ -1398,7 +1606,7 @@ function assertRustCanaryMetadata(metadata, label) {
   );
   assert.equal(
     metadata.status,
-    "record-only-current-rust-canary-metadata",
+    "private-root-execution-bridge-current-rust-canary-metadata",
     label
   );
   assert.equal(metadata.compatibilityTarget, compatibilityTarget, label);
@@ -1414,7 +1622,8 @@ function assertRustCanaryMetadata(metadata, label) {
   assert.deepEqual(metadata.acceptedJsBridgeWorkers, [
     "worker-304-test-renderer-js-private-root-request-bridge",
     "worker-306-test-renderer-testinstance-private-wrapper-skeleton",
-    "worker-307-test-renderer-update-unmount-private-js-bridge"
+    "worker-307-test-renderer-update-unmount-private-js-bridge",
+    "worker-423-test-renderer-native-root-execution-bridge"
   ]);
 
   assert.equal(Object.isFrozen(metadata.root), true, label);
@@ -1539,7 +1748,19 @@ function assertRustCanaryMetadata(metadata, label) {
     "update",
     "unmount"
   ]);
-  assert.equal(metadata.recordOnlyPrivateBridge, true, label);
+  assert.equal(metadata.recordOnlyPrivateBridge, false, label);
+  assert.equal(metadata.privateRootExecutionBridgeAvailable, true, label);
+  assert.equal(metadata.rustRootExecutionBoundaryCallable, true, label);
+  assert.equal(
+    metadata.rustRootExecutionBoundary,
+    "fast-react-test-renderer.TestRendererRoot",
+    label
+  );
+  assert.equal(
+    metadata.rustRootExecutionBridgeStatus,
+    "admitted-private-test-renderer-native-root-execution-bridge",
+    label
+  );
   assert.equal(metadata.nativeAddonLoaded, false, label);
   assert.equal(metadata.nativeBridgeAvailable, false, label);
   assert.equal(metadata.nativeExecution, false, label);
@@ -1738,7 +1959,9 @@ function assertCreateRoutingGate(error, entrypoint) {
     gate.privateRootRequestBridgeExecutionStatus,
     rootRequestExecutionStatus
   );
-  assert.equal(gate.rootRequestRecordOnly, true);
+  assert.equal(gate.rootRequestRecordOnly, false);
+  assert.equal(gate.privateRootExecutionBridgeAvailable, true);
+  assert.equal(gate.rustRootExecutionBoundaryCallable, true);
   assert.equal(gate.createRouteAvailable, false);
   assert.equal(gate.updateRouteAvailable, false);
   assert.equal(gate.unmountRouteAvailable, false);
@@ -1760,14 +1983,20 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(Object.isFrozen(gate.prerequisites), true);
   assert.deepEqual(
     gate.prerequisites.map((prerequisite) => prerequisite.id),
-    missingPrerequisites
+    [
+      "private-rust-native-test-renderer-root-execution-bridge",
+      ...missingPrerequisites
+    ]
   );
+  assert.equal(Object.isFrozen(gate.prerequisites[0]), true);
+  assert.equal(gate.prerequisites[0].present, true);
+  assert.equal(gate.prerequisites[0].requiredBeforeCreateRouting, false);
+  assert.match(gate.prerequisites[0].reason, /private bridge shape/u);
 
-  for (const prerequisite of gate.prerequisites) {
+  for (const prerequisite of gate.prerequisites.slice(1)) {
     assert.equal(Object.isFrozen(prerequisite), true);
     assert.equal(prerequisite.present, false);
     assert.equal(prerequisite.requiredBeforeCreateRouting, true);
-    assert.match(prerequisite.reason, /JS package/u);
   }
 
   assert.equal(error.privateRoutes, gate.privateRoutes);
@@ -1847,7 +2076,7 @@ function assertLifecycleDiagnosticGate(gate) {
   assert.equal(gate.deterministic, true);
   assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer");
   assert.deepEqual(gate.acceptedRustRecords, acceptedRustLifecycleDiagnosticRecords);
-  assert.deepEqual(gate.acceptedOperations, ["update", "unmount"]);
+  assert.deepEqual(gate.acceptedOperations, ["create", "update", "unmount"]);
   assert.deepEqual(gate.acceptedLifecycleStates, [
     rootLifecycleActive,
     rootLifecycleUnmountScheduled
@@ -2799,7 +3028,15 @@ function assertPrivateRootRequestDiagnostics(error, expected) {
   assert.equal(error.privateRootBridgeState.nativeExecution, false);
   assert.equal(error.privateRootBridgeState.reconcilerExecution, false);
   assert.equal(error.privateRootBridgeState.compatibilityClaimed, false);
-  assert.equal(error.privateRootBridgeState.recordOnlyPrivateBridge, true);
+  assert.equal(error.privateRootBridgeState.recordOnlyPrivateBridge, false);
+  assert.equal(
+    error.privateRootBridgeState.privateRootExecutionBridgeAvailable,
+    true
+  );
+  assert.equal(
+    error.privateRootBridgeState.rustRootExecutionBoundaryCallable,
+    true
+  );
   assertRustCanaryMetadata(
     error.privateRootBridgeState.rustCanaryMetadata,
     "private root bridge state"
@@ -2880,6 +3117,9 @@ function assertPrivateRootRequest(record, expected) {
   assert.equal(record.owner.$$typeof, "fast.react_test_renderer.private_root_owner");
   assert.equal(record.handle.$$typeof, "fast.react_test_renderer.private_root_handle");
   assert.equal(record.handle.owner, record.owner);
+  assert.equal(record.recordOnlyPrivateBridge, false);
+  assert.equal(record.privateRootExecutionBridgeAvailable, true);
+  assert.equal(record.rustRootExecutionBoundaryCallable, true);
   assert.equal(record.nativeBridgeAvailable, false);
   assert.equal(record.nativeExecution, false);
   assert.equal(record.reconcilerExecution, false);
@@ -3005,14 +3245,8 @@ function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
   );
   assert.equal(diagnostic.sync, expected.schedulesRootUpdate ? expected.sync : null);
   assert.equal(diagnostic.schedulesRootUpdate, expected.schedulesRootUpdate);
-  assert.equal(
-    diagnostic.consumesAcceptedRustLifecycleDiagnostics,
-    expected.operation === "update" || expected.operation === "unmount"
-  );
-  assert.equal(
-    diagnostic.privateDiagnosticConsumed,
-    expected.operation === "update" || expected.operation === "unmount"
-  );
+  assert.equal(diagnostic.consumesAcceptedRustLifecycleDiagnostics, true);
+  assert.equal(diagnostic.privateDiagnosticConsumed, true);
   assert.equal(diagnostic.publicRouteAvailable, false);
   assert.equal(
     diagnostic.publicCreateUpdateUnmountBehaviorAvailable,
