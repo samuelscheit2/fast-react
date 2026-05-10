@@ -497,6 +497,213 @@ test('private controlled input value-tracker gate records deterministic metadata
   );
 });
 
+test('private controlled input wrapper property-payload gate records blocked rows only', () => {
+  const first = createPrivateControlledWrapperPropertyPayloadScenario();
+  const second = createPrivateControlledWrapperPropertyPayloadScenario();
+
+  assert.deepEqual(first.records, second.records);
+  assert.deepEqual(first.summary, second.summary);
+
+  for (const record of first.records) {
+    assert.equal(Object.isFrozen(record), true, record.requestType);
+    assert.equal(
+      resourceFormGate.isPrivateControlledInputWrapperPropertyPayloadRecord(
+        record
+      ),
+      true,
+      record.requestType
+    );
+    assert.equal(
+      resourceFormGate.getPrivateControlledInputWrapperPropertyPayloadRecordPayload(
+        record
+      ),
+      record,
+      record.requestType
+    );
+    assert.equal(record.status, resourceFormGate.unsupportedStatus);
+    assert.equal(record.unsupportedCode, unsupportedCode);
+    assert.equal(record.compatibilityTarget, compatibilityTarget);
+    assert.equal(
+      record.gateId,
+      resourceFormGate.controlledInputPrivateWrapperGateId
+    );
+    assert.deepEqual(
+      record.sideEffects,
+      resourceFormGate.controlledInputPrivateWrapperSideEffects
+    );
+    assert.equal(record.sideEffects.controlsTracked, false);
+    assert.equal(record.sideEffects.trackerAttached, false);
+    assert.equal(record.sideEffects.hostValueRead, false);
+    assert.equal(record.sideEffects.hostValueWritten, false);
+    assert.equal(record.sideEffects.propertyDescriptorInstalled, false);
+    assert.equal(record.sideEffects.hostWrapperInvoked, false);
+    assert.equal(record.sideEffects.wrapperValidationInvoked, false);
+    assert.equal(record.sideEffects.wrapperPropertyWritten, false);
+    assert.equal(record.sideEffects.postEventRestoreQueued, false);
+    assert.equal(record.sideEffects.latestPropsLookup, false);
+    assert.equal(record.wrapperMetadata.deterministicMetadataOnly, true);
+    assert.equal(record.wrapperMetadata.propertyPayloadRowAccepted, false);
+    assert.equal(record.wrapperMetadata.ordinaryPayloadAccepted, false);
+    assert.equal(record.wrapperMetadata.sourceAdapterInvoked, false);
+    assert.equal(record.wrapperMetadata.liveHostNodeRequired, false);
+    assert.equal(record.wrapperMetadata.rawTargetCaptured, false);
+    assert.equal(record.wrapperMetadata.hostWrapperInvoked, false);
+    assert.equal(record.wrapperMetadata.wrapperPropertyWritten, false);
+    assert.equal(record.wrapperMetadata.trackerAttached, false);
+    assert.equal(record.valueTrackerMetadata.trackerAttached, false);
+    assert.equal(record.valueTrackerMetadata.currentValueSnapshot, null);
+    assert.equal(record.postEventRestoreBoundary.latestPropsLookup, false);
+    assert.equal(record.postEventRestoreBoundary.eventPluginDispatch, false);
+    assert.equal(record.postEventRestoreBoundary.restoreQueued, false);
+    assert.equal(record.postEventRestoreBoundary.restoreFlushed, false);
+    assert.equal(
+      record.publicControlledBehaviorBoundary.hostWrapperWrites,
+      false
+    );
+    assert.equal(
+      record.publicControlledBehaviorBoundary.compatibilityClaimed,
+      false
+    );
+  }
+
+  assert.deepEqual(
+    first.records.map((record) => ({
+      requestType: record.requestType,
+      hostTag: record.hostTag,
+      propName: record.propName,
+      inputType: record.inputType,
+      multiple: record.multiple,
+      controlKind: record.controlKind,
+      contractId: record.contractId,
+      wrapperKind: record.wrapperMetadata.wrapperKind,
+      wrapperOperations: record.wrapperMetadata.wrapperOperations,
+      valueTrackerContractId:
+        record.wrapperMetadata.valueTrackerContractId,
+      trackedField: record.wrapperMetadata.trackedField,
+      observedPropKeys: record.wrapperMetadata.observedPropKeys,
+      propSummary: record.wrapperMetadata.propSummary
+    })),
+    [
+      {
+        requestType: 'controlled-wrapper.input.value',
+        hostTag: 'input',
+        propName: 'value',
+        inputType: 'text',
+        multiple: false,
+        controlKind: 'value',
+        contractId: 'input-wrapper-value-payload',
+        wrapperKind: 'input-host-wrapper',
+        wrapperOperations: ['validateInputProps', 'initInput', 'updateInput'],
+        valueTrackerContractId: 'input-value-tracker',
+        trackedField: 'value',
+        observedPropKeys: ['type', 'value', 'onChange'],
+        propSummary: {
+          type: {present: true, value: {type: 'string', empty: false}},
+          value: {present: true, value: {type: 'string', empty: false}},
+          onChange: {present: true, value: {type: 'function'}}
+        }
+      },
+      {
+        requestType: 'controlled-wrapper.input.checked',
+        hostTag: 'input',
+        propName: 'checked',
+        inputType: 'checkbox',
+        multiple: false,
+        controlKind: 'checked',
+        contractId: 'input-wrapper-checked-payload',
+        wrapperKind: 'input-host-wrapper',
+        wrapperOperations: [
+          'validateInputProps',
+          'initInput',
+          'updateInput',
+          'restoreControlledInputState'
+        ],
+        valueTrackerContractId: 'input-checked-tracker',
+        trackedField: 'checked',
+        observedPropKeys: ['type', 'checked', 'onChange'],
+        propSummary: {
+          type: {present: true, value: {type: 'string', empty: false}},
+          checked: {present: true, value: {type: 'boolean'}},
+          onChange: {present: true, value: {type: 'function'}}
+        }
+      },
+      {
+        requestType: 'controlled-wrapper.select.multiple',
+        hostTag: 'select',
+        propName: 'multiple',
+        inputType: null,
+        multiple: true,
+        controlKind: 'multiple',
+        contractId: 'select-wrapper-multiple-payload',
+        wrapperKind: 'select-host-wrapper',
+        wrapperOperations: ['validateSelectProps', 'initSelect', 'updateSelect'],
+        valueTrackerContractId: 'select-multiple-value-tracker',
+        trackedField: 'selectedOptions',
+        observedPropKeys: ['multiple', 'value', 'onChange'],
+        propSummary: {
+          multiple: {present: true, value: {type: 'boolean'}},
+          value: {present: true, value: {type: 'object'}},
+          onChange: {present: true, value: {type: 'function'}}
+        }
+      },
+      {
+        requestType: 'controlled-wrapper.textarea.value',
+        hostTag: 'textarea',
+        propName: 'value',
+        inputType: null,
+        multiple: false,
+        controlKind: 'value',
+        contractId: 'textarea-wrapper-value-payload',
+        wrapperKind: 'textarea-host-wrapper',
+        wrapperOperations: [
+          'validateTextareaProps',
+          'initTextarea',
+          'updateTextarea'
+        ],
+        valueTrackerContractId: 'textarea-value-tracker',
+        trackedField: 'value',
+        observedPropKeys: ['value', 'onChange'],
+        propSummary: {
+          value: {present: true, value: {type: 'string', empty: false}},
+          onChange: {present: true, value: {type: 'function'}}
+        }
+      }
+    ]
+  );
+
+  assert.equal(
+    first.summary.gateId,
+    resourceFormGate.controlledInputPrivateWrapperGateId
+  );
+  assert.equal(first.summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(first.summary.contracts.length, 11);
+  assert.deepEqual(
+    first.summary.contracts.map((contract) => contract.id),
+    [
+      'input-wrapper-type-payload',
+      'input-wrapper-name-payload',
+      'input-wrapper-value-payload',
+      'input-wrapper-default-value-payload',
+      'input-wrapper-checked-payload',
+      'input-wrapper-default-checked-payload',
+      'select-wrapper-value-payload',
+      'select-wrapper-default-value-payload',
+      'select-wrapper-multiple-payload',
+      'textarea-wrapper-value-payload',
+      'textarea-wrapper-default-value-payload'
+    ]
+  );
+  assert.deepEqual(
+    first.summary.sideEffects,
+    resourceFormGate.controlledInputPrivateWrapperSideEffects
+  );
+  assert.deepEqual(
+    first.summary.postEventRestoreBoundary,
+    resourceFormGate.describeControlledInputValueTrackerGate()
+      .postEventRestoreBoundary
+  );
+});
+
 test('private resource hint dispatcher metadata gate validates normalized shapes without dispatching', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-gate'
@@ -1989,6 +2196,56 @@ function createPrivateControlledValueTrackerScenario() {
   return {
     records,
     summary: resourceFormGate.describeControlledInputValueTrackerGate()
+  };
+}
+
+function createPrivateControlledWrapperPropertyPayloadScenario() {
+  const records = [
+    resourceFormGate.createControlledInputPrivateWrapperPropertyPayloadRecord({
+      hostTag: 'input',
+      propName: 'value',
+      props: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {}
+      },
+      target: throwingProxy('input wrapper target')
+    }),
+    resourceFormGate.createControlledInputPrivateWrapperPropertyPayloadRecord({
+      hostTag: 'input',
+      propName: 'checked',
+      props: {
+        type: 'checkbox',
+        checked: true,
+        onChange() {}
+      },
+      target: throwingProxy('checkbox wrapper target')
+    }),
+    resourceFormGate.createControlledInputPrivateWrapperPropertyPayloadRecord({
+      hostTag: 'select',
+      propName: 'multiple',
+      props: {
+        multiple: true,
+        value: ['a'],
+        onChange() {}
+      },
+      target: throwingProxy('select wrapper target')
+    }),
+    resourceFormGate.createControlledInputPrivateWrapperPropertyPayloadRecord({
+      hostTag: 'textarea',
+      propName: 'value',
+      props: {
+        value: 'alpha',
+        onChange() {}
+      },
+      target: throwingProxy('textarea wrapper target')
+    })
+  ];
+
+  return {
+    records,
+    summary:
+      resourceFormGate.describeControlledInputPrivateWrapperPropertyPayloadGate()
   };
 }
 
