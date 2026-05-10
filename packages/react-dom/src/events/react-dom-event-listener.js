@@ -4,6 +4,8 @@ const {
   ContinuousEventPriority,
   DefaultEventPriority,
   DiscreteEventPriority,
+  createEventPriorityRecordFromPriority,
+  eventPriorityToLane,
   getEventPriority,
   getEventPriorityLabel,
   getEventPriorityName
@@ -12,6 +14,7 @@ const {
 const DISCRETE_EVENT_WRAPPER = 'discrete';
 const CONTINUOUS_EVENT_WRAPPER = 'continuous';
 const DEFAULT_EVENT_WRAPPER = 'default';
+const EVENT_WRAPPER_RECORD_KIND = 'FastReactDomEventPriorityWrapperRecord';
 
 function dispatchEvent() {
   return undefined;
@@ -30,8 +33,21 @@ function createEventListenerWrapper(
   domEventName,
   eventSystemFlags
 ) {
-  return createInertEventListenerWrapper(
+  return createEventListenerWrapperRecord(
+    targetContainer,
+    domEventName,
+    eventSystemFlags
+  ).listener;
+}
+
+function createEventListenerWrapperRecord(
+  targetContainer,
+  domEventName,
+  eventSystemFlags
+) {
+  return createInertEventListenerWrapperRecord(
     dispatchEvent,
+    'dispatchEvent',
     DEFAULT_EVENT_WRAPPER,
     DefaultEventPriority,
     targetContainer,
@@ -46,11 +62,26 @@ function createEventListenerWrapperWithPriority(
   eventSystemFlags,
   options
 ) {
+  return createEventListenerWrapperRecordWithPriority(
+    targetContainer,
+    domEventName,
+    eventSystemFlags,
+    options
+  ).listener;
+}
+
+function createEventListenerWrapperRecordWithPriority(
+  targetContainer,
+  domEventName,
+  eventSystemFlags,
+  options
+) {
   const eventPriority = getEventPriority(domEventName, options);
   switch (eventPriority) {
     case DiscreteEventPriority:
-      return createInertEventListenerWrapper(
+      return createInertEventListenerWrapperRecord(
         dispatchDiscreteEvent,
+        'dispatchDiscreteEvent',
         DISCRETE_EVENT_WRAPPER,
         eventPriority,
         targetContainer,
@@ -58,8 +89,9 @@ function createEventListenerWrapperWithPriority(
         eventSystemFlags
       );
     case ContinuousEventPriority:
-      return createInertEventListenerWrapper(
+      return createInertEventListenerWrapperRecord(
         dispatchContinuousEvent,
+        'dispatchContinuousEvent',
         CONTINUOUS_EVENT_WRAPPER,
         eventPriority,
         targetContainer,
@@ -68,8 +100,9 @@ function createEventListenerWrapperWithPriority(
       );
     case DefaultEventPriority:
     default:
-      return createInertEventListenerWrapper(
+      return createInertEventListenerWrapperRecord(
         dispatchEvent,
+        'dispatchEvent',
         DEFAULT_EVENT_WRAPPER,
         eventPriority,
         targetContainer,
@@ -79,8 +112,9 @@ function createEventListenerWrapperWithPriority(
   }
 }
 
-function createInertEventListenerWrapper(
+function createInertEventListenerWrapperRecord(
   dispatcher,
+  dispatcherName,
   wrapperKind,
   eventPriority,
   targetContainer,
@@ -95,8 +129,29 @@ function createInertEventListenerWrapper(
       nativeEvent
     );
   };
+  const priorityRecord = createEventPriorityRecordFromPriority(
+    domEventName,
+    eventPriority
+  );
+  const record = Object.freeze({
+    dispatcherName,
+    domEventName,
+    eventPriority,
+    eventPriorityLabel: getEventPriorityLabel(eventPriority),
+    eventPriorityLane: eventPriorityToLane(eventPriority),
+    eventPriorityName: getEventPriorityName(eventPriority),
+    eventSystemFlags,
+    kind: EVENT_WRAPPER_RECORD_KIND,
+    listener,
+    priorityRecord,
+    targetContainer,
+    wrapperKind
+  });
 
   Object.defineProperties(listener, {
+    __FAST_REACT_DOM_EVENT_WRAPPER_RECORD__: {
+      value: record
+    },
     __FAST_REACT_DOM_EVENT_WRAPPER__: {
       value: true
     },
@@ -114,17 +169,19 @@ function createInertEventListenerWrapper(
     }
   });
 
-  return listener;
+  return record;
 }
 
 module.exports = {
   CONTINUOUS_EVENT_WRAPPER,
   DEFAULT_EVENT_WRAPPER,
   DISCRETE_EVENT_WRAPPER,
+  EVENT_WRAPPER_RECORD_KIND,
   createEventListenerWrapper,
+  createEventListenerWrapperRecord,
+  createEventListenerWrapperRecordWithPriority,
   createEventListenerWrapperWithPriority,
   dispatchContinuousEvent,
   dispatchDiscreteEvent,
   dispatchEvent
 };
-

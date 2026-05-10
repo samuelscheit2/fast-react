@@ -22,6 +22,12 @@ const eventNames = require(
 const listenerRegistry = require(
   path.join(repoRoot, 'packages/react-dom/src/events/listener-registry.js')
 );
+const eventPriorities = require(
+  path.join(repoRoot, 'packages/react-dom/src/events/event-priorities.js')
+);
+const eventListener = require(
+  path.join(repoRoot, 'packages/react-dom/src/events/react-dom-event-listener.js')
+);
 const rootListeners = require(
   path.join(repoRoot, 'packages/react-dom/src/events/root-listeners.js')
 );
@@ -207,6 +213,12 @@ assert.equal(
   assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_NAME__, 'click');
   assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_FLAGS__, 0);
   assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_TARGET__, container);
+  assertListenerWrapperRecord(firstClickBubble, {
+    domEventName: 'click',
+    eventPriorityName: 'DiscreteEventPriority',
+    target: container,
+    wrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+  });
   assert.equal(container.__registrations.length, 1);
   assert.equal(
     rootListeners.listenToNativeEvent('click', false, container),
@@ -223,6 +235,12 @@ assert.equal(
     firstClickCapture.__FAST_REACT_DOM_EVENT_FLAGS__,
     rootListeners.IS_CAPTURE_PHASE
   );
+  assertListenerWrapperRecord(firstClickCapture, {
+    domEventName: 'click',
+    eventPriorityName: 'DiscreteEventPriority',
+    target: container,
+    wrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+  });
   assert.equal(container.__registrations.length, 2);
   assert.equal(
     rootListeners.listenToNativeEvent('click', true, container),
@@ -263,6 +281,12 @@ assert.equal(
   assert.equal(listener.__FAST_REACT_DOM_EVENT_NAME__, 'click');
   assert.equal(listener.__FAST_REACT_DOM_EVENT_FLAGS__, 0);
   assert.equal(listener.__FAST_REACT_DOM_EVENT_TARGET__, button);
+  assertListenerWrapperRecord(listener, {
+    domEventName: 'click',
+    eventPriorityName: 'DiscreteEventPriority',
+    target: button,
+    wrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+  });
   assert.equal(rootListeners.listenToNativeEvent('click', false, button), null);
   assert.equal(
     button.__registrations.filter(
@@ -441,6 +465,17 @@ function assertRootListenerSet(target, label) {
     assert.ok(summary.byEvent.has(name), `${label} has ${name}`);
   }
 
+  for (const registration of target.__registrations) {
+    assertListenerWrapperRecord(registration.listener, {
+      domEventName: registration.type,
+      eventPriorityName: eventPriorities.getEventPriorityName(
+        eventPriorities.getEventPriority(registration.type)
+      ),
+      target,
+      wrapperKind: expectedWrapperKind(registration.type)
+    });
+  }
+
   for (const name of ['click', 'mousemove']) {
     assert.deepEqual(
       {
@@ -498,4 +533,31 @@ function assertSelectionChangeOnlyOnDocument(document) {
     capture: 0,
     passiveTrue: 0
   });
+}
+
+function assertListenerWrapperRecord(
+  listener,
+  {domEventName, eventPriorityName, target, wrapperKind}
+) {
+  const record = listener.__FAST_REACT_DOM_EVENT_SHELL_WRAPPER_RECORD__;
+  assert.equal(listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__, record);
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(record.kind, eventListener.EVENT_WRAPPER_RECORD_KIND);
+  assert.equal(record.domEventName, domEventName);
+  assert.equal(record.eventPriorityName, eventPriorityName);
+  assert.equal(record.wrapperKind, wrapperKind);
+  assert.equal(record.targetContainer, target);
+  assert.equal(record.listener, listener);
+  assert.equal(record.priorityRecord.eventPriorityName, eventPriorityName);
+}
+
+function expectedWrapperKind(domEventName) {
+  const eventPriority = eventPriorities.getEventPriority(domEventName);
+  if (eventPriority === eventPriorities.DiscreteEventPriority) {
+    return eventListener.DISCRETE_EVENT_WRAPPER;
+  }
+  if (eventPriority === eventPriorities.ContinuousEventPriority) {
+    return eventListener.CONTINUOUS_EVENT_WRAPPER;
+  }
+  return eventListener.DEFAULT_EVENT_WRAPPER;
 }

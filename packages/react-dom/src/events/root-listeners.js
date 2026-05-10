@@ -14,18 +14,19 @@ const {
   markTargetAsListening
 } = require('./listener-registry.js');
 const {
-  createEventListenerWrapperWithPriority
+  createEventListenerWrapperRecordWithPriority
 } = require('./react-dom-event-listener.js');
 
 const IS_CAPTURE_PHASE = 1 << 2;
 const IS_NON_DELEGATED = 1 << 1;
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
-  const listener = createEventListenerWrapperWithPriority(
+  const wrapperRecord = createEventListenerWrapperRecordWithPriority(
     target,
     domEventName,
     eventSystemFlags
   );
+  const listener = wrapperRecord.listener;
 
   Object.defineProperties(listener, {
     __FAST_REACT_DOM_EVENT_SHELL__: {
@@ -39,6 +40,9 @@ function createEventListenerShell(target, domEventName, eventSystemFlags) {
     },
     __FAST_REACT_DOM_EVENT_TARGET__: {
       value: target
+    },
+    __FAST_REACT_DOM_EVENT_SHELL_WRAPPER_RECORD__: {
+      value: wrapperRecord
     }
   });
 
