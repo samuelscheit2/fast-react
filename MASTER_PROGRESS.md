@@ -29,6 +29,64 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 736
+
+- Worker 736 added Rust-only nested `toJSON` source-report finished-work
+  identity generation backed by committed nested fiber inspection. The nested
+  output now carries committed nested inspection into the private JSON report,
+  and the nested native identity path uses the shared finished-work identity
+  builder instead of the previous test-only helper.
+- Acceptance audit found an integration-only compile issue after Worker 735:
+  the nested placement output used a `fiber_inspection` binding that landed in
+  the wrong placement context when applied to current `main`. The accepted
+  follow-up integrated current `main`, kept Worker 735's sibling snapshot
+  blocker intact, and bound the nested placement inspection in the correct
+  committed-output path.
+- Worker 736 was accepted after reconciler committed-fiber inspection tests,
+  focused nested `toJSON`, serialization identity, sibling snapshot, and
+  broader `toJSON` Rust tests, formatting, clippy, package-surface guard,
+  import smoke, independent audit, conflict-marker scanning, and `git diff
+  --check`. JS/CJS admission, public serialization, native bridge
+  loading/execution, package compatibility, and sibling snapshot identity
+  remain blocked.
+
+### Worker 735
+
+- Worker 735 added a Rust-only private sibling snapshot finished-work identity
+  blocker/preflight diagnostic for react-test-renderer `toJSON`. The diagnostic
+  records that plausible update `toJSON` finished-work identity can match the
+  update route handoff, but the snapshot path still has no committed
+  sibling-text fiber/report shape or real sibling-text handoff.
+- The accepted blocker keeps sibling snapshot identity admission closed and
+  fails closed if the missing sibling-text handoff is marked available. It does
+  not admit public serialization, JS/CJS facades, native bridge
+  loading/execution, package compatibility, broad multichild identity, or
+  sibling snapshot identity.
+- Worker 735 was accepted after focused sibling/snapshot/`toJSON` and
+  serialization identity Rust tests, unmount regression checks, formatting,
+  clippy, package-surface guard, import smoke, independent audit,
+  conflict-marker scanning, and `git diff --check`. The remaining prerequisite
+  is a real committed sibling-text output/report and handoff.
+
+### Worker 734
+
+- Worker 734 added the static private-admission ledger for Workers 732-733.
+  Worker 732 is recorded as prior ledger context for Workers 729-731, and
+  Worker 733 is recorded as accepted Rust-only private unmount finished-work
+  identity evidence for `toJSON` and `toTree` native diagnostics.
+- Acceptance audit found two ledger hardening gaps. The first was generic
+  whole-file cleanup handoff evidence that could let one surviving
+  `cleanup_handoff_id` validation satisfy both `toJSON` and `toTree`; the
+  accepted fix made both validator and tamper evidence slice-specific. The
+  second was dropped carry-forward blockers from the 729-731 ledger; the
+  accepted fix makes 732-733 blocked public claims, blocked surfaces, and
+  blocked admission claims a fail-closed superset of 729-731.
+- Worker 734 was accepted after syntax checks, focused private-admission tests,
+  focused conformance serialization/private-admission tests, package-surface
+  guard, import smoke, independent audit, conflict-marker scanning, and `git
+  diff --check`. This is static ledger evidence only and does not execute
+  runtime paths or promote public/package/native/JS compatibility.
+
 ### Worker 733
 
 - Worker 733 added Rust-only private unmount finished-work identity gates for
