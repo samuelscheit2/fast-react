@@ -1039,6 +1039,278 @@ const HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS:
 ];
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootTextUpdateCommitExecutionRequestForCanary {
+    root: FiberRootId,
+    root_token: StateNodeHandle,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    committed_current: FiberId,
+    source_handoff_order: usize,
+    commit_order: usize,
+    request_order: usize,
+    mutation_index: usize,
+    mutation: HostRootMutationApplyRecord,
+    status: HostRootTextUpdateCommitExecutionStatusForCanary,
+    blockers: [HostRootTextUpdateCommitExecutionBlockerForCanary; 5],
+}
+
+#[cfg(test)]
+impl HostRootTextUpdateCommitExecutionRequestForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(self) -> StateNodeHandle {
+        self.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_order(self) -> usize {
+        self.source_handoff_order
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(self) -> usize {
+        self.request_order
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_index(self) -> usize {
+        self.mutation_index
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation(self) -> HostRootMutationApplyRecord {
+        self.mutation
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> HostRootTextUpdateCommitExecutionStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(&self) -> &[HostRootTextUpdateCommitExecutionBlockerForCanary; 5] {
+        &self.blockers
+    }
+
+    #[must_use]
+    pub(crate) const fn private_test_host_text_mutation_allowed(self) -> bool {
+        matches!(
+            self.status,
+            HostRootTextUpdateCommitExecutionStatusForCanary::ValidatedForTestHostMutation
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_mutation_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootTextUpdateCommitExecutionStatusForCanary {
+    ValidatedForTestHostMutation,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootTextUpdateCommitExecutionBlockerForCanary {
+    PublicRootRendering,
+    PublicRendererHostMutation,
+    ReactDomTextCompatibilityClaim,
+    ReactTestRendererCompatibilityClaim,
+    PublicCompatibilityClaim,
+}
+
+#[cfg(test)]
+const HOST_ROOT_TEXT_UPDATE_COMMIT_EXECUTION_BLOCKERS:
+    [HostRootTextUpdateCommitExecutionBlockerForCanary; 5] = [
+    HostRootTextUpdateCommitExecutionBlockerForCanary::PublicRootRendering,
+    HostRootTextUpdateCommitExecutionBlockerForCanary::PublicRendererHostMutation,
+    HostRootTextUpdateCommitExecutionBlockerForCanary::ReactDomTextCompatibilityClaim,
+    HostRootTextUpdateCommitExecutionBlockerForCanary::ReactTestRendererCompatibilityClaim,
+    HostRootTextUpdateCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
+];
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostRootTextUpdateCommitExecutionErrorForCanary {
+    StaleCommitHandoff {
+        root: FiberRootId,
+        expected_current: FiberId,
+        actual_current: FiberId,
+        finished_work: FiberId,
+        finished_work_after_commit: Option<FiberId>,
+        render_phase_work_after_commit: Option<FiberId>,
+    },
+    MissingMutationApplyRecord {
+        root: FiberRootId,
+        finished_work: FiberId,
+        mutation_index: usize,
+    },
+    UnexpectedMutationApplyKind {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: HostRootMutationApplyRecordKind,
+        actual: HostRootMutationApplyRecordKind,
+    },
+    ForeignMutationApplyRecord {
+        expected_root: FiberRootId,
+        actual_root: FiberRootId,
+        expected_finished_work: FiberId,
+        actual_host_root: FiberId,
+    },
+    ExpectedHostTextMutation {
+        root: FiberRootId,
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingHostTextCurrent {
+        root: FiberRootId,
+        fiber: FiberId,
+    },
+    MissingHostTextStateNode {
+        root: FiberRootId,
+        fiber: FiberId,
+    },
+    HostTextUpdateFlagMissing {
+        root: FiberRootId,
+        fiber: FiberId,
+        effect_flag: FiberFlags,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootTextUpdateCommitExecutionErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StaleCommitHandoff {
+                root,
+                expected_current,
+                actual_current,
+                finished_work,
+                finished_work_after_commit,
+                render_phase_work_after_commit,
+            } => write!(
+                formatter,
+                "root {} stale HostText update commit handoff expected committed current fiber slot {}, found current fiber slot {}; finished work slot {}, pending finished work {:?}, render phase work {:?}",
+                root.raw(),
+                expected_current.slot().get(),
+                actual_current.slot().get(),
+                finished_work.slot().get(),
+                finished_work_after_commit.map(|fiber| fiber.slot().get()),
+                render_phase_work_after_commit.map(|fiber| fiber.slot().get())
+            ),
+            Self::MissingMutationApplyRecord {
+                root,
+                finished_work,
+                mutation_index,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} has no HostText update mutation apply record at index {}",
+                root.raw(),
+                finished_work.slot().get(),
+                mutation_index
+            ),
+            Self::UnexpectedMutationApplyKind {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} fiber slot {} expected {:?} mutation apply record, found {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                expected,
+                actual
+            ),
+            Self::ForeignMutationApplyRecord {
+                expected_root,
+                actual_root,
+                expected_finished_work,
+                actual_host_root,
+            } => write!(
+                formatter,
+                "HostText update mutation record for root {} host root slot {} cannot execute for root {} finished work slot {}",
+                actual_root.raw(),
+                actual_host_root.slot().get(),
+                expected_root.raw(),
+                expected_finished_work.slot().get()
+            ),
+            Self::ExpectedHostTextMutation { root, fiber, tag } => write!(
+                formatter,
+                "root {} HostText update execution expected HostText fiber slot {}, found {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingHostTextCurrent { root, fiber } => write!(
+                formatter,
+                "root {} HostText update execution requires an alternate current fiber for updated fiber slot {}",
+                root.raw(),
+                fiber.slot().get()
+            ),
+            Self::MissingHostTextStateNode { root, fiber } => write!(
+                formatter,
+                "root {} HostText update execution requires a text state node for fiber slot {}",
+                root.raw(),
+                fiber.slot().get()
+            ),
+            Self::HostTextUpdateFlagMissing {
+                root,
+                fiber,
+                effect_flag,
+            } => write!(
+                formatter,
+                "root {} HostText update execution expected UPDATE effect for fiber slot {}, found {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                effect_flag
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootTextUpdateCommitExecutionErrorForCanary {}
+
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum HostRootFinishedWorkCommitHandoffErrorForCanary {
     MissingFinishedWorkRecord {
@@ -5504,6 +5776,118 @@ pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H:
         finished_work_after_commit: root.finished_work(),
         finished_lanes_after_commit: root.finished_lanes(),
         render_phase_work_after_commit: root.scheduling().work_in_progress(),
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn host_root_text_update_commit_execution_request_for_canary(
+    handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    mutation_index: usize,
+    request_order: usize,
+) -> Result<
+    HostRootTextUpdateCommitExecutionRequestForCanary,
+    HostRootTextUpdateCommitExecutionErrorForCanary,
+> {
+    let commit = handoff.commit();
+    let root = commit.root();
+    let finished_work = commit.finished_work();
+    if handoff.current_after_commit() != finished_work
+        || handoff.finished_work_after_commit().is_some()
+        || handoff.render_phase_work_after_commit().is_some()
+    {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::StaleCommitHandoff {
+                root,
+                expected_current: finished_work,
+                actual_current: handoff.current_after_commit(),
+                finished_work,
+                finished_work_after_commit: handoff.finished_work_after_commit(),
+                render_phase_work_after_commit: handoff.render_phase_work_after_commit(),
+            },
+        );
+    }
+
+    let mutation = commit
+        .mutation_apply_log()
+        .records()
+        .get(mutation_index)
+        .copied()
+        .ok_or(
+            HostRootTextUpdateCommitExecutionErrorForCanary::MissingMutationApplyRecord {
+                root,
+                finished_work,
+                mutation_index,
+            },
+        )?;
+
+    if mutation.root() != root || mutation.host_root() != finished_work {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::ForeignMutationApplyRecord {
+                expected_root: root,
+                actual_root: mutation.root(),
+                expected_finished_work: finished_work,
+                actual_host_root: mutation.host_root(),
+            },
+        );
+    }
+    if mutation.kind() != HostRootMutationApplyRecordKind::CommitHostTextUpdate {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::UnexpectedMutationApplyKind {
+                root,
+                fiber: mutation.fiber(),
+                expected: HostRootMutationApplyRecordKind::CommitHostTextUpdate,
+                actual: mutation.kind(),
+            },
+        );
+    }
+    if mutation.tag() != FiberTag::HostText {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::ExpectedHostTextMutation {
+                root,
+                fiber: mutation.fiber(),
+                tag: mutation.tag(),
+            },
+        );
+    }
+    if mutation.alternate_fiber().is_none() {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::MissingHostTextCurrent {
+                root,
+                fiber: mutation.fiber(),
+            },
+        );
+    }
+    if mutation.state_node().is_none() {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::MissingHostTextStateNode {
+                root,
+                fiber: mutation.fiber(),
+            },
+        );
+    }
+    if !mutation.effect_flag().contains_all(FiberFlags::UPDATE) {
+        return Err(
+            HostRootTextUpdateCommitExecutionErrorForCanary::HostTextUpdateFlagMissing {
+                root,
+                fiber: mutation.fiber(),
+                effect_flag: mutation.effect_flag(),
+            },
+        );
+    }
+
+    Ok(HostRootTextUpdateCommitExecutionRequestForCanary {
+        root,
+        root_token: handoff.pending().root_token(),
+        previous_current: handoff.pending().previous_current(),
+        finished_work,
+        committed_current: handoff.current_after_commit(),
+        source_handoff_order: handoff.pending().handoff_order(),
+        commit_order: handoff.commit_order(),
+        request_order,
+        mutation_index,
+        mutation,
+        status: HostRootTextUpdateCommitExecutionStatusForCanary::ValidatedForTestHostMutation,
+        blockers: HOST_ROOT_TEXT_UPDATE_COMMIT_EXECUTION_BLOCKERS,
     })
 }
 
@@ -11652,6 +12036,132 @@ mod tests {
             work_text,
             StateNodeHandle::from_raw(9999).raw()
         ));
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_validates_host_text_update_execution_request_after_finished_work_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let parent_state_node = StateNodeHandle::from_raw(7_830);
+        let text_state_node = StateNodeHandle::from_raw(7_831);
+        let parent_props = PropsHandle::from_raw(7_832);
+        let old_text_props = PropsHandle::from_raw(7_833);
+        let next_pending_props = PropsHandle::from_raw(7_834);
+        let next_memoized_props = PropsHandle::from_raw(7_835);
+        let current_parent = attach_host_root_child(
+            &mut store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            parent_state_node,
+            parent_props,
+            parent_props,
+        );
+        let current_text = create_test_fiber(&mut store, FiberTag::HostText, old_text_props.raw());
+        {
+            let node = store.fiber_arena_mut().get_mut(current_text).unwrap();
+            node.set_state_node(text_state_node);
+            node.set_memoized_props(old_text_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(current_parent, &[current_text])
+            .unwrap();
+        bubble_test_fiber(&mut store, current_parent);
+        bubble_test_fiber(&mut store, current_root);
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7_836),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let work_text = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_text, next_pending_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_text).unwrap();
+            node.set_flags(FiberFlags::UPDATE);
+            node.set_state_node(text_state_node);
+            node.set_memoized_props(next_memoized_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(work_parent, &[work_text])
+            .unwrap();
+        bubble_test_fiber(&mut store, work_parent);
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_parent])
+            .unwrap();
+        bubble_test_fiber(&mut store, render.finished_work());
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, 11).unwrap();
+
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            render,
+            Some(pending),
+            12,
+        )
+        .unwrap();
+        let request =
+            host_root_text_update_commit_execution_request_for_canary(&handoff, 0, 13).unwrap();
+
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.root_token(), root_id.state_node_handle());
+        assert_eq!(request.previous_current(), current_root);
+        assert_eq!(request.finished_work(), render.finished_work());
+        assert_eq!(request.committed_current(), render.finished_work());
+        assert_eq!(request.source_handoff_order(), 11);
+        assert_eq!(request.commit_order(), 12);
+        assert_eq!(request.request_order(), 13);
+        assert_eq!(request.mutation_index(), 0);
+        assert_eq!(
+            request.status(),
+            HostRootTextUpdateCommitExecutionStatusForCanary::ValidatedForTestHostMutation
+        );
+        assert_eq!(
+            request.blockers(),
+            &HOST_ROOT_TEXT_UPDATE_COMMIT_EXECUTION_BLOCKERS
+        );
+        assert!(request.private_test_host_text_mutation_allowed());
+        assert!(request.public_root_rendering_blocked());
+        assert!(request.public_renderer_mutation_blocked());
+        assert!(!request.public_renderer_compatibility_claimed());
+
+        let mutation = request.mutation();
+        assert_eq!(
+            mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        );
+        assert_eq!(mutation.root(), root_id);
+        assert_eq!(mutation.host_root(), render.finished_work());
+        assert_eq!(mutation.parent(), work_parent);
+        assert_eq!(mutation.parent_tag(), FiberTag::HostComponent);
+        assert_eq!(mutation.parent_state_node(), parent_state_node);
+        assert_eq!(mutation.fiber(), work_text);
+        assert_eq!(mutation.alternate_fiber(), Some(current_text));
+        assert_eq!(mutation.tag(), FiberTag::HostText);
+        assert_eq!(mutation.state_node(), text_state_node);
+        assert_eq!(mutation.effect_flag(), FiberFlags::UPDATE);
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.finished_work()
