@@ -11,6 +11,20 @@ const ENTRY_REMOVE_STYLE = 'removeStyle';
 const ENTRY_SET_INNER_HTML = 'setInnerHTML';
 const ENTRY_NON_PAYLOAD = 'nonPayload';
 const ENTRY_UNSUPPORTED = 'unsupported';
+const PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_KIND =
+  'FastReactDomPrivateStyleObjectDiffDiagnosticRecord';
+const PRIVATE_STYLE_OBJECT_DIFF_ROW_KIND =
+  'FastReactDomPrivateStyleObjectDiffRow';
+const PRIVATE_STYLE_OBJECT_DIFF_UNSUPPORTED_ROW_KIND =
+  'FastReactDomPrivateStyleObjectDiffUnsupportedRow';
+const PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS =
+  'accepted-private-dom-style-object-diff-diagnostic';
+const PRIVATE_STYLE_OBJECT_DIFF_UNSUPPORTED_STATUS =
+  'blocked-private-dom-style-object-diff-diagnostic';
+const PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS =
+  'blocked-public-dom-style-object-mutation';
+const PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS =
+  'blocked-public-dom-style-object-compatibility';
 const CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS =
   'blocked-controlled-form-property-payload';
 const CONTROLLED_VALUE_TRACKER_GATE_STATUS =
@@ -33,6 +47,18 @@ const CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS =
 const emptyProps = Object.freeze({});
 
 const hasOwn = Object.prototype.hasOwnProperty;
+
+function freezeRecord(record) {
+  return Object.freeze(record);
+}
+
+function freezeArray(values) {
+  return Object.freeze(values);
+}
+
+function freezeRecords(records) {
+  return freezeArray(records.map((record) => freezeRecord(record)));
+}
 
 const attributeAliases = Object.freeze({
   className: 'class',
@@ -364,6 +390,299 @@ function createStyleEntries(propName, value, previousValue) {
   }
 
   return entries;
+}
+
+function recordPrivateDomStyleObjectDiffDiagnostics(lastStyle, nextStyle) {
+  const previousStyles = isObjectLike(lastStyle) ? lastStyle : null;
+  const currentStyles = isObjectLike(nextStyle) ? nextStyle : null;
+  const createdRows = createStyleEntries('style', nextStyle, lastStyle);
+  const payloadRows = Array.isArray(createdRows)
+    ? createdRows
+    : [createdRows];
+  const diffRows = payloadRows.map((entry) =>
+    createPrivateStyleObjectDiffRow(entry, previousStyles, currentStyles)
+  );
+  const summary = summarizePrivateStyleObjectDiffRows(diffRows);
+  const unsupportedRowCount = summary.unsupportedRowCount;
+  const status =
+    unsupportedRowCount === 0
+      ? PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS
+      : PRIVATE_STYLE_OBJECT_DIFF_UNSUPPORTED_STATUS;
+
+  return freezeRecord({
+    kind: PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_KIND,
+    status,
+    compatibilityTarget: 'react-dom@19.2.6',
+    propName: 'style',
+    propertyPayloadBacked: true,
+    styleObjectDiffRows: freezeRecords(diffRows),
+    payloadRows: freezeRecords(
+      payloadRows.map((entry) => clonePrivateStylePayloadEntry(entry))
+    ),
+    summary,
+    payloadRowsAccepted: unsupportedRowCount === 0,
+    publicMutationStatus: PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
+    publicCompatibilityStatus:
+      PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS,
+    blockedCapabilities: freezeRecords([
+      {
+        id: 'real-browser-dom-style-mutation',
+        blocked: true,
+        status: PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
+        reason:
+          'The diagnostic records property-payload style rows without writing to a browser DOM node.'
+      },
+      {
+        id: 'public-style-compatibility',
+        blocked: true,
+        status: PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS,
+        reason:
+          'The diagnostic is private metadata and does not claim React DOM style compatibility.'
+      }
+    ]),
+    blockedPublicMutation: freezeRecord({
+      status: PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
+      realDomNodeRequired: false,
+      browserDomMutation: false,
+      fakeDomMutation: false,
+      styleObjectMutated: false,
+      propertyAssignmentInvoked: false,
+      setPropertyInvoked: false
+    }),
+    blockedPublicCompatibility: freezeRecord({
+      status: PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS,
+      reactDomCompared: false,
+      browserDomCompared: false,
+      serverRenderingCompared: false,
+      publicStyleCompatibility: false,
+      compatibilityClaimed: false
+    }),
+    sideEffects: freezeRecord({
+      realDomNodeMutated: false,
+      browserDomMutation: false,
+      fakeDomMutation: false,
+      styleObjectMutated: false,
+      latestPropsPublished: false,
+      propertyAssignmentInvoked: false,
+      setPropertyInvoked: false,
+      compatibilityClaimed: false
+    })
+  });
+}
+
+function createPrivateStyleObjectDiffRow(
+  entry,
+  previousStyles,
+  currentStyles
+) {
+  if (entry.kind === ENTRY_SET_STYLE || entry.kind === ENTRY_REMOVE_STYLE) {
+    const styleName = entry.styleName;
+    const previousPresent =
+      previousStyles !== null && hasOwn.call(previousStyles, styleName);
+    const nextPresent =
+      currentStyles !== null && hasOwn.call(currentStyles, styleName);
+    const previousValue = previousPresent
+      ? previousStyles[styleName]
+      : undefined;
+    const nextValue = nextPresent ? currentStyles[styleName] : undefined;
+    const customProperty = isCustomStyleProperty(styleName);
+    const unitless = !customProperty && unitlessStyleNames.has(styleName);
+    const action =
+      entry.kind === ENTRY_REMOVE_STYLE
+        ? 'remove'
+        : previousPresent
+          ? 'change'
+          : 'add';
+    const removalReason =
+      entry.kind === ENTRY_REMOVE_STYLE
+        ? nextPresent
+          ? 'nullish-empty-or-boolean-next-value'
+          : 'omitted-next-style-property'
+        : null;
+    const nextValueIsNumber = typeof nextValue === 'number';
+
+    return {
+      kind: PRIVATE_STYLE_OBJECT_DIFF_ROW_KIND,
+      payloadKind: entry.kind,
+      propName: 'style',
+      styleName,
+      action,
+      removalReason,
+      mutation: entry.mutation,
+      value: entry.value,
+      previousValue: describePrivateStyleDiffValue(
+        previousValue,
+        previousPresent
+      ),
+      nextValue: describePrivateStyleDiffValue(nextValue, nextPresent),
+      customProperty,
+      unitless,
+      numericValue: nextValueIsNumber,
+      unitlessNumber:
+        entry.kind === ENTRY_SET_STYLE && nextValueIsNumber && unitless,
+      numericWithoutPx:
+        entry.kind === ENTRY_SET_STYLE &&
+        nextValueIsNumber &&
+        entry.value === String(nextValue),
+      pxAppended:
+        entry.kind === ENTRY_SET_STYLE &&
+        nextValueIsNumber &&
+        entry.value === `${nextValue}px`,
+      zeroNumericValue:
+        entry.kind === ENTRY_SET_STYLE && nextValueIsNumber && nextValue === 0,
+      realDomNodeMutated: false,
+      publicMutationBlocked: true,
+      compatibilityClaimed: false
+    };
+  }
+
+  return {
+    kind: PRIVATE_STYLE_OBJECT_DIFF_UNSUPPORTED_ROW_KIND,
+    payloadKind: ENTRY_UNSUPPORTED,
+    propName: entry.propName || 'style',
+    action: 'blocked',
+    category: entry.category,
+    reason: entry.reason,
+    styleName: entry.styleName || null,
+    realDomNodeMutated: false,
+    publicMutationBlocked: true,
+    compatibilityClaimed: false
+  };
+}
+
+function describePrivateStyleDiffValue(value, present) {
+  if (!present) {
+    return freezeRecord({
+      present: false,
+      type: 'missing'
+    });
+  }
+
+  if (value === null) {
+    return freezeRecord({
+      present: true,
+      type: 'null'
+    });
+  }
+
+  const valueType = typeof value;
+  if (valueType === 'string') {
+    return freezeRecord({
+      present: true,
+      type: 'string',
+      empty: value.length === 0
+    });
+  }
+
+  if (valueType === 'number') {
+    return freezeRecord({
+      present: true,
+      type: 'number',
+      finite: Number.isFinite(value),
+      zero: value === 0
+    });
+  }
+
+  if (valueType === 'boolean') {
+    return freezeRecord({
+      present: true,
+      type: 'boolean'
+    });
+  }
+
+  if (valueType === 'undefined') {
+    return freezeRecord({
+      present: true,
+      type: 'undefined'
+    });
+  }
+
+  return freezeRecord({
+    present: true,
+    type: valueType
+  });
+}
+
+function summarizePrivateStyleObjectDiffRows(rows) {
+  const rowKinds = [];
+  const summary = {
+    rowCount: rows.length,
+    payloadRowCount: rows.length,
+    setStyleCount: 0,
+    removeStyleCount: 0,
+    additionRowCount: 0,
+    changeRowCount: 0,
+    removalRowCount: 0,
+    unsupportedRowCount: 0,
+    unitlessRowCount: 0,
+    unitlessSetRowCount: 0,
+    customPropertyRowCount: 0,
+    numericWithoutPxRowCount: 0,
+    pxAppendedRowCount: 0,
+    zeroNumericRowCount: 0,
+    propertyAssignmentCount: 0,
+    setPropertyCount: 0
+  };
+
+  for (const row of rows) {
+    if (!rowKinds.includes(row.payloadKind)) {
+      rowKinds.push(row.payloadKind);
+    }
+
+    if (row.payloadKind === ENTRY_SET_STYLE) {
+      summary.setStyleCount += 1;
+      if (row.action === 'add') {
+        summary.additionRowCount += 1;
+      } else if (row.action === 'change') {
+        summary.changeRowCount += 1;
+      }
+    } else if (row.payloadKind === ENTRY_REMOVE_STYLE) {
+      summary.removeStyleCount += 1;
+      summary.removalRowCount += 1;
+    } else {
+      summary.unsupportedRowCount += 1;
+    }
+
+    if (row.mutation === 'propertyAssignment') {
+      summary.propertyAssignmentCount += 1;
+    } else if (row.mutation === 'setProperty') {
+      summary.setPropertyCount += 1;
+    }
+
+    if (row.unitless) {
+      summary.unitlessRowCount += 1;
+      if (row.payloadKind === ENTRY_SET_STYLE) {
+        summary.unitlessSetRowCount += 1;
+      }
+    }
+    if (row.customProperty) {
+      summary.customPropertyRowCount += 1;
+    }
+    if (row.numericWithoutPx) {
+      summary.numericWithoutPxRowCount += 1;
+    }
+    if (row.pxAppended) {
+      summary.pxAppendedRowCount += 1;
+    }
+    if (row.zeroNumericValue) {
+      summary.zeroNumericRowCount += 1;
+    }
+  }
+
+  return freezeRecord({
+    ...summary,
+    mutatingRowCount: 0,
+    realDomNodeMutated: false,
+    browserDomMutation: false,
+    fakeDomMutation: false,
+    compatibilityClaimed: false,
+    publicMutationBlocked: true,
+    rowKinds: freezeArray(rowKinds)
+  });
+}
+
+function clonePrivateStylePayloadEntry(entry) {
+  return {...entry};
 }
 
 function createStyleValueEntryOrUnsupported(propName, styleName, value) {
@@ -957,11 +1276,19 @@ module.exports = {
   ENTRY_SET_PROPERTY,
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
+  PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_KIND,
+  PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_ROW_KIND,
+  PRIVATE_STYLE_OBJECT_DIFF_UNSUPPORTED_ROW_KIND,
+  PRIVATE_STYLE_OBJECT_DIFF_UNSUPPORTED_STATUS,
   diffDomPropertyPayload,
   isAttributeNameSafe,
   isEventLikeProp,
   isNonPayloadPropertyPayloadEntry,
   isOrdinaryPropertyPayloadEntry,
   isStylePropertyPayloadEntry,
-  isStyleDangerousHtmlPayloadEntry
+  isStyleDangerousHtmlPayloadEntry,
+  recordPrivateDomStyleObjectDiffDiagnostics
 };
