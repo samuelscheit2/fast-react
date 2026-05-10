@@ -249,6 +249,26 @@ const expectedNativeRootBridgeRequestShape = {
         unsupportedFieldValue:
           'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE'
       },
+      jsonTransportErrorDiagnosticRowFields: [
+        'id',
+        'category',
+        'phase',
+        'name',
+        'code',
+        'sourceErrorCode',
+        'boundaryErrorCode',
+        'nativeAddonLoaded',
+        'nativeExecution',
+        'rendererExecution',
+        'reconcilerExecution',
+        'reactBehaviorError'
+      ],
+      jsonTransportErrorDiagnosticCaseIds: [
+        'malformed-payload',
+        'wrong-environment-root-handle',
+        'stale-value-handle-generation',
+        'render-before-create-lifecycle-order'
+      ],
       nativeAddonLoaded: false,
       nativeExecution: false,
       rendererExecution: false,
@@ -1032,6 +1052,7 @@ function assertNativeRootBridgeJsonTransportParserGate(parserGate, expected) {
   assert.equal(Object.isFrozen(parserGate), true);
   assert.equal(Object.isFrozen(parserGate.decodedRequestRecords), true);
   assert.equal(Object.isFrozen(parserGate.deterministicParseErrors), true);
+  assert.equal(Object.isFrozen(parserGate.deterministicErrorRows), true);
   assert.equal(
     parserGate.parserGateStatus,
     'parsed-native-root-bridge-json-transport-schema'
@@ -1062,6 +1083,16 @@ function assertNativeRootBridgeJsonTransportParserGate(parserGate, expected) {
     parserGate.parseErrorCodes,
     native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
       .parseErrorCodes
+  );
+  assert.equal(
+    parserGate.jsonTransportErrorDiagnosticRowFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .jsonTransportErrorDiagnosticRowFields
+  );
+  assert.equal(
+    parserGate.jsonTransportErrorDiagnosticCaseIds,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .jsonTransportErrorDiagnosticCaseIds
   );
   assert.deepEqual(
     parserGate.decodedRequestRecords.map((record) => record.kind),
@@ -1118,6 +1149,67 @@ function assertNativeRootBridgeJsonTransportParserGate(parserGate, expected) {
     assert.equal(error.nativeExecution, false);
     assert.equal(error.rendererExecution, false);
     assert.equal(error.reconcilerExecution, false);
+  }
+  assert.deepEqual(
+    parserGate.deterministicErrorRows.map((row) => row.id),
+    [
+      'malformed-payload',
+      'wrong-environment-root-handle',
+      'stale-value-handle-generation',
+      'render-before-create-lifecycle-order'
+    ]
+  );
+  assert.deepEqual(
+    parserGate.deterministicErrorRows.map((row) => row.category),
+    [
+      'malformed-payload',
+      'wrong-environment',
+      'stale-handle',
+      'lifecycle-order'
+    ]
+  );
+  assert.deepEqual(
+    parserGate.deterministicErrorRows.map((row) => row.phase),
+    ['parse', 'validation', 'validation', 'validation']
+  );
+  assert.deepEqual(
+    parserGate.deterministicErrorRows.map((row) => row.code),
+    [
+      parserGate.parseErrorCodes.invalidJson,
+      'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE'
+    ]
+  );
+  assert.deepEqual(
+    parserGate.deterministicErrorRows.map((row) => row.sourceErrorCode),
+    [
+      null,
+      'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE'
+    ]
+  );
+  assert.deepEqual(
+    parserGate.deterministicErrorRows.map((row) => row.boundaryErrorCode),
+    [
+      null,
+      'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT',
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER'
+    ]
+  );
+  for (const row of parserGate.deterministicErrorRows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(
+      Object.keys(row),
+      parserGate.jsonTransportErrorDiagnosticRowFields
+    );
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.reactBehaviorError, false);
   }
 }
 
