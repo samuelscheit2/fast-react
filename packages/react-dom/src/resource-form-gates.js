@@ -12,6 +12,8 @@ const resourceFormRootBridgeBlockedGateId =
   'resource-form-root-bridge-blocked-gate-1';
 const resourceFormRootBoundaryRecordType =
   'fast.react_dom.resource_form_root_boundary_record';
+const resourceFormPortalCommitBoundaryRecordType =
+  'fast.react_dom.resource_form_portal_commit_boundary_record';
 const publicRootFacadeBlockedGateId =
   'react-dom-root-public-facade-blocked-gate-1';
 const publicRootFacadeBlockedStatus =
@@ -22,14 +24,19 @@ const privateSourceAdapterBlockedStatus =
   'blocked-private-source-adapter';
 const privateControlledValueTrackerBlockedStatus =
   'blocked-private-controlled-value-tracker-metadata-only';
+const privatePortalCommitResourceBlockedStatus =
+  'blocked-private-portal-commit-resource-side-effects';
 const rootBoundaryInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_RECORD';
+const rootBoundaryInvalidPortalCommitHandoffCode =
+  'FAST_REACT_DOM_RESOURCE_FORM_PORTAL_COMMIT_INVALID_HANDOFF';
 const rootBoundaryInvalidRootMetadataCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_ROOT_METADATA';
 const rootBoundaryInvalidPublicMetadataCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_PUBLIC_METADATA';
 
 const boundaryRecordPayloads = new WeakMap();
+const portalCommitBoundaryRecordPayloads = new WeakMap();
 
 const rootBlockedFlagFields = freezeArray([
   'nativeExecution',
@@ -55,6 +62,14 @@ const rootBoundarySideEffects = freezeRecord({
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
   sourceAdaptersInvoked: false
+});
+
+const portalCommitResourceSideEffects = freezeRecord({
+  ...rootBoundarySideEffects,
+  portalContainerMutated: false,
+  portalContainerChildrenReplaced: false,
+  portalPrepareMountCalled: false,
+  portalListenersInstalled: false
 });
 
 function describeResourceFormRootBridgeBlockedGate() {
@@ -110,12 +125,59 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
   return payload;
 }
 
+function recordResourceFormPortalCommitBlockedRequest(portalCommitHandoff) {
+  assertPortalCommitHandoffIsRecordOnly(portalCommitHandoff);
+
+  const payload = freezeRecord({
+    $$typeof: resourceFormPortalCommitBoundaryRecordType,
+    kind: 'FastReactDomResourceFormPortalCommitBoundaryRecord',
+    schemaVersion: resourceFormRootBridgeGateSchemaVersion,
+    gateId: resourceFormRootBridgeBlockedGateId,
+    compatibilityTarget,
+    status: internalsGate.unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    resourceSideEffectStatus: privatePortalCommitResourceBlockedStatus,
+    portalCommitHandoffId: portalCommitHandoff.commitHandoffId,
+    portalCommitHandoffStatus: portalCommitHandoff.handoffStatus,
+    portalCommitStatus: portalCommitHandoff.commitStatus,
+    portalBoundaryId: portalCommitHandoff.sourceBoundaryId,
+    sourceRequestId: portalCommitHandoff.sourceRequestId,
+    sourceRequestSequence: portalCommitHandoff.sourceRequestSequence,
+    sourceRequestType: portalCommitHandoff.sourceRequestType,
+    rootId: portalCommitHandoff.rootId,
+    rootKind: portalCommitHandoff.rootKind,
+    rootTag: portalCommitHandoff.rootTag,
+    rootBridgeBoundary:
+      describePrivatePortalCommitRootBridgeBoundary(portalCommitHandoff),
+    privateResourceDispatcherBoundary:
+      describePrivateResourceDispatcherBoundary('resource-hint'),
+    sourceAdapterBoundary: describeSourceAdapterBoundary('resource-hint'),
+    sideEffects: portalCommitResourceSideEffects
+  });
+
+  portalCommitBoundaryRecordPayloads.set(
+    payload,
+    freezeRecord({
+      portalCommitHandoff
+    })
+  );
+  return payload;
+}
+
 function getResourceFormRootBridgeBlockedRecordPayload(record) {
   return boundaryRecordPayloads.get(record) || null;
 }
 
 function isResourceFormRootBridgeBlockedRecord(value) {
   return boundaryRecordPayloads.has(value);
+}
+
+function getResourceFormPortalCommitBlockedRecordPayload(record) {
+  return portalCommitBoundaryRecordPayloads.get(record) || null;
+}
+
+function isResourceFormPortalCommitBlockedRecord(value) {
+  return portalCommitBoundaryRecordPayloads.has(value);
 }
 
 function describePublicRootBoundary(options) {
@@ -216,6 +278,36 @@ function describePrivateRootBridgeBoundary(admission) {
   });
 }
 
+function describePrivatePortalCommitRootBridgeBoundary(portalCommitHandoff) {
+  return freezeRecord({
+    gateStatus: privateRootBridgeRecordOnlyStatus,
+    admittedPortalCommitHandoff: true,
+    handoffStatus: portalCommitHandoff.handoffStatus,
+    commitStatus: portalCommitHandoff.commitStatus,
+    portalContainerOwnershipStatus:
+      portalCommitHandoff.portalContainerOwnership.ownershipStatus,
+    sourceRequestType: portalCommitHandoff.sourceRequestType,
+    rootKind: portalCommitHandoff.rootKind,
+    rootTag: portalCommitHandoff.rootTag,
+    blockedCapabilities: summarizeBlockedCapabilities(
+      portalCommitHandoff.blockedCapabilities,
+      rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES
+    ),
+    fakeDomCommitApplied: false,
+    portalContainerChildrenReplaced: false,
+    preparePortalMount: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    resourceSideEffects: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+}
+
 function describeSourceAdapterBoundary(behaviorArea) {
   return freezeRecord({
     gateStatus: privateSourceAdapterBlockedStatus,
@@ -309,20 +401,62 @@ function assertRootBridgeAdmissionIsRecordOnly(admission) {
   assertBlockedCapabilities(admission.blockedCapabilities);
 }
 
-function assertBlockedCapabilities(capabilities) {
+function assertPortalCommitHandoffIsRecordOnly(portalCommitHandoff) {
+  if (
+    !rootBridge.isPrivateRootPortalCommitHandoffRecord(portalCommitHandoff) ||
+    portalCommitHandoff.handoffStatus !==
+      rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_HANDOFF_ADMITTED ||
+    portalCommitHandoff.commitStatus !==
+      rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED ||
+    portalCommitHandoff.rootKind !== rootBridge.CLIENT_ROOT_KIND ||
+    portalCommitHandoff.rootTag !== rootBridge.CONCURRENT_ROOT_TAG ||
+    portalCommitHandoff.portalContainerOwnership?.ownershipStatus !==
+      rootBridge.ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED ||
+    portalCommitHandoff.listenerSideEffects?.preparePortalMount !== false ||
+    portalCommitHandoff.listenerSideEffects?.listenerInstallation !== false
+  ) {
+    throwInvalidPortalCommitHandoff();
+  }
+
+  for (const field of rootBlockedFlagFields) {
+    if (portalCommitHandoff[field] !== false) {
+      throwInvalidPortalCommitHandoff();
+    }
+  }
+
+  if (
+    portalCommitHandoff.fakeDomCommitApplied !== false ||
+    portalCommitHandoff.portalContainerChildrenReplaced !== false ||
+    portalCommitHandoff.preparePortalMount !== false ||
+    portalCommitHandoff.resourceSideEffects !== false ||
+    portalCommitHandoff.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalCommitHandoff();
+  }
+
+  assertBlockedCapabilities(
+    portalCommitHandoff.blockedCapabilities,
+    rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES
+  );
+}
+
+function assertBlockedCapabilities(
+  capabilities,
+  expectedCapabilities = rootBridge.ROOT_BRIDGE_BLOCKED_CAPABILITIES
+) {
   if (!Array.isArray(capabilities)) {
-    throwInvalidRootBridgeMetadata();
+    throwInvalidBlockedCapabilities(expectedCapabilities);
   }
 
   const expectedById = new Map(
-    rootBridge.ROOT_BRIDGE_BLOCKED_CAPABILITIES.map((capability) => [
+    expectedCapabilities.map((capability) => [
       capability.id,
       capability
     ])
   );
 
   if (capabilities.length !== expectedById.size) {
-    throwInvalidRootBridgeMetadata();
+    throwInvalidBlockedCapabilities(expectedCapabilities);
   }
 
   for (const capability of capabilities) {
@@ -332,13 +466,23 @@ function assertBlockedCapabilities(capabilities) {
       capability.blocked !== true ||
       capability.reason !== expected.reason
     ) {
-      throwInvalidRootBridgeMetadata();
+      throwInvalidBlockedCapabilities(expectedCapabilities);
     }
   }
 }
 
-function summarizeBlockedCapabilities(capabilities) {
-  assertBlockedCapabilities(capabilities);
+function throwInvalidBlockedCapabilities(expectedCapabilities) {
+  if (expectedCapabilities === rootBridge.ROOT_BRIDGE_BLOCKED_CAPABILITIES) {
+    throwInvalidRootBridgeMetadata();
+  }
+  throwInvalidPortalCommitHandoff();
+}
+
+function summarizeBlockedCapabilities(
+  capabilities,
+  expectedCapabilities = rootBridge.ROOT_BRIDGE_BLOCKED_CAPABILITIES
+) {
+  assertBlockedCapabilities(capabilities, expectedCapabilities);
   return freezeArray(
     capabilities.map((capability) =>
       freezeRecord({
@@ -377,6 +521,16 @@ function throwInvalidPublicRootMetadata() {
   throw error;
 }
 
+function throwInvalidPortalCommitHandoff() {
+  const error = new Error(
+    'Expected private portal commit handoff metadata to remain record-only.'
+  );
+  error.name = 'FastReactDomResourceFormRootBoundaryError';
+  error.code = rootBoundaryInvalidPortalCommitHandoffCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function freezeArray(value) {
   return Object.freeze(value.slice());
 }
@@ -388,17 +542,24 @@ function freezeRecord(value) {
 module.exports = Object.assign({}, internalsGate, {
   describeResourceFormRootBridgeBlockedGate,
   describePrivateResourceDispatcherBoundary,
+  getResourceFormPortalCommitBlockedRecordPayload,
   getResourceFormRootBridgeBlockedRecordPayload,
+  isResourceFormPortalCommitBlockedRecord,
   isResourceFormRootBridgeBlockedRecord,
+  privatePortalCommitResourceBlockedStatus,
   privateControlledValueTrackerBlockedStatus,
   privateRootBridgeRecordOnlyStatus,
   privateSourceAdapterBlockedStatus,
+  portalCommitResourceSideEffects,
   publicRootFacadeBlockedGateId,
   publicRootFacadeBlockedStatus,
+  recordResourceFormPortalCommitBlockedRequest,
   recordResourceFormRootBridgeBlockedRequest,
+  resourceFormPortalCommitBoundaryRecordType,
   resourceFormRootBoundaryRecordType,
   resourceFormRootBridgeBlockedGateId,
   resourceFormRootBridgeGateSchemaVersion,
+  rootBoundaryInvalidPortalCommitHandoffCode,
   rootBoundaryInvalidPublicMetadataCode,
   rootBoundaryInvalidRecordCode,
   rootBoundaryInvalidRootMetadataCode,

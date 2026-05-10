@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   evaluateReactDomPortalRootRenderBlockedGate,
@@ -13,6 +16,27 @@ import {
 } from "../src/react-dom-root-render-e2e-oracle.mjs";
 
 const oracle = readCheckedReactDomRootRenderE2EOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const packageRoot = path.join(repoRoot, "packages", "react-dom");
+const domContainer = require(
+  path.join(packageRoot, "src", "client", "dom-container.js")
+);
+const listenerRegistry = require(
+  path.join(packageRoot, "src", "events", "listener-registry.js")
+);
+const reactDom = require(path.join(packageRoot, "index.js"));
+const resourceFormGate = require(
+  path.join(packageRoot, "src", "resource-form-gates.js")
+);
+const rootBridge = require(
+  path.join(packageRoot, "src", "client", "root-bridge.js")
+);
 
 test("createPortal local gate feeds the portal root-render blocked gate without admitting compatibility", () => {
   const result = evaluateReactDomPortalRootRenderBlockedGate({
@@ -140,6 +164,127 @@ test("private portal root boundary records remain diagnostic-only", () => {
   assert.equal(record.portalListenerGuard.hasPortalListeningMarker, false);
 });
 
+test("private portal fake-DOM commit handoff records blocked listener and resource side effects", () => {
+  const document = createPortalGateDocument("portal-commit-handoff");
+  const rootContainer = createPortalGateElement("DIV", document);
+  const portalContainer = createPortalGateElement("SECTION", document);
+  const portalChild = {
+    props: {
+      children: "portal child"
+    },
+    type: "span"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: "portal-boundary",
+    portalCommitIdPrefix: "portal-commit"
+  });
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const hiddenHandoff =
+    rootBridge.getPrivateRootPortalCommitHandoffPayload(handoff);
+  const resourceBoundary =
+    resourceFormGate.recordResourceFormPortalCommitBlockedRequest(handoff);
+
+  assert.equal(
+    handoff.kind,
+    "FastReactDomPrivateRootPortalFakeDomCommitHandoffRecord"
+  );
+  assert.equal(
+    handoff.handoffStatus,
+    "admitted-private-root-portal-fake-dom-commit-handoff"
+  );
+  assert.equal(
+    handoff.commitStatus,
+    "blocked-private-root-portal-fake-dom-commit-apply"
+  );
+  assert.equal(handoff.fakeDomCommitHandoff, true);
+  assert.equal(handoff.fakeDomCommitApplied, false);
+  assert.equal(handoff.portalContainerChildrenReplaced, false);
+  assert.equal(handoff.portalMounting, false);
+  assert.equal(handoff.preparePortalMount, false);
+  assert.equal(handoff.domMutation, false);
+  assert.equal(handoff.listenerInstallation, false);
+  assert.equal(handoff.resourceSideEffects, false);
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      "portal-fake-dom-commit-apply",
+      "portal-prepare-mount-listeners",
+      "portal-resource-side-effects",
+      "portal-child-reconciliation",
+      "portal-container-mounting",
+      "portal-container-listeners",
+      "native-execution",
+      "reconciler-execution",
+      "dom-mutation",
+      "marker-writes",
+      "listener-installation",
+      "hydration",
+      "events",
+      "compatibility-claims"
+    ]
+  );
+  assert.equal(
+    handoff.portalContainerOwnership.ownershipStatus,
+    "validated-private-root-portal-container-ownership"
+  );
+  assert.equal(handoff.portalContainerOwnership.rootContainerMarkedAsRoot, true);
+  assert.equal(
+    handoff.portalContainerOwnership.rootContainerOwnerMatchesHandle,
+    true
+  );
+  assert.equal(
+    handoff.portalContainerOwnership.portalContainerMarkedAsRoot,
+    false
+  );
+  assert.equal(handoff.portalContainerOwnership.sameOwnerDocument, true);
+  assert.equal(handoff.listenerSideEffects.preparePortalMount, false);
+  assert.equal(handoff.listenerSideEffects.listenerInstallation, false);
+  assert.equal(handoff.listenerSideEffects.hasPortalListeningMarker, false);
+  assert.equal(
+    resourceBoundary.rootBridgeBoundary.commitStatus,
+    "blocked-private-root-portal-fake-dom-commit-apply"
+  );
+  assert.equal(
+    resourceBoundary.resourceSideEffectStatus,
+    resourceFormGate.privatePortalCommitResourceBlockedStatus
+  );
+  assert.equal(resourceBoundary.rootBridgeBoundary.resourceSideEffects, false);
+  assert.deepEqual(
+    resourceBoundary.sideEffects,
+    resourceFormGate.portalCommitResourceSideEffects
+  );
+  assert.equal(resourceBoundary.sideEffects.resourcesDispatched, false);
+  assert.equal(resourceBoundary.sideEffects.sourceAdaptersInvoked, false);
+  assert.equal(resourceBoundary.sideEffects.portalContainerMutated, false);
+  assert.equal(
+    resourceFormGate.isResourceFormPortalCommitBlockedRecord(resourceBoundary),
+    true
+  );
+  assert.equal(hiddenHandoff.portalContainer, portalContainer);
+  assert.equal(hiddenHandoff.rootContainer, rootContainer);
+  assert.equal(hiddenHandoff.pendingChildren[0], portalChild);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalContainer.__mutationLog.length, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
+
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootContainer.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalContainer.__mutationLog.length, 0);
+});
+
 test("portal root-render gate sees accepted reconciler fail-closed diagnostics", () => {
   const boundary = inspectReactDomPortalRootRenderBlockedBoundary();
   const diagnostics = boundary.reconcilerDiagnostics;
@@ -246,4 +391,73 @@ function assertPrivatePortalRootBoundary(record) {
       "HostRootChildBeginWorkPreflightError::UnsupportedPortal",
     unsupportedFeature: "PORTAL_RECONCILER_UNSUPPORTED_FEATURE"
   });
+}
+
+function createPortalGateDocument(label) {
+  const document = createPortalGateEventTarget({
+    label,
+    nodeName: "#document",
+    nodeType: domContainer.DOCUMENT_NODE
+  });
+  document.ownerDocument = document;
+  document.defaultView = createPortalGateEventTarget({
+    label: `${label}-window`
+  });
+  return document;
+}
+
+function createPortalGateElement(nodeName, ownerDocument) {
+  return createPortalGateEventTarget({
+    nodeName,
+    nodeType: domContainer.ELEMENT_NODE,
+    ownerDocument
+  });
+}
+
+function createPortalGateEventTarget(fields) {
+  const target = {
+    ...fields,
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener, options) {
+      this.__registrations.push({
+        listener,
+        options,
+        type
+      });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.type === type &&
+          entry.listener === listener &&
+          entry.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
+    },
+    appendChild(child) {
+      this.__mutationLog.push({ child, type: "appendChild" });
+    },
+    insertBefore(child, beforeChild) {
+      this.__mutationLog.push({ beforeChild, child, type: "insertBefore" });
+    },
+    removeChild(child) {
+      this.__mutationLog.push({ child, type: "removeChild" });
+    }
+  };
+  let textContent = "";
+  Object.defineProperty(target, "textContent", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return textContent;
+    },
+    set(value) {
+      textContent = value;
+      this.__mutationLog.push({ type: "textContent", value });
+    }
+  });
+  return target;
 }
