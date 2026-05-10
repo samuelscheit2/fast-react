@@ -928,6 +928,160 @@ test("React DOM client private facade preflight accepts live containers only as 
   );
 });
 
+test("React DOM private root-render host-output evidence stays behind public facade block", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domHost = require(
+    path.join(repoRoot, "packages/react-dom/src/dom-host/mutation.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const document = createPrivateGateDocument(
+    "private-root-render-host-output",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const publicContainer = createPrivateGateElement(
+    "DIV",
+    createPrivateGateDocument(
+      "private-root-render-host-output-public",
+      domContainer
+    ),
+    domContainer
+  );
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "conformance-root-render-admission",
+    initialHostOutputIdPrefix: "conformance-root-render-initial",
+    requestIdPrefix: "conformance-root-render-request",
+    rootIdPrefix: "conformance-root-render-root",
+    rootRenderHostOutputIdPrefix: "conformance-root-render-host-output",
+    sideEffectIdPrefix: "conformance-root-render-side-effect",
+    updateIdPrefix: "conformance-root-render-update"
+  });
+  const element = {
+    props: {
+      children: "private root render output",
+      id: "private-root-render-host",
+      title: "Private root render"
+    },
+    type: "section"
+  };
+  const create = bridge.createClientRoot(container);
+  const metadata = createPrivateGateRootWorkLoopFinishedWorkMetadata(
+    rootBridge,
+    {
+      rootId: create.rootId,
+      rootTag: create.rootTag,
+      renderUpdateId: "conformance-root-render-update:1",
+      hostType: "section",
+      textContent: "private root render output"
+    }
+  );
+
+  const record = bridge.renderRootHostOutput(create, element, {
+    acceptedRootWorkLoopFinishedWorkMetadata: metadata
+  });
+  const hidden = rootBridge.getPrivateRootRenderHostOutputPayload(record);
+  const finishedWork = record.rootWorkLoopFinishedWorkRecord;
+
+  assert.equal(
+    record.$$typeof,
+    rootBridge.privateRootRenderHostOutputRecordType
+  );
+  assert.equal(
+    record.renderStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_APPLIED
+  );
+  assert.equal(
+    finishedWork.$$typeof,
+    rootBridge.privateRootRenderHostOutputFinishedWorkRecordType
+  );
+  assert.equal(
+    finishedWork.handoffStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED
+  );
+  assert.deepEqual(record.childTags, ["HostComponent", "HostText"]);
+  assert.equal(record.rootWorkLoopFinishedWorkConsumed, true);
+  assert.equal(record.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(record.rustHostOutputMetadataAccepted, true);
+  assert.equal(
+    record.domHostMutationGateMetadata,
+    domHost.DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA
+  );
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "private-create-root-record",
+      "private-root-render-record",
+      "root-marker-setup-cleanup",
+      "root-listener-setup-cleanup",
+      "create-render-admission",
+      "root-work-loop-finished-work-handoff",
+      "fake-dom-host-output-mutation",
+      "component-tree-host-instance-map",
+      "latest-props-publication"
+    ]
+  );
+  assert.equal(record.publicCreateRootEnabled, false);
+  assert.equal(record.publicRootCreated, false);
+  assert.equal(record.publicRootObjectExposed, false);
+  assert.equal(record.publicRootExecution, false);
+  assert.equal(record.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.browserDomMutation, false);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.compatibilityClaimed, false);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, "SECTION");
+  assert.equal(container.textContent, "private root render output");
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ["id", "private-root-render-host"],
+    ["title", "Private root render"]
+  ]);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(
+    rootBridge.isPrivateRootRenderHostOutputRecord(record),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootRenderHostOutputFinishedWorkRecord(finishedWork),
+    true
+  );
+  assert.equal(hidden.createRecord, create);
+  assert.equal(
+    hidden.renderRecord.updateId,
+    "conformance-root-render-update:1"
+  );
+  assert.equal(hidden.rootWorkLoopFinishedWorkRecord, finishedWork);
+
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    entrypoint: "react-dom/client",
+    exportName: "createRoot"
+  });
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+
+  bridge.cleanupInitialRenderHostOutput(hidden.hostOutputHandoff);
+  assert.equal(container.childNodes.length, 0);
+});
+
 test("React DOM client private facade host-output update routes through private fake DOM only", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")
@@ -2676,6 +2830,56 @@ function detachPrivateGateChild(child) {
     siblings.splice(index, 1);
   }
   child.parentNode = null;
+}
+
+function createPrivateGateRootWorkLoopFinishedWorkMetadata(
+  rootBridge,
+  options
+) {
+  return {
+    source: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+    status: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+    metadataRevision:
+      rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+    facade: {
+      rootId: options.rootId,
+      rootTag: options.rootTag,
+      renderUpdateId: options.renderUpdateId,
+      hostType: options.hostType,
+      hostOutputShape: "host-component",
+      hostComponentCount: 1,
+      hostTextCount: 1,
+      textContent: options.textContent
+    },
+    completeWork: {
+      rootChildTag: "HostComponent",
+      completedChildTag: "HostComponent",
+      hostTextChildTag: "HostText",
+      childTags: ["HostComponent", "HostText"]
+    },
+    pending: {
+      recordsFinishedWork: true,
+      pendingWorkMatchesFinishedWork: true,
+      renderLanes: "Default",
+      finishedLanes: "Default",
+      remainingLanes: "NoLanes"
+    },
+    commit: {
+      commitOrderAfterPendingRecord: true,
+      consumedFinishedWorkRecord: true,
+      finishedWorkAfterCommit: null,
+      finishedLanesAfterCommit: "NoLanes",
+      renderPhaseWorkAfterCommit: null,
+      mutationExecutionBlocked: true,
+      publicRootRenderingBlocked: true,
+      effectsRefsAndHydrationBlocked: true
+    },
+    placement: {
+      tag: "HostComponent",
+      applyKind: "append-placement-to-container",
+      siblingStatus: "append"
+    }
+  };
 }
 
 function attributeEntries(node) {
