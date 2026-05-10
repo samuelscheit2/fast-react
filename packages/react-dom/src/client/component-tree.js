@@ -33,13 +33,18 @@ const INVALID_EVENT_LISTENER_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_LISTENER';
 const HOST_INSTANCE_NODE_RECORD_KIND =
   'FastReactDomComponentTreeHostInstanceNodeRecord';
+const REF_CALLBACK_FAKE_HOST_NODE_RECORD_KIND =
+  'FastReactDomRefCallbackFakeHostNodeRecord';
 const privateHostInstanceNodeRecordType =
   'fast.react_dom.private_component_tree_host_instance_node_record';
+const privateRefCallbackFakeHostNodeRecordType =
+  'fast.react_dom.private_ref_callback_fake_host_node_record';
 
 const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
 const eventListenerTargetLookupRecordPayloads = new WeakMap();
 const hostInstanceNodeRecordPayloads = new WeakMap();
+const refCallbackFakeHostNodeRecordPayloads = new WeakMap();
 
 const disabledMouseEventRegistrationNames = new Set([
   'onClick',
@@ -323,6 +328,51 @@ function createMountedHostInstanceNodeRecord(token) {
   return record;
 }
 
+function createRefCallbackFakeHostNodeRecord(hostNodeRecord) {
+  const hostNodePayload = getPrivateHostInstanceNodeRecordPayload(
+    hostNodeRecord
+  );
+  if (hostNodePayload === null) {
+    throw createComponentTreeError(
+      'Cannot create a fake ref callback host node without a private component-tree host node record.',
+      'FAST_REACT_DOM_INVALID_REF_CALLBACK_HOST_NODE_RECORD'
+    );
+  }
+
+  const fakeHostNode = createFakeHostNodeFromHostInstance(
+    hostNodePayload.node
+  );
+  const record = Object.freeze({
+    $$typeof: privateRefCallbackFakeHostNodeRecordType,
+    kind: REF_CALLBACK_FAKE_HOST_NODE_RECORD_KIND,
+    status: 'fake-host-node-for-private-ref-callback',
+    sourceHostNodeRecordKind: hostNodeRecord.kind,
+    nodeType: fakeHostNode.nodeType,
+    nodeName: fakeHostNode.nodeName,
+    localName:
+      Object.prototype.hasOwnProperty.call(fakeHostNode, 'localName')
+        ? fakeHostNode.localName
+        : null,
+    exposesHostNode: false,
+    exposesFakeHostNode: false,
+    exposesLatestProps: false,
+    privateRefCallbackOnly: true
+  });
+
+  refCallbackFakeHostNodeRecordPayloads.set(
+    record,
+    Object.freeze({
+      fakeHostNode,
+      hostNodeRecord,
+      hostNodePayload,
+      latestProps: hostNodePayload.latestProps,
+      sourceNode: hostNodePayload.node
+    })
+  );
+
+  return record;
+}
+
 function createEventListenerTargetLookupRecord(
   targetNormalizationRecord,
   registrationName
@@ -492,6 +542,18 @@ function isPrivateHostInstanceNodeRecord(value) {
   return getPrivateHostInstanceNodeRecordPayload(value) !== null;
 }
 
+function getPrivateRefCallbackFakeHostNodeRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return refCallbackFakeHostNodeRecordPayloads.get(record) || null;
+}
+
+function isPrivateRefCallbackFakeHostNodeRecord(value) {
+  return getPrivateRefCallbackFakeHostNodeRecordPayload(value) !== null;
+}
+
 function createEventListenerTargetLookupRecordFromPayload(payload) {
   const record = Object.freeze({
     blockedReason: EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
@@ -617,6 +679,83 @@ function getHostNodeName(node) {
 
   if (typeof node.tagName === 'string') {
     return node.tagName.toLowerCase();
+  }
+
+  return '';
+}
+
+function getHostNodeLocalName(node) {
+  if (!isObjectLike(node)) {
+    return null;
+  }
+
+  if (typeof node.localName === 'string' && node.localName !== '') {
+    return node.localName.toLowerCase();
+  }
+
+  const hostNodeName = getHostNodeName(node);
+  return hostNodeName === '' ? null : hostNodeName;
+}
+
+function getHostNodeDisplayName(node) {
+  if (!isObjectLike(node)) {
+    return null;
+  }
+
+  if (typeof node.nodeName === 'string' && node.nodeName !== '') {
+    return node.nodeName;
+  }
+
+  if (typeof node.tagName === 'string' && node.tagName !== '') {
+    return node.tagName;
+  }
+
+  const localName = getHostNodeLocalName(node);
+  return localName === null ? null : localName.toUpperCase();
+}
+
+function createFakeHostNodeFromHostInstance(node) {
+  const nodeType = typeof node.nodeType === 'number' ? node.nodeType : null;
+
+  if (nodeType === TEXT_NODE) {
+    const textContent = getTextNodeContent(node);
+    return Object.freeze({
+      data: textContent,
+      isConnected: true,
+      nodeName: '#text',
+      nodeType: TEXT_NODE,
+      textContent
+    });
+  }
+
+  const localName = getHostNodeLocalName(node);
+  const nodeName = getHostNodeDisplayName(node);
+  return Object.freeze({
+    isConnected: true,
+    localName,
+    namespaceURI:
+      typeof node.namespaceURI === 'string' ? node.namespaceURI : null,
+    nodeName,
+    nodeType,
+    tagName: nodeName
+  });
+}
+
+function getTextNodeContent(node) {
+  if (!isObjectLike(node)) {
+    return '';
+  }
+
+  if (typeof node.textContent === 'string') {
+    return node.textContent;
+  }
+
+  if (typeof node.data === 'string') {
+    return node.data;
+  }
+
+  if (typeof node.nodeValue === 'string') {
+    return node.nodeValue;
   }
 
   return '';
@@ -846,6 +985,7 @@ module.exports = {
   INVALID_EVENT_LISTENER_LATEST_PROPS_CODE,
   INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE,
   INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE,
+  REF_CALLBACK_FAKE_HOST_NODE_RECORD_KIND,
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
@@ -857,6 +997,7 @@ module.exports = {
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
   createMountedHostInstanceNodeRecord,
+  createRefCallbackFakeHostNodeRecord,
   detachHostInstanceNode,
   detachHostInstanceToken,
   getAttachedNodeFromHostInstanceToken,
@@ -871,6 +1012,7 @@ module.exports = {
   getMountedHostInstanceNodeFromToken,
   getMountedHostInstanceTokenFromNode,
   getPrivateHostInstanceNodeRecordPayload,
+  getPrivateRefCallbackFakeHostNodeRecordPayload,
   getRootOwnerFromHostInstanceToken,
   getRootOwnerFromNode,
   hostInstanceMarkerPrefix,
@@ -879,9 +1021,11 @@ module.exports = {
   isEventListenerTargetLookupRecord,
   isHostInstanceNode,
   isPrivateHostInstanceNodeRecord,
+  isPrivateRefCallbackFakeHostNodeRecord,
   isHostInstanceToken,
   latestPropsMarkerPrefix,
   privateHostInstanceNodeRecordType,
+  privateRefCallbackFakeHostNodeRecordType,
   updateLatestPropsForHostInstanceToken,
   updateLatestPropsForNode
 };
