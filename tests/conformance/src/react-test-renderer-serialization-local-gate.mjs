@@ -12,41 +12,76 @@ import {
 const DEFAULT_WORKSPACE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS =
-  "blocked-until-rust-test-renderer-root-and-commit-output";
+  "ready-for-private-diagnostics-public-serialization-compatibility-blocked";
 
-export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS = [
+export const REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS =
+  "blocked-until-private-serialization-diagnostics";
+
+export const REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS = [
   {
     id: "rust-test-renderer-root-facade",
-    requiredBeforeCompatibilityClaim: true,
+    requiredBeforePrivateDiagnostics: true,
     reason:
       "Public serialization needs a Rust TestRendererRoot that owns reconciler root state instead of direct host snapshots."
   },
   {
     id: "committed-test-renderer-host-output",
-    requiredBeforeCompatibilityClaim: true,
+    requiredBeforePrivateDiagnostics: true,
     reason:
       "toJSON output must be read after reconciler commit produces test-renderer host output."
   },
   {
     id: "committed-fiber-inspection-api",
-    requiredBeforeCompatibilityClaim: true,
+    requiredBeforePrivateDiagnostics: true,
     reason:
       "toTree and TestInstance queries need a read-only current-fiber view, not raw mutation host handles."
   },
   {
-    id: "public-js-react-test-renderer-facade",
+    id: "private-json-diagnostics",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The Rust test-renderer canary must expose deterministic private JSON diagnostics before any public serializer is considered."
+  }
+];
+
+export const REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS =
+  "blocked-public-react-test-renderer-serialization-compatibility";
+
+export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS = [
+  {
+    id: "public-to-json-api",
     requiredBeforeCompatibilityClaim: true,
     reason:
-      "A dual-run compatibility claim needs a local public @fast-react/react-test-renderer target to execute."
+      "Public compatibility needs create().toJSON to route to Fast React serialization instead of the placeholder thrower."
+  },
+  {
+    id: "public-to-tree-api",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Public compatibility needs create().toTree to expose React-shaped tree output instead of the placeholder thrower."
+  },
+  {
+    id: "public-test-instance-wrappers",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Public compatibility needs ReactTestInstance root and query wrappers, not private fiber diagnostics."
+  },
+  {
+    id: "public-js-react-test-renderer-routing",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "A dual-run compatibility claim needs the public JS facade to route create, update, unmount, and serialization through the Rust test renderer."
   }
 ];
 
 export const REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS =
   REACT_TEST_RENDERER_SERIALIZATION_SCENARIO_IDS.map((scenarioId) => ({
     scenarioId,
+    readyForPrivateDiagnostics: true,
+    publicComparisonBlocked: true,
     admittedForFastReactComparison: false,
     compatibilityClaimed: false,
-    status: REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS,
+    status: REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
     unblockRequires:
       REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.map(
         (requirement) => requirement.id
@@ -64,9 +99,36 @@ export function evaluateReactTestRendererSerializationLocalGate({
   const localChecks = inspectReactTestRendererSerializationLocalTargets({
     workspaceRoot
   });
-  const requiredLocalTargetsReady =
+  const privateDiagnosticsReady =
     localChecks.rustTestRendererRootFacadePresent &&
-    localChecks.committedTestRendererHostOutputPresent;
+    localChecks.committedTestRendererHostOutputPresent &&
+    localChecks.committedFiberInspectionPresent &&
+    localChecks.privateJsonDiagnosticsPresent;
+  const requiredLocalTargetsReady = privateDiagnosticsReady;
+  const publicCompatibilityReady =
+    privateDiagnosticsReady &&
+    localChecks.publicJsFacadeRoutingPresent &&
+    localChecks.publicToJSONAvailable &&
+    localChecks.publicToTreeAvailable &&
+    localChecks.publicTestInstanceWrappersPresent;
+  const privateDiagnosticBlockers =
+    REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS.filter(
+      (requirement) => {
+        if (requirement.id === "rust-test-renderer-root-facade") {
+          return !localChecks.rustTestRendererRootFacadePresent;
+        }
+        if (requirement.id === "committed-test-renderer-host-output") {
+          return !localChecks.committedTestRendererHostOutputPresent;
+        }
+        if (requirement.id === "committed-fiber-inspection-api") {
+          return !localChecks.committedFiberInspectionPresent;
+        }
+        if (requirement.id === "private-json-diagnostics") {
+          return !localChecks.privateJsonDiagnosticsPresent;
+        }
+        return true;
+      }
+    ).map((requirement) => requirement.id);
   const admittedScenarios =
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS.filter(
       (scenario) =>
@@ -80,21 +142,40 @@ export function evaluateReactTestRendererSerializationLocalGate({
       REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS
         .behaviorCompatibilityClaimed
   );
+  const publicCompatibilityBlockers =
+    REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS.filter(
+      (requirement) => {
+        if (requirement.id === "public-to-json-api") {
+          return !localChecks.publicToJSONAvailable;
+        }
+        if (requirement.id === "public-to-tree-api") {
+          return !localChecks.publicToTreeAvailable;
+        }
+        if (requirement.id === "public-test-instance-wrappers") {
+          return !localChecks.publicTestInstanceWrappersPresent;
+        }
+        if (requirement.id === "public-js-react-test-renderer-routing") {
+          return !localChecks.publicJsFacadeRoutingPresent;
+        }
+        return true;
+      }
+    ).map((requirement) => requirement.id);
   const violations = [];
 
-  if (publicCompatibilityClaimed && !requiredLocalTargetsReady) {
+  if (publicCompatibilityClaimed && !publicCompatibilityReady) {
     violations.push({
-      id: "compatibility-claimed-before-rust-root-and-commit-output",
+      id: "compatibility-claimed-before-public-serialization-support",
       reason:
-        "react-test-renderer serialization compatibility cannot be claimed before the Rust root facade and committed host output exist."
+        "react-test-renderer serialization compatibility cannot be claimed while public toJSON, toTree, TestInstance wrappers, and JS facade routing remain blocked.",
+      blockers: publicCompatibilityBlockers
     });
   }
 
-  if (admittedScenarios.length > 0 && !requiredLocalTargetsReady) {
+  if (admittedScenarios.length > 0 && !publicCompatibilityReady) {
     violations.push({
-      id: "scenario-admitted-before-rust-root-and-commit-output",
+      id: "scenario-admitted-before-public-serialization-support",
       reason:
-        "Scenario admission must wait for the Rust root facade and committed host output, then be updated explicitly per scenario.",
+        "Scenario admission must remain explicit and blocked until public serialization and TestInstance surfaces are ready.",
       scenarioIds: admittedScenarios.map((scenario) => scenario.scenarioId)
     });
   }
@@ -114,11 +195,17 @@ export function evaluateReactTestRendererSerializationLocalGate({
 
   return {
     status:
-      violations.length === 0
+      violations.length > 0
+        ? "blocked-with-violations"
+        : privateDiagnosticsReady
         ? REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS
-        : "blocked-with-violations",
+        : REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS,
     requiredLocalTargetsReady,
+    privateDiagnosticsReady,
+    privateDiagnosticBlockers,
+    publicCompatibilityReady,
     publicCompatibilityClaimed,
+    publicCompatibilityBlockers,
     localChecks,
     admittedScenarios,
     violations
@@ -144,6 +231,10 @@ export function inspectReactTestRendererSerializationLocalTargets({
     workspaceRoot,
     "crates/fast-react-reconciler/src"
   );
+  const publicJsReactTestRendererPackageSource =
+    publicJsReactTestRendererPackageRoots.map((packageRoot) =>
+      readWorkspaceTree(workspaceRoot, packageRoot)
+    ).join("\n");
 
   const publicJsReactTestRendererFacadePresent =
     publicJsReactTestRendererPackageRoots.some((packageRoot) =>
@@ -166,19 +257,59 @@ export function inspectReactTestRendererSerializationLocalTargets({
       /\b(?:pub\s+)?struct\s+TestRendererRoot\b/u
     );
   const committedTestRendererHostOutputPresent =
-    hasSourcePattern(reconcilerSource, /\b(?:pub\s+)?fn\s+commit_root\b/u) &&
     hasSourcePattern(
-      reconcilerSource,
-      /\bappend_child_to_container\b|\bcommit_placement\b/u
+      testRendererSource,
+      /\b(?:pub\s+)?struct\s+TestRendererCommittedHostOutput\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\brender_and_commit_host_output_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\breal_host_output_available\b/u
     );
   const committedFiberInspectionPresent = hasSourcePattern(
     reconcilerSource,
-    /\bCommitted(?:Root|Fiber)View\b|\bcommitted_fiber_(?:view|inspection)\b/u
+    /\bTestRendererCommittedFiberTreeInspection\b|\binspect_test_renderer_committed_fiber_tree\b/u
   );
-  const rustSerializationApiPresent = hasSourcePattern(
+  const privateJsonDiagnosticsPresent = hasSourcePattern(
     testRendererSource,
-    /\bto_json\b|\bto_tree\b|\bTestJson\b|\bReactTestInstance\b/u
+    /\bTestRendererPrivateJsonSerializationReport\b/u
+  ) && hasSourcePattern(
+    testRendererSource,
+    /\bdescribe_private_json_serialization_for_canary\b/u
+  ) && hasSourcePattern(
+    testRendererSource,
+    /\bTestRendererPrivateJsonPublicSurfaceBlockers\b/u
   );
+  const publicJsFacadeRoutingPresent =
+    publicJsReactTestRendererFacadePresent &&
+    !publicJsReactTestRendererFacadePlaceholder &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\b(?:nativeBridgeAvailable|createRouteAvailable|serializationAvailable)\s*:\s*true\b/u
+    );
+  const publicToJSONAvailable =
+    publicJsFacadeRoutingPresent &&
+    hasSourcePattern(publicJsReactTestRendererPackageSource, /\btoJSON\b/u) &&
+    !hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreateRendererUnsupportedFunction\(\s*['"]create\(\)\.toJSON['"]/u
+    );
+  const publicToTreeAvailable =
+    publicJsFacadeRoutingPresent &&
+    hasSourcePattern(publicJsReactTestRendererPackageSource, /\btoTree\b/u) &&
+    !hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreateRendererUnsupportedFunction\(\s*['"]create\(\)\.toTree['"]/u
+    );
+  const publicTestInstanceWrappersPresent =
+    publicJsFacadeRoutingPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bReactTestInstance\b|\bfindAllBy(?:Type|Props)\b|\bfindBy(?:Type|Props)\b/u
+    );
 
   return {
     publicJsReactTestRendererFacadePresent,
@@ -187,7 +318,11 @@ export function inspectReactTestRendererSerializationLocalTargets({
     rustTestRendererRootFacadePresent,
     committedTestRendererHostOutputPresent,
     committedFiberInspectionPresent,
-    rustSerializationApiPresent
+    privateJsonDiagnosticsPresent,
+    publicToJSONAvailable,
+    publicToTreeAvailable,
+    publicTestInstanceWrappersPresent,
+    publicJsFacadeRoutingPresent
   };
 }
 
