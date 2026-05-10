@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   findReactDomContainerRootMarkersObservation,
@@ -18,6 +21,28 @@ import {
 } from "../src/react-dom-container-root-markers-targets.mjs";
 
 const oracle = readCheckedReactDomContainerRootMarkersOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const hydrationGate = require(
+  path.join(
+    repoRoot,
+    "packages/react-dom/src/client/hydration-boundary-gate.js"
+  )
+);
+const domContainer = require(
+  path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+);
+const rootMarkers = require(
+  path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+);
+const listenerRegistry = require(
+  path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+);
 
 test("checked React DOM container root markers oracle has the expected schema and targets", () => {
   assert.equal(
@@ -90,6 +115,80 @@ test("React DOM container root markers oracle keeps Fast React compatibility cla
   assert.equal(
     oracle.evidenceClaims.randomizedReactMarkerSuffixesSerialized,
     false
+  );
+});
+
+test("Fast React unsupported hydrateRoot diagnostics bridge root marker evidence without compatibility claims", () => {
+  const first = createPrivateHydrateRootBridgeScenario("root-marker-bridge");
+  const second = createPrivateHydrateRootBridgeScenario("root-marker-bridge");
+
+  assert.deepEqual(first.record, second.record);
+  assert.equal(first.record.operation, "hydrateRoot");
+  assert.equal(first.record.status, "unsupported");
+  assert.equal(first.record.canHydrate, false);
+  assert.equal(first.record.publicRootCreated, false);
+  assert.equal(first.record.containerMarked, false);
+  assert.equal(first.record.listenersAttached, false);
+  assert.equal(first.record.domMutated, false);
+  assert.equal(first.record.eventsReplayed, false);
+  assert.equal(first.record.rootScheduled, false);
+  assert.equal(first.record.oracleInfo.compatibilityClaimed, false);
+  assert.equal(first.record.markerDiagnostics.compatibilityClaimed, false);
+  assert.deepEqual(
+    first.record.markerDiagnostics.markers.map(markerContractId),
+    ["suspense-completed-start", "suspense-end"]
+  );
+
+  assert.deepEqual(first.record.markerGuard, {
+    action: "defer-mark-container-as-root-for-hydrate-root",
+    hasLegacyRootMarker: false,
+    isContainerMarkedAsRoot: true,
+    rootMarkerSnapshot: {
+      inspectable: true,
+      nullCount: 0,
+      properties: [
+        {
+          enumerable: true,
+          keyPrefix: "__reactContainer$",
+          valueState: "truthy",
+          valueType: "object"
+        }
+      ],
+      propertyCount: 1,
+      truthyCount: 1
+    },
+    warning: {
+      message:
+        "You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it.",
+      type: "duplicate-create-root"
+    }
+  });
+  assert.deepEqual(first.record.listenerGuard, {
+    action: "defer-listen-to-all-supported-events-for-hydrate-root",
+    canInstallRootListeners: true,
+    hasRootListeningMarker: true,
+    ownerDocumentCanInstallSelectionChange: true,
+    ownerDocumentHasSelectionChangeMarker: false,
+    ownerDocumentInfo: {
+      kind: "object",
+      nodeName: "#document",
+      nodeType: domContainer.DOCUMENT_NODE
+    },
+    rootEventTargetInfo: {
+      kind: "object",
+      nodeName: "DIV",
+      nodeType: domContainer.ELEMENT_NODE
+    }
+  });
+  assert.deepEqual(first.container.__registrations, []);
+  assert.deepEqual(first.document.__registrations, []);
+  assert.equal(
+    rootMarkers.inspectContainerRootMarker(first.container).propertyCount,
+    1
+  );
+  assert.equal(
+    listenerRegistry.inspectListeningMarker(first.container).propertyCount,
+    1
   );
 });
 
@@ -300,4 +399,90 @@ function emptyDivTextContentMutation() {
       value: ""
     }
   ];
+}
+
+function markerContractId(marker) {
+  return marker.contractId;
+}
+
+function createPrivateHydrateRootBridgeScenario(label) {
+  const document = createDocument(label);
+  const container = createElement("DIV", document);
+  container.childNodes = [createComment("$"), createComment("/$")];
+
+  rootMarkers.markContainerAsRoot(
+    Object.freeze({
+      rootId: `${label}:existing-root`
+    }),
+    container
+  );
+  listenerRegistry.markTargetAsListening(container);
+
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    markerOptions: {
+      development: true
+    },
+    recordIdPrefix: "hydration-root-marker-bridge"
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    {
+      props: {
+        children: "hello"
+      },
+      type: "App"
+    },
+    {
+      identifierPrefix: `${label}-`
+    }
+  );
+
+  return {
+    container,
+    document,
+    record
+  };
+}
+
+function createComment(data) {
+  return {
+    data,
+    nodeType: domContainer.COMMENT_NODE
+  };
+}
+
+function createDocument(label) {
+  const document = createEventTarget({
+    label,
+    nodeName: "#document",
+    nodeType: domContainer.DOCUMENT_NODE
+  });
+  document.defaultView = createEventTarget({
+    label: `${label}-window`
+  });
+  document.ownerDocument = document;
+  return document;
+}
+
+function createElement(nodeName, ownerDocument) {
+  return createEventTarget({
+    childNodes: [],
+    nodeName,
+    nodeType: domContainer.ELEMENT_NODE,
+    ownerDocument
+  });
+}
+
+function createEventTarget(fields) {
+  return {
+    ...fields,
+    __registrations: [],
+    addEventListener(type, listener, options) {
+      this.__registrations.push({
+        listener,
+        options,
+        type
+      });
+    }
+  };
 }
