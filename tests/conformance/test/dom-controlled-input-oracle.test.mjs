@@ -266,6 +266,9 @@ test("private controlled post-event restore queue consumes event latest-props ev
   assert.equal(intent.restoreIntent.eventDispatchRecordAccepted, true);
   assert.equal(intent.restoreIntent.eventPluginDispatchPerformed, false);
   assert.equal(intent.restoreIntent.restoreQueueWritten, false);
+  assert.equal(intent.restoreIntent.restoreQueueWriteOrderRecorded, true);
+  assert.equal(intent.restoreIntent.restoreQueueFlushOrderRecorded, true);
+  assert.equal(intent.restoreIntent.hostWrapperRestoreOrderRecorded, true);
   assert.equal(intent.restoreIntent.controlledStateRestoreInvoked, false);
   assert.equal(intent.restoreIntent.restoreFlushed, false);
   assert.equal(intent.restoreIntent.liveValueTrackerInstalled, false);
@@ -273,6 +276,33 @@ test("private controlled post-event restore queue consumes event latest-props ev
   assert.equal(intent.restoreIntent.propertyDescriptorInstalled, false);
   assert.equal(intent.restoreIntent.hostValueRead, false);
   assert.equal(intent.restoreIntent.hostValueWritten, false);
+  assert.equal(
+    intent.restoreQueueOrdering.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWriteFlushOrderingStatus
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.acceptedRestoreKind,
+    "input-checkbox-checked"
+  );
+  assert.equal(intent.restoreQueueOrdering.writeOrder.queueSlot, "primary");
+  assert.equal(
+    intent.restoreQueueOrdering.flushOrder.flushWouldBeRequiredAfterWrite,
+    true
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.wrapperOperation,
+    "input-checked-sync"
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.primaryHostWrapperRan,
+    false
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.wrapperWritePerformed,
+    false
+  );
+  assert.equal(intent.restoreQueueOrdering.hostValueWritten, false);
+  assert.equal(intent.restoreQueueOrdering.browserInputMutated, false);
   assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
   assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
   assert.equal(intent.sideEffects.restoreQueueWritten, false);
@@ -342,6 +372,28 @@ test("private controlled radio post-event restore queue records group intent wit
   assert.equal(
     intent.checkableRestoreMetadata.radioGroupIntentRecorded,
     true
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.acceptedRestoreKind,
+    "input-radio-checked"
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder
+      .radioGroupRestoreWouldFollowPrimaryInputRestore,
+    true
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder
+      .radioValueTrackerRefreshWouldFollowSiblingRestore,
+    true
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.radioGroupLookupPerformed,
+    false
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.radioValueTrackerRefreshed,
+    false
   );
   assert.deepEqual(
     intent.groupIntentRecords.map((record) => ({
@@ -502,6 +554,14 @@ test("private controlled select and textarea post-event restore queue consumes f
       fakeDomTrackerObservationAccepted:
         intent.restoreIntent.fakeDomTrackerObservationAccepted,
       restoreQueueWritten: intent.restoreIntent.restoreQueueWritten,
+      restoreQueueWriteOrderRecorded:
+        intent.restoreIntent.restoreQueueWriteOrderRecorded,
+      restoreQueueFlushOrderRecorded:
+        intent.restoreIntent.restoreQueueFlushOrderRecorded,
+      acceptedRestoreKind:
+        intent.restoreQueueOrdering.acceptedRestoreKind,
+      hostWrapperOperation:
+        intent.restoreQueueOrdering.hostWrapperOrder.wrapperOperation,
       controlledStateRestoreInvoked:
         intent.restoreIntent.controlledStateRestoreInvoked
     })),
@@ -521,6 +581,10 @@ test("private controlled select and textarea post-event restore queue consumes f
         eventDispatchRecordAccepted: false,
         fakeDomTrackerObservationAccepted: true,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        restoreQueueFlushOrderRecorded: true,
+        acceptedRestoreKind: "select-multiple-value",
+        hostWrapperOperation: "select-multiple-options-sync",
         controlledStateRestoreInvoked: false
       },
       {
@@ -538,6 +602,10 @@ test("private controlled select and textarea post-event restore queue consumes f
         eventDispatchRecordAccepted: false,
         fakeDomTrackerObservationAccepted: true,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        restoreQueueFlushOrderRecorded: true,
+        acceptedRestoreKind: "textarea-value",
+        hostWrapperOperation: "textarea-value-sync",
         controlledStateRestoreInvoked: false
       }
     ]
@@ -549,12 +617,31 @@ test("private controlled select and textarea post-event restore queue consumes f
     assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
     assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
     assert.equal(intent.sideEffects.eventDispatchRecordAccepted, false);
+    assert.equal(intent.sideEffects.restoreQueueWriteOrderRecorded, true);
+    assert.equal(intent.sideEffects.restoreQueueFlushOrderRecorded, true);
+    assert.equal(intent.sideEffects.hostWrapperRestoreOrderRecorded, true);
     assert.equal(intent.sideEffects.restoreQueueWritten, false);
     assert.equal(intent.sideEffects.restoreQueueFlushed, false);
     assert.equal(intent.sideEffects.hostWrapperInvoked, false);
     assert.equal(intent.sideEffects.hostValueRead, false);
     assert.equal(intent.sideEffects.hostValueWritten, false);
     assert.equal(intent.sideEffects.browserInputMutated, false);
+    assert.equal(
+      intent.restoreQueueOrdering.writeOrder.restoreQueueWritten,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.flushOrder.restoreQueueFlushed,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.primaryHostWrapperRan,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.wrapperWritePerformed,
+      false
+    );
     assert.equal(intent.sideEffects.publicControlledBehaviorEnabled, false);
     assert.equal(intent.sideEffects.compatibilityClaimed, false);
     assert.equal(Object.hasOwn(fakeTarget, "_valueTracker"), false);

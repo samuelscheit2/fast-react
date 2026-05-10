@@ -1449,6 +1449,17 @@ test('private controlled input post-event restore queue gate records event/lates
       eventPluginDispatchPerformed:
         record.restoreIntent.eventPluginDispatchPerformed,
       restoreQueueWritten: record.restoreIntent.restoreQueueWritten,
+      restoreQueueWriteOrderRecorded:
+        record.restoreIntent.restoreQueueWriteOrderRecorded,
+      restoreQueueFlushOrderRecorded:
+        record.restoreIntent.restoreQueueFlushOrderRecorded,
+      acceptedRestoreKind:
+        record.restoreQueueOrdering.acceptedRestoreKind,
+      queueSlot: record.restoreQueueOrdering.writeOrder.queueSlot,
+      flushWouldBeRequiredAfterWrite:
+        record.restoreQueueOrdering.flushOrder.flushWouldBeRequiredAfterWrite,
+      hostWrapperOperation:
+        record.restoreQueueOrdering.hostWrapperOrder.wrapperOperation,
       controlledStateRestoreInvoked:
         record.restoreIntent.controlledStateRestoreInvoked,
       postEventRestoreIntentRecorded:
@@ -1476,6 +1487,12 @@ test('private controlled input post-event restore queue gate records event/lates
         eventDispatchRecordAccepted: true,
         eventPluginDispatchPerformed: false,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        restoreQueueFlushOrderRecorded: true,
+        acceptedRestoreKind: 'input-text-value',
+        queueSlot: 'primary',
+        flushWouldBeRequiredAfterWrite: true,
+        hostWrapperOperation: 'input-value-sync',
         controlledStateRestoreInvoked: false,
         postEventRestoreIntentRecorded: true,
         postEventRestoreIntentSkipped: false,
@@ -1499,6 +1516,12 @@ test('private controlled input post-event restore queue gate records event/lates
         eventDispatchRecordAccepted: true,
         eventPluginDispatchPerformed: false,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: false,
+        restoreQueueFlushOrderRecorded: false,
+        acceptedRestoreKind: null,
+        queueSlot: null,
+        flushWouldBeRequiredAfterWrite: false,
+        hostWrapperOperation: 'input-value-sync',
         controlledStateRestoreInvoked: false,
         postEventRestoreIntentRecorded: false,
         postEventRestoreIntentSkipped: true,
@@ -1543,8 +1566,60 @@ test('private controlled input post-event restore queue gate records event/lates
   assert.equal(intent.restoreIntent.rawTargetCaptured, false);
   assert.equal(intent.restoreIntent.rawEventCaptured, false);
   assert.equal(intent.restoreIntent.rawLatestPropsRetained, false);
+  assert.equal(
+    intent.restoreQueueOrdering.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWriteFlushOrderingStatus
+  );
+  assert.equal(intent.restoreQueueOrdering.metadataOnly, true);
+  assert.equal(intent.restoreQueueOrdering.acceptedRestoreMetadata, true);
+  assert.deepEqual(intent.restoreQueueOrdering.writeOrder.writeSequence, [
+    'accept-restore-metadata',
+    'record-latest-props-evidence',
+    'would-store-primary-restore-target',
+    'would-defer-controlled-restore-until-batch-exit'
+  ]);
+  assert.deepEqual(intent.restoreQueueOrdering.flushOrder.flushSequence, [
+    'event-batch-exit',
+    'pending-restore-check',
+    'synchronous-work-flush',
+    'snapshot-and-clear-private-queue',
+    'restore-primary-target',
+    'restore-additional-targets-in-order',
+    'host-wrapper-restore-dispatch'
+  ]);
+  assert.equal(intent.restoreQueueOrdering.actualQueueWritePerformed, false);
+  assert.equal(intent.restoreQueueOrdering.actualQueueFlushPerformed, false);
+  assert.equal(intent.restoreQueueOrdering.hostWrapperInvoked, false);
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.primaryHostWrapperRan,
+    false
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.wrapperWritePerformed,
+    false
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.valueTrackerFieldWritten,
+    false
+  );
+  assert.equal(
+    intent.restoreQueueOrdering.hostWrapperOrder.browserInputMutated,
+    false
+  );
   assert.equal(intent.postEventRestoreBoundary.latestPropsLookup, true);
   assert.equal(intent.postEventRestoreBoundary.eventPluginDispatch, false);
+  assert.equal(
+    intent.postEventRestoreBoundary.restoreQueueWriteOrderRecorded,
+    true
+  );
+  assert.equal(
+    intent.postEventRestoreBoundary.restoreQueueFlushOrderRecorded,
+    true
+  );
+  assert.equal(
+    intent.postEventRestoreBoundary.hostWrapperRestoreOrderRecorded,
+    true
+  );
   assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
   assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
   assert.equal(intent.sideEffects.eventDispatchRecordAccepted, true);
@@ -1587,6 +1662,20 @@ test('private controlled input post-event restore queue gate records event/lates
   );
   assert.equal(summary.consumesEventDispatchEvidence, true);
   assert.equal(summary.consumesLatestPropsEvidence, true);
+  assert.equal(summary.recordsRestoreQueueWriteFlushOrdering, true);
+  assert.deepEqual(summary.acceptedRestoreMetadataKinds, [
+    'input-text-value',
+    'input-checkbox-checked',
+    'input-radio-checked',
+    'select-single-value',
+    'select-multiple-value',
+    'textarea-value'
+  ]);
+  assert.equal(summary.restoreQueueOrdering.recordsQueueWriteOrder, true);
+  assert.equal(summary.restoreQueueOrdering.recordsQueueFlushOrder, true);
+  assert.equal(summary.restoreQueueOrdering.hostWrapperInvocations, false);
+  assert.equal(summary.restoreQueueOrdering.valueTrackerWrites, false);
+  assert.equal(summary.restoreQueueOrdering.liveDomMutations, false);
   assert.equal(summary.installsLiveDescriptors, false);
   assert.equal(summary.writesValueTrackerField, false);
   assert.equal(summary.writesRestoreQueue, false);
@@ -1705,6 +1794,20 @@ test('private controlled checkbox and radio restore queue gate records checkable
       groupIntentStatus: intent.groupIntentRecords[0].status,
       groupKind: intent.groupIntentRecords[0].groupKind,
       skipReason: intent.groupIntentRecords[0].skipReason,
+      acceptedRestoreKind:
+        intent.restoreQueueOrdering.acceptedRestoreKind,
+      hostWrapperOperation:
+        intent.restoreQueueOrdering.hostWrapperOrder.wrapperOperation,
+      primaryHostWrapperWouldRun:
+        intent.restoreQueueOrdering.hostWrapperOrder.primaryHostWrapperWouldRun,
+      primaryHostWrapperRan:
+        intent.restoreQueueOrdering.hostWrapperOrder.primaryHostWrapperRan,
+      radioGroupRestoreWouldFollowPrimaryInputRestore:
+        intent.restoreQueueOrdering.hostWrapperOrder
+          .radioGroupRestoreWouldFollowPrimaryInputRestore,
+      radioValueTrackerRefreshWouldFollowSiblingRestore:
+        intent.restoreQueueOrdering.hostWrapperOrder
+          .radioValueTrackerRefreshWouldFollowSiblingRestore,
       groupLookupRequired:
         intent.groupIntentRecords[0].groupLookupRequired,
       groupLookupPerformed:
@@ -1739,6 +1842,12 @@ test('private controlled checkbox and radio restore queue gate records checkable
           controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
         groupKind: 'single-checkable',
         skipReason: 'checkboxes-do-not-restore-radio-groups',
+        acceptedRestoreKind: 'input-checkbox-checked',
+        hostWrapperOperation: 'input-checked-sync',
+        primaryHostWrapperWouldRun: true,
+        primaryHostWrapperRan: false,
+        radioGroupRestoreWouldFollowPrimaryInputRestore: false,
+        radioValueTrackerRefreshWouldFollowSiblingRestore: false,
         groupLookupRequired: false,
         groupLookupPerformed: false,
         siblingLatestPropsLookupPerformed: false,
@@ -1763,6 +1872,12 @@ test('private controlled checkbox and radio restore queue gate records checkable
           controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
         groupKind: 'radio-group',
         skipReason: null,
+        acceptedRestoreKind: 'input-radio-checked',
+        hostWrapperOperation: 'input-checked-sync',
+        primaryHostWrapperWouldRun: true,
+        primaryHostWrapperRan: false,
+        radioGroupRestoreWouldFollowPrimaryInputRestore: true,
+        radioValueTrackerRefreshWouldFollowSiblingRestore: true,
         groupLookupRequired: true,
         groupLookupPerformed: false,
         siblingLatestPropsLookupPerformed: false,
@@ -1790,6 +1905,26 @@ test('private controlled checkbox and radio restore queue gate records checkable
     assert.equal(intent.groupIntentRecords[0].rawGroupNodesCaptured, false);
     assert.equal(intent.groupIntentRecords[0].rawNameRetained, false);
     assert.equal(intent.groupIntentRecords[0].compatibilityClaimed, false);
+    assert.equal(
+      intent.restoreQueueOrdering.writeOrder.restoreQueueWritten,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.flushOrder.restoreQueueFlushed,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.wrapperWritePerformed,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.radioGroupLookupPerformed,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.radioValueTrackerRefreshed,
+      false
+    );
     assert.equal(intent.sideEffects.hostValueRead, false);
     assert.equal(intent.sideEffects.hostValueWritten, false);
     assert.equal(intent.sideEffects.browserInputMutated, false);
@@ -1949,6 +2084,17 @@ test('private controlled input post-event restore queue gate records select and 
       latestPropsLookupPerformed:
         intent.restoreIntent.latestPropsLookupPerformed,
       restoreQueueWritten: intent.restoreIntent.restoreQueueWritten,
+      restoreQueueWriteOrderRecorded:
+        intent.restoreIntent.restoreQueueWriteOrderRecorded,
+      restoreQueueFlushOrderRecorded:
+        intent.restoreIntent.restoreQueueFlushOrderRecorded,
+      acceptedRestoreKind:
+        intent.restoreQueueOrdering.acceptedRestoreKind,
+      queueSlot: intent.restoreQueueOrdering.writeOrder.queueSlot,
+      flushWouldBeRequiredAfterWrite:
+        intent.restoreQueueOrdering.flushOrder.flushWouldBeRequiredAfterWrite,
+      hostWrapperOperation:
+        intent.restoreQueueOrdering.hostWrapperOrder.wrapperOperation,
       controlledStateRestoreInvoked:
         intent.restoreIntent.controlledStateRestoreInvoked,
       latestPropsMetadataRead: intent.sideEffects.latestPropsMetadataRead,
@@ -1980,6 +2126,12 @@ test('private controlled input post-event restore queue gate records select and 
         fakeDomTrackerObservationAccepted: true,
         latestPropsLookupPerformed: true,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        restoreQueueFlushOrderRecorded: true,
+        acceptedRestoreKind: 'select-single-value',
+        queueSlot: 'primary',
+        flushWouldBeRequiredAfterWrite: true,
+        hostWrapperOperation: 'select-single-options-sync',
         controlledStateRestoreInvoked: false,
         latestPropsMetadataRead: true,
         fakeDomValueChangeObserved: true
@@ -2008,6 +2160,12 @@ test('private controlled input post-event restore queue gate records select and 
         fakeDomTrackerObservationAccepted: true,
         latestPropsLookupPerformed: true,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        restoreQueueFlushOrderRecorded: true,
+        acceptedRestoreKind: 'select-multiple-value',
+        queueSlot: 'primary',
+        flushWouldBeRequiredAfterWrite: true,
+        hostWrapperOperation: 'select-multiple-options-sync',
         controlledStateRestoreInvoked: false,
         latestPropsMetadataRead: true,
         fakeDomValueChangeObserved: true
@@ -2036,6 +2194,12 @@ test('private controlled input post-event restore queue gate records select and 
         fakeDomTrackerObservationAccepted: true,
         latestPropsLookupPerformed: true,
         restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        restoreQueueFlushOrderRecorded: true,
+        acceptedRestoreKind: 'textarea-value',
+        queueSlot: 'primary',
+        flushWouldBeRequiredAfterWrite: true,
+        hostWrapperOperation: 'textarea-value-sync',
         controlledStateRestoreInvoked: false,
         latestPropsMetadataRead: true,
         fakeDomValueChangeObserved: true
@@ -2073,6 +2237,31 @@ test('private controlled input post-event restore queue gate records select and 
     assert.equal(intent.restoreIntent.rawTargetCaptured, false);
     assert.equal(intent.restoreIntent.rawEventCaptured, false);
     assert.equal(intent.restoreIntent.rawLatestPropsRetained, false);
+    assert.equal(intent.restoreQueueOrdering.metadataOnly, true);
+    assert.equal(
+      intent.restoreQueueOrdering.writeOrder.restoreQueueWritten,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.flushOrder.restoreQueueFlushed,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.primaryHostWrapperRan,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.wrapperWritePerformed,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.hostValueWritten,
+      false
+    );
+    assert.equal(
+      intent.restoreQueueOrdering.hostWrapperOrder.browserInputMutated,
+      false
+    );
     assert.equal(intent.postEventRestoreBoundary.latestPropsLookup, true);
     assert.equal(intent.postEventRestoreBoundary.eventPluginDispatch, false);
     assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
