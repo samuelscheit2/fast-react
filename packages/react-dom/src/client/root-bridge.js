@@ -6,6 +6,13 @@ const {
   getOwnerDocument
 } = require('./dom-container.js');
 const {
+  assertMountedHostInstanceToken,
+  commitLatestPropsFromMutationHandoff,
+  getLatestPropsFromHostInstanceToken,
+  getRootOwnerFromHostInstanceToken,
+  isHostInstanceToken
+} = require('./component-tree.js');
+const {
   ROOT_MARKER_APPLIED,
   duplicateCreateRootWarning,
   getContainerRoot,
@@ -35,18 +42,22 @@ const {
   REACT_PORTAL_TYPE,
   reactDomPortalImplementation
 } = require('../shared/create-portal.js');
+const {
+  commitDomPropertyUpdateForLatestProps,
+  commitTextUpdate,
+  getDomPropertyUpdateLatestPropsHandoffPayload,
+  rollbackDomPropertyUpdateLatestPropsHandoff
+} = require('../dom-host/mutation.js');
 
 const CLIENT_ROOT_KIND = 'client';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
 
 const privateRootOwnerType = 'fast.react_dom.private_root_owner';
 const privateRootHandleType = 'fast.react_dom.private_root_handle';
-const privateRootCreateRecordType =
-  'fast.react_dom.private_root_create_record';
+const privateRootCreateRecordType = 'fast.react_dom.private_root_create_record';
 const privateRootHydrateRecordType =
   'fast.react_dom.private_root_hydrate_record';
-const privateRootUpdateRecordType =
-  'fast.react_dom.private_root_update_record';
+const privateRootUpdateRecordType = 'fast.react_dom.private_root_update_record';
 const privateRootAdmissionRecordType =
   'fast.react_dom.private_root_admission_record';
 const privateRootCreateRenderAdmissionRecordType =
@@ -63,6 +74,8 @@ const privateRootPortalBoundaryRecordType =
   'fast.react_dom.private_root_portal_boundary_record';
 const privateRootPortalCommitHandoffRecordType =
   'fast.react_dom.private_root_portal_commit_handoff_record';
+const privateRootHostOutputUpdateHandoffRecordType =
+  'fast.react_dom.private_root_host_output_update_handoff_record';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -71,8 +84,7 @@ const ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION = 'unsupported-hydration';
 
 const ROOT_BRIDGE_REQUEST_ADMITTED =
   'admitted-private-root-bridge-request-record';
-const ROOT_BRIDGE_EXECUTION_BLOCKED =
-  'blocked-private-root-bridge-execution';
+const ROOT_BRIDGE_EXECUTION_BLOCKED = 'blocked-private-root-bridge-execution';
 const ROOT_BRIDGE_COMPATIBILITY_BLOCKED =
   'blocked-private-root-bridge-compatibility';
 const ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED =
@@ -93,6 +105,8 @@ const ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED =
   'blocked-private-root-portal-fake-dom-commit-apply';
 const ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED =
   'validated-private-root-portal-container-ownership';
+const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
+  'applied-private-root-host-output-update';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -230,6 +244,65 @@ const ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES = freezeArray([
   }),
   ...ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES
 ]);
+const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'fake-dom-property-update',
+    accepted: true,
+    reason:
+      'The private DOM property payload helper mutated the attached fake HostComponent.'
+  }),
+  freezeRecord({
+    id: 'fake-dom-text-update',
+    accepted: true,
+    reason:
+      'The private DOM HostText update helper mutated the attached text node.'
+  }),
+  freezeRecord({
+    id: 'latest-props-after-mutation',
+    accepted: true,
+    reason:
+      'The component-tree latest-props map was published only after property and text mutation completed.'
+  })
+]);
+const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'native-execution',
+    blocked: true,
+    reason: 'No native or Rust root bridge execution is admitted.'
+  }),
+  freezeRecord({
+    id: 'reconciler-execution',
+    blocked: true,
+    reason:
+      'No generic reconciler render, schedule, or commit traversal is admitted.'
+  }),
+  freezeRecord({
+    id: 'browser-dom-compatibility',
+    blocked: true,
+    reason:
+      'Only deterministic fake-DOM host nodes are admitted by this private handoff.'
+  }),
+  freezeRecord({
+    id: 'hydration',
+    blocked: true,
+    reason: 'Hydration markers and replay are not admitted by this handoff.'
+  }),
+  freezeRecord({
+    id: 'events',
+    blocked: true,
+    reason: 'Synthetic event extraction and dispatch are not admitted.'
+  }),
+  freezeRecord({
+    id: 'refs',
+    blocked: true,
+    reason: 'Ref attach/detach ordering is not admitted by this handoff.'
+  }),
+  freezeRecord({
+    id: 'compatibility-claims',
+    blocked: true,
+    reason: 'React DOM root update compatibility remains unclaimed.'
+  })
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -243,6 +316,8 @@ const rootCreateSideEffectRecords = new WeakMap();
 const rootCreateSideEffectCleanupRecords = new WeakMap();
 const rootPortalBoundaryPayloads = new WeakMap();
 const rootPortalCommitHandoffPayloads = new WeakMap();
+const rootHostOutputUpdateHandoffPayloads = new WeakMap();
+const rootHostOutputUpdateHandoffRecords = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -325,6 +400,13 @@ function createPrivateRootBridgeShell(options) {
     },
     createPortalCommitHandoff(record, options) {
       return createPortalCommitHandoffRecordWithBridge(
+        bridgeState,
+        record,
+        options
+      );
+    },
+    applyHostOutputUpdate(record, options) {
+      return applyPrivateRootHostOutputUpdateWithBridge(
         bridgeState,
         record,
         options
@@ -412,6 +494,10 @@ function createPortalCommitHandoffRecord(record, options) {
   return createPortalCommitHandoffRecordWithBridge(null, record, options);
 }
 
+function applyPrivateRootHostOutputUpdate(record, options) {
+  return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
+}
+
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
   if (bridgeState !== null && validation.bridgeState !== bridgeState) {
@@ -460,7 +546,10 @@ function admitPrivateCreateRenderPathWithBridge(
     createRecord,
     createValidation
   );
-  if (bridgeState !== null && sideEffectValidation.bridgeState !== bridgeState) {
+  if (
+    bridgeState !== null &&
+    sideEffectValidation.bridgeState !== bridgeState
+  ) {
     throwForeignRootBridgeRequest();
   }
 
@@ -532,7 +621,8 @@ function admitPrivateCreateRenderPathWithBridge(
       listenerRegistrationStatus:
         sideEffectRecord.listenerRegistration.registrationStatus,
       rootMarkerMatchesOwner: true,
-      rootListeningMarkerPresent: sideEffectValidation.rootListeningMarkerPresent,
+      rootListeningMarkerPresent:
+        sideEffectValidation.rootListeningMarkerPresent,
       ownerDocumentListeningMarkerPresent:
         sideEffectValidation.ownerDocumentListeningMarkerPresent,
       sideEffectActiveAtAdmission: true
@@ -570,8 +660,173 @@ function admitPrivateCreateRenderPathWithBridge(
     renderRecord,
     sideEffectRecord
   });
+  renderValidation.rootHandleState.createRenderAdmissionRecord =
+    admissionRecord;
 
   return admissionRecord;
+}
+
+function applyPrivateRootHostOutputUpdateWithBridge(
+  bridgeState,
+  record,
+  options
+) {
+  const validation = validateHostOutputUpdateRequestRecord(record);
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const existing = rootHostOutputUpdateHandoffRecords.get(record);
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const payload = rootRecordPayloads.get(record);
+  const normalized = normalizeHostOutputUpdateOptions(options);
+  const hostNode = assertMountedHostInstanceToken(normalized.hostInstanceToken);
+  const hostRootOwner = getRootOwnerFromHostInstanceToken(
+    normalized.hostInstanceToken
+  );
+  if (hostRootOwner !== payload.rootHandle.owner) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require a host instance owned by the updated root.'
+    );
+  }
+
+  assertHostOutputTextInstanceBelongsToHost(hostNode, normalized.textInstance);
+
+  const previousProps = getLatestPropsFromHostInstanceToken(
+    normalized.hostInstanceToken
+  );
+  assertHostOutputTextPropsMatch(previousProps, normalized.oldText, 'previous');
+  assertHostOutputTextPropsMatch(
+    normalized.nextProps,
+    normalized.newText,
+    'next'
+  );
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence = rootBridgeState.nextHostOutputUpdateSequence++;
+  const handoffId = `${rootBridgeState.hostOutputUpdateIdPrefix}:${sequence}`;
+  let propertyHandoff = null;
+  let propertyHandoffPayload = null;
+  let publishedLatestProps = null;
+
+  try {
+    propertyHandoff = commitDomPropertyUpdateForLatestProps(
+      hostNode,
+      normalized.tag,
+      previousProps,
+      normalized.nextProps
+    );
+    propertyHandoffPayload =
+      getDomPropertyUpdateLatestPropsHandoffPayload(propertyHandoff);
+
+    commitTextUpdate(
+      normalized.textInstance,
+      normalized.oldText,
+      normalized.newText
+    );
+
+    publishedLatestProps =
+      commitLatestPropsFromMutationHandoff(propertyHandoff);
+  } catch (error) {
+    if (propertyHandoff !== null) {
+      try {
+        rollbackDomPropertyUpdateLatestPropsHandoff(propertyHandoff);
+      } catch (rollbackError) {
+        error.rollbackError = {
+          code: rollbackError.code || null,
+          message: rollbackError.message
+        };
+      }
+    }
+    throw error;
+  }
+
+  const latestPropsPublished = publishedLatestProps === normalized.nextProps;
+  const latestPropsCommitRecord =
+    propertyHandoffPayload === null
+      ? null
+      : propertyHandoffPayload.latestPropsCommitRecord;
+  const handoff = freezeRecord({
+    $$typeof: privateRootHostOutputUpdateHandoffRecordType,
+    kind: 'FastReactDomPrivateRootHostOutputUpdateHandoffRecord',
+    operation: 'root-host-output-update',
+    handoffId,
+    handoffSequence: sequence,
+    updateStatus: ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED,
+    sourceRequestId: record.requestId,
+    sourceRequestSequence: record.requestSequence,
+    sourceRequestType: record.requestType,
+    sourceUpdateId: record.updateId,
+    sourceLifecycleStatusBefore: record.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: record.lifecycleStatusAfter,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    hostTag: normalized.tag,
+    propertyMutation: freezeRecord({
+      handoffKind: propertyHandoff.kind,
+      latestPropsCommitRecordKind:
+        latestPropsCommitRecord === null ? null : latestPropsCommitRecord.kind,
+      latestPropsCommitRecordStatus:
+        latestPropsCommitRecord === null
+          ? null
+          : latestPropsCommitRecord.status,
+      mutationRecordCount:
+        propertyHandoffPayload === null
+          ? 0
+          : propertyHandoffPayload.mutationRecords.length,
+      payloadCount: propertyHandoff.payloadCount,
+      status: propertyHandoff.status
+    }),
+    textMutation: freezeRecord({
+      newTextLength: String(normalized.newText).length,
+      oldTextLength: String(normalized.oldText).length,
+      status: 'mutated'
+    }),
+    latestPropsPublished,
+    latestPropsPublishOrder: 'after-property-and-text-mutation',
+    acceptedCapabilities: ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
+    blockedCapabilities: ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootHostOutputUpdateHandoffRecords.set(record, handoff);
+  rootHostOutputUpdateHandoffPayloads.set(handoff, {
+    bridgeState: rootBridgeState,
+    hostInstanceNode: hostNode,
+    hostInstanceToken: normalized.hostInstanceToken,
+    latestPropsCommitRecord,
+    latestPropsPublished,
+    nextProps: normalized.nextProps,
+    previousProps,
+    propertyHandoff,
+    propertyHandoffPayload,
+    rootHandle: payload.rootHandle,
+    sourceRecord: record,
+    textInstance: normalized.textInstance,
+    textUpdate: {
+      newText: normalized.newText,
+      oldText: normalized.oldText
+    }
+  });
+
+  return handoff;
 }
 
 function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
@@ -792,7 +1047,9 @@ function revertPrivateCreateRootSideEffectsWithBridge(bridgeState, record) {
 
 function createPrivateRootOwner(rootId, options) {
   if (typeof rootId !== 'string' || rootId.length === 0) {
-    const error = new Error('Cannot create a private root owner without a root id.');
+    const error = new Error(
+      'Cannot create a private root owner without a root id.'
+    );
     error.code = 'FAST_REACT_DOM_INVALID_ROOT_ID';
     throw error;
   }
@@ -835,6 +1092,7 @@ function createPrivateRootHandle(owner, container, rootOptions, bridgeState) {
     bridgeState: rootBridgeState,
     container,
     containerInfo: freezeRecord(describeContainer(container)),
+    createRenderAdmissionRecord: null,
     lifecycleStatus: ROOT_LIFECYCLE_CREATED,
     nativeRootHandle,
     nativeRootId,
@@ -891,6 +1149,14 @@ function getPrivateRootPortalCommitHandoffPayload(record) {
 
 function isPrivateRootPortalCommitHandoffRecord(value) {
   return rootPortalCommitHandoffPayloads.has(value);
+}
+
+function getPrivateRootHostOutputUpdateHandoffPayload(record) {
+  return rootHostOutputUpdateHandoffPayloads.get(record) || null;
+}
+
+function isPrivateRootHostOutputUpdateHandoffRecord(value) {
+  return rootHostOutputUpdateHandoffPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -1104,10 +1370,7 @@ function createRootUpdateRecordWithBridge(
     element,
     nativeValueHandle:
       operation === 'render'
-        ? createNativeBridgeHandle(
-            bridgeState,
-            NATIVE_ROOT_BRIDGE_HANDLE_VALUE
-          )
+        ? createNativeBridgeHandle(bridgeState, NATIVE_ROOT_BRIDGE_HANDLE_VALUE)
         : null,
     rootHandle
   });
@@ -1303,11 +1566,7 @@ function validateCreateRootBridgeRequestRecord(record) {
   assertRecordField(record, 'rootKind', CLIENT_ROOT_KIND);
   assertRecordField(record, 'rootTag', CONCURRENT_ROOT_TAG);
   assertRecordField(record, 'lifecycleStatusBefore', null);
-  assertRecordField(
-    record,
-    'lifecycleStatusAfter',
-    ROOT_LIFECYCLE_CREATED
-  );
+  assertRecordField(record, 'lifecycleStatusAfter', ROOT_LIFECYCLE_CREATED);
   assertExecutionIsBlockedOnRequestRecord(record);
 
   const rootHandleState = getPrivateRootHandleState(record.handle);
@@ -1600,12 +1859,9 @@ function createPortalRootBoundaryRecordWithBridge(bridgeState, record) {
     portalChildrenInfo: describeBridgeValue(portal.children),
     portalContainerInfo: freezeRecord(describeContainer(portalContainer)),
     portalImplementationInfo: describeBridgeValue(portal.implementation),
-    portalListenerGuard: describePortalContainerListenerGuard(
-      portalContainer,
-      {
-        action: 'defer-listen-to-portal-container-events-for-root-boundary'
-      }
-    ),
+    portalListenerGuard: describePortalContainerListenerGuard(portalContainer, {
+      action: 'defer-listen-to-portal-container-events-for-root-boundary'
+    }),
     portalContainerOwnership: describePortalContainerOwnership(
       validation.payload.rootHandle,
       validation.rootHandleState,
@@ -1813,7 +2069,10 @@ function createBridgeState(options) {
     ),
     validationOptions: options && options.validationOptions
   };
-  if (options && Object.prototype.hasOwnProperty.call(options, 'markerOracle')) {
+  if (
+    options &&
+    Object.prototype.hasOwnProperty.call(options, 'markerOracle')
+  ) {
     hydrationBoundaryOptions.markerOracle = options.markerOracle;
   }
   const hydrationBoundaryGate = createHydrationBoundaryGate(
@@ -1836,6 +2095,10 @@ function createBridgeState(options) {
       options && options.nativeHandoffIdPrefix,
       'native-handoff'
     ),
+    hostOutputUpdateIdPrefix: getIdPrefix(
+      options && options.hostOutputUpdateIdPrefix,
+      'host-output-update'
+    ),
     nextRequestSequence: 1,
     portalBoundaryIdPrefix: getIdPrefix(
       options && options.portalBoundaryIdPrefix,
@@ -1846,10 +2109,7 @@ function createBridgeState(options) {
       'portal-commit'
     ),
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
-    requestIdPrefix: getIdPrefix(
-      options && options.requestIdPrefix,
-      'request'
-    ),
+    requestIdPrefix: getIdPrefix(options && options.requestIdPrefix, 'request'),
     sideEffectIdPrefix: getIdPrefix(
       options && options.sideEffectIdPrefix,
       'side-effect'
@@ -1859,6 +2119,7 @@ function createBridgeState(options) {
     nextNativeRootId: 1,
     nextCreateRenderAdmissionSequence: 1,
     nextHydrateSequence: 1,
+    nextHostOutputUpdateSequence: 1,
     nextPortalBoundarySequence: 1,
     nextPortalCommitSequence: 1,
     nextRootSequence: 1,
@@ -1990,6 +2251,125 @@ function assertCreateRenderAdmissionField(record, field, expectedValue) {
       `Invalid private create/render admission field ${field}.`
     );
   }
+}
+
+function validateHostOutputUpdateRequestRecord(record) {
+  const validation = validateRootBridgeRequestRecord(record);
+  if (validation.operation !== 'render') {
+    throwInvalidHostOutputUpdateHandoff(
+      'Expected a private root.render request record for host-output update.'
+    );
+  }
+  if (record.lifecycleStatusBefore !== ROOT_LIFECYCLE_RENDERED) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require a later root.render after the initial render.'
+    );
+  }
+  if (validation.rootHandleState.createRenderAdmissionRecord === null) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require an accepted create/render admission first.'
+    );
+  }
+  return validation;
+}
+
+function normalizeHostOutputUpdateOptions(options) {
+  if (options === null || typeof options !== 'object') {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require an options object.'
+    );
+  }
+
+  const hostInstanceToken = options.hostInstanceToken;
+  if (!isHostInstanceToken(hostInstanceToken)) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require a host instance token.'
+    );
+  }
+
+  const tag = options.tag;
+  if (typeof tag !== 'string' || tag === '') {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require a host tag.'
+    );
+  }
+
+  const nextProps = options.nextProps;
+  if (!isObjectOrFunction(nextProps)) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require object next props.'
+    );
+  }
+
+  const textUpdate = options.textUpdate;
+  if (textUpdate === null || typeof textUpdate !== 'object') {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require a text update object.'
+    );
+  }
+
+  const textInstance = textUpdate.textInstance;
+  if (!isObjectOrFunction(textInstance)) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output updates require a text instance.'
+    );
+  }
+
+  return {
+    hostInstanceToken,
+    newText: textUpdate.newText,
+    nextProps,
+    oldText: textUpdate.oldText,
+    tag,
+    textInstance
+  };
+}
+
+function assertHostOutputTextInstanceBelongsToHost(hostNode, textInstance) {
+  if (textInstance.parentNode === hostNode) {
+    return;
+  }
+  if (
+    Array.isArray(hostNode.childNodes) &&
+    hostNode.childNodes.includes(textInstance)
+  ) {
+    return;
+  }
+  throwInvalidHostOutputUpdateHandoff(
+    'Private root host-output updates require the text instance to belong to the host node.'
+  );
+}
+
+function assertHostOutputTextPropsMatch(props, text, phase) {
+  if (!isObjectOrFunction(props)) {
+    throwInvalidHostOutputUpdateHandoff(
+      `Private root host-output updates require ${phase} host props.`
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(props, 'children')) {
+    throwInvalidHostOutputUpdateHandoff(
+      `Private root host-output updates require ${phase} text children props.`
+    );
+  }
+
+  const children = props.children;
+  const childrenType = typeof children;
+  if (childrenType !== 'string' && childrenType !== 'number') {
+    throwInvalidHostOutputUpdateHandoff(
+      `Private root host-output updates require primitive ${phase} text children.`
+    );
+  }
+  if (String(children) !== String(text)) {
+    throwInvalidHostOutputUpdateHandoff(
+      `Private root host-output updates require ${phase} text to match props.children.`
+    );
+  }
+}
+
+function isObjectOrFunction(value) {
+  return (
+    value !== null && (typeof value === 'object' || typeof value === 'function')
+  );
 }
 
 function validatePortalRootBoundaryRequestRecord(record) {
@@ -2144,9 +2524,11 @@ function describePortalContainerOwnership(
     portalContainerMarkedAsRoot: portalContainerOwner !== null,
     portalContainerOwnerMatchesRoot: portalContainerOwner === rootHandle.owner,
     portalContainerOwnedByAnotherRoot:
-      portalContainerOwner !== null && portalContainerOwner !== rootHandle.owner,
+      portalContainerOwner !== null &&
+      portalContainerOwner !== rootHandle.owner,
     portalContainerAvailableForPortal:
-      portalContainerOwner === null || portalContainerOwner === rootHandle.owner,
+      portalContainerOwner === null ||
+      portalContainerOwner === rootHandle.owner,
     sameContainerAsRoot: portalContainer === rootContainer,
     sameOwnerDocument:
       getOwnerDocument(portalContainer) === getOwnerDocument(rootContainer),
@@ -2200,6 +2582,12 @@ function throwInvalidPortalRootBoundaryRecord(message) {
 function throwInvalidPortalCommitHandoffRecord(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_PORTAL_COMMIT_HANDOFF_RECORD';
+  throw error;
+}
+
+function throwInvalidHostOutputUpdateHandoff(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF';
   throw error;
 }
 
@@ -2328,6 +2716,9 @@ module.exports = {
   ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_CREATE_RENDER_ADMITTED,
   ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED,
+  ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_MARK_LISTEN_APPLIED,
   ROOT_BRIDGE_MARK_LISTEN_REVERTED,
   ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED,
@@ -2353,6 +2744,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
   admitPrivateCreateRenderPath,
   admitRootBridgeRequestRecord,
+  applyPrivateRootHostOutputUpdate,
   applyPrivateCreateRootSideEffects,
   createClientRootRecord,
   createHydrateRootRecord,
@@ -2370,11 +2762,13 @@ module.exports = {
   describeUnmountMarkerGuard,
   getNativeRootBridgeHandoffPayload,
   getPrivateRootCreateRenderAdmissionPayload,
+  getPrivateRootHostOutputUpdateHandoffPayload,
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootRecordPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
+  isPrivateRootHostOutputUpdateHandoffRecord,
   isPrivateRootCreateRenderAdmissionRecord,
   isPrivateRootPortalCommitHandoffRecord,
   isPrivateRootPortalBoundaryRecord,
@@ -2384,6 +2778,7 @@ module.exports = {
   privateRootCreateRenderAdmissionRecordType,
   privateRootCreateSideEffectCleanupRecordType,
   privateRootCreateSideEffectRecordType,
+  privateRootHostOutputUpdateHandoffRecordType,
   privateRootNativeBridgeHandleType,
   privateRootNativeHandoffRecordType,
   privateRootPortalBoundaryRecordType,

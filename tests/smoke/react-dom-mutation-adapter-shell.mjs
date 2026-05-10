@@ -290,6 +290,48 @@ function runSmokeChecks() {
   }
 
   {
+    const rootOwner = {kind: 'LatestPropsDeferredRollbackRoot'};
+    const hostOwner = {kind: 'LatestPropsDeferredRollbackHost'};
+    const element = createElement('button');
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialProps = orderedProps([
+      ['title', 'old-title'],
+      ['children', 'Old label']
+    ]);
+    const nextProps = orderedProps([
+      ['id', 'next-id'],
+      ['title', 'new-title'],
+      ['children', 'New label'],
+      ['data-state', 'ready']
+    ]);
+
+    element.setAttribute('title', 'old-title');
+    element.attributeLog = [];
+    componentTree.attachHostInstanceNode(element, token, initialProps);
+
+    const handoff = domHost.commitDomPropertyUpdateForLatestProps(
+      element,
+      'button',
+      initialProps,
+      nextProps
+    );
+
+    assert.deepEqual(attributeEntries(element), [
+      ['data-state', 'ready'],
+      ['id', 'next-id'],
+      ['title', 'new-title']
+    ]);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(
+      domHost.rollbackDomPropertyUpdateLatestPropsHandoff(handoff),
+      3
+    );
+    assert.deepEqual(attributeEntries(element), [['title', 'old-title']]);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
+  }
+
+  {
     const element = createElement('fast-widget');
     const value = {answer: 42};
 
