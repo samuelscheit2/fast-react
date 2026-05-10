@@ -446,6 +446,140 @@ test("private controlled radio post-event restore queue records group intent wit
   componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
+test("private controlled restore queue write preflight records intent rows without live writes", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-write-preflight"
+    });
+  const rows = [
+    {
+      domEventName: "input",
+      latestProps: {
+        type: "text",
+        value: "alpha",
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: "INPUT",
+      queueId: "oracle-text-write-preflight",
+      value: "browser-mutated"
+    },
+    {
+      domEventName: "click",
+      latestProps: {
+        type: "radio",
+        name: "choice",
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: "INPUT",
+      queueId: "oracle-radio-write-preflight"
+    }
+  ];
+  const records = rows.map((row) => {
+    const dispatch = createPrivateControlledEventDispatch(row);
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          "deterministic-event-latest-props-post-event-restore-queue",
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: "controlled-input-post-event-restore-queue"
+      }
+    );
+    return {dispatch, intent};
+  });
+  const preflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-controlled-input-post-event-restore-queue-write-preflight",
+      queueId: "oracle-controlled-write-preflight-queue",
+      targetKind: "controlled-input-post-event-restore-queue-write-preflight"
+    }
+  );
+
+  assert.equal(
+    preflight.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWritePreflightStatus
+  );
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueWritePreflightRecord(
+      preflight
+    ),
+    true
+  );
+  assert.deepEqual(
+    preflight.writeIntentRows.map((row) => ({
+      rowId: row.rowId,
+      sourceRequestId: row.sourceRequestId,
+      queueSlot: row.queueSlot,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      writeWouldRun: row.writeWouldRun,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      radioGroupLookupRequired: row.radioGroupLookupRequired,
+      radioGroupLookupPerformed: row.radioGroupLookupPerformed,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        rowId: "controlled-oracle-write-preflight:3:row:1",
+        sourceRequestId: "controlled-oracle-write-preflight:1",
+        queueSlot: "restore-target",
+        acceptedRestoreKind: "input-text-value",
+        writeWouldRun: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: "controlled-oracle-write-preflight:3:row:2",
+        sourceRequestId: "controlled-oracle-write-preflight:2",
+        queueSlot: "restore-queue",
+        acceptedRestoreKind: "input-radio-checked",
+        writeWouldRun: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupRequired: true,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.equal(preflight.writePlan.restoreQueueWritten, false);
+  assert.equal(preflight.writePlan.restoreQueueFlushed, false);
+  assert.equal(preflight.writePlan.hostWrapperInvoked, false);
+  assert.equal(preflight.writePlan.radioGroupLookupPerformed, false);
+  assert.equal(preflight.sideEffects.restoreQueueWritePreflightRecorded, true);
+  assert.equal(preflight.sideEffects.restoreQueueWriteIntentRowCount, 2);
+  assert.equal(preflight.sideEffects.restoreQueueWritten, false);
+  assert.equal(preflight.sideEffects.restoreQueueFlushed, false);
+  assert.equal(preflight.sideEffects.hostWrapperInvoked, false);
+  assert.equal(preflight.sideEffects.radioGroupLookupRequired, true);
+  assert.equal(preflight.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(preflight.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(preflight.sideEffects.browserInputMutated, false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  for (const {dispatch} of records) {
+    assert.equal(Object.hasOwn(dispatch.targetNode, "_valueTracker"), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+});
+
 test("private controlled select and textarea post-event restore queue consumes fake-DOM observations with latest props only", () => {
   const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: "controlled-oracle-fake-dom-tracker"
