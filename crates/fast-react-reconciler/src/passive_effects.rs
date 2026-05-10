@@ -23,7 +23,14 @@ use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
     PendingPassiveUnmountOrigin,
 };
-use crate::{FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord};
+use crate::root_scheduler::{
+    SyncFlushPostPassiveContinuationExecutionGateRecord,
+    sync_flush_post_passive_continuation_execution_gate,
+};
+use crate::{
+    ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
+    RootSchedulerError,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PassiveEffectsFlushStatus {
@@ -445,6 +452,20 @@ pub(crate) fn flush_passive_effects_after_commit<H: HostTypes>(
     flush_passive_effects_after_commit_inner(store, commit, None)
 }
 
+pub(crate) fn observe_sync_flush_post_passive_continuation_execution_gate_after_commit<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    execution_context: &ExecutionContextState,
+) -> Result<Option<SyncFlushPostPassiveContinuationExecutionGateRecord>, RootSchedulerError> {
+    sync_flush_post_passive_continuation_execution_gate(
+        store,
+        execution_context,
+        commit.pending_passive_handoff(),
+    )
+}
+
 #[allow(
     dead_code,
     reason = "crate-private passive hook-effect flush handoff canary for future commit traversal"
@@ -683,8 +704,9 @@ mod tests {
     use crate::root_config::PendingPassiveUnmountOrigin;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        RootElementHandle, RootOptions, commit_finished_host_root, render_host_root_for_lanes,
-        update_container,
+        RootElementHandle, RootOptions, RootSyncFlushExitStatus, commit_finished_host_root,
+        ensure_root_is_scheduled, render_host_root_for_lanes, update_container,
+        update_container_sync,
     };
     use fast_react_core::{
         DependenciesHandle, FiberTag, FiberTypeHandle, HookEffectCallbackHandle,
@@ -698,6 +720,15 @@ mod tests {
             .create_client_root(FakeContainer::new(1), RootOptions::new())
             .unwrap();
         (store, root_id, host)
+    }
+
+    fn schedule_sync_update(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        element: RootElementHandle,
+    ) {
+        let update = update_container_sync(store, root_id, element, None).unwrap();
+        ensure_root_is_scheduled(store, update.schedule()).unwrap();
     }
 
     fn append_function_component_child(
@@ -1155,6 +1186,133 @@ mod tests {
         assert!(
             store
                 .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_observes_post_passive_sync_flush_gate_without_consuming_handoff() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let continuation_current = store.root(continuation_root).unwrap().current();
+        update_container(
+            &mut store,
+            passive_root,
+            RootElementHandle::from_raw(60),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, passive_root, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        store
+            .root_mut(passive_root)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(passive_root, Lanes::NO);
+        store
+            .root_mut(passive_root)
+            .unwrap()
+            .scheduling_mut()
+            .pending_passive_mut()
+            .queue_mount(finished_work, Lanes::DEFAULT)
+            .unwrap();
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(61),
+        );
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let gate = observe_sync_flush_post_passive_continuation_execution_gate_after_commit(
+            &mut store,
+            &commit,
+            &ExecutionContextState::new(),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(gate.exit_status(), RootSyncFlushExitStatus::Completed);
+        assert_eq!(gate.pending_passive_root(), passive_root);
+        assert_eq!(gate.pending_passive_finished_work(), finished_work);
+        assert_eq!(gate.pending_passive_lanes(), Lanes::DEFAULT);
+        assert_eq!(gate.pending_passive_unmount_count(), 0);
+        assert_eq!(gate.pending_passive_mount_count(), 1);
+        assert_eq!(gate.pending_passive_record_count(), 1);
+        assert_eq!(gate.continuation_roots().len(), 1);
+        assert_eq!(gate.continuation_roots()[0].root(), continuation_root);
+        assert_eq!(gate.continuation_roots()[0].lanes(), Lanes::SYNC);
+        let pending_passive = store
+            .root(passive_root)
+            .unwrap()
+            .scheduling()
+            .pending_passive();
+        assert_eq!(pending_passive.finished_work(), Some(finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_mounts().len(), 1);
+        assert_eq!(
+            store.root(continuation_root).unwrap().current(),
+            continuation_current
+        );
+        assert_eq!(store.root(continuation_root).unwrap().finished_work(), None);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_post_passive_sync_flush_gate_requires_passive_handoff() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        update_container(
+            &mut store,
+            passive_root,
+            RootElementHandle::from_raw(62),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, passive_root, Lanes::DEFAULT).unwrap();
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(63),
+        );
+
+        let gate = observe_sync_flush_post_passive_continuation_execution_gate_after_commit(
+            &mut store,
+            &commit,
+            &ExecutionContextState::new(),
+        )
+        .unwrap();
+
+        assert_eq!(gate, None);
+        assert!(
+            store
+                .root(passive_root)
                 .unwrap()
                 .scheduling()
                 .pending_passive()
