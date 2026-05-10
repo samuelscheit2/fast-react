@@ -103,6 +103,8 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-186-dom-property-payload-helper`.
 - Worker 187: host node store boundary in
   `/Users/user/Developer/Developer/fast-react-worker-187-host-node-store-boundary`.
+- Worker 188: test-renderer commit handoff canary in
+  `/Users/user/Developer/Developer/fast-react-worker-188-test-renderer-commit-handoff-canary`.
 
 ## Near-Term Sequencing
 
