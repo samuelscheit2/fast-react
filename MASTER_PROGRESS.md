@@ -29,6 +29,20 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Queue 595-624
+
+- Workers 595, 597, 598, 601, 604, 618, and 621 were accepted from the active
+  queue. The partial batch added private test-host HostComponent update
+  execution, sync-flush root commit continuation diagnostics, visible root
+  callback invocation, accepted passive callback execution, context-changed
+  bailout evidence, hydration target-claiming metadata, and private form submit
+  dispatch diagnostics while keeping public compatibility blocked.
+- The partial batch was verified after merge with focused Rust checks for
+  host-component update, sync flush, root callbacks, passive effects, and
+  context provider update lanes; focused React DOM hydration/form conformance
+  checks; `npm run check --workspace @fast-react/react-dom`; conflict-marker
+  scanning; and `git diff --check`.
+
 ### Queue 565-594
 
 - Workers 565-594 were accepted and merged. The batch extended private
