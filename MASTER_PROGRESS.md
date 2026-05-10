@@ -29,6 +29,12 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 503 was accepted from queue 503-533. It added private
+  deleted-subtree passive destroy flush diagnostics that consume accepted
+  deletion passive/ref cleanup ordering metadata without opening public passive
+  effect execution. It was verified after merge with focused deleted-subtree
+  passive and root-commit snapshot tests, passive-effect and root-commit
+  deletion filters, Rust fmt, conflict-marker scanning, and `git diff --check`.
 - Worker 509 was accepted from queue 503-532. It added private controlled
   restore queue write/flush ordering diagnostics for accepted text,
   select/textarea, checkbox, and radio metadata while keeping actual queue
