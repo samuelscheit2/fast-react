@@ -35,6 +35,25 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
       (admission) => admission.metadataId
     )
   );
+  assert.deepEqual(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.filter(
+      (admission) => Number(admission.workerId) >= 503
+    ).map((admission) => admission.metadataId),
+    [
+      "worker-505-form-action-event-extraction",
+      "worker-506-form-reset-queue-commit",
+      "worker-507-resource-map-commit",
+      "worker-508-stylesheet-load-error-state",
+      "worker-509-controlled-restore-flush-order",
+      "worker-510-controlled-radio-sibling-props",
+      "worker-511-public-facade-host-output-update",
+      "worker-512-public-facade-unmount-cleanup",
+      "worker-513-event-type-dispatch-canary",
+      "worker-514-portal-event-error-routing",
+      "worker-528-hydration-replay-error-metadata",
+      "worker-533-controlled-restore-queue-write-preflight"
+    ]
+  );
   assert.equal(result.summary.privateReactDomMetadataCompatibilityClaimed, false);
   assert.equal(
     result.summary
@@ -120,5 +139,70 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
     developmentRows["worker-492-form-submit-reset-metadata"].metadataEvidence
       .requestSubmitWouldDispatchSubmitEvent,
     true
+  );
+  assert.deepEqual(
+    developmentRows["worker-505-form-action-event-extraction"].metadataEvidence
+      .submissionTriggers,
+    ["submit", "requestSubmit"]
+  );
+  assert.equal(
+    developmentRows["worker-505-form-action-event-extraction"].metadataEvidence
+      .syntheticEventCreated,
+    false
+  );
+  assert.equal(
+    developmentRows["worker-506-form-reset-queue-commit"].metadataEvidence
+      .resetTraversalWouldRunAfterMutationEffects,
+    true
+  );
+  assert.deepEqual(
+    developmentRows["worker-507-resource-map-commit"].metadataEvidence
+      .recordKinds,
+    ["preload", "stylesheet", "preload", "script"]
+  );
+  assert.deepEqual(
+    developmentRows["worker-508-stylesheet-load-error-state"].metadataEvidence
+      .loadingBitmasks,
+    [0, 1, 2, 3, 4]
+  );
+  assert.deepEqual(
+    developmentRows["worker-509-controlled-restore-flush-order"]
+      .metadataEvidence.acceptedRestoreKinds,
+    ["input-text-value", "input-radio-checked"]
+  );
+  assert.equal(
+    developmentRows["worker-510-controlled-radio-sibling-props"]
+      .metadataEvidence.acceptedSameNameSameFormCount,
+    1
+  );
+  assert.equal(
+    developmentRows["worker-511-public-facade-host-output-update"]
+      .metadataEvidence.latestTextContent,
+    "updated facade output"
+  );
+  assert.equal(
+    developmentRows["worker-512-public-facade-unmount-cleanup"].metadataEvidence
+      .rootContainerChildrenCleared,
+    true
+  );
+  assert.deepEqual(
+    developmentRows["worker-513-event-type-dispatch-canary"].metadataEvidence
+      .cases.map((row) => row.eventPriorityName),
+    ["DiscreteEventPriority", "ContinuousEventPriority", "DefaultEventPriority"]
+  );
+  assert.equal(
+    developmentRows["worker-514-portal-event-error-routing"].metadataEvidence
+      .portalEventOwnerRootGateLinked,
+    true
+  );
+  assert.equal(
+    developmentRows["worker-528-hydration-replay-error-metadata"]
+      .metadataEvidence.rootErrorOptionCallbackRecordCount,
+    3
+  );
+  assert.deepEqual(
+    developmentRows["worker-533-controlled-restore-queue-write-preflight"]
+      .metadataEvidence.writeIntentQueueSlots,
+    ["restore-target", "restore-queue"]
   );
 });

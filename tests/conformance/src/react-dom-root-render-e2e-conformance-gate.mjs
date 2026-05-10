@@ -382,6 +382,150 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS =
       evidenceKind: "private-form-submit-reset-metadata",
       reason:
         "Worker 492 accepted only primitive submit/requestSubmit action metadata and reset dispatcher ordering diagnostics without inspecting or mutating real forms."
+    }),
+    Object.freeze({
+      metadataId: "worker-505-form-action-event-extraction",
+      workerId: "505",
+      category: "form",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-form-action-event-extraction-metadata",
+      reason:
+        "Worker 505 accepted only private submit/requestSubmit event-extraction metadata that consumes form action intent rows without SyntheticEvents, FormData, action invocation, transitions, reset queueing, or public form compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-506-form-reset-queue-commit",
+      workerId: "506",
+      category: "form",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-form-reset-queue-commit-metadata",
+      reason:
+        "Worker 506 accepted only private reset queue and after-mutation commit ordering metadata without resolving real forms, queueing React updates, marking fiber flags, or calling form.reset()."
+    }),
+    Object.freeze({
+      metadataId: "worker-507-resource-map-commit",
+      workerId: "507",
+      category: "resource",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-resource-map-commit-metadata",
+      reason:
+        "Worker 507 accepted only private resource-map commit rows for stylesheet, preload, and script metadata without creating or mutating real/fake resource maps, starting fetches, or claiming public resource compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-508-stylesheet-load-error-state",
+      workerId: "508",
+      category: "resource",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-stylesheet-load-error-state-metadata",
+      reason:
+        "Worker 508 accepted only private stylesheet resource/load/error state metadata without installing load/error listeners, creating promises, scheduling timers, mutating DOM, suspending commits, or enabling public resource behavior."
+    }),
+    Object.freeze({
+      metadataId: "worker-509-controlled-restore-flush-order",
+      workerId: "509",
+      category: "controlled",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-controlled-restore-flush-order-metadata",
+      reason:
+        "Worker 509 accepted only private controlled restore write/flush/host-wrapper ordering metadata without queue writes, queue flushing, wrapper execution, value tracking, radio lookup, or live DOM mutation."
+    }),
+    Object.freeze({
+      metadataId: "worker-510-controlled-radio-sibling-props",
+      workerId: "510",
+      category: "controlled",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-controlled-radio-sibling-props-metadata",
+      reason:
+        "Worker 510 accepted only private controlled radio sibling-props evidence rows for same-name/same-form matching without DOM queries, form traversal, live props lookup, wrapper execution, or public controlled radio compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-511-public-facade-host-output-update",
+      workerId: "511",
+      category: "host-output",
+      scenarioId: "update-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-root-public-facade-host-output-update",
+      reason:
+        "Worker 511 accepted only the symbol-private react-dom/client facade update diagnostic that routes a public-shaped root.render update through fake-DOM host-output metadata while public root execution remains blocked."
+    }),
+    Object.freeze({
+      metadataId: "worker-512-public-facade-unmount-cleanup",
+      workerId: "512",
+      category: "host-output",
+      scenarioId: "root-unmount",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-root-public-facade-unmount-cleanup",
+      reason:
+        "Worker 512 accepted only the symbol-private react-dom/client facade unmount cleanup diagnostic that clears fake-DOM host output and root markers without opening public root unmount compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-513-event-type-dispatch-canary",
+      workerId: "513",
+      category: "event",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-event-type-dispatch-metadata",
+      reason:
+        "Worker 513 accepted only private non-click event type dispatch canary metadata for priority/listener selection while SyntheticEvent creation, browser dispatch, hydration replay, and public event compatibility remain blocked."
+    }),
+    Object.freeze({
+      metadataId: "worker-514-portal-event-error-routing",
+      workerId: "514",
+      category: "event",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-portal-event-error-routing-metadata",
+      reason:
+        "Worker 514 accepted only private portal owner-root event error-routing metadata into root option callback records without portal bubbling, public callbacks, global reporting, or public portal event compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-528-hydration-replay-error-metadata",
+      workerId: "528",
+      category: "hydration-event",
+      scenarioId: "create-root-no-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-hydration-replay-error-metadata",
+      reason:
+        "Worker 528 accepted only private hydration replay error metadata that links retained dehydrated ownership rows to root option callback records without replaying events, invoking callbacks, reporting globally, or enabling hydration compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-533-controlled-restore-queue-write-preflight",
+      workerId: "533",
+      category: "controlled",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-controlled-restore-queue-write-preflight",
+      reason:
+        "Worker 533 accepted only private controlled restore queue write preflight rows without writing or flushing queues, invoking wrappers, querying radio groups, writing value trackers, or mutating live controls."
     })
   ]);
 
@@ -4875,6 +5019,7 @@ function loadPrivateReactDomMetadataModules(workspaceRoot) {
       join(reactDomRoot, "src/events/plugin-event-system.js")
     ),
     propertyPayload: require(join(reactDomRoot, "src/dom-host/property-payload.js")),
+    reactDom: require(join(reactDomRoot, "index.js")),
     reactDomClient: require(join(reactDomRoot, "client.js")),
     resourceFormGate: require(join(reactDomRoot, "src/resource-form-gates.js")),
     rootListeners: require(join(reactDomRoot, "src/events/root-listeners.js"))
@@ -5381,6 +5526,90 @@ function runPrivateReactDomMetadataDiagnostic({ admission, mode, modules }) {
           mode,
           modules
         });
+        break;
+      case "worker-505-form-action-event-extraction":
+        metadataEvidence =
+          runPrivateReactDomMetadataFormEventExtractionDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-506-form-reset-queue-commit":
+        metadataEvidence =
+          runPrivateReactDomMetadataFormResetQueueCommitDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-507-resource-map-commit":
+        metadataEvidence =
+          runPrivateReactDomMetadataResourceMapCommitDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-508-stylesheet-load-error-state":
+        metadataEvidence =
+          runPrivateReactDomMetadataStylesheetLoadErrorStateDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-509-controlled-restore-flush-order":
+        metadataEvidence =
+          runPrivateReactDomMetadataControlledFlushOrderDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-510-controlled-radio-sibling-props":
+        metadataEvidence =
+          runPrivateReactDomMetadataControlledRadioSiblingPropsDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-511-public-facade-host-output-update":
+        metadataEvidence =
+          runPrivateReactDomMetadataHostOutputUpdateDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-512-public-facade-unmount-cleanup":
+        metadataEvidence =
+          runPrivateReactDomMetadataHostOutputUnmountCleanupDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-513-event-type-dispatch-canary":
+        metadataEvidence =
+          runPrivateReactDomMetadataEventTypeDispatchDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-514-portal-event-error-routing":
+        metadataEvidence =
+          runPrivateReactDomMetadataPortalEventErrorRoutingDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-528-hydration-replay-error-metadata":
+        metadataEvidence =
+          runPrivateReactDomMetadataHydrationReplayErrorDiagnostic({
+            mode,
+            modules
+          });
+        break;
+      case "worker-533-controlled-restore-queue-write-preflight":
+        metadataEvidence =
+          runPrivateReactDomMetadataControlledQueueWritePreflightDiagnostic({
+            mode,
+            modules
+          });
         break;
       default:
         throw new Error(
@@ -6012,6 +6241,1145 @@ function runPrivateReactDomMetadataFormDiagnostic({ mode, modules }) {
     submitterValueWouldBeIncludedInFormData:
       requestSubmit.intent.actionMetadata
         .submitterValueWouldBeIncludedInFormData
+  };
+}
+
+function runPrivateReactDomMetadataFormEventExtractionDiagnostic({
+  mode,
+  modules
+}) {
+  const dispatcherGate =
+    modules.resourceFormGate.createFormActionResetDispatcherGate({
+      requestIdPrefix: `${mode.id}:metadata-form-event-source`
+    });
+  const extractionGate =
+    modules.resourceFormGate.createFormActionEventExtractionGate({
+      requestIdPrefix: `${mode.id}:metadata-form-event-extraction`
+    });
+  const submit = dispatcherGate.recordSubmissionIntent({
+    actionKind: "function",
+    actionSource: "form",
+    defaultPrevented: false,
+    eventName: "submit",
+    explicitIntent: true,
+    submitControlKind: "button",
+    transitionScheduled: false
+  });
+  const requestSubmit = dispatcherGate.recordSubmissionIntent({
+    actionKind: "function",
+    actionSource: "submit-control",
+    defaultPrevented: false,
+    eventName: "submit",
+    explicitIntent: true,
+    formActionKind: "string",
+    submissionTrigger: "requestSubmit",
+    submitControlKind: "input",
+    submitterActionKind: "function",
+    transitionScheduled: false
+  });
+  const records = [
+    extractionGate.recordEventExtractionFromSubmissionIntent(submit),
+    extractionGate.recordEventExtractionFromSubmissionIntent(requestSubmit)
+  ];
+
+  return {
+    actionInvoked: records.some((record) => record.eventExtraction.actionInvoked),
+    compatibilityClaimed: records.some(
+      (record) => record.eventExtraction.compatibilityClaimed
+    ),
+    consumedSubmitRequestSubmitActionMetadata: records.every(
+      (record) =>
+        record.eventExtraction.consumedSubmitRequestSubmitActionMetadata ===
+        true
+    ),
+    eventExtractionMetadataRecorded: records.every(
+      (record) => record.sideEffects.eventExtractionMetadataRecorded === true
+    ),
+    formDataConstructed: records.some(
+      (record) => record.eventExtraction.formDataConstructed
+    ),
+    hostTransitionStarted: records.some(
+      (record) => record.eventExtraction.hostTransitionStarted
+    ),
+    nativeNavigationWouldBePreventedCount: records.filter(
+      (record) => record.eventExtraction.nativeNavigationWouldBePrevented
+    ).length,
+    recordCount: records.length,
+    requestSubmitWouldDispatchSubmitEvent:
+      records[1].eventExtraction.requestSubmitWouldDispatchSubmitEvent,
+    statuses: records.map((record) => record.status),
+    submissionTriggers: records.map((record) => record.submissionTrigger),
+    syntheticEventCreated: records.some(
+      (record) => record.eventExtraction.syntheticEventCreated
+    )
+  };
+}
+
+function runPrivateReactDomMetadataFormResetQueueCommitDiagnostic({
+  mode,
+  modules
+}) {
+  const dispatcherGate =
+    modules.resourceFormGate.createFormActionResetDispatcherGate({
+      requestIdPrefix: `${mode.id}:metadata-form-reset-source`
+    });
+  const reset = dispatcherGate.recordResetIntent({
+    dispatcherKey: "r",
+    explicitIntent: true,
+    formOwnership: "react-owned",
+    resetSource: "requestFormReset",
+    transitionContext: "transition"
+  });
+  const queueCommitGate =
+    modules.resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: `${mode.id}:metadata-form-reset-queue-commit`
+    });
+  const record = queueCommitGate.recordResetQueueCommit(reset, {
+    commitKind: "after-mutation-form-reset-order",
+    explicitAdmission: true,
+    hostTag: "form",
+    queueKind: "metadata-only-reset-state-queue",
+    queueSource: "requestFormResetOnFiber"
+  });
+
+  return {
+    compatibilityClaimed: record.admission.compatibilityClaimed,
+    commitBoundaryStatus: record.commitBoundary.status,
+    defaultValueUpdatesWouldPrecedeReset:
+      record.commitBoundary.defaultValueUpdatesWouldPrecedeReset,
+    formResetCommitted: record.commitBoundary.formResetCommitted,
+    previousDispatcherCalled: record.admission.previousDispatcherCalled,
+    queueBoundaryStatus: record.queueBoundary.status,
+    reactUpdateQueued: record.sideEffects.reactUpdateQueued,
+    realFormInspected: record.admission.realFormInspected,
+    realFormReset: record.commitBoundary.realFormReset,
+    resetFormInstanceCalled: record.commitBoundary.resetFormInstanceCalled,
+    resetStateWouldBeQueued: record.queueBoundary.resetStateWouldBeQueued,
+    resetTraversalWouldRunAfterMutationEffects:
+      record.commitBoundary.resetTraversalWouldRunAfterMutationEffects,
+    status: record.status
+  };
+}
+
+function runPrivateReactDomMetadataResourceMapCommitDiagnostic({
+  mode,
+  modules
+}) {
+  const dispatcherGate =
+    modules.resourceFormGate.createResourceFormActionInternalsGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-map-source`
+    });
+  const adapterGate =
+    modules.resourceFormGate.createResourceHintFakeDomAdapterGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-map-adapter`
+    });
+  const orderGate =
+    modules.resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-map-order`
+    });
+  const stylesheetGate =
+    modules.resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-map-stylesheet`
+    });
+  const commitGate =
+    modules.resourceFormGate.createResourceHintResourceMapCommitGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-map-commit`
+    });
+  const fakeDom = createPrivateMetadataResourceDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/script.js",
+      "script",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script-preload",
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("X", [
+      "/script.js",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script",
+        fetchPriority: "high",
+        nonce: "nonce-script"
+      }
+    ])
+  ];
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "metadata-resource-map-head" }
+  ]);
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      adapterKind: "deterministic-fake-dom",
+      explicitAdmission: true,
+      targetKind: "document-head"
+    })
+  );
+  appendPrivateMetadataResourceHeadChild(fakeDom, "link", {
+    "data-fast-react-precedence-key": "precedence-main",
+    "data-fast-react-resource-key": "style-main",
+    "data-precedence": "theme",
+    rel: "stylesheet"
+  });
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(admissions, {
+    explicitOrderDiagnostic: true,
+    fakeDocument: fakeDom.document,
+    fakeHead: fakeDom.head,
+    resourceDescriptors: [
+      {
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[0].adapterAdmissionId
+      },
+      {
+        precedenceKey: "precedence-main",
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[1].adapterAdmissionId
+      },
+      {
+        resourceKey: "script-main",
+        resourceKind: "script",
+        sourceAdapterAdmissionId: admissions[2].adapterAdmissionId
+      },
+      {
+        resourceKey: "script-main",
+        resourceKind: "script",
+        sourceAdapterAdmissionId: admissions[3].adapterAdmissionId
+      }
+    ]
+  });
+  const stylesheet = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const diagnostic = commitGate.recordResourceMapCommitDiagnostic(
+    order,
+    stylesheet,
+    {
+      explicitResourceMapCommitDiagnostic: true
+    }
+  );
+
+  return {
+    fakeResourceMapsMutated:
+      diagnostic.resourceMapCommitPlan.fakeResourceMapsMutated,
+    loadStateMutated:
+      diagnostic.resourceLifecycleBoundary.loadStateMutated,
+    mapKinds: diagnostic.privateResourceMapRecords.map((row) => row.mapKind),
+    preloadRecordCount:
+      diagnostic.resourceMapCommitPlan.preloadRecordCount,
+    publicResourceHintCallsReachable:
+      diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    realResourceMapsMutated:
+      diagnostic.resourceMapCommitPlan.realResourceMapsMutated,
+    recordKinds: diagnostic.privateResourceMapRecords.map(
+      (row) => row.recordKind
+    ),
+    resourceFetchStarted: diagnostic.sideEffects.resourceFetchStarted,
+    scriptRecordCount: diagnostic.resourceMapCommitPlan.scriptRecordCount,
+    singletonOwnershipClaimed:
+      diagnostic.resourceLifecycleBoundary.singletonOwnershipClaimed,
+    status: diagnostic.resourceMapCommitStatus,
+    stylesheetRecordCount:
+      diagnostic.resourceMapCommitPlan.stylesheetRecordCount
+  };
+}
+
+function runPrivateReactDomMetadataStylesheetLoadErrorStateDiagnostic({
+  mode,
+  modules
+}) {
+  const dispatcherGate =
+    modules.resourceFormGate.createResourceFormActionInternalsGate({
+      requestIdPrefix: `${mode.id}:metadata-load-state-source`
+    });
+  const adapterGate =
+    modules.resourceFormGate.createResourceHintFakeDomAdapterGate({
+      requestIdPrefix: `${mode.id}:metadata-load-state-adapter`
+    });
+  const orderGate =
+    modules.resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: `${mode.id}:metadata-load-state-order`
+    });
+  const stylesheetGate =
+    modules.resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: `${mode.id}:metadata-load-state-precedence`
+    });
+  const loadStateGate =
+    modules.resourceFormGate.createResourceHintStylesheetLoadErrorStateGate({
+      requestIdPrefix: `${mode.id}:metadata-load-state`
+    });
+  const fakeDom = createPrivateMetadataResourceDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ])
+  ];
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "metadata-load-state-head" }
+  ]);
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      adapterKind: "deterministic-fake-dom",
+      explicitAdmission: true,
+      targetKind: "document-head"
+    })
+  );
+  appendPrivateMetadataResourceHeadChild(fakeDom, "link", {
+    "data-fast-react-precedence-key": "precedence-main",
+    "data-fast-react-resource-key": "style-main",
+    "data-precedence": "theme",
+    rel: "stylesheet"
+  });
+  appendPrivateMetadataResourceHeadChild(fakeDom, "link", {
+    "data-fast-react-resource-key": "style-main",
+    as: "style",
+    rel: "preload"
+  });
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(admissions, {
+    explicitOrderDiagnostic: true,
+    fakeDocument: fakeDom.document,
+    fakeHead: fakeDom.head,
+    resourceDescriptors: [
+      {
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[0].adapterAdmissionId
+      },
+      {
+        precedenceKey: "precedence-main",
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[1].adapterAdmissionId
+      }
+    ]
+  });
+  const stylesheet = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const diagnostic =
+    loadStateGate.recordStylesheetLoadErrorStateDiagnostic(stylesheet, {
+      explicitStylesheetLoadErrorStateDiagnostic: true,
+      stateKind: "deterministic-fake-stylesheet-load-error-state",
+      targetKind: "stylesheet-resource-state"
+    });
+
+  return {
+    commitSuspended: diagnostic.commitSuspensionRows[0].commitSuspended,
+    loadingBitmasks: diagnostic.loadingStateBits.map((row) => row.bitmask),
+    loadingPromiseCreated: diagnostic.loadingStateRows.some(
+      (row) => row.loadingPromiseCreated
+    ),
+    preloadFetchStarted: diagnostic.preloadStateRows[0].preloadFetchStarted,
+    realTimerScheduled: diagnostic.suspendedCommitBoundary.realTimerScheduled,
+    resourceCount: diagnostic.resourceStateRows.length,
+    resourceInstance:
+      diagnostic.resourceStateRows[0].reactResourceShape.instance,
+    resourceLoading: diagnostic.resourceStateRows[0].stateShape.loading,
+    resourcePreloadSeenBefore:
+      diagnostic.resourceStateRows[0].preloadSeenBefore,
+    status: diagnostic.stylesheetLoadErrorStateStatus,
+    stylesheetCommitSuspended:
+      diagnostic.sideEffects.stylesheetCommitSuspended,
+    stylesheetFetchStarted: diagnostic.sideEffects.stylesheetFetchStarted
+  };
+}
+
+function runPrivateReactDomMetadataControlledFlushOrderDiagnostic({
+  mode,
+  modules
+}) {
+  const gate =
+    modules.controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate(
+      {
+        requestIdPrefix: `${mode.id}:metadata-controlled-flush-order`
+      }
+    );
+  const rows = [
+    {
+      domEventName: "input",
+      latestProps: {
+        onChange() {},
+        onInput() {},
+        type: "text",
+        value: "alpha"
+      },
+      nodeName: "INPUT",
+      queueId: `${mode.id}:metadata-controlled-text-flush-order`
+    },
+    {
+      domEventName: "click",
+      latestProps: {
+        checked: true,
+        name: "choice",
+        onChange() {},
+        onClick() {},
+        type: "radio"
+      },
+      nodeName: "INPUT",
+      queueId: `${mode.id}:metadata-controlled-radio-flush-order`
+    }
+  ];
+  const records = rows.map((row) => {
+    const dispatch = createPrivateControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      modules,
+      nodeName: row.nodeName
+    });
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        eventName: row.domEventName,
+        explicitAdmission: true,
+        queueId: row.queueId,
+        queueKind:
+          "deterministic-event-latest-props-post-event-restore-queue",
+        targetKind: "controlled-input-post-event-restore-queue"
+      }
+    );
+    modules.componentTree.detachHostInstanceToken(dispatch.token);
+    return intent;
+  });
+
+  return {
+    acceptedRestoreKinds: records.map(
+      (record) => record.restoreQueueOrdering.acceptedRestoreKind
+    ),
+    controlledStateRestoreInvoked: records.some(
+      (record) => record.restoreIntent.controlledStateRestoreInvoked
+    ),
+    hostWrapperInvoked: records.some(
+      (record) => record.sideEffects.hostWrapperInvoked
+    ),
+    hostWrapperRestoreOrderRecorded: records.every(
+      (record) => record.restoreIntent.hostWrapperRestoreOrderRecorded
+    ),
+    radioGroupLookupPerformed: records.some(
+      (record) => record.sideEffects.radioGroupLookupPerformed
+    ),
+    radioGroupRestoreRequired: records[1].checkableRestoreMetadata
+      .radioGroupRestoreRequired,
+    radioValueTrackerRefreshed: records.some(
+      (record) => record.sideEffects.radioGroupValueTrackerRefreshed
+    ),
+    recordCount: records.length,
+    restoreQueueFlushed: records.some(
+      (record) => record.sideEffects.restoreQueueFlushed
+    ),
+    restoreQueueFlushOrderRecorded: records.every(
+      (record) => record.restoreIntent.restoreQueueFlushOrderRecorded
+    ),
+    restoreQueueWritten: records.some(
+      (record) => record.sideEffects.restoreQueueWritten
+    ),
+    restoreQueueWriteOrderRecorded: records.every(
+      (record) => record.restoreIntent.restoreQueueWriteOrderRecorded
+    ),
+    statuses: records.map((record) => record.restoreQueueOrdering.status)
+  };
+}
+
+function runPrivateReactDomMetadataControlledRadioSiblingPropsDiagnostic({
+  mode,
+  modules
+}) {
+  const gate =
+    modules.controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate(
+      {
+        requestIdPrefix: `${mode.id}:metadata-radio-sibling-props`
+      }
+    );
+  const dispatch = createPrivateControlledInputEventDispatch({
+    domEventName: "click",
+    latestProps: {
+      checked: true,
+      name: "choice",
+      onChange() {},
+      onClick() {},
+      type: "radio"
+    },
+    modules,
+    nodeName: "INPUT"
+  });
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    dispatch.dispatchRecord,
+    {
+      eventName: "click",
+      explicitAdmission: true,
+      queueId: `${mode.id}:metadata-radio-sibling-props`,
+      queueKind:
+        "deterministic-event-latest-props-post-event-restore-queue",
+      radioGroupFormKey: "form:choice",
+      radioGroupSiblingProps: [
+        {
+          formKey: "form:choice",
+          props: {
+            checked: false,
+            defaultChecked: false,
+            name: "choice",
+            onChange() {},
+            type: "radio"
+          }
+        },
+        {
+          formKey: "form:other",
+          props: {
+            checked: false,
+            name: "choice",
+            onChange() {},
+            type: "radio"
+          }
+        }
+      ],
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+  modules.componentTree.detachHostInstanceToken(dispatch.token);
+  const [groupRecord] = intent.groupIntentRecords;
+
+  return {
+    acceptedSameNameSameFormCount:
+      groupRecord.siblingPropsLookup.acceptedSameNameSameFormCount,
+    candidateCount: groupRecord.siblingPropsLookup.candidateCount,
+    formTraversalPerformed:
+      groupRecord.siblingPropsLookup.formTraversalPerformed,
+    groupIntentStatus: groupRecord.status,
+    livePropsLookupPerformed:
+      groupRecord.siblingPropsLookup.livePropsLookupPerformed,
+    radioGroupSiblingMetadataRead:
+      intent.sideEffects.radioGroupSiblingMetadataRead,
+    realDomQueried: groupRecord.realDomQueried,
+    records: intent.radioGroupSiblingPropsLookup.records.map((record) => ({
+      sameForm: record.sameForm,
+      sameName: record.sameName,
+      siblingWouldReceiveRestore: record.siblingWouldReceiveRestore,
+      skipReason: record.skipReason,
+      status: record.status
+    })),
+    siblingInputRestorePerformed: groupRecord.siblingInputRestorePerformed,
+    siblingPropsLookupStatus: groupRecord.siblingPropsLookup.status,
+    wrapperExecuted: groupRecord.siblingPropsLookup.wrapperExecuted
+  };
+}
+
+function runPrivateReactDomMetadataHostOutputUpdateDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-facade-update`
+  });
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    modules.reactDomClient.createRoot,
+    modules.rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    hostOutputUpdateIdPrefix: `${mode.id}:metadata-facade-update-handoff`,
+    publicFacadeHostOutputRenderIdPrefix: `${mode.id}:metadata-facade-render`,
+    publicFacadeHostOutputUpdateIdPrefix: `${mode.id}:metadata-facade-update`,
+    requestIdPrefix: `${mode.id}:metadata-facade-request`,
+    rootIdPrefix: `${mode.id}:metadata-facade-root`,
+    updateIdPrefix: `${mode.id}:metadata-facade-update-id`
+  });
+  const root = adapter.createRoot(container);
+  adapter.renderHostOutput(root, {
+    props: {
+      children: "initial facade output",
+      className: "facade-initial",
+      "data-phase": "initial",
+      id: "facade-host"
+    },
+    type: "main"
+  });
+  const update = adapter.updateHostOutput(root, {
+    props: {
+      children: "updated facade output",
+      className: "facade-updated",
+      "data-phase": "updated",
+      id: "facade-host"
+    },
+    type: "main"
+  });
+  const payload =
+    modules.rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(
+      update
+    );
+
+  return {
+    acceptedCapabilityIds: update.acceptedCapabilities.map(
+      (capability) => capability.id
+    ),
+    browserDomMutation: update.browserDomMutation,
+    compatibilityClaimed: update.compatibilityClaimed,
+    containerChildCount: container.childNodes.length,
+    diagnosticStatus: update.diagnosticStatus,
+    hostOutputUpdateHandoffStatus:
+      payload.hostOutputUpdateHandoff.updateStatus,
+    latestTextContent: container.firstChild.textContent,
+    listenerInstallation: update.listenerInstallation,
+    nativeExecution: update.nativeExecution,
+    publicRootCompatibilitySurface: update.publicRootCompatibilitySurface,
+    publicRootExecution: update.publicRootExecution,
+    requestTypes: adapter
+      .getRootRequestRecords(root)
+      .map((record) => record.requestType),
+    updatedAttributeNames: Array.from(container.firstChild.attributes.keys())
+  };
+}
+
+function runPrivateReactDomMetadataHostOutputUnmountCleanupDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-facade-unmount`
+  });
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    modules.reactDomClient.createRoot,
+    modules.rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: `${mode.id}:metadata-facade-unmount-admission`,
+    initialHostOutputIdPrefix: `${mode.id}:metadata-facade-unmount-initial`,
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      `${mode.id}:metadata-facade-unmount-diagnostic`,
+    requestIdPrefix: `${mode.id}:metadata-facade-unmount-request`,
+    rootIdPrefix: `${mode.id}:metadata-facade-unmount-root`,
+    sideEffectIdPrefix: `${mode.id}:metadata-facade-unmount-side-effect`,
+    unmountCleanupIdPrefix: `${mode.id}:metadata-facade-unmount-cleanup`,
+    updateIdPrefix: `${mode.id}:metadata-facade-unmount-update`
+  });
+  const root = adapter.createRoot(container);
+  const diagnostic = adapter.unmountHostOutput(root, {
+    props: {
+      children: "facade cleanup",
+      id: "facade-cleanup-host"
+    },
+    type: "section"
+  });
+  const payload =
+    modules.rootBridge.getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(
+      diagnostic
+    );
+
+  return {
+    acceptedCapabilityIds: diagnostic.acceptedCapabilities.map(
+      (capability) => capability.id
+    ),
+    blockedCapabilityIds: diagnostic.blockedCapabilities.map(
+      (capability) => capability.id
+    ),
+    browserDomMutation: diagnostic.browserDomMutation,
+    cleanupRequired: diagnostic.cleanupRequired,
+    compatibilityClaimed: diagnostic.compatibilityClaimed,
+    componentTreeMetadataDetached: diagnostic.componentTreeMetadataDetached,
+    containerChildCountAfterUnmount: container.childNodes.length,
+    diagnosticStatus: diagnostic.diagnosticStatus,
+    publicRootCompatibilitySurface: diagnostic.publicRootCompatibilitySurface,
+    publicRootExecution: diagnostic.publicRootExecution,
+    publicRootUnmounted: diagnostic.publicRootUnmounted,
+    rootContainerChildrenCleared: diagnostic.rootContainerChildrenCleared,
+    rootMarkerCleared: modules.rootMarkers.getContainerRoot(container) === null,
+    rootRegistrationsCleared:
+      container.__registrations.length === 0 &&
+      document.__registrations.length === 0,
+    unmountCleanupStatus: payload.unmountCleanupRecord.cleanupStatus,
+    unmountNoOp: diagnostic.unmountNoOp
+  };
+}
+
+function runPrivateReactDomMetadataEventTypeDispatchDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-event-type`
+  });
+  const root = document.createElement("div");
+  const parent = document.createElement("div");
+  const child = document.createElement("button");
+  root.appendChild(parent);
+  parent.appendChild(child);
+  const rootOwner = { kind: "MetadataEventTypeRootOwner" };
+  const parentToken = modules.componentTree.createHostInstanceToken(
+    { kind: "MetadataEventTypeParent" },
+    rootOwner
+  );
+  const childToken = modules.componentTree.createHostInstanceToken(
+    { kind: "MetadataEventTypeChild" },
+    rootOwner
+  );
+  modules.componentTree.attachHostInstanceNode(parent, parentToken, {
+    onAnimationEnd() {},
+    onKeyDownCapture() {},
+    onMouseMove() {}
+  });
+  modules.componentTree.attachHostInstanceNode(child, childToken, {
+    onAnimationEnd() {},
+    onKeyDownCapture() {},
+    onMouseMove() {}
+  });
+
+  try {
+    const cases = [
+      {
+        domEventName: "keydown",
+        eventSystemFlags: modules.eventSystemFlags.IS_CAPTURE_PHASE
+      },
+      {
+        domEventName: "mousemove",
+        eventSystemFlags: 0
+      },
+      {
+        domEventName: "animationend",
+        eventSystemFlags: 0
+      }
+    ];
+
+    return {
+      cases: cases.map((testCase) => {
+        const wrapper =
+          modules.eventListener.createEventListenerWrapperRecordWithPriority(
+            root,
+            testCase.domEventName,
+            testCase.eventSystemFlags
+          );
+        const dispatchRecord =
+          modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+            wrapper,
+            createPrivateMetadataNativeEvent(testCase.domEventName, child)
+          );
+        const canary =
+          modules.pluginEventSystem.createEventTypeDispatchCanaryRecord(
+            dispatchRecord
+          );
+        return {
+          dispatchQueueLength: canary.dispatchQueueLength,
+          domEventName: canary.domEventName,
+          eventDispatch: canary.eventDispatch,
+          eventPriorityName: canary.eventPriorityName,
+          hydrationReplayQueued: canary.hydrationReplayQueued,
+          listenerInvocationCount: canary.listenerInvocationCount,
+          listenerMetadataCount: canary.listenerMetadataCount,
+          publicDispatchEnabled: canary.publicDispatchEnabled,
+          syntheticEventCount: canary.syntheticEventCount,
+          targetDispatchPathLength: canary.targetDispatchPathLength,
+          targetListenerFound: canary.targetListenerFound
+        };
+      }),
+      metadataOnly: true
+    };
+  } finally {
+    modules.componentTree.detachHostInstanceToken(parentToken);
+    modules.componentTree.detachHostInstanceToken(childToken);
+  }
+}
+
+function runPrivateReactDomMetadataPortalEventErrorRoutingDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-portal-event-error`
+  });
+  const rootContainer = document.createElement("div");
+  const portalContainer = document.createElement("section");
+  const listenerCalls = [];
+  const rootErrorCalls = [];
+  const thrown = new Error("root-render metadata portal listener boom");
+  thrown.code = "ROOT_RENDER_METADATA_PORTAL_LISTENER_ERROR";
+  const portalChild = {
+    props: {
+      children: "portal error target",
+      onClick() {
+        listenerCalls.push("bubble");
+      },
+      onClickCapture() {
+        listenerCalls.push("capture");
+        throw thrown;
+      }
+    },
+    type: "button"
+  };
+  const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: `${mode.id}:metadata-portal-error-boundary`,
+    portalCommitIdPrefix: `${mode.id}:metadata-portal-error-commit`,
+    portalEventOwnerRootIdPrefix: `${mode.id}:metadata-portal-error-owner`,
+    portalMountIdPrefix: `${mode.id}:metadata-portal-error-mount`,
+    sideEffectIdPrefix: `${mode.id}:metadata-portal-error-side-effect`
+  });
+  const create = bridge.createClientRoot(rootContainer, {
+    onCaughtError(error) {
+      rootErrorCalls.push(["caught", error.message]);
+    },
+    onRecoverableError(error) {
+      rootErrorCalls.push(["recoverable", error.message]);
+    },
+    onUncaughtError(error) {
+      rootErrorCalls.push(["uncaught", error.message]);
+    }
+  });
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+
+  try {
+    const portal = modules.reactDom.createPortal(
+      portalChild,
+      portalContainer,
+      "metadata-portal-error-key"
+    );
+    const render = bridge.renderContainer(create.handle, portal);
+    const boundary = bridge.createPortalRootBoundary(render);
+    const handoff = bridge.createPortalCommitHandoff(boundary, {
+      pendingChildren: [portalChild]
+    });
+    const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+      explicitChild: portalChild
+    });
+    const ownerGate = bridge.createPortalEventOwnerRootGate(mount);
+    const ownerGatePayload =
+      modules.rootBridge.getPrivateRootPortalEventOwnerRootGatePayload(
+        ownerGate
+      );
+    const clickRecord =
+      modules.rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+        sideEffects.listenerRegistration,
+        {
+          hostNode: ownerGatePayload.hostComponentNode,
+          hostToken: ownerGatePayload.hostInstanceToken,
+          rootOwner: create.owner
+        },
+        {
+          enableListenerErrorRoutingDiagnostics: true
+        }
+      );
+    const routing = bridge.createEventListenerRootErrorRouting(
+      [create, render],
+      clickRecord,
+      {
+        portalEventOwnerRootGateRecord: ownerGate,
+        routeLabels: ["metadata-portal-listener-error-route"]
+      }
+    );
+    const payload =
+      modules.rootBridge.getPrivateRootEventListenerErrorRoutingPayload(
+        routing
+      );
+    const [callbackRecord] = routing.rootErrorOptionCallbackRecords;
+
+    return {
+      acceptedCapabilityIds: routing.acceptedCapabilities.map(
+        (capability) => capability.id
+      ),
+      callbackRecordCount: routing.rootErrorOptionCallbackRecordCount,
+      compatibilityClaimed: routing.compatibilityClaimed,
+      eventDispatch: routing.eventDispatch,
+      listenerErrorRouteCount: routing.listenerErrorRouteCount,
+      listenerPhases: listenerCalls,
+      payloadPortalGateMatches:
+        payload.portalEventOwnerRootGateRecord === ownerGate,
+      portalContainerContainsEventTarget:
+        routing.portalContainerContainsEventTarget,
+      portalEventBubbling: routing.portalEventBubbling,
+      portalEventOwnerRootGateLinked:
+        routing.portalEventOwnerRootGateLinked,
+      portalEventOwnerRootMatchesTargetRoot:
+        routing.portalEventOwnerRootMatchesTargetRoot,
+      publicDispatchEnabled: routing.publicDispatchEnabled,
+      publicPortalBubbling: routing.publicPortalBubbling,
+      publicRootErrorCallbackCalls: rootErrorCalls.length,
+      publicRootErrorCallbacksInvoked:
+        routing.publicRootErrorCallbacksInvoked,
+      reportGlobalErrorInvoked: routing.reportGlobalErrorInvoked,
+      rootContainerContainsEventTarget:
+        routing.rootContainerContainsEventTarget,
+      rootErrorCallbackInvocationCount:
+        routing.rootErrorCallbackInvocationCount,
+      sourceLabel: callbackRecord.sourceLabel
+    };
+  } finally {
+    bridge.revertCreateRootSideEffects(sideEffects);
+  }
+}
+
+function runPrivateReactDomMetadataHydrationReplayErrorDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-hydration-replay-error`
+  });
+  const container = document.createElement("div");
+  const firstBoundaryTarget = document.createElement("button");
+  const rootTarget = document.createElement("input");
+  const secondBoundaryTarget = document.createElement("a");
+  firstBoundaryTarget.parentNode = container;
+  rootTarget.parentNode = container;
+  secondBoundaryTarget.parentNode = container;
+  container.childNodes = [
+    { data: "$", nodeType: modules.domContainer.COMMENT_NODE },
+    firstBoundaryTarget,
+    { data: "/$", nodeType: modules.domContainer.COMMENT_NODE },
+    rootTarget,
+    { data: "$", nodeType: modules.domContainer.COMMENT_NODE },
+    secondBoundaryTarget,
+    { data: "/$", nodeType: modules.domContainer.COMMENT_NODE }
+  ];
+  const rootErrorCalls = [];
+  const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+    hydrateIdPrefix: `${mode.id}:metadata-replay-error-hydrate`,
+    hydrationRecordIdPrefix: `${mode.id}:metadata-replay-error-boundary`,
+    requestIdPrefix: `${mode.id}:metadata-replay-error-request`
+  });
+  const hydrateRecord = bridge.createHydrateRoot(
+    container,
+    { props: { children: "replay error metadata" }, type: "App" },
+    {
+      identifierPrefix: "metadata-replay-error-",
+      onCaughtError(error) {
+        rootErrorCalls.push(["caught", error.message]);
+      },
+      onRecoverableError(error) {
+        rootErrorCalls.push(["recoverable", error.message]);
+      },
+      onUncaughtError(error) {
+        rootErrorCalls.push(["uncaught", error.message]);
+      }
+    }
+  );
+  const secondBoundaryRecord =
+    modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      modules.eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "mouseover",
+        0
+      ),
+      createPrivateMetadataNativeEvent("mouseover", secondBoundaryTarget)
+    );
+  const rootRecord =
+    modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      modules.eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "change",
+        modules.eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createPrivateMetadataNativeEvent("change", rootTarget)
+    );
+  const firstBoundaryRecord =
+    modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      modules.eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "click",
+        modules.eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createPrivateMetadataNativeEvent("click", firstBoundaryTarget)
+    );
+  const ownershipDiagnostics =
+    modules.hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      hydrateRecord.hydrationBoundaryRecord,
+      [secondBoundaryRecord, rootRecord, firstBoundaryRecord],
+      {
+        source: "root-render-private-react-dom-metadata-gate"
+      }
+    );
+  const metadata = bridge.createHydrationReplayErrorMetadata(
+    hydrateRecord,
+    ownershipDiagnostics,
+    {
+      replayTargetLabels: [
+        "first-boundary",
+        "root-target",
+        "second-boundary"
+      ],
+      source: "root-render-private-react-dom-metadata-gate"
+    }
+  );
+
+  return {
+    compatibilityClaimed: metadata.compatibilityClaimed,
+    dehydratedBoundaryOwnershipRequiredCount:
+      metadata.dehydratedBoundaryOwnershipRequiredCount,
+    dehydratedBoundaryOwnershipRetainedCount:
+      metadata.dehydratedBoundaryOwnershipRetainedCount,
+    eventDispatch: metadata.eventDispatch,
+    eventsReplayed: metadata.eventsReplayed,
+    hydration: metadata.hydration,
+    metadataStatus: metadata.metadataStatus,
+    publicRootErrorCallbackCalls: rootErrorCalls.length,
+    publicRootErrorCallbacksInvoked:
+      metadata.publicRootErrorCallbacksInvoked,
+    reportGlobalErrorInvoked: metadata.reportGlobalErrorInvoked,
+    rootErrorCallbackInvocationCount:
+      metadata.rootErrorCallbackInvocationCount,
+    rootErrorOptionCallbackRecordCount:
+      metadata.rootErrorOptionCallbackRecordCount,
+    rootOwnershipRetainedCount: metadata.rootOwnershipRetainedCount,
+    sourceLabels: metadata.rootErrorOptionCallbackRecords.map(
+      (record) => record.sourceLabel
+    ),
+    willReplayFlags: metadata.rootErrorOptionCallbackRecords.map(
+      (record) => record.willReplay
+    )
+  };
+}
+
+function runPrivateReactDomMetadataControlledQueueWritePreflightDiagnostic({
+  mode,
+  modules
+}) {
+  const gate =
+    modules.controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate(
+      {
+        requestIdPrefix: `${mode.id}:metadata-controlled-write-preflight`
+      }
+    );
+  const rows = [
+    {
+      domEventName: "input",
+      latestProps: {
+        onChange() {},
+        onInput() {},
+        type: "text",
+        value: "alpha"
+      },
+      nodeName: "INPUT",
+      queueId: `${mode.id}:metadata-text-write-preflight`
+    },
+    {
+      domEventName: "click",
+      latestProps: {
+        checked: true,
+        name: "choice",
+        onChange() {},
+        onClick() {},
+        type: "radio"
+      },
+      nodeName: "INPUT",
+      queueId: `${mode.id}:metadata-radio-write-preflight`
+    }
+  ];
+  const records = rows.map((row) => {
+    const dispatch = createPrivateControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      modules,
+      nodeName: row.nodeName
+    });
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        eventName: row.domEventName,
+        explicitAdmission: true,
+        queueId: row.queueId,
+        queueKind:
+          "deterministic-event-latest-props-post-event-restore-queue",
+        targetKind: "controlled-input-post-event-restore-queue"
+      }
+    );
+    modules.componentTree.detachHostInstanceToken(dispatch.token);
+    return intent;
+  });
+  const preflight = gate.preflightRestoreQueueWrites(records, {
+    explicitAdmission: true,
+    queueId: `${mode.id}:metadata-controlled-write-preflight-queue`,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-write-preflight",
+    targetKind: "controlled-input-post-event-restore-queue-write-preflight"
+  });
+
+  return {
+    acceptedRestoreKinds: preflight.writeIntentRows.map(
+      (row) => row.acceptedRestoreKind
+    ),
+    browserInputMutated: preflight.sideEffects.browserInputMutated,
+    hostWrapperInvoked: preflight.sideEffects.hostWrapperInvoked,
+    radioGroupLookupPerformed:
+      preflight.sideEffects.radioGroupLookupPerformed,
+    radioGroupLookupRequired: preflight.sideEffects.radioGroupLookupRequired,
+    restoreQueueFlushed: preflight.sideEffects.restoreQueueFlushed,
+    restoreQueueWritten: preflight.sideEffects.restoreQueueWritten,
+    restoreQueueWriteIntentRowCount:
+      preflight.sideEffects.restoreQueueWriteIntentRowCount,
+    status: preflight.status,
+    valueTrackerFieldWritten:
+      preflight.sideEffects.valueTrackerFieldWritten,
+    writeIntentQueueSlots: preflight.writeIntentRows.map(
+      (row) => row.queueSlot
+    ),
+    writeWouldRunFlags: preflight.writeIntentRows.map(
+      (row) => row.writeWouldRun
+    )
   };
 }
 
@@ -9789,6 +11157,300 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
         submitterActionOverridesFormAction: true,
         submitterValueWouldBeIncludedInFormData: false
       };
+    case "worker-505-form-action-event-extraction":
+      return {
+        actionInvoked: false,
+        compatibilityClaimed: false,
+        consumedSubmitRequestSubmitActionMetadata: true,
+        eventExtractionMetadataRecorded: true,
+        formDataConstructed: false,
+        hostTransitionStarted: false,
+        nativeNavigationWouldBePreventedCount: 2,
+        recordCount: 2,
+        requestSubmitWouldDispatchSubmitEvent: true,
+        statuses: [
+          "recorded-private-form-action-event-extraction-metadata",
+          "recorded-private-form-action-event-extraction-metadata"
+        ],
+        submissionTriggers: ["submit", "requestSubmit"],
+        syntheticEventCreated: false
+      };
+    case "worker-506-form-reset-queue-commit":
+      return {
+        compatibilityClaimed: false,
+        commitBoundaryStatus:
+          "blocked-private-form-reset-after-mutation-commit",
+        defaultValueUpdatesWouldPrecedeReset: true,
+        formResetCommitted: false,
+        previousDispatcherCalled: false,
+        queueBoundaryStatus: "blocked-private-form-reset-state-queue",
+        reactUpdateQueued: false,
+        realFormInspected: false,
+        realFormReset: false,
+        resetFormInstanceCalled: false,
+        resetStateWouldBeQueued: true,
+        resetTraversalWouldRunAfterMutationEffects: true,
+        status: "recorded-private-form-action-reset-queue-commit-boundary"
+      };
+    case "worker-507-resource-map-commit":
+      return {
+        fakeResourceMapsMutated: false,
+        loadStateMutated: false,
+        mapKinds: [
+          "preload-props",
+          "hoistable-styles",
+          "preload-props",
+          "hoistable-scripts"
+        ],
+        preloadRecordCount: 2,
+        publicResourceHintCallsReachable: false,
+        realResourceMapsMutated: false,
+        recordKinds: ["preload", "stylesheet", "preload", "script"],
+        resourceFetchStarted: false,
+        scriptRecordCount: 1,
+        singletonOwnershipClaimed: false,
+        status: "admitted-private-resource-hint-resource-map-commit-record",
+        stylesheetRecordCount: 1
+      };
+    case "worker-508-stylesheet-load-error-state":
+      return {
+        commitSuspended: false,
+        loadingBitmasks: [0, 1, 2, 3, 4],
+        loadingPromiseCreated: false,
+        preloadFetchStarted: false,
+        realTimerScheduled: false,
+        resourceCount: 1,
+        resourceInstance: null,
+        resourceLoading: 0,
+        resourcePreloadSeenBefore: true,
+        status:
+          "admitted-private-resource-hint-stylesheet-load-error-state-record",
+        stylesheetCommitSuspended: false,
+        stylesheetFetchStarted: false
+      };
+    case "worker-509-controlled-restore-flush-order":
+      return {
+        acceptedRestoreKinds: ["input-text-value", "input-radio-checked"],
+        controlledStateRestoreInvoked: false,
+        hostWrapperInvoked: false,
+        hostWrapperRestoreOrderRecorded: true,
+        radioGroupLookupPerformed: false,
+        radioGroupRestoreRequired: true,
+        radioValueTrackerRefreshed: false,
+        recordCount: 2,
+        restoreQueueFlushed: false,
+        restoreQueueFlushOrderRecorded: true,
+        restoreQueueWritten: false,
+        restoreQueueWriteOrderRecorded: true,
+        statuses: [
+          "private-controlled-input-post-event-restore-queue-write-flush-ordering",
+          "private-controlled-input-post-event-restore-queue-write-flush-ordering"
+        ]
+      };
+    case "worker-510-controlled-radio-sibling-props":
+      return {
+        acceptedSameNameSameFormCount: 1,
+        candidateCount: 2,
+        formTraversalPerformed: false,
+        groupIntentStatus: "recorded-private-controlled-radio-group-restore-intent",
+        livePropsLookupPerformed: false,
+        radioGroupSiblingMetadataRead: true,
+        realDomQueried: false,
+        records: [
+          {
+            sameForm: true,
+            sameName: true,
+            siblingWouldReceiveRestore: true,
+            skipReason: null,
+            status: "accepted-private-controlled-radio-sibling-props-evidence"
+          },
+          {
+            sameForm: false,
+            sameName: true,
+            siblingWouldReceiveRestore: false,
+            skipReason: "sibling-radio-form-does-not-match",
+            status: "skipped-private-controlled-radio-sibling-props-evidence"
+          }
+        ],
+        siblingInputRestorePerformed: false,
+        siblingPropsLookupStatus:
+          "recorded-private-controlled-radio-sibling-props-lookup-intent",
+        wrapperExecuted: false
+      };
+    case "worker-511-public-facade-host-output-update":
+      return {
+        acceptedCapabilityIds: [
+          "public-facade-create-root-record",
+          "public-facade-initial-host-output-render",
+          "public-facade-root-render-update-record",
+          "host-output-update-handoff",
+          "fake-dom-property-update",
+          "property-payload-evidence",
+          "fake-dom-text-update",
+          "latest-props-after-mutation",
+          "attribute-payload-rows"
+        ],
+        browserDomMutation: false,
+        compatibilityClaimed: false,
+        containerChildCount: 1,
+        diagnosticStatus:
+          "applied-private-root-public-facade-host-output-update-diagnostic",
+        hostOutputUpdateHandoffStatus:
+          "applied-private-root-host-output-update",
+        latestTextContent: "updated facade output",
+        listenerInstallation: false,
+        nativeExecution: false,
+        publicRootCompatibilitySurface: false,
+        publicRootExecution: false,
+        requestTypes: ["createRoot", "root.render", "root.render"],
+        updatedAttributeNames: ["class", "data-phase", "id"]
+      };
+    case "worker-512-public-facade-unmount-cleanup":
+      return {
+        acceptedCapabilityIds: [
+          "public-facade-create-root-record",
+          "public-facade-root-render-record",
+          "public-facade-root-unmount-record",
+          "root-marker-setup-cleanup",
+          "root-listener-setup-cleanup",
+          "create-render-admission",
+          "fake-dom-host-output-mutation",
+          "fake-dom-unmount-cleanup",
+          "component-tree-metadata-detach",
+          "latest-props-publication"
+        ],
+        blockedCapabilityIds: [
+          "public-root-execution",
+          "public-root-unmount",
+          "native-execution",
+          "reconciler-execution",
+          "browser-dom-compatibility",
+          "hydration",
+          "events",
+          "refs",
+          "compatibility-claims"
+        ],
+        browserDomMutation: false,
+        cleanupRequired: false,
+        compatibilityClaimed: false,
+        componentTreeMetadataDetached: true,
+        containerChildCountAfterUnmount: 0,
+        diagnosticStatus:
+          "cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic",
+        publicRootCompatibilitySurface: false,
+        publicRootExecution: false,
+        publicRootUnmounted: false,
+        rootContainerChildrenCleared: true,
+        rootMarkerCleared: true,
+        rootRegistrationsCleared: true,
+        unmountCleanupStatus: "cleaned-private-root-unmount-host-output",
+        unmountNoOp: false
+      };
+    case "worker-513-event-type-dispatch-canary":
+      return {
+        cases: [
+          {
+            dispatchQueueLength: 1,
+            domEventName: "keydown",
+            eventDispatch: false,
+            eventPriorityName: "DiscreteEventPriority",
+            hydrationReplayQueued: false,
+            listenerInvocationCount: 0,
+            listenerMetadataCount: 2,
+            publicDispatchEnabled: false,
+            syntheticEventCount: 0,
+            targetDispatchPathLength: 2,
+            targetListenerFound: true
+          },
+          {
+            dispatchQueueLength: 1,
+            domEventName: "mousemove",
+            eventDispatch: false,
+            eventPriorityName: "ContinuousEventPriority",
+            hydrationReplayQueued: false,
+            listenerInvocationCount: 0,
+            listenerMetadataCount: 2,
+            publicDispatchEnabled: false,
+            syntheticEventCount: 0,
+            targetDispatchPathLength: 2,
+            targetListenerFound: true
+          },
+          {
+            dispatchQueueLength: 1,
+            domEventName: "animationend",
+            eventDispatch: false,
+            eventPriorityName: "DefaultEventPriority",
+            hydrationReplayQueued: false,
+            listenerInvocationCount: 0,
+            listenerMetadataCount: 2,
+            publicDispatchEnabled: false,
+            syntheticEventCount: 0,
+            targetDispatchPathLength: 2,
+            targetListenerFound: true
+          }
+        ],
+        metadataOnly: true
+      };
+    case "worker-514-portal-event-error-routing":
+      return {
+        acceptedCapabilityIds: [
+          "private-listener-error-route",
+          "root-error-option-callback-metadata",
+          "portal-owner-root-event-path-metadata",
+          "portal-listener-error-route-correlation"
+        ],
+        callbackRecordCount: 1,
+        compatibilityClaimed: false,
+        eventDispatch: false,
+        listenerErrorRouteCount: 1,
+        listenerPhases: ["capture", "bubble"],
+        payloadPortalGateMatches: true,
+        portalContainerContainsEventTarget: true,
+        portalEventBubbling: false,
+        portalEventOwnerRootGateLinked: true,
+        portalEventOwnerRootMatchesTargetRoot: true,
+        publicDispatchEnabled: false,
+        publicPortalBubbling: false,
+        publicRootErrorCallbackCalls: 0,
+        publicRootErrorCallbacksInvoked: false,
+        reportGlobalErrorInvoked: false,
+        rootContainerContainsEventTarget: false,
+        rootErrorCallbackInvocationCount: 0,
+        sourceLabel: "metadata-portal-listener-error-route"
+      };
+    case "worker-528-hydration-replay-error-metadata":
+      return {
+        compatibilityClaimed: false,
+        dehydratedBoundaryOwnershipRequiredCount: 2,
+        dehydratedBoundaryOwnershipRetainedCount: 2,
+        eventDispatch: false,
+        eventsReplayed: false,
+        hydration: false,
+        metadataStatus: "recorded-private-root-hydration-replay-error-metadata",
+        publicRootErrorCallbackCalls: 0,
+        publicRootErrorCallbacksInvoked: false,
+        reportGlobalErrorInvoked: false,
+        rootErrorCallbackInvocationCount: 0,
+        rootErrorOptionCallbackRecordCount: 3,
+        rootOwnershipRetainedCount: 3,
+        sourceLabels: ["first-boundary", "root-target", "second-boundary"],
+        willReplayFlags: [false, false, false]
+      };
+    case "worker-533-controlled-restore-queue-write-preflight":
+      return {
+        acceptedRestoreKinds: ["input-text-value", "input-radio-checked"],
+        browserInputMutated: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupPerformed: false,
+        radioGroupLookupRequired: true,
+        restoreQueueFlushed: false,
+        restoreQueueWritten: false,
+        restoreQueueWriteIntentRowCount: 2,
+        status: "private-controlled-input-post-event-restore-queue-write-preflight",
+        valueTrackerFieldWritten: false,
+        writeIntentQueueSlots: ["restore-target", "restore-queue"],
+        writeWouldRunFlags: [true, true]
+      };
     default:
       return null;
   }
@@ -9924,6 +11586,19 @@ function comparablePrivateReactDomMetadataEvidence(metadataId, evidence) {
         submitterValueWouldBeIncludedInFormData:
           evidence.submitterValueWouldBeIncludedInFormData
       };
+    case "worker-505-form-action-event-extraction":
+    case "worker-506-form-reset-queue-commit":
+    case "worker-507-resource-map-commit":
+    case "worker-508-stylesheet-load-error-state":
+    case "worker-509-controlled-restore-flush-order":
+    case "worker-510-controlled-radio-sibling-props":
+    case "worker-511-public-facade-host-output-update":
+    case "worker-512-public-facade-unmount-cleanup":
+    case "worker-513-event-type-dispatch-canary":
+    case "worker-514-portal-event-error-routing":
+    case "worker-528-hydration-replay-error-metadata":
+    case "worker-533-controlled-restore-queue-write-preflight":
+      return evidence;
     default:
       return null;
   }

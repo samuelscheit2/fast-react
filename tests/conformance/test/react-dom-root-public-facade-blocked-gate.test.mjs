@@ -74,6 +74,26 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     gate.blockedPublicFacadeRows.map((row) => row.id),
     REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS.map((row) => row.id)
   );
+  assert.equal(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.filter(
+      (admission) => Number(admission.workerId) >= 503
+    ).length,
+    12
+  );
+  const privateMetadataBlockedRow = gate.blockedPublicFacadeRows.find(
+    (row) =>
+      row.id ===
+      "public-root-render-private-react-dom-metadata-compatibility"
+  );
+  assert.equal(
+    privateMetadataBlockedRow.gateStatus,
+    REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS
+  );
+  assert.equal(privateMetadataBlockedRow.compatibilityClaimed, false);
+  assert.equal(
+    privateMetadataBlockedRow.privateReactDomMetadataEvidence,
+    "separate"
+  );
   assert.equal(gate.blockedPrivateBridgeRows.length, 8);
   assert.equal(
     gate.rootRenderGate.summary.privateHostOutputDiagnosticScenarioModeRowCount,
