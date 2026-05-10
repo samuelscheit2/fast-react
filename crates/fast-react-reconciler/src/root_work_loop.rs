@@ -34,9 +34,12 @@ use fast_react_host_config::HostTypes;
 use crate::UpdateId;
 #[cfg(test)]
 use crate::context::{
+    ContextProviderUpdateConsumerOrder, ContextProviderUpdateDependencyPath,
     ContextProviderUpdateLaneGateError, ContextProviderUpdateSingleConsumerLaneRecord,
-    ContextProviderUpdateSingleConsumerLaneRequest,
+    ContextProviderUpdateSingleConsumerLaneRequest, ContextProviderUpdateTwoConsumerLaneRecord,
+    ContextProviderUpdateTwoConsumerLaneRequest,
     record_context_provider_update_single_consumer_lane_gate,
+    record_context_provider_update_two_consumer_lane_gate,
 };
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
@@ -116,6 +119,8 @@ use crate::{
         mount_test_host_sibling_work, mount_test_host_work,
     },
     root_commit::{
+        HostRootContextProviderUpdateCommitHandoffErrorForCanary,
+        HostRootContextProviderUpdateCommitHandoffRecordForCanary,
         HostRootFinishedWorkCommitExecutionBlockerForCanary,
         HostRootFinishedWorkCommitExecutionStatusForCanary,
         HostRootFinishedWorkCommitHandoffErrorForCanary,
@@ -124,6 +129,7 @@ use crate::{
         HostRootSingleHostUpdateApplyRecordErrorForCanary,
         HostRootSingleHostUpdateApplyRecordForCanary,
         commit_finished_host_root_with_finished_work_handoff_for_canary,
+        record_context_provider_update_two_consumer_commit_handoff_for_canary,
         record_host_root_finished_work_pending_commit_for_canary,
         record_host_root_single_host_update_apply_for_canary,
     },
@@ -3444,6 +3450,11 @@ impl HostRootNestedContextProviderTwoConsumerPropagationGateRequest {
     }
 
     #[must_use]
+    const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
     const fn propagation_lanes(self) -> Lanes {
         self.propagation_lanes
     }
@@ -3867,6 +3878,87 @@ impl HostRootContextProviderUpdateRenderCommitTraversalRecord {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootNestedContextProviderUpdateRenderCommitHandoffRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    original_root_element: RootElementHandle,
+    outer_provider: FiberId,
+    inner_provider: FiberId,
+    first_function_component: FiberId,
+    second_function_component: FiberId,
+    begin_work: NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
+    provider_update: ContextProviderUpdateTwoConsumerLaneRecord,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    context_update_commit_handoff: HostRootContextProviderUpdateCommitHandoffRecordForCanary,
+}
+
+#[cfg(test)]
+impl HostRootNestedContextProviderUpdateRenderCommitHandoffRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn original_root_element(&self) -> RootElementHandle {
+        self.original_root_element
+    }
+
+    #[must_use]
+    const fn outer_provider(&self) -> FiberId {
+        self.outer_provider
+    }
+
+    #[must_use]
+    const fn inner_provider(&self) -> FiberId {
+        self.inner_provider
+    }
+
+    #[must_use]
+    const fn first_function_component(&self) -> FiberId {
+        self.first_function_component
+    }
+
+    #[must_use]
+    const fn second_function_component(&self) -> FiberId {
+        self.second_function_component
+    }
+
+    #[must_use]
+    const fn begin_work(&self) -> NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    const fn provider_update(&self) -> ContextProviderUpdateTwoConsumerLaneRecord {
+        self.provider_update
+    }
+
+    #[must_use]
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    const fn context_update_commit_handoff(
+        &self,
+    ) -> &HostRootContextProviderUpdateCommitHandoffRecordForCanary {
+        &self.context_update_commit_handoff
+    }
+
+    #[must_use]
+    const fn commit(&self) -> &HostRootCommitRecord {
+        self.finished_work_handoff.commit()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootContextProviderUseContextCompleteUnwindTraversalError {
     ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
     ContextProvider(ContextProviderBeginWorkError),
@@ -4144,6 +4236,133 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootNestedContextProviderUpdateRenderCommitHandoffError {
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    NestedContextProvider(Box<NestedContextProviderBeginWorkError>),
+    ContextProviderUpdate(ContextProviderUpdateLaneGateError),
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    ContextUpdateCommitHandoff(HostRootContextProviderUpdateCommitHandoffErrorForCanary),
+    MissingContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootNestedContextProviderUpdateRenderCommitHandoffError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ChildPreflight(error) => Display::fmt(error, formatter),
+            Self::NestedContextProvider(error) => Display::fmt(error, formatter),
+            Self::ContextProviderUpdate(error) => Display::fmt(error, formatter),
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::ContextUpdateCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::MissingContextProviderChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no ContextProvider child for private nested provider update render/commit handoff",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedContextProviderChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be ContextProvider for private nested provider update render/commit handoff, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootNestedContextProviderUpdateRenderCommitHandoffError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::ChildPreflight(error) => Some(error.as_ref()),
+            Self::NestedContextProvider(error) => Some(error.as_ref()),
+            Self::ContextProviderUpdate(error) => Some(error),
+            Self::CompleteWork(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::ContextUpdateCommitHandoff(error) => Some(error),
+            Self::MissingContextProviderChild { .. }
+            | Self::ExpectedContextProviderChild { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootNestedContextProviderUpdateRenderCommitHandoffError
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<NestedContextProviderBeginWorkError>
+    for HostRootNestedContextProviderUpdateRenderCommitHandoffError
+{
+    fn from(error: NestedContextProviderBeginWorkError) -> Self {
+        Self::NestedContextProvider(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderUpdateLaneGateError>
+    for HostRootNestedContextProviderUpdateRenderCommitHandoffError
+{
+    fn from(error: ContextProviderUpdateLaneGateError) -> Self {
+        Self::ContextProviderUpdate(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootNestedContextProviderUpdateRenderCommitHandoffError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootNestedContextProviderUpdateRenderCommitHandoffError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkCommitHandoff(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootContextProviderUpdateCommitHandoffErrorForCanary>
+    for HostRootNestedContextProviderUpdateRenderCommitHandoffError
+{
+    fn from(error: HostRootContextProviderUpdateCommitHandoffErrorForCanary) -> Self {
+        Self::ContextUpdateCommitHandoff(error)
+    }
+}
+
+#[cfg(test)]
 fn propagate_host_root_context_provider_use_context_change_for_test(
     store: &mut FiberRootStore<RecordingHost>,
     render: HostRootRenderPhaseRecord,
@@ -4297,6 +4516,110 @@ fn propagate_host_root_nested_context_provider_two_consumer_use_context_change_f
             begin_work,
             first_propagation,
             second_propagation,
+        },
+    )
+}
+
+#[cfg(test)]
+fn handoff_nested_context_provider_two_consumer_update_to_test_render_commit(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    request: HostRootNestedContextProviderTwoConsumerPropagationGateRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    HostRootNestedContextProviderUpdateRenderCommitHandoffRecord,
+    HostRootNestedContextProviderUpdateRenderCommitHandoffError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        request.root(),
+        request.host_root_work_in_progress(),
+        request.render_lanes(),
+    )?;
+    let outer_provider = validated.child.ok_or(
+        HostRootNestedContextProviderUpdateRenderCommitHandoffError::MissingContextProviderChild {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootNestedContextProviderUpdateRenderCommitHandoffError::MissingContextProviderChild {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::ContextProvider {
+        return Err(
+            HostRootNestedContextProviderUpdateRenderCommitHandoffError::ExpectedContextProviderChild {
+                root: request.root(),
+                host_root_work_in_progress: request.host_root_work_in_progress(),
+                child: outer_provider,
+                tag: child_tag,
+            },
+        );
+    }
+
+    let begin_work = begin_work_nested_context_provider_two_consumer_use_context_children(
+        store.fiber_arena_mut(),
+        NestedContextProviderBeginWorkRequest::new(
+            outer_provider,
+            request.render_lanes(),
+            request.outer_context(),
+            request.outer_value(),
+            request.inner_context(),
+            request.inner_value(),
+        ),
+        context_store,
+        invoker,
+    )?;
+    let provider_update = record_context_provider_update_two_consumer_lane_gate(
+        store,
+        context_store,
+        begin_work,
+        ContextProviderUpdateTwoConsumerLaneRequest::new(
+            request.root(),
+            request.host_root_work_in_progress(),
+            begin_work.outer_provider_token(),
+            begin_work.inner_provider_token(),
+            request.inner_context(),
+            request.inner_value(),
+            request.next_value(),
+            request.propagation_lanes(),
+            ContextProviderUpdateDependencyPath::from_begin_work(begin_work),
+        ),
+    )?;
+
+    let pending_finished_work =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending_finished_work),
+        2,
+    )?;
+    let context_update_commit_handoff =
+        record_context_provider_update_two_consumer_commit_handoff_for_canary(
+            store,
+            &finished_work_handoff,
+            provider_update,
+            3,
+        )?;
+
+    Ok(
+        HostRootNestedContextProviderUpdateRenderCommitHandoffRecord {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+            original_root_element: render.resulting_element(),
+            outer_provider,
+            inner_provider: begin_work.inner_provider(),
+            first_function_component: begin_work.first_child(),
+            second_function_component: begin_work.second_child(),
+            begin_work,
+            provider_update,
+            finished_work_handoff,
+            context_update_commit_handoff,
         },
     )
 }
@@ -5707,10 +6030,6 @@ mod tests {
     use crate::begin_work::{
         BeginWorkError, FragmentSingleHostChildBeginWorkError,
         PORTAL_RECONCILER_UNSUPPORTED_FEATURE,
-    };
-    use crate::context::{
-        ContextProviderUpdateDependencyPath, ContextProviderUpdateTwoConsumerLaneRequest,
-        record_context_provider_update_two_consumer_lane_gate,
     };
     use crate::function_component::{
         FunctionComponentContextReadRecord, FunctionComponentContextRenderReader,
@@ -7702,6 +8021,239 @@ mod tests {
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn root_work_loop_nested_context_update_commit_handoff_proves_lanes_survive() {
+        let (mut store, root_id, host) = root_store();
+        let original_root_element = RootElementHandle::from_raw(1_127);
+        let skipped_sync_element = RootElementHandle::from_raw(1_128);
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, original_root_element, None).unwrap();
+        update_container_sync(&mut store, root_id, skipped_sync_element, None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        assert_eq!(render.resulting_element(), original_root_element);
+        assert_eq!(render.remaining_lanes(), Lanes::SYNC);
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            outer_provider,
+            inner_provider,
+            first_function_component,
+            first_component,
+            second_function_component,
+            second_component,
+        ) = attach_nested_context_provider_two_consumer_wip_children(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_129);
+        let outer_value = context_value(1_130);
+        let previous_inner_value = context_value(1_131);
+        let next_inner_value = context_value(1_132);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(second_component, UseContextBehavior::ReadOnce { context });
+
+        let record = handoff_nested_context_provider_two_consumer_update_to_test_render_commit(
+            &mut store,
+            render,
+            HostRootNestedContextProviderTwoConsumerPropagationGateRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                Lanes::DEFAULT,
+                context,
+                outer_value,
+                context,
+                previous_inner_value,
+                next_inner_value,
+                Lanes::SYNC,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.original_root_element(), original_root_element);
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.first_function_component(), first_function_component);
+        assert_eq!(
+            record.second_function_component(),
+            second_function_component
+        );
+
+        let begin_work = record.begin_work();
+        assert_eq!(begin_work.outer_provider(), outer_provider);
+        assert_eq!(begin_work.inner_provider(), inner_provider);
+        assert_eq!(begin_work.outer_value(), outer_value);
+        assert_eq!(begin_work.inner_value(), previous_inner_value);
+        assert_eq!(begin_work.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(begin_work.first_child(), first_function_component);
+        assert_eq!(begin_work.second_child(), second_function_component);
+        assert_eq!(begin_work.first_child_context_read_count(), 1);
+        assert_eq!(begin_work.second_child_context_read_count(), 1);
+        assert_eq!(registry.reads().len(), 2);
+        assert_eq!(registry.reads()[0], begin_work.first_child_context_read());
+        assert_eq!(registry.reads()[1], begin_work.second_child_context_read());
+
+        let provider_update = record.provider_update();
+        assert_eq!(provider_update.root(), root_id);
+        assert_eq!(
+            provider_update.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(provider_update.outer_provider(), outer_provider);
+        assert_eq!(provider_update.inner_provider(), inner_provider);
+        assert_eq!(provider_update.context(), context);
+        assert_eq!(provider_update.previous_value(), previous_inner_value);
+        assert_eq!(provider_update.next_value(), next_inner_value);
+        assert_eq!(provider_update.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(provider_update.propagation_lanes(), Lanes::SYNC);
+        assert!(provider_update.provider_changed());
+        assert_eq!(provider_update.marked_dependency_count(), 2);
+        assert_eq!(provider_update.dependent_consumer_count(), 2);
+        assert!(provider_update.all_marked_consumers_include_propagation_lanes());
+        assert!(provider_update.public_context_compatibility_blocked());
+
+        let consumers = provider_update.dependent_consumers();
+        for (consumer_record, consumer, read) in [
+            (
+                consumers[0],
+                first_function_component,
+                begin_work.first_child_context_read(),
+            ),
+            (
+                consumers[1],
+                second_function_component,
+                begin_work.second_child_context_read(),
+            ),
+        ] {
+            assert_eq!(consumer_record.consumer(), consumer);
+            assert_eq!(consumer_record.dependency(), read.dependency());
+            assert_eq!(consumer_record.context(), context);
+            assert_eq!(consumer_record.memoized_value(), previous_inner_value);
+            assert_eq!(consumer_record.previous_value(), previous_inner_value);
+            assert_eq!(consumer_record.next_value(), next_inner_value);
+            assert_eq!(consumer_record.render_lanes(), Lanes::DEFAULT);
+            assert_eq!(consumer_record.propagation_lanes(), Lanes::SYNC);
+            assert_eq!(consumer_record.dependency_lanes(), Lanes::SYNC);
+            assert!(consumer_record.marked_changed_provider_lanes());
+        }
+
+        let finished_work_handoff = record.finished_work_handoff();
+        assert_eq!(finished_work_handoff.commit_order(), 2);
+        assert!(finished_work_handoff.proves_private_finished_work_commit_execution());
+        assert_eq!(
+            finished_work_handoff
+                .pending()
+                .pending_lanes_before_commit(),
+            Lanes::DEFAULT.merge_lane(Lane::SYNC)
+        );
+        assert_eq!(
+            finished_work_handoff.pending().finished_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            finished_work_handoff.pending().remaining_lanes(),
+            Lanes::SYNC
+        );
+
+        let context_commit = record.context_update_commit_handoff();
+        assert_eq!(context_commit.request_order(), 3);
+        assert_eq!(context_commit.provider_update(), provider_update);
+        assert_eq!(
+            context_commit.finished_work_handoff().pending(),
+            finished_work_handoff.pending()
+        );
+        assert!(context_commit.marked_consumer_lanes_survived_to_commit());
+        assert!(context_commit.ancestor_child_lanes_survived_to_commit());
+        assert!(context_commit.root_pending_lanes_survived_to_commit());
+        assert!(context_commit.proves_marked_consumer_lanes_survive_to_commit());
+        assert!(
+            context_commit
+                .host_root_child_lanes_after_commit()
+                .contains_all(Lanes::SYNC)
+        );
+        assert!(
+            context_commit
+                .outer_provider_child_lanes_after_commit()
+                .contains_all(Lanes::SYNC)
+        );
+        assert!(
+            context_commit
+                .inner_provider_child_lanes_after_commit()
+                .contains_all(Lanes::SYNC)
+        );
+        assert!(
+            context_commit
+                .root_pending_lanes_after_commit()
+                .contains_all(Lanes::SYNC)
+        );
+
+        for (committed, consumer) in context_commit.committed_consumers().iter().zip([
+            (
+                ContextProviderUpdateConsumerOrder::First,
+                first_function_component,
+            ),
+            (
+                ContextProviderUpdateConsumerOrder::Second,
+                second_function_component,
+            ),
+        ]) {
+            let (order, consumer) = consumer;
+            assert_eq!(committed.order(), order);
+            assert_eq!(committed.consumer(), consumer);
+            assert_eq!(committed.dependency_lanes(), Lanes::SYNC);
+            assert_eq!(committed.propagation_lanes(), Lanes::SYNC);
+            assert!(
+                committed
+                    .fiber_lanes_after_render()
+                    .contains_all(Lanes::SYNC)
+            );
+            assert!(
+                committed
+                    .fiber_lanes_after_commit()
+                    .contains_all(Lanes::SYNC)
+            );
+            assert!(committed.lanes_survived());
+        }
+
+        let commit = record.commit();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), host_root_work_in_progress);
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(commit.remaining_lanes(), Lanes::SYNC);
+        assert_eq!(commit.pending_lanes(), Lanes::SYNC);
+        assert!(commit.has_remaining_work());
+        assert!(commit.mutation_log().is_empty());
+        assert!(commit.mutation_apply_log().is_empty());
+
+        let committed_root = store.root(root_id).unwrap();
+        assert_eq!(committed_root.current(), host_root_work_in_progress);
+        assert_eq!(committed_root.finished_work(), None);
+        assert_eq!(committed_root.finished_lanes(), Lanes::NO);
+        assert_eq!(committed_root.lanes().pending_lanes(), Lanes::SYNC);
+        for consumer in [first_function_component, second_function_component] {
+            let node = store.fiber_arena().get(consumer).unwrap();
+            assert!(node.lanes().contains_all(Lanes::SYNC));
+            assert_eq!(node.dependencies(), DependenciesHandle::NONE);
+            assert!(!node.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
+        }
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+        store.fiber_arena().validate_topology().unwrap();
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     #[test]

@@ -23,6 +23,11 @@ use crate::complete_work::{
     OffscreenRevealCommitMetadataRecord, OffscreenRevealCommitMetadataStatus,
     OffscreenVisibilitySubtreeFlagBubblingIntent,
 };
+#[cfg(test)]
+use crate::context::{
+    ContextProviderUpdateConsumerLaneRecord, ContextProviderUpdateConsumerOrder,
+    ContextProviderUpdateTwoConsumerLaneRecord,
+};
 use crate::function_component::{
     FunctionComponentCommittedEffectQueue, FunctionComponentEffectDependencyPhase,
     FunctionComponentEffectDependencyStatus, FunctionComponentHookRenderPhase,
@@ -1156,6 +1161,167 @@ const HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS:
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootContextProviderUpdateCommitHandoffRecordForCanary {
+    provider_update: ContextProviderUpdateTwoConsumerLaneRecord,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    request_order: usize,
+    committed_consumers: [HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary; 2],
+    host_root_child_lanes_after_commit: Lanes,
+    outer_provider_child_lanes_after_commit: Lanes,
+    inner_provider_child_lanes_after_commit: Lanes,
+    root_pending_lanes_after_commit: Lanes,
+}
+
+#[cfg(test)]
+impl HostRootContextProviderUpdateCommitHandoffRecordForCanary {
+    #[must_use]
+    pub(crate) const fn provider_update(&self) -> ContextProviderUpdateTwoConsumerLaneRecord {
+        self.provider_update
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff(
+        &self,
+    ) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(&self) -> usize {
+        self.request_order
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_consumers(
+        &self,
+    ) -> &[HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary; 2] {
+        &self.committed_consumers
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root_child_lanes_after_commit(&self) -> Lanes {
+        self.host_root_child_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn outer_provider_child_lanes_after_commit(&self) -> Lanes {
+        self.outer_provider_child_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn inner_provider_child_lanes_after_commit(&self) -> Lanes {
+        self.inner_provider_child_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pending_lanes_after_commit(&self) -> Lanes {
+        self.root_pending_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) fn marked_consumer_lanes_survived_to_commit(&self) -> bool {
+        self.committed_consumers
+            .iter()
+            .all(HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary::lanes_survived)
+    }
+
+    #[must_use]
+    pub(crate) fn ancestor_child_lanes_survived_to_commit(&self) -> bool {
+        let lanes = self.provider_update.propagation_lanes();
+        self.host_root_child_lanes_after_commit.contains_all(lanes)
+            && self
+                .outer_provider_child_lanes_after_commit
+                .contains_all(lanes)
+            && self
+                .inner_provider_child_lanes_after_commit
+                .contains_all(lanes)
+    }
+
+    #[must_use]
+    pub(crate) fn root_pending_lanes_survived_to_commit(&self) -> bool {
+        self.root_pending_lanes_after_commit
+            .contains_all(self.provider_update.propagation_lanes())
+    }
+
+    #[must_use]
+    pub(crate) fn proves_marked_consumer_lanes_survive_to_commit(&self) -> bool {
+        self.finished_work_handoff
+            .proves_private_finished_work_commit_execution()
+            && self.provider_update.provider_changed()
+            && self.provider_update.marked_dependency_count()
+                == self.provider_update.dependent_consumer_count()
+            && self
+                .provider_update
+                .all_marked_consumers_include_propagation_lanes()
+            && self.marked_consumer_lanes_survived_to_commit()
+            && self.ancestor_child_lanes_survived_to_commit()
+            && self.root_pending_lanes_survived_to_commit()
+            && self
+                .finished_work_handoff
+                .commit()
+                .pending_lanes()
+                .contains_all(self.provider_update.propagation_lanes())
+            && self.provider_update.public_context_compatibility_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary {
+    order: ContextProviderUpdateConsumerOrder,
+    consumer: FiberId,
+    dependency_lanes: Lanes,
+    propagation_lanes: Lanes,
+    fiber_lanes_after_render: Lanes,
+    fiber_lanes_after_commit: Lanes,
+}
+
+#[cfg(test)]
+impl HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary {
+    #[must_use]
+    pub(crate) const fn order(self) -> ContextProviderUpdateConsumerOrder {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn consumer(self) -> FiberId {
+        self.consumer
+    }
+
+    #[must_use]
+    pub(crate) const fn dependency_lanes(self) -> Lanes {
+        self.dependency_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber_lanes_after_render(self) -> Lanes {
+        self.fiber_lanes_after_render
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber_lanes_after_commit(self) -> Lanes {
+        self.fiber_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) fn lanes_survived(&self) -> bool {
+        self.dependency_lanes.contains_all(self.propagation_lanes)
+            && self
+                .fiber_lanes_after_render
+                .contains_all(self.propagation_lanes)
+            && self
+                .fiber_lanes_after_commit
+                .contains_all(self.propagation_lanes)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HostRootOffscreenRevealCommitHandoffRecordForCanary {
     reveal_metadata: OffscreenRevealCommitMetadataRecord,
     execution_request: HostRootOffscreenRevealCommitExecutionRequestForCanary,
@@ -2011,6 +2177,187 @@ impl Display for HostRootTextUpdateCommitExecutionErrorForCanary {
 
 #[cfg(test)]
 impl Error for HostRootTextUpdateCommitExecutionErrorForCanary {}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootContextProviderUpdateCommitHandoffErrorForCanary {
+    RootCommit(RootCommitError),
+    IncompleteFinishedWorkHandoff {
+        root: FiberRootId,
+        finished_work: FiberId,
+    },
+    ContextUpdateRootMismatch {
+        expected_root: FiberRootId,
+        actual_root: FiberRootId,
+    },
+    ContextUpdateFinishedWorkMismatch {
+        root: FiberRootId,
+        expected_finished_work: FiberId,
+        actual_host_root_work_in_progress: FiberId,
+    },
+    ContextUpdateDidNotMarkChangedConsumers {
+        root: FiberRootId,
+        expected_marked_count: usize,
+        actual_marked_count: usize,
+    },
+    ContextUpdateConsumerLaneMismatch {
+        root: FiberRootId,
+        consumer: FiberId,
+        expected_lanes: Lanes,
+        actual_lanes: Lanes,
+    },
+    ContextUpdateConsumerNotCommitted {
+        root: FiberRootId,
+        finished_work: FiberId,
+        consumer: FiberId,
+    },
+    ContextUpdateAncestorChildLanesMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected_lanes: Lanes,
+        actual_child_lanes: Lanes,
+    },
+    ContextUpdateRootPendingLanesMismatch {
+        root: FiberRootId,
+        expected_lanes: Lanes,
+        actual_pending_lanes: Lanes,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootContextProviderUpdateCommitHandoffErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::IncompleteFinishedWorkHandoff {
+                root,
+                finished_work,
+            } => write!(
+                formatter,
+                "root {} context-provider update commit handoff requires a proven finished-work commit for fiber slot {}",
+                root.raw(),
+                finished_work.slot().get()
+            ),
+            Self::ContextUpdateRootMismatch {
+                expected_root,
+                actual_root,
+            } => write!(
+                formatter,
+                "context-provider update commit handoff expected root {}, found root {}",
+                expected_root.raw(),
+                actual_root.raw()
+            ),
+            Self::ContextUpdateFinishedWorkMismatch {
+                root,
+                expected_finished_work,
+                actual_host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} context-provider update commit handoff expected HostRoot work-in-progress fiber slot {}, found slot {}",
+                root.raw(),
+                expected_finished_work.slot().get(),
+                actual_host_root_work_in_progress.slot().get()
+            ),
+            Self::ContextUpdateDidNotMarkChangedConsumers {
+                root,
+                expected_marked_count,
+                actual_marked_count,
+            } => write!(
+                formatter,
+                "root {} context-provider update commit handoff expected {} marked changed consumers, found {}",
+                root.raw(),
+                expected_marked_count,
+                actual_marked_count
+            ),
+            Self::ContextUpdateConsumerLaneMismatch {
+                root,
+                consumer,
+                expected_lanes,
+                actual_lanes,
+            } => write!(
+                formatter,
+                "root {} context-provider update consumer {} lanes {:?} do not contain {:?} at commit",
+                root.raw(),
+                consumer.slot().get(),
+                actual_lanes,
+                expected_lanes
+            ),
+            Self::ContextUpdateConsumerNotCommitted {
+                root,
+                finished_work,
+                consumer,
+            } => write!(
+                formatter,
+                "root {} context-provider update consumer {} is not in committed finished-work subtree rooted at {}",
+                root.raw(),
+                consumer.slot().get(),
+                finished_work.slot().get()
+            ),
+            Self::ContextUpdateAncestorChildLanesMismatch {
+                root,
+                fiber,
+                expected_lanes,
+                actual_child_lanes,
+            } => write!(
+                formatter,
+                "root {} context-provider update ancestor {} child lanes {:?} do not contain {:?} at commit",
+                root.raw(),
+                fiber.slot().get(),
+                actual_child_lanes,
+                expected_lanes
+            ),
+            Self::ContextUpdateRootPendingLanesMismatch {
+                root,
+                expected_lanes,
+                actual_pending_lanes,
+            } => write!(
+                formatter,
+                "root {} context-provider update pending lanes {:?} do not retain {:?} after commit",
+                root.raw(),
+                actual_pending_lanes,
+                expected_lanes
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootContextProviderUpdateCommitHandoffErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::RootCommit(error) => Some(error),
+            Self::IncompleteFinishedWorkHandoff { .. }
+            | Self::ContextUpdateRootMismatch { .. }
+            | Self::ContextUpdateFinishedWorkMismatch { .. }
+            | Self::ContextUpdateDidNotMarkChangedConsumers { .. }
+            | Self::ContextUpdateConsumerLaneMismatch { .. }
+            | Self::ContextUpdateConsumerNotCommitted { .. }
+            | Self::ContextUpdateAncestorChildLanesMismatch { .. }
+            | Self::ContextUpdateRootPendingLanesMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<RootCommitError> for HostRootContextProviderUpdateCommitHandoffErrorForCanary {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for HostRootContextProviderUpdateCommitHandoffErrorForCanary {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::RootCommit(RootCommitError::from(error))
+    }
+}
+
+#[cfg(test)]
+impl From<FiberRootStoreError> for HostRootContextProviderUpdateCommitHandoffErrorForCanary {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::RootCommit(RootCommitError::from(error))
+    }
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7796,6 +8143,190 @@ pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H:
         finished_lanes_after_commit: root.finished_lanes(),
         render_phase_work_after_commit: root.scheduling().work_in_progress(),
     })
+}
+
+#[cfg(test)]
+pub(crate) fn record_context_provider_update_two_consumer_commit_handoff_for_canary<
+    H: HostTypes,
+>(
+    store: &FiberRootStore<H>,
+    finished_work_handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    provider_update: ContextProviderUpdateTwoConsumerLaneRecord,
+    request_order: usize,
+) -> Result<
+    HostRootContextProviderUpdateCommitHandoffRecordForCanary,
+    HostRootContextProviderUpdateCommitHandoffErrorForCanary,
+> {
+    let commit = finished_work_handoff.commit();
+    let root = commit.root();
+    let finished_work = commit.finished_work();
+    let propagation_lanes = provider_update.propagation_lanes();
+
+    if !finished_work_handoff.proves_private_finished_work_commit_execution() {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::IncompleteFinishedWorkHandoff {
+                root,
+                finished_work,
+            },
+        );
+    }
+
+    if provider_update.root() != root {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateRootMismatch {
+                expected_root: root,
+                actual_root: provider_update.root(),
+            },
+        );
+    }
+    if provider_update.host_root_work_in_progress() != finished_work {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateFinishedWorkMismatch {
+                root,
+                expected_finished_work: finished_work,
+                actual_host_root_work_in_progress: provider_update.host_root_work_in_progress(),
+            },
+        );
+    }
+    if !provider_update.provider_changed()
+        || provider_update.marked_dependency_count() != provider_update.dependent_consumer_count()
+        || !provider_update.all_marked_consumers_include_propagation_lanes()
+    {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateDidNotMarkChangedConsumers {
+                root,
+                expected_marked_count: provider_update.dependent_consumer_count(),
+                actual_marked_count: provider_update.marked_dependency_count(),
+            },
+        );
+    }
+
+    let committed_consumers = provider_update.dependent_consumers().map(|consumer| {
+        context_provider_update_commit_consumer_record_for_canary(
+            store,
+            root,
+            finished_work,
+            consumer,
+        )
+    });
+    let [first_committed_consumer, second_committed_consumer] = committed_consumers;
+    let committed_consumers = [first_committed_consumer?, second_committed_consumer?];
+
+    let arena = store.fiber_arena();
+    let host_root_child_lanes_after_commit = arena.get(finished_work)?.child_lanes();
+    validate_context_provider_update_ancestor_child_lanes_for_canary(
+        root,
+        finished_work,
+        propagation_lanes,
+        host_root_child_lanes_after_commit,
+    )?;
+    let outer_provider_child_lanes_after_commit =
+        arena.get(provider_update.outer_provider())?.child_lanes();
+    validate_context_provider_update_ancestor_child_lanes_for_canary(
+        root,
+        provider_update.outer_provider(),
+        propagation_lanes,
+        outer_provider_child_lanes_after_commit,
+    )?;
+    let inner_provider_child_lanes_after_commit =
+        arena.get(provider_update.inner_provider())?.child_lanes();
+    validate_context_provider_update_ancestor_child_lanes_for_canary(
+        root,
+        provider_update.inner_provider(),
+        propagation_lanes,
+        inner_provider_child_lanes_after_commit,
+    )?;
+
+    let root_pending_lanes_after_commit = store
+        .root(root)
+        .map_err(RootCommitError::from)?
+        .lanes()
+        .pending_lanes();
+    if !root_pending_lanes_after_commit.contains_all(propagation_lanes) {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateRootPendingLanesMismatch {
+                root,
+                expected_lanes: propagation_lanes,
+                actual_pending_lanes: root_pending_lanes_after_commit,
+            },
+        );
+    }
+
+    Ok(HostRootContextProviderUpdateCommitHandoffRecordForCanary {
+        provider_update,
+        finished_work_handoff: finished_work_handoff.clone(),
+        request_order,
+        committed_consumers,
+        host_root_child_lanes_after_commit,
+        outer_provider_child_lanes_after_commit,
+        inner_provider_child_lanes_after_commit,
+        root_pending_lanes_after_commit,
+    })
+}
+
+#[cfg(test)]
+fn context_provider_update_commit_consumer_record_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    consumer: ContextProviderUpdateConsumerLaneRecord,
+) -> Result<
+    HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary,
+    HostRootContextProviderUpdateCommitHandoffErrorForCanary,
+> {
+    if !committed_subtree_contains_fiber(store.fiber_arena(), finished_work, consumer.consumer())? {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateConsumerNotCommitted {
+                root,
+                finished_work,
+                consumer: consumer.consumer(),
+            },
+        );
+    }
+
+    let fiber_lanes_after_commit = store.fiber_arena().get(consumer.consumer())?.lanes();
+    if !fiber_lanes_after_commit.contains_all(consumer.propagation_lanes()) {
+        return Err(
+            HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateConsumerLaneMismatch {
+                root,
+                consumer: consumer.consumer(),
+                expected_lanes: consumer.propagation_lanes(),
+                actual_lanes: fiber_lanes_after_commit,
+            },
+        );
+    }
+
+    Ok(
+        HostRootContextProviderUpdateCommitConsumerLaneRecordForCanary {
+            order: consumer.order(),
+            consumer: consumer.consumer(),
+            dependency_lanes: consumer.dependency_lanes(),
+            propagation_lanes: consumer.propagation_lanes(),
+            fiber_lanes_after_render: consumer.fiber_lanes_after(),
+            fiber_lanes_after_commit,
+        },
+    )
+}
+
+#[cfg(test)]
+fn validate_context_provider_update_ancestor_child_lanes_for_canary(
+    root: FiberRootId,
+    fiber: FiberId,
+    expected_lanes: Lanes,
+    actual_child_lanes: Lanes,
+) -> Result<(), HostRootContextProviderUpdateCommitHandoffErrorForCanary> {
+    if actual_child_lanes.contains_all(expected_lanes) {
+        return Ok(());
+    }
+
+    Err(
+        HostRootContextProviderUpdateCommitHandoffErrorForCanary::ContextUpdateAncestorChildLanesMismatch {
+            root,
+            fiber,
+            expected_lanes,
+            actual_child_lanes,
+        },
+    )
 }
 
 #[cfg(test)]

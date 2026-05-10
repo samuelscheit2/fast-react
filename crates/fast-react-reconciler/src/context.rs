@@ -659,6 +659,16 @@ impl ContextProviderUpdateConsumerLaneRecord {
     }
 
     #[must_use]
+    pub fn dependency_lanes_include_propagation(self) -> bool {
+        self.dependency_lanes.contains_all(self.propagation_lanes)
+    }
+
+    #[must_use]
+    pub fn fiber_lanes_include_propagation(self) -> bool {
+        self.fiber_lanes_after.contains_all(self.propagation_lanes)
+    }
+
+    #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
     }
@@ -772,6 +782,11 @@ impl ContextProviderUpdateTwoConsumerLaneRecord {
     }
 
     #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.begin_work.render_lanes()
+    }
+
+    #[must_use]
     pub const fn begin_work(self) -> NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
         self.begin_work
     }
@@ -825,6 +840,20 @@ impl ContextProviderUpdateTwoConsumerLaneRecord {
     pub const fn marked_dependency_count(self) -> usize {
         self.dependent_consumers[0].marked_dependency_count
             + self.dependent_consumers[1].marked_dependency_count
+    }
+
+    #[must_use]
+    pub const fn dependent_consumer_count(self) -> usize {
+        2
+    }
+
+    #[must_use]
+    pub fn all_marked_consumers_include_propagation_lanes(self) -> bool {
+        self.dependent_consumers.iter().all(|consumer| {
+            consumer.marked_changed_provider_lanes()
+                && consumer.dependency_lanes_include_propagation()
+                && consumer.fiber_lanes_include_propagation()
+        })
     }
 
     #[must_use]
