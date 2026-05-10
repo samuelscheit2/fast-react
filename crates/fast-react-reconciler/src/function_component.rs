@@ -3072,11 +3072,14 @@ impl FunctionComponentCommittedEffectQueue {
                 hook_list: record.hook_list(),
                 effect_index: record.effect_index(),
                 effect: record.effect(),
+                previous_effect: record.previous_effect(),
                 instance: record.instance(),
                 tag: record.tag(),
                 create: record.create(),
                 destroy: record.destroy(),
+                previous_dependencies: record.previous_dependencies(),
                 dependencies: record.dependencies(),
+                dependency_status: record.dependency_status(),
                 lanes: self.lanes,
             });
         }
@@ -3336,11 +3339,14 @@ impl FunctionComponentHookRenderStore {
                 hook_list: list,
                 effect_index,
                 effect: effect.id(),
+                previous_effect: None,
                 instance: effect.instance(),
                 tag: effect.tag(),
                 create: effect.create(),
                 destroy,
+                previous_dependencies: None,
                 dependencies: effect.dependencies(),
+                dependency_status: None,
                 lanes,
             });
         }
@@ -3454,11 +3460,14 @@ impl FunctionComponentHookRenderStore {
                 hook_list: record.hook_list(),
                 effect_index: accepted.len(),
                 effect: record.effect(),
+                previous_effect: Some(record.previous_effect()),
                 instance: record.instance(),
                 tag: record.tag(),
                 create: record.create(),
                 destroy: record.destroy(),
+                previous_dependencies: Some(record.previous_dependencies()),
                 dependencies: record.dependencies(),
+                dependency_status: Some(record.dependency_status()),
                 lanes,
             });
         }
@@ -5355,6 +5364,30 @@ impl FunctionComponentEffectDependencyStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentEffectDependencyPhase {
+    Mount,
+    UpdateChanged,
+    UpdateUnchanged,
+}
+
+impl FunctionComponentEffectDependencyPhase {
+    #[must_use]
+    pub const fn from_render_metadata(
+        render_phase: FunctionComponentHookRenderPhase,
+        dependency_status: Option<FunctionComponentEffectDependencyStatus>,
+    ) -> Self {
+        match (render_phase, dependency_status) {
+            (FunctionComponentHookRenderPhase::Mount, _) => Self::Mount,
+            (
+                FunctionComponentHookRenderPhase::Update,
+                Some(FunctionComponentEffectDependencyStatus::Unchanged),
+            ) => Self::UpdateUnchanged,
+            (FunctionComponentHookRenderPhase::Update, _) => Self::UpdateChanged,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentEffectRegistration {
     hook: HookSlotId,
     effect: HookEffectId,
@@ -5487,11 +5520,14 @@ pub(crate) struct FunctionComponentLayoutEffectMetadata {
     hook_list: HookListId,
     effect_index: usize,
     effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
     instance: HookEffectInstanceId,
     tag: HookEffectFlags,
     create: HookEffectCallbackHandle,
     destroy: Option<HookEffectCallbackHandle>,
+    previous_dependencies: Option<HookEffectDependencies>,
     dependencies: HookEffectDependencies,
+    dependency_status: Option<FunctionComponentEffectDependencyStatus>,
     lanes: Lanes,
 }
 
@@ -5522,6 +5558,11 @@ impl FunctionComponentLayoutEffectMetadata {
     }
 
     #[must_use]
+    pub const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
+    }
+
+    #[must_use]
     pub const fn instance(self) -> HookEffectInstanceId {
         self.instance
     }
@@ -5542,8 +5583,26 @@ impl FunctionComponentLayoutEffectMetadata {
     }
 
     #[must_use]
+    pub const fn previous_dependencies(self) -> Option<HookEffectDependencies> {
+        self.previous_dependencies
+    }
+
+    #[must_use]
     pub const fn dependencies(self) -> HookEffectDependencies {
         self.dependencies
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> Option<FunctionComponentEffectDependencyStatus> {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn dependency_phase(self) -> FunctionComponentEffectDependencyPhase {
+        FunctionComponentEffectDependencyPhase::from_render_metadata(
+            self.render_phase,
+            self.dependency_status,
+        )
     }
 
     #[must_use]
@@ -9304,11 +9363,18 @@ mod tests {
         );
         assert_eq!(layout_metadata[0].effect_index(), 0);
         assert_eq!(layout_metadata[0].effect(), layout.effect());
+        assert_eq!(layout_metadata[0].previous_effect(), None);
         assert_eq!(layout_metadata[0].instance(), layout.instance());
         assert_eq!(layout_metadata[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
         assert_eq!(layout_metadata[0].create(), callback(940));
         assert_eq!(layout_metadata[0].destroy(), None);
+        assert_eq!(layout_metadata[0].previous_dependencies(), None);
         assert_eq!(layout_metadata[0].dependencies(), deps(941));
+        assert_eq!(layout_metadata[0].dependency_status(), None);
+        assert_eq!(
+            layout_metadata[0].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::Mount
+        );
         assert_eq!(layout_metadata[0].lanes(), Lanes::DEFAULT);
         assert!(
             hook_store
@@ -9426,11 +9492,18 @@ mod tests {
         );
         assert_eq!(layout_metadata[0].effect_index(), 0);
         assert_eq!(layout_metadata[0].effect(), layout.effect());
+        assert_eq!(layout_metadata[0].previous_effect(), None);
         assert_eq!(layout_metadata[0].instance(), layout.instance());
         assert_eq!(layout_metadata[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
         assert_eq!(layout_metadata[0].create(), callback(930));
         assert_eq!(layout_metadata[0].destroy(), None);
+        assert_eq!(layout_metadata[0].previous_dependencies(), None);
         assert_eq!(layout_metadata[0].dependencies(), deps(931));
+        assert_eq!(layout_metadata[0].dependency_status(), None);
+        assert_eq!(
+            layout_metadata[0].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::Mount
+        );
         assert_eq!(layout_metadata[0].lanes(), Lanes::DEFAULT);
         assert!(
             hook_store
@@ -12328,11 +12401,21 @@ mod tests {
         assert_eq!(layout[0].hook_list(), state.work_in_progress_list());
         assert_eq!(layout[0].effect_index(), 0);
         assert_eq!(layout[0].effect(), changed.effect());
+        assert_eq!(layout[0].previous_effect(), Some(previous_changed.effect()));
         assert_eq!(layout[0].instance(), changed.instance());
         assert_eq!(layout[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
         assert_eq!(layout[0].create(), callback(1023));
         assert_eq!(layout[0].destroy(), Some(callback(1022)));
+        assert_eq!(layout[0].previous_dependencies(), Some(deps(1021)));
         assert_eq!(layout[0].dependencies(), deps(1024));
+        assert_eq!(
+            layout[0].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Changed)
+        );
+        assert_eq!(
+            layout[0].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::UpdateChanged
+        );
         assert_eq!(layout[0].lanes(), Lanes::DEFAULT);
         assert!(
             hook_store
@@ -12392,10 +12475,23 @@ mod tests {
         );
         assert_eq!(firing_layout[0].effect_index(), 0);
         assert_eq!(firing_layout[0].effect(), changed.effect());
+        assert_eq!(
+            firing_layout[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
         assert_eq!(firing_layout[0].instance(), previous_changed.instance());
         assert_eq!(firing_layout[0].create(), callback(1023));
         assert_eq!(firing_layout[0].destroy(), Some(callback(1022)));
+        assert_eq!(firing_layout[0].previous_dependencies(), Some(deps(1021)));
         assert_eq!(firing_layout[0].dependencies(), deps(1024));
+        assert_eq!(
+            firing_layout[0].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Changed)
+        );
+        assert_eq!(
+            firing_layout[0].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::UpdateChanged
+        );
         assert_eq!(firing_layout[0].lanes(), Lanes::DEFAULT);
 
         let all_layout =
@@ -12403,6 +12499,18 @@ mod tests {
         assert_eq!(all_layout.len(), 2);
         assert_eq!(all_layout[0].effect(), changed.effect());
         assert_eq!(all_layout[1].effect(), unchanged.effect());
+        assert_eq!(
+            all_layout[1].previous_effect(),
+            Some(previous_unchanged.effect())
+        );
+        assert_eq!(
+            all_layout[1].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Unchanged)
+        );
+        assert_eq!(
+            all_layout[1].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::UpdateUnchanged
+        );
         assert!(
             hook_store
                 .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE)

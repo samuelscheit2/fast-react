@@ -19,7 +19,8 @@ use fast_react_core::{
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 use crate::function_component::{
-    FunctionComponentCommittedEffectQueue, FunctionComponentHookRenderPhase,
+    FunctionComponentCommittedEffectQueue, FunctionComponentEffectDependencyPhase,
+    FunctionComponentEffectDependencyStatus, FunctionComponentHookRenderPhase,
     FunctionComponentHookRenderState, FunctionComponentHookRenderStore,
     FunctionComponentLayoutEffectMetadata, FunctionComponentPassiveEffectMetadata,
 };
@@ -87,6 +88,23 @@ pub enum RootCommitError {
         root: FiberRootId,
         commit_current: FiberId,
         store_current: FiberId,
+    },
+    LayoutEffectHandoffLanesMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    LayoutEffectHandoffFiberMismatch {
+        root: FiberRootId,
+        expected: FiberId,
+        actual: FiberId,
+    },
+    LayoutEffectHandoffRecordMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        effect: HookEffectId,
+        message: String,
     },
     CommittedPassiveEffectsWithoutPendingPassiveHandoff {
         root: FiberRootId,
@@ -257,6 +275,43 @@ impl Display for RootCommitError {
                 root.raw(),
                 commit_current.slot().get(),
                 store_current.slot().get()
+            ),
+            Self::LayoutEffectHandoffLanesMismatch {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} layout effect handoff for function component fiber slot {} expected committed lanes {:?}, found stale lanes {:?}",
+                root.raw(),
+                fiber.slot().get(),
+                expected,
+                actual
+            ),
+            Self::LayoutEffectHandoffFiberMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} layout effect handoff expected committed queue for function component fiber slot {}, found fiber slot {}",
+                root.raw(),
+                expected.slot().get(),
+                actual.slot().get()
+            ),
+            Self::LayoutEffectHandoffRecordMismatch {
+                root,
+                fiber,
+                effect,
+                message,
+            } => write!(
+                formatter,
+                "root {} layout effect handoff rejected mismatched function component fiber slot {} effect slot {}: {}",
+                root.raw(),
+                fiber.slot().get(),
+                effect.slot().get(),
+                message
             ),
             Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { root } => write!(
                 formatter,
@@ -477,6 +532,9 @@ impl Error for RootCommitError {
             | Self::FunctionComponentCommittedEffectQueue { .. }
             | Self::FunctionComponentLayoutEffectQueue { .. }
             | Self::LayoutEffectHandoffCurrentMismatch { .. }
+            | Self::LayoutEffectHandoffLanesMismatch { .. }
+            | Self::LayoutEffectHandoffFiberMismatch { .. }
+            | Self::LayoutEffectHandoffRecordMismatch { .. }
             | Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { .. }
             | Self::CommittedPassiveEffectHandoffRootMismatch { .. }
             | Self::CommittedPassiveEffectHandoffLanesMismatch { .. }
@@ -1503,16 +1561,22 @@ impl FunctionComponentDeletedSubtreePassiveEffectsSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentLayoutEffectCommitRecord {
     commit_order: usize,
+    destroy_order: Option<usize>,
+    create_order: usize,
     fiber: FiberId,
     render_phase: FunctionComponentHookRenderPhase,
+    dependency_phase: FunctionComponentEffectDependencyPhase,
     hook_list: HookListId,
     effect_index: usize,
     effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
     instance: HookEffectInstanceId,
     tag: HookEffectFlags,
     create: HookEffectCallbackHandle,
     destroy: Option<HookEffectCallbackHandle>,
+    previous_dependencies: Option<HookEffectDependencies>,
     dependencies: HookEffectDependencies,
+    dependency_status: Option<FunctionComponentEffectDependencyStatus>,
     lanes: Lanes,
 }
 
@@ -1527,6 +1591,16 @@ impl FunctionComponentLayoutEffectCommitRecord {
     }
 
     #[must_use]
+    pub(crate) const fn destroy_order(self) -> Option<usize> {
+        self.destroy_order
+    }
+
+    #[must_use]
+    pub(crate) const fn create_order(self) -> usize {
+        self.create_order
+    }
+
+    #[must_use]
     pub(crate) const fn fiber(self) -> FiberId {
         self.fiber
     }
@@ -1534,6 +1608,11 @@ impl FunctionComponentLayoutEffectCommitRecord {
     #[must_use]
     pub(crate) const fn render_phase(self) -> FunctionComponentHookRenderPhase {
         self.render_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn dependency_phase(self) -> FunctionComponentEffectDependencyPhase {
+        self.dependency_phase
     }
 
     #[must_use]
@@ -1549,6 +1628,11 @@ impl FunctionComponentLayoutEffectCommitRecord {
     #[must_use]
     pub(crate) const fn effect(self) -> HookEffectId {
         self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
     }
 
     #[must_use]
@@ -1572,13 +1656,215 @@ impl FunctionComponentLayoutEffectCommitRecord {
     }
 
     #[must_use]
+    pub(crate) const fn previous_dependencies(self) -> Option<HookEffectDependencies> {
+        self.previous_dependencies
+    }
+
+    #[must_use]
     pub(crate) const fn dependencies(self) -> HookEffectDependencies {
         self.dependencies
     }
 
     #[must_use]
+    pub(crate) const fn dependency_status(self) -> Option<FunctionComponentEffectDependencyStatus> {
+        self.dependency_status
+    }
+
+    #[must_use]
     pub(crate) const fn lanes(self) -> Lanes {
         self.lanes
+    }
+
+    #[must_use]
+    const fn destroy_phase_record(self) -> Option<FunctionComponentLayoutEffectPhaseCommitRecord> {
+        match self.destroy_order {
+            Some(order) => Some(FunctionComponentLayoutEffectPhaseCommitRecord {
+                order,
+                source_commit_order: self.commit_order,
+                fiber: self.fiber,
+                render_phase: self.render_phase,
+                dependency_phase: self.dependency_phase,
+                hook_list: self.hook_list,
+                effect_index: self.effect_index,
+                effect: match self.previous_effect {
+                    Some(effect) => effect,
+                    None => self.effect,
+                },
+                previous_effect: self.previous_effect,
+                instance: self.instance,
+                tag: self.tag,
+                create: None,
+                destroy: self.destroy,
+                previous_dependencies: self.previous_dependencies,
+                dependencies: self.dependencies,
+                dependency_status: self.dependency_status,
+                lanes: self.lanes,
+                handoff: FunctionComponentLayoutEffectHandoff::Destroy,
+                commit_phase: FunctionComponentLayoutEffectCommitPhase::Mutation,
+            }),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    const fn create_phase_record(self) -> FunctionComponentLayoutEffectPhaseCommitRecord {
+        FunctionComponentLayoutEffectPhaseCommitRecord {
+            order: self.create_order,
+            source_commit_order: self.commit_order,
+            fiber: self.fiber,
+            render_phase: self.render_phase,
+            dependency_phase: self.dependency_phase,
+            hook_list: self.hook_list,
+            effect_index: self.effect_index,
+            effect: self.effect,
+            previous_effect: self.previous_effect,
+            instance: self.instance,
+            tag: self.tag,
+            create: Some(self.create),
+            destroy: None,
+            previous_dependencies: self.previous_dependencies,
+            dependencies: self.dependencies,
+            dependency_status: self.dependency_status,
+            lanes: self.lanes,
+            handoff: FunctionComponentLayoutEffectHandoff::Create,
+            commit_phase: FunctionComponentLayoutEffectCommitPhase::Layout,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum FunctionComponentLayoutEffectHandoff {
+    Destroy,
+    Create,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum FunctionComponentLayoutEffectCommitPhase {
+    Mutation,
+    Layout,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentLayoutEffectPhaseCommitRecord {
+    order: usize,
+    source_commit_order: usize,
+    fiber: FiberId,
+    render_phase: FunctionComponentHookRenderPhase,
+    dependency_phase: FunctionComponentEffectDependencyPhase,
+    hook_list: HookListId,
+    effect_index: usize,
+    effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
+    instance: HookEffectInstanceId,
+    tag: HookEffectFlags,
+    create: Option<HookEffectCallbackHandle>,
+    destroy: Option<HookEffectCallbackHandle>,
+    previous_dependencies: Option<HookEffectDependencies>,
+    dependencies: HookEffectDependencies,
+    dependency_status: Option<FunctionComponentEffectDependencyStatus>,
+    lanes: Lanes,
+    handoff: FunctionComponentLayoutEffectHandoff,
+    commit_phase: FunctionComponentLayoutEffectCommitPhase,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private layout hook-effect phase handoff metadata for deterministic canaries"
+)]
+impl FunctionComponentLayoutEffectPhaseCommitRecord {
+    #[must_use]
+    pub(crate) const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn source_commit_order(self) -> usize {
+        self.source_commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(self) -> FunctionComponentHookRenderPhase {
+        self.render_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn dependency_phase(self) -> FunctionComponentEffectDependencyPhase {
+        self.dependency_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub(crate) const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
+    }
+
+    #[must_use]
+    pub(crate) const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub(crate) const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub(crate) const fn create(self) -> Option<HookEffectCallbackHandle> {
+        self.create
+    }
+
+    #[must_use]
+    pub(crate) const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_dependencies(self) -> Option<HookEffectDependencies> {
+        self.previous_dependencies
+    }
+
+    #[must_use]
+    pub(crate) const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub(crate) const fn dependency_status(self) -> Option<FunctionComponentEffectDependencyStatus> {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff(self) -> FunctionComponentLayoutEffectHandoff {
+        self.handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_phase(self) -> FunctionComponentLayoutEffectCommitPhase {
+        self.commit_phase
     }
 }
 
@@ -1605,6 +1891,66 @@ impl FunctionComponentLayoutEffectsSnapshot {
     #[must_use]
     pub(crate) fn len(&self) -> usize {
         self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn destroy_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.destroy_order().is_some())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn create_count(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn destroy_phase_records(
+        &self,
+    ) -> Vec<FunctionComponentLayoutEffectPhaseCommitRecord> {
+        self.records
+            .iter()
+            .filter_map(|record| record.destroy_phase_record())
+            .collect()
+    }
+
+    #[must_use]
+    pub(crate) fn create_phase_records(
+        &self,
+    ) -> Vec<FunctionComponentLayoutEffectPhaseCommitRecord> {
+        self.records
+            .iter()
+            .map(|record| record.create_phase_record())
+            .collect()
+    }
+
+    #[must_use]
+    pub(crate) fn phase_records(&self) -> Vec<FunctionComponentLayoutEffectPhaseCommitRecord> {
+        let mut records = self.destroy_phase_records();
+        records.extend(self.create_phase_records());
+        records
+    }
+
+    #[must_use]
+    pub(crate) const fn layout_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn dom_mutation_side_effects_performed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_attached_or_detached(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_effect_compatibility_claimed(&self) -> bool {
+        false
     }
 }
 
@@ -3565,7 +3911,8 @@ pub enum HostRootCommitOrderMetadataKindForCanary {
     DeletionCleanup,
     RefDetach,
     RefAttach,
-    LayoutEffect,
+    LayoutEffectDestroy,
+    LayoutEffectCreate,
     RootUpdateCallback,
     PassiveUnmount,
     PassiveMount,
@@ -4170,6 +4517,21 @@ impl HostRootCommitRecord {
             });
         }
 
+        for record in self
+            .function_component_layout_effects
+            .destroy_phase_records()
+        {
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Mutation,
+                metadata_kind: HostRootCommitOrderMetadataKindForCanary::LayoutEffectDestroy,
+                root: self.root,
+                finished_work: self.current,
+                fiber: record.fiber(),
+                tag: FiberTag::FunctionComponent,
+                source_order: record.order() as u64,
+            });
+        }
+
         for record in self.ref_callback_execution_handoff.records() {
             diagnostics.push(HostRootCommitOrderRecordInputForCanary {
                 phase: HostRootCommitOrderPhaseForCanary::Layout,
@@ -4182,15 +4544,18 @@ impl HostRootCommitRecord {
             });
         }
 
-        for record in self.function_component_layout_effects.records() {
+        for record in self
+            .function_component_layout_effects
+            .create_phase_records()
+        {
             diagnostics.push(HostRootCommitOrderRecordInputForCanary {
                 phase: HostRootCommitOrderPhaseForCanary::Layout,
-                metadata_kind: HostRootCommitOrderMetadataKindForCanary::LayoutEffect,
+                metadata_kind: HostRootCommitOrderMetadataKindForCanary::LayoutEffectCreate,
                 root: self.root,
                 finished_work: self.current,
                 fiber: record.fiber(),
                 tag: FiberTag::FunctionComponent,
-                source_order: record.commit_order() as u64,
+                source_order: record.order() as u64,
             });
         }
 
@@ -4665,6 +5030,7 @@ pub(crate) fn record_function_component_layout_effects_for_committed_root<H: Hos
     let mut records = Vec::new();
     record_function_component_layout_effects_for_committed_subtree(
         store.fiber_arena(),
+        root,
         current,
         hook_store,
         lanes,
@@ -4675,6 +5041,7 @@ pub(crate) fn record_function_component_layout_effects_for_committed_root<H: Hos
 
 fn record_function_component_layout_effects_for_committed_subtree(
     arena: &FiberArena,
+    root: FiberRootId,
     fiber: FiberId,
     hook_store: &mut FunctionComponentHookRenderStore,
     lanes: Lanes,
@@ -4688,57 +5055,198 @@ fn record_function_component_layout_effects_for_committed_subtree(
 
     if let Some(child) = child {
         record_function_component_layout_effects_for_committed_subtree(
-            arena, child, hook_store, lanes, records,
+            arena, root, child, hook_store, lanes, records,
         )?;
     }
 
     if tag == FiberTag::FunctionComponent && flags.contains_any(FiberFlags::UPDATE) {
-        if hook_store.committed_effect_queue(fiber).is_none() {
-            hook_store
-                .commit_pending_effect_queue_for_fiber(fiber, lanes)
-                .map_err(
-                    |error| RootCommitError::FunctionComponentLayoutEffectQueue {
-                        fiber,
-                        message: error.to_string(),
-                    },
-                )?;
-        }
+        hook_store
+            .commit_pending_effect_queue_for_fiber(fiber, lanes)
+            .map_err(
+                |error| RootCommitError::FunctionComponentLayoutEffectQueue {
+                    fiber,
+                    message: error.to_string(),
+                },
+            )?;
 
-        for metadata in
-            hook_store.committed_layout_effect_metadata(fiber, HookEffectFlags::LAYOUT_EFFECT)
-        {
-            records.push(function_component_layout_effect_commit_record(
-                records.len(),
-                metadata,
-            ));
+        if let Some(queue) = hook_store.committed_effect_queue(fiber) {
+            validate_layout_effect_queue_lanes(root, queue, fiber, lanes)?;
+
+            for metadata in queue.layout_effect_metadata(HookEffectFlags::LAYOUT_EFFECT) {
+                validate_layout_effect_metadata_for_committed_queue(root, queue, metadata)?;
+                let destroy_order = match metadata.dependency_phase() {
+                    FunctionComponentEffectDependencyPhase::UpdateChanged => {
+                        Some(layout_destroy_handoff_count(records))
+                    }
+                    FunctionComponentEffectDependencyPhase::Mount => None,
+                    FunctionComponentEffectDependencyPhase::UpdateUnchanged => {
+                        return Err(RootCommitError::LayoutEffectHandoffRecordMismatch {
+                            root,
+                            fiber,
+                            effect: metadata.effect(),
+                            message:
+                                "unchanged layout effect was selected for create/destroy handoff"
+                                    .to_owned(),
+                        });
+                    }
+                };
+                records.push(function_component_layout_effect_commit_record(
+                    records.len(),
+                    destroy_order,
+                    metadata,
+                ));
+            }
         }
     }
 
     if let Some(sibling) = sibling {
         record_function_component_layout_effects_for_committed_subtree(
-            arena, sibling, hook_store, lanes, records,
+            arena, root, sibling, hook_store, lanes, records,
         )?;
     }
 
     Ok(())
 }
 
+fn validate_layout_effect_queue_lanes(
+    root: FiberRootId,
+    queue: &FunctionComponentCommittedEffectQueue,
+    fiber: FiberId,
+    lanes: Lanes,
+) -> Result<(), RootCommitError> {
+    if queue.fiber() != fiber {
+        return Err(RootCommitError::LayoutEffectHandoffFiberMismatch {
+            root,
+            expected: fiber,
+            actual: queue.fiber(),
+        });
+    }
+    if queue.lanes() != lanes {
+        return Err(RootCommitError::LayoutEffectHandoffLanesMismatch {
+            root,
+            fiber,
+            expected: lanes,
+            actual: queue.lanes(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_layout_effect_metadata_for_committed_queue(
+    root: FiberRootId,
+    queue: &FunctionComponentCommittedEffectQueue,
+    metadata: FunctionComponentLayoutEffectMetadata,
+) -> Result<(), RootCommitError> {
+    if metadata.fiber() != queue.fiber() {
+        return Err(layout_effect_record_mismatch(
+            root,
+            queue.fiber(),
+            metadata.effect(),
+            "metadata fiber does not match committed queue owner",
+        ));
+    }
+    if metadata.render_phase() != queue.phase() {
+        return Err(layout_effect_record_mismatch(
+            root,
+            queue.fiber(),
+            metadata.effect(),
+            "metadata render phase does not match committed queue phase",
+        ));
+    }
+    if metadata.lanes() != queue.lanes() {
+        return Err(RootCommitError::LayoutEffectHandoffLanesMismatch {
+            root,
+            fiber: queue.fiber(),
+            expected: queue.lanes(),
+            actual: metadata.lanes(),
+        });
+    }
+    if !metadata.tag().fires_in_layout() {
+        return Err(layout_effect_record_mismatch(
+            root,
+            queue.fiber(),
+            metadata.effect(),
+            "metadata tag is not eligible for layout create handoff",
+        ));
+    }
+
+    let Some(record) = queue
+        .records()
+        .iter()
+        .find(|record| record.effect() == metadata.effect())
+    else {
+        return Err(layout_effect_record_mismatch(
+            root,
+            queue.fiber(),
+            metadata.effect(),
+            "metadata effect is missing from committed queue",
+        ));
+    };
+
+    if record.instance() != metadata.instance()
+        || record.tag() != metadata.tag()
+        || record.create() != metadata.create()
+        || record.destroy() != metadata.destroy()
+        || record.previous_effect() != metadata.previous_effect()
+        || record.previous_dependencies() != metadata.previous_dependencies()
+        || record.dependencies() != metadata.dependencies()
+        || record.dependency_status() != metadata.dependency_status()
+    {
+        return Err(layout_effect_record_mismatch(
+            root,
+            queue.fiber(),
+            metadata.effect(),
+            "metadata fields do not match committed queue record",
+        ));
+    }
+
+    Ok(())
+}
+
+fn layout_effect_record_mismatch(
+    root: FiberRootId,
+    fiber: FiberId,
+    effect: HookEffectId,
+    message: &'static str,
+) -> RootCommitError {
+    RootCommitError::LayoutEffectHandoffRecordMismatch {
+        root,
+        fiber,
+        effect,
+        message: message.to_owned(),
+    }
+}
+
+fn layout_destroy_handoff_count(records: &[FunctionComponentLayoutEffectCommitRecord]) -> usize {
+    records
+        .iter()
+        .filter(|record| record.destroy_order().is_some())
+        .count()
+}
+
 const fn function_component_layout_effect_commit_record(
     commit_order: usize,
+    destroy_order: Option<usize>,
     metadata: FunctionComponentLayoutEffectMetadata,
 ) -> FunctionComponentLayoutEffectCommitRecord {
     FunctionComponentLayoutEffectCommitRecord {
         commit_order,
+        destroy_order,
+        create_order: commit_order,
         fiber: metadata.fiber(),
         render_phase: metadata.render_phase(),
+        dependency_phase: metadata.dependency_phase(),
         hook_list: metadata.hook_list(),
         effect_index: metadata.effect_index(),
         effect: metadata.effect(),
+        previous_effect: metadata.previous_effect(),
         instance: metadata.instance(),
         tag: metadata.tag(),
         create: metadata.create(),
         destroy: metadata.destroy(),
+        previous_dependencies: metadata.previous_dependencies(),
         dependencies: metadata.dependencies(),
+        dependency_status: metadata.dependency_status(),
         lanes: metadata.lanes(),
     }
 }
@@ -6324,7 +6832,8 @@ const fn host_root_commit_order_metadata_kind_name(
         HostRootCommitOrderMetadataKindForCanary::DeletionCleanup => "deletion-cleanup",
         HostRootCommitOrderMetadataKindForCanary::RefDetach => "ref-detach",
         HostRootCommitOrderMetadataKindForCanary::RefAttach => "ref-attach",
-        HostRootCommitOrderMetadataKindForCanary::LayoutEffect => "layout-effect",
+        HostRootCommitOrderMetadataKindForCanary::LayoutEffectDestroy => "layout-effect-destroy",
+        HostRootCommitOrderMetadataKindForCanary::LayoutEffectCreate => "layout-effect-create",
         HostRootCommitOrderMetadataKindForCanary::RootUpdateCallback => "root-update-callback",
         HostRootCommitOrderMetadataKindForCanary::PassiveUnmount => "passive-unmount",
         HostRootCommitOrderMetadataKindForCanary::PassiveMount => "passive-mount",
@@ -8455,8 +8964,8 @@ fn validate_finished_host_root<H: HostTypes>(
 mod tests {
     use super::*;
     use crate::function_component::{
-        FunctionComponentEffectDependencyStatus, FunctionComponentEffectPhase,
-        FunctionComponentHookRenderStore,
+        FunctionComponentEffectDependencyPhase, FunctionComponentEffectDependencyStatus,
+        FunctionComponentEffectPhase, FunctionComponentHookRenderStore,
     };
     use crate::passive_effects::{
         PASSIVE_EFFECT_CALLBACK_INVOCATION_GATE_BLOCKERS,
@@ -12070,30 +12579,61 @@ mod tests {
             .clone();
 
         assert_eq!(snapshot.len(), 3);
+        assert_eq!(snapshot.destroy_count(), 0);
+        assert_eq!(snapshot.create_count(), 3);
+        assert_eq!(snapshot.phase_records().len(), 3);
+        assert!(!snapshot.layout_callbacks_invoked());
+        assert!(!snapshot.dom_mutation_side_effects_performed());
+        assert!(!snapshot.refs_attached_or_detached());
+        assert!(!snapshot.public_effect_compatibility_claimed());
         assert_eq!(commit.function_component_layout_effects(), &snapshot);
         let records = snapshot.records();
         assert_eq!(records[0].commit_order(), 0);
+        assert_eq!(records[0].destroy_order(), None);
+        assert_eq!(records[0].create_order(), 0);
         assert_eq!(records[0].fiber(), child);
         assert_eq!(
             records[0].render_phase(),
             FunctionComponentHookRenderPhase::Mount
         );
+        assert_eq!(
+            records[0].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::Mount
+        );
         assert_eq!(records[0].hook_list(), child_state.work_in_progress_list());
         assert_eq!(records[0].effect_index(), 0);
         assert_eq!(records[0].effect(), child_layout.effect());
+        assert_eq!(records[0].previous_effect(), None);
         assert_eq!(records[0].instance(), child_layout.instance());
         assert_eq!(records[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
         assert_eq!(records[0].create(), callback(750));
         assert_eq!(records[0].destroy(), None);
+        assert_eq!(records[0].previous_dependencies(), None);
         assert_eq!(records[0].dependencies(), deps(751));
+        assert_eq!(records[0].dependency_status(), None);
         assert_eq!(records[0].lanes(), Lanes::DEFAULT);
+        let phase_records = snapshot.phase_records();
+        assert_eq!(
+            phase_records[0].handoff(),
+            FunctionComponentLayoutEffectHandoff::Create
+        );
+        assert_eq!(
+            phase_records[0].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Layout
+        );
+        assert_eq!(phase_records[0].order(), 0);
+        assert_eq!(phase_records[0].source_commit_order(), 0);
+        assert_eq!(phase_records[0].create(), Some(callback(750)));
+        assert_eq!(phase_records[0].destroy(), None);
 
         assert_eq!(records[1].commit_order(), 1);
+        assert_eq!(records[1].create_order(), 1);
         assert_eq!(records[1].fiber(), parent);
         assert_eq!(records[1].effect(), parent_layout.effect());
         assert_eq!(records[1].create(), callback(746));
         assert_eq!(records[1].dependencies(), deps(747));
         assert_eq!(records[2].commit_order(), 2);
+        assert_eq!(records[2].create_order(), 2);
         assert_eq!(records[2].fiber(), sibling);
         assert_eq!(records[2].effect(), sibling_layout.effect());
         assert_eq!(records[2].create(), callback(752));
@@ -12112,6 +12652,72 @@ mod tests {
                 .pending_passive()
                 .is_empty()
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_rejects_stale_layout_effect_handoff_lanes_without_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(147), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mode = store
+            .fiber_arena()
+            .get(render.finished_work())
+            .unwrap()
+            .mode();
+        let function = create_function_component_fiber(
+            &mut store,
+            mode,
+            PropsHandle::from_raw(148),
+            FiberTypeHandle::from_raw(149),
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[function])
+            .unwrap();
+
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), function)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(150),
+                deps(151),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let stale_queue = hook_store
+            .commit_pending_effect_queue_for_fiber(function, Lanes::SYNC)
+            .unwrap()
+            .unwrap();
+        assert_eq!(stale_queue.lanes(), Lanes::SYNC);
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let error = commit
+            .record_function_component_layout_effects_for_canary(&store, &mut hook_store)
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error,
+                RootCommitError::LayoutEffectHandoffLanesMismatch {
+                    root,
+                    fiber,
+                    expected,
+                    actual,
+                } if root == root_id
+                    && fiber == function
+                    && expected == Lanes::DEFAULT
+                    && actual == Lanes::SYNC
+            ),
+            "unexpected error: {error:?}"
+        );
+        assert!(commit.function_component_layout_effects().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -12264,9 +12870,12 @@ mod tests {
         assert_eq!(commit.host_node_deletion_cleanup_log().len(), 1);
         assert_eq!(commit.ref_callback_execution_handoff().len(), 1);
         assert_eq!(layout_snapshot.len(), 1);
+        assert_eq!(layout_snapshot.destroy_count(), 1);
+        assert_eq!(layout_snapshot.create_count(), 1);
+        assert_eq!(layout_snapshot.phase_records().len(), 2);
         assert_eq!(passive_snapshot.phase_records().len(), 2);
         assert_eq!(commit.root_update_callback_invocation_gate().len(), 1);
-        assert_eq!(diagnostics.len(), 6);
+        assert_eq!(diagnostics.len(), 7);
         assert!(!diagnostics.public_effects_invoked());
         assert!(!diagnostics.host_containers_mutated());
         assert_eq!(
@@ -12274,7 +12883,7 @@ mod tests {
                 .iter()
                 .map(|record| record.sequence())
                 .collect::<Vec<_>>(),
-            vec![0, 1, 2, 3, 4, 5]
+            vec![0, 1, 2, 3, 4, 5, 6]
         );
         assert_eq!(
             records
@@ -12282,7 +12891,7 @@ mod tests {
                 .map(|record| record.phase_name())
                 .collect::<Vec<_>>(),
             vec![
-                "mutation", "layout", "layout", "layout", "passive", "passive"
+                "mutation", "mutation", "layout", "layout", "layout", "passive", "passive"
             ]
         );
         assert_eq!(
@@ -12292,8 +12901,9 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 "deletion-cleanup",
+                "layout-effect-destroy",
                 "ref-attach",
-                "layout-effect",
+                "layout-effect-create",
                 "root-update-callback",
                 "passive-unmount",
                 "passive-mount",
@@ -12303,27 +12913,77 @@ mod tests {
         assert_eq!(records[0].fiber(), deleted_text);
         assert_eq!(records[0].tag_name(), "HostText");
         assert_eq!(records[0].source_order(), 0);
-        assert_eq!(records[1].fiber(), ref_child);
-        assert_eq!(records[1].tag_name(), "HostComponent");
+        assert_eq!(records[1].fiber(), finished_function);
+        assert_eq!(records[1].tag_name(), "FunctionComponent");
         assert_eq!(records[1].source_order(), 0);
-        assert_eq!(records[2].fiber(), finished_function);
-        assert_eq!(records[2].tag_name(), "FunctionComponent");
+        assert_eq!(records[2].fiber(), ref_child);
+        assert_eq!(records[2].tag_name(), "HostComponent");
         assert_eq!(records[2].source_order(), 0);
-        assert_eq!(records[3].fiber(), finished_work);
-        assert_eq!(records[3].tag_name(), "HostRoot");
+        assert_eq!(records[3].fiber(), finished_function);
+        assert_eq!(records[3].tag_name(), "FunctionComponent");
         assert_eq!(records[3].source_order(), 0);
-        assert_eq!(records[4].fiber(), finished_function);
-        assert_eq!(records[4].tag_name(), "FunctionComponent");
-        assert!(records[4].source_order() < records[5].source_order());
+        assert_eq!(records[4].fiber(), finished_work);
+        assert_eq!(records[4].tag_name(), "HostRoot");
+        assert_eq!(records[4].source_order(), 0);
         assert_eq!(records[5].fiber(), finished_function);
         assert_eq!(records[5].tag_name(), "FunctionComponent");
+        assert!(records[5].source_order() < records[6].source_order());
+        assert_eq!(records[6].fiber(), finished_function);
+        assert_eq!(records[6].tag_name(), "FunctionComponent");
 
+        assert!(!layout_snapshot.layout_callbacks_invoked());
+        assert!(!layout_snapshot.dom_mutation_side_effects_performed());
+        assert!(!layout_snapshot.refs_attached_or_detached());
+        assert!(!layout_snapshot.public_effect_compatibility_claimed());
         assert_eq!(layout_snapshot.records()[0].effect(), layout.effect());
+        assert_eq!(
+            layout_snapshot.records()[0].previous_effect(),
+            Some(previous_layout.effect())
+        );
         assert_eq!(
             layout_snapshot.records()[0].instance(),
             previous_layout.instance()
         );
+        assert_eq!(
+            layout_snapshot.records()[0].dependency_phase(),
+            FunctionComponentEffectDependencyPhase::UpdateChanged
+        );
+        assert_eq!(
+            layout_snapshot.records()[0].previous_dependencies(),
+            Some(deps(763))
+        );
+        assert_eq!(layout_snapshot.records()[0].dependencies(), deps(778));
         assert_eq!(layout_snapshot.records()[0].create(), callback(777));
+        assert_eq!(layout_snapshot.records()[0].destroy(), Some(callback(764)));
+        assert_eq!(layout_snapshot.records()[0].destroy_order(), Some(0));
+        assert_eq!(layout_snapshot.records()[0].create_order(), 0);
+        let layout_phase_records = layout_snapshot.phase_records();
+        assert_eq!(
+            layout_phase_records[0].handoff(),
+            FunctionComponentLayoutEffectHandoff::Destroy
+        );
+        assert_eq!(
+            layout_phase_records[0].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Mutation
+        );
+        assert_eq!(layout_phase_records[0].effect(), previous_layout.effect());
+        assert_eq!(
+            layout_phase_records[0].previous_effect(),
+            Some(previous_layout.effect())
+        );
+        assert_eq!(layout_phase_records[0].create(), None);
+        assert_eq!(layout_phase_records[0].destroy(), Some(callback(764)));
+        assert_eq!(
+            layout_phase_records[1].handoff(),
+            FunctionComponentLayoutEffectHandoff::Create
+        );
+        assert_eq!(
+            layout_phase_records[1].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Layout
+        );
+        assert_eq!(layout_phase_records[1].effect(), layout.effect());
+        assert_eq!(layout_phase_records[1].create(), Some(callback(777)));
+        assert_eq!(layout_phase_records[1].destroy(), None);
         assert_eq!(
             passive_snapshot.phase_records()[0].phase(),
             PendingPassiveEffectPhase::Unmount
