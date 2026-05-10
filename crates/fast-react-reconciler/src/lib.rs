@@ -8,7 +8,9 @@ mod fiber_root;
 mod fiber_store;
 mod host_tokens;
 mod root_config;
+mod root_scheduler;
 mod root_updates;
+mod scheduler_bridge;
 #[cfg(test)]
 mod test_support;
 mod update_priority;
@@ -46,9 +48,19 @@ pub use root_config::{
     RootRenderExitStatus, RootSchedulerCallbackHandle, RootSuspenseBoundarySetHandle, RootTag,
     RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
 };
+pub use root_scheduler::{
+    RootScheduleMicrotaskResult, RootSchedulerError, RootSchedulerState, RootSyncFlushPlan,
+    RootTaskScheduleOutcome, RootTaskScheduleRecord, ScheduledRootUpdateResult,
+    collect_sync_flush_plan, ensure_root_is_scheduled, process_root_schedule_in_microtask,
+    schedule_task_for_root_during_microtask, scheduled_roots,
+};
 pub use root_updates::{
     RootScheduleUpdateRecord, RootTransitionEntanglementRecord, RootUpdateError,
     UpdateContainerResult, update_container, update_container_sync,
+};
+pub use scheduler_bridge::{
+    SchedulerBridge, SchedulerCallbackRequest, SchedulerCancellationRecord,
+    SchedulerMicrotaskHandle, SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
 };
 pub use update_priority::{UpdatePriorityState, request_update_lane};
 pub use update_queue::{
@@ -75,6 +87,7 @@ pub enum ReconcilerError {
     UpdateQueue(UpdateQueueError),
     ConcurrentUpdate(ConcurrentUpdateError),
     RootUpdate(RootUpdateError),
+    RootScheduler(RootSchedulerError),
     WorkInProgress(WorkInProgressError),
 }
 
@@ -99,6 +112,7 @@ impl Display for ReconcilerError {
             Self::UpdateQueue(error) => Display::fmt(error, formatter),
             Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
             Self::RootUpdate(error) => Display::fmt(error, formatter),
+            Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
@@ -118,6 +132,7 @@ impl Error for ReconcilerError {
             Self::UpdateQueue(error) => Some(error),
             Self::ConcurrentUpdate(error) => Some(error),
             Self::RootUpdate(error) => Some(error),
+            Self::RootScheduler(error) => Some(error),
             Self::WorkInProgress(error) => Some(error),
         }
     }
@@ -189,6 +204,12 @@ impl From<ConcurrentUpdateError> for ReconcilerError {
 impl From<RootUpdateError> for ReconcilerError {
     fn from(error: RootUpdateError) -> Self {
         Self::RootUpdate(error)
+    }
+}
+
+impl From<RootSchedulerError> for ReconcilerError {
+    fn from(error: RootSchedulerError) -> Self {
+        Self::RootScheduler(error)
     }
 }
 

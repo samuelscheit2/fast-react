@@ -8,8 +8,8 @@ use fast_react_host_config::HostTypes;
 
 use crate::{
     ConcurrentUpdateStaging, FiberRoot, HostFiberTokenStore, HostRootState, HostRootStateStore,
-    HostRootStateStoreError, RootElementHandle, RootOptions, RootTag, UpdateQueueStore,
-    create_host_root_current_fiber,
+    HostRootStateStoreError, RootElementHandle, RootOptions, RootSchedulerState, RootTag,
+    SchedulerBridge, UpdateQueueStore, create_host_root_current_fiber,
 };
 
 const ROOT_ID_SLOT_BITS: u64 = 32;
@@ -153,6 +153,8 @@ pub struct FiberRootStore<H: HostTypes> {
     host_tokens: HostFiberTokenStore,
     update_queues: UpdateQueueStore,
     concurrent_updates: ConcurrentUpdateStaging,
+    root_scheduler: RootSchedulerState,
+    scheduler_bridge: SchedulerBridge,
 }
 
 impl<H: HostTypes> FiberRootStore<H> {
@@ -166,6 +168,8 @@ impl<H: HostTypes> FiberRootStore<H> {
             host_tokens: HostFiberTokenStore::new(),
             update_queues: UpdateQueueStore::new(),
             concurrent_updates: ConcurrentUpdateStaging::new(),
+            root_scheduler: RootSchedulerState::new(),
+            scheduler_bridge: SchedulerBridge::new(),
         }
     }
 
@@ -249,6 +253,26 @@ impl<H: HostTypes> FiberRootStore<H> {
     #[must_use]
     pub(crate) fn concurrent_updates_mut(&mut self) -> &mut ConcurrentUpdateStaging {
         &mut self.concurrent_updates
+    }
+
+    #[must_use]
+    pub const fn root_scheduler(&self) -> &RootSchedulerState {
+        &self.root_scheduler
+    }
+
+    #[must_use]
+    pub(crate) fn root_scheduler_mut(&mut self) -> &mut RootSchedulerState {
+        &mut self.root_scheduler
+    }
+
+    #[must_use]
+    pub const fn scheduler_bridge(&self) -> &SchedulerBridge {
+        &self.scheduler_bridge
+    }
+
+    #[must_use]
+    pub(crate) fn scheduler_bridge_mut(&mut self) -> &mut SchedulerBridge {
+        &mut self.scheduler_bridge
     }
 
     pub fn ensure_host_root_update_queue(

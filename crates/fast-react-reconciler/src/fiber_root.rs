@@ -200,6 +200,10 @@ impl<H: HostTypes> RootSchedulingState<H> {
         self.next_scheduled_root
     }
 
+    pub(crate) fn set_next_scheduled_root(&mut self, root: Option<FiberRootId>) {
+        self.next_scheduled_root = root;
+    }
+
     #[must_use]
     pub const fn callback_node(&self) -> RootSchedulerCallbackHandle {
         self.callback_node
@@ -208,6 +212,20 @@ impl<H: HostTypes> RootSchedulingState<H> {
     #[must_use]
     pub const fn callback_priority(&self) -> RootCallbackPriority {
         self.callback_priority
+    }
+
+    pub(crate) fn set_callback(
+        &mut self,
+        node: RootSchedulerCallbackHandle,
+        priority: RootCallbackPriority,
+    ) {
+        self.callback_node = node;
+        self.callback_priority = priority;
+    }
+
+    pub(crate) fn clear_callback(&mut self) {
+        self.callback_node = RootSchedulerCallbackHandle::NONE;
+        self.callback_priority = RootCallbackPriority::NO;
     }
 
     #[must_use]
@@ -362,6 +380,10 @@ impl<H: HostTypes> FiberRoot<H> {
     #[must_use]
     pub const fn scheduling(&self) -> &RootSchedulingState<H> {
         &self.scheduling
+    }
+
+    pub(crate) fn scheduling_mut(&mut self) -> &mut RootSchedulingState<H> {
+        &mut self.scheduling
     }
 
     #[must_use]
