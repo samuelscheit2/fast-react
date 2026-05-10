@@ -44,6 +44,11 @@ const privateToTreeHostOutputMetadataSymbolDescription =
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
   privateToTreeHostOutputMetadataSymbolDescription
 );
+const privateToTreeFacadeSymbolDescription =
+  "fast.react_test_renderer.private_totree_facade";
+const privateToTreeFacadeSymbol = Symbol.for(
+  privateToTreeFacadeSymbolDescription
+);
 const missingPrerequisites = [
   "rust-native-test-renderer-create-bridge",
   "react-test-renderer-host-output-serialization"
@@ -766,6 +771,11 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
     gate.localChecks.privateToTreeHostOutputMetadataGatePresent,
     true
   );
+  assert.equal(gate.localChecks.privateToTreePrivateFacadeGatePresent, true);
+  assert.equal(
+    gate.localChecks.privateToTreePrivateFacadeConsumesRustTreeMetadata,
+    true
+  );
   assert.equal(
     gate.localChecks.privateToTreeHostOutputMetadataPubliclyBlocked,
     true
@@ -1367,7 +1377,7 @@ function assertRendererShape(renderer, label, moduleScheduler) {
   assert.equal(renderer.toTree.length, 0, label);
   assert.deepEqual(
     Object.getOwnPropertySymbols(renderer.toTree),
-    [privateToTreeHostOutputMetadataSymbol],
+    [privateToTreeHostOutputMetadataSymbol, privateToTreeFacadeSymbol],
     label
   );
   const toTreeMetadataDescriptor = Object.getOwnPropertyDescriptor(
@@ -1381,6 +1391,14 @@ function assertRendererShape(renderer, label, moduleScheduler) {
     toTreeMetadataDescriptor.value,
     label
   );
+  const toTreeFacadeDescriptor = Object.getOwnPropertyDescriptor(
+    renderer.toTree,
+    privateToTreeFacadeSymbol
+  );
+  assert.equal(toTreeFacadeDescriptor.enumerable, false, label);
+  assert.equal(toTreeFacadeDescriptor.configurable, false, label);
+  assert.equal(toTreeFacadeDescriptor.writable, false, label);
+  assertPrivateToTreeFacade(toTreeFacadeDescriptor.value, label);
   assert.equal(renderer.update.length, 1, label);
   assert.equal(renderer.unmount.length, 0, label);
   assert.equal(renderer.getInstance.length, 0, label);
@@ -1480,6 +1498,8 @@ function assertCreateRoutingGate(error, entrypoint) {
     gate.toTreeHostOutputMetadataGate,
     entrypoint
   );
+  assert.equal(error.toTreePrivateFacadeGate, gate.toTreePrivateFacadeGate);
+  assertPrivateToTreeFacadeGate(gate.toTreePrivateFacadeGate, entrypoint);
   assertPrivateTestInstanceWrapperSkeleton(
     gate.privateTestInstanceWrapperSkeleton,
     entrypoint
@@ -1532,6 +1552,16 @@ function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
     "private-host-output-totree-metadata-ready-public-totree-blocked",
     entrypoint
   );
+  assert.equal(
+    gate.privateFacadeSymbol,
+    privateToTreeFacadeSymbolDescription,
+    entrypoint
+  );
+  assert.equal(
+    gate.privateFacadeStatus,
+    "private-tree-diagnostics-serializable-public-totree-blocked",
+    entrypoint
+  );
   assert.deepEqual(gate.acceptedMinimalFiberShape, [
     "HostRoot",
     "HostComponent",
@@ -1542,6 +1572,7 @@ function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
   assert.match(gate.hostComponentBehavior, /nodeType 'host'/u, entrypoint);
   assert.match(gate.hostTextBehavior, /text string/u, entrypoint);
   assert.equal(gate.acceptedRustPrivateJsonDiagnostics, true, entrypoint);
+  assert.equal(gate.acceptedRustPrivateTreeMetadata, true, entrypoint);
   assert.equal(gate.acceptedCommittedFiberInspection, true, entrypoint);
   assert.equal(gate.publicTreeAvailable, false, entrypoint);
   assert.equal(gate.publicRouteAvailable, false, entrypoint);
@@ -1563,11 +1594,16 @@ function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
     "TestRendererCommittedFiberTreeInspection::host_component",
     "TestRendererCommittedFiberTreeInspection::host_text",
     "TestRendererRoot::describe_private_json_serialization_for_canary",
-    "TestRendererPrivateJsonSerializationReport"
+    "TestRendererRoot::describe_private_tree_metadata_for_canary",
+    "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+    "TestRendererPrivateJsonSerializationReport",
+    "TestRendererPrivateTreeMetadataReport"
   ]);
   assert.deepEqual(gate.acceptedRustTests, [
     "committed_fiber_inspection_describes_host_root_component_and_text",
-    "root_private_json_serialization_canary_describes_minimal_host_component_with_text"
+    "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
+    "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
+    "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit"
   ]);
   assert.deepEqual(gate.blockedPublicSurfaces, [
     "create().toTree",
@@ -1621,6 +1657,119 @@ function assertPrivateToTreeHostOutputMetadata(record, entrypoint) {
   );
   assert.equal(
     typeof record.describeAcceptedHostOutputDiagnostic,
+    "function",
+    entrypoint
+  );
+}
+
+function assertPrivateToTreeFacadeGate(gate, entrypoint) {
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(
+    gate.id,
+    "react-test-renderer-totree-private-facade-gate",
+    entrypoint
+  );
+  assert.equal(gate.publicSurface, "create().toTree", entrypoint);
+  assert.equal(
+    gate.status,
+    "ready-for-private-diagnostics-public-totree-blocked",
+    entrypoint
+  );
+  assert.equal(gate.privateFacadeGateAvailable, true, entrypoint);
+  assert.equal(gate.privateTreeMetadataSerializable, true, entrypoint);
+  assert.equal(
+    gate.privateFacadeSymbol,
+    privateToTreeFacadeSymbolDescription,
+    entrypoint
+  );
+  assert.equal(
+    gate.privateFacadeStatus,
+    "private-tree-diagnostics-serializable-public-totree-blocked",
+    entrypoint
+  );
+  assert.equal(gate.acceptedRustPrivateTreeMetadata, true, entrypoint);
+  assert.equal(
+    gate.acceptedRustDiagnosticName,
+    "fast-react-test-renderer.serialization.private-tree-canary",
+    entrypoint
+  );
+  assert.deepEqual(gate.acceptedMinimalFiberShape, [
+    "HostRoot",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.deepEqual(gate.acceptedHostOutputUpdateKinds, [
+    "Create",
+    "Update"
+  ]);
+  assert.equal(gate.hostOutputSnapshotFreshnessRequired, true, entrypoint);
+  assert.equal(gate.staleSnapshotRejection, true, entrypoint);
+  assert.equal(gate.publicTreeAvailable, false, entrypoint);
+  assert.equal(gate.publicRouteAvailable, false, entrypoint);
+  assert.equal(gate.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(gate.nativeExecution, false, entrypoint);
+  assert.equal(gate.compatibilityClaimed, false, entrypoint);
+  assert.equal(
+    gate.acceptedWorker,
+    "worker-392-test-renderer-public-totree-private-facade",
+    entrypoint
+  );
+  assert.deepEqual(gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_tree_metadata_for_canary",
+    "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+    "TestRendererPrivateTreeMetadataReport",
+    "TestRendererPrivateTreeHostComponentDiagnostic",
+    "TestRendererPrivateTreeHostTextDiagnostic"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
+    "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+    "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
+  ]);
+  assert.deepEqual(gate.blockedPublicSurfaces, [
+    "create().toTree",
+    "create().toJSON",
+    "create().root",
+    "ReactTestInstance",
+    "public-js-react-test-renderer-routing",
+    "compatibility-claim"
+  ]);
+}
+
+function assertPrivateToTreeFacade(record, entrypoint) {
+  assert.equal(Object.isFrozen(record), true, entrypoint);
+  assert.equal(
+    record.id,
+    "react-test-renderer-totree-private-facade",
+    entrypoint
+  );
+  assert.equal(
+    record.status,
+    "private-tree-diagnostics-serializable-public-totree-blocked",
+    entrypoint
+  );
+  assert.equal(
+    entrypoint.startsWith(record.entrypoint),
+    true,
+    `${entrypoint} entrypoint`
+  );
+  assert.equal(record.publicSurface, "create().toTree", entrypoint);
+  assert.equal(record.symbol, privateToTreeFacadeSymbolDescription, entrypoint);
+  assertPrivateToTreeFacadeGate(record.gate, entrypoint);
+  assertPrivateToTreeHostOutputMetadataGate(record.metadataGate, entrypoint);
+  assert.equal(record.privateTreeMetadataSerializable, true, entrypoint);
+  assert.equal(record.publicTreeAvailable, false, entrypoint);
+  assert.equal(record.publicRouteAvailable, false, entrypoint);
+  assert.equal(record.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(record.nativeExecution, false, entrypoint);
+  assert.equal(record.compatibilityClaimed, false, entrypoint);
+  assert.equal(
+    typeof record.canSerializeAcceptedTreeMetadata,
+    "function",
+    entrypoint
+  );
+  assert.equal(
+    typeof record.serializeAcceptedTreeMetadata,
     "function",
     entrypoint
   );

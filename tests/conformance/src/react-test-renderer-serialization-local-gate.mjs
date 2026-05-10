@@ -82,6 +82,18 @@ export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
       "The JS react-test-renderer facade must record private toTree metadata without exposing public toTree output."
   },
   {
+    id: "js-totree-private-facade-gate",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The JS react-test-renderer facade must expose a hidden private toTree facade without making create().toTree public."
+  },
+  {
+    id: "js-totree-consumes-accepted-rust-private-tree-metadata",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree facade must consume the accepted Rust private tree metadata report, not only JS-local shape metadata."
+  },
+  {
     id: "js-totree-recognizes-accepted-minimal-host-output-shape",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -262,6 +274,8 @@ export function evaluateReactTestRendererSerializationLocalGate({
   const privateToTreeMetadataGateReady =
     privateDiagnosticsReady &&
     localChecks.privateToTreeHostOutputMetadataGatePresent &&
+    localChecks.privateToTreePrivateFacadeGatePresent &&
+    localChecks.privateToTreePrivateFacadeConsumesRustTreeMetadata &&
     localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape &&
     localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
   const requiredLocalTargetsReady =
@@ -295,6 +309,15 @@ export function evaluateReactTestRendererSerializationLocalGate({
       (requirement) => {
         if (requirement.id === "js-totree-private-host-output-metadata-gate") {
           return !localChecks.privateToTreeHostOutputMetadataGatePresent;
+        }
+        if (requirement.id === "js-totree-private-facade-gate") {
+          return !localChecks.privateToTreePrivateFacadeGatePresent;
+        }
+        if (
+          requirement.id ===
+          "js-totree-consumes-accepted-rust-private-tree-metadata"
+        ) {
+          return !localChecks.privateToTreePrivateFacadeConsumesRustTreeMetadata;
         }
         if (
           requirement.id ===
@@ -599,6 +622,19 @@ export function inspectReactTestRendererSerializationLocalTargets({
     testRendererSource,
     /\bTestRendererPrivateJsonPublicSurfaceBlockers\b/u
   );
+  const privateTreeMetadataPresent = hasSourcePattern(
+    testRendererSource,
+    /\bTestRendererPrivateTreeMetadataReport\b/u
+  ) && hasSourcePattern(
+    testRendererSource,
+    /\bdescribe_private_tree_metadata_for_canary\b/u
+  ) && hasSourcePattern(
+    testRendererSource,
+    /\bdescribe_private_tree_metadata_after_update_for_canary\b/u
+  ) && hasSourcePattern(
+    testRendererSource,
+    /\bTEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME\b/u
+  );
   const privateToJSONSerializationFacadeGatePresent =
     publicJsReactTestRendererFacadePresent &&
     publicJsReactTestRendererFacadePlaceholder &&
@@ -715,6 +751,60 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\breact-test-renderer-totree-private-host-output-metadata-gate\b/u
     );
+  const privateToTreePrivateFacadeGatePresent =
+    publicJsReactTestRendererFacadePresent &&
+    publicJsReactTestRendererFacadePlaceholder &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\btoTreePrivateFacadeGate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-totree-private-facade-gate\b/u
+    );
+  const privateToTreePrivateFacadeConsumesRustTreeMetadata =
+    privateTreeMetadataPresent &&
+    privateToTreePrivateFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedRustPrivateTreeMetadata\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfast-react-test-renderer\.serialization\.private-tree-canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_tree_metadata_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_tree_metadata_after_update_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererPrivateTreeMetadataReport\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTreeMetadataSerializable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast\.react_test_renderer\.private_totree_facade/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bserializePrivateToTreeMetadataDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bserializeAcceptedTreeMetadata\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bhostOutputSnapshotCurrent\b/u
+    );
   const privateToTreeHostOutputMetadataRecognizesMinimalShape =
     privateToTreeHostOutputMetadataGatePresent &&
     hasSourcePattern(
@@ -744,6 +834,10 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bworker-364-test-renderer-totree-private-host-output\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-392-test-renderer-public-totree-private-facade\b/u
     );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
@@ -877,11 +971,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
     committedTestRendererHostOutputPresent,
     committedFiberInspectionPresent,
     privateJsonDiagnosticsPresent,
+    privateTreeMetadataPresent,
     privateToJSONSerializationFacadeGatePresent,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
+    privateToTreePrivateFacadeGatePresent,
+    privateToTreePrivateFacadeConsumesRustTreeMetadata,
     privateToTreeHostOutputMetadataRecognizesMinimalShape,
     privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,

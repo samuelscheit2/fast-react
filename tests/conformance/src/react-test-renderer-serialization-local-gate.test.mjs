@@ -61,6 +61,13 @@ const privateToTreeHostOutputMetadataSymbol = Symbol.for(
 );
 const privateToTreeHostOutputMetadataStatus =
   "private-host-output-totree-metadata-ready-public-totree-blocked";
+const privateToTreeFacadeSymbol = Symbol.for(
+  "fast.react_test_renderer.private_totree_facade"
+);
+const privateToTreeFacadeStatus =
+  "private-tree-diagnostics-serializable-public-totree-blocked";
+const privateToTreeAcceptedDiagnosticName =
+  "fast-react-test-renderer.serialization.private-tree-canary";
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
@@ -90,11 +97,14 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     committedTestRendererHostOutputPresent: true,
     committedFiberInspectionPresent: true,
     privateJsonDiagnosticsPresent: true,
+    privateTreeMetadataPresent: true,
     privateToJSONSerializationFacadeGatePresent: true,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics: true,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateToTreeHostOutputMetadataGatePresent: true,
+    privateToTreePrivateFacadeGatePresent: true,
+    privateToTreePrivateFacadeConsumesRustTreeMetadata: true,
     privateToTreeHostOutputMetadataRecognizesMinimalShape: true,
     privateToTreeHostOutputMetadataPubliclyBlocked: true,
     privateRecordOnlyTestInstanceWrapperPresent: true,
@@ -142,6 +152,8 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
     ),
     [
       "js-totree-private-host-output-metadata-gate",
+      "js-totree-private-facade-gate",
+      "js-totree-consumes-accepted-rust-private-tree-metadata",
       "js-totree-recognizes-accepted-minimal-host-output-shape",
       "js-totree-public-tree-blocked"
     ]
@@ -398,6 +410,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
 
     const metadataGate = error.toTreeHostOutputMetadataGate;
     assert.equal(metadataGate, error.routingGate.toTreeHostOutputMetadataGate);
+    assert.equal(
+      error.toTreePrivateFacadeGate,
+      error.routingGate.toTreePrivateFacadeGate
+    );
     assert.equal(Object.isFrozen(metadataGate), true);
     assert.equal(
       metadataGate.id,
@@ -417,6 +433,11 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       metadataGate.privateMetadataStatus,
       privateToTreeHostOutputMetadataStatus
     );
+    assert.equal(
+      metadataGate.privateFacadeSymbol,
+      privateToTreeFacadeSymbol.description
+    );
+    assert.equal(metadataGate.privateFacadeStatus, privateToTreeFacadeStatus);
     assert.deepEqual(metadataGate.acceptedMinimalFiberShape, [
       "HostRoot",
       "HostComponent",
@@ -424,6 +445,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     ]);
     assert.equal(metadataGate.acceptedReactSourceAlgorithm, "ReactTestRenderer.js toTree");
     assert.equal(metadataGate.acceptedRustPrivateJsonDiagnostics, true);
+    assert.equal(metadataGate.acceptedRustPrivateTreeMetadata, true);
     assert.equal(metadataGate.acceptedCommittedFiberInspection, true);
     assert.equal(metadataGate.publicTreeAvailable, false);
     assert.equal(metadataGate.publicRouteAvailable, false);
@@ -438,7 +460,88 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "worker-235-test-renderer-private-fiber-inspection",
       "worker-265-test-renderer-private-json-ready-diagnostics"
     ]);
+    assert.deepEqual(metadataGate.acceptedRustApis, [
+      "inspect_test_renderer_committed_fiber_tree",
+      "TestRendererCommittedFiberTreeInspection::host_root",
+      "TestRendererCommittedFiberTreeInspection::host_component",
+      "TestRendererCommittedFiberTreeInspection::host_text",
+      "TestRendererRoot::describe_private_json_serialization_for_canary",
+      "TestRendererRoot::describe_private_tree_metadata_for_canary",
+      "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+      "TestRendererPrivateJsonSerializationReport",
+      "TestRendererPrivateTreeMetadataReport"
+    ]);
+    assert.deepEqual(metadataGate.acceptedRustTests, [
+      "committed_fiber_inspection_describes_host_root_component_and_text",
+      "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
+      "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
+      "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit"
+    ]);
     assert.deepEqual(metadataGate.blockedPublicSurfaces, [
+      "create().toTree",
+      "create().toJSON",
+      "create().root",
+      "ReactTestInstance",
+      "public-js-react-test-renderer-routing",
+      "compatibility-claim"
+    ]);
+
+    const facadeGate = error.toTreePrivateFacadeGate;
+    assert.equal(Object.isFrozen(facadeGate), true);
+    assert.equal(
+      facadeGate.id,
+      "react-test-renderer-totree-private-facade-gate"
+    );
+    assert.equal(facadeGate.publicSurface, "create().toTree");
+    assert.equal(
+      facadeGate.status,
+      "ready-for-private-diagnostics-public-totree-blocked"
+    );
+    assert.equal(facadeGate.privateFacadeGateAvailable, true);
+    assert.equal(facadeGate.privateTreeMetadataSerializable, true);
+    assert.equal(
+      facadeGate.privateFacadeSymbol,
+      privateToTreeFacadeSymbol.description
+    );
+    assert.equal(facadeGate.privateFacadeStatus, privateToTreeFacadeStatus);
+    assert.equal(facadeGate.acceptedRustPrivateTreeMetadata, true);
+    assert.equal(
+      facadeGate.acceptedRustDiagnosticName,
+      privateToTreeAcceptedDiagnosticName
+    );
+    assert.deepEqual(facadeGate.acceptedMinimalFiberShape, [
+      "HostRoot",
+      "HostComponent",
+      "HostText"
+    ]);
+    assert.deepEqual(facadeGate.acceptedHostOutputUpdateKinds, [
+      "Create",
+      "Update"
+    ]);
+    assert.equal(facadeGate.hostOutputSnapshotFreshnessRequired, true);
+    assert.equal(facadeGate.staleSnapshotRejection, true);
+    assert.equal(facadeGate.publicTreeAvailable, false);
+    assert.equal(facadeGate.publicRouteAvailable, false);
+    assert.equal(facadeGate.nativeBridgeAvailable, false);
+    assert.equal(facadeGate.nativeExecution, false);
+    assert.equal(facadeGate.compatibilityClaimed, false);
+    assert.equal(
+      facadeGate.acceptedWorker,
+      "worker-392-test-renderer-public-totree-private-facade"
+    );
+    assert.deepEqual(facadeGate.acceptedRustApis, [
+      "TestRendererRoot::describe_private_tree_metadata_for_canary",
+      "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+      "TestRendererPrivateTreeMetadataReport",
+      "TestRendererPrivateTreeHostComponentDiagnostic",
+      "TestRendererPrivateTreeHostTextDiagnostic"
+    ]);
+    assert.deepEqual(facadeGate.acceptedRustTests, [
+      "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
+      "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+      "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
+    ]);
+    assert.deepEqual(facadeGate.blockedPublicSurfaces, [
       "create().toTree",
       "create().toJSON",
       "create().root",
@@ -486,7 +589,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     );
 
     const shape = privateMetadata.describeAcceptedHostOutputDiagnostic(
-      createAcceptedMinimalHostOutputDiagnostic()
+      createAcceptedMinimalTreeMetadataDiagnostic()
     );
     assert.equal(Object.isFrozen(shape), true);
     assert.equal(
@@ -530,12 +633,12 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(Object.hasOwn(shape.hostComponent, "instance"), false);
     assert.equal(
       privateMetadata.canDescribeAcceptedHostOutputDiagnostic(
-        createAcceptedMinimalHostOutputDiagnostic()
+        createAcceptedMinimalTreeMetadataDiagnostic()
       ),
       true
     );
 
-    const rejectedDiagnostic = createAcceptedMinimalHostOutputDiagnostic();
+    const rejectedDiagnostic = createAcceptedMinimalTreeMetadataDiagnostic();
     rejectedDiagnostic.publicBlockers.treeMethodBlocked = false;
     assert.equal(
       privateMetadata.canDescribeAcceptedHostOutputDiagnostic(
@@ -560,6 +663,103 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateError.nativeBridgeAvailable, false);
     assert.equal(privateError.nativeExecution, false);
     assert.equal(privateError.compatibilityClaimed, false);
+
+    const facadeDescriptor = Object.getOwnPropertyDescriptor(
+      renderer.toTree,
+      privateToTreeFacadeSymbol
+    );
+    assert.notEqual(facadeDescriptor, undefined);
+    assert.equal(facadeDescriptor.enumerable, false);
+    assert.equal(facadeDescriptor.configurable, false);
+    assert.equal(facadeDescriptor.writable, false);
+    const privateFacade = facadeDescriptor.value;
+    assert.equal(Object.isFrozen(privateFacade), true);
+    assert.equal(privateFacade.id, "react-test-renderer-totree-private-facade");
+    assert.equal(privateFacade.status, privateToTreeFacadeStatus);
+    assert.equal(privateFacade.entrypoint, entry.entrypoint);
+    assert.equal(privateFacade.publicSurface, "create().toTree");
+    assert.equal(privateFacade.symbol, privateToTreeFacadeSymbol.description);
+    assert.equal(privateFacade.gate, error.toTreePrivateFacadeGate);
+    assert.equal(privateFacade.metadataGate, metadataGate);
+    assert.equal(privateFacade.rootRequest, error.rootRequest);
+    assert.equal(privateFacade.privateTreeMetadataSerializable, true);
+    assert.equal(privateFacade.publicTreeAvailable, false);
+    assert.equal(privateFacade.publicRouteAvailable, false);
+    assert.equal(privateFacade.nativeBridgeAvailable, false);
+    assert.equal(privateFacade.nativeExecution, false);
+    assert.equal(privateFacade.compatibilityClaimed, false);
+    assert.equal(typeof privateFacade.serializeAcceptedTreeMetadata, "function");
+    assert.equal(typeof privateFacade.canSerializeAcceptedTreeMetadata, "function");
+
+    const privateTree = privateFacade.serializeAcceptedTreeMetadata(
+      createAcceptedMinimalTreeMetadataDiagnostic()
+    );
+    assert.equal(Object.isFrozen(privateTree), true);
+    assert.equal(Object.isFrozen(privateTree.props), true);
+    assert.equal(Object.isFrozen(privateTree.rendered), true);
+    assert.deepEqual(privateTree, {
+      nodeType: "host",
+      type: "span",
+      props: {},
+      instance: null,
+      rendered: ["hello"]
+    });
+    const updatedPrivateTree = privateFacade.serializeAcceptedTreeMetadata(
+      createAcceptedMinimalTreeMetadataDiagnostic({
+        hostOutputUpdateKind: "Update",
+        text: "goodbye"
+      })
+    );
+    assert.deepEqual(updatedPrivateTree, {
+      nodeType: "host",
+      type: "span",
+      props: {},
+      instance: null,
+      rendered: ["goodbye"]
+    });
+    assert.equal(
+      privateFacade.canSerializeAcceptedTreeMetadata(
+        createAcceptedMinimalTreeMetadataDiagnostic()
+      ),
+      true
+    );
+    assert.equal(
+      privateFacade.canSerializeAcceptedTreeMetadata(
+        createAcceptedMinimalHostOutputDiagnostic()
+      ),
+      false
+    );
+
+    const staleTreeMetadata = createAcceptedMinimalTreeMetadataDiagnostic({
+      hostOutputSnapshotCurrent: false
+    });
+    assert.equal(
+      privateFacade.canSerializeAcceptedTreeMetadata(staleTreeMetadata),
+      false
+    );
+    const staleTreeError = captureThrown(() =>
+      privateFacade.serializeAcceptedTreeMetadata(staleTreeMetadata)
+    );
+    assert.equal(
+      staleTreeError.name,
+      "FastReactTestRendererPrivateToTreeMetadataError"
+    );
+    assert.match(staleTreeError.message, /hostOutputSnapshotCurrent to be true/u);
+
+    const compositeTreeMetadata = createAcceptedMinimalTreeMetadataDiagnostic();
+    compositeTreeMetadata.hostComponent.nodeType = "component";
+    assert.equal(
+      privateFacade.canSerializeAcceptedTreeMetadata(compositeTreeMetadata),
+      false
+    );
+    const compositeTreeError = captureThrown(() =>
+      privateFacade.serializeAcceptedTreeMetadata(compositeTreeMetadata)
+    );
+    assert.equal(
+      compositeTreeError.name,
+      "FastReactTestRendererPrivateToTreeMetadataError"
+    );
+    assert.match(compositeTreeError.message, /nodeType to be host/u);
   }
 });
 
@@ -710,6 +910,70 @@ function createAcceptedMinimalHostOutputDiagnostic({
       publicActBlocked: true,
       compatibilityClaimBlocked: true
     }
+  };
+}
+
+function createAcceptedMinimalTreeMetadataDiagnostic({
+  hostOutputSnapshotCurrent = true,
+  hostOutputUpdateKind = "Create",
+  text = "hello"
+} = {}) {
+  return {
+    diagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent,
+    gate: {
+      status: "ReadyForPrivateSerializationDiagnostics",
+      requirements: {
+        rootCommitDiagnosticsAvailable: true,
+        realHostOutputAvailable: true,
+        committedFiberInspectionAvailable: true
+      },
+      hostOutput: {
+        containerChildCount: 1,
+        instanceCount: 1,
+        textCount: 1,
+        realHostOutputAvailable: true
+      }
+    },
+    acceptedFiberShape: ["HostRoot", "HostComponent", "HostText"],
+    rootChildCount: 1,
+    hostRoot: {
+      fiberTag: "HostRoot",
+      delegatesToChild: true,
+      childFiberTag: "HostComponent",
+      publicTreeObjectAvailable: false
+    },
+    hostComponent: {
+      fiberTag: "HostComponent",
+      nodeType: "host",
+      elementType: { name: "span" },
+      props: {
+        attributes: {},
+        textContent: null
+      },
+      instanceAvailable: false,
+      renderedChildCount: 1,
+      renderedText: text,
+      publicTreeObjectAvailable: false
+    },
+    hostText: {
+      fiberTag: "HostText",
+      text,
+      returnsTextValue: true,
+      publicTreeObjectAvailable: false
+    },
+    publicBlockers: {
+      jsonMethodBlocked: true,
+      treeMethodBlocked: true,
+      instanceWrapperBlocked: true,
+      jsFacadeRoutingBlocked: true,
+      publicActBlocked: true,
+      compatibilityClaimBlocked: true
+    },
+    publicTreeObjectAvailable: false
   };
 }
 
