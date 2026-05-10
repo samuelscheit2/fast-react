@@ -872,6 +872,249 @@ test("private root-commit ref callback execution handoff proves cleanup detach b
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private cleanup-return execution gate records handles and executes detach before changed attach", () => {
+  const rootOwner = {kind: "PrivateCleanupReturnExecutionRoot"};
+  const hostOwner = {kind: "PrivateCleanupReturnExecutionHost"};
+  const node = createElement("DIV");
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const calls = [];
+  const firstRefHandle = {id: "cleanup-gate-first-ref"};
+  const secondRefHandle = {id: "cleanup-gate-second-ref"};
+
+  function firstCleanup() {
+    calls.push("first:cleanup");
+  }
+
+  function secondCleanup() {
+    calls.push("second:cleanup");
+  }
+
+  function firstRef(value) {
+    calls.push(`first:attach:${value.localName}`);
+    return firstCleanup;
+  }
+
+  function secondRef(value) {
+    calls.push(`second:attach:${value.localName}`);
+    return secondCleanup;
+  }
+
+  const initialProps = {id: "cleanup-gate", ref: firstRef};
+  const updateProps = {id: "cleanup-gate", ref: secondRef};
+  componentTree.attachHostInstanceNode(node, token, initialProps);
+
+  const initialAttachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "cleanup-gate-initial-fiber"},
+    stateNode: {id: "cleanup-gate-state-node"},
+    refHandle: firstRefHandle,
+    ref: firstRef,
+    sourceToken: "commit-token:cleanup-gate-first-attach"
+  });
+  const updateDetachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "cleanup-gate-update-current-fiber"},
+    stateNode: {id: "cleanup-gate-state-node"},
+    refHandle: firstRefHandle,
+    ref: firstRef,
+    expectedLatestRef: secondRef,
+    sourceToken: "deletion-token:cleanup-gate-first-cleanup",
+    detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
+  });
+  const updateAttachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "cleanup-gate-update-finished-fiber"},
+    stateNode: {id: "cleanup-gate-state-node"},
+    refHandle: secondRefHandle,
+    ref: secondRef,
+    sourceToken: "commit-token:cleanup-gate-second-attach"
+  });
+  const unmountDetachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "cleanup-gate-unmount-current-fiber"},
+    stateNode: {id: "cleanup-gate-state-node"},
+    refHandle: secondRefHandle,
+    ref: secondRef,
+    sourceToken: "deletion-token:cleanup-gate-second-cleanup",
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+
+  const gate =
+    refCallbackGate.createRefCallbackCleanupReturnExecutionGateSnapshot({
+      steps: [
+        {
+          label: "initial-attach-records-cleanup-handle",
+          rootCommitRefMetadata: {
+            detach: [],
+            attach: [initialAttachRecord]
+          }
+        },
+        {
+          label: "changed-ref-executes-cleanup-before-attach",
+          latestPropsUpdates: [
+            {
+              hostInstanceToken: token,
+              latestProps: updateProps
+            }
+          ],
+          rootCommitRefMetadata: {
+            detach: [updateDetachRecord],
+            attach: [updateAttachRecord]
+          }
+        },
+        {
+          label: "unmount-executes-second-cleanup",
+          rootCommitRefMetadata: {
+            detach: [unmountDetachRecord],
+            attach: []
+          }
+        }
+      ]
+    });
+
+  assert.equal(
+    gate.$$typeof,
+    refCallbackGate
+      .privateDomRefCallbackCleanupReturnExecutionGateSnapshotType
+  );
+  assert.equal(
+    gate.status,
+    refCallbackGate.REF_CALLBACK_CLEANUP_RETURN_EXECUTION_GATE_STATUS
+  );
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackCleanupReturnExecutionGateSnapshot(
+      gate
+    ),
+    true
+  );
+  assert.equal(gate.testOnlyExecution, true);
+  assert.equal(gate.stepCount, 3);
+  assert.equal(gate.recordCount, 4);
+  assert.equal(gate.attachCount, 2);
+  assert.equal(gate.detachCount, 2);
+  assert.equal(gate.callbackRefRecordCount, 4);
+  assert.equal(gate.objectRefRecordCount, 0);
+  assert.equal(gate.callbackInvocationAttemptCount, 2);
+  assert.equal(gate.cleanupInvocationAttemptCount, 2);
+  assert.equal(gate.callbackCleanupReturnCount, 2);
+  assert.equal(gate.callbackCleanupReturnHandleCount, 2);
+  assert.equal(gate.cleanupReturnHandleConsumedCount, 2);
+  assert.equal(gate.cleanupReturnHandleExecutionCount, 2);
+  assert.equal(gate.callbackNullDetachAttemptCount, 0);
+  assert.equal(gate.latestPropsUpdateCount, 1);
+  assert.equal(gate.changedRefCleanupBeforeAttach, true);
+  assert.equal(gate.changedRefCleanupDetachSequence, 1);
+  assert.equal(gate.changedRefAttachSequence, 2);
+  assert.equal(gate.callbackRefsInvoked, true);
+  assert.equal(gate.callbackCleanupReturnsInvoked, true);
+  assert.equal(gate.objectRefsMutated, false);
+  assert.equal(gate.domMutated, false);
+  assert.equal(gate.publicRootsTouched, false);
+  assert.equal(gate.rootErrorsReported, false);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.deepEqual(calls, [
+    "first:attach:div",
+    "first:cleanup",
+    "second:attach:div",
+    "second:cleanup"
+  ]);
+  assert.deepEqual(
+    gate.records.map((record) => [
+      record.sequence,
+      record.sourceStepLabel,
+      record.action,
+      record.invocationKind,
+      record.cleanupReturnHandleRecorded,
+      record.cleanupReturnHandleConsumed,
+      record.cleanupReturnHandleExecution,
+      record.callbackRefInvocationAttempted,
+      record.cleanupReturnInvocationAttempted
+    ]),
+    [
+      [
+        0,
+        "initial-attach-records-cleanup-handle",
+        refCallbackGate.REF_ACTION_ATTACH,
+        refCallbackGate.REF_CALLBACK_INVOCATION_ATTACH,
+        true,
+        false,
+        false,
+        true,
+        false
+      ],
+      [
+        1,
+        "changed-ref-executes-cleanup-before-attach",
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+        false,
+        true,
+        true,
+        false,
+        true
+      ],
+      [
+        2,
+        "changed-ref-executes-cleanup-before-attach",
+        refCallbackGate.REF_ACTION_ATTACH,
+        refCallbackGate.REF_CALLBACK_INVOCATION_ATTACH,
+        true,
+        false,
+        false,
+        true,
+        false
+      ],
+      [
+        3,
+        "unmount-executes-second-cleanup",
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+        false,
+        true,
+        true,
+        false,
+        true
+      ]
+    ]
+  );
+
+  for (const record of gate.records) {
+    assert.equal(
+      refCallbackGate.isPrivateRefCallbackCleanupReturnExecutionGateRecord(
+        record
+      ),
+      true
+    );
+    assert.equal(Object.hasOwn(record, "ref"), false);
+    assert.equal(Object.hasOwn(record, "node"), false);
+    assert.equal(Object.hasOwn(record, "latestProps"), false);
+    assert.equal(record.publicRootsTouched, false);
+    assert.equal(record.compatibilityClaimed, false);
+  }
+
+  const payload =
+    refCallbackGate
+      .getPrivateRefCallbackCleanupReturnExecutionGateSnapshotPayload(gate);
+  assert.equal(payload.controlledSnapshots.length, 3);
+  assert.equal(payload.records[1].refCleanup, firstCleanup);
+  assert.equal(payload.records[3].refCleanup, secondCleanup);
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackCleanupReturnHandle(
+      payload.records[1].refCleanupHandle
+    ),
+    true
+  );
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("private root bridge ref ordering diagnostic proves update identity and unmount cleanup without public roots", () => {
   const bridge = rootBridge.createPrivateRootBridgeShell();
   const container = createContainer("DIV");

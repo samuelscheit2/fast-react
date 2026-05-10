@@ -1477,6 +1477,225 @@ const REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS: [HostRootRefCallbackExecutionHand
 ];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootRefCleanupReturnExecutionGateSnapshot {
+    records: Vec<HostRootRefCleanupReturnExecutionGateRecord>,
+    cleanup_return_handle_record_gate_count: usize,
+    cleanup_return_execution_gate_count: usize,
+    changed_ref_cleanup_before_attach_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private cleanup-return execution gate metadata is reserved for future DOM commit workers"
+)]
+impl HostRootRefCleanupReturnExecutionGateSnapshot {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootRefCleanupReturnExecutionGateRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_handle_record_gate_count(&self) -> usize {
+        self.cleanup_return_handle_record_gate_count
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_execution_gate_count(&self) -> usize {
+        self.cleanup_return_execution_gate_count
+    }
+
+    #[must_use]
+    pub(crate) const fn changed_ref_cleanup_before_attach_count(&self) -> usize {
+        self.changed_ref_cleanup_before_attach_count
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_refs_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn object_refs_mutated(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_roots_touched(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_errors_reported(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_ref_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct HostRootRefCleanupReturnExecutionGateRecord {
+    sequence: usize,
+    source_handoff_sequence: usize,
+    source_gate_sequence: usize,
+    root: FiberRootId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    token: HostFiberTokenId,
+    token_phase: HostFiberTokenPhase,
+    token_target: HostFiberTokenTarget,
+    action: HostRootRefCommitAction,
+    detach_reason: Option<HostRootRefDetachReason>,
+    cleanup_return_phase: HostRootRefCleanupReturnExecutionPhase,
+    cleanup_return_handle_recording_gate: bool,
+    cleanup_return_execution_gate: bool,
+    changed_ref_cleanup_before_attach: bool,
+    status: HostRootRefCleanupReturnExecutionGateStatus,
+    blockers: [HostRootRefCleanupReturnExecutionGateBlocker; 4],
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private cleanup-return execution gate metadata is reserved for future DOM commit workers"
+)]
+impl HostRootRefCleanupReturnExecutionGateRecord {
+    #[must_use]
+    pub(crate) const fn sequence(&self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_sequence(&self) -> usize {
+        self.source_handoff_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn source_gate_sequence(&self) -> usize {
+        self.source_gate_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(&self) -> RefHandle {
+        self.ref_handle
+    }
+
+    #[must_use]
+    pub(crate) const fn token(&self) -> HostFiberTokenId {
+        self.token
+    }
+
+    #[must_use]
+    pub(crate) const fn token_phase(&self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn token_target(&self) -> HostFiberTokenTarget {
+        self.token_target
+    }
+
+    #[must_use]
+    pub(crate) const fn action(&self) -> HostRootRefCommitAction {
+        self.action
+    }
+
+    #[must_use]
+    pub(crate) const fn detach_reason(&self) -> Option<HostRootRefDetachReason> {
+        self.detach_reason
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_phase(&self) -> HostRootRefCleanupReturnExecutionPhase {
+        self.cleanup_return_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_handle_recording_gate(&self) -> bool {
+        self.cleanup_return_handle_recording_gate
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_return_execution_gate(&self) -> bool {
+        self.cleanup_return_execution_gate
+    }
+
+    #[must_use]
+    pub(crate) const fn changed_ref_cleanup_before_attach(&self) -> bool {
+        self.changed_ref_cleanup_before_attach
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> HostRootRefCleanupReturnExecutionGateStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(&self) -> &[HostRootRefCleanupReturnExecutionGateBlocker; 4] {
+        &self.blockers
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCleanupReturnExecutionPhase {
+    RecordAttachCleanupReturnHandle,
+    ExecuteDetachCleanupReturnHandleOrNull,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCleanupReturnExecutionGateStatus {
+    TestOnlyExecutionGate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCleanupReturnExecutionGateBlocker {
+    ObjectRefMutation,
+    PublicRootExecution,
+    PublicRootErrorRouting,
+    ReactDomRefCompatibilityClaim,
+}
+
+const REF_CLEANUP_RETURN_EXECUTION_GATE_BLOCKERS: [HostRootRefCleanupReturnExecutionGateBlocker;
+    4] = [
+    HostRootRefCleanupReturnExecutionGateBlocker::ObjectRefMutation,
+    HostRootRefCleanupReturnExecutionGateBlocker::PublicRootExecution,
+    HostRootRefCleanupReturnExecutionGateBlocker::PublicRootErrorRouting,
+    HostRootRefCleanupReturnExecutionGateBlocker::ReactDomRefCompatibilityClaim,
+];
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct PendingRefCommitSnapshot {
     detach: Vec<PendingRefCommitRecord>,
     attach: Vec<PendingRefCommitRecord>,
@@ -1791,6 +2010,7 @@ pub struct HostRootCommitRecord {
     ref_commit_metadata: HostRootRefCommitSnapshot,
     dom_ref_callback_commit_gate: HostRootDomRefCallbackCommitGateSnapshot,
     ref_callback_execution_handoff: HostRootRefCallbackExecutionHandoffSnapshot,
+    ref_cleanup_return_execution_gate: HostRootRefCleanupReturnExecutionGateSnapshot,
 }
 
 impl HostRootCommitRecord {
@@ -1877,6 +2097,17 @@ impl HostRootCommitRecord {
         &self,
     ) -> &HostRootRefCallbackExecutionHandoffSnapshot {
         &self.ref_callback_execution_handoff
+    }
+
+    #[must_use]
+    #[allow(
+        dead_code,
+        reason = "crate-private cleanup-return execution gate records are reserved for future DOM commit workers"
+    )]
+    pub(crate) fn ref_cleanup_return_execution_gate(
+        &self,
+    ) -> &HostRootRefCleanupReturnExecutionGateSnapshot {
+        &self.ref_cleanup_return_execution_gate
     }
 
     #[allow(
@@ -2276,6 +2507,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         materialize_dom_ref_callback_commit_gate(store, &ref_commit_metadata)?;
     let ref_callback_execution_handoff =
         materialize_ref_callback_execution_handoff(store, &dom_ref_callback_commit_gate)?;
+    let ref_cleanup_return_execution_gate =
+        materialize_ref_cleanup_return_execution_gate(store, &ref_callback_execution_handoff)?;
 
     Ok(HostRootCommitRecord {
         root: root_id,
@@ -2297,6 +2530,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
         ref_commit_metadata,
         dom_ref_callback_commit_gate,
         ref_callback_execution_handoff,
+        ref_cleanup_return_execution_gate,
     })
 }
 
@@ -2978,6 +3212,84 @@ fn ref_callback_execution_handoff_record<H: HostTypes>(
         status: HostRootRefCallbackExecutionHandoffStatus::PrivateExecutionHandoff,
         blockers: REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS,
     })
+}
+
+fn materialize_ref_cleanup_return_execution_gate<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    handoff: &HostRootRefCallbackExecutionHandoffSnapshot,
+) -> Result<HostRootRefCleanupReturnExecutionGateSnapshot, RootCommitError> {
+    let mut gate = HostRootRefCleanupReturnExecutionGateSnapshot::default();
+
+    for handoff_record in handoff.records() {
+        match handoff_record.action() {
+            HostRootRefCommitAction::Detach => {
+                gate.cleanup_return_execution_gate_count += 1;
+            }
+            HostRootRefCommitAction::Attach => {
+                gate.cleanup_return_handle_record_gate_count += 1;
+                if handoff_record.changed_ref_detach_before_attach() {
+                    gate.changed_ref_cleanup_before_attach_count += 1;
+                }
+            }
+        }
+
+        gate.records.push(ref_cleanup_return_execution_gate_record(
+            store,
+            gate.records.len(),
+            handoff_record,
+        )?);
+    }
+
+    Ok(gate)
+}
+
+fn ref_cleanup_return_execution_gate_record<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    sequence: usize,
+    handoff_record: &HostRootRefCallbackExecutionHandoffRecord,
+) -> Result<HostRootRefCleanupReturnExecutionGateRecord, RootCommitError> {
+    store.host_tokens().validate(
+        handoff_record.token(),
+        handoff_record.root(),
+        handoff_record.fiber(),
+        handoff_record.token_phase(),
+        handoff_record.token_target(),
+    )?;
+
+    Ok(HostRootRefCleanupReturnExecutionGateRecord {
+        sequence,
+        source_handoff_sequence: handoff_record.sequence(),
+        source_gate_sequence: handoff_record.source_gate_sequence(),
+        root: handoff_record.root(),
+        fiber: handoff_record.fiber(),
+        state_node: handoff_record.state_node(),
+        ref_handle: handoff_record.ref_handle(),
+        token: handoff_record.token(),
+        token_phase: handoff_record.token_phase(),
+        token_target: handoff_record.token_target(),
+        action: handoff_record.action(),
+        detach_reason: handoff_record.detach_reason(),
+        cleanup_return_phase: ref_cleanup_return_execution_phase(handoff_record.action()),
+        cleanup_return_handle_recording_gate: handoff_record.action()
+            == HostRootRefCommitAction::Attach,
+        cleanup_return_execution_gate: handoff_record.action() == HostRootRefCommitAction::Detach,
+        changed_ref_cleanup_before_attach: handoff_record.changed_ref_detach_before_attach(),
+        status: HostRootRefCleanupReturnExecutionGateStatus::TestOnlyExecutionGate,
+        blockers: REF_CLEANUP_RETURN_EXECUTION_GATE_BLOCKERS,
+    })
+}
+
+const fn ref_cleanup_return_execution_phase(
+    action: HostRootRefCommitAction,
+) -> HostRootRefCleanupReturnExecutionPhase {
+    match action {
+        HostRootRefCommitAction::Detach => {
+            HostRootRefCleanupReturnExecutionPhase::ExecuteDetachCleanupReturnHandleOrNull
+        }
+        HostRootRefCommitAction::Attach => {
+            HostRootRefCleanupReturnExecutionPhase::RecordAttachCleanupReturnHandle
+        }
+    }
 }
 
 const fn ref_callback_execution_phase(
@@ -6084,6 +6396,10 @@ mod tests {
         assert_ref_callback_execution_handoff_keeps_public_blockers(
             commit.ref_callback_execution_handoff(),
         );
+        assert!(commit.ref_cleanup_return_execution_gate().is_empty());
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(
+            commit.ref_cleanup_return_execution_gate(),
+        );
         assert!(commit.root_update_callback_invocation_gate().is_empty());
         assert_root_update_callback_invocation_gate_is_inert(
             commit.root_update_callback_invocation_gate(),
@@ -8024,6 +8340,7 @@ mod tests {
         assert!(commit.ref_commit_metadata().is_empty());
         assert!(commit.dom_ref_callback_commit_gate().is_empty());
         assert!(commit.ref_callback_execution_handoff().is_empty());
+        assert!(commit.ref_cleanup_return_execution_gate().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -8481,6 +8798,7 @@ mod tests {
         let refs = commit.ref_commit_metadata();
         let gate = commit.dom_ref_callback_commit_gate();
         let handoff = commit.ref_callback_execution_handoff();
+        let cleanup_gate = commit.ref_cleanup_return_execution_gate();
 
         assert!(refs.detach().is_empty());
         assert_eq!(refs.attach().len(), 1);
@@ -8530,6 +8848,34 @@ mod tests {
             HostRootRefCallbackExecutionPhase::CallbackAttach
         );
         assert!(!handoff_record.changed_ref_detach_before_attach());
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(cleanup_gate);
+        assert_eq!(cleanup_gate.len(), 1);
+        assert_eq!(cleanup_gate.cleanup_return_handle_record_gate_count(), 1);
+        assert_eq!(cleanup_gate.cleanup_return_execution_gate_count(), 0);
+        assert_eq!(cleanup_gate.changed_ref_cleanup_before_attach_count(), 0);
+        let cleanup_record = cleanup_gate.records()[0];
+        assert_eq!(cleanup_record.sequence(), 0);
+        assert_eq!(
+            cleanup_record.source_handoff_sequence(),
+            handoff_record.sequence()
+        );
+        assert_eq!(
+            cleanup_record.source_gate_sequence(),
+            gate_record.sequence()
+        );
+        assert_eq!(cleanup_record.root(), root_id);
+        assert_eq!(cleanup_record.fiber(), child);
+        assert_eq!(cleanup_record.state_node(), state_node);
+        assert_eq!(cleanup_record.ref_handle(), ref_handle);
+        assert_eq!(cleanup_record.token(), attach.token());
+        assert_eq!(cleanup_record.action(), HostRootRefCommitAction::Attach);
+        assert_eq!(
+            cleanup_record.cleanup_return_phase(),
+            HostRootRefCleanupReturnExecutionPhase::RecordAttachCleanupReturnHandle
+        );
+        assert!(cleanup_record.cleanup_return_handle_recording_gate());
+        assert!(!cleanup_record.cleanup_return_execution_gate());
+        assert!(!cleanup_record.changed_ref_cleanup_before_attach());
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.work_in_progress()
@@ -8571,6 +8917,7 @@ mod tests {
         let refs = commit.ref_commit_metadata();
         let gate = commit.dom_ref_callback_commit_gate();
         let handoff = commit.ref_callback_execution_handoff();
+        let cleanup_gate = commit.ref_cleanup_return_execution_gate();
 
         assert_eq!(refs.detach().len(), 1);
         assert_eq!(refs.attach().len(), 1);
@@ -8640,6 +8987,35 @@ mod tests {
             HostRootRefCallbackExecutionPhase::CallbackAttach
         );
         assert!(handoff.records()[1].changed_ref_detach_before_attach());
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(cleanup_gate);
+        assert_eq!(cleanup_gate.len(), 2);
+        assert_eq!(cleanup_gate.cleanup_return_handle_record_gate_count(), 1);
+        assert_eq!(cleanup_gate.cleanup_return_execution_gate_count(), 1);
+        assert_eq!(cleanup_gate.changed_ref_cleanup_before_attach_count(), 1);
+        assert_eq!(cleanup_gate.records()[0].sequence(), 0);
+        assert_eq!(cleanup_gate.records()[0].source_handoff_sequence(), 0);
+        assert_eq!(cleanup_gate.records()[0].source_gate_sequence(), 0);
+        assert_eq!(cleanup_gate.records()[0].fiber(), current_child);
+        assert_eq!(cleanup_gate.records()[0].token(), detach.token());
+        assert_eq!(
+            cleanup_gate.records()[0].cleanup_return_phase(),
+            HostRootRefCleanupReturnExecutionPhase::ExecuteDetachCleanupReturnHandleOrNull
+        );
+        assert!(!cleanup_gate.records()[0].cleanup_return_handle_recording_gate());
+        assert!(cleanup_gate.records()[0].cleanup_return_execution_gate());
+        assert!(!cleanup_gate.records()[0].changed_ref_cleanup_before_attach());
+        assert_eq!(cleanup_gate.records()[1].sequence(), 1);
+        assert_eq!(cleanup_gate.records()[1].source_handoff_sequence(), 1);
+        assert_eq!(cleanup_gate.records()[1].source_gate_sequence(), 1);
+        assert_eq!(cleanup_gate.records()[1].fiber(), finished_child);
+        assert_eq!(cleanup_gate.records()[1].token(), attach.token());
+        assert_eq!(
+            cleanup_gate.records()[1].cleanup_return_phase(),
+            HostRootRefCleanupReturnExecutionPhase::RecordAttachCleanupReturnHandle
+        );
+        assert!(cleanup_gate.records()[1].cleanup_return_handle_recording_gate());
+        assert!(!cleanup_gate.records()[1].cleanup_return_execution_gate());
+        assert!(cleanup_gate.records()[1].changed_ref_cleanup_before_attach());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -8673,6 +9049,7 @@ mod tests {
         let refs = commit.ref_commit_metadata();
         let gate = commit.dom_ref_callback_commit_gate();
         let handoff = commit.ref_callback_execution_handoff();
+        let cleanup_gate = commit.ref_cleanup_return_execution_gate();
 
         assert_eq!(refs.attach().len(), 0);
         assert_eq!(refs.detach().len(), 2);
@@ -8734,6 +9111,27 @@ mod tests {
             handoff.records()[1].detach_reason(),
             Some(HostRootRefDetachReason::Deleted)
         );
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(cleanup_gate);
+        assert_eq!(cleanup_gate.len(), 2);
+        assert_eq!(cleanup_gate.cleanup_return_handle_record_gate_count(), 0);
+        assert_eq!(cleanup_gate.cleanup_return_execution_gate_count(), 2);
+        assert_eq!(cleanup_gate.changed_ref_cleanup_before_attach_count(), 0);
+        assert_eq!(cleanup_gate.records()[0].source_handoff_sequence(), 0);
+        assert_eq!(cleanup_gate.records()[0].fiber(), deleted_parent);
+        assert_eq!(cleanup_gate.records()[0].token(), refs.detach()[0].token());
+        assert_eq!(
+            cleanup_gate.records()[0].cleanup_return_phase(),
+            HostRootRefCleanupReturnExecutionPhase::ExecuteDetachCleanupReturnHandleOrNull
+        );
+        assert!(cleanup_gate.records()[0].cleanup_return_execution_gate());
+        assert_eq!(cleanup_gate.records()[1].source_handoff_sequence(), 1);
+        assert_eq!(cleanup_gate.records()[1].fiber(), deleted_child);
+        assert_eq!(cleanup_gate.records()[1].token(), refs.detach()[1].token());
+        assert_eq!(
+            cleanup_gate.records()[1].cleanup_return_phase(),
+            HostRootRefCleanupReturnExecutionPhase::ExecuteDetachCleanupReturnHandleOrNull
+        );
+        assert!(cleanup_gate.records()[1].cleanup_return_execution_gate());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -8843,6 +9241,44 @@ mod tests {
             .unwrap();
 
         let error = materialize_ref_callback_execution_handoff(&store, &gate).unwrap_err();
+
+        assert!(matches!(
+            error,
+            RootCommitError::HostFiberToken(error)
+                if error.violation() == HostFiberTokenViolation::Stale
+                    && error.phase() == HostFiberTokenPhase::Commit
+                    && error.target() == HostFiberTokenTarget::Instance
+        ));
+    }
+
+    #[test]
+    fn ref_cleanup_return_execution_gate_revalidates_handoff_source_tokens() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(51), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let ref_handle = RefHandle::from_raw(143);
+        let state_node = StateNodeHandle::from_raw(243);
+        append_host_ref_child(
+            &mut store,
+            render.work_in_progress(),
+            ref_handle,
+            state_node,
+            FiberFlags::REF,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(render.work_in_progress())
+            .unwrap()
+            .set_subtree_flags(FiberFlags::REF);
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let handoff = commit.ref_callback_execution_handoff().clone();
+        let attach = commit.ref_commit_metadata().attach()[0];
+        store
+            .host_tokens_mut()
+            .invalidate(attach.token(), attach.token_phase(), attach.token_target())
+            .unwrap();
+
+        let error = materialize_ref_cleanup_return_execution_gate(&store, &handoff).unwrap_err();
 
         assert!(matches!(
             error,
@@ -9314,6 +9750,27 @@ mod tests {
                 HostRootRefCallbackExecutionHandoffStatus::PrivateExecutionHandoff
             );
             assert_eq!(record.blockers(), &REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS);
+        }
+    }
+
+    fn assert_ref_cleanup_return_execution_gate_keeps_public_blockers(
+        gate: &HostRootRefCleanupReturnExecutionGateSnapshot,
+    ) {
+        assert!(!gate.callback_refs_invoked());
+        assert!(!gate.cleanup_return_callbacks_invoked());
+        assert!(!gate.object_refs_mutated());
+        assert!(!gate.public_roots_touched());
+        assert!(!gate.root_errors_reported());
+        assert!(!gate.react_dom_ref_compatibility_claimed());
+        for record in gate.records() {
+            assert_eq!(
+                record.status(),
+                HostRootRefCleanupReturnExecutionGateStatus::TestOnlyExecutionGate
+            );
+            assert_eq!(
+                record.blockers(),
+                &REF_CLEANUP_RETURN_EXECUTION_GATE_BLOCKERS
+            );
         }
     }
 
