@@ -1396,6 +1396,43 @@ impl FunctionComponentUseStateRenderRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseReducerRenderRequest {
+    reducer: FunctionComponentReducerHandle,
+    initial_state: StateHandle,
+    lanes: FunctionComponentStateUpdateRenderLanes,
+}
+
+impl FunctionComponentUseReducerRenderRequest {
+    #[must_use]
+    pub const fn new(
+        reducer: FunctionComponentReducerHandle,
+        initial_state: StateHandle,
+        lanes: FunctionComponentStateUpdateRenderLanes,
+    ) -> Self {
+        Self {
+            reducer,
+            initial_state,
+            lanes,
+        }
+    }
+
+    #[must_use]
+    pub const fn reducer(self) -> FunctionComponentReducerHandle {
+        self.reducer
+    }
+
+    #[must_use]
+    pub const fn initial_state(self) -> StateHandle {
+        self.initial_state
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> FunctionComponentStateUpdateRenderLanes {
+        self.lanes
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentUseMemoRenderRequest {
     value: StateHandle,
     dependencies: HookEffectDependencies,
@@ -1521,6 +1558,12 @@ pub(crate) struct FunctionComponentReducerUpdateRenderRecord {
 pub(crate) enum FunctionComponentUseStateHookRenderRecord {
     Mount(FunctionComponentStateHookRecord),
     Update(FunctionComponentStateUpdateRenderRecord),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentUseReducerHookRenderRecord {
+    Mount(FunctionComponentReducerHookRecord),
+    Update(FunctionComponentReducerUpdateRenderRecord),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1873,6 +1916,88 @@ impl FunctionComponentUseStateHookRenderRecord {
 
     #[must_use]
     pub const fn update_record(self) -> Option<FunctionComponentStateUpdateRenderRecord> {
+        match self {
+            Self::Update(record) => Some(record),
+            Self::Mount(_) => None,
+        }
+    }
+}
+
+impl FunctionComponentUseReducerHookRenderRecord {
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentHookRenderPhase {
+        match self {
+            Self::Mount(_) => FunctionComponentHookRenderPhase::Mount,
+            Self::Update(_) => FunctionComponentHookRenderPhase::Update,
+        }
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        match self {
+            Self::Mount(record) => record.hook(),
+            Self::Update(record) => record.hook(),
+        }
+    }
+
+    #[must_use]
+    pub const fn queue(self) -> HookQueueId {
+        match self {
+            Self::Mount(record) => record.queue(),
+            Self::Update(record) => record.queue(),
+        }
+    }
+
+    #[must_use]
+    pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        match self {
+            Self::Mount(record) => record.dispatch(),
+            Self::Update(record) => record.dispatch(),
+        }
+    }
+
+    #[must_use]
+    pub const fn reducer(self) -> FunctionComponentReducerHandle {
+        match self {
+            Self::Mount(record) => record.reducer(),
+            Self::Update(record) => record.reducer(),
+        }
+    }
+
+    #[must_use]
+    pub const fn memoized_state(self) -> StateHandle {
+        match self {
+            Self::Mount(record) => record.memoized_state(),
+            Self::Update(record) => record.memoized_state(),
+        }
+    }
+
+    #[must_use]
+    pub const fn base_state(self) -> StateHandle {
+        match self {
+            Self::Mount(record) => record.base_state(),
+            Self::Update(record) => record.base_state(),
+        }
+    }
+
+    #[must_use]
+    pub const fn base_queue(self) -> Option<HookUpdateId> {
+        match self {
+            Self::Mount(record) => record.base_queue(),
+            Self::Update(record) => record.base_queue(),
+        }
+    }
+
+    #[must_use]
+    pub const fn mount_record(self) -> Option<FunctionComponentReducerHookRecord> {
+        match self {
+            Self::Mount(record) => Some(record),
+            Self::Update(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn update_record(self) -> Option<FunctionComponentReducerUpdateRenderRecord> {
         match self {
             Self::Update(record) => Some(record),
             Self::Mount(_) => None,
@@ -7015,6 +7140,287 @@ impl FunctionComponentSingleChildReconciliationRecord {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FunctionComponentSingleChildUpdateReconciliationError {
+    FiberTopology(FiberTopologyError),
+    UnexpectedFiberTag {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingCurrent {
+        fiber: FiberId,
+    },
+    MissingCurrentChild {
+        fiber: FiberId,
+        current: FiberId,
+    },
+    UnexpectedCurrentChildSibling {
+        fiber: FiberId,
+        current_child: FiberId,
+        sibling: FiberId,
+    },
+    ExistingWorkInProgressChild {
+        fiber: FiberId,
+        child: FiberId,
+    },
+    MissingOutput {
+        fiber: FiberId,
+    },
+    UnknownOutput {
+        fiber: FiberId,
+        output: FunctionComponentOutputHandle,
+    },
+    OutputMismatch {
+        fiber: FiberId,
+        expected: FunctionComponentOutputHandle,
+        actual: FunctionComponentOutputHandle,
+    },
+    MissingChildElement {
+        fiber: FiberId,
+        output: FunctionComponentOutputHandle,
+    },
+    UnsupportedChildTag {
+        fiber: FiberId,
+        output: FunctionComponentOutputHandle,
+        tag: FiberTag,
+    },
+    CurrentChildTagMismatch {
+        fiber: FiberId,
+        current_child: FiberId,
+        expected: FiberTag,
+        actual: FiberTag,
+    },
+    HostComponentElementTypeMismatch {
+        fiber: FiberId,
+        current_child: FiberId,
+        expected: ElementTypeHandle,
+        actual: ElementTypeHandle,
+    },
+    MissingCurrentChildStateNode {
+        child: FiberId,
+        tag: FiberTag,
+    },
+    UnchangedChildProps {
+        child: FiberId,
+        props: PropsHandle,
+    },
+}
+
+impl Display for FunctionComponentSingleChildUpdateReconciliationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UnexpectedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be FunctionComponent for private single-child update reconciliation, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingCurrent { fiber } => write!(
+                formatter,
+                "function component fiber {} requires a current alternate for private single-child update reconciliation",
+                fiber.slot().get()
+            ),
+            Self::MissingCurrentChild { fiber, current } => write!(
+                formatter,
+                "function component fiber {} current alternate {} has no child for private single-child update reconciliation",
+                fiber.slot().get(),
+                current.slot().get()
+            ),
+            Self::UnexpectedCurrentChildSibling {
+                fiber,
+                current_child,
+                sibling,
+            } => write!(
+                formatter,
+                "function component fiber {} current child {} has sibling {}; private single-child update reconciliation admits exactly one current child",
+                fiber.slot().get(),
+                current_child.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::ExistingWorkInProgressChild { fiber, child } => write!(
+                formatter,
+                "function component fiber {} already has work-in-progress child {}; private single-child update reconciliation requires an empty child slot",
+                fiber.slot().get(),
+                child.slot().get()
+            ),
+            Self::MissingOutput { fiber } => write!(
+                formatter,
+                "function component fiber {} returned no output for private single-child update reconciliation",
+                fiber.slot().get()
+            ),
+            Self::UnknownOutput { fiber, output } => write!(
+                formatter,
+                "function component fiber {} output handle {} is not a supported private single-child update output",
+                fiber.slot().get(),
+                output.raw()
+            ),
+            Self::OutputMismatch {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} resolved update output handle {} while render returned {}",
+                fiber.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::MissingChildElement { fiber, output } => write!(
+                formatter,
+                "function component fiber {} update output handle {} resolved to an empty child element",
+                fiber.slot().get(),
+                output.raw()
+            ),
+            Self::UnsupportedChildTag { fiber, output, tag } => write!(
+                formatter,
+                "function component fiber {} update output handle {} resolved to unsupported private single-child tag {:?}; only HostComponent and HostText are admitted",
+                fiber.slot().get(),
+                output.raw(),
+                tag
+            ),
+            Self::CurrentChildTagMismatch {
+                fiber,
+                current_child,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} current child {} is {:?}, but update output resolved to {:?}; replacements are not admitted by this canary",
+                fiber.slot().get(),
+                current_child.slot().get(),
+                actual,
+                expected
+            ),
+            Self::HostComponentElementTypeMismatch {
+                fiber,
+                current_child,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} current HostComponent child {} has element type {}, but update output resolved to {}; replacements are not admitted by this canary",
+                fiber.slot().get(),
+                current_child.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::MissingCurrentChildStateNode { child, tag } => write!(
+                formatter,
+                "{:?} current child {} has no state node for private single-child update reconciliation",
+                tag,
+                child.slot().get()
+            ),
+            Self::UnchangedChildProps { child, props } => write!(
+                formatter,
+                "current child {} already has props {}; private single-child update reconciliation requires a HostComponent/HostText update",
+                child.slot().get(),
+                props.raw()
+            ),
+        }
+    }
+}
+
+impl Error for FunctionComponentSingleChildUpdateReconciliationError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::UnexpectedFiberTag { .. }
+            | Self::MissingCurrent { .. }
+            | Self::MissingCurrentChild { .. }
+            | Self::UnexpectedCurrentChildSibling { .. }
+            | Self::ExistingWorkInProgressChild { .. }
+            | Self::MissingOutput { .. }
+            | Self::UnknownOutput { .. }
+            | Self::OutputMismatch { .. }
+            | Self::MissingChildElement { .. }
+            | Self::UnsupportedChildTag { .. }
+            | Self::CurrentChildTagMismatch { .. }
+            | Self::HostComponentElementTypeMismatch { .. }
+            | Self::MissingCurrentChildStateNode { .. }
+            | Self::UnchangedChildProps { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for FunctionComponentSingleChildUpdateReconciliationError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentSingleChildUpdateReconciliationRecord {
+    function_component: FiberId,
+    current: FiberId,
+    current_child: FiberId,
+    work_in_progress_child: FiberId,
+    output: FunctionComponentOutputHandle,
+    child_element: RootElementHandle,
+    child_tag: FiberTag,
+    child_element_type: ElementTypeHandle,
+    previous_child_props: PropsHandle,
+    child_props: PropsHandle,
+    render_lanes: Lanes,
+}
+
+impl FunctionComponentSingleChildUpdateReconciliationRecord {
+    #[must_use]
+    pub const fn function_component(self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    pub const fn current(self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn current_child(self) -> FiberId {
+        self.current_child
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_child(self) -> FiberId {
+        self.work_in_progress_child
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.output
+    }
+
+    #[must_use]
+    pub const fn child_element(self) -> RootElementHandle {
+        self.child_element
+    }
+
+    #[must_use]
+    pub const fn child_tag(self) -> FiberTag {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub const fn child_element_type(self) -> ElementTypeHandle {
+        self.child_element_type
+    }
+
+    #[must_use]
+    pub const fn previous_child_props(self) -> PropsHandle {
+        self.previous_child_props
+    }
+
+    #[must_use]
+    pub const fn child_props(self) -> PropsHandle {
+        self.child_props
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderRecord {
     current: Option<FiberId>,
@@ -7088,6 +7494,13 @@ pub(crate) struct FunctionComponentUseStateRenderRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseReducerRenderRecord {
+    render: FunctionComponentRenderRecord,
+    hook_result: FunctionComponentHookRenderResult,
+    reducer_hook: FunctionComponentUseReducerHookRenderRecord,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentUseContextRenderRecord {
     render: FunctionComponentRenderRecord,
     context_read: FunctionComponentContextReadRecord,
@@ -7107,6 +7520,53 @@ impl FunctionComponentUseStateRenderRecord {
     #[must_use]
     pub const fn state_hook(self) -> FunctionComponentUseStateHookRenderRecord {
         self.state_hook
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn hook_state(self) -> FunctionComponentHookRenderState {
+        self.hook_result.state()
+    }
+
+    #[must_use]
+    pub const fn hook_traversal(self) -> HookListTraversalResult {
+        self.hook_result.traversal()
+    }
+}
+
+impl FunctionComponentUseReducerRenderRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn hook_result(self) -> FunctionComponentHookRenderResult {
+        self.hook_result
+    }
+
+    #[must_use]
+    pub const fn reducer_hook(self) -> FunctionComponentUseReducerHookRenderRecord {
+        self.reducer_hook
     }
 
     #[must_use]
@@ -7525,6 +7985,71 @@ pub(crate) fn render_function_component_with_use_state(
         },
         hook_result,
         state_hook,
+    })
+}
+
+pub(crate) fn render_function_component_with_use_reducer(
+    arena: &mut FiberArena,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    reducer_request: FunctionComponentUseReducerRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+    mut reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+) -> Result<FunctionComponentUseReducerRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
+    request = request.with_hook_state(hook_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    let mut cursor = hook_store.begin_render_cursor(hook_state)?;
+    let reducer_hook = match hook_state.phase() {
+        FunctionComponentHookRenderPhase::Mount => {
+            FunctionComponentUseReducerHookRenderRecord::Mount(hook_store.mount_reducer_hook(
+                &mut cursor,
+                reducer_request.reducer(),
+                reducer_request.initial_state(),
+            )?)
+        }
+        FunctionComponentHookRenderPhase::Update => {
+            FunctionComponentUseReducerHookRenderRecord::Update(
+                hook_store.update_reducer_hook_with_queued_updates(
+                    &mut cursor,
+                    reducer_request.reducer(),
+                    reducer_request.lanes(),
+                    &mut reducer,
+                )?,
+            )
+        }
+    };
+    let hook_result = hook_store.finish_render_cursor(cursor)?;
+
+    let output = invoker
+        .invoke_function_component(request)
+        .map_err(|error| FunctionComponentRenderError::Invocation {
+            fiber: request.fiber(),
+            component: request.component(),
+            error,
+        })?;
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    Ok(FunctionComponentUseReducerRenderRecord {
+        render: FunctionComponentRenderRecord {
+            current: arena.get(work_in_progress)?.alternate(),
+            work_in_progress,
+            component: request.component(),
+            props: request.props(),
+            render_lanes: request.render_lanes(),
+            hook_state: request.hook_state(),
+            context_state: request.context_state(),
+            context_read_count: 0,
+            output,
+        },
+        hook_result,
+        reducer_hook,
     })
 }
 
@@ -8187,6 +8712,171 @@ pub(crate) fn reconcile_function_component_single_child_output(
         child_element: single_child.element(),
         child_tag: single_child.tag(),
         child_element_type: single_child.element_type(),
+        child_props: single_child.props(),
+        render_lanes: render.render_lanes(),
+    })
+}
+
+pub(crate) fn reconcile_function_component_single_child_update_output(
+    arena: &mut FiberArena,
+    render: FunctionComponentRenderRecord,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+) -> Result<
+    FunctionComponentSingleChildUpdateReconciliationRecord,
+    FunctionComponentSingleChildUpdateReconciliationError,
+> {
+    let function_component = render.work_in_progress();
+    let node = arena.get(function_component)?;
+    let tag = node.tag();
+    if tag != FiberTag::FunctionComponent {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::UnexpectedFiberTag {
+                fiber: function_component,
+                tag,
+            },
+        );
+    }
+    if let Some(child) = node.child() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::ExistingWorkInProgressChild {
+                fiber: function_component,
+                child,
+            },
+        );
+    }
+    let current = render.current().ok_or(
+        FunctionComponentSingleChildUpdateReconciliationError::MissingCurrent {
+            fiber: function_component,
+        },
+    )?;
+    let current_child = arena.get(current)?.child().ok_or(
+        FunctionComponentSingleChildUpdateReconciliationError::MissingCurrentChild {
+            fiber: function_component,
+            current,
+        },
+    )?;
+    if let Some(sibling) = arena.get(current_child)?.sibling() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::UnexpectedCurrentChildSibling {
+                fiber: function_component,
+                current_child,
+                sibling,
+            },
+        );
+    }
+
+    let output = render.output();
+    if output.is_none() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::MissingOutput {
+                fiber: function_component,
+            },
+        );
+    }
+    let single_child = resolver
+        .resolve_function_component_single_child_output(output)
+        .ok_or(
+            FunctionComponentSingleChildUpdateReconciliationError::UnknownOutput {
+                fiber: function_component,
+                output,
+            },
+        )?;
+    if single_child.output() != output {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::OutputMismatch {
+                fiber: function_component,
+                expected: output,
+                actual: single_child.output(),
+            },
+        );
+    }
+    if single_child.element().is_none() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::MissingChildElement {
+                fiber: function_component,
+                output,
+            },
+        );
+    }
+    if !matches!(
+        single_child.tag(),
+        FiberTag::HostComponent | FiberTag::HostText
+    ) {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::UnsupportedChildTag {
+                fiber: function_component,
+                output,
+                tag: single_child.tag(),
+            },
+        );
+    }
+
+    let current_child_node = arena.get(current_child)?;
+    let current_child_tag = current_child_node.tag();
+    if current_child_tag != single_child.tag() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::CurrentChildTagMismatch {
+                fiber: function_component,
+                current_child,
+                expected: single_child.tag(),
+                actual: current_child_tag,
+            },
+        );
+    }
+    if current_child_tag == FiberTag::HostComponent
+        && current_child_node.element_type() != single_child.element_type()
+    {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::HostComponentElementTypeMismatch {
+                fiber: function_component,
+                current_child,
+                expected: single_child.element_type(),
+                actual: current_child_node.element_type(),
+            },
+        );
+    }
+    if current_child_node.state_node().is_none() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::MissingCurrentChildStateNode {
+                child: current_child,
+                tag: current_child_tag,
+            },
+        );
+    }
+    let previous_child_props = current_child_node.memoized_props();
+    if previous_child_props == single_child.props() {
+        return Err(
+            FunctionComponentSingleChildUpdateReconciliationError::UnchangedChildProps {
+                child: current_child,
+                props: previous_child_props,
+            },
+        );
+    }
+
+    let work_in_progress_child =
+        arena.create_work_in_progress(current_child, single_child.props())?;
+    {
+        let child_node = arena.get_mut(work_in_progress_child)?;
+        child_node.set_element_type(single_child.element_type());
+        child_node.set_memoized_props(single_child.props());
+        child_node.set_lanes(Lanes::NO);
+        child_node.merge_flags(FiberFlags::UPDATE);
+    }
+    arena.set_children(function_component, &[work_in_progress_child])?;
+    arena
+        .get_mut(function_component)?
+        .merge_flags(FiberFlags::PERFORMED_WORK);
+
+    Ok(FunctionComponentSingleChildUpdateReconciliationRecord {
+        function_component,
+        current,
+        current_child,
+        work_in_progress_child,
+        output,
+        child_element: single_child.element(),
+        child_tag: single_child.tag(),
+        child_element_type: single_child.element_type(),
+        previous_child_props,
         child_props: single_child.props(),
         render_lanes: render.render_lanes(),
     })
@@ -10506,6 +11196,148 @@ mod tests {
     }
 
     #[test]
+    fn private_use_reducer_render_path_mounts_reducer_hook_during_render() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(720);
+        let output = FunctionComponentOutputHandle::from_raw(721);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let reducer_request = FunctionComponentUseReducerRenderRequest::new(
+            reducer_id,
+            StateHandle::from_raw(722),
+            lanes,
+        );
+
+        let record = render_function_component_with_use_reducer(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            reducer_request,
+            &mut registry,
+            reducer_adds_action,
+        )
+        .unwrap();
+
+        let hook_state = record.hook_state();
+        let reducer_hook = record.reducer_hook();
+        let mount = reducer_hook.mount_record().unwrap();
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.output(), output);
+        assert_eq!(record.render().hook_state(), Some(hook_state));
+        assert_eq!(hook_state.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert_eq!(record.hook_traversal().traversed_count(), 1);
+        assert_eq!(
+            reducer_hook.phase(),
+            FunctionComponentHookRenderPhase::Mount
+        );
+        assert_eq!(reducer_hook.reducer(), reducer_id);
+        assert_eq!(reducer_hook.memoized_state(), StateHandle::from_raw(722));
+        assert_eq!(reducer_hook.base_state(), StateHandle::from_raw(722));
+        assert_eq!(reducer_hook.base_queue(), None);
+        assert_eq!(reducer_hook.hook(), mount.hook());
+        assert_eq!(reducer_hook.queue(), mount.queue());
+        assert_eq!(reducer_hook.dispatch(), mount.dispatch());
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].hook_state(), Some(hook_state));
+
+        let queue = hook_store.state_queues().queue(mount.queue()).unwrap();
+        assert_eq!(queue.dispatch().copied(), Some(mount.dispatch()));
+        assert_eq!(
+            queue.last_rendered_reducer().copied(),
+            Some(FunctionComponentStateReducerId::Reducer(reducer_id))
+        );
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(722));
+    }
+
+    #[test]
+    fn private_use_reducer_render_path_updates_reducer_hook_before_invocation() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_reducer = reducer(730);
+        let next_reducer = reducer(731);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, previous_reducer, StateHandle::from_raw(732))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_reducer_update(FunctionComponentReducerDispatchRequest::new(
+                current_reducer.dispatch(),
+                action(8),
+                lane,
+            ))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(733);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let reducer_request = FunctionComponentUseReducerRenderRequest::new(
+            next_reducer,
+            StateHandle::from_raw(999),
+            lanes,
+        );
+        let mut reducer_calls = 0;
+
+        let record = render_function_component_with_use_reducer(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            reducer_request,
+            &mut registry,
+            |state, action| {
+                reducer_calls += 1;
+                StateHandle::from_raw(state.raw() + action.raw())
+            },
+        )
+        .unwrap();
+
+        let hook_state = record.hook_state();
+        let reducer_hook = record.reducer_hook();
+        let update = reducer_hook.update_record().unwrap();
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.output(), output);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.hook_traversal().traversed_count(), 1);
+        assert_eq!(hook_state.phase(), FunctionComponentHookRenderPhase::Update);
+        assert_eq!(
+            reducer_hook.phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(reducer_hook.reducer(), next_reducer);
+        assert_eq!(reducer_hook.queue(), current_reducer.queue());
+        assert_eq!(reducer_hook.dispatch(), current_reducer.dispatch());
+        assert_eq!(update.previous_memoized_state(), StateHandle::from_raw(732));
+        assert_eq!(update.memoized_state(), StateHandle::from_raw(740));
+        assert_eq!(update.base_state(), StateHandle::from_raw(740));
+        assert_eq!(update.remaining_lanes(), Lanes::NO);
+        assert_eq!(update.applied_update_count(), 1);
+        assert_eq!(update.skipped_update_count(), 0);
+        assert_eq!(reducer_calls, 1);
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].hook_state(), Some(hook_state));
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_reducer.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        let queue = hook_store
+            .state_queues()
+            .queue(current_reducer.queue())
+            .unwrap();
+        assert_eq!(
+            queue.last_rendered_reducer().copied(),
+            Some(FunctionComponentStateReducerId::Reducer(next_reducer))
+        );
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(740));
+    }
+
+    #[test]
     fn private_use_state_dispatch_after_initial_render_records_root_reschedule_request() {
         let host = RecordingHost::default();
         let mut store = FiberRootStore::<RecordingHost>::new();
@@ -12414,6 +13246,81 @@ mod tests {
                 .unwrap(),
             Vec::<HookUpdateId>::new()
         );
+    }
+
+    #[test]
+    fn private_use_reducer_render_execution_processes_update_and_invokes_component() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_reducer = reducer(713);
+        let next_reducer = reducer(714);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, previous_reducer, StateHandle::from_raw(40))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_reducer_update(FunctionComponentReducerDispatchRequest::new(
+                current_reducer.dispatch(),
+                action(6),
+                lane,
+            ))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(830);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let record = render_function_component_with_use_reducer(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseReducerRenderRequest::new(
+                next_reducer,
+                StateHandle::from_raw(999),
+                lanes,
+            ),
+            &mut registry,
+            reducer_adds_action,
+        )
+        .unwrap();
+
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.output(), output);
+        assert_eq!(
+            record.hook_state().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(record.hook_traversal().traversed_count(), 1);
+        assert_eq!(
+            record.reducer_hook().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        let update = record.reducer_hook().update_record().unwrap();
+        assert_eq!(update.reducer(), next_reducer);
+        assert_eq!(update.previous_memoized_state(), StateHandle::from_raw(40));
+        assert_eq!(update.memoized_state(), StateHandle::from_raw(46));
+        assert_eq!(update.applied_update_count(), 1);
+        assert_eq!(update.skipped_update_count(), 0);
+        assert_eq!(update.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_reducer.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .queue(current_reducer.queue())
+                .unwrap()
+                .last_rendered_reducer()
+                .copied(),
+            Some(FunctionComponentStateReducerId::Reducer(next_reducer))
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].hook_state(), Some(record.hook_state()));
     }
 
     #[test]
