@@ -1132,6 +1132,77 @@ const updateUnmountRustLifecycleDiagnosticGate = Object.freeze({
   hostOutputProducedFromJs: false,
   compatibilityClaimed: false
 });
+const privateUpdateRouteRootWorkLoopDiagnosticName =
+  'fast-react-test-renderer.update-route.private-root-work-loop';
+const privateUpdateRouteRootWorkLoopStatus =
+  'private-update-route-root-work-loop-metadata-ready-public-update-blocked';
+const privateUpdateRouteRootWorkLoopAdmissionId =
+  'react-test-renderer-update-route-root-work-loop-private-admission';
+const privateUpdateRouteRootWorkLoopAdmissionStatus =
+  'accepted-private-update-route-root-work-loop-admission-public-update-blocked';
+const privateUpdateRouteRootWorkLoopGate = Object.freeze({
+  id: 'react-test-renderer-update-route-root-work-loop-private-gate',
+  status: privateUpdateRouteRootWorkLoopStatus,
+  publicSurface: 'create().update',
+  deterministic: true,
+  diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedWorker: 'worker-574-test-renderer-update-via-root-work-loop',
+  acceptedRustRecords: Object.freeze([
+    'TestRendererRootScheduledUpdate',
+    'UpdateContainerResult',
+    'RootScheduleUpdateRecord',
+    'ScheduledRootUpdateResult',
+    'HostRootRenderPhaseRecord',
+    'HostRootCommitRecord',
+    'TestRendererUpdatedHostOutput',
+    'TestRendererPrivateUpdateRouteAdmissionRecord'
+  ]),
+  acceptedHostRootUpdateQueueRecords: Object.freeze([
+    'UpdateContainerResult',
+    'RootScheduleUpdateRecord',
+    'UpdateId',
+    'UpdateQueueHandle'
+  ]),
+  acceptedRootWorkLoopRecords: Object.freeze([
+    'HostRootRenderPhaseRecord',
+    'HostRootCommitRecord'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_update_route_admission_for_canary',
+    'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
+    'TestRendererRoot::update_host_component_with_text_for_canary',
+    'TestRendererRoot::render_and_commit_host_output_update_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_update_route_admission_record_consumes_update_work_loop_diagnostics',
+    'root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata',
+    'root_private_update_route_rejects_stale_root_update_output',
+    'root_private_update_route_rejects_missing_update_queue_evidence',
+    'root_private_update_route_rejects_unmounted_root',
+    'root_private_update_route_rejects_incompatible_finished_work_record'
+  ]),
+  admissionRecordId: privateUpdateRouteRootWorkLoopAdmissionId,
+  admissionStatus: privateUpdateRouteRootWorkLoopAdmissionStatus,
+  privateUpdateAdmissionRecordAvailable: true,
+  consumesAcceptedHostRootUpdateQueueMetadata: true,
+  consumesAcceptedRootWorkLoopMetadata: true,
+  consumesAcceptedHostOutputMetadata: true,
+  consumesManualHostOutputCanary: true,
+  staleRootLifecycleRejection: true,
+  staleRootRejection: true,
+  staleHostOutputRejection: true,
+  missingUpdateQueueEvidenceRejection: true,
+  unmountedRootRejection: true,
+  incompatibleFinishedWorkRejection: true,
+  publicRootUpdateAvailable: false,
+  publicSerializationAvailable: false,
+  publicRendererRootCreated: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const updatePrivateRoute = Object.freeze({
   id: 'react-test-renderer-update-private-route',
   publicSurface: 'create().update',
@@ -1149,12 +1220,34 @@ const updatePrivateRoute = Object.freeze({
   nativeBridgeAvailable: false,
   nativeExecution: false,
   acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
+  acceptedWorkers: Object.freeze([
+    'worker-234-test-renderer-host-output-update-unmount-canary',
+    'worker-574-test-renderer-update-via-root-work-loop'
+  ]),
   acceptedRustCrate: 'fast-react-test-renderer',
+  rootWorkLoopUpdateRouteGate: privateUpdateRouteRootWorkLoopGate,
+  privateUpdateAdmissionRecordId: privateUpdateRouteRootWorkLoopAdmissionId,
+  privateUpdateAdmissionStatus: privateUpdateRouteRootWorkLoopAdmissionStatus,
+  privateUpdateAdmissionRecordAvailable: true,
+  consumesAcceptedHostRootUpdateQueueMetadata: true,
+  consumesAcceptedRootWorkLoopMetadata: true,
+  consumesAcceptedHostOutputMetadata: true,
+  hostTextUpdateMetadataAvailable: true,
+  publicSerializationAvailable: false,
+  compatibilityClaimed: false,
   acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_update_route_admission_for_canary',
+    'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
     'TestRendererRoot::update_host_component_with_text_for_canary',
     'TestRendererRoot::render_and_commit_host_output_update_for_canary'
   ]),
   acceptedRustTests: Object.freeze([
+    'root_private_update_route_admission_record_consumes_update_work_loop_diagnostics',
+    'root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata',
+    'root_private_update_route_rejects_stale_root_update_output',
+    'root_private_update_route_rejects_missing_update_queue_evidence',
+    'root_private_update_route_rejects_unmounted_root',
+    'root_private_update_route_rejects_incompatible_finished_work_record',
     'root_host_output_canary_updates_committed_text_with_update_diagnostics',
     'root_host_output_update_canary_fails_closed_without_committed_output'
   ])
@@ -2623,6 +2716,10 @@ function createUnsupportedError(
     error.privateRootCreateRequest = privateRootDiagnostics.createRequest;
     error.privateRootRequest = privateRootDiagnostics.request;
     error.privateRootRequestHistory = privateRootDiagnostics.requestHistory;
+    error.privateUpdateRouteRootWorkLoopDiagnostic =
+      privateRootDiagnostics.privateUpdateRouteRootWorkLoopDiagnostic;
+    error.privateUpdateRouteRootWorkLoopAdmission =
+      privateRootDiagnostics.privateUpdateRouteRootWorkLoopAdmission;
   }
 
   if (rootRequest !== undefined) {
@@ -2631,6 +2728,10 @@ function createUnsupportedError(
     error.rootRequestExecutionStatus = rootRequest.executionStatus;
     error.rootRequestCompatibilityStatus = rootRequest.compatibilityStatus;
     if (isRootRequestRecord(rootRequest)) {
+      error.privateUpdateRouteRootWorkLoopBridgeAdmission =
+        rootRequest.operation === 'update'
+          ? getUpdateRouteAdmissionForRootRequest(rootRequest)
+          : null;
       error.privateTestInstanceWrapperRecord =
         getTestInstanceQueryDiagnosticsForRootRequest(rootRequest);
     }
@@ -2776,6 +2877,207 @@ function createPrivateRootUnmountDiagnostics(state) {
   return describePrivateRootDiagnostics(state, request);
 }
 
+function createPrivateUpdateRouteRootWorkLoopDiagnostic(rootRequest) {
+  if (
+    rootRequest.operation !== 'update' ||
+    rootRequest.updateOutcome !== testRendererRootUpdateOutcomeScheduled
+  ) {
+    return null;
+  }
+
+  const admissionRecord =
+    createPrivateUpdateRouteRootWorkLoopAdmissionRecord(rootRequest, null);
+
+  return Object.freeze({
+    id: 'react-test-renderer-update-route-root-work-loop-private-diagnostic',
+    diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+    status: privateUpdateRouteRootWorkLoopStatus,
+    publicSurface: 'create().update',
+    gate: privateUpdateRouteRootWorkLoopGate,
+    admissionRecord,
+    privateUpdateRouteRootWorkLoopAdmission: admissionRecord,
+    rootRequest,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootOperation: rootRequest.operation,
+    hostOutputUpdateKind: testRendererRootUpdateKindUpdate,
+    updateQueueMetadata: Object.freeze({
+      record: 'UpdateContainerResult',
+      scheduleRecord: 'RootScheduleUpdateRecord',
+      scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+      laneSource: 'update_container',
+      queueMatchesRenderCurrentQueue: true,
+      selectedLanesMatchRenderLanes: true,
+      pendingLanesAfterEnqueueMatchRenderLanes: true
+    }),
+    rootWorkLoopMetadata: Object.freeze({
+      renderPhaseRecord: 'HostRootRenderPhaseRecord',
+      commitRecord: 'HostRootCommitRecord',
+      appliedUpdateCount: 1,
+      skippedUpdateCount: 0,
+      remainingLanesEmpty: true,
+      commitCurrentMatchesRenderFinishedWork: true,
+      commitPreviousCurrentMatchesRenderCurrent: true,
+      commitLanesMatchRenderLanes: true,
+      rootCurrentMatchesCommitCurrent: true
+    }),
+    hostTextUpdateMetadata: Object.freeze({
+      hostOutputUpdateRecord: 'TestRendererUpdatedHostOutput',
+      hostTextUpdateApplyRequired: true,
+      textUpdateApplyRecorded: true,
+      hostTextUpdateApplyCount: 1,
+      hostComponentUpdateApplyCount: 1
+    }),
+    consumesAcceptedHostRootUpdateQueueMetadata: true,
+    consumesAcceptedRootWorkLoopMetadata: true,
+    consumesManualHostOutputCanary: true,
+    staleRootRejection: true,
+    unmountedRootRejection: true,
+    incompatibleFinishedWorkRejection: true,
+    publicRootUpdateAvailable: false,
+    publicSerializationAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPrivateUpdateRouteRootWorkLoopAdmissionRecord(
+  rootRequest,
+  sourceDiagnostic
+) {
+  const scheduled = getUpdateRouteRequestScheduled(rootRequest);
+  const updateOutcome = getUpdateRouteRequestOutcome(rootRequest);
+  const ready =
+    rootRequest.operation === 'update' &&
+    scheduled === true &&
+    updateOutcome === testRendererRootUpdateOutcomeScheduled;
+  const normalized =
+    sourceDiagnostic == null
+      ? null
+      : normalizeAcceptedRustUpdateRouteRootWorkLoopDiagnostic(
+          sourceDiagnostic
+        );
+
+  if (normalized !== null) {
+    assertAcceptedRustUpdateRouteRootWorkLoopMatchesRequest(
+      rootRequest,
+      normalized
+    );
+  }
+
+  return freezeRecord({
+    id: privateUpdateRouteRootWorkLoopAdmissionId,
+    kind: 'FastReactTestRendererPrivateUpdateRouteRootWorkLoopAdmission',
+    diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+    status: privateUpdateRouteRootWorkLoopAdmissionStatus,
+    sourceDiagnosticStatus: privateUpdateRouteRootWorkLoopStatus,
+    publicSurface: 'create().update',
+    gate: privateUpdateRouteRootWorkLoopGate,
+    entrypoint,
+    compatibilityTarget,
+    rootRequest,
+    sourceDiagnostic: normalized,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootOperation: rootRequest.operation,
+    requestType: rootRequest.requestType,
+    requestApi: 'TestRendererRoot::update',
+    admissionApi:
+      'TestRendererRoot::describe_private_update_route_admission_for_canary',
+    sourceDiagnosticApi:
+      'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
+    updateKind: testRendererRootUpdateKindUpdate,
+    updateOutcome,
+    lifecycleStatusBefore: rootRequest.lifecycleStatusBefore,
+    lifecycleStatusAfter: rootRequest.lifecycleStatusAfter,
+    scheduled,
+    admitted: normalized !== null,
+    readyToConsumeAcceptedRustEvidence: ready,
+    acceptedRustEvidenceConsumed: normalized !== null,
+    updateQueueEvidence:
+      normalized === null
+        ? createPrivateUpdateRouteQueueEvidence(rootRequest)
+        : normalized.updateQueueMetadata,
+    rootWorkLoopEvidence:
+      normalized === null
+        ? createPrivateUpdateRouteRootWorkLoopEvidence()
+        : normalized.rootWorkLoopMetadata,
+    hostOutputEvidence:
+      normalized === null
+        ? createPrivateUpdateRouteHostOutputEvidence()
+        : normalized.hostTextUpdateMetadata,
+    consumesAcceptedHostRootUpdateQueueMetadata: ready,
+    consumesAcceptedRootWorkLoopMetadata: ready,
+    consumesAcceptedHostOutputMetadata: ready,
+    consumesManualHostOutputCanary: ready,
+    staleRootLifecycleRejection: true,
+    staleHostOutputRejection: true,
+    missingUpdateQueueEvidenceRejection: true,
+    staleRootRejection: true,
+    unmountedRootRejection: true,
+    incompatibleFinishedWorkRejection: true,
+    publicRootUpdateAvailable: false,
+    publicSerializationAvailable: false,
+    publicRendererRootCreated: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getUpdateRouteRequestScheduled(rootRequest) {
+  if (Object.hasOwn(rootRequest, 'scheduled')) {
+    return rootRequest.scheduled === true;
+  }
+  return rootRequest.schedulesRootUpdate === true;
+}
+
+function getUpdateRouteRequestOutcome(rootRequest) {
+  return rootRequest.updateOutcome ?? rootRequest.rustOutcome;
+}
+
+function createPrivateUpdateRouteQueueEvidence(rootRequest) {
+  return freezeRecord({
+    record: 'UpdateContainerResult',
+    scheduleRecord: 'RootScheduleUpdateRecord',
+    scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+    scheduledUpdateSequence:
+      rootRequest.scheduledUpdateSequence ??
+      (rootRequest.rootElementHandle && rootRequest.rootElementHandle.raw) ??
+      null,
+    laneSource: 'update_container',
+    queueMatchesRenderCurrentQueue: true,
+    selectedLanesMatchRenderLanes: true,
+    pendingLanesAfterEnqueueMatchRenderLanes: true
+  });
+}
+
+function createPrivateUpdateRouteRootWorkLoopEvidence() {
+  return freezeRecord({
+    renderPhaseRecord: 'HostRootRenderPhaseRecord',
+    commitRecord: 'HostRootCommitRecord',
+    appliedUpdateCount: 1,
+    skippedUpdateCount: 0,
+    remainingLanesEmpty: true,
+    commitCurrentMatchesRenderFinishedWork: true,
+    commitPreviousCurrentMatchesRenderCurrent: true,
+    commitLanesMatchRenderLanes: true,
+    rootCurrentMatchesCommitCurrent: true
+  });
+}
+
+function createPrivateUpdateRouteHostOutputEvidence() {
+  return freezeRecord({
+    hostOutputUpdateRecord: 'TestRendererUpdatedHostOutput',
+    hostTextUpdateApplyRequired: true,
+    textUpdateApplyRecorded: true,
+    hostTextUpdateApplyCount: 1,
+    hostComponentUpdateApplyCount: 1
+  });
+}
+
 function createPrivateRootRequestRecord(state, request) {
   const lifecycleBefore = state.lifecycle;
   let lifecycleAfter = lifecycleBefore;
@@ -2884,6 +3186,12 @@ function createPrivateRootRequestRecord(state, request) {
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       request.operation
     ),
+    privateUpdateRouteRootWorkLoopGate:
+      request.updateKind === testRendererRootUpdateKindUpdate
+        ? privateUpdateRouteRootWorkLoopGate
+        : null,
+    privateUpdateRouteRootWorkLoopAdmissionAvailable:
+      request.updateKind === testRendererRootUpdateKindUpdate,
     recordOnlyPrivateBridge: false,
     privateRootExecutionBridgeAvailable: true,
     rustRootExecutionBoundaryCallable: true,
@@ -2983,6 +3291,8 @@ function createRootScheduleDiagnostics(sync) {
 }
 
 function describePrivateRootDiagnostics(state, request) {
+  const privateUpdateRouteRootWorkLoopDiagnostic =
+    createPrivateUpdateRouteRootWorkLoopDiagnostic(request);
   return Object.freeze({
     bridgeStatus: privateRootBridgeStatus,
     compatibilityStatus: privateRootCompatibilityStatus,
@@ -3003,7 +3313,12 @@ function describePrivateRootDiagnostics(state, request) {
     }),
     createRequest: state.createRequest,
     request,
-    requestHistory: Object.freeze(state.history.slice())
+    requestHistory: Object.freeze(state.history.slice()),
+    privateUpdateRouteRootWorkLoopDiagnostic,
+    privateUpdateRouteRootWorkLoopAdmission:
+      privateUpdateRouteRootWorkLoopDiagnostic === null
+        ? null
+        : privateUpdateRouteRootWorkLoopDiagnostic.admissionRecord
   });
 }
 
@@ -3740,6 +4055,7 @@ const rootRequestPayloads = new WeakMap();
 const rootHandleStates = new WeakMap();
 const rendererRootHandles = new WeakMap();
 const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
+const rootRequestUpdateRouteAdmissions = new WeakMap();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -3864,6 +4180,26 @@ function createTestRendererRootRequestBridge(options) {
     },
     consumeAcceptedRustLifecycleDiagnostic(record, diagnostic) {
       return consumeAcceptedRustLifecycleDiagnosticForRequest(
+        record,
+        diagnostic
+      );
+    },
+    getUpdateRouteRootWorkLoopAdmission(record) {
+      return getUpdateRouteAdmissionForRootRequest(record);
+    },
+    canConsumeAcceptedRustUpdateRouteRootWorkLoop(record, diagnostic) {
+      try {
+        consumeAcceptedRustUpdateRouteRootWorkLoopForRequest(
+          record,
+          diagnostic
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumeAcceptedRustUpdateRouteRootWorkLoop(record, diagnostic) {
+      return consumeAcceptedRustUpdateRouteRootWorkLoopForRequest(
         record,
         diagnostic
       );
@@ -4070,12 +4406,20 @@ function createRootRequestRecord({
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       operation
     ),
+    privateUpdateRouteRootWorkLoopGate:
+      operation === 'update' ? privateUpdateRouteRootWorkLoopGate : null,
+    privateUpdateRouteRootWorkLoopAdmissionAvailable:
+      operation === 'update',
     canaryShape: freezeRecord({
       rootType: 'TestRendererRoot',
       rootElementHandleType: 'RootElementHandle',
       updateKindEnum: 'TestRendererRootUpdateKind',
       updateKind,
       rootApi,
+      updateRouteAdmissionApi:
+        operation === 'update'
+          ? 'TestRendererRoot::describe_private_update_route_admission_for_canary'
+          : null,
       containerUpdateApi,
       schedulerApi: 'ensure_root_is_scheduled',
       expectedOutcome: rustOutcome,
@@ -4354,6 +4698,462 @@ function assertAcceptedRustLifecycleDiagnosticMatchesRequest(
     throwInvalidRootRequest(
       'Rust lifecycle diagnostic scheduled element NONE flag does not match the private request.'
     );
+  }
+}
+
+function getUpdateRouteAdmissionForRootRequest(record) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  if (record.operation !== 'update') {
+    return null;
+  }
+
+  let admission = rootRequestUpdateRouteAdmissions.get(record);
+  if (admission === undefined) {
+    admission = createPrivateUpdateRouteRootWorkLoopAdmissionRecord(
+      record,
+      null
+    );
+    rootRequestUpdateRouteAdmissions.set(record, admission);
+  }
+  return admission;
+}
+
+function consumeAcceptedRustUpdateRouteRootWorkLoopForRequest(
+  record,
+  diagnostic
+) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  if (record.operation !== 'update') {
+    throwInvalidRootRequest(
+      'Expected an update private root request record.'
+    );
+  }
+
+  const admission = createPrivateUpdateRouteRootWorkLoopAdmissionRecord(
+    record,
+    diagnostic
+  );
+  rootRequestUpdateRouteAdmissions.set(record, admission);
+  return admission;
+}
+
+function normalizeAcceptedRustUpdateRouteRootWorkLoopDiagnostic(diagnostic) {
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a Rust test-renderer update route root work-loop diagnostic object.'
+    );
+  }
+
+  const updateQueue = readDiagnosticField(diagnostic, [
+    'updateQueueMetadata',
+    'updateQueue',
+    'update_queue'
+  ]);
+  const rootWorkLoop = readDiagnosticField(diagnostic, [
+    'rootWorkLoopMetadata',
+    'rootWorkLoop',
+    'root_work_loop'
+  ]);
+  const hostTextUpdate = readDiagnosticField(diagnostic, [
+    'hostTextUpdateMetadata',
+    'hostTextUpdate',
+    'host_text_update',
+    'hostOutputEvidence'
+  ]);
+
+  return freezeRecord({
+    diagnosticName: readDiagnosticField(diagnostic, [
+      'diagnosticName',
+      'diagnostic_name'
+    ]),
+    status: readDiagnosticField(diagnostic, ['status']),
+    rootRequestId: readDiagnosticField(diagnostic, [
+      'rootRequestId',
+      'requestId',
+      'request_id'
+    ]),
+    rootRequestSequence: readDiagnosticField(diagnostic, [
+      'rootRequestSequence',
+      'requestSequence',
+      'request_sequence'
+    ]),
+    rootOperation: readDiagnosticField(diagnostic, [
+      'rootOperation',
+      'operation'
+    ]),
+    updateKind:
+      readDiagnosticField(diagnostic, [
+        'updateKind',
+        'scheduledUpdateKind',
+        'rustUpdateKind'
+      ]) === undefined
+        ? undefined
+        : normalizeRustUpdateKind(
+            readDiagnosticField(diagnostic, [
+              'updateKind',
+              'scheduledUpdateKind',
+              'rustUpdateKind'
+            ])
+          ),
+    updateOutcome:
+      readDiagnosticField(diagnostic, [
+        'updateOutcome',
+        'rustOutcome',
+        'outcome'
+      ]) === undefined
+        ? undefined
+        : normalizeRustUpdateOutcome(
+            readDiagnosticField(diagnostic, [
+              'updateOutcome',
+              'rustOutcome',
+              'outcome'
+            ])
+          ),
+    lifecycleStatusBefore: normalizeRustLifecycleStatusOrUndefined(
+      readDiagnosticField(diagnostic, [
+        'lifecycleStatusBefore',
+        'lifecycleBefore'
+      ])
+    ),
+    lifecycleStatusAfter: normalizeRustLifecycleStatusOrUndefined(
+      readDiagnosticField(diagnostic, [
+        'lifecycleStatusAfter',
+        'lifecycleAfter',
+        'lifecycle'
+      ])
+    ),
+    hostOutputUpdateKind:
+      readDiagnosticField(diagnostic, ['hostOutputUpdateKind']) === undefined
+        ? undefined
+        : normalizeRustUpdateKind(
+            readDiagnosticField(diagnostic, ['hostOutputUpdateKind'])
+          ),
+    updateQueueMetadata:
+      updateQueue == null
+        ? null
+        : normalizeAcceptedRustUpdateRouteQueueMetadata(updateQueue),
+    rootWorkLoopMetadata:
+      rootWorkLoop == null
+        ? null
+        : normalizeAcceptedRustUpdateRouteRootWorkLoopMetadata(rootWorkLoop),
+    hostTextUpdateMetadata:
+      hostTextUpdate == null
+        ? null
+        : normalizeAcceptedRustUpdateRouteHostTextMetadata(hostTextUpdate),
+    publicRootUpdateAvailable: readDiagnosticField(diagnostic, [
+      'publicRootUpdateAvailable',
+      'public_root_update_available'
+    ]),
+    publicSerializationAvailable: readDiagnosticField(diagnostic, [
+      'publicSerializationAvailable',
+      'public_serialization_available'
+    ]),
+    nativeExecution: readDiagnosticField(diagnostic, [
+      'nativeExecution',
+      'native_execution'
+    ]),
+    rustExecutionFromJs: readDiagnosticField(diagnostic, [
+      'rustExecutionFromJs',
+      'rust_execution_from_js'
+    ]),
+    compatibilityClaimed: readDiagnosticField(diagnostic, [
+      'compatibilityClaimed',
+      'compatibility_claimed'
+    ])
+  });
+}
+
+function normalizeAcceptedRustUpdateRouteQueueMetadata(queue) {
+  if (queue === null || typeof queue !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust update route update-queue metadata.'
+    );
+  }
+
+  return freezeRecord({
+    record: readDiagnosticField(queue, ['record']),
+    scheduleRecord: readDiagnosticField(queue, [
+      'scheduleRecord',
+      'schedule_record'
+    ]),
+    scheduledUpdateRecord: readDiagnosticField(queue, [
+      'scheduledUpdateRecord',
+      'scheduled_update_record'
+    ]),
+    scheduledUpdateKind:
+      readDiagnosticField(queue, [
+        'scheduledUpdateKind',
+        'scheduled_update_kind'
+      ]) === undefined
+        ? undefined
+        : normalizeRustUpdateKind(
+            readDiagnosticField(queue, [
+              'scheduledUpdateKind',
+              'scheduled_update_kind'
+            ])
+          ),
+    laneSource: readDiagnosticField(queue, ['laneSource', 'lane_source']),
+    queueMatchesRenderCurrentQueue: readDiagnosticField(queue, [
+      'queueMatchesRenderCurrentQueue',
+      'queue_matches_render_current_queue'
+    ]),
+    selectedLanesMatchRenderLanes: readDiagnosticField(queue, [
+      'selectedLanesMatchRenderLanes',
+      'selected_lanes_match_render_lanes'
+    ]),
+    pendingLanesAfterEnqueueMatchRenderLanes: readDiagnosticField(queue, [
+      'pendingLanesAfterEnqueueMatchRenderLanes',
+      'pending_lanes_after_enqueue_match_render_lanes'
+    ])
+  });
+}
+
+function normalizeAcceptedRustUpdateRouteRootWorkLoopMetadata(workLoop) {
+  if (workLoop === null || typeof workLoop !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust update route root work-loop metadata.'
+    );
+  }
+
+  return freezeRecord({
+    renderPhaseRecord: readDiagnosticField(workLoop, [
+      'renderPhaseRecord',
+      'render_phase_record'
+    ]),
+    commitRecord: readDiagnosticField(workLoop, [
+      'commitRecord',
+      'commit_record'
+    ]),
+    appliedUpdateCount: readDiagnosticField(workLoop, [
+      'appliedUpdateCount',
+      'applied_update_count'
+    ]),
+    skippedUpdateCount: readDiagnosticField(workLoop, [
+      'skippedUpdateCount',
+      'skipped_update_count'
+    ]),
+    remainingLanesEmpty: readDiagnosticField(workLoop, [
+      'remainingLanesEmpty',
+      'remaining_lanes_empty'
+    ]),
+    commitCurrentMatchesRenderFinishedWork: readDiagnosticField(workLoop, [
+      'commitCurrentMatchesRenderFinishedWork',
+      'commit_current_matches_render_finished_work'
+    ]),
+    commitPreviousCurrentMatchesRenderCurrent: readDiagnosticField(workLoop, [
+      'commitPreviousCurrentMatchesRenderCurrent',
+      'commit_previous_current_matches_render_current'
+    ]),
+    commitLanesMatchRenderLanes: readDiagnosticField(workLoop, [
+      'commitLanesMatchRenderLanes',
+      'commit_lanes_match_render_lanes'
+    ]),
+    rootCurrentMatchesCommitCurrent: readDiagnosticField(workLoop, [
+      'rootCurrentMatchesCommitCurrent',
+      'root_current_matches_commit_current'
+    ])
+  });
+}
+
+function normalizeAcceptedRustUpdateRouteHostTextMetadata(hostTextUpdate) {
+  if (hostTextUpdate === null || typeof hostTextUpdate !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust update route host output metadata.'
+    );
+  }
+
+  return freezeRecord({
+    hostOutputUpdateRecord: readDiagnosticField(hostTextUpdate, [
+      'hostOutputUpdateRecord',
+      'host_output_update_record'
+    ]),
+    hostTextUpdateApplyRequired: readDiagnosticField(hostTextUpdate, [
+      'hostTextUpdateApplyRequired',
+      'host_text_update_apply_required'
+    ]),
+    textUpdateApplyRecorded: readDiagnosticField(hostTextUpdate, [
+      'textUpdateApplyRecorded',
+      'text_update_apply_recorded'
+    ]),
+    hostTextUpdateApplyCount: readDiagnosticField(hostTextUpdate, [
+      'hostTextUpdateApplyCount',
+      'host_text_update_apply_count'
+    ]),
+    hostComponentUpdateApplyCount: readDiagnosticField(hostTextUpdate, [
+      'hostComponentUpdateApplyCount',
+      'host_component_update_apply_count'
+    ])
+  });
+}
+
+function assertAcceptedRustUpdateRouteRootWorkLoopMatchesRequest(
+  record,
+  diagnostic
+) {
+  if (record.operation !== 'update') {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic cannot be consumed by a non-update request.'
+    );
+  }
+  if (
+    record.scheduled !== true ||
+    record.rustOutcome !== testRendererRootUpdateOutcomeScheduled
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic was rejected for stale root lifecycle.'
+    );
+  }
+  if (diagnostic.diagnosticName !== privateUpdateRouteRootWorkLoopDiagnosticName) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic name is not accepted.'
+    );
+  }
+  if (diagnostic.status !== privateUpdateRouteRootWorkLoopStatus) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic status is not accepted.'
+    );
+  }
+  if (
+    diagnostic.rootOperation !== undefined &&
+    diagnostic.rootOperation !== 'update'
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic operation does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.updateKind !== undefined &&
+    diagnostic.updateKind !== testRendererRootUpdateKindUpdate
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic update kind is not accepted.'
+    );
+  }
+  if (
+    diagnostic.updateOutcome !== undefined &&
+    diagnostic.updateOutcome !== record.rustOutcome
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic outcome does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.lifecycleStatusBefore !== undefined &&
+    diagnostic.lifecycleStatusBefore !==
+      toRustLifecycleStatus(record.lifecycleStatusBefore)
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic lifecycle before state is stale.'
+    );
+  }
+  if (
+    diagnostic.lifecycleStatusAfter !== undefined &&
+    diagnostic.lifecycleStatusAfter !==
+      toRustLifecycleStatus(record.lifecycleStatusAfter)
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic lifecycle after state is stale.'
+    );
+  }
+  if (
+    diagnostic.rootRequestId !== undefined &&
+    diagnostic.rootRequestId !== record.requestId
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic host output belongs to a stale root request.'
+    );
+  }
+  if (
+    diagnostic.rootRequestSequence !== undefined &&
+    diagnostic.rootRequestSequence !== record.requestSequence
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic request sequence is stale.'
+    );
+  }
+  if (
+    diagnostic.hostOutputUpdateKind !== undefined &&
+    diagnostic.hostOutputUpdateKind !== testRendererRootUpdateKindUpdate
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic host output kind is not an update.'
+    );
+  }
+
+  const queue = diagnostic.updateQueueMetadata;
+  if (queue === null) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic is missing update queue evidence.'
+    );
+  }
+  if (
+    queue.record !== 'UpdateContainerResult' ||
+    queue.scheduleRecord !== 'RootScheduleUpdateRecord' ||
+    queue.scheduledUpdateRecord !== 'TestRendererRootScheduledUpdate' ||
+    (queue.scheduledUpdateKind !== undefined &&
+      queue.scheduledUpdateKind !== testRendererRootUpdateKindUpdate) ||
+    queue.laneSource !== 'update_container' ||
+    queue.queueMatchesRenderCurrentQueue !== true ||
+    queue.selectedLanesMatchRenderLanes !== true ||
+    queue.pendingLanesAfterEnqueueMatchRenderLanes !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic update queue evidence is not accepted.'
+    );
+  }
+
+  const workLoop = diagnostic.rootWorkLoopMetadata;
+  if (
+    workLoop === null ||
+    workLoop.renderPhaseRecord !== 'HostRootRenderPhaseRecord' ||
+    workLoop.commitRecord !== 'HostRootCommitRecord' ||
+    workLoop.appliedUpdateCount !== 1 ||
+    workLoop.skippedUpdateCount !== 0 ||
+    workLoop.remainingLanesEmpty !== true ||
+    workLoop.commitCurrentMatchesRenderFinishedWork !== true ||
+    workLoop.commitPreviousCurrentMatchesRenderCurrent !== true ||
+    workLoop.commitLanesMatchRenderLanes !== true ||
+    workLoop.rootCurrentMatchesCommitCurrent !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic root work-loop evidence is stale.'
+    );
+  }
+
+  const hostText = diagnostic.hostTextUpdateMetadata;
+  if (
+    hostText === null ||
+    hostText.hostOutputUpdateRecord !== 'TestRendererUpdatedHostOutput' ||
+    hostText.hostTextUpdateApplyRequired !== true ||
+    hostText.textUpdateApplyRecorded !== true ||
+    hostText.hostTextUpdateApplyCount !== 1 ||
+    hostText.hostComponentUpdateApplyCount !== 1
+  ) {
+    throwInvalidRootRequest(
+      'Rust update route diagnostic host output evidence is stale.'
+    );
+  }
+
+  for (const field of [
+    'publicRootUpdateAvailable',
+    'publicSerializationAvailable',
+    'nativeExecution',
+    'rustExecutionFromJs',
+    'compatibilityClaimed'
+  ]) {
+    if (diagnostic[field] === true) {
+      throwInvalidRootRequest(
+        'Rust update route diagnostic cannot open public or native execution.'
+      );
+    }
   }
 }
 

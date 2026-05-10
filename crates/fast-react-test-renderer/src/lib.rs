@@ -2252,6 +2252,132 @@ impl TestRendererPrivateUpdateRouteHostTextDiagnostics {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateUpdateRouteAdmissionRecord {
+    record_id: &'static str,
+    status: &'static str,
+    public_surface: &'static str,
+    root: FiberRootId,
+    request_api: &'static str,
+    source_diagnostic_name: &'static str,
+    source_diagnostic_status: &'static str,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    consumes_accepted_host_root_update_queue_metadata: bool,
+    consumes_accepted_root_work_loop_metadata: bool,
+    consumes_accepted_host_output_metadata: bool,
+    rejects_stale_root_lifecycle: bool,
+    rejects_stale_host_output: bool,
+    rejects_missing_update_queue_evidence: bool,
+    public_root_update_available: bool,
+    public_serialization_available: bool,
+    native_execution_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateUpdateRouteAdmissionRecord {
+    #[must_use]
+    pub const fn record_id(self) -> &'static str {
+        self.record_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn request_api(self) -> &'static str {
+        self.request_api
+    }
+
+    #[must_use]
+    pub const fn source_diagnostic_name(self) -> &'static str {
+        self.source_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_diagnostic_status(self) -> &'static str {
+        self.source_diagnostic_status
+    }
+
+    #[must_use]
+    pub const fn lifecycle(self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_host_root_update_queue_metadata(self) -> bool {
+        self.consumes_accepted_host_root_update_queue_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_root_work_loop_metadata(self) -> bool {
+        self.consumes_accepted_root_work_loop_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_host_output_metadata(self) -> bool {
+        self.consumes_accepted_host_output_metadata
+    }
+
+    #[must_use]
+    pub const fn rejects_stale_root_lifecycle(self) -> bool {
+        self.rejects_stale_root_lifecycle
+    }
+
+    #[must_use]
+    pub const fn rejects_stale_host_output(self) -> bool {
+        self.rejects_stale_host_output
+    }
+
+    #[must_use]
+    pub const fn rejects_missing_update_queue_evidence(self) -> bool {
+        self.rejects_missing_update_queue_evidence
+    }
+
+    #[must_use]
+    pub const fn public_root_update_available(self) -> bool {
+        self.public_root_update_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateUpdateRouteDiagnostics {
     diagnostic_name: &'static str,
@@ -2261,6 +2387,7 @@ pub struct TestRendererPrivateUpdateRouteDiagnostics {
     update_queue: TestRendererPrivateUpdateRouteQueueDiagnostics,
     root_work_loop: TestRendererPrivateUpdateRouteWorkLoopDiagnostics,
     host_text_update: TestRendererPrivateUpdateRouteHostTextDiagnostics,
+    admission: TestRendererPrivateUpdateRouteAdmissionRecord,
     consumes_accepted_host_root_update_queue_metadata: bool,
     consumes_accepted_root_work_loop_metadata: bool,
     consumes_manual_host_output_canary: bool,
@@ -2304,6 +2431,11 @@ impl TestRendererPrivateUpdateRouteDiagnostics {
     #[must_use]
     pub const fn host_text_update(&self) -> TestRendererPrivateUpdateRouteHostTextDiagnostics {
         self.host_text_update
+    }
+
+    #[must_use]
+    pub const fn admission(&self) -> TestRendererPrivateUpdateRouteAdmissionRecord {
+        self.admission
     }
 
     #[must_use]
@@ -2366,6 +2498,10 @@ pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.update-route.private-root-work-loop";
 pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS: &str =
     "private-update-route-root-work-loop-metadata-ready-public-update-blocked";
+pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID: &str =
+    "react-test-renderer-update-route-root-work-loop-private-admission";
+pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS: &str =
+    "accepted-private-update-route-root-work-loop-admission-public-update-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID: &str =
     "react-test-renderer-serialization-private-json-diagnostic";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID: &str =
@@ -7364,6 +7500,28 @@ impl TestRendererRoot {
                 host_component_update_apply_count: commit
                     .test_only_host_component_update_apply_count_for_canary(),
             },
+            admission: TestRendererPrivateUpdateRouteAdmissionRecord {
+                record_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+                status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+                public_surface: "create().update",
+                root: self.root_id,
+                request_api: "TestRendererRoot::update",
+                source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
+                source_diagnostic_status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS,
+                lifecycle: self.lifecycle,
+                scheduled_update_kind: scheduled_update.kind(),
+                host_output_update_kind: TestRendererRootUpdateKind::Update,
+                consumes_accepted_host_root_update_queue_metadata: true,
+                consumes_accepted_root_work_loop_metadata: true,
+                consumes_accepted_host_output_metadata: true,
+                rejects_stale_root_lifecycle: true,
+                rejects_stale_host_output: true,
+                rejects_missing_update_queue_evidence: true,
+                public_root_update_available: false,
+                public_serialization_available: false,
+                native_execution_available: false,
+                compatibility_claimed: false,
+            },
             consumes_accepted_host_root_update_queue_metadata: true,
             consumes_accepted_root_work_loop_metadata: true,
             consumes_manual_host_output_canary: true,
@@ -7372,6 +7530,15 @@ impl TestRendererRoot {
             native_execution_available: false,
             compatibility_claimed: false,
         })
+    }
+
+    pub fn describe_private_update_route_admission_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateUpdateRouteAdmissionRecord, TestRendererRootError> {
+        Ok(self
+            .describe_private_update_route_via_root_work_loop_for_canary(output)?
+            .admission())
     }
 
     pub fn describe_private_json_serialization_for_canary(
@@ -13341,6 +13508,7 @@ mod tests {
         let queue = diagnostics.update_queue();
         let work_loop = diagnostics.root_work_loop();
         let host_text = diagnostics.host_text_update();
+        let admission = diagnostics.admission();
 
         assert_eq!(
             diagnostics.diagnostic_name(),
@@ -13362,6 +13530,45 @@ mod tests {
         assert!(!diagnostics.public_serialization_available());
         assert!(!diagnostics.native_execution_available());
         assert!(!diagnostics.compatibility_claimed());
+
+        assert_eq!(
+            admission.record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            admission.status(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+        );
+        assert_eq!(admission.public_surface(), "create().update");
+        assert_eq!(admission.root(), root.root_id());
+        assert_eq!(admission.request_api(), "TestRendererRoot::update");
+        assert_eq!(
+            admission.source_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            admission.source_diagnostic_status(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+        );
+        assert_eq!(admission.lifecycle(), TestRendererRootLifecycle::Active);
+        assert_eq!(
+            admission.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            admission.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(admission.consumes_accepted_host_root_update_queue_metadata());
+        assert!(admission.consumes_accepted_root_work_loop_metadata());
+        assert!(admission.consumes_accepted_host_output_metadata());
+        assert!(admission.rejects_stale_root_lifecycle());
+        assert!(admission.rejects_stale_host_output());
+        assert!(admission.rejects_missing_update_queue_evidence());
+        assert!(!admission.public_root_update_available());
+        assert!(!admission.public_serialization_available());
+        assert!(!admission.native_execution_available());
+        assert!(!admission.compatibility_claimed());
 
         assert_eq!(queue.root(), root.root_id());
         assert_eq!(
@@ -13469,6 +13676,46 @@ mod tests {
     }
 
     #[test]
+    fn root_private_update_route_admission_record_consumes_update_work_loop_diagnostics() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let admission = root
+            .describe_private_update_route_admission_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            admission.record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            admission.status(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+        );
+        assert_eq!(admission.request_api(), "TestRendererRoot::update");
+        assert!(admission.consumes_accepted_host_root_update_queue_metadata());
+        assert!(admission.consumes_accepted_root_work_loop_metadata());
+        assert!(admission.consumes_accepted_host_output_metadata());
+        assert!(!admission.public_root_update_available());
+        assert!(!admission.public_serialization_available());
+        assert!(!admission.native_execution_available());
+        assert!(!admission.compatibility_claimed());
+    }
+
+    #[test]
     fn root_private_update_route_rejects_stale_root_update_output() {
         let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
             "span",
@@ -13502,6 +13749,38 @@ mod tests {
             error.as_ref(),
             TestRendererSerializationGateError::CommitIsNotCurrent { root: error_root, .. }
                 if *error_root == root.root_id()
+        ));
+    }
+
+    #[test]
+    fn root_private_update_route_rejects_missing_update_queue_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        root.scheduled_updates.clear();
+
+        let error = root
+            .describe_private_update_route_via_root_work_loop_for_canary(&updated)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUpdateRoute(error) = error else {
+            panic!("expected private update route rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUpdateRouteError::MissingScheduledUpdate
         ));
     }
 
