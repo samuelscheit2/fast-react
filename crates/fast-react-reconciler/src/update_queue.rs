@@ -10,7 +10,10 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{Lane, Lanes, UpdateQueueHandle};
 
-use crate::{HostRootState, RootElementHandle};
+use crate::{
+    HostRootState, RootElementHandle, RootUpdateCallbackRecord, RootUpdateCallbackSnapshot,
+    RootUpdateCallbackVisibility,
+};
 
 const UPDATE_ID_SLOT_BITS: u64 = 32;
 const UPDATE_ID_SLOT_MASK: u64 = (1u64 << UPDATE_ID_SLOT_BITS) - 1;
@@ -192,11 +195,17 @@ impl RootUpdate {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CollectedRootUpdateCallback {
+    update: UpdateId,
     callback: RootUpdateCallbackHandle,
     hidden: bool,
 }
 
 impl CollectedRootUpdateCallback {
+    #[must_use]
+    pub const fn update(self) -> UpdateId {
+        self.update
+    }
+
     #[must_use]
     pub const fn callback(self) -> RootUpdateCallbackHandle {
         self.callback
@@ -206,13 +215,23 @@ impl CollectedRootUpdateCallback {
     pub const fn hidden(self) -> bool {
         self.hidden
     }
+
+    #[must_use]
+    fn into_record(
+        self,
+        queue: UpdateQueueHandle,
+        sequence: usize,
+        visibility: RootUpdateCallbackVisibility,
+    ) -> RootUpdateCallbackRecord {
+        RootUpdateCallbackRecord::new(queue, self.update, self.callback, sequence, visibility)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SharedQueue {
     pending: Option<UpdateId>,
     lanes: Lanes,
-    hidden_callbacks: Vec<RootUpdateCallbackHandle>,
+    hidden_callbacks: Vec<CollectedRootUpdateCallback>,
 }
 
 impl SharedQueue {
@@ -236,7 +255,7 @@ impl SharedQueue {
     }
 
     #[must_use]
-    pub fn hidden_callbacks(&self) -> &[RootUpdateCallbackHandle] {
+    pub fn hidden_callbacks(&self) -> &[CollectedRootUpdateCallback] {
         &self.hidden_callbacks
     }
 }
@@ -549,7 +568,7 @@ impl UpdateQueueStore {
         let mut visible_callbacks = Vec::new();
         for callback in queue.callbacks.drain(..) {
             if callback.hidden {
-                queue.shared.hidden_callbacks.push(callback.callback);
+                queue.shared.hidden_callbacks.push(callback);
             } else {
                 visible_callbacks.push(callback);
             }
@@ -568,9 +587,96 @@ impl UpdateQueueStore {
     pub fn take_hidden_callbacks(
         &mut self,
         queue: UpdateQueueHandle,
-    ) -> Result<Vec<RootUpdateCallbackHandle>, UpdateQueueError> {
+    ) -> Result<Vec<CollectedRootUpdateCallback>, UpdateQueueError> {
         Ok(std::mem::take(
             &mut self.queue_mut(queue)?.shared.hidden_callbacks,
+        ))
+    }
+
+    pub fn peek_root_update_callback_records(
+        &self,
+        queue: UpdateQueueHandle,
+    ) -> Result<RootUpdateCallbackSnapshot, UpdateQueueError> {
+        let queue_ref = self.queue(queue)?;
+        let mut visible = Vec::new();
+        let mut hidden = Vec::new();
+
+        for (sequence, callback) in queue_ref.callbacks.iter().copied().enumerate() {
+            if callback.hidden {
+                hidden.push(callback.into_record(
+                    queue,
+                    sequence,
+                    RootUpdateCallbackVisibility::Hidden,
+                ));
+            } else {
+                visible.push(callback.into_record(
+                    queue,
+                    sequence,
+                    RootUpdateCallbackVisibility::Visible,
+                ));
+            }
+        }
+
+        let deferred_hidden = queue_ref
+            .shared
+            .hidden_callbacks
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(sequence, callback)| {
+                callback.into_record(
+                    queue,
+                    sequence,
+                    RootUpdateCallbackVisibility::DeferredHidden,
+                )
+            })
+            .collect();
+
+        Ok(RootUpdateCallbackSnapshot::from_parts(
+            queue,
+            visible,
+            hidden,
+            deferred_hidden,
+        ))
+    }
+
+    pub fn take_root_update_callback_records(
+        &mut self,
+        queue: UpdateQueueHandle,
+    ) -> Result<RootUpdateCallbackSnapshot, UpdateQueueError> {
+        let callbacks = std::mem::take(&mut self.queue_mut(queue)?.callbacks);
+        let mut visible = Vec::new();
+        let hidden = Vec::new();
+        let mut newly_deferred_hidden = Vec::new();
+        let mut callbacks_to_defer = Vec::new();
+
+        for (sequence, callback) in callbacks.into_iter().enumerate() {
+            if callback.hidden {
+                newly_deferred_hidden.push(callback.into_record(
+                    queue,
+                    sequence,
+                    RootUpdateCallbackVisibility::DeferredHidden,
+                ));
+                callbacks_to_defer.push(callback);
+            } else {
+                visible.push(callback.into_record(
+                    queue,
+                    sequence,
+                    RootUpdateCallbackVisibility::Visible,
+                ));
+            }
+        }
+
+        self.queue_mut(queue)?
+            .shared
+            .hidden_callbacks
+            .extend(callbacks_to_defer);
+
+        Ok(RootUpdateCallbackSnapshot::from_parts(
+            queue,
+            visible,
+            hidden,
+            newly_deferred_hidden,
         ))
     }
 
@@ -630,6 +736,7 @@ impl UpdateQueueStore {
                     self.queue_mut(queue)?
                         .callbacks
                         .push(CollectedRootUpdateCallback {
+                            update: update_id,
                             callback: original.callback,
                             hidden: is_hidden_update,
                         });
@@ -1006,10 +1113,13 @@ mod tests {
 
         assert!(store.queue(queue).unwrap().callbacks().is_empty());
         assert_eq!(
-            store.queue(queue).unwrap().shared().hidden_callbacks(),
-            &[callback]
+            store.queue(queue).unwrap().shared().hidden_callbacks()[0].callback(),
+            callback
         );
-        assert_eq!(store.take_hidden_callbacks(queue).unwrap(), vec![callback]);
+        assert_eq!(
+            store.take_hidden_callbacks(queue).unwrap()[0].callback(),
+            callback
+        );
     }
 
     #[test]

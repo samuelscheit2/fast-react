@@ -1001,11 +1001,150 @@ pub enum HostChild<'a, H: HostTypes + ?Sized> {
     Text(&'a H::TextInstance),
 }
 
+impl<'a, H: HostTypes + ?Sized> Copy for HostChild<'a, H> {}
+
+impl<'a, H: HostTypes + ?Sized> Clone for HostChild<'a, H> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, H: HostTypes + ?Sized> HostChild<'a, H> {
+    #[must_use]
+    pub const fn instance(instance: &'a H::Instance) -> Self {
+        Self::Instance(instance)
+    }
+
+    #[must_use]
+    pub const fn text(text_instance: &'a H::TextInstance) -> Self {
+        Self::Text(text_instance)
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> HostChildKind {
+        match self {
+            Self::Instance(_) => HostChildKind::Instance,
+            Self::Text(_) => HostChildKind::TextInstance,
+        }
+    }
+
+    #[must_use]
+    pub const fn into_detached(self) -> DetachedHostChild<'a, H> {
+        match self {
+            Self::Instance(instance) => DetachedHostChild::Instance(instance),
+            Self::Text(text_instance) => DetachedHostChild::Text(text_instance),
+        }
+    }
+}
+
+/// A host child handle known to be used for detached initial-child assembly.
+///
+/// React complete work appends terminal host children to a parent instance
+/// before that parent is mounted into a container. Keeping this type distinct
+/// from mounted tree mutation inputs makes future complete-work code express
+/// that detached-only contract without exposing concrete renderer handles.
+pub enum DetachedHostChild<'a, H: HostTypes + ?Sized> {
+    Instance(&'a H::Instance),
+    Text(&'a H::TextInstance),
+}
+
+impl<'a, H: HostTypes + ?Sized> Copy for DetachedHostChild<'a, H> {}
+
+impl<'a, H: HostTypes + ?Sized> Clone for DetachedHostChild<'a, H> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, H: HostTypes + ?Sized> DetachedHostChild<'a, H> {
+    #[must_use]
+    pub const fn instance(instance: &'a H::Instance) -> Self {
+        Self::Instance(instance)
+    }
+
+    #[must_use]
+    pub const fn text(text_instance: &'a H::TextInstance) -> Self {
+        Self::Text(text_instance)
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> HostChildKind {
+        match self {
+            Self::Instance(_) => HostChildKind::Instance,
+            Self::Text(_) => HostChildKind::TextInstance,
+        }
+    }
+
+    #[must_use]
+    pub const fn into_host_child(self) -> HostChild<'a, H> {
+        match self {
+            Self::Instance(instance) => HostChild::Instance(instance),
+            Self::Text(text_instance) => HostChild::Text(text_instance),
+        }
+    }
+}
+
+impl<'a, H: HostTypes + ?Sized> From<DetachedHostChild<'a, H>> for HostChild<'a, H> {
+    fn from(child: DetachedHostChild<'a, H>) -> Self {
+        child.into_host_child()
+    }
+}
+
+impl<'a, H: HostTypes + ?Sized> From<HostChild<'a, H>> for DetachedHostChild<'a, H> {
+    fn from(child: HostChild<'a, H>) -> Self {
+        child.into_detached()
+    }
+}
+
+/// Renderer-owned decision for how a host component's primitive children are handled.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum HostTextContentDecision {
+    /// The reconciler should reconcile children and create HostText fibers where needed.
+    #[default]
+    ReconcileChildren,
+    /// The host instance owns the primitive text or HTML content directly.
+    SetTextContent,
+}
+
+impl HostTextContentDecision {
+    #[must_use]
+    pub const fn from_should_set_text_content(should_set_text_content: bool) -> Self {
+        if should_set_text_content {
+            Self::SetTextContent
+        } else {
+            Self::ReconcileChildren
+        }
+    }
+
+    #[must_use]
+    pub const fn should_set_text_content(self) -> bool {
+        matches!(self, Self::SetTextContent)
+    }
+
+    #[must_use]
+    pub const fn reconciles_children(self) -> bool {
+        matches!(self, Self::ReconcileChildren)
+    }
+}
+
+impl From<bool> for HostTextContentDecision {
+    fn from(should_set_text_content: bool) -> Self {
+        Self::from_should_set_text_content(should_set_text_content)
+    }
+}
+
 /// Whether finalizing initial children requires a follow-up mount commit hook.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InitialChildrenFinalization {
     NoCommitMount,
     CommitMount,
+}
+
+impl InitialChildrenFinalization {
+    #[must_use]
+    pub const fn requires_commit_mount(self) -> bool {
+        matches!(self, Self::CommitMount)
+    }
 }
 
 /// Base creation hooks used before a host node is mounted.
@@ -1016,6 +1155,23 @@ pub trait HostCreation: HostIdentityAndContext {
         props: &Self::Props,
         context: &Self::HostContext,
     ) -> bool;
+
+    fn text_content_decision(
+        &self,
+        ty: &Self::Type,
+        props: &Self::Props,
+        context: &Self::HostContext,
+    ) -> HostTextContentDecision {
+        HostTextContentDecision::from_should_set_text_content(
+            self.should_set_text_content(ty, props, context),
+        )
+    }
+
+    fn detached_host_creation_mode(
+        &self,
+    ) -> Result<HostTreeUpdateMode, HostTreeUpdateModeDiagnostic> {
+        self.validate_tree_update_mode()
+    }
 
     fn create_instance(
         &mut self,
@@ -1039,6 +1195,14 @@ pub trait HostCreation: HostIdentityAndContext {
         parent: &mut Self::Instance,
         child: HostChild<'_, Self>,
     ) -> HostResult<()>;
+
+    fn append_detached_initial_child(
+        &mut self,
+        parent: &mut Self::Instance,
+        child: DetachedHostChild<'_, Self>,
+    ) -> HostResult<()> {
+        self.append_initial_child(parent, child.into())
+    }
 
     fn finalize_initial_children(
         &mut self,
@@ -1882,7 +2046,35 @@ mod tests {
         );
     }
 
-    struct SkeletonHost;
+    #[derive(Clone, Copy)]
+    struct SkeletonHost {
+        capabilities: HostCapabilitySet,
+        should_set_text_content: bool,
+    }
+
+    impl SkeletonHost {
+        #[must_use]
+        const fn mutation() -> Self {
+            Self {
+                capabilities: HostCapabilitySet::empty().with(HostCapability::Mutation),
+                should_set_text_content: false,
+            }
+        }
+
+        #[must_use]
+        const fn unsupported() -> Self {
+            Self {
+                capabilities: HostCapabilitySet::empty(),
+                should_set_text_content: false,
+            }
+        }
+
+        #[must_use]
+        const fn with_text_content(mut self, should_set_text_content: bool) -> Self {
+            self.should_set_text_content = should_set_text_content;
+            self
+        }
+    }
 
     impl HostTypes for SkeletonHost {
         type HostFiberToken = u64;
@@ -1924,7 +2116,7 @@ mod tests {
         }
 
         fn capabilities(&self) -> HostCapabilitySet {
-            HostCapabilitySet::empty().with(HostCapability::Mutation)
+            self.capabilities
         }
 
         fn get_public_instance(
@@ -1958,7 +2150,7 @@ mod tests {
             _props: &Self::Props,
             _context: &Self::HostContext,
         ) -> bool {
-            false
+            self.should_set_text_content
         }
 
         fn create_instance(
@@ -2216,7 +2408,7 @@ mod tests {
 
     #[test]
     fn token_aware_lifecycle_hooks_compile_without_dom_behavior() {
-        let mut host = SkeletonHost;
+        let mut host = SkeletonHost::mutation();
         let raw_token = 7;
         let creation_instance = HostFiberTokenRef::<SkeletonHost>::new(
             &raw_token,
@@ -2252,7 +2444,7 @@ mod tests {
 
     #[test]
     fn canonical_traits_keep_handles_opaque_and_capabilities_explicit() {
-        let host = SkeletonHost;
+        let host = SkeletonHost::mutation();
 
         assert_eq!(host.require_capability(HostCapability::Mutation), Ok(()));
         assert_eq!(
@@ -2275,5 +2467,96 @@ mod tests {
 
         assert_mutation_host::<SkeletonHost>();
         assert_mutation_renderer::<SkeletonHost>();
+    }
+
+    #[test]
+    fn text_content_decision_is_typed_and_renderer_owned() {
+        let host = SkeletonHost::mutation();
+        let reconcile = host.text_content_decision(&"View", &(), &());
+
+        assert_eq!(reconcile, HostTextContentDecision::ReconcileChildren);
+        assert!(reconcile.reconciles_children());
+        assert!(!reconcile.should_set_text_content());
+
+        let host = SkeletonHost::mutation().with_text_content(true);
+        let set_text_content = host.text_content_decision(&"TextLeaf", &(), &());
+
+        assert_eq!(set_text_content, HostTextContentDecision::SetTextContent);
+        assert!(set_text_content.should_set_text_content());
+        assert!(!set_text_content.reconciles_children());
+        assert_eq!(
+            HostTextContentDecision::from(true),
+            HostTextContentDecision::SetTextContent
+        );
+    }
+
+    #[test]
+    fn detached_initial_child_handles_are_separate_from_mutation_calls() {
+        let mut host = SkeletonHost::mutation();
+        let instance = ();
+        let text = ();
+        let mut parent = ();
+
+        let instance_child = DetachedHostChild::<SkeletonHost>::instance(&instance);
+        let text_child = DetachedHostChild::<SkeletonHost>::text(&text);
+
+        assert_eq!(instance_child.kind(), HostChildKind::Instance);
+        assert_eq!(text_child.kind(), HostChildKind::TextInstance);
+        assert_eq!(
+            HostChild::<SkeletonHost>::from(instance_child).kind(),
+            HostChildKind::Instance
+        );
+        assert_eq!(
+            HostChild::<SkeletonHost>::text(&text)
+                .into_detached()
+                .kind(),
+            HostChildKind::TextInstance
+        );
+
+        host.append_detached_initial_child(&mut parent, text_child)
+            .unwrap();
+    }
+
+    #[test]
+    fn initial_children_finalization_exposes_commit_mount_requirement() {
+        assert!(!InitialChildrenFinalization::NoCommitMount.requires_commit_mount());
+        assert!(InitialChildrenFinalization::CommitMount.requires_commit_mount());
+    }
+
+    #[test]
+    fn detached_creation_boundary_accepts_mutation_only_hosts() {
+        let host = SkeletonHost::mutation();
+
+        assert_eq!(
+            host.detached_host_creation_mode(),
+            Ok(HostTreeUpdateMode::Mutation)
+        );
+        assert_eq!(host.require_capability(HostCapability::Mutation), Ok(()));
+        assert_eq!(
+            host.require_capability(HostCapability::Hydration)
+                .unwrap_err()
+                .as_unsupported_capability()
+                .unwrap()
+                .capability(),
+            HostCapability::Hydration
+        );
+    }
+
+    #[test]
+    fn detached_creation_boundary_rejects_hosts_without_tree_updates() {
+        let host = SkeletonHost::unsupported();
+        let error = host.detached_host_creation_mode().unwrap_err();
+
+        assert_eq!(error.renderer_name(), "skeleton");
+        assert_eq!(error.error(), HostTreeUpdateModeError::Missing);
+        assert!(error.capabilities().is_empty());
+        assert_eq!(
+            host.require_capability(HostCapability::Mutation)
+                .unwrap_err()
+                .as_unsupported_capability()
+                .unwrap()
+                .capability(),
+            HostCapability::Mutation
+        );
     }
 }

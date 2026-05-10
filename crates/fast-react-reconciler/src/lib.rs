@@ -4,9 +4,14 @@
 //! layout reserves the boundary where lane/update/hook semantics will be built.
 
 mod concurrent_updates;
+mod execution_context;
 mod fiber_root;
 mod fiber_store;
+mod function_component;
 mod host_tokens;
+#[cfg(test)]
+mod host_work;
+mod root_callbacks;
 mod root_commit;
 mod root_config;
 mod root_scheduler;
@@ -16,6 +21,7 @@ mod scheduler_bridge;
 mod sync_flush;
 #[cfg(test)]
 mod test_support;
+mod unsupported_features;
 mod update_priority;
 mod update_queue;
 mod work_in_progress;
@@ -34,6 +40,9 @@ pub use concurrent_updates::{
     StagedConcurrentUpdate, enqueue_concurrent_host_root_update,
     finish_queueing_concurrent_updates, mark_update_lane_from_fiber_to_root,
 };
+pub use execution_context::{
+    ExecutionContext, ExecutionContextState, SyncFlushExecutionContextRecord,
+};
 pub use fiber_root::{
     FiberRoot, HostRootHydrationState, HostRootState, HostRootStateStore, HostRootStateStoreError,
     RootSchedulingState, create_host_root_current_fiber,
@@ -42,6 +51,9 @@ pub use fiber_store::{FiberRootId, FiberRootStore, FiberRootStoreError};
 pub use host_tokens::{
     HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
     HostFiberTokenValidationError,
+};
+pub use root_callbacks::{
+    RootUpdateCallbackRecord, RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility,
 };
 pub use root_commit::{HostRootCommitRecord, RootCommitError, commit_finished_host_root};
 pub use root_config::{
@@ -53,10 +65,13 @@ pub use root_config::{
     RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
 };
 pub use root_scheduler::{
-    RootScheduleMicrotaskResult, RootSchedulerError, RootSchedulerState, RootSyncFlushPlan,
-    RootTaskScheduleOutcome, RootTaskScheduleRecord, ScheduledRootUpdateResult,
-    collect_sync_flush_plan, ensure_root_is_scheduled, process_root_schedule_in_microtask,
-    schedule_task_for_root_during_microtask, scheduled_roots,
+    RootScheduleMicrotaskResult, RootSchedulerCallbackExecutionRecord,
+    RootSchedulerCallbackExecutionStatus, RootSchedulerError, RootSchedulerState,
+    RootSyncFlushExitStatus, RootSyncFlushPlan, RootSyncFlushRecord, RootSyncFlushRecordStatus,
+    RootSyncFlushResult, RootTaskScheduleOutcome, RootTaskScheduleRecord,
+    ScheduledRootUpdateResult, collect_sync_flush_plan, ensure_root_is_scheduled,
+    execute_scheduled_root_callback, flush_sync_work_on_all_roots,
+    process_root_schedule_in_microtask, schedule_task_for_root_during_microtask, scheduled_roots,
 };
 pub use root_updates::{
     RootScheduleUpdateRecord, RootTransitionEntanglementRecord, RootUpdateError,
@@ -68,11 +83,12 @@ pub use root_work_loop::{
     render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
 pub use scheduler_bridge::{
-    SchedulerBridge, SchedulerCallbackRequest, SchedulerCancellationRecord,
-    SchedulerMicrotaskHandle, SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
+    FAKE_ACT_CALLBACK_NODE, SchedulerActQueueRequest, SchedulerActQueueTaskKind, SchedulerBridge,
+    SchedulerCallbackRequest, SchedulerCancellationRecord, SchedulerMicrotaskHandle,
+    SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
 };
 pub use sync_flush::{
-    SyncFlushError, SyncFlushResult, SyncFlushRootRecord, flush_sync_work_on_all_roots,
+    SyncFlushError, SyncFlushResult, SyncFlushRootRecord, flush_sync_commit_work_on_all_roots,
 };
 pub use update_priority::{UpdatePriorityState, request_update_lane};
 pub use update_queue::{

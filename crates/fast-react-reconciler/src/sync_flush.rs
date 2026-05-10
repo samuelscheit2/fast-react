@@ -157,7 +157,7 @@ impl From<RootCommitError> for SyncFlushError {
     }
 }
 
-pub fn flush_sync_work_on_all_roots<H: HostTypes>(
+pub fn flush_sync_commit_work_on_all_roots<H: HostTypes>(
     store: &mut FiberRootStore<H>,
 ) -> Result<SyncFlushResult, SyncFlushError> {
     if store.root_scheduler().is_flushing_work() {
@@ -272,7 +272,7 @@ mod tests {
     fn sync_flush_no_op_fast_path_returns_empty_result() {
         let (mut store, _root_id, host) = root_store();
 
-        let result = flush_sync_work_on_all_roots(&mut store).unwrap();
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
 
         assert!(result.skipped_no_sync_work());
         assert!(!result.skipped_reentrant_flush());
@@ -288,7 +288,7 @@ mod tests {
         let previous_current = store.root(root_id).unwrap().current();
         schedule_sync_update(&mut store, root_id, element);
 
-        let result = flush_sync_work_on_all_roots(&mut store).unwrap();
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
 
         assert!(result.did_flush_work());
         assert_eq!(result.records().len(), 1);
@@ -328,7 +328,7 @@ mod tests {
         schedule_sync_update(&mut store, first, RootElementHandle::from_raw(10));
         schedule_sync_update(&mut store, third, RootElementHandle::from_raw(30));
 
-        let result = flush_sync_work_on_all_roots(&mut store).unwrap();
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
         let committed_roots = result
             .records()
             .iter()
@@ -361,7 +361,7 @@ mod tests {
         let default_result = update_container(&mut store, root_id, default_element, None).unwrap();
         ensure_root_is_scheduled(&mut store, default_result.schedule()).unwrap();
 
-        let result = flush_sync_work_on_all_roots(&mut store).unwrap();
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
 
         assert_eq!(result.records().len(), 1);
         let record = result.records()[0];
@@ -404,7 +404,7 @@ mod tests {
         let (mut store, root_id, host) = root_store();
         schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(99));
 
-        let result = flush_sync_work_on_all_roots(&mut store).unwrap();
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
 
         assert_eq!(result.records().len(), 1);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
