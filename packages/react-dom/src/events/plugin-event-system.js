@@ -46,6 +46,8 @@ const EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomEventTypeDispatchCanaryRecord';
 const PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND =
   'FastReactDomPrivateClickEventDelegationDispatchGateRecord';
+const PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND =
+  'FastReactDomPrivateFocusBlurEventDispatchExecutionRecord';
 const INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND =
   'FastReactDomInputChangeEventExtractionPreflightRecord';
 const SYNTHETIC_EVENT_SHAPE_RECORD_KIND =
@@ -126,6 +128,8 @@ const INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PORTAL_EVENT_OWNER_ROOT_GATE';
 const INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE =
   'FAST_REACT_DOM_INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE';
+const INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION';
 const INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE';
 const INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE =
@@ -156,6 +160,8 @@ const PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS =
   'controlled-private-event-type-dispatch-canary';
 const PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS =
   'controlled-private-focus-blur-event-blocker-gate';
+const PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS =
+  'admitted-private-focus-blur-event-dispatch-execution';
 const PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS =
   'admitted-private-click-event-delegation-dispatch-gate';
 const PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS =
@@ -329,6 +335,7 @@ const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
 const portalEventOwnerRootGateRecordPayloads = new WeakMap();
 const focusBlurEventBlockerGateRecordPayloads = new WeakMap();
+const privateFocusBlurEventDispatchExecutionPayloads = new WeakMap();
 const privateClickEventDelegationDispatchGatePayloads = new WeakMap();
 const hydrationReplayEventQueueDiagnosticPayloads = new WeakMap();
 const hydrationDehydratedTargetResolutionDiagnosticPayloads =
@@ -3027,6 +3034,178 @@ function createFocusBlurPortalOwnerRootSummary(
   });
 }
 
+function createPrivateFocusBlurEventDispatchExecutionRecord(
+  dispatchRecords,
+  listenerQueueEntryRecord,
+  options
+) {
+  const queueEntryPayload = getPrivateEventListenerQueueEntryPayload(
+    listenerQueueEntryRecord
+  );
+  if (queueEntryPayload === null || queueEntryPayload.active !== true) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution requires an active accepted private listener queue entry record.',
+      'stale-listener-record'
+    );
+  }
+  if (!focusBlurNativeEventNameSet.has(queueEntryPayload.domEventName)) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution only accepts focusin/focusout listener queue entries.',
+      'unsupported-event-type'
+    );
+  }
+
+  const normalizedOptions =
+    normalizePrivateFocusBlurEventDispatchExecutionOptions(options);
+  const match =
+    findPrivateFocusBlurEventDispatchExecutionListenerRecordForQueueEntry(
+      normalizeDispatchRecordList(dispatchRecords),
+      listenerQueueEntryRecord,
+      normalizedOptions.useProcessingOrder
+    );
+  if (match === null) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution could not route the accepted listener record through the focus/blur dispatch queue.',
+      'accepted-listener-not-on-dispatch-path'
+    );
+  }
+
+  return invokePrivateFocusBlurEventDispatchExecutionRecord(
+    match.dispatchRecord,
+    match.dispatchListenerRecord,
+    {
+      portalEventOwnerRootGateRecord:
+        normalizedOptions.portalEventOwnerRootGateRecord,
+      useProcessingOrder: normalizedOptions.useProcessingOrder
+    }
+  );
+}
+
+function invokePrivateFocusBlurEventDispatchExecutionRecord(
+  dispatchRecord,
+  dispatchListenerRecord,
+  options
+) {
+  const normalizedDispatchRecord =
+    assertPrivateFocusBlurEventDispatchExecutionDispatchRecord(
+      dispatchRecord
+    );
+  const normalizedOptions =
+    normalizePrivateFocusBlurEventDispatchExecutionOptions(options);
+  const normalizedListenerRecord =
+    assertPrivateFocusBlurEventDispatchExecutionListenerRecord(
+      dispatchListenerRecord,
+      normalizedDispatchRecord
+    );
+  const freshness =
+    assertFreshPrivateFocusBlurEventDispatchExecutionListenerRecord(
+      normalizedListenerRecord
+    );
+  const selection =
+    findPrivateFocusBlurEventDispatchExecutionListenerSelection(
+      normalizedDispatchRecord,
+      normalizedListenerRecord
+    );
+  const portalOwnerRoot =
+    validatePrivateFocusBlurEventDispatchExecutionPortalOwnerRootGate(
+      normalizedDispatchRecord,
+      normalizedOptions.portalEventOwnerRootGateRecord
+    );
+  const invocationRecord = invokeDispatchListenerRecordForCanary(
+    normalizedListenerRecord,
+    {
+      dispatchQueueEntry: selection.dispatchQueueEntry,
+      dispatchRecord: normalizedDispatchRecord,
+      listenerIndex: selection.listenerIndex,
+      selectedFromProcessingOrder: selection.selectedFromProcessingOrder
+    }
+  );
+  const syntheticEventType = getFocusBlurSyntheticEventType(
+    normalizedDispatchRecord.domEventName
+  );
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    canaryEventKind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
+    compatibilityClaimed: false,
+    currentTarget: normalizedListenerRecord.currentTarget,
+    dispatchPathIndex: normalizedListenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind: selection.dispatchQueueEntry.kind,
+    dispatchRecordKind: normalizedDispatchRecord.kind,
+    domEventName: normalizedDispatchRecord.domEventName,
+    eventDispatch: false,
+    eventObjectCreation: false,
+    eventPriority: normalizedDispatchRecord.eventPriority,
+    eventPriorityLabel: normalizedDispatchRecord.eventPriorityLabel,
+    eventPriorityLane: normalizedDispatchRecord.eventPriorityLane,
+    eventPriorityName: normalizedDispatchRecord.eventPriorityName,
+    eventSystemFlags: normalizedDispatchRecord.eventSystemFlags,
+    extractionRecordKind: normalizedDispatchRecord.extractionRecord.kind,
+    fakeDomEventDispatchExecution: true,
+    focusBlurEventDispatchExecution: true,
+    inCapturePhase: normalizedDispatchRecord.inCapturePhase,
+    invocationRecordKind: invocationRecord.kind,
+    invocationStatus: invocationRecord.invocationStatus,
+    kind: PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND,
+    listenerIndex: selection.listenerIndex,
+    listenerInvocationCount: invocationRecord.listenerInvocationCount,
+    listenerQueueIndex: normalizedListenerRecord.listenerQueueIndex,
+    listenerQueueKey: normalizedListenerRecord.listenerQueueKey,
+    listenerQueueRecordKind:
+      normalizedListenerRecord.listenerQueueRecordKind,
+    listenerStatus: normalizedListenerRecord.listenerStatus,
+    listenerType: normalizedListenerRecord.listenerType,
+    nativeEventTarget: normalizedDispatchRecord.nativeEventTarget,
+    nativeEventType: normalizedDispatchRecord.nativeEventType,
+    phase: normalizedListenerRecord.phase,
+    pluginName: selection.dispatchQueueEntry.pluginName,
+    portalOwnerRoot,
+    portalOwnerRootAvailable: portalOwnerRoot.available,
+    privateListenerInvoked: invocationRecord.listenerInvocationCount === 1,
+    privateListenerQueue: true,
+    publicDispatchBlocked: true,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    reactName: getSimpleEventReactName(normalizedDispatchRecord.domEventName),
+    registrationName: normalizedListenerRecord.registrationName,
+    rootOwner: normalizedListenerRecord.rootOwner,
+    selectedFromProcessingOrder: selection.selectedFromProcessingOrder,
+    status: PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS,
+    syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticEventConstructor: 'SyntheticFocusEvent',
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    syntheticEventType,
+    syntheticFocusEventCreation: false,
+    targetInst: normalizedDispatchRecord.targetInst,
+    targetInstStatus: normalizedDispatchRecord.targetInstStatus,
+    targetListenerRecordTargetInst: normalizedListenerRecord.targetInst,
+    willCreateSyntheticFocusEvent: false,
+    willDispatchPublicEvent: false,
+    willInvokeListeners: false,
+    willInvokePublicListeners: false
+  });
+
+  privateFocusBlurEventDispatchExecutionPayloads.set(
+    record,
+    Object.freeze({
+      dispatchListenerRecord: normalizedListenerRecord,
+      dispatchQueueEntry: selection.dispatchQueueEntry,
+      dispatchRecord: normalizedDispatchRecord,
+      invocationRecord,
+      listener: freshness.listenerPayload.listener,
+      listenerQueueEntryPayload: freshness.queueEntryPayload,
+      listenerQueueEntryRecord: freshness.queueEntryRecord,
+      options: normalizedOptions.rawOptions,
+      portalEventOwnerRootGateRecord:
+        normalizedOptions.portalEventOwnerRootGateRecord
+    })
+  );
+
+  return record;
+}
+
 function createPrivateClickEventDelegationDispatchGate(
   dispatchRecords,
   listenerQueueEntryRecord,
@@ -4563,6 +4742,342 @@ function getFocusBlurSyntheticEventType(domEventName) {
   )
     ? focusBlurSyntheticEventTypes[domEventName]
     : null;
+}
+
+function normalizePrivateFocusBlurEventDispatchExecutionOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const sourcePortalGate =
+    normalizedOptions.portalEventOwnerRootGateRecord ||
+    normalizedOptions.portalOwnerRootGateRecord ||
+    null;
+
+  if (
+    sourcePortalGate !== null &&
+    !isPortalEventOwnerRootGateRecord(sourcePortalGate)
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution requires a private portal owner-root gate record when portal metadata is provided.',
+      'invalid-portal-owner-root-gate-record'
+    );
+  }
+
+  return {
+    portalEventOwnerRootGateRecord: sourcePortalGate,
+    rawOptions: options,
+    useProcessingOrder: normalizedOptions.useProcessingOrder !== false
+  };
+}
+
+function assertPrivateFocusBlurEventDispatchExecutionDispatchRecord(
+  dispatchRecord
+) {
+  const normalizedDispatchRecord =
+    assertFocusBlurEventBlockerDispatchRecord(dispatchRecord);
+  if (
+    normalizedDispatchRecord.nativeEventType !==
+    normalizedDispatchRecord.domEventName
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution requires native focusin/focusout event records.',
+      'unsupported-event-type'
+    );
+  }
+  if (
+    normalizedDispatchRecord.isNonDelegatedEvent ||
+    normalizedDispatchRecord.isEventHandleNonManagedNode
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution requires delegated root-listener event flags.',
+      'unsupported-event-system-flags'
+    );
+  }
+
+  return normalizedDispatchRecord;
+}
+
+function assertPrivateFocusBlurEventDispatchExecutionListenerRecord(
+  dispatchListenerRecord,
+  dispatchRecord
+) {
+  const normalizedListenerRecord =
+    assertDispatchListenerRecord(dispatchListenerRecord);
+  const payload =
+    getDispatchListenerRecordPayload(normalizedListenerRecord);
+  if (
+    payload === null ||
+    normalizedListenerRecord.privateListenerQueue !== true ||
+    payload.privateEventListenerQueueEntryRecord === undefined ||
+    payload.privateEventListenerQueueEntryRecord === null
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution requires a private accepted listener queue record.',
+      'unsupported-listener-record'
+    );
+  }
+  if (
+    !focusBlurNativeEventNameSet.has(normalizedListenerRecord.domEventName) ||
+    normalizedListenerRecord.nativeEventType !==
+      normalizedListenerRecord.domEventName ||
+    normalizedListenerRecord.domEventName !== dispatchRecord.domEventName
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution only supports focusin/focusout listener records.',
+      'unsupported-event-type'
+    );
+  }
+  if (
+    normalizedListenerRecord.inCapturePhase !==
+      dispatchRecord.inCapturePhase ||
+    normalizedListenerRecord.phase !==
+      (dispatchRecord.inCapturePhase ? 'capture' : 'bubble')
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution listener phase must match the root listener phase.',
+      'unsupported-event-phase'
+    );
+  }
+  if (
+    dispatchRecord.targetDispatchPathRecord.rootOwner !== null &&
+    normalizedListenerRecord.rootOwner !==
+      dispatchRecord.targetDispatchPathRecord.rootOwner
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution listener belongs to a different owner root.',
+      'portal-owner-root-mismatch'
+    );
+  }
+
+  return normalizedListenerRecord;
+}
+
+function assertFreshPrivateFocusBlurEventDispatchExecutionListenerRecord(
+  dispatchListenerRecord
+) {
+  const listenerPayload =
+    getDispatchListenerRecordPayload(dispatchListenerRecord);
+  const queueEntryRecord =
+    listenerPayload === null
+      ? null
+      : listenerPayload.privateEventListenerQueueEntryRecord;
+  const queueEntryPayload =
+    getPrivateEventListenerQueueEntryPayload(queueEntryRecord);
+
+  if (
+    listenerPayload === null ||
+    queueEntryPayload === null ||
+    queueEntryPayload.active !== true
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution rejected a stale listener record.',
+      'stale-listener-record'
+    );
+  }
+  if (
+    queueEntryPayload.target !== dispatchListenerRecord.currentTarget ||
+    queueEntryPayload.listener !== listenerPayload.listener
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution listener metadata no longer matches the accepted registry record.',
+      'stale-listener-record'
+    );
+  }
+  if (!focusBlurNativeEventNameSet.has(queueEntryPayload.domEventName)) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution only accepts focusin/focusout listener registry records.',
+      'unsupported-event-type'
+    );
+  }
+  if (queueEntryPayload.domEventName !== dispatchListenerRecord.domEventName) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution listener registry event does not match the dispatch event.',
+      'unsupported-event-type'
+    );
+  }
+  if (queueEntryPayload.capture !== dispatchListenerRecord.inCapturePhase) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution listener registry phase does not match the dispatch phase.',
+      'unsupported-event-phase'
+    );
+  }
+
+  return {
+    listenerPayload,
+    queueEntryPayload,
+    queueEntryRecord
+  };
+}
+
+function findPrivateFocusBlurEventDispatchExecutionListenerRecordForQueueEntry(
+  dispatchRecords,
+  listenerQueueEntryRecord,
+  useProcessingOrder
+) {
+  for (const dispatchRecord of dispatchRecords) {
+    const normalizedDispatchRecord =
+      assertPrivateFocusBlurEventDispatchExecutionDispatchRecord(
+        dispatchRecord
+      );
+    for (const dispatchQueueEntry of normalizedDispatchRecord.dispatchQueue
+      .entries) {
+      const entryPayload =
+        getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+      const listenerRecords =
+        useProcessingOrder && entryPayload !== null
+          ? entryPayload.processingListenerRecords
+          : entryPayload === null
+            ? []
+            : entryPayload.listenerRecords;
+      for (const dispatchListenerRecord of listenerRecords) {
+        const listenerPayload =
+          getDispatchListenerRecordPayload(dispatchListenerRecord);
+        if (
+          listenerPayload !== null &&
+          listenerPayload.privateEventListenerQueueEntryRecord ===
+            listenerQueueEntryRecord
+        ) {
+          return {
+            dispatchListenerRecord,
+            dispatchRecord: normalizedDispatchRecord
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function findPrivateFocusBlurEventDispatchExecutionListenerSelection(
+  dispatchRecord,
+  dispatchListenerRecord
+) {
+  for (
+    let dispatchQueueEntryIndex = 0;
+    dispatchQueueEntryIndex < dispatchRecord.dispatchQueue.entries.length;
+    dispatchQueueEntryIndex++
+  ) {
+    const dispatchQueueEntry = assertDispatchQueueEntryRecord(
+      dispatchRecord.dispatchQueue.entries[dispatchQueueEntryIndex]
+    );
+    const entryPayload =
+      getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+    const processingIndex =
+      entryPayload.processingListenerRecords.indexOf(dispatchListenerRecord);
+    if (processingIndex !== -1) {
+      return {
+        dispatchQueueEntry,
+        dispatchQueueEntryIndex,
+        listenerIndex: processingIndex,
+        selectedFromProcessingOrder: true
+      };
+    }
+
+    const listenerIndex =
+      entryPayload.listenerRecords.indexOf(dispatchListenerRecord);
+    if (listenerIndex !== -1) {
+      return {
+        dispatchQueueEntry,
+        dispatchQueueEntryIndex,
+        listenerIndex,
+        selectedFromProcessingOrder: false
+      };
+    }
+  }
+
+  throw createPrivateFocusBlurEventDispatchExecutionError(
+    'Private focus/blur event dispatch execution rejected a listener record that is no longer part of the plugin extraction queue.',
+    'stale-listener-record'
+  );
+}
+
+function validatePrivateFocusBlurEventDispatchExecutionPortalOwnerRootGate(
+  dispatchRecord,
+  portalEventOwnerRootGateRecord
+) {
+  if (portalEventOwnerRootGateRecord === null) {
+    return Object.freeze({
+      available: false,
+      ownerRootMatchesTargetRoot: false,
+      recordKind: null,
+      status: 'unavailable-no-portal-owner-root-gate',
+      targetDispatchPathLength: 0,
+      targetInstStatus: 'not-applicable'
+    });
+  }
+
+  const portalPayload = getPortalEventOwnerRootGateRecordPayload(
+    portalEventOwnerRootGateRecord
+  );
+  if (portalPayload === null) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution requires a known portal owner-root gate record.',
+      'invalid-portal-owner-root-gate-record'
+    );
+  }
+
+  if (
+    portalEventOwnerRootGateRecord.status !==
+      PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS ||
+    portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot !== true ||
+    portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount !== 0 ||
+    portalEventOwnerRootGateRecord.targetInst !== dispatchRecord.targetInst ||
+    portalPayload.targetDispatchPathRecord.rootOwner !==
+      dispatchRecord.targetDispatchPathRecord.rootOwner
+  ) {
+    throw createPrivateFocusBlurEventDispatchExecutionError(
+      'Private focus/blur event dispatch execution rejected portal owner-root metadata that does not match the focus/blur target.',
+      'portal-owner-root-mismatch'
+    );
+  }
+
+  return Object.freeze({
+    available: true,
+    blockedReason: portalEventOwnerRootGateRecord.blockedReason,
+    dispatchPathRootOwnerMatchCount:
+      portalEventOwnerRootGateRecord.dispatchPathRootOwnerMatchCount,
+    dispatchPathRootOwnerMismatchCount:
+      portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
+    ownerRootMatchesTargetRoot:
+      portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+    portalContainerContainsTarget:
+      portalEventOwnerRootGateRecord.portalContainerContainsTarget,
+    portalGateDomEventName: portalEventOwnerRootGateRecord.domEventName,
+    publicPortalBubblingEnabled:
+      portalEventOwnerRootGateRecord.publicPortalBubblingEnabled,
+    recordKind: portalEventOwnerRootGateRecord.kind,
+    rootContainerContainsTarget:
+      portalEventOwnerRootGateRecord.rootContainerContainsTarget,
+    status: portalEventOwnerRootGateRecord.status,
+    targetDispatchPathLength:
+      portalEventOwnerRootGateRecord.targetDispatchPathLength,
+    targetDispatchPathStatus:
+      portalEventOwnerRootGateRecord.targetDispatchPathStatus,
+    targetInstStatus: portalEventOwnerRootGateRecord.targetInstStatus
+  });
+}
+
+function getPrivateFocusBlurEventDispatchExecutionPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return privateFocusBlurEventDispatchExecutionPayloads.get(record) || null;
+}
+
+function isPrivateFocusBlurEventDispatchExecutionRecord(record) {
+  return getPrivateFocusBlurEventDispatchExecutionPayload(record) !== null;
+}
+
+function createPrivateFocusBlurEventDispatchExecutionError(
+  message,
+  reason
+) {
+  const error = createPluginEventSystemError(
+    message,
+    INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE
+  );
+  error.reason = reason;
+  return error;
 }
 
 function normalizePrivateClickEventDelegationDispatchGateOptions(options) {
@@ -7109,6 +7624,7 @@ module.exports = {
   DISPATCH_QUEUE_RECORD_KIND,
   DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
   EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND,
+  PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND,
   PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
@@ -7137,6 +7653,7 @@ module.exports = {
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
   INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE,
+  INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
   INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE,
   INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
   INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE,
@@ -7157,6 +7674,7 @@ module.exports = {
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
   PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
+  PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS,
   PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS,
   PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS,
   PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
@@ -7178,6 +7696,7 @@ module.exports = {
   createHydrationReplayTargetDispatchLinkDiagnostic,
   createInputChangeEventExtractionPreflightRecord,
   createHydrationReplayEventQueueDiagnostic,
+  createPrivateFocusBlurEventDispatchExecutionRecord,
   createPrivateClickEventDelegationDispatchGate,
   createPortalEventOwnerRootGateRecord,
   createPluginExtractionRecord,
@@ -7194,12 +7713,14 @@ module.exports = {
   getEventTypeDispatchCanaryRecordPayload,
   getHydrationReplayTargetDispatchLinkDiagnosticPayload,
   getFocusBlurEventBlockerGateRecordPayload,
+  getPrivateFocusBlurEventDispatchExecutionPayload,
   getPrivateClickEventDelegationDispatchGatePayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
   getSyntheticEventShapeGateRecordPayload,
   getSyntheticEventShapeRecordPayload,
   getWrapperRecord,
+  invokePrivateFocusBlurEventDispatchExecutionRecord,
   invokePrivateClickEventDelegationDispatchGate,
   invokeDispatchListenerRecordForCanary,
   invokeDispatchQueueCanaryFromDispatchRecords,
@@ -7213,6 +7734,7 @@ module.exports = {
   isDispatchQueueInvocationCanaryRecord,
   isEventTypeDispatchCanaryRecord,
   isFocusBlurEventBlockerGateRecord,
+  isPrivateFocusBlurEventDispatchExecutionRecord,
   isPrivateClickEventDelegationDispatchGateRecord,
   isPortalEventOwnerRootGateRecord,
   isSyntheticEventShapeGateRecord,

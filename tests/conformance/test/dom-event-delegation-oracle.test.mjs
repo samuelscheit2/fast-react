@@ -219,11 +219,56 @@ test("focus and blur blocker gate records private metadata without widening the 
   assert.equal(blocker.portalOwnerRoot.ownerRootMatchesTargetRoot, true);
   assert.equal(blocker.portalOwnerRoot.portalContainerContainsTarget, true);
   assert.equal(blocker.portalOwnerRoot.rootContainerContainsTarget, false);
+  assert.equal(
+    fixture.execution.kind,
+    pluginEventSystem
+      .PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND
+  );
+  assert.equal(
+    fixture.execution.status,
+    pluginEventSystem.PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS
+  );
+  assert.equal(fixture.execution.domEventName, "focusin");
+  assert.equal(fixture.execution.phase, "bubble");
+  assert.equal(fixture.execution.reactName, "onFocus");
+  assert.equal(fixture.execution.registrationName, "onFocus");
+  assert.equal(fixture.execution.syntheticEventType, "focus");
+  assert.equal(fixture.execution.fakeDomEventDispatchExecution, true);
+  assert.equal(fixture.execution.listenerInvocationCount, 1);
+  assert.equal(fixture.execution.privateListenerInvoked, true);
+  assert.equal(fixture.execution.syntheticEventCount, 0);
+  assert.equal(fixture.execution.syntheticFocusEventCreation, false);
+  assert.equal(fixture.execution.publicDispatchEnabled, false);
+  assert.equal(fixture.execution.browserDomEventCompatibilityClaimed, false);
+  assert.equal(fixture.execution.compatibilityClaimed, false);
+  assert.equal(fixture.execution.portalOwnerRootAvailable, true);
+  assert.equal(
+    fixture.execution.portalOwnerRoot.status,
+    pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS
+  );
+  assert.deepEqual(fixture.privateListenerCalls.map(call => [
+    call.type,
+    call.registrationName,
+    call.currentTarget,
+    call.target,
+    call.targetInst
+  ]), [
+    [
+      "focusin",
+      "onFocus",
+      fixture.child,
+      fixture.child,
+      fixture.childToken
+    ]
+  ]);
   assert.equal(fixture.listenerCalls.count, 0);
   assert.equal(fixture.rootContainer.__registrations.length, 0);
   assert.equal(fixture.portalContainer.__registrations.length, 0);
   assert.equal(fixture.child.__registrations.length, 0);
 
+  listenerRegistry.removePrivateEventListenerQueueEntry(
+    fixture.acceptedFocusQueue
+  );
   componentTree.detachHostInstanceToken(fixture.childToken);
   componentTree.detachHostInstanceToken(fixture.parentToken);
 });
@@ -652,6 +697,7 @@ function createPrivateFocusBlurBlockerFixture() {
     rootOwner
   );
   const listenerCalls = { count: 0 };
+  const privateListenerCalls = [];
   const parentProps = createFocusBlurProps(listenerCalls);
   const childProps = createFocusBlurProps(listenerCalls);
 
@@ -702,14 +748,49 @@ function createPrivateFocusBlurBlockerFixture() {
         portalEventOwnerRootGateRecord: portalOwnerGate
       }
     );
+  const acceptedFocusQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "focusin",
+      false,
+      event => {
+        privateListenerCalls.push({
+          currentTarget: event.currentTarget,
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: "accepted-private-focus-blur-conformance"
+      }
+    );
+  const executionDispatch = createPrivateFocusBlurDispatch(
+    rootContainer,
+    "focusin",
+    0,
+    child
+  );
+  const execution =
+    pluginEventSystem.createPrivateFocusBlurEventDispatchExecutionRecord(
+      executionDispatch,
+      acceptedFocusQueue,
+      {
+        portalEventOwnerRootGateRecord: portalOwnerGate
+      }
+    );
 
   return {
+    acceptedFocusQueue,
     blocker,
     child,
     childToken,
+    execution,
     listenerCalls,
     parent,
     parentToken,
+    privateListenerCalls,
     portalContainer,
     rootContainer
   };
