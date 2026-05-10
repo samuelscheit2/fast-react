@@ -17,7 +17,7 @@ const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
 const PROBE_TIMEOUT_MS = 10_000;
 
 export const CONTEXT_OBJECT_LOCAL_GATE_STATUS =
-  "direct-object-provider-shape-covered-runtime-blocked";
+  "direct-object-provider-shape-private-usecontext-provider-progress-runtime-blocked";
 
 export const CONTEXT_OBJECT_LOCAL_GATE_ROWS = [
   {
@@ -83,6 +83,27 @@ export const CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS = [
   }
 ];
 
+export const CONTEXT_OBJECT_ACCEPTED_PRIVATE_PROGRESS_REQUIREMENTS = [
+  {
+    id: "private-function-component-use-context-render-read",
+    readyCheck: "functionComponentUseContextRenderReadPresent",
+    reason:
+      "The accepted private function-component render path can read a context value from reconciler-owned state during invocation."
+  },
+  {
+    id: "private-context-provider-begin-work-handoff",
+    readyCheck: "acceptedPrivateContextProviderProgressPresent",
+    reason:
+      "The accepted private ContextProvider begin-work canaries push provider values, render a single function child, and unwind snapshots deterministically."
+  },
+  {
+    id: "private-root-work-loop-context-provider-handoff",
+    readyCheck: "privateRootWorkLoopContextProviderHandoffPresent",
+    reason:
+      "The accepted private HostRoot handoff can route the exact nested ContextProvider shape into the provider/useContext canary."
+  }
+];
+
 export function evaluateContextObjectLocalGate({
   oracle,
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
@@ -92,10 +113,34 @@ export function evaluateContextObjectLocalGate({
   }
 
   const localChecks = inspectContextObjectRuntimeLocalTargets({ workspaceRoot });
+  const acceptedPrivateProgressRows =
+    CONTEXT_OBJECT_ACCEPTED_PRIVATE_PROGRESS_REQUIREMENTS.map(
+      (requirement) => ({
+        id: requirement.id,
+        ready: isContextObjectAcceptedPrivateProgressReady(
+          requirement.id,
+          localChecks
+        )
+      })
+    );
+  const acceptedPrivateProgressBlockers = acceptedPrivateProgressRows
+    .filter((row) => !row.ready)
+    .map((row) => row.id);
+  const acceptedPrivateProgressReady =
+    acceptedPrivateProgressBlockers.length === 0;
+  const runtimeBlockingRequirementStatuses =
+    CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS.map((requirement) => ({
+      id: requirement.id,
+      satisfied: isContextObjectRuntimeRequirementSatisfied(
+        requirement.id,
+        localChecks
+      )
+    }));
+  const runtimeCompatibilityBlockers = runtimeBlockingRequirementStatuses
+    .filter((row) => !row.satisfied)
+    .map((row) => row.id);
   const requiredRuntimeTargetsReady =
-    localChecks.runtimeContextPropagationPresent &&
-    localChecks.reconcilerProviderBeginWorkIntegrationPresent &&
-    localChecks.functionComponentUseContextRenderReadPresent;
+    runtimeCompatibilityBlockers.length === 0;
   const localComparisonRows = CONTEXT_OBJECT_LOCAL_GATE_ROWS.map((row) =>
     compareLocalRowToOracle({
       modeId: row.modeId,
@@ -129,11 +174,21 @@ export function evaluateContextObjectLocalGate({
     });
   }
 
+  if (acceptedPrivateProgressBlockers.length > 0) {
+    violations.push({
+      id: "accepted-private-context-progress-missing",
+      reason:
+        "The context-object local gate must continue to record the accepted private useContext and Provider handoff progress as partial readiness.",
+      blockers: acceptedPrivateProgressBlockers
+    });
+  }
+
   if (publicCompatibilityClaimed && !requiredRuntimeTargetsReady) {
     violations.push({
       id: "compatibility-claimed-before-context-runtime-propagation",
       reason:
-        "Context compatibility cannot be claimed before runtime propagation, Provider begin-work handling, and function-component context reads are integrated."
+        "Context compatibility cannot be claimed before runtime propagation, Provider begin-work handling, and function-component context reads are integrated.",
+      blockers: runtimeCompatibilityBlockers
     });
   }
 
@@ -144,6 +199,11 @@ export function evaluateContextObjectLocalGate({
         : "blocked-with-violations",
     directObjectProviderShapeMatchesOracle,
     requiredRuntimeTargetsReady,
+    runtimeBlockingRequirementStatuses,
+    runtimeCompatibilityBlockers,
+    acceptedPrivateProgressReady,
+    acceptedPrivateProgressRows,
+    acceptedPrivateProgressBlockers,
     publicCompatibilityClaimed,
     localChecks,
     localComparisonRows,
@@ -166,6 +226,10 @@ export function inspectContextObjectRuntimeLocalTargets({
   const beginWorkSource = readWorkspaceFile(
     workspaceRoot,
     "crates/fast-react-reconciler/src/begin_work.rs"
+  );
+  const rootWorkLoopSource = readWorkspaceFile(
+    workspaceRoot,
+    "crates/fast-react-reconciler/src/root_work_loop.rs"
   );
   const functionComponentSource = readWorkspaceFile(
     workspaceRoot,
@@ -209,6 +273,56 @@ export function inspectContextObjectRuntimeLocalTargets({
   const functionComponentUseContextRenderReadPresent =
     hasSourcePattern(functionComponentSource, /\buseContext\b|\buse_context\b/u) &&
     hasSourcePattern(functionComponentSource, /\bread_context\b/u);
+  const privateContextProviderBeginWorkHandoffPresent =
+    hasSourcePattern(
+      beginWorkSource,
+      /\bfn\s+begin_work_context_provider_use_context_child\b/u
+    ) &&
+    hasSourcePattern(
+      beginWorkSource,
+      /\bContextProviderUseContextBeginWorkRecord\b/u
+    ) &&
+    hasSourcePattern(
+      beginWorkSource,
+      /\bbegin_work_function_component_use_context\b/u
+    ) &&
+    hasSourcePattern(beginWorkSource, /\bpush_provider\b/u) &&
+    hasSourcePattern(beginWorkSource, /\brestore_snapshot\b/u);
+  const privateNestedContextProviderBeginWorkHandoffPresent =
+    hasSourcePattern(
+      beginWorkSource,
+      /\bfn\s+begin_work_nested_context_provider_use_context_child\b/u
+    ) &&
+    hasSourcePattern(
+      beginWorkSource,
+      /\bNestedContextProviderUseContextBeginWorkRecord\b/u
+    ) &&
+    hasSourcePattern(
+      beginWorkSource,
+      /\bbegin_work_function_component_use_context\b/u
+    ) &&
+    hasSourcePattern(beginWorkSource, /\bpush_provider\b/u) &&
+    hasSourcePattern(beginWorkSource, /\brestore_snapshot\b/u);
+  const privateRootWorkLoopContextProviderHandoffPresent =
+    hasSourcePattern(
+      rootWorkLoopSource,
+      /\bfn\s+handoff_host_root_nested_context_provider_use_context_child_begin_work\b/u
+    ) &&
+    hasSourcePattern(
+      rootWorkLoopSource,
+      /\bbegin_work_nested_context_provider_use_context_child\b/u
+    ) &&
+    hasSourcePattern(
+      rootWorkLoopSource,
+      /\bHostRootNestedContextProviderUseContextBeginWorkHandoffRecord\b/u
+    );
+  const acceptedPrivateContextProviderProgressPresent =
+    privateContextProviderBeginWorkHandoffPresent &&
+    privateNestedContextProviderBeginWorkHandoffPresent;
+  const acceptedPrivateContextProgressPresent =
+    functionComponentUseContextRenderReadPresent &&
+    acceptedPrivateContextProviderProgressPresent &&
+    privateRootWorkLoopContextProviderHandoffPresent;
 
   return {
     jsCreateContextDirectObjectPresent,
@@ -217,8 +331,39 @@ export function inspectContextObjectRuntimeLocalTargets({
     functionComponentContextUnsupported,
     runtimeContextPropagationPresent,
     reconcilerProviderBeginWorkIntegrationPresent,
-    functionComponentUseContextRenderReadPresent
+    functionComponentUseContextRenderReadPresent,
+    privateContextProviderBeginWorkHandoffPresent,
+    privateNestedContextProviderBeginWorkHandoffPresent,
+    privateRootWorkLoopContextProviderHandoffPresent,
+    acceptedPrivateContextProviderProgressPresent,
+    acceptedPrivateContextProgressPresent
   };
+}
+
+function isContextObjectRuntimeRequirementSatisfied(id, localChecks) {
+  if (id === "runtime-context-value-propagation") {
+    return localChecks.runtimeContextPropagationPresent;
+  }
+  if (id === "reconciler-context-provider-begin-work") {
+    return localChecks.reconcilerProviderBeginWorkIntegrationPresent;
+  }
+  if (id === "function-component-use-context-render-read") {
+    return localChecks.functionComponentUseContextRenderReadPresent;
+  }
+  throw new Error(`Unknown context-object runtime requirement: ${id}`);
+}
+
+function isContextObjectAcceptedPrivateProgressReady(id, localChecks) {
+  if (id === "private-function-component-use-context-render-read") {
+    return localChecks.functionComponentUseContextRenderReadPresent;
+  }
+  if (id === "private-context-provider-begin-work-handoff") {
+    return localChecks.acceptedPrivateContextProviderProgressPresent;
+  }
+  if (id === "private-root-work-loop-context-provider-handoff") {
+    return localChecks.privateRootWorkLoopContextProviderHandoffPresent;
+  }
+  throw new Error(`Unknown context-object private progress requirement: ${id}`);
 }
 
 function compareLocalRowToOracle({

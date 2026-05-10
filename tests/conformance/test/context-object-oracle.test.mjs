@@ -13,6 +13,7 @@ import {
   CONTEXT_OBJECT_SCENARIOS
 } from "../src/context-object-scenarios.mjs";
 import {
+  CONTEXT_OBJECT_ACCEPTED_PRIVATE_PROGRESS_REQUIREMENTS,
   CONTEXT_OBJECT_LOCAL_GATE_ROWS,
   CONTEXT_OBJECT_LOCAL_GATE_STATUS,
   CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS,
@@ -95,6 +96,40 @@ test("context-object local gate compares live provider object shape to the accep
   assert.equal(gate.status, CONTEXT_OBJECT_LOCAL_GATE_STATUS);
   assert.equal(gate.directObjectProviderShapeMatchesOracle, true);
   assert.equal(gate.requiredRuntimeTargetsReady, false);
+  assert.deepEqual(gate.runtimeCompatibilityBlockers, [
+    "runtime-context-value-propagation",
+    "reconciler-context-provider-begin-work"
+  ]);
+  assert.deepEqual(gate.runtimeBlockingRequirementStatuses, [
+    {
+      id: "runtime-context-value-propagation",
+      satisfied: false
+    },
+    {
+      id: "reconciler-context-provider-begin-work",
+      satisfied: false
+    },
+    {
+      id: "function-component-use-context-render-read",
+      satisfied: true
+    }
+  ]);
+  assert.equal(gate.acceptedPrivateProgressReady, true);
+  assert.deepEqual(gate.acceptedPrivateProgressBlockers, []);
+  assert.deepEqual(gate.acceptedPrivateProgressRows, [
+    {
+      id: "private-function-component-use-context-render-read",
+      ready: true
+    },
+    {
+      id: "private-context-provider-begin-work-handoff",
+      ready: true
+    },
+    {
+      id: "private-root-work-loop-context-provider-handoff",
+      ready: true
+    }
+  ]);
   assert.equal(gate.publicCompatibilityClaimed, false);
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(
@@ -122,6 +157,23 @@ test("context-object local gate compares live provider object shape to the accep
     gate.localChecks.functionComponentUseContextRenderReadPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateContextProviderBeginWorkHandoffPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateNestedContextProviderBeginWorkHandoffPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateRootWorkLoopContextProviderHandoffPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.acceptedPrivateContextProviderProgressPresent,
+    true
+  );
+  assert.equal(gate.localChecks.acceptedPrivateContextProgressPresent, true);
 });
 
 test("context-object local gate rejects premature compatibility claims", () => {
@@ -137,6 +189,10 @@ test("context-object local gate rejects premature compatibility claims", () => {
     gate.violations.map((violation) => violation.id),
     ["compatibility-claimed-before-context-runtime-propagation"]
   );
+  assert.deepEqual(gate.violations[0].blockers, [
+    "runtime-context-value-propagation",
+    "reconciler-context-provider-begin-work"
+  ]);
 });
 
 test("context-object local gate keeps runtime unblock requirements explicit", () => {
@@ -168,6 +224,25 @@ test("context-object local gate keeps runtime unblock requirements explicit", ()
   for (const requirement of CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS) {
     assert.equal(requirement.requiredBeforeCompatibilityClaim, true);
   }
+  assert.deepEqual(
+    CONTEXT_OBJECT_ACCEPTED_PRIVATE_PROGRESS_REQUIREMENTS.map(
+      ({ id, readyCheck }) => ({ id, readyCheck })
+    ),
+    [
+      {
+        id: "private-function-component-use-context-render-read",
+        readyCheck: "functionComponentUseContextRenderReadPresent"
+      },
+      {
+        id: "private-context-provider-begin-work-handoff",
+        readyCheck: "acceptedPrivateContextProviderProgressPresent"
+      },
+      {
+        id: "private-root-work-loop-context-provider-handoff",
+        readyCheck: "privateRootWorkLoopContextProviderHandoffPresent"
+      }
+    ]
+  );
 });
 
 test("context-object oracle covers every scenario in every probe mode", () => {
