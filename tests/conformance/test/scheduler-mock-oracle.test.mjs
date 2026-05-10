@@ -385,6 +385,7 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
         drainsAcceptedInternalTestQueues: true,
         executesBrandedInternalTestCallbacks: true,
         recordsBrandedInternalTestContinuations: true,
+        executesBrandedInternalTestContinuations: true,
         drainsPublicSchedulerTaskQueue: false,
         drainsPublicReactActQueue: false,
         publicSchedulerTimingCompatibilityClaimed: false,
@@ -401,8 +402,10 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
     assert.equal(report.drainedCount, 2);
     assert.equal(report.executedCallbackCount, 0);
     assert.equal(report.recordedContinuationCount, 0);
+    assert.equal(report.executedContinuationCount, 0);
     assert.equal(report.remainingCount, 0);
     assert.deepEqual(report.recordedContinuations, []);
+    assert.deepEqual(report.executedContinuations, []);
     assert.deepEqual(
       report.drainedRecords.map((record) => [
         record.index,
@@ -461,6 +464,11 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
       nodeEnv
     );
     assert.equal(
+      report.executesBrandedInternalTestContinuations,
+      true,
+      nodeEnv
+    );
+    assert.equal(
       report.publicSchedulerTimingCompatibilityClaimed,
       false,
       nodeEnv
@@ -476,8 +484,9 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
     const privateContinuation = reactGate.createInternalActQueueTestCallback(
       (didTimeout) => {
         privateCallbackEvents.push([
-          "continuation-should-not-run",
-          didTimeout
+          "private-continuation",
+          didTimeout,
+          Scheduler.unstable_now()
         ]);
       },
       {
@@ -519,10 +528,14 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
     assert.equal(callbackReport.drainedCount, 1, nodeEnv);
     assert.equal(callbackReport.executedCallbackCount, 1, nodeEnv);
     assert.equal(callbackReport.recordedContinuationCount, 1, nodeEnv);
+    assert.equal(callbackReport.executedContinuationCount, 1, nodeEnv);
     assert.equal(callbackReport.remainingCount, 0, nodeEnv);
     assert.deepEqual(
       privateCallbackEvents,
-      [["private-callback", false, 0]],
+      [
+        ["private-callback", false, 0],
+        ["private-continuation", false, 0]
+      ],
       nodeEnv
     );
     assert.deepEqual(
@@ -543,13 +556,14 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
         returnedContinuation: {
           sourceIndex: 0,
           sourceLabel: "executable-scheduler-callback",
-          status: "recorded-branded-internal-test-continuation",
+          status: "executed-branded-internal-test-continuation",
           continuation: {
             kind: reactGate.internalTestCallbackKind,
             label: "private-continuation",
             executesQueuedWork: false,
             executesEffects: false
           },
+          returnedContinuation: null,
           executesQueuedWork: false,
           executesEffects: false
         },
@@ -563,12 +577,22 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
       [callbackReport.drainedRecords[0].returnedContinuation],
       nodeEnv
     );
+    assert.deepEqual(
+      callbackReport.executedContinuations,
+      [callbackReport.drainedRecords[0].returnedContinuation],
+      nodeEnv
+    );
     assert.equal(callbackReport.mockSchedulerPendingWorkBefore, true, nodeEnv);
     assert.equal(callbackReport.mockSchedulerPendingWorkAfter, true, nodeEnv);
     assert.equal(callbackReport.mockSchedulerNowBefore, 0, nodeEnv);
     assert.equal(callbackReport.mockSchedulerNowAfter, 0, nodeEnv);
     assert.equal(callbackReport.drainsPublicSchedulerTaskQueue, false, nodeEnv);
     assert.equal(callbackReport.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(
+      callbackReport.executesBrandedInternalTestContinuations,
+      true,
+      nodeEnv
+    );
     assert.equal(callbackReport.executesQueuedWork, false, nodeEnv);
     assert.equal(callbackReport.executesEffects, false, nodeEnv);
     assert.equal(callbackQueue.records.length, 0, nodeEnv);
@@ -1095,6 +1119,11 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   );
   assert.equal(
     diagnostics.recordsBrandedInternalTestContinuations,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.executesBrandedInternalTestContinuations,
     true,
     label
   );
