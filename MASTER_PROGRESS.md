@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 723
+
+- Worker 723 added a create-path private react-test-renderer native
+  serialization admission gate for hidden `toJSON` and `toTree` diagnostics.
+  Rust create native diagnostic APIs now require accepted Worker 720
+  finished-work identity evidence before admitting private native diagnostic
+  evidence.
+- The hidden CJS development and production facades reuse the Worker 720 JS
+  identity validator for root request id/sequence, root id, source report,
+  lane evidence, public-surface matching, and public-compatibility blockers.
+  Public `toJSON`, `toTree`, `.root`, `TestInstance`, native addon execution,
+  `act`, root routing, and compatibility claims remain blocked.
+- Worker 723 was accepted after independent audit and verification with
+  focused Rust create-admission tests, create-routing and serialization local
+  gates, react-test-renderer workspace checks, package-surface guard,
+  import-entrypoint smoke, full `npm run check`, conflict-marker scanning, and
+  `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. Update, unmount, and multichild native serialization identity
+  admission remain deferred.
+
 ### Worker 722
 
 - Worker 722 added the static private-admission ledger for Workers 715-721.

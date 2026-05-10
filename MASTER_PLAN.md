@@ -47,32 +47,31 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-721 have also been accepted and cleaned
-up. Worker 722 has also been accepted and cleaned up.
+accepted and cleaned up. Workers 715-723 have also been accepted and cleaned
+up.
 
-Worker 723 remains active from queue base commit `bf5440e` in an isolated
-`worker/<slug>` branch and worktree.
-
-- Worker 723: test-renderer native serialization identity gate consuming
-  Worker 720 evidence.
+No worker branches or worktrees are currently active.
 
 ## Near-Term Sequencing
 
-1. Monitor worker 723, accepting only scoped private evidence with
-   public package behavior and compatibility claims still blocked.
-2. Select later work from accepted private blockers only; keep public root,
+1. Select the next queue from accepted Worker 722-723 evidence and remaining
+   private blockers only; keep public root,
    act, flushSync, hooks/effects, test-renderer, and React DOM compatibility
    blocked until each private gate is proven.
-3. Audit and merge completed workers one at a time or in a small non-conflicting
+2. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
 
-- Select the next queue after Worker 723 finishes, based on its accepted
-  evidence and remaining private blockers.
+- Extend Worker 723's finished-work identity admission pattern to update-path
+  native serialization diagnostics after update identity evidence is formally
+  accepted.
+- Decide whether unmount and multichild private diagnostics need distinct
+  finished-work identity evidence or should remain behind existing route /
+  host-output gates until broader serialization work starts.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.
