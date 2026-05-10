@@ -39,6 +39,26 @@ const {
     "dom-property-operations.js"
   )
 );
+const componentTree = require(
+  path.join(
+    repoRoot,
+    "packages",
+    "react-dom",
+    "src",
+    "client",
+    "component-tree.js"
+  )
+);
+const rootBridge = require(
+  path.join(
+    repoRoot,
+    "packages",
+    "react-dom",
+    "src",
+    "client",
+    "root-bridge.js"
+  )
+);
 const propertyPayload = require(
   path.join(
     repoRoot,
@@ -564,6 +584,57 @@ test("private dangerous HTML/text reset diagnostics keep oracle HTML transitions
   }
 });
 
+test("private dangerous HTML fake-DOM commit metadata mirrors oracle transitions without DOM writes", () => {
+  const updatePreviousProps = {
+    dangerouslySetInnerHTML: { __html: "<span>Before</span>" }
+  };
+  const updateNextProps = {
+    dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+  };
+  const removePreviousProps = {
+    dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+  };
+  const removeNextProps = {
+    dangerouslySetInnerHTML: undefined,
+    children: "Managed child"
+  };
+
+  const updateHandoff = recordDangerousHtmlOracleCommit(
+    "oracle-inner-html-update",
+    updatePreviousProps,
+    updateNextProps
+  );
+  const removeHandoff = recordDangerousHtmlOracleCommit(
+    "oracle-html-to-text",
+    removePreviousProps,
+    removeNextProps
+  );
+
+  assert.deepEqual(
+    updateHandoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+    ["dangerous-html-set-inner-html"]
+  );
+  assert.deepEqual(
+    removeHandoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+    ["dangerous-html-to-managed-text-set-text-content"]
+  );
+
+  for (const handoff of [updateHandoff, removeHandoff]) {
+    assert.equal(handoff.fakeDomMutation, false);
+    assert.equal(handoff.browserDomMutation, false);
+    assert.equal(handoff.realDomInnerHTMLWritten, false);
+    assert.equal(handoff.realDomTextContentWritten, false);
+    assert.equal(handoff.latestPropsPublished, false);
+    assert.equal(handoff.publicRootObjectExposed, false);
+    assert.equal(handoff.compatibilityClaimed, false);
+    assert.equal(
+      handoff.handoffStatus,
+      rootBridge
+        .ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA_ACCEPTED
+    );
+  }
+});
+
 test("shape validation records server throws and client root errors", () => {
   const styleServer = serverPhase(
     "default-node-development",
@@ -653,6 +724,152 @@ test("print DOM style/dangerouslySetInnerHTML oracle CLI emits the checked-in ar
 
   assert.equal(output, readCheckedDomStyleDangerousHtmlOracleText());
 });
+
+function recordDangerousHtmlOracleCommit(label, previousProps, nextProps) {
+  const document = new DangerousHtmlOracleDocument(label);
+  const container = document.createElement("div");
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    dangerousHtmlTextResetCommitMetadataIdPrefix: `${label}-commit`,
+    sideEffectIdPrefix: `${label}-side-effect`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: { children: "initial" },
+    type: "div"
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement("div");
+  const token = componentTree.createHostInstanceToken(
+    { kind: "DangerousHtmlOracleHost" },
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, previousProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: "div"
+  });
+  const diagnostic = createDangerousHtmlTextResetDiagnostic(
+    "div",
+    previousProps,
+    nextProps
+  );
+
+  try {
+    const handoff = bridge.recordDangerousHtmlTextResetCommitMetadata(
+      update,
+      createDangerousHtmlOracleRootCommitMetadata(),
+      diagnostic,
+      {
+        hostInstanceToken: token,
+        nextProps,
+        stateNodeRaw: 901,
+        tag: "div"
+      }
+    );
+    assert.deepEqual(host.dangerousWriteLog, []);
+    assert.equal(
+      componentTree.getLatestPropsFromHostInstanceToken(token),
+      previousProps
+    );
+    return handoff;
+  } finally {
+    componentTree.detachHostInstanceToken(token);
+    bridge.revertCreateRootSideEffects(sideEffects);
+  }
+}
+
+function createDangerousHtmlOracleRootCommitMetadata() {
+  return {
+    mutationApplyRecords: [
+      {
+        kind: "commit-host-component-update",
+        tag: "HostComponent",
+        source: {
+          kind: "Update"
+        },
+        parentTag: "HostRoot",
+        stateNodeRaw: 901,
+        pendingPropsRaw: 3003,
+        memoizedPropsRaw: 3003,
+        alternateMemoizedPropsRaw: 3001
+      }
+    ]
+  };
+}
+
+class DangerousHtmlOracleEventTarget {
+  constructor(fields) {
+    Object.assign(this, fields);
+    this.__mutationLog = [];
+    this.__registrations = [];
+    this.__removals = [];
+  }
+
+  addEventListener(type, listener, options) {
+    this.__registrations.push({ listener, options, type });
+  }
+
+  removeEventListener(type, listener, options) {
+    this.__removals.push({ listener, options, type });
+  }
+}
+
+class DangerousHtmlOracleDocument extends DangerousHtmlOracleEventTarget {
+  constructor(label) {
+    super({
+      label,
+      nodeName: "#document",
+      nodeType: 9
+    });
+    this.ownerDocument = this;
+    this.defaultView = new DangerousHtmlOracleEventTarget({
+      label: `${label}-window`
+    });
+  }
+
+  createElement(nodeName) {
+    return new DangerousHtmlOracleElement(String(nodeName), this);
+  }
+}
+
+class DangerousHtmlOracleElement extends DangerousHtmlOracleEventTarget {
+  constructor(nodeName, ownerDocument) {
+    super({
+      nodeName: nodeName.toUpperCase(),
+      nodeType: 1,
+      ownerDocument
+    });
+    this.childNodes = [];
+    this.parentNode = null;
+    this.dangerousWriteLog = [];
+    this._innerHTML = "";
+    this._textContent = "";
+  }
+
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set innerHTML(value) {
+    this.dangerousWriteLog.push(["innerHTML", String(value)]);
+    throw new Error("innerHTML writes must remain blocked");
+  }
+
+  get textContent() {
+    return this._textContent;
+  }
+
+  set textContent(value) {
+    this.dangerousWriteLog.push(["textContent", String(value)]);
+    throw new Error("textContent writes must remain blocked");
+  }
+}
 
 function serverObservation(modeId, scenarioId) {
   return findDomStyleDangerousHtmlServerObservation(oracle, modeId, scenarioId);

@@ -9,13 +9,19 @@ const packageJson = require(path.join(packageRoot, 'package.json'));
 const propertyOperations = require(
   path.join(packageRoot, 'src/client/dom-property-operations.js')
 );
+const componentTree = require(
+  path.join(packageRoot, 'src/client/component-tree.js')
+);
 const propertyPayload = require(
   path.join(packageRoot, 'src/dom-host/property-payload.js')
 );
+const rootBridge = require(path.join(packageRoot, 'src/client/root-bridge.js'));
 
 const {
   DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA,
-  createDangerousHtmlTextResetDiagnostic
+  createDangerousHtmlTextResetDiagnostic,
+  getDangerousHtmlTextResetDiagnosticPayload,
+  isDangerousHtmlTextResetDiagnostic
 } = propertyOperations;
 
 const {
@@ -384,6 +390,10 @@ test('private dangerous HTML/text reset gate records metadata without public exp
     false
   );
   assert.equal(
+    DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA.fakeDomCommitMetadata,
+    true
+  );
+  assert.equal(
     DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA.publicDomMutation,
     false
   );
@@ -400,6 +410,32 @@ test('private dangerous HTML/text reset gate records metadata without public exp
       'managed-text-to-dangerous-html-set-inner-html-blocked'
     ]
   );
+});
+
+test('private dangerous HTML diagnostics expose hidden validation payloads', () => {
+  const previousProps = {
+    dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+  };
+  const nextProps = {
+    dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+  };
+  const diagnostic = createDangerousHtmlTextResetDiagnostic(
+    'div',
+    previousProps,
+    nextProps
+  );
+  const hiddenPayload =
+    getDangerousHtmlTextResetDiagnosticPayload(diagnostic);
+
+  assert.equal(isDangerousHtmlTextResetDiagnostic(diagnostic), true);
+  assert.equal(isDangerousHtmlTextResetDiagnostic({}), false);
+  assert.equal(hiddenPayload.hostTag, 'div');
+  assert.equal(hiddenPayload.previousProps, previousProps);
+  assert.equal(hiddenPayload.nextProps, nextProps);
+  assert.equal(hiddenPayload.propertyPayloadRowsAccepted, true);
+  assert.equal(diagnostic.propertyPayloadRowsAccepted, true);
+  assert.equal(diagnostic.fakeDomCommitMetadataAvailable, true);
+  assert.equal(getDangerousHtmlTextResetDiagnosticPayload({}), null);
 });
 
 test('private dangerous HTML diagnostics record blocked innerHTML update rows', () => {
@@ -621,6 +657,391 @@ test('private dangerous HTML diagnostics fail closed for children conflicts', ()
   ]);
   assertCompatibilityFalse(diagnostic);
 });
+
+test('private root bridge records dangerous HTML/text reset rows as fake-DOM commit metadata only', () => {
+  const scenarios = [
+    {
+      expectedRowKind: 'dangerous-html-set-inner-html',
+      name: 'innerHTML set',
+      nextProps: {
+        dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+      },
+      previousProps: {
+        dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+      }
+    },
+    {
+      expectedRowKind:
+        'dangerous-html-to-managed-text-set-text-content',
+      name: 'HTML-to-text',
+      nextProps: {
+        dangerouslySetInnerHTML: undefined,
+        children: 'Managed child'
+      },
+      previousProps: {
+        dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+      }
+    },
+    {
+      expectedRowKind:
+        'managed-text-to-dangerous-html-set-inner-html',
+      name: 'text-to-HTML',
+      nextProps: {
+        dangerouslySetInnerHTML: {__html: '<strong>Raw</strong>'}
+      },
+      previousProps: {
+        children: 'Managed text'
+      }
+    },
+    {
+      expectedRowKind:
+        'dangerous-html-to-managed-child-reset-text-content',
+      name: 'resetTextContent',
+      nextProps: {
+        children: [{type: 'span', props: {children: 'Managed child'}}]
+      },
+      previousProps: {
+        dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+      }
+    }
+  ];
+
+  for (const scenario of scenarios) {
+    const setup = createDangerousHtmlCommitSetup(
+      scenario.previousProps,
+      scenario.name
+    );
+    try {
+      const diagnostic = createDangerousHtmlTextResetDiagnostic(
+        'div',
+        scenario.previousProps,
+        scenario.nextProps
+      );
+      const handoff = setup.recordCommitMetadata(
+        scenario.nextProps,
+        diagnostic
+      );
+      const hiddenHandoff =
+        rootBridge.getPrivateRootDangerousHtmlTextResetCommitMetadataPayload(
+          handoff
+        );
+
+      assert.equal(
+        handoff.$$typeof,
+        rootBridge.privateRootDangerousHtmlTextResetCommitMetadataRecordType
+      );
+      assert.equal(
+        handoff.kind,
+        'FastReactDomPrivateRootDangerousHtmlTextResetCommitMetadataRecord'
+      );
+      assert.equal(
+        handoff.handoffStatus,
+        rootBridge
+          .ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA_ACCEPTED
+      );
+      assert.equal(handoff.hostTag, 'div');
+      assert.equal(handoff.rootCommitMetadataRecordCount, 1);
+      assert.equal(handoff.rootCommitHostComponentUpdateRecordCount, 1);
+      assert.equal(handoff.fakeDomCommitRowCount, 1);
+      assert.deepEqual(
+        handoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+        [scenario.expectedRowKind]
+      );
+      assert.deepEqual(
+        handoff.fakeDomCommitRows.map((row) => ({
+          fakeDomCommitMetadata: row.fakeDomCommitMetadata,
+          fakeDomMutation: row.fakeDomMutation,
+          latestPropsPublished: row.latestPropsPublished,
+          realDomInnerHTMLWritten: row.realDomInnerHTMLWritten,
+          realDomTextContentWritten: row.realDomTextContentWritten
+        })),
+        [
+          {
+            fakeDomCommitMetadata: true,
+            fakeDomMutation: false,
+            latestPropsPublished: false,
+            realDomInnerHTMLWritten: false,
+            realDomTextContentWritten: false
+          }
+        ]
+      );
+      assert.equal(handoff.fakeDomMutation, false);
+      assert.equal(handoff.domMutation, false);
+      assert.equal(handoff.browserDomMutation, false);
+      assert.equal(handoff.realDomInnerHTMLWritten, false);
+      assert.equal(handoff.realDomTextContentWritten, false);
+      assert.equal(handoff.publicRootObjectExposed, false);
+      assert.equal(handoff.nativeExecution, false);
+      assert.equal(handoff.reconcilerExecution, false);
+      assert.equal(handoff.compatibilityClaimed, false);
+      assert.deepEqual(
+        handoff.acceptedCapabilities.map((capability) => capability.id),
+        [
+          'root-commit-host-component-update-metadata',
+          'dangerous-html-text-reset-diagnostic',
+          'fake-dom-dangerous-html-text-reset-commit-metadata'
+        ]
+      );
+      assert.deepEqual(
+        handoff.blockedCapabilities.map((capability) => capability.id),
+        [
+          'real-dom-inner-html-write',
+          'real-dom-text-content-write',
+          'latest-props-publication',
+          'public-root-execution',
+          'native-execution',
+          'reconciler-execution',
+          'browser-dom-compatibility',
+          'compatibility-claims'
+        ]
+      );
+      assert.equal(
+        rootBridge.isPrivateRootDangerousHtmlTextResetCommitMetadataRecord(
+          handoff
+        ),
+        true
+      );
+      assert.equal(
+        rootBridge.isPrivateRootDangerousHtmlTextResetCommitMetadataRecord({}),
+        false
+      );
+      assert.equal(hiddenHandoff.sourceRecord, setup.update);
+      assert.equal(hiddenHandoff.diagnostic, diagnostic);
+      assert.equal(hiddenHandoff.previousProps, scenario.previousProps);
+      assert.equal(hiddenHandoff.nextProps, scenario.nextProps);
+      assert.equal(hiddenHandoff.hostInstanceNode, setup.host);
+      assert.equal(
+        componentTree.getLatestPropsFromHostInstanceToken(setup.token),
+        scenario.previousProps
+      );
+      assert.deepEqual(setup.host.dangerousWriteLog, []);
+
+      const serialized = JSON.stringify(handoff);
+      assert.equal(serialized.includes('<span>Before</span>'), false);
+      assert.equal(serialized.includes('<em>After</em>'), false);
+      assert.equal(serialized.includes('<strong>Raw</strong>'), false);
+    } finally {
+      setup.cleanup();
+    }
+  }
+});
+
+test('private root bridge rejects stale or unsupported dangerous HTML commit metadata', () => {
+  const previousProps = {
+    dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+  };
+  const nextProps = {
+    dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+  };
+  const staleNextProps = {
+    dangerouslySetInnerHTML: {__html: '<strong>Stale</strong>'}
+  };
+  const staleSetup = createDangerousHtmlCommitSetup(
+    previousProps,
+    'stale-dangerous-html'
+  );
+  try {
+    const staleDiagnostic = createDangerousHtmlTextResetDiagnostic(
+      'div',
+      previousProps,
+      nextProps
+    );
+    assert.throws(
+      () =>
+        staleSetup.recordCommitMetadata(
+          staleNextProps,
+          staleDiagnostic
+        ),
+      {
+        code:
+          'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA'
+      }
+    );
+    assert.deepEqual(staleSetup.host.dangerousWriteLog, []);
+  } finally {
+    staleSetup.cleanup();
+  }
+
+  const conflictNextProps = {
+    dangerouslySetInnerHTML: {__html: '<strong>bad</strong>'},
+    children: 'conflict'
+  };
+  const conflictSetup = createDangerousHtmlCommitSetup(
+    {},
+    'conflict-dangerous-html'
+  );
+  try {
+    const conflictDiagnostic = createDangerousHtmlTextResetDiagnostic(
+      'div',
+      {},
+      conflictNextProps
+    );
+    assert.equal(conflictDiagnostic.propertyPayloadRowsAccepted, false);
+    assert.equal(conflictDiagnostic.fakeDomCommitMetadataAvailable, false);
+    assert.equal(
+      conflictDiagnostic.blockedMutationRows[0].category,
+      'dangerouslySetInnerHTML-children-conflict'
+    );
+    assert.throws(
+      () =>
+        conflictSetup.recordCommitMetadata(
+          conflictNextProps,
+          conflictDiagnostic
+        ),
+      {
+        code:
+          'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA'
+      }
+    );
+    assert.deepEqual(conflictSetup.host.dangerousWriteLog, []);
+  } finally {
+    conflictSetup.cleanup();
+  }
+});
+
+function createDangerousHtmlCommitSetup(previousProps, label) {
+  const document = new DangerousHtmlCommitDocument(label);
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    dangerousHtmlTextResetCommitMetadataIdPrefix:
+      `dangerous-html-commit-${label}`,
+    sideEffectIdPrefix: `dangerous-html-side-effect-${label}`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: {children: 'initial'},
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement('div');
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'DangerousHtmlTextResetCommitHost'},
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, previousProps);
+  const metadata = createDangerousHtmlRootCommitMetadata();
+  const setup = {
+    cleanup() {
+      componentTree.detachHostInstanceToken(token);
+      bridge.revertCreateRootSideEffects(sideEffects);
+    },
+    host,
+    recordCommitMetadata(nextProps, diagnostic) {
+      const update = bridge.renderContainer(create.handle, {
+        props: nextProps,
+        type: 'div'
+      });
+      setup.update = update;
+      return bridge.recordDangerousHtmlTextResetCommitMetadata(
+        update,
+        metadata,
+        diagnostic,
+        {
+          hostInstanceToken: token,
+          nextProps,
+          stateNodeRaw: 901,
+          tag: 'div'
+        }
+      );
+    },
+    token,
+    update: null
+  };
+  return setup;
+}
+
+function createDangerousHtmlRootCommitMetadata() {
+  return {
+    mutationApplyRecords: [
+      {
+        kind: 'commit-host-component-update',
+        tag: 'HostComponent',
+        source: {
+          kind: 'Update'
+        },
+        parentTag: 'HostRoot',
+        stateNodeRaw: 901,
+        pendingPropsRaw: 3003,
+        memoizedPropsRaw: 3003,
+        alternateMemoizedPropsRaw: 3001
+      }
+    ]
+  };
+}
+
+class DangerousHtmlCommitEventTarget {
+  constructor(fields) {
+    Object.assign(this, fields);
+    this.__mutationLog = [];
+    this.__registrations = [];
+    this.__removals = [];
+  }
+
+  addEventListener(type, listener, options) {
+    this.__registrations.push({listener, options, type});
+  }
+
+  removeEventListener(type, listener, options) {
+    this.__removals.push({listener, options, type});
+  }
+}
+
+class DangerousHtmlCommitDocument extends DangerousHtmlCommitEventTarget {
+  constructor(label) {
+    super({
+      label,
+      nodeName: '#document',
+      nodeType: 9
+    });
+    this.ownerDocument = this;
+    this.defaultView = new DangerousHtmlCommitEventTarget({
+      label: `${label}-window`
+    });
+  }
+
+  createElement(nodeName) {
+    return new DangerousHtmlCommitElement(String(nodeName), this);
+  }
+}
+
+class DangerousHtmlCommitElement extends DangerousHtmlCommitEventTarget {
+  constructor(nodeName, ownerDocument) {
+    super({
+      nodeName: nodeName.toUpperCase(),
+      nodeType: 1,
+      ownerDocument
+    });
+    this.childNodes = [];
+    this.parentNode = null;
+    this.dangerousWriteLog = [];
+    this._innerHTML = '';
+    this._textContent = '';
+  }
+
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set innerHTML(value) {
+    this.dangerousWriteLog.push(['innerHTML', String(value)]);
+    throw new Error('innerHTML writes must remain blocked');
+  }
+
+  get textContent() {
+    return this._textContent;
+  }
+
+  set textContent(value) {
+    this.dangerousWriteLog.push(['textContent', String(value)]);
+    throw new Error('textContent writes must remain blocked');
+  }
+}
 
 function assertCompatibilityFalse(diagnostic) {
   assert.equal(diagnostic.sideEffects.realDomMutated, false);
