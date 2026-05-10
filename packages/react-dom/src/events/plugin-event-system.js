@@ -41,6 +41,8 @@ const DISPATCH_LISTENER_CANARY_EVENT_KIND =
   'FastReactDomDispatchListenerCanaryEvent';
 const DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND =
   'FastReactDomDispatchQueueInvocationCanaryRecord';
+const EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND =
+  'FastReactDomEventTypeDispatchCanaryRecord';
 const SYNTHETIC_EVENT_SHAPE_RECORD_KIND =
   'FastReactDomSyntheticEventShapeRecord';
 const SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
@@ -123,6 +125,8 @@ const PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS =
   'validated-private-current-target-progression';
 const PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS =
   'controlled-private-portal-event-owner-root-gate';
+const PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS =
+  'controlled-private-event-type-dispatch-canary';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -259,6 +263,7 @@ const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
+const eventTypeDispatchCanaryRecordPayloads = new WeakMap();
 const syntheticEventShapeRecordPayloads = new WeakMap();
 const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
@@ -735,6 +740,198 @@ function getDispatchQueueEntryRecordPayload(record) {
 
 function isDispatchQueueEntryRecord(record) {
   return getDispatchQueueEntryRecordPayload(record) !== null;
+}
+
+function createEventTypeDispatchCanaryRecord(dispatchRecord) {
+  const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  const dispatchQueue = normalizedDispatchRecord.dispatchQueue;
+  const dispatchQueueEntries = Object.freeze(
+    dispatchQueue.entries.map((dispatchQueueEntry, index) =>
+      createEventTypeDispatchCanaryEntryRecord(dispatchQueueEntry, index)
+    )
+  );
+  const listenerMetadata = Object.freeze(
+    dispatchQueueEntries.flatMap((entry) => entry.listenerMetadata)
+  );
+  const primaryEntry =
+    dispatchQueueEntries.length === 0 ? null : dispatchQueueEntries[0];
+  const hydrationReplay = normalizedDispatchRecord.hydrationReplay;
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    blockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    dispatchQueueEntries,
+    dispatchQueueEntryCount: dispatchQueueEntries.length,
+    dispatchQueueLength: dispatchQueue.length,
+    dispatchQueueListenerCount: dispatchQueue.listenerCount,
+    dispatchQueueStatus: dispatchQueue.status,
+    dispatcherName: normalizedDispatchRecord.dispatcherName,
+    domEventName: normalizedDispatchRecord.domEventName,
+    eventDispatch: false,
+    eventPriority: normalizedDispatchRecord.eventPriority,
+    eventPriorityLabel: normalizedDispatchRecord.eventPriorityLabel,
+    eventPriorityLane: normalizedDispatchRecord.eventPriorityLane,
+    eventPriorityName: normalizedDispatchRecord.eventPriorityName,
+    eventSystemFlags: normalizedDispatchRecord.eventSystemFlags,
+    hydrationReplayBlockedReason: hydrationReplay.blockedReason,
+    hydrationReplayQueued: hydrationReplay.queued,
+    hydrationReplayStatus: hydrationReplay.status,
+    inCapturePhase: normalizedDispatchRecord.inCapturePhase,
+    isEventHandleNonManagedNode:
+      normalizedDispatchRecord.isEventHandleNonManagedNode,
+    isNonDelegatedEvent: normalizedDispatchRecord.isNonDelegatedEvent,
+    kind: EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND,
+    listenerInvocationCount: 0,
+    listenerMetadata,
+    listenerMetadataCount: listenerMetadata.length,
+    metadataOnly: true,
+    nativeEventType: normalizedDispatchRecord.nativeEventType,
+    primaryReactName: primaryEntry === null ? null : primaryEntry.reactName,
+    primaryRegistrationName:
+      primaryEntry === null ? null : primaryEntry.registrationName,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    reactName: primaryEntry === null ? null : primaryEntry.reactName,
+    registrationName:
+      primaryEntry === null ? null : primaryEntry.registrationName,
+    status: PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
+    syntheticEventCount: 0,
+    syntheticEventStatus:
+      primaryEntry === null
+        ? 'not-applicable'
+        : primaryEntry.syntheticEventStatus,
+    targetDispatchPathLength:
+      normalizedDispatchRecord.targetDispatchPathLength,
+    targetDispatchPathStatus:
+      normalizedDispatchRecord.targetDispatchPathStatus,
+    targetInst: normalizedDispatchRecord.targetInst,
+    targetInstStatus: normalizedDispatchRecord.targetInstStatus,
+    targetListenerFound: normalizedDispatchRecord.targetListenerFound,
+    targetListenerLookupCount:
+      normalizedDispatchRecord.targetListenerLookupCount,
+    targetListenerLookupStatus:
+      normalizedDispatchRecord.targetListenerLookupStatus,
+    targetListenerRegistrationName:
+      normalizedDispatchRecord.targetListenerRegistrationName,
+    targetResolutionStatus: normalizedDispatchRecord.targetResolutionStatus,
+    willInvokeListeners: false,
+    wrapperKind: normalizedDispatchRecord.wrapperKind
+  });
+
+  eventTypeDispatchCanaryRecordPayloads.set(
+    record,
+    Object.freeze({
+      dispatchQueueEntries: Object.freeze(dispatchQueue.entries.slice()),
+      dispatchRecord: normalizedDispatchRecord,
+      listenerRecords: Object.freeze(
+        dispatchQueue.entries.flatMap((entry) => {
+          const payload = getDispatchQueueEntryRecordPayload(entry);
+          return payload === null ? [] : payload.listenerRecords;
+        })
+      )
+    })
+  );
+
+  return record;
+}
+
+function createEventTypeDispatchCanaryEntryRecord(
+  dispatchQueueEntry,
+  index
+) {
+  const normalizedDispatchQueueEntry =
+    assertDispatchQueueEntryRecord(dispatchQueueEntry);
+  const entryPayload = getDispatchQueueEntryRecordPayload(
+    normalizedDispatchQueueEntry
+  );
+  const listenerRecords =
+    entryPayload === null ? [] : entryPayload.listenerRecords;
+
+  return Object.freeze({
+    accumulationOrder: normalizedDispatchQueueEntry.accumulationOrder,
+    browserDomEventCompatibilityClaimed: false,
+    domEventName: normalizedDispatchQueueEntry.domEventName,
+    index,
+    inCapturePhase: normalizedDispatchQueueEntry.inCapturePhase,
+    kind: normalizedDispatchQueueEntry.kind,
+    listenerCount: normalizedDispatchQueueEntry.listenerCount,
+    listenerInvocationCount: 0,
+    listenerMetadata: Object.freeze(
+      listenerRecords.map((listenerRecord, listenerIndex) =>
+        createEventTypeDispatchCanaryListenerMetadata(
+          listenerRecord,
+          listenerIndex,
+          index
+        )
+      )
+    ),
+    nativeEventType: normalizedDispatchQueueEntry.nativeEventType,
+    pluginName: normalizedDispatchQueueEntry.pluginName,
+    processingOrder: normalizedDispatchQueueEntry.processingOrder,
+    publicRootBehaviorChanged: false,
+    reactName: normalizedDispatchQueueEntry.reactName,
+    registrationName: normalizedDispatchQueueEntry.registrationName,
+    status: normalizedDispatchQueueEntry.status,
+    syntheticEventCount: 0,
+    syntheticEventStatus:
+      normalizedDispatchQueueEntry.syntheticEventStatus,
+    willInvokeListeners: false
+  });
+}
+
+function createEventTypeDispatchCanaryListenerMetadata(
+  dispatchListenerRecord,
+  listenerIndex,
+  dispatchQueueEntryIndex
+) {
+  const normalizedDispatchListenerRecord =
+    assertDispatchListenerRecord(dispatchListenerRecord);
+
+  return Object.freeze({
+    browserDomEventCompatibilityClaimed: false,
+    currentTarget: normalizedDispatchListenerRecord.currentTarget,
+    dispatchPathIndex:
+      normalizedDispatchListenerRecord.dispatchPathIndex,
+    dispatchQueueEntryIndex,
+    domEventName: normalizedDispatchListenerRecord.domEventName,
+    exposesLatestProps: false,
+    exposesListener: false,
+    inCapturePhase: normalizedDispatchListenerRecord.inCapturePhase,
+    index: listenerIndex,
+    kind: normalizedDispatchListenerRecord.kind,
+    latestPropsStatus:
+      normalizedDispatchListenerRecord.latestPropsStatus,
+    listenerFound: normalizedDispatchListenerRecord.listenerFound,
+    listenerInvocationCount: 0,
+    listenerStatus: normalizedDispatchListenerRecord.listenerStatus,
+    listenerType: normalizedDispatchListenerRecord.listenerType,
+    nativeEventType: normalizedDispatchListenerRecord.nativeEventType,
+    phase: normalizedDispatchListenerRecord.phase,
+    publicRootBehaviorChanged: false,
+    registrationName:
+      normalizedDispatchListenerRecord.registrationName,
+    status: normalizedDispatchListenerRecord.status,
+    syntheticEventCount: 0,
+    targetHostInstanceStatus:
+      normalizedDispatchListenerRecord.targetHostInstanceStatus,
+    targetInst: normalizedDispatchListenerRecord.targetInst,
+    targetInstStatus:
+      normalizedDispatchListenerRecord.targetInstStatus,
+    willInvokeListener: false
+  });
+}
+
+function getEventTypeDispatchCanaryRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return eventTypeDispatchCanaryRecordPayloads.get(record) || null;
+}
+
+function isEventTypeDispatchCanaryRecord(record) {
+  return getEventTypeDispatchCanaryRecordPayload(record) !== null;
 }
 
 function invokeSingleListenerCanaryFromDispatchRecord(dispatchRecord, options) {
@@ -4700,6 +4897,7 @@ module.exports = {
   DISPATCH_QUEUE_ENTRY_RECORD_KIND,
   DISPATCH_QUEUE_RECORD_KIND,
   DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
+  EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
@@ -4733,6 +4931,7 @@ module.exports = {
   PRIVATE_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_STATUS,
   PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
+  PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS,
@@ -4745,6 +4944,7 @@ module.exports = {
   SYNTHETIC_EVENT_SHAPE_RECORD_KIND,
   assertEventListenerWrapperRecord,
   createEventDispatchRecordFromWrapperRecord,
+  createEventTypeDispatchCanaryRecord,
   createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic,
   createPortalEventOwnerRootGateRecord,
@@ -4758,6 +4958,7 @@ module.exports = {
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
   getDispatchQueueInvocationCanaryRecordPayload,
+  getEventTypeDispatchCanaryRecordPayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
   getSyntheticEventShapeGateRecordPayload,
@@ -4772,6 +4973,7 @@ module.exports = {
   isDispatchListenerRecord,
   isDispatchQueueEntryRecord,
   isDispatchQueueInvocationCanaryRecord,
+  isEventTypeDispatchCanaryRecord,
   isPortalEventOwnerRootGateRecord,
   isSyntheticEventShapeGateRecord,
   isSyntheticEventShapeRecord

@@ -477,6 +477,293 @@ test("private target listener lookup sees current latest props without dispatchi
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private event type dispatch canaries cover non-click priority and listener metadata", () => {
+  const root = createEventTarget("event-type-canary-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "EventTypeCanaryRootOwner"};
+  const parentHostOwner = {kind: "EventTypeCanaryParentHostOwner"};
+  const childHostOwner = {kind: "EventTypeCanaryChildHostOwner"};
+  const calls = [];
+  const parentProps = {
+    onAnimationEnd() {
+      calls.push("parent-animationend");
+    },
+    onKeyDownCapture() {
+      calls.push("parent-keydown-capture");
+    },
+    onMouseMove() {
+      calls.push("parent-mousemove");
+    }
+  };
+  const childProps = {
+    onAnimationEnd() {
+      calls.push("child-animationend");
+    },
+    onKeyDownCapture() {
+      calls.push("child-keydown-capture");
+    },
+    onMouseMove() {
+      calls.push("child-mousemove");
+    }
+  };
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+
+  const cases = [
+    {
+      dispatcherName: "dispatchDiscreteEvent",
+      domEventName: "keydown",
+      eventPriorityName: "DiscreteEventPriority",
+      eventSystemFlags: rootListeners.IS_CAPTURE_PHASE,
+      phase: "capture",
+      processingOrder: "root-to-target",
+      processingTargets: [parentToken, childToken],
+      reactName: "onKeyDown",
+      registrationName: "onKeyDownCapture",
+      targetOrder: [childToken, parentToken],
+      wrapperKind: eventListener.DISCRETE_EVENT_WRAPPER
+    },
+    {
+      dispatcherName: "dispatchContinuousEvent",
+      domEventName: "mousemove",
+      eventPriorityName: "ContinuousEventPriority",
+      eventSystemFlags: 0,
+      phase: "bubble",
+      processingOrder: "target-to-root",
+      processingTargets: [childToken, parentToken],
+      reactName: "onMouseMove",
+      registrationName: "onMouseMove",
+      targetOrder: [childToken, parentToken],
+      wrapperKind: eventListener.CONTINUOUS_EVENT_WRAPPER
+    },
+    {
+      dispatcherName: "dispatchEvent",
+      domEventName: "animationend",
+      eventPriorityName: "DefaultEventPriority",
+      eventSystemFlags: 0,
+      phase: "bubble",
+      processingOrder: "target-to-root",
+      processingTargets: [childToken, parentToken],
+      reactName: "onAnimationEnd",
+      registrationName: "onAnimationEnd",
+      targetOrder: [childToken, parentToken],
+      wrapperKind: eventListener.DEFAULT_EVENT_WRAPPER
+    }
+  ];
+
+  for (const testCase of cases) {
+    const wrapperRecord =
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        root,
+        testCase.domEventName,
+        testCase.eventSystemFlags
+      );
+    const nativeEvent = createNativeEvent(testCase.domEventName, child);
+    const dispatchRecord =
+      pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+        wrapperRecord,
+        nativeEvent
+      );
+    const canaryRecord =
+      pluginEventSystem.createEventTypeDispatchCanaryRecord(dispatchRecord);
+
+    assert.equal(Object.isFrozen(canaryRecord), true, testCase.domEventName);
+    assert.equal(
+      pluginEventSystem.isEventTypeDispatchCanaryRecord(canaryRecord),
+      true,
+      testCase.domEventName
+    );
+    assert.equal(
+      canaryRecord.kind,
+      pluginEventSystem.EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND,
+      testCase.domEventName
+    );
+    assert.equal(
+      canaryRecord.status,
+      pluginEventSystem.PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
+      testCase.domEventName
+    );
+    assert.equal(canaryRecord.domEventName, testCase.domEventName);
+    assert.equal(canaryRecord.nativeEventType, testCase.domEventName);
+    assert.equal(canaryRecord.dispatcherName, testCase.dispatcherName);
+    assert.equal(canaryRecord.wrapperKind, testCase.wrapperKind);
+    assert.equal(canaryRecord.eventPriorityName, testCase.eventPriorityName);
+    assert.equal(
+      canaryRecord.eventPriorityName,
+      dispatchRecord.eventPriorityName
+    );
+    assert.equal(canaryRecord.reactName, testCase.reactName);
+    assert.equal(canaryRecord.primaryReactName, testCase.reactName);
+    assert.equal(canaryRecord.registrationName, testCase.registrationName);
+    assert.equal(
+      canaryRecord.primaryRegistrationName,
+      testCase.registrationName
+    );
+    assert.equal(
+      canaryRecord.targetListenerRegistrationName,
+      testCase.registrationName
+    );
+    assert.equal(canaryRecord.targetListenerLookupStatus, "present");
+    assert.equal(canaryRecord.targetListenerFound, true);
+    assert.equal(canaryRecord.targetListenerLookupCount, 2);
+    assert.equal(canaryRecord.targetInst, childToken);
+    assert.equal(canaryRecord.targetResolutionStatus, "resolved");
+    assert.equal(
+      canaryRecord.targetDispatchPathStatus,
+      "resolved-component-tree-dispatch-path"
+    );
+    assert.equal(canaryRecord.targetDispatchPathLength, 2);
+    assert.equal(canaryRecord.dispatchQueueLength, 1);
+    assert.equal(canaryRecord.dispatchQueueEntryCount, 1);
+    assert.equal(Object.isFrozen(canaryRecord.dispatchQueueEntries), true);
+    assert.equal(canaryRecord.dispatchQueueEntries.length, 1);
+    assert.equal(
+      canaryRecord.dispatchQueueEntries[0].pluginName,
+      pluginEventSystem.SIMPLE_EVENT_PLUGIN_NAME
+    );
+    assert.equal(
+      canaryRecord.dispatchQueueEntries[0].reactName,
+      testCase.reactName
+    );
+    assert.equal(
+      canaryRecord.dispatchQueueEntries[0].registrationName,
+      testCase.registrationName
+    );
+    assert.equal(
+      canaryRecord.dispatchQueueEntries[0].processingOrder,
+      testCase.processingOrder
+    );
+    assert.equal(
+      canaryRecord.dispatchQueueEntries[0].syntheticEventStatus,
+      "not-created"
+    );
+    assert.equal(
+      canaryRecord.dispatchQueueEntries[0].willInvokeListeners,
+      false
+    );
+    assert.equal(
+      Object.isFrozen(canaryRecord.dispatchQueueEntries[0].listenerMetadata),
+      true
+    );
+    assert.equal(canaryRecord.dispatchQueueListenerCount, 2);
+    assert.equal(canaryRecord.listenerMetadataCount, 2);
+    assert.equal(canaryRecord.listenerInvocationCount, 0);
+    assert.equal(canaryRecord.willInvokeListeners, false);
+    assert.equal(canaryRecord.syntheticEventCount, 0);
+    assert.equal(canaryRecord.syntheticEventStatus, "not-created");
+    assert.equal(canaryRecord.metadataOnly, true);
+    assert.equal(canaryRecord.eventDispatch, false);
+    assert.equal(canaryRecord.publicDispatchEnabled, false);
+    assert.equal(
+      canaryRecord.publicDispatchBlockedReason,
+      pluginEventSystem.PUBLIC_EVENT_DISPATCH_BLOCKED_CODE
+    );
+    assert.equal(canaryRecord.publicRootBehaviorChanged, false);
+    assert.equal(canaryRecord.browserDomEventCompatibilityClaimed, false);
+    assert.equal(canaryRecord.hydrationReplayStatus, "blocked");
+    assert.equal(canaryRecord.hydrationReplayQueued, false);
+    assert.equal(
+      canaryRecord.hydrationReplayBlockedReason,
+      pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+    );
+    assert.equal(Object.hasOwn(canaryRecord, "nativeEvent"), false);
+    assert.equal(Object.hasOwn(canaryRecord, "syntheticEvent"), false);
+    assert.equal(Object.hasOwn(canaryRecord, "listener"), false);
+    assert.equal(Object.hasOwn(canaryRecord, "latestProps"), false);
+    assert.deepEqual(
+      canaryRecord.listenerMetadata.map((record) => [
+        record.registrationName,
+        record.phase,
+        record.dispatchQueueEntryIndex,
+        record.targetInst,
+        record.currentTarget,
+        record.listenerStatus,
+        record.listenerInvocationCount,
+        record.syntheticEventCount,
+        record.willInvokeListener
+      ]),
+      [
+        [
+          testCase.registrationName,
+          testCase.phase,
+          0,
+          childToken,
+          child,
+          "present",
+          0,
+          0,
+          false
+        ],
+        [
+          testCase.registrationName,
+          testCase.phase,
+          0,
+          parentToken,
+          parent,
+          "present",
+          0,
+          0,
+          false
+        ]
+      ],
+      testCase.domEventName
+    );
+    assert.deepEqual(
+      dispatchRecord.dispatchQueue.entries[0].listeners.map(
+        (record) => record.targetInst
+      ),
+      testCase.targetOrder,
+      testCase.domEventName
+    );
+    assert.deepEqual(
+      dispatchRecord.dispatchQueue.entries[0].processingListenerRecords.map(
+        (record) => record.targetInst
+      ),
+      testCase.processingTargets,
+      testCase.domEventName
+    );
+    assert.equal(
+      dispatchRecord.dispatchQueue.entries[0].processingOrder,
+      testCase.processingOrder,
+      testCase.domEventName
+    );
+
+    const canaryPayload =
+      pluginEventSystem.getEventTypeDispatchCanaryRecordPayload(
+        canaryRecord
+      );
+    assert.equal(canaryPayload.dispatchRecord, dispatchRecord);
+    assert.equal(canaryPayload.dispatchQueueEntries.length, 1);
+    assert.equal(
+      canaryPayload.dispatchQueueEntries[0],
+      dispatchRecord.dispatchQueue.entries[0]
+    );
+    assert.deepEqual(
+      canaryPayload.listenerRecords.map((record) => record.targetInst),
+      testCase.targetOrder
+    );
+    assert.equal(nativeEvent.stopPropagationCallCount, 0);
+    assert.equal(nativeEvent.preventDefaultCallCount, 0);
+    assert.equal(wrapperRecord.listener(nativeEvent), undefined);
+    assert.equal(nativeEvent.stopPropagationCallCount, 0);
+    assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  }
+
+  assert.deepEqual(calls, []);
+  assert.equal(root.__registrations.length, 0);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
+});
+
 test("private single-listener invocation canary invokes one hidden listener without SyntheticEvent or public dispatch", () => {
   const root = createEventTarget("single-listener-canary-root");
   const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
@@ -3029,6 +3316,12 @@ test("invalid dispatch wrapper metadata fails before any native event side effec
       code: pluginEventSystem.INVALID_EVENT_DISPATCH_RECORD_CODE
     }
   );
+  assert.throws(
+    () => pluginEventSystem.createEventTypeDispatchCanaryRecord({}),
+    {
+      code: pluginEventSystem.INVALID_EVENT_DISPATCH_RECORD_CODE
+    }
+  );
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
 });
@@ -3134,7 +3427,15 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
     false
   );
   assert.equal(
+    Object.hasOwn(reactDom, "createEventTypeDispatchCanaryRecord"),
+    false
+  );
+  assert.equal(
     Object.hasOwn(reactDomClient, "invokeLastRootListenerSingleListenerCanary"),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(reactDomClient, "createEventTypeDispatchCanaryRecord"),
     false
   );
   assert.equal(
