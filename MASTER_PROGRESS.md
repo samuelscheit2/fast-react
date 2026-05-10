@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Queue 565-594
+
+- Workers 565-594 were accepted and merged. The batch extended private
+  root-work-loop and scheduler diagnostics, multi-provider context lane
+  propagation, Suspense retry and Offscreen visibility gates, test-renderer
+  root/update/unmount/act/toJSON diagnostics, React DOM root facade,
+  style/dangerousHTML fake-DOM commit metadata, controlled restore mutation
+  intent, hydration replay dispatch, modulepreload ordering, scheduler mock and
+  postTask continuations, native JSON streaming, transition dispatcher routing,
+  element key/ref warnings, package-surface/private-admission/benchmark gates,
+  root-render E2E handoff evidence, and worker-launcher status handling.
+- Post-merge integration moved scheduler postTask and mock diagnostics out of
+  package physical surfaces, refreshed the root-render handoff source evidence
+  gate, and resolved combined test-renderer and DOM metadata conflicts while
+  keeping public compatibility blocked.
+- Queue 565-594 was verified after merge with `cargo fmt --all --check`,
+  focused reconciler context checks, full `fast-react-reconciler` tests, full
+  `fast-react-test-renderer` tests, focused React DOM/test-renderer conformance
+  checks, `npm run check:js`, conflict-marker scanning, and `git diff --check`.
+
 ### Queue 534-564
 
 - Workers 534-562 and 564 were accepted, completing the queue after worker 563
