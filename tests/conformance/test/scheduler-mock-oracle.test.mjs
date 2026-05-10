@@ -46,6 +46,11 @@ const privateSchedulerMockExpiredWorkMetadataKind =
 const privateSchedulerMockExpiredWorkMetadataBrand = Symbol.for(
   privateSchedulerMockExpiredWorkMetadataKind
 );
+const privateSchedulerMockFrameBudgetMetadataKind =
+  "fast-react.scheduler.mock-frame-budget-diagnostics";
+const privateSchedulerMockFrameBudgetMetadataBrand = Symbol.for(
+  privateSchedulerMockFrameBudgetMetadataKind
+);
 
 const EXPECTED_MOCK_EXPORT_KEYS = [
   "log",
@@ -1418,6 +1423,253 @@ test("scheduler mock private diagnostics record yields, paint, and continuation 
   }
 });
 
+test("scheduler mock private diagnostics record frame-budget gates without flushing work", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler,
+      "unstable_flushUntilNextPaint"
+    );
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const initialFrameBudget =
+      diagnostics.describeMockSchedulerFrameBudgetForDiagnostics();
+    assert.equal(
+      initialFrameBudget[privateSchedulerMockFrameBudgetMetadataBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      initialFrameBudget.kind,
+      privateSchedulerMockFrameBudgetMetadataKind,
+      nodeEnv
+    );
+    assert.equal(initialFrameBudget.version, 1, nodeEnv);
+    assert.equal(
+      initialFrameBudget.status,
+      "described-mock-scheduler-frame-budget-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(Object.isFrozen(initialFrameBudget), true, nodeEnv);
+    assert.equal(initialFrameBudget.now, 0, nodeEnv);
+    assert.equal(initialFrameBudget.pendingWork, false, nodeEnv);
+    assert.equal(initialFrameBudget.requestedPaint, false, nodeEnv);
+    assert.deepEqual(initialFrameBudget.yieldLog, {
+      state: "empty",
+      empty: true,
+      values: [],
+      valueCount: 0,
+      entries: [],
+      lastClearOrder: 0,
+      nextSequence: 1
+    });
+    assert.equal(initialFrameBudget.frameBudgetDecision.shouldYield, false);
+    assert.deepEqual(initialFrameBudget.frameBudgetDecision.reasons, []);
+    assert.equal(
+      initialFrameBudget.frameBudgetDecision.usesPublicSchedulerFrameInterval,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      initialFrameBudget.frameBudgetDecision.usesWallClockTime,
+      false,
+      nodeEnv
+    );
+    assert.equal(initialFrameBudget.unstableShouldYieldInvoked, false);
+    assert.equal(initialFrameBudget.unstableRequestPaintInvoked, false);
+    assert.equal(initialFrameBudget.drainsMockSchedulerWork, false);
+    assert.equal(
+      initialFrameBudget.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(initialFrameBudget.compatibilityClaimed, false, nodeEnv);
+    assert.equal(initialFrameBudget.executesScheduledCallbacks, false, nodeEnv);
+
+    Scheduler.log("frame-a");
+    Scheduler.log("frame-b");
+    Scheduler.unstable_advanceTime(17);
+    const loggedFrameBudget =
+      diagnostics.describeMockSchedulerFrameBudgetForDiagnostics();
+    assert.equal(loggedFrameBudget.now, 17, nodeEnv);
+    assert.deepEqual(loggedFrameBudget.yieldedValues, [
+      "frame-a",
+      "frame-b"
+    ]);
+    assert.deepEqual(loggedFrameBudget.yieldLog, {
+      state: "yielded-values",
+      empty: false,
+      values: ["frame-a", "frame-b"],
+      valueCount: 2,
+      entries: [
+        { index: 0, sequence: 1, value: "frame-a" },
+        { index: 1, sequence: 2, value: "frame-b" }
+      ],
+      lastClearOrder: 0,
+      nextSequence: 3
+    });
+    assert.equal(loggedFrameBudget.frameBudgetDecision.shouldYield, false);
+    assert.equal(loggedFrameBudget.taskQueueCount, 0, nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), false, nodeEnv);
+
+    const publicSchedulerEvents = [];
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        publicSchedulerEvents.push("public-scheduler-work");
+        Scheduler.log("public-scheduler-work");
+      }
+    );
+
+    const paintOutsideFlush =
+      diagnostics.requestPaintFrameBudgetForDiagnostics();
+    assert.equal(
+      paintOutsideFlush[privateSchedulerMockFrameBudgetMetadataBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      paintOutsideFlush.status,
+      "requested-paint-frame-budget-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(Object.isFrozen(paintOutsideFlush), true, nodeEnv);
+    assert.equal(paintOutsideFlush.nowBefore, 17, nodeEnv);
+    assert.equal(paintOutsideFlush.nowAfter, 17, nodeEnv);
+    assert.equal(paintOutsideFlush.pendingBefore, true, nodeEnv);
+    assert.equal(paintOutsideFlush.pendingAfter, true, nodeEnv);
+    assert.equal(paintOutsideFlush.requestedPaintBefore, false, nodeEnv);
+    assert.equal(paintOutsideFlush.requestedPaintAfter, true, nodeEnv);
+    assert.equal(paintOutsideFlush.requestPaintReturnedUndefined, true, nodeEnv);
+    assert.deepEqual(paintOutsideFlush.yieldedValuesAdded, [], nodeEnv);
+    assert.equal(
+      paintOutsideFlush.frameBudgetDecisionBefore.shouldYield,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      paintOutsideFlush.frameBudgetDecisionAfter.shouldYield,
+      false,
+      nodeEnv
+    );
+    assert.equal(paintOutsideFlush.unstableShouldYieldInvoked, false, nodeEnv);
+    assert.equal(paintOutsideFlush.unstableRequestPaintInvoked, true, nodeEnv);
+    assert.equal(paintOutsideFlush.taskQueueUnchanged, true, nodeEnv);
+    assert.equal(paintOutsideFlush.drainsMockSchedulerWork, false, nodeEnv);
+    assert.equal(paintOutsideFlush.executesScheduledCallbacks, false, nodeEnv);
+    assert.equal(
+      paintOutsideFlush.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.deepEqual(publicSchedulerEvents, [], nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    const PaintScheduler = loadFreshSchedulerMock(nodeEnv);
+    const paintDiagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      PaintScheduler,
+      "unstable_flushUntilNextPaint"
+    );
+    assertPrivateActQueueFlushDiagnostics(paintDiagnostics, nodeEnv);
+    PaintScheduler.reset();
+    const paintEvents = [];
+    const frameBudgetReports = [];
+    const paintContinuation = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        paintEvents.push([
+          "paint-continuation",
+          didTimeout,
+          PaintScheduler.unstable_now()
+        ]);
+        PaintScheduler.log("paint-continuation");
+      },
+      { label: "paint-continuation" }
+    );
+    const paintStart = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        paintEvents.push([
+          "paint-start",
+          didTimeout,
+          PaintScheduler.unstable_now()
+        ]);
+        PaintScheduler.log("paint-start");
+        frameBudgetReports.push(
+          paintDiagnostics.requestPaintFrameBudgetForDiagnostics()
+        );
+        return paintContinuation;
+      },
+      { label: "paint-start" }
+    );
+    const afterPaint = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        paintEvents.push([
+          "after-paint",
+          didTimeout,
+          PaintScheduler.unstable_now()
+        ]);
+        PaintScheduler.log("after-paint");
+      },
+      { label: "after-paint" }
+    );
+
+    PaintScheduler.unstable_scheduleCallback(
+      PaintScheduler.unstable_NormalPriority,
+      paintStart
+    );
+    PaintScheduler.unstable_scheduleCallback(
+      PaintScheduler.unstable_NormalPriority,
+      afterPaint
+    );
+    const paintFlushReport =
+      paintDiagnostics.flushUntilNextPaintForDiagnostics();
+    assert.equal(frameBudgetReports.length, 1, nodeEnv);
+    const paintDuringFlush = frameBudgetReports[0];
+    assert.equal(paintDuringFlush.requestedPaintBefore, false, nodeEnv);
+    assert.equal(paintDuringFlush.requestedPaintAfter, true, nodeEnv);
+    assert.equal(paintDuringFlush.shouldYieldForPaintBefore, true, nodeEnv);
+    assert.equal(paintDuringFlush.shouldYieldForPaintAfter, true, nodeEnv);
+    assert.equal(
+      paintDuringFlush.frameBudgetDecisionBefore.shouldYield,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      paintDuringFlush.frameBudgetDecisionAfter.shouldYield,
+      true,
+      nodeEnv
+    );
+    assert.deepEqual(paintDuringFlush.frameBudgetDecisionAfter.reasons, [
+      "requested-paint-while-flushing-until-next-paint"
+    ]);
+    assert.equal(paintDuringFlush.unstableShouldYieldInvoked, false, nodeEnv);
+    assert.equal(paintDuringFlush.taskQueueUnchanged, true, nodeEnv);
+    assert.equal(paintDuringFlush.executesScheduledCallbacks, false, nodeEnv);
+    assert.equal(
+      paintDuringFlush.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.deepEqual(paintEvents, [["paint-start", false, 0]], nodeEnv);
+    assert.equal(paintFlushReport.pendingAfter, true, nodeEnv);
+    assert.deepEqual(paintFlushReport.yieldedValuesAdded, ["paint-start"]);
+
+    PaintScheduler.unstable_flushAllWithoutAsserting();
+    assert.deepEqual(
+      paintEvents,
+      [
+        ["paint-start", false, 0],
+        ["paint-continuation", false, 0],
+        ["after-paint", false, 0]
+      ],
+      nodeEnv
+    );
+    PaintScheduler.reset();
+  }
+});
+
 test("scheduler mock oracle captures virtual time, log, and disable-yield-value behavior", () => {
   for (const mode of SCHEDULER_MOCK_PROBE_MODES) {
     const value = operationValue(mode.id, "scheduler-mock-virtual-time-and-logs");
@@ -1867,6 +2119,41 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     true,
     label
   );
+  assert.equal(
+    diagnostics.mockSchedulerFrameBudgetDiagnosticsReady,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recognizesMockSchedulerFrameBudgetMetadata,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.describesMockSchedulerFrameBudgetWithoutFlushing,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerShouldYieldDecision,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerFrameBudgetDecision,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerYieldLogOrdering,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerRequestPaintFrameBudget,
+    true,
+    label
+  );
   assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false, label);
   assert.equal(diagnostics.drainsPublicReactActQueue, false, label);
   assert.equal(
@@ -1895,6 +2182,14 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   );
   assert.equal(
     typeof diagnostics.flushUntilNextPaintForDiagnostics,
+    "function"
+  );
+  assert.equal(
+    typeof diagnostics.describeMockSchedulerFrameBudgetForDiagnostics,
+    "function"
+  );
+  assert.equal(
+    typeof diagnostics.requestPaintFrameBudgetForDiagnostics,
     "function"
   );
 }
