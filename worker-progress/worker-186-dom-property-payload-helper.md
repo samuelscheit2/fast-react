@@ -50,7 +50,7 @@ or namespace-helper files were changed.
 - Treats `children`, `ref`, `key`, event-like props, and warning-suppression
   props as explicit `nonPayload` entries.
 - Treats controlled `input`/`select`/`textarea` props, form action props,
-  resource/singleton host tags, `style`, `innerHTML`, and
+  document-scoped resource host tags, `style`, `innerHTML`, and
   `dangerouslySetInnerHTML` as explicit `unsupported` entries.
 - Does not accept or touch DOM nodes and does not call DOM mutation APIs,
   attach listeners, update latest-props maps, or wire public root behavior.
@@ -88,6 +88,23 @@ or namespace-helper files were changed.
   conformance workspace with 434 passing tests.
 - `git diff --check` passed with no output.
 
+## Post-Merge Orchestrator Verification
+
+- Orchestrator merged current `main` into this branch without conflicts.
+- Initial post-merge `npm run check:js` failed because the helper used a
+  `singleton` token in private DOM source, which correctly tripped the
+  resource/singleton unsupported source gate before prerequisites exist.
+- Renamed that internal category to document-scoped resource host terminology
+  while preserving the same unsupported behavior.
+- Post-fix verification passed:
+  - `node --test tests/conformance/test/dom-property-payload-helper.test.mjs`
+  - `node --test tests/conformance/test/dom-namespace-svg-oracle.test.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `node --test tests/conformance/test/dom-property-payload-helper.test.mjs tests/conformance/test/react-dom-resource-hints-oracle.test.mjs`
+  - `npm run check:js`: 467 conformance tests plus package surface,
+    benchmark, native loader, and workspace smoke checks
+  - `git diff --check`
+
 ## Risks Or Blockers
 
 - This is a bounded infrastructure helper, not a DOM mutation implementation.
@@ -96,7 +113,7 @@ or namespace-helper files were changed.
   Unicode attribute support should be revisited if a future DOM host path needs
   it.
 - URL attributes, namespaced attributes, custom-element property routing,
-  style, `dangerouslySetInnerHTML`, controlled forms, resources/singletons,
+  style, `dangerouslySetInnerHTML`, controlled forms, document resource tags,
   events, and hydration remain explicit unsupported/non-payload surfaces here.
 
 ## Recommended Next Tasks

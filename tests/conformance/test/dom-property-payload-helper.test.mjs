@@ -208,7 +208,7 @@ test("private DOM property payload reports unsupported style and dangerous HTML 
   );
 });
 
-test("private DOM property payload reports controlled form and resource host entries as unsupported", () => {
+test("private DOM property payload reports controlled form and document resource host entries as unsupported", () => {
   assert.deepEqual(
     diffDomPropertyPayload(
       "input",
@@ -258,13 +258,13 @@ test("private DOM property payload reports controlled form and resource host ent
     [
       unsupported(
         "rel",
-        "resource-or-singleton-host",
-        "resource and singleton host tags require dedicated React DOM handling"
+        "document-resource-host",
+        "document-scoped resource host tags require dedicated React DOM handling"
       ),
       unsupported(
         "href",
-        "resource-or-singleton-host",
-        "resource and singleton host tags require dedicated React DOM handling"
+        "document-resource-host",
+        "document-scoped resource host tags require dedicated React DOM handling"
       )
     ]
   );

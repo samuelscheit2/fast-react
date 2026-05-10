@@ -80,7 +80,7 @@ const formActionProps = new Set([
   'target'
 ]);
 
-const resourceOrSingletonTags = new Set([
+const documentScopedResourceTags = new Set([
   'base',
   'body',
   'head',
@@ -213,11 +213,11 @@ function createEntry(tag, propName, value) {
     );
   }
 
-  if (isResourceOrSingletonTag(tag)) {
+  if (isDocumentScopedResourceTag(tag)) {
     return createUnsupportedEntry(
       propName,
-      'resource-or-singleton-host',
-      'resource and singleton host tags require dedicated React DOM handling'
+      'document-resource-host',
+      'document-scoped resource host tags require dedicated React DOM handling'
     );
   }
 
@@ -381,8 +381,8 @@ function isControlledFormProp(tag, propName) {
   return controlledProps !== undefined && controlledProps.has(propName);
 }
 
-function isResourceOrSingletonTag(tag) {
-  return typeof tag === 'string' && resourceOrSingletonTags.has(tag);
+function isDocumentScopedResourceTag(tag) {
+  return typeof tag === 'string' && documentScopedResourceTags.has(tag);
 }
 
 function isEventLikeProp(propName) {
