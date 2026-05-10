@@ -13,6 +13,9 @@ const repoRoot = path.resolve(
 const domHost = require(
   path.join(repoRoot, 'packages/react-dom/src/dom-host/index.js')
 );
+const componentTree = require(
+  path.join(repoRoot, 'packages/react-dom/src/client/component-tree.js')
+);
 const propertyPayload = require(
   path.join(repoRoot, 'packages/react-dom/src/dom-host/property-payload.js')
 );
@@ -222,6 +225,71 @@ function runSmokeChecks() {
   }
 
   {
+    const rootOwner = {kind: 'LatestPropsMutationRoot'};
+    const hostOwner = {kind: 'LatestPropsMutationHost'};
+    const element = createElement('button');
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialProps = orderedProps([
+      ['title', 'old-title'],
+      ['hidden', true],
+      ['onClick', () => 'old']
+    ]);
+    const nextProps = orderedProps([
+      ['id', 'next-id'],
+      ['title', 'new-title'],
+      ['onClick', () => 'new'],
+      ['data-state', 'ready']
+    ]);
+
+    element.setAttribute('title', 'old-title');
+    element.setAttribute('hidden', '');
+    element.attributeLog = [];
+    componentTree.attachHostInstanceNode(element, token, initialProps);
+
+    const handoff = domHost.commitDomPropertyUpdateForLatestProps(
+      element,
+      'button',
+      initialProps,
+      nextProps
+    );
+    const hiddenHandoff =
+      domHost.getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+
+    assert.equal(
+      handoff.kind,
+      domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF
+    );
+    assert.equal(handoff.payloadCount, 5);
+    assert.equal(Object.hasOwn(handoff, 'node'), false);
+    assert.equal(Object.hasOwn(handoff, 'latestProps'), false);
+    assert.equal(domHost.isDomPropertyUpdateLatestPropsHandoff(handoff), true);
+    assert.deepEqual(hiddenHandoff.mutationRecords, [
+      appliedRemoveAttribute('hidden'),
+      appliedSetAttribute('id', 'next-id'),
+      appliedSetAttribute('title', 'new-title'),
+      skippedNonPayload(
+        'onClick',
+        'event',
+        'event props are stored by the future event/latest-props path'
+      ),
+      appliedSetAttribute('data-state', 'ready')
+    ]);
+    assert.deepEqual(element.attributeLog, [
+      ['removeAttribute', 'hidden', true],
+      ['setAttribute', 'id', 'next-id'],
+      ['setAttribute', 'title', 'new-title'],
+      ['setAttribute', 'data-state', 'ready']
+    ]);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(
+      componentTree.commitLatestPropsFromMutationHandoff(handoff),
+      nextProps
+    );
+    assert.equal(componentTree.getLatestPropsFromNode(element), nextProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
+  }
+
+  {
     const element = createElement('fast-widget');
     const value = {answer: 42};
 
@@ -347,10 +415,16 @@ function runSmokeChecks() {
 
   {
     const element = createElement('input');
+    const rootOwner = {kind: 'LatestPropsControlledRoot'};
+    const hostOwner = {kind: 'LatestPropsControlledHost'};
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialProps = {};
+
+    componentTree.attachHostInstanceNode(element, token, initialProps);
 
     assert.throws(
       () =>
-        domHost.commitDomPropertyUpdate(
+        domHost.commitDomPropertyUpdateForLatestProps(
           element,
           'input',
           {},
@@ -365,14 +439,22 @@ function runSmokeChecks() {
     );
     assert.deepEqual(element.attributeLog, []);
     assert.deepEqual(element.propertyLog, []);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
   }
 
   {
     const element = createElement('div');
+    const rootOwner = {kind: 'LatestPropsStyleRoot'};
+    const hostOwner = {kind: 'LatestPropsStyleHost'};
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialProps = {};
+
+    componentTree.attachHostInstanceNode(element, token, initialProps);
 
     assert.throws(
       () =>
-        domHost.commitDomPropertyUpdate(
+        domHost.commitDomPropertyUpdateForLatestProps(
           element,
           'div',
           {},
@@ -387,6 +469,36 @@ function runSmokeChecks() {
     );
     assert.deepEqual(element.attributeLog, []);
     assert.deepEqual(element.styleLog, []);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
+  }
+
+  {
+    const element = createElement('div');
+    const rootOwner = {kind: 'LatestPropsThrowingMutationRoot'};
+    const hostOwner = {kind: 'LatestPropsThrowingMutationHost'};
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialProps = {};
+    const thrownError = new Error('fake setAttribute failed');
+
+    element.setAttribute = function setAttribute() {
+      throw thrownError;
+    };
+    componentTree.attachHostInstanceNode(element, token, initialProps);
+
+    assert.throws(
+      () =>
+        domHost.commitDomPropertyUpdateForLatestProps(
+          element,
+          'div',
+          {},
+          orderedProps([['id', 'must-not-apply']])
+        ),
+      (error) => error === thrownError
+    );
+    assert.deepEqual(element.attributeLog, []);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
   }
 
   {

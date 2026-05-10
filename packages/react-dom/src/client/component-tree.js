@@ -3,6 +3,7 @@
 const {ELEMENT_NODE, TEXT_NODE} = require('./dom-container.js');
 const {getContainerRoot} = require('./root-markers.js');
 const {
+  getDomPropertyUpdateLatestPropsHandoffPayload,
   getLatestPropsCommitRecordPayload
 } = require('../dom-host/mutation.js');
 
@@ -313,6 +314,31 @@ function commitLatestPropsFromMutationRecords(records) {
   return payloads.length;
 }
 
+function commitLatestPropsFromMutationHandoff(handoff) {
+  const payload = getLatestPropsMutationHandoffPayload(handoff);
+  return commitLatestPropsFromMutationRecord(payload.latestPropsCommitRecord);
+}
+
+function commitLatestPropsFromMutationHandoffs(handoffs) {
+  const payloads = normalizeLatestPropsMutationHandoffs(handoffs);
+  const latestPropsPayloads = payloads.map((payload) =>
+    getLatestPropsCommitPayload(payload.latestPropsCommitRecord)
+  );
+
+  for (const latestPropsPayload of latestPropsPayloads) {
+    assertAttachedLatestPropsCommitPayload(latestPropsPayload);
+  }
+
+  for (const latestPropsPayload of latestPropsPayloads) {
+    updateLatestPropsForNode(
+      latestPropsPayload.node,
+      latestPropsPayload.latestProps
+    );
+  }
+
+  return latestPropsPayloads.length;
+}
+
 function normalizeLatestPropsCommitRecords(records) {
   if (!Array.isArray(records)) {
     throw createComponentTreeError(
@@ -322,6 +348,30 @@ function normalizeLatestPropsCommitRecords(records) {
   }
 
   return records.map((record) => getLatestPropsCommitPayload(record));
+}
+
+function normalizeLatestPropsMutationHandoffs(handoffs) {
+  if (!Array.isArray(handoffs)) {
+    throw createComponentTreeError(
+      'Cannot commit latest props from a non-array mutation handoff batch.',
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_MUTATION_HANDOFF_BATCH'
+    );
+  }
+
+  return handoffs.map((handoff) =>
+    getLatestPropsMutationHandoffPayload(handoff)
+  );
+}
+
+function getLatestPropsMutationHandoffPayload(handoff) {
+  const payload = getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+  if (payload === null) {
+    throw createComponentTreeError(
+      'Cannot commit latest props from an invalid mutation handoff.',
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_MUTATION_HANDOFF'
+    );
+  }
+  return payload;
 }
 
 function getLatestPropsCommitPayload(record) {
@@ -399,6 +449,8 @@ module.exports = {
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
+  commitLatestPropsFromMutationHandoff,
+  commitLatestPropsFromMutationHandoffs,
   commitLatestPropsFromMutationRecord,
   commitLatestPropsFromMutationRecords,
   createEventTargetNormalizationRecord,
