@@ -29,6 +29,27 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Follow-Ups 716-717
+
+- Worker 716 added the private-admission and package-surface ledger for the
+  accepted queue 685-714 work without product code changes. It extended the
+  conformance guard evidence for accepted private surfaces and kept public
+  package compatibility claims blocked.
+- Worker 716 was accepted after independent review and focused verification
+  with the conformance workspace, `npm run check:package-surface`, import
+  smoke, conflict-marker scanning, and `git diff --check`; its subagent,
+  worktree, and branch were removed after merge.
+- Worker 717 hardened the private HostRoot render -> finished-work -> commit
+  handoff by adding a test-only commit entrypoint that validates completed
+  HostRoot renders, records root finished-work metadata, and commits through the
+  existing guarded handoff. Public root rendering, `act`, `flushSync`, host
+  mutation compatibility, refs/effects execution, and hydration remain blocked.
+- Worker 717 was accepted after independent review and verification with
+  focused `root_work_loop` and `root_commit` tests, workspace formatting,
+  clippy with `-D warnings`, full reconciler tests, full `npm run check`,
+  conflict-marker scanning, and `git diff --check`; its subagent, worktree, and
+  branch were removed after merge.
+
 ### Maintenance 715
 
 - Worker 715 restored the Rust 1.95.0 / clippy 0.1.95 workspace gate after the
