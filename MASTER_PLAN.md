@@ -46,6 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 443-472 is assigned in isolated worktrees.
+Worker 448 has been accepted, leaving 29 active top-level workers from this
+queue.
 
 | Worker | Focus |
 | --- | --- |
@@ -54,7 +56,6 @@ Top-level cap: 30 workers. Queue 443-472 is assigned in isolated worktrees.
 | 445 | Root error option callback records |
 | 446 | Context change propagation lane gate |
 | 447 | Function component `useCallback` private path |
-| 448 | Function component layout-effect metadata |
 | 449 | Passive effect scheduler flush gate |
 | 450 | Sync flush error recovery diagnostics |
 | 451 | Root callback invocation execution gate |
