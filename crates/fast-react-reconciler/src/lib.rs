@@ -20,6 +20,7 @@ mod root_work_loop;
 mod scheduler_bridge;
 #[cfg(test)]
 mod test_support;
+mod unsupported_features;
 mod update_priority;
 mod update_queue;
 mod work_in_progress;
