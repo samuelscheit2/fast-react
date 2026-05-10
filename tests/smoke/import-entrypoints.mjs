@@ -181,6 +181,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/component-class.js',
   '@fast-react/react/context-object.js',
   '@fast-react/react/element-factory.js',
+  '@fast-react/react/hook-dispatcher.js',
   '@fast-react/react/ref-object.js',
   '@fast-react/react/wrapper-object.js',
   '@fast-react/react/placeholder-utils.js'
@@ -705,6 +706,24 @@ function assertUnimplemented(callback, label) {
       assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
       assert.equal(error.compatibilityTarget, 'react@19.2.6', label);
       assert.match(error.message, /no React behavior implementation yet/, label);
+      return true;
+    },
+    label
+  );
+}
+
+function assertInvalidHookCall(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, 'Error', label);
+      assert.equal(error.code, 'FAST_REACT_INVALID_HOOK_CALL', label);
+      assert.match(error.message, /Invalid hook call/u, label);
+      assert.match(
+        error.message,
+        /Hooks can only be called inside of the body of a function component/u,
+        label
+      );
       return true;
     },
     label
@@ -2132,7 +2151,7 @@ function assertReactPlaceholderBehavior(react, label, options = {}) {
   }
 
   if (Object.hasOwn(react, 'useRef')) {
-    assertUnimplemented(() => react.useRef(null), `${label}.useRef`);
+    assertInvalidHookCall(() => react.useRef(null), `${label}.useRef`);
   }
 
   const privateInternals =
