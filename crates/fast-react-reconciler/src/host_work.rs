@@ -17,7 +17,9 @@ use fast_react_host_config::{
     HostFiberTokenTarget, HostIdentityAndContext, InitialChildrenFinalization, MutationHost,
 };
 
-use crate::host_nodes::{HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError};
+use crate::host_nodes::{
+    HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError, HostNodeViolation,
+};
 use crate::root_commit::{HostRootMutationApplyRecord, HostRootMutationApplyRecordKind};
 use crate::test_support::{
     FakeHostFiberToken, FakeInstance, FakeTextInstance, RecordingHost, TestHostElement,
@@ -346,6 +348,59 @@ impl DetachedHostRecords {
         Ok(lookup_scope)
     }
 
+    fn validated_scope_for_apply_fiber(
+        &self,
+        store: &FiberRootStore<RecordingHost>,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+        target: HostFiberTokenTarget,
+    ) -> Result<HostNodeScope, HostWorkError> {
+        let stored_scope = self.scope(handle, target)?;
+        let lookup_scope = HostNodeScope::new(
+            root_id,
+            stored_scope.fiber_id(),
+            stored_scope.token_id(),
+            stored_scope.phase(),
+        );
+
+        match target {
+            HostFiberTokenTarget::Instance => {
+                self.nodes.instance_metadata(handle, lookup_scope)?;
+            }
+            HostFiberTokenTarget::TextInstance => {
+                self.nodes.text_metadata(handle, lookup_scope)?;
+            }
+            _ => return Err(Self::invalid_handle(handle, target)),
+        }
+
+        let owner = stored_scope.fiber_id();
+        if owner != fiber_id {
+            let requested_node = store.fiber_arena().get(fiber_id)?;
+            let owner_node = store.fiber_arena().get(owner)?;
+            let owner_matches_requested_alternate = requested_node.alternate() == Some(owner)
+                || owner_node.alternate() == Some(fiber_id);
+            if !owner_matches_requested_alternate {
+                return Err(HostNodeValidationError::new(
+                    handle,
+                    stored_scope.phase(),
+                    target,
+                    HostNodeViolation::WrongFiber,
+                )
+                .into());
+            }
+        }
+
+        store.host_tokens().validate(
+            lookup_scope.token_id(),
+            lookup_scope.root_id(),
+            lookup_scope.fiber_id(),
+            lookup_scope.phase(),
+            target,
+        )?;
+        Ok(lookup_scope)
+    }
+
     fn scope(
         &self,
         handle: StateNodeHandle,
@@ -538,6 +593,7 @@ impl HostTextUpdateDiff {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TestHostRootMutationHostCall {
     AppendChildToContainer,
+    RemoveChild,
     RemoveChildFromContainer,
     CommitUpdate,
     CommitTextUpdate,
@@ -663,8 +719,10 @@ fn apply_test_host_root_mutation_record(
         HostRootMutationApplyRecordKind::CommitHostTextUpdate => {
             apply_test_host_text_update_record(store, host, mutation, detached_hosts)
         }
-        HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
-        | HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber => {
+        HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent => {
+            apply_test_host_parent_deletion_record(store, host, mutation, detached_hosts)
+        }
+        HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber => {
             Ok(TestHostRootMutationApplyStatus::RecordedOnly)
         }
     }
@@ -738,6 +796,96 @@ fn apply_test_host_text_update_record(
     Ok(TestHostRootMutationApplyStatus::Applied(
         TestHostRootMutationHostCall::CommitTextUpdate,
     ))
+}
+
+fn apply_test_host_parent_deletion_record(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    mutation: HostRootMutationApplyRecord,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<TestHostRootMutationApplyStatus, HostWorkError> {
+    if mutation.parent_tag() != FiberTag::HostComponent
+        || mutation.parent_state_node().is_none()
+        || mutation.state_node().is_none()
+    {
+        return Ok(TestHostRootMutationApplyStatus::RecordedOnly);
+    }
+
+    let child = owned_detached_host_child_for_apply_record(store, detached_hosts, mutation)?;
+    let parent_scope = detached_hosts.validated_scope_for_apply_fiber(
+        store,
+        mutation.parent_state_node(),
+        mutation.root(),
+        mutation.parent(),
+        HostFiberTokenTarget::Instance,
+    )?;
+    let parent = detached_hosts
+        .nodes
+        .instance_mut(mutation.parent_state_node(), parent_scope)?;
+    host.remove_child(parent, child.as_host_child())?;
+
+    Ok(TestHostRootMutationApplyStatus::Applied(
+        TestHostRootMutationHostCall::RemoveChild,
+    ))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum OwnedDetachedHostChild {
+    Instance(FakeInstance),
+    Text(FakeTextInstance),
+}
+
+impl OwnedDetachedHostChild {
+    fn as_host_child(&self) -> HostChild<'_, RecordingHost> {
+        match self {
+            Self::Instance(instance) => HostChild::Instance(instance),
+            Self::Text(text) => HostChild::Text(text),
+        }
+    }
+}
+
+fn owned_detached_host_child_for_apply_record(
+    store: &FiberRootStore<RecordingHost>,
+    detached_hosts: &DetachedHostRecords,
+    mutation: HostRootMutationApplyRecord,
+) -> Result<OwnedDetachedHostChild, HostWorkError> {
+    match mutation.tag() {
+        FiberTag::HostComponent => {
+            let scope = detached_hosts.validated_scope_for_apply_fiber(
+                store,
+                mutation.state_node(),
+                mutation.root(),
+                mutation.fiber(),
+                HostFiberTokenTarget::Instance,
+            )?;
+            Ok(OwnedDetachedHostChild::Instance(
+                detached_hosts
+                    .nodes
+                    .instance(mutation.state_node(), scope)?
+                    .clone(),
+            ))
+        }
+        FiberTag::HostText => {
+            let scope = detached_hosts.validated_scope_for_apply_fiber(
+                store,
+                mutation.state_node(),
+                mutation.root(),
+                mutation.fiber(),
+                HostFiberTokenTarget::TextInstance,
+            )?;
+            Ok(OwnedDetachedHostChild::Text(
+                detached_hosts
+                    .nodes
+                    .text(mutation.state_node(), scope)?
+                    .clone(),
+            ))
+        }
+        actual => Err(HostWorkError::ExpectedFiberTag {
+            fiber: mutation.fiber(),
+            expected: FiberTag::HostComponent,
+            actual,
+        }),
+    }
 }
 
 fn detached_host_child_for_apply_record<'a>(
@@ -1562,6 +1710,137 @@ mod tests {
         work_in_progress
     }
 
+    fn attach_detached_root_element_with_text_for_commit(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        detached_hosts: &mut DetachedHostRecords,
+        root_id: FiberRootId,
+        host_root: FiberId,
+        text: &str,
+    ) -> (FiberId, FiberId) {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let component = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9010),
+            mode,
+        );
+        let text_fiber = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9011),
+            mode,
+        );
+
+        let text_scope = issue_creation_host_node_scope(
+            store,
+            root_id,
+            text_fiber,
+            HostFiberTokenTarget::TextInstance,
+        )
+        .unwrap();
+        let text_token = FakeHostFiberToken(text_scope.token_id().raw());
+        let container = *store.root(root_id).unwrap().container_info();
+        let text_instance = host
+            .create_text_instance(
+                HostFiberTokenRef::new(
+                    &text_token,
+                    HostFiberTokenPhase::Creation,
+                    HostFiberTokenTarget::TextInstance,
+                ),
+                text,
+                &container,
+                &(),
+            )
+            .unwrap();
+        let text_state_node = detached_hosts.insert_text(text_scope, text_instance);
+        complete_fiber_common(
+            store,
+            text_fiber,
+            PropsHandle::from_raw(9011),
+            text_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+
+        let component_scope = issue_creation_host_node_scope(
+            store,
+            root_id,
+            component,
+            HostFiberTokenTarget::Instance,
+        )
+        .unwrap();
+        let component_token = FakeHostFiberToken(component_scope.token_id().raw());
+        let mut instance = host
+            .create_instance(
+                HostFiberTokenRef::new(
+                    &component_token,
+                    HostFiberTokenPhase::Creation,
+                    HostFiberTokenTarget::Instance,
+                ),
+                &"div",
+                &(),
+                &container,
+                &(),
+            )
+            .unwrap();
+        detached_hosts
+            .append_initial_child(
+                store.host_tokens(),
+                host,
+                &mut instance,
+                root_id,
+                store.fiber_arena().get(text_fiber).unwrap(),
+            )
+            .unwrap();
+        let component_state_node = detached_hosts.insert_instance(component_scope, instance);
+        store
+            .fiber_arena_mut()
+            .set_children(component, &[text_fiber])
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(component).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+        }
+        complete_fiber_common(
+            store,
+            component,
+            PropsHandle::from_raw(9010),
+            component_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[component])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        (component, text_fiber)
+    }
+
+    fn delete_host_text_under_host_parent_for_commit(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+        current_parent: FiberId,
+        current_text: FiberId,
+    ) -> FiberId {
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, PropsHandle::from_raw(9020))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(work_parent, current_text)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_parent])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        work_parent
+    }
+
     #[test]
     fn host_work_mounts_one_host_element_with_text_under_host_root_wip() {
         let (mut store, root_id) = root_store();
@@ -2149,11 +2428,150 @@ mod tests {
     }
 
     #[test]
-    fn host_work_leaves_root_text_update_apply_record_recorded_only() {
+    fn host_work_applies_host_parent_text_deletion_record_without_cleanup() {
         let (mut store, root_id) = root_store();
         let mut host = RecordingHost::default();
         let mut detached_hosts = DetachedHostRecords::default();
         let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(73));
+        let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "nested",
+        );
+        let parent_state_node = store
+            .fiber_arena()
+            .get(current_parent)
+            .unwrap()
+            .state_node();
+        let text_state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(74), None).unwrap();
+        let delete_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = delete_host_text_under_host_parent_for_commit(
+            &mut store,
+            delete_render.finished_work(),
+            current_parent,
+            current_text,
+        );
+        let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+        let apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(apply.records().len(), 1);
+        assert_eq!(apply.records()[0].mutation().parent(), work_parent);
+        assert_eq!(
+            apply.records()[0].mutation().parent_state_node(),
+            parent_state_node
+        );
+        assert_eq!(apply.records()[0].mutation().fiber(), current_text);
+        assert_eq!(apply.records()[0].mutation().state_node(), text_state_node);
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        );
+        assert_eq!(apply.applied_host_call_count(), 1);
+        assert_eq!(
+            detached_hosts.text(text_state_node).unwrap().text(),
+            "nested"
+        );
+        assert!(
+            detached_hosts
+                .instance(parent_state_node)
+                .unwrap()
+                .children()
+                .contains(&FakeHostChild::Text(
+                    detached_hosts.text(text_state_node).unwrap().id()
+                ))
+        );
+        assert!(
+            host.operations()
+                .ends_with(&["append_child_to_container", "remove_child"])
+        );
+    }
+
+    #[test]
+    fn host_work_leaves_host_parent_deletion_recorded_only_without_host_handles() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(75));
+        let mode = store
+            .fiber_arena()
+            .get(render.finished_work())
+            .unwrap()
+            .mode();
+        let parent = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9030),
+            mode,
+        );
+        let deleted = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9031),
+            mode,
+        );
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(parent, deleted)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[parent])
+            .unwrap();
+        complete_host_root(&mut store, render.finished_work()).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let operations_before_apply = host.operations();
+        let apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(apply.records().len(), 1);
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::RecordedOnly
+        );
+        assert_eq!(apply.applied_host_call_count(), 0);
+        assert_eq!(host.operations(), operations_before_apply);
+    }
+
+    #[test]
+    fn host_work_leaves_root_text_update_apply_record_recorded_only() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(76));
         let current_text = attach_detached_root_text_for_commit(
             &mut store,
             &mut host,
@@ -2172,7 +2590,7 @@ mod tests {
         )
         .unwrap();
 
-        update_container(&mut store, root_id, RootElementHandle::from_raw(74), None).unwrap();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(77), None).unwrap();
         let update_render =
             render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
         let updated_text = update_root_text_for_commit_without_payload(
