@@ -140,6 +140,17 @@ export const ELEMENT_OBJECT_SCENARIOS = [
     ]
   },
   {
+    id: "clone-key-ref-warning-access",
+    area: "cloneElement",
+    entrypoints: ["react"],
+    captures: [
+      "dev clone props.key warning getter absence",
+      "dev clone element.ref deprecation getter",
+      "getter name",
+      "console error arguments"
+    ]
+  },
+  {
     id: "jsx-no-key-reuses-config",
     area: "jsx",
     entrypoints: ["react/jsx-runtime"],
@@ -177,6 +188,18 @@ export const ELEMENT_OBJECT_SCENARIOS = [
     captures: ["dev key-spread console error", "key still honored"]
   },
   {
+    id: "jsx-key-ref-warning-access",
+    area: "jsx",
+    entrypoints: ["react/jsx-runtime"],
+    captures: [
+      "dev props.key warning getter",
+      "dev element.ref deprecation getter",
+      "getter name",
+      "isReactWarning marker",
+      "console error arguments"
+    ]
+  },
+  {
     id: "jsxs-static-children-array",
     area: "jsxs",
     entrypoints: ["react/jsx-runtime"],
@@ -193,6 +216,18 @@ export const ELEMENT_OBJECT_SCENARIOS = [
     captures: ["development static children non-array warning"]
   },
   {
+    id: "jsxs-key-ref-warning-access",
+    area: "jsxs",
+    entrypoints: ["react/jsx-runtime"],
+    captures: [
+      "dev props.key warning getter",
+      "dev element.ref deprecation getter",
+      "getter name",
+      "isReactWarning marker",
+      "console error arguments"
+    ]
+  },
+  {
     id: "jsxdev-basic",
     area: "jsxDEV",
     entrypoints: ["react/jsx-dev-runtime"],
@@ -207,6 +242,19 @@ export const ELEMENT_OBJECT_SCENARIOS = [
     area: "jsxDEV",
     entrypoints: ["react/jsx-dev-runtime"],
     captures: ["development static children non-array warning"]
+  },
+  {
+    id: "jsxdev-key-ref-warning-access",
+    area: "jsxDEV",
+    entrypoints: ["react/jsx-dev-runtime"],
+    captures: [
+      "dev props.key warning getter",
+      "dev element.ref deprecation getter",
+      "getter name",
+      "isReactWarning marker",
+      "console error arguments",
+      "production undefined export behavior"
+    ]
   }
 ];
 

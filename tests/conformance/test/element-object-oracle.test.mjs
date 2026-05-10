@@ -151,10 +151,9 @@ test("React oracle captures key/ref warning getters and raw console calls", () =
     "create-key-warning-access"
   ).result;
   const keyValue = unwrapNestedOperation(keyProbe.result.value);
-  const keyDescriptor = descriptorFor(keyValue.before.props.descriptors, "key");
-  assert.equal(keyDescriptor.kind, "accessor");
-  assert.equal(keyDescriptor.get.name, "warnAboutAccessingKey");
-  assert.equal(keyDescriptor.get.isReactWarning, true);
+  assertKeyWarningGetter(keyValue.before.props.descriptors);
+  assertUndefinedAccess(keyValue.keyAccess);
+  assert.equal(keyProbe.consoleCalls.length, 1);
   assert.equal(keyProbe.consoleCalls[0].method, "error");
   assert.match(keyProbe.consoleCalls[0].args[0].value, /`key` is not a prop/u);
 
@@ -163,13 +162,64 @@ test("React oracle captures key/ref warning getters and raw console calls", () =
     "create-ref-warning-access"
   ).result;
   const refValue = unwrapNestedOperation(refProbe.result.value);
-  assert.equal(refValue.before.refDescriptor.kind, "accessor");
-  assert.equal(
-    refValue.before.refDescriptor.get.name,
-    "elementRefGetterWithDeprecationWarning"
-  );
+  assertRefWarningGetter(refValue.before.refDescriptor);
+  assertFunctionAccess(refValue.refAccess, "refFn");
+  assert.equal(refProbe.consoleCalls.length, 1);
   assert.equal(refProbe.consoleCalls[0].method, "error");
   assert.match(refProbe.consoleCalls[0].args[0].value, /element\.ref/u);
+
+  const cloneProbe = reactObservation(
+    "default-node-development",
+    "clone-key-ref-warning-access"
+  ).result;
+  const cloneValue = unwrapNestedOperation(cloneProbe.result.value);
+  assert.equal(maybeDescriptorFor(cloneValue.before.props.descriptors, "key"), null);
+  assertUndefinedAccess(cloneValue.keyAccess);
+  assertRefWarningGetter(cloneValue.before.refDescriptor);
+  assertFunctionAccess(cloneValue.refAccess, "cloneRef");
+  assert.equal(cloneProbe.consoleCalls.length, 1);
+  assert.equal(cloneProbe.consoleCalls[0].method, "error");
+  assert.match(cloneProbe.consoleCalls[0].args[0].value, /element\.ref/u);
+
+  for (const [scenarioId, refName] of [
+    ["jsx-key-ref-warning-access", "jsxRef"],
+    ["jsxs-key-ref-warning-access", "jsxsRef"],
+    ["jsxdev-key-ref-warning-access", "jsxDEVRef"]
+  ]) {
+    const probe = reactObservation("default-node-development", scenarioId).result;
+    const value = unwrapNestedOperation(probe.result.value);
+    assertKeyWarningGetter(value.before.props.descriptors);
+    assertUndefinedAccess(value.keyAccess);
+    assertRefWarningGetter(value.before.refDescriptor);
+    assertFunctionAccess(value.refAccess, refName);
+    assert.equal(value.propsIsConfig, true, scenarioId);
+    assert.equal(probe.consoleCalls.length, 2, scenarioId);
+    assert.equal(probe.consoleCalls[0].method, "error", scenarioId);
+    assert.match(probe.consoleCalls[0].args[0].value, /`key` is not a prop/u);
+    assert.equal(probe.consoleCalls[1].method, "error", scenarioId);
+    assert.match(probe.consoleCalls[1].args[0].value, /element\.ref/u);
+  }
+
+  for (const scenarioId of [
+    "create-key-warning-access",
+    "create-ref-warning-access",
+    "clone-key-ref-warning-access",
+    "jsx-key-ref-warning-access",
+    "jsxs-key-ref-warning-access",
+    "jsxdev-key-ref-warning-access"
+  ]) {
+    const comparison = fastReactComparison(
+      "default-node-development",
+      scenarioId
+    );
+    assert.equal(
+      comparison.status,
+      "unexpected-match-compatibility-not-claimed",
+      scenarioId
+    );
+    assert.equal(comparison.compatibilityClaimed, false, scenarioId);
+    assert.equal(comparison.firstDifferencePath, null, scenarioId);
+  }
 });
 
 test("React oracle captures JSX runtime identity, child-array, and jsxDEV condition behavior", () => {
@@ -205,6 +255,16 @@ test("React oracle captures JSX runtime identity, child-array, and jsxDEV condit
   );
   assert.deepEqual(productionJsxDev.jsxDEV, { type: "undefined" });
   assert.equal(productionJsxDev.callSkippedBecauseNotFunction, true);
+
+  const productionJsxDevWarningAccess = operationValue(
+    "default-node-production",
+    "jsxdev-key-ref-warning-access"
+  );
+  assert.deepEqual(productionJsxDevWarningAccess.jsxDEV, { type: "undefined" });
+  assert.equal(
+    productionJsxDevWarningAccess.callSkippedBecauseNotFunction,
+    true
+  );
 
   const reactServerExports = operationValue(
     "react-server-production",
@@ -283,7 +343,7 @@ test("Fast React comparison status counts stay focused on matched element behavi
   );
   assert.deepEqual(totalCounts, {
     "known-mismatch": 6,
-    "unexpected-match-compatibility-not-claimed": 82,
+    "unexpected-match-compatibility-not-claimed": 98,
     "unsupported-placeholder": 0
   });
 
@@ -296,12 +356,12 @@ test("Fast React comparison status counts stay focused on matched element behavi
       mode.nodeEnv === "development"
         ? {
             "known-mismatch": 2,
-            "unexpected-match-compatibility-not-claimed": 20,
+            "unexpected-match-compatibility-not-claimed": 24,
             "unsupported-placeholder": 0
           }
         : {
             "known-mismatch": 1,
-            "unexpected-match-compatibility-not-claimed": 21,
+            "unexpected-match-compatibility-not-claimed": 25,
             "unsupported-placeholder": 0
           },
       mode.id
@@ -392,12 +452,46 @@ function keyValues(keys) {
 }
 
 function descriptorFor(descriptors, key) {
-  const descriptor = descriptors.find(
-    (candidate) =>
-      candidate.key.type === "string" && candidate.key.value === key
-  );
+  const descriptor = maybeDescriptorFor(descriptors, key);
   assert.ok(descriptor, `missing descriptor ${key}`);
   return descriptor;
+}
+
+function maybeDescriptorFor(descriptors, key) {
+  return descriptors.find(
+    (candidate) =>
+      candidate.key.type === "string" && candidate.key.value === key
+  ) ?? null;
+}
+
+function assertKeyWarningGetter(descriptors) {
+  const keyDescriptor = descriptorFor(descriptors, "key");
+  assert.equal(keyDescriptor.kind, "accessor");
+  assert.equal(keyDescriptor.get.name, "warnAboutAccessingKey");
+  assert.equal(keyDescriptor.get.isReactWarning, true);
+}
+
+function assertRefWarningGetter(refDescriptor) {
+  assert.equal(refDescriptor.kind, "accessor");
+  assert.equal(
+    refDescriptor.get.name,
+    "elementRefGetterWithDeprecationWarning"
+  );
+}
+
+function assertUndefinedAccess(operation) {
+  assert.equal(operation.status, "ok");
+  assert.deepEqual(operation.value, { type: "undefined" });
+}
+
+function assertFunctionAccess(operation, name) {
+  assert.equal(operation.status, "ok");
+  assert.deepEqual(operation.value, {
+    type: "function",
+    name,
+    length: 0,
+    isReactWarning: false
+  });
 }
 
 function countFastReactComparisonStatuses(comparisons) {
