@@ -156,6 +156,88 @@ const transitionHookPublicShapeBlockers = freezeRecordArray([
       'public export remains a createUnimplementedFunction placeholder until transition scheduling is admitted'
   }
 ]);
+const transitionStartTransitionPublicRoutingBlockerFields = freezeArray([
+  'apiName',
+  'currentPublicExport',
+  'blocker'
+]);
+const transitionStartTransitionPublicRoutingBlocker = freezeRecord({
+  apiName: 'startTransition',
+  currentPublicExport: 'react.startTransition facade',
+  blocker:
+    'public startTransition does not route through the hook dispatcher, request transition lanes, or schedule root work until transition execution is admitted'
+});
+const transitionActionIdentityFieldNames = freezeArray([
+  'action',
+  'actionName',
+  'actionLength'
+]);
+const transitionLaneMetadataFieldNames = freezeArray([
+  'laneChoiceRecord',
+  'laneChoiceSourcePriority',
+  'transitionUpdateLaneClaim',
+  'transitionDeferredLaneClaim',
+  'scheduleUpdateRecord',
+  'entanglementRecord',
+  'pendingLanesBeforeEnqueueField',
+  'pendingLanesAfterEnqueueField',
+  'selectedNextLanesField'
+]);
+const transitionLaneMetadata = freezeRecord({
+  laneChoiceRecord: 'RootUpdateLaneChoiceRecord',
+  laneChoiceSourcePriority: 'RootUpdateLaneSourcePriority::TransitionLane',
+  transitionUpdateLaneClaim:
+    'LaneClaimers.claim_next_transition_update_lane',
+  transitionDeferredLaneClaim:
+    'LaneClaimers.claim_next_transition_deferred_lane',
+  scheduleUpdateRecord: 'RootScheduleUpdateRecord',
+  entanglementRecord: 'RootTransitionEntanglementRecord',
+  pendingLanesBeforeEnqueueField:
+    'UpdateContainerResult.pending_lanes_before_enqueue',
+  pendingLanesAfterEnqueueField:
+    'UpdateContainerResult.pending_lanes_after_enqueue',
+  selectedNextLanesField: 'UpdateContainerResult.selected_next_lanes'
+});
+const transitionPendingStateTupleFieldNames = freezeArray([
+  'tupleKind',
+  'tupleLength',
+  'pendingStateSlot',
+  'startTransitionSlot',
+  'initialPendingState',
+  'optimisticPendingState',
+  'finishedPendingState'
+]);
+const transitionPendingStateTupleShape = freezeRecord({
+  tupleKind: 'useTransition',
+  tupleLength: 2,
+  pendingStateSlot: 'isPending',
+  startTransitionSlot: 'startTransition',
+  initialPendingState: false,
+  optimisticPendingState: true,
+  finishedPendingState: false
+});
+const startTransitionRoutingRecordFieldNames = freezeArray([
+  'dispatcher',
+  'action',
+  'actionName',
+  'actionLength',
+  'metadata',
+  'laneMetadata',
+  'pendingStateTupleShape',
+  'schedulerExecutionBlocked',
+  'rootSchedulingBlocked',
+  'rootExecutionBlocked',
+  'callbackExecutionBlocked',
+  'publicStartTransitionDispatcherRouting',
+  'compatibilityClaimed'
+]);
+const transitionAcceptedReconcilerRecords = freezeArray([
+  'RootUpdateLaneChoiceRecord',
+  'RootUpdateLaneSourcePriority',
+  'RootScheduleUpdateRecord',
+  'RootTransitionEntanglementRecord',
+  'UpdateContainerResult'
+]);
 const transitionHookMissingSchedulerPrerequisites = freezeArray([
   'getCurrentUpdatePriority',
   'setCurrentUpdatePriority',
@@ -177,9 +259,14 @@ const transitionHookMissingRootLanePrerequisites = freezeArray([
 const transitionHookCompatibilityFalseFlags = freezeArray([
   'compatibilityClaimed',
   'exposesPublicHookImplementation',
+  'publicStartTransitionDispatcherRouting',
+  'publicUseTransitionImplementation',
   'rendererIntegration',
   'schedulerIntegration',
   'rootLaneIntegration',
+  'schedulerExecution',
+  'rootScheduling',
+  'rootExecution',
   'schedulesTransitionUpdates',
   'schedulesDeferredValueUpdates',
   'executesTransitionCallbacks',
@@ -303,9 +390,14 @@ const privateTransitionHookDispatcherMetadata = freezeRecord({
   compatibilityTarget: 'react@19.2.6',
   compatibilityClaimed: false,
   exposesPublicHookImplementation: false,
+  publicStartTransitionDispatcherRouting: false,
+  publicUseTransitionImplementation: false,
   rendererIntegration: false,
   schedulerIntegration: false,
   rootLaneIntegration: false,
+  schedulerExecution: false,
+  rootScheduling: false,
+  rootExecution: false,
   schedulesTransitionUpdates: false,
   schedulesDeferredValueUpdates: false,
   executesTransitionCallbacks: false,
@@ -314,17 +406,34 @@ const privateTransitionHookDispatcherMetadata = freezeRecord({
   hookNames: transitionHookNames,
   publicShapeBlockerFields: transitionHookPublicShapeBlockerFields,
   publicShapeBlockers: transitionHookPublicShapeBlockers,
+  startTransitionPublicRoutingBlockerFields:
+    transitionStartTransitionPublicRoutingBlockerFields,
+  startTransitionPublicRoutingBlocker:
+    transitionStartTransitionPublicRoutingBlocker,
+  transitionActionIdentityFieldNames,
+  transitionLaneMetadataFieldNames,
+  transitionLaneMetadata,
+  transitionPendingStateTupleFieldNames,
+  transitionPendingStateTupleShape,
+  startTransitionRoutingRecordFieldNames,
   missingSchedulerPrerequisites: transitionHookMissingSchedulerPrerequisites,
   missingRootLanePrerequisites: transitionHookMissingRootLanePrerequisites,
-  compatibilityFalseFlags: transitionHookCompatibilityFalseFlags
+  compatibilityFalseFlags: transitionHookCompatibilityFalseFlags,
+  acceptedReconcilerRecords: transitionAcceptedReconcilerRecords
 });
 
 const privateTransitionHookDispatcherMetadataArrayKeys = freezeArray([
   'hookNames',
   'publicShapeBlockerFields',
+  'startTransitionPublicRoutingBlockerFields',
+  'transitionActionIdentityFieldNames',
+  'transitionLaneMetadataFieldNames',
+  'transitionPendingStateTupleFieldNames',
+  'startTransitionRoutingRecordFieldNames',
   'missingSchedulerPrerequisites',
   'missingRootLanePrerequisites',
-  'compatibilityFalseFlags'
+  'compatibilityFalseFlags',
+  'acceptedReconcilerRecords'
 ]);
 
 const privateStateHookDispatcherMetadata = freezeRecord({
@@ -637,6 +746,16 @@ function createMissingPrivateStateHookDispatcherError(hookName) {
     'was called',
     'Stateful hooks require a private/native hook dispatcher before they can execute.'
   );
+}
+
+function createUnsupportedPrivateTransitionCallbackError() {
+  const error = new TypeError(
+    'Private startTransition dispatcher routing requires a callback function.'
+  );
+  error.code = 'FAST_REACT_UNSUPPORTED_TRANSITION_CALLBACK';
+  error.hookName = 'useTransition';
+  error.apiName = 'startTransition';
+  return error;
 }
 
 function createEffectHookMetadata({
@@ -1035,6 +1154,37 @@ function callPrivateStateDispatcherHook(hookName, args) {
   return hook.apply(dispatcher, args);
 }
 
+function recordPrivateStartTransitionDispatcherRouting(callback, metadata) {
+  const dispatcher = resolveDispatcher('useTransition');
+
+  if (!isPrivateTransitionHookDispatcher(dispatcher)) {
+    throw createInvalidHookCallError('useTransition');
+  }
+
+  validatePrivateTransitionHookDispatcherMetadata(metadata);
+
+  if (typeof callback !== 'function') {
+    throw createUnsupportedPrivateTransitionCallbackError();
+  }
+
+  return freezeRecord({
+    dispatcher,
+    action: callback,
+    actionName: callback.name,
+    actionLength: callback.length,
+    metadata,
+    laneMetadata: privateTransitionHookDispatcherMetadata.transitionLaneMetadata,
+    pendingStateTupleShape:
+      privateTransitionHookDispatcherMetadata.transitionPendingStateTupleShape,
+    schedulerExecutionBlocked: true,
+    rootSchedulingBlocked: true,
+    rootExecutionBlocked: true,
+    callbackExecutionBlocked: true,
+    publicStartTransitionDispatcherRouting: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPrivateEffectHookArgs(args, metadata) {
   const privateArgs = Array.prototype.slice.call(args);
   privateArgs.push(metadata);
@@ -1270,9 +1420,26 @@ function isPrivateTransitionHookDispatcherMetadata(metadata) {
     }
   }
 
-  return hasSamePublicShapeBlockers(
-    metadata.publicShapeBlockers,
-    privateTransitionHookDispatcherMetadata.publicShapeBlockers
+  return (
+    hasSamePublicShapeBlockers(
+      metadata.publicShapeBlockers,
+      privateTransitionHookDispatcherMetadata.publicShapeBlockers
+    ) &&
+    hasSameRecordFields(
+      metadata.startTransitionPublicRoutingBlocker,
+      privateTransitionHookDispatcherMetadata.startTransitionPublicRoutingBlocker,
+      transitionStartTransitionPublicRoutingBlockerFields
+    ) &&
+    hasSameRecordFields(
+      metadata.transitionLaneMetadata,
+      privateTransitionHookDispatcherMetadata.transitionLaneMetadata,
+      transitionLaneMetadataFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.transitionPendingStateTupleShape,
+      privateTransitionHookDispatcherMetadata.transitionPendingStateTupleShape,
+      transitionPendingStateTupleFieldNames
+    )
   );
 }
 
@@ -1343,6 +1510,20 @@ function hasSamePublicShapeBlockers(actual, expected) {
       if (actualRecord[fieldName] !== expectedRecord[fieldName]) {
         return false;
       }
+    }
+  }
+
+  return true;
+}
+
+function hasSameRecordFields(actual, expected, fieldNames) {
+  if (!isObjectLike(actual)) {
+    return false;
+  }
+
+  for (const fieldName of fieldNames) {
+    if (actual[fieldName] !== expected[fieldName]) {
+      return false;
     }
   }
 
@@ -1431,6 +1612,7 @@ module.exports = {
   callPrivateStateDispatcherHook,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
+  createUnsupportedPrivateTransitionCallbackError,
   effectHookMetadataByHookName,
   effectHookNames,
   getEffectHookMetadata,
@@ -1466,6 +1648,7 @@ module.exports = {
   privateMemoHookDispatcherMetadata,
   privateStateHookDispatcherMetadata,
   privateTransitionHookDispatcherMetadata,
+  recordPrivateStartTransitionDispatcherRouting,
   resolveDispatcher,
   transitionHookNames,
   use,

@@ -44,6 +44,80 @@ const expectedPublicShapeBlockers = [
       "public export remains a createUnimplementedFunction placeholder until transition scheduling is admitted"
   }
 ];
+const expectedStartTransitionPublicRoutingBlockerFields = [
+  "apiName",
+  "currentPublicExport",
+  "blocker"
+];
+const expectedStartTransitionPublicRoutingBlocker = {
+  apiName: "startTransition",
+  currentPublicExport: "react.startTransition facade",
+  blocker:
+    "public startTransition does not route through the hook dispatcher, request transition lanes, or schedule root work until transition execution is admitted"
+};
+const expectedTransitionActionIdentityFieldNames = [
+  "action",
+  "actionName",
+  "actionLength"
+];
+const expectedTransitionLaneMetadataFieldNames = [
+  "laneChoiceRecord",
+  "laneChoiceSourcePriority",
+  "transitionUpdateLaneClaim",
+  "transitionDeferredLaneClaim",
+  "scheduleUpdateRecord",
+  "entanglementRecord",
+  "pendingLanesBeforeEnqueueField",
+  "pendingLanesAfterEnqueueField",
+  "selectedNextLanesField"
+];
+const expectedTransitionLaneMetadata = {
+  laneChoiceRecord: "RootUpdateLaneChoiceRecord",
+  laneChoiceSourcePriority: "RootUpdateLaneSourcePriority::TransitionLane",
+  transitionUpdateLaneClaim: "LaneClaimers.claim_next_transition_update_lane",
+  transitionDeferredLaneClaim:
+    "LaneClaimers.claim_next_transition_deferred_lane",
+  scheduleUpdateRecord: "RootScheduleUpdateRecord",
+  entanglementRecord: "RootTransitionEntanglementRecord",
+  pendingLanesBeforeEnqueueField:
+    "UpdateContainerResult.pending_lanes_before_enqueue",
+  pendingLanesAfterEnqueueField:
+    "UpdateContainerResult.pending_lanes_after_enqueue",
+  selectedNextLanesField: "UpdateContainerResult.selected_next_lanes"
+};
+const expectedTransitionPendingStateTupleFieldNames = [
+  "tupleKind",
+  "tupleLength",
+  "pendingStateSlot",
+  "startTransitionSlot",
+  "initialPendingState",
+  "optimisticPendingState",
+  "finishedPendingState"
+];
+const expectedTransitionPendingStateTupleShape = {
+  tupleKind: "useTransition",
+  tupleLength: 2,
+  pendingStateSlot: "isPending",
+  startTransitionSlot: "startTransition",
+  initialPendingState: false,
+  optimisticPendingState: true,
+  finishedPendingState: false
+};
+const expectedStartTransitionRoutingRecordFieldNames = [
+  "dispatcher",
+  "action",
+  "actionName",
+  "actionLength",
+  "metadata",
+  "laneMetadata",
+  "pendingStateTupleShape",
+  "schedulerExecutionBlocked",
+  "rootSchedulingBlocked",
+  "rootExecutionBlocked",
+  "callbackExecutionBlocked",
+  "publicStartTransitionDispatcherRouting",
+  "compatibilityClaimed"
+];
 const expectedMissingSchedulerPrerequisites = [
   "getCurrentUpdatePriority",
   "setCurrentUpdatePriority",
@@ -65,14 +139,26 @@ const expectedMissingRootLanePrerequisites = [
 const expectedCompatibilityFalseFlags = [
   "compatibilityClaimed",
   "exposesPublicHookImplementation",
+  "publicStartTransitionDispatcherRouting",
+  "publicUseTransitionImplementation",
   "rendererIntegration",
   "schedulerIntegration",
   "rootLaneIntegration",
+  "schedulerExecution",
+  "rootScheduling",
+  "rootExecution",
   "schedulesTransitionUpdates",
   "schedulesDeferredValueUpdates",
   "executesTransitionCallbacks",
   "returnsPendingState",
   "readsThenables"
+];
+const expectedAcceptedTransitionReconcilerRecords = [
+  "RootUpdateLaneChoiceRecord",
+  "RootUpdateLaneSourcePriority",
+  "RootScheduleUpdateRecord",
+  "RootTransitionEntanglementRecord",
+  "UpdateContainerResult"
 ];
 
 test.afterEach(() => {
@@ -94,6 +180,38 @@ test("private transition-hook dispatcher blockers record public shape and lane p
   );
   assert.deepEqual(metadata.publicShapeBlockers, expectedPublicShapeBlockers);
   assert.deepEqual(
+    metadata.startTransitionPublicRoutingBlockerFields,
+    expectedStartTransitionPublicRoutingBlockerFields
+  );
+  assert.deepEqual(
+    metadata.startTransitionPublicRoutingBlocker,
+    expectedStartTransitionPublicRoutingBlocker
+  );
+  assert.deepEqual(
+    metadata.transitionActionIdentityFieldNames,
+    expectedTransitionActionIdentityFieldNames
+  );
+  assert.deepEqual(
+    metadata.transitionLaneMetadataFieldNames,
+    expectedTransitionLaneMetadataFieldNames
+  );
+  assert.deepEqual(
+    metadata.transitionLaneMetadata,
+    expectedTransitionLaneMetadata
+  );
+  assert.deepEqual(
+    metadata.transitionPendingStateTupleFieldNames,
+    expectedTransitionPendingStateTupleFieldNames
+  );
+  assert.deepEqual(
+    metadata.transitionPendingStateTupleShape,
+    expectedTransitionPendingStateTupleShape
+  );
+  assert.deepEqual(
+    metadata.startTransitionRoutingRecordFieldNames,
+    expectedStartTransitionRoutingRecordFieldNames
+  );
+  assert.deepEqual(
     metadata.missingSchedulerPrerequisites,
     expectedMissingSchedulerPrerequisites
   );
@@ -104,6 +222,10 @@ test("private transition-hook dispatcher blockers record public shape and lane p
   assert.deepEqual(
     metadata.compatibilityFalseFlags,
     expectedCompatibilityFalseFlags
+  );
+  assert.deepEqual(
+    metadata.acceptedReconcilerRecords,
+    expectedAcceptedTransitionReconcilerRecords
   );
 
   for (const flagName of expectedCompatibilityFalseFlags) {
@@ -130,13 +252,21 @@ test("private transition-hook dispatcher blockers record public shape and lane p
       }
     }
   }
+  assert.equal(Object.isFrozen(metadata.startTransitionPublicRoutingBlocker), true);
+  assert.equal(Object.isFrozen(metadata.transitionLaneMetadata), true);
+  assert.equal(Object.isFrozen(metadata.transitionPendingStateTupleShape), true);
 
   assert.equal(React.privateTransitionHookDispatcherMetadata, undefined);
   assert.equal(React.markPrivateTransitionHookDispatcher, undefined);
+  assert.equal(
+    React.recordPrivateStartTransitionDispatcherRouting,
+    undefined
+  );
 });
 
 test("public transition hooks remain placeholder-blocked and do not call an installed dispatcher", () => {
   const calls = [];
+  const publicStartTransitionCalls = [];
   const dispatcher = {
     useDeferredValue(value, initialValue) {
       calls.push(["useDeferredValue", value, initialValue]);
@@ -160,6 +290,10 @@ test("public transition hooks remain placeholder-blocked and do not call an inst
   assertUnimplemented(() => React.useTransition(), {
     exportName: "useTransition"
   });
+  React.startTransition(() => {
+    publicStartTransitionCalls.push("scope");
+  });
+  assert.deepEqual(publicStartTransitionCalls, ["scope"]);
   assert.deepEqual(calls, []);
 });
 
@@ -228,6 +362,145 @@ test("private transition-hook dispatcher marker records diagnostics without exec
   assert.deepEqual(calls, []);
 });
 
+test("private startTransition routing rejects missing or unmarked dispatcher context", () => {
+  const calls = [];
+  const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
+  const transitionAction = () => calls.push(["transitionAction"]);
+
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.recordPrivateStartTransitionDispatcherRouting(
+        transitionAction,
+        metadata
+      ),
+    "useTransition"
+  );
+
+  const dispatcher = {
+    useDeferredValue(value) {
+      calls.push(["useDeferredValue", value]);
+      return value;
+    },
+    useTransition() {
+      calls.push(["useTransition"]);
+      return [false, () => calls.push(["startTransition"])];
+    }
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.recordPrivateStartTransitionDispatcherRouting(
+        transitionAction,
+        metadata
+      ),
+    "useTransition"
+  );
+  assert.deepEqual(calls, []);
+});
+
+test("private startTransition routing rejects stale transition metadata and unsupported callbacks", () => {
+  const calls = [];
+  const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
+  const dispatcher = {
+    useDeferredValue(value) {
+      calls.push(["useDeferredValue", value]);
+      return value;
+    },
+    useTransition() {
+      calls.push(["useTransition"]);
+      return [false, () => calls.push(["startTransition"])];
+    }
+  };
+
+  hookDispatcher.markPrivateTransitionHookDispatcher(dispatcher, metadata);
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  const driftedMetadata = {
+    ...metadata,
+    transitionLaneMetadata: {
+      ...metadata.transitionLaneMetadata,
+      laneChoiceSourcePriority: "RootUpdateLaneSourcePriority::DefaultEventPriority"
+    }
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateTransitionHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.recordPrivateStartTransitionDispatcherRouting(
+        () => calls.push(["transitionAction"]),
+        driftedMetadata
+      ),
+    "useTransition"
+  );
+
+  for (const callback of [undefined, null, 42, "scope", {}, { then() {} }]) {
+    assertUnsupportedTransitionCallback(
+      () =>
+        hookDispatcher.recordPrivateStartTransitionDispatcherRouting(
+          callback,
+          metadata
+        ),
+      "startTransition"
+    );
+  }
+
+  assert.deepEqual(calls, []);
+});
+
+test("private startTransition routing records action identity and blocked lane execution", () => {
+  const calls = [];
+  const metadata = hookDispatcher.privateTransitionHookDispatcherMetadata;
+  const dispatcher = {
+    useDeferredValue(value, initialValue, receivedMetadata) {
+      calls.push(["useDeferredValue", value, initialValue, receivedMetadata]);
+      return value;
+    },
+    useTransition(receivedMetadata) {
+      calls.push(["useTransition", receivedMetadata]);
+      return [false, () => calls.push(["startTransition"])];
+    }
+  };
+  function transitionAction(first, second) {
+    calls.push(["transitionAction", first, second]);
+  }
+
+  hookDispatcher.markPrivateTransitionHookDispatcher(dispatcher, metadata);
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  const record = hookDispatcher.recordPrivateStartTransitionDispatcherRouting(
+    transitionAction,
+    metadata
+  );
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.deepEqual(
+    Object.keys(record),
+    expectedStartTransitionRoutingRecordFieldNames
+  );
+  assert.equal(record.dispatcher, dispatcher);
+  assert.equal(record.action, transitionAction);
+  assert.equal(record.actionName, "transitionAction");
+  assert.equal(record.actionLength, 2);
+  assert.equal(record.metadata, metadata);
+  assert.equal(record.laneMetadata, metadata.transitionLaneMetadata);
+  assert.equal(
+    record.pendingStateTupleShape,
+    metadata.transitionPendingStateTupleShape
+  );
+  assert.equal(record.schedulerExecutionBlocked, true);
+  assert.equal(record.rootSchedulingBlocked, true);
+  assert.equal(record.rootExecutionBlocked, true);
+  assert.equal(record.callbackExecutionBlocked, true);
+  assert.equal(record.publicStartTransitionDispatcherRouting, false);
+  assert.equal(record.compatibilityClaimed, false);
+  assert.deepEqual(calls, []);
+});
+
 function assertUnimplemented(callback, { exportName }) {
   assert.throws(
     callback,
@@ -258,6 +531,29 @@ function assertInvalidHookCall(callback, label) {
       assert.match(
         error.message,
         /Hooks can only be called inside of the body of a function component/u,
+        label
+      );
+      return true;
+    },
+    label
+  );
+}
+
+function assertUnsupportedTransitionCallback(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, "TypeError", label);
+      assert.equal(
+        error.code,
+        "FAST_REACT_UNSUPPORTED_TRANSITION_CALLBACK",
+        label
+      );
+      assert.equal(error.hookName, "useTransition", label);
+      assert.equal(error.apiName, "startTransition", label);
+      assert.match(
+        error.message,
+        /requires a callback function/u,
         label
       );
       return true;
