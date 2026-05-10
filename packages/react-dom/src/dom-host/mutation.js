@@ -39,12 +39,17 @@ const unsafePropertyNames = new Set([
 const propertyNamePattern = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 const LATEST_PROPS_COMMIT_RECORD = 'latestPropsCommit';
+const DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF =
+  'domPropertyUpdateLatestPropsHandoff';
 
 const latestPropsCommitRecordPayloads = new WeakMap();
+const domPropertyUpdateLatestPropsHandoffPayloads = new WeakMap();
 const latestPropsSafePayloadKinds = new Set([
-  'setAttribute',
-  'removeAttribute',
-  'nonPayload'
+  ENTRY_SET_ATTRIBUTE,
+  ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_SET_PROPERTY,
+  ENTRY_REMOVE_PROPERTY,
+  ENTRY_NON_PAYLOAD
 ]);
 function createDomHostMutationError(code, message) {
   const error = new Error(message);
@@ -184,6 +189,16 @@ function commitDomPropertyUpdate(instance, tag, lastProps, nextProps) {
   return applyAdmittedDomPropertyPayload(instance, payload);
 }
 
+function commitDomPropertyUpdateForLatestProps(
+  instance,
+  tag,
+  lastProps,
+  nextProps
+) {
+  const payload = diffDomPropertyPayload(tag, lastProps, nextProps);
+  return applyDomPropertyPayloadForLatestProps(instance, payload, nextProps);
+}
+
 function applyAdmittedDomPropertyPayload(instance, payload) {
   assertDomLikeObject(instance, 'applyAdmittedDomPropertyPayload', 'parent');
   if (!Array.isArray(payload)) {
@@ -202,6 +217,47 @@ function applyAdmittedDomPropertyPayload(instance, payload) {
   }
 
   return entries.map(createAdmittedPropertyPayloadRecord);
+}
+
+function applyDomPropertyPayloadForLatestProps(instance, payload, latestProps) {
+  assertDomLikeObject(
+    instance,
+    'applyDomPropertyPayloadForLatestProps',
+    'parent'
+  );
+  if (!Array.isArray(payload)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD',
+      'Cannot apply a DOM property payload for latest props that is not an array.'
+    );
+  }
+
+  const entries = payload.map((entry, index) =>
+    normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
+  );
+
+  for (const entry of entries) {
+    applyLatestPropsSafeDomPropertyPayloadEntry(instance, entry);
+  }
+
+  const mutationRecords = Object.freeze(
+    entries.map((entry) =>
+      Object.freeze(createAdmittedPropertyPayloadRecord(entry))
+    )
+  );
+  const latestPropsPayloadRecords = Object.freeze(
+    entries.map(createLatestPropsPayloadRecord)
+  );
+  const latestPropsCommitRecord = createLatestPropsCommitRecord(
+    instance,
+    latestProps,
+    latestPropsPayloadRecords
+  );
+
+  return createDomPropertyUpdateLatestPropsHandoff(
+    mutationRecords,
+    latestPropsCommitRecord
+  );
 }
 
 function applyStyleDangerousHtmlPayload(instance, payload) {
@@ -257,6 +313,17 @@ function getLatestPropsCommitRecordPayload(record) {
 
 function isLatestPropsCommitRecord(record) {
   return getLatestPropsCommitRecordPayload(record) !== null;
+}
+
+function getDomPropertyUpdateLatestPropsHandoffPayload(handoff) {
+  if (!isWeakMapKey(handoff)) {
+    return null;
+  }
+  return domPropertyUpdateLatestPropsHandoffPayloads.get(handoff) || null;
+}
+
+function isDomPropertyUpdateLatestPropsHandoff(handoff) {
+  return getDomPropertyUpdateLatestPropsHandoffPayload(handoff) !== null;
 }
 
 function assertAppendParent(parent, operation) {
@@ -337,15 +404,18 @@ function normalizeSetAttributePayloadEntry(instance, entry, index) {
   return {
     kind: ENTRY_SET_ATTRIBUTE,
     attributeName,
+    propName: normalizePayloadPropName(entry, index, attributeName),
     value: entry.value
   };
 }
 
 function normalizeRemoveAttributePayloadEntry(instance, entry, index) {
   assertAttributePayloadTarget(instance, 'removeAttribute');
+  const attributeName = normalizePayloadAttributeName(entry, index);
   return {
     kind: ENTRY_REMOVE_ATTRIBUTE,
-    attributeName: normalizePayloadAttributeName(entry, index)
+    attributeName,
+    propName: normalizePayloadPropName(entry, index, attributeName)
   };
 }
 
@@ -357,6 +427,7 @@ function normalizeSetPropertyPayloadEntry(instance, entry, index) {
   return {
     kind: ENTRY_SET_PROPERTY,
     propertyName,
+    propName: normalizePayloadPropName(entry, index, propertyName),
     value: entry.value
   };
 }
@@ -368,6 +439,7 @@ function normalizeRemovePropertyPayloadEntry(instance, entry, index) {
   return {
     kind: ENTRY_REMOVE_PROPERTY,
     propertyName,
+    propName: normalizePayloadPropName(entry, index, propertyName),
     value: null
   };
 }
@@ -419,6 +491,18 @@ function normalizePayloadPropertyName(entry, index) {
   }
 
   return propertyName;
+}
+
+function normalizePayloadPropName(entry, index, fallbackName) {
+  const propName = entry.propName === undefined ? fallbackName : entry.propName;
+  if (typeof propName !== 'string' || propName === '') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ENTRY',
+      `Cannot apply payload entry ${index} without a string propName.`
+    );
+  }
+
+  return propName;
 }
 
 function isSafePayloadPropertyName(propertyName) {
@@ -482,6 +566,18 @@ function createBlockedAdmittedPayloadEntryError(entry, index) {
   );
 }
 
+function createBlockedLatestPropsPayloadEntryError(entry, index) {
+  const kind = entry && typeof entry === 'object' ? entry.kind : undefined;
+  const code =
+    kind !== undefined && blockedPayloadEntryKinds.has(kind)
+      ? 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+      : 'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY';
+  return createDomHostMutationError(
+    code,
+    `Cannot apply unsupported latest-props DOM property payload entry ${index}.`
+  );
+}
+
 function applyNormalizedPropertyPayloadEntry(instance, entry) {
   switch (entry.kind) {
     case ENTRY_SET_ATTRIBUTE:
@@ -496,6 +592,24 @@ function applyNormalizedPropertyPayloadEntry(instance, entry) {
     case ENTRY_REMOVE_PROPERTY:
       instance[entry.propertyName] = null;
       return;
+  }
+}
+
+function normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index) {
+  if (isOrdinaryPropertyPayloadEntry(entry)) {
+    return normalizePropertyPayloadEntry(instance, entry, index);
+  }
+
+  if (isNonPayloadPropertyPayloadEntry(entry)) {
+    return normalizeNonPayloadPropertyPayloadEntry(entry, index);
+  }
+
+  throw createBlockedLatestPropsPayloadEntryError(entry, index);
+}
+
+function applyLatestPropsSafeDomPropertyPayloadEntry(instance, entry) {
+  if (isOrdinaryPropertyPayloadEntry(entry)) {
+    applyNormalizedPropertyPayloadEntry(instance, entry);
   }
 }
 
@@ -549,6 +663,67 @@ function createAdmittedPropertyPayloadRecord(entry) {
   }
 
   return {...entry};
+}
+
+function createLatestPropsPayloadRecord(entry) {
+  if (entry.kind === ENTRY_SET_ATTRIBUTE) {
+    return Object.freeze({
+      kind: entry.kind,
+      attributeName: entry.attributeName,
+      propName: entry.propName,
+      value: entry.value
+    });
+  }
+
+  if (entry.kind === ENTRY_REMOVE_ATTRIBUTE) {
+    return Object.freeze({
+      kind: entry.kind,
+      attributeName: entry.attributeName,
+      propName: entry.propName
+    });
+  }
+
+  if (entry.kind === ENTRY_SET_PROPERTY) {
+    return Object.freeze({
+      kind: entry.kind,
+      propertyName: entry.propertyName,
+      propName: entry.propName,
+      value: entry.value
+    });
+  }
+
+  if (entry.kind === ENTRY_REMOVE_PROPERTY) {
+    return Object.freeze({
+      kind: entry.kind,
+      propertyName: entry.propertyName,
+      propName: entry.propName,
+      value: null
+    });
+  }
+
+  return Object.freeze({...entry});
+}
+
+function createDomPropertyUpdateLatestPropsHandoff(
+  mutationRecords,
+  latestPropsCommitRecord
+) {
+  const handoff = Object.freeze({
+    kind: DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+    mutation: 'propertyUpdate',
+    payloadCount: mutationRecords.length,
+    status: 'mutated'
+  });
+
+  domPropertyUpdateLatestPropsHandoffPayloads.set(
+    handoff,
+    Object.freeze({
+      latestPropsCommitRecord,
+      mutationRecords
+    })
+  );
+
+  return handoff;
 }
 
 function assertChildNode(child, operation) {
@@ -616,6 +791,12 @@ function cloneSafeLatestPropsPayloadRecord(payloadRecord, index) {
   } else if (kind === 'removeAttribute') {
     assertStringPayloadField(payloadRecord, 'propName', index);
     assertStringPayloadField(payloadRecord, 'attributeName', index);
+  } else if (kind === 'setProperty') {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'propertyName', index);
+  } else if (kind === 'removeProperty') {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'propertyName', index);
   } else {
     assertStringPayloadField(payloadRecord, 'propName', index);
     assertStringPayloadField(payloadRecord, 'category', index);
@@ -926,21 +1107,26 @@ function applyStylePayloadEntry(instance, entry) {
 
 module.exports = {
   DOM_HOST_TEXT_COMMIT_GATE_METADATA,
+  DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
   appendChild,
   appendChildToContainer,
   appendInitialChild,
   applyAdmittedDomPropertyPayload,
   applyDomPropertyPayload,
+  applyDomPropertyPayloadForLatestProps,
   applyStyleDangerousHtmlPayload,
   clearContainer,
+  commitDomPropertyUpdateForLatestProps,
   commitTextUpdate,
   commitDomPropertyUpdate,
   createDomHostTextInstance,
   createDomHostMutationError,
   createLatestPropsCommitRecord,
+  getDomPropertyUpdateLatestPropsHandoffPayload,
   getLatestPropsCommitRecordPayload,
   insertBefore,
   insertInContainerBefore,
+  isDomPropertyUpdateLatestPropsHandoff,
   isLatestPropsCommitRecord,
   LATEST_PROPS_COMMIT_RECORD,
   removeChild,

@@ -95,6 +95,61 @@ const reactDomPackage = require(
   assert.equal(componentTree.getLatestPropsFromNode(node), tokenProps);
 
   let eventCallCount = 0;
+  const handoffProps = {
+    id: 'from-handoff',
+    children: 'Handoff label',
+    onClick() {
+      eventCallCount += 1;
+    }
+  };
+  const handoff = domHost.commitDomPropertyUpdateForLatestProps(
+    node,
+    'button',
+    tokenProps,
+    handoffProps
+  );
+  const hiddenHandoff =
+    domHost.getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+
+  assert.equal(
+    handoff.kind,
+    domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF
+  );
+  assert.equal(handoff.mutation, 'propertyUpdate');
+  assert.equal(handoff.payloadCount, 4);
+  assert.equal(handoff.status, 'mutated');
+  assert.equal(Object.hasOwn(handoff, 'node'), false);
+  assert.equal(Object.hasOwn(handoff, 'latestProps'), false);
+  assert.equal(domHost.isDomPropertyUpdateLatestPropsHandoff(handoff), true);
+  assert.equal(
+    domHost.isLatestPropsCommitRecord(hiddenHandoff.latestPropsCommitRecord),
+    true
+  );
+  assert.deepEqual(hiddenHandoff.mutationRecords, [
+    removeAttributePayloadRecord('disabled'),
+    setAttributePayloadRecord('id', 'from-handoff'),
+    skippedNonPayload(
+      'children',
+      'children',
+      'children are handled by text-content reconciliation'
+    ),
+    skippedNonPayload(
+      'onClick',
+      'event',
+      'event props are stored by the future event/latest-props path'
+    )
+  ]);
+  assert.deepEqual(node.attributeLog, [
+    ['removeAttribute', 'disabled', false],
+    ['setAttribute', 'id', 'from-handoff']
+  ]);
+  assert.equal(componentTree.getLatestPropsFromNode(node), tokenProps);
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationHandoff(handoff),
+    handoffProps
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(node), handoffProps);
+
   const recordProps = {
     disabled: true,
     id: 'from-record',
@@ -259,6 +314,34 @@ const reactDomPackage = require(
     secondNextProps
   );
 
+  const firstHandoffProps = {id: 'first-handoff'};
+  const secondHandoffProps = {id: 'second-handoff'};
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationHandoffs([
+      domHost.commitDomPropertyUpdateForLatestProps(
+        firstNode,
+        'div',
+        firstNextProps,
+        firstHandoffProps
+      ),
+      domHost.commitDomPropertyUpdateForLatestProps(
+        secondNode,
+        'div',
+        secondNextProps,
+        secondHandoffProps
+      )
+    ]),
+    2
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(firstNode),
+    firstHandoffProps
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(secondNode),
+    secondHandoffProps
+  );
+
   const firstBlockedProps = {id: 'first-blocked'};
   const invalidBatchRecord = {kind: 'latestPropsCommit'};
   assert.throws(
@@ -273,7 +356,31 @@ const reactDomPackage = require(
       code: 'FAST_REACT_DOM_INVALID_LATEST_PROPS_COMMIT_RECORD'
     }
   );
-  assert.equal(componentTree.getLatestPropsFromNode(firstNode), firstNextProps);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(firstNode),
+    firstHandoffProps
+  );
+
+  const firstBlockedHandoffProps = {id: 'first-blocked-handoff'};
+  assert.throws(
+    () =>
+      componentTree.commitLatestPropsFromMutationHandoffs([
+        domHost.commitDomPropertyUpdateForLatestProps(
+          firstNode,
+          'div',
+          firstHandoffProps,
+          firstBlockedHandoffProps
+        ),
+        {kind: 'domPropertyUpdateLatestPropsHandoff'}
+      ]),
+    {
+      code: 'FAST_REACT_DOM_INVALID_LATEST_PROPS_MUTATION_HANDOFF'
+    }
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(firstNode),
+    firstHandoffProps
+  );
 
   assert.equal(componentTree.detachHostInstanceToken(firstToken), firstToken);
   assert.equal(componentTree.detachHostInstanceToken(secondToken), secondToken);
@@ -805,6 +912,8 @@ const reactDomPackage = require(
   const privateHelperNames = [
     'assertMountedHostInstanceToken',
     'attachHostInstanceNode',
+    'commitLatestPropsFromMutationHandoff',
+    'commitLatestPropsFromMutationHandoffs',
     'commitLatestPropsFromMutationRecord',
     'commitLatestPropsFromMutationRecords',
     'createHostInstanceToken',
@@ -868,6 +977,31 @@ function removeAttributePayload(propName, attributeName) {
   };
 }
 
+function setAttributePayloadRecord(attributeName, value) {
+  return {
+    attributeName,
+    kind: 'setAttribute',
+    value
+  };
+}
+
+function removeAttributePayloadRecord(attributeName) {
+  return {
+    attributeName,
+    kind: 'removeAttribute'
+  };
+}
+
+function skippedNonPayload(propName, category, reason) {
+  return {
+    category,
+    kind: 'nonPayload',
+    propName,
+    reason,
+    status: 'skipped'
+  };
+}
+
 function nonPayload(propName, category) {
   return {
     category,
@@ -879,10 +1013,33 @@ function nonPayload(propName, category) {
 
 function createElement(nodeName) {
   return {
+    attributeLog: [],
+    attributes: new Map(),
     childNodes: [],
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
+    },
     nodeName,
     nodeType: domContainer.ELEMENT_NODE,
-    parentNode: null
+    parentNode: null,
+    removeAttribute(name) {
+      const attributeName = String(name);
+      this.attributeLog.push([
+        'removeAttribute',
+        attributeName,
+        this.attributes.has(attributeName)
+      ]);
+      this.attributes.delete(attributeName);
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributeLog.push(['setAttribute', attributeName, stringValue]);
+      this.attributes.set(attributeName, stringValue);
+    }
   };
 }
 

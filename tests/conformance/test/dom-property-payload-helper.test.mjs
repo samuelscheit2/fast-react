@@ -25,6 +25,16 @@ const propertyPayload = require(
 const domMutation = require(
   path.join(repoRoot, "packages", "react-dom", "src", "dom-host", "mutation.js")
 );
+const componentTree = require(
+  path.join(
+    repoRoot,
+    "packages",
+    "react-dom",
+    "src",
+    "client",
+    "component-tree.js"
+  )
+);
 const reactDomPackageJson = require(
   path.join(repoRoot, "packages", "react-dom", "package.json")
 );
@@ -46,7 +56,9 @@ const {
 } = propertyPayload;
 const {
   applyAdmittedDomPropertyPayload,
+  applyDomPropertyPayloadForLatestProps,
   applyStyleDangerousHtmlPayload,
+  commitDomPropertyUpdateForLatestProps,
   commitDomPropertyUpdate
 } = domMutation;
 
@@ -468,6 +480,119 @@ test("private DOM mutation adapter commits diffed admitted property rows in orde
   ]);
 });
 
+test("private DOM latest-props handoff publishes only after ordinary mutations succeed", () => {
+  const element = new FakeElement("button");
+  const rootOwner = { kind: "LatestPropsRoot" };
+  const hostOwner = { kind: "LatestPropsHost" };
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const initialProps = orderedProps([
+    ["title", "old-title"],
+    ["hidden", true],
+    ["onClick", () => "old"]
+  ]);
+  const nextProps = orderedProps([
+    ["id", "next-id"],
+    ["title", "new-title"],
+    ["onClick", () => "new"],
+    ["data-state", "ready"]
+  ]);
+
+  element.setAttribute("title", "old-title");
+  element.setAttribute("hidden", "");
+  element.mutationLog = [];
+  componentTree.attachHostInstanceNode(element, token, initialProps);
+
+  const handoff = commitDomPropertyUpdateForLatestProps(
+    element,
+    "button",
+    initialProps,
+    nextProps
+  );
+  const hiddenHandoff =
+    domMutation.getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+  const latestPropsPayload = domMutation.getLatestPropsCommitRecordPayload(
+    hiddenHandoff.latestPropsCommitRecord
+  );
+
+  assert.equal(
+    handoff.kind,
+    domMutation.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF
+  );
+  assert.equal(handoff.status, "mutated");
+  assert.equal(handoff.payloadCount, 5);
+  assert.equal(Object.hasOwn(handoff, "node"), false);
+  assert.equal(Object.hasOwn(handoff, "latestProps"), false);
+  assert.deepEqual(element.mutationLog, [
+    ["removeAttribute", "hidden", true],
+    ["setAttribute", "id", "next-id"],
+    ["setAttribute", "title", "new-title"],
+    ["setAttribute", "data-state", "ready"]
+  ]);
+  assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+  assert.equal(latestPropsPayload.latestProps, nextProps);
+  assert.deepEqual(latestPropsPayload.payloadRecords, [
+    removeAttribute("hidden", "hidden"),
+    setAttribute("id", "id", "next-id"),
+    setAttribute("title", "title", "new-title"),
+    skippedNonPayload(
+      "onClick",
+      "event",
+      "event props are stored by the future event/latest-props path"
+    ),
+    setAttribute("data-state", "data-state", "ready")
+  ]);
+
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationHandoff(handoff),
+    nextProps
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(element), nextProps);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
+test("private DOM latest-props handoff accepts ordinary property payload rows", () => {
+  const element = new FakeElement("fast-widget");
+  const rootOwner = { kind: "LatestPropsPropertyRoot" };
+  const hostOwner = { kind: "LatestPropsPropertyHost" };
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const initialProps = { objectProp: null };
+  const value = { answer: 42 };
+  const nextProps = {
+    objectProp: null,
+    onWidget() {
+      return value.answer;
+    }
+  };
+
+  componentTree.attachHostInstanceNode(element, token, initialProps);
+  const handoff = applyDomPropertyPayloadForLatestProps(
+    element,
+    [
+      setProperty("objectProp", value),
+      nonPayload(
+        "onWidget",
+        "event",
+        "event props are stored by the future event/latest-props path"
+      ),
+      removeProperty("objectProp")
+    ],
+    nextProps
+  );
+
+  assert.deepEqual(element.mutationLog, [
+    ["setProperty", "objectProp", value],
+    ["setProperty", "objectProp", null]
+  ]);
+  assert.equal(element.objectProp, null);
+  assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationHandoff(handoff),
+    nextProps
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(element), nextProps);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("private DOM admitted payload adapter accepts property rows and skips non-payload rows", () => {
   const element = new FakeElement("fast-widget");
   const value = { answer: 42 };
@@ -556,6 +681,108 @@ test("private DOM admitted payload adapter fails closed before unsupported rows 
   );
   assert.deepEqual(resource.mutationLog, []);
   assert.deepEqual(resource.activeAttributeEntries(), []);
+});
+
+test("private DOM latest-props handoff keeps failed payloads out of the component-tree map", () => {
+  const controlled = new FakeElement("input");
+  const controlledToken = componentTree.createHostInstanceToken(
+    { kind: "LatestPropsControlledHost" },
+    { kind: "LatestPropsControlledRoot" }
+  );
+  const controlledInitialProps = {};
+  componentTree.attachHostInstanceNode(
+    controlled,
+    controlledToken,
+    controlledInitialProps
+  );
+
+  assert.throws(
+    () =>
+      commitDomPropertyUpdateForLatestProps(
+        controlled,
+        "input",
+        {},
+        orderedProps([
+          ["id", "must-not-apply"],
+          ["value", "Ada"]
+        ])
+      ),
+    {
+      code: "FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(controlled.mutationLog, []);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(controlled),
+    controlledInitialProps
+  );
+  assert.equal(
+    componentTree.detachHostInstanceToken(controlledToken),
+    controlledToken
+  );
+
+  const styled = new FakeElement("div");
+  const styledToken = componentTree.createHostInstanceToken(
+    { kind: "LatestPropsStyleHost" },
+    { kind: "LatestPropsStyleRoot" }
+  );
+  const styledInitialProps = {};
+  componentTree.attachHostInstanceNode(styled, styledToken, styledInitialProps);
+
+  assert.throws(
+    () =>
+      commitDomPropertyUpdateForLatestProps(
+        styled,
+        "div",
+        {},
+        orderedProps([
+          ["id", "must-not-apply"],
+          ["style", orderedProps([["color", "red"]])]
+        ])
+      ),
+    {
+      code: "FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(styled.mutationLog, []);
+  assert.equal(componentTree.getLatestPropsFromNode(styled), styledInitialProps);
+  assert.equal(componentTree.detachHostInstanceToken(styledToken), styledToken);
+
+  const throwing = new FakeElement("div");
+  const throwingToken = componentTree.createHostInstanceToken(
+    { kind: "LatestPropsThrowingHost" },
+    { kind: "LatestPropsThrowingRoot" }
+  );
+  const throwingInitialProps = {};
+  const thrownError = new Error("fake setAttribute failed");
+  throwing.setAttribute = function setAttribute() {
+    throw thrownError;
+  };
+  componentTree.attachHostInstanceNode(
+    throwing,
+    throwingToken,
+    throwingInitialProps
+  );
+
+  assert.throws(
+    () =>
+      commitDomPropertyUpdateForLatestProps(
+        throwing,
+        "div",
+        {},
+        orderedProps([["id", "must-not-apply"]])
+      ),
+    (error) => error === thrownError
+  );
+  assert.deepEqual(throwing.mutationLog, []);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(throwing),
+    throwingInitialProps
+  );
+  assert.equal(
+    componentTree.detachHostInstanceToken(throwingToken),
+    throwingToken
+  );
 });
 
 test("private DOM style and innerHTML applier applies accepted payload records in order", () => {
