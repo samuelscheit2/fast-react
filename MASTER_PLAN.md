@@ -46,13 +46,12 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
-Workers 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 487,
-489, 493, 494, 495, 496, 497, 498, 499, 500, 501, and 502 have been accepted,
-leaving 5 active top-level workers from this queue.
+Workers 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486,
+487, 489, 493, 494, 495, 496, 497, 498, 499, 500, 501, and 502 have been
+accepted, leaving 4 active top-level workers from this queue.
 
 | Worker | Focus |
 | --- | --- |
-| 486 | React DOM root render private host output |
 | 488 | DOM event error routing gate |
 | 490 | Controlled checkbox/radio restore gate |
 | 491 | Resource stylesheet precedence gate |

@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 486 was accepted from queue 473-502. It added a private React DOM
+  root facade host-output diagnostic that routes accepted create/render
+  metadata through the bridge and fake-DOM mutation adapter while cleaning up
+  marker/listener setup and keeping public root compatibility blocked. It was
+  verified after merge with private root bridge package tests, root-bridge and
+  mutation-adapter smoke checks, React DOM workspace checks, public facade
+  blocked-gate conformance, syntax checks, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 485 was accepted from queue 473-502. It added private
   react-test-renderer `toTree` diagnostics for minimal multi-child host output
   and function-component-above-host shapes in Rust and the CJS-development
