@@ -48,12 +48,20 @@ use crate::{
     HostRootCommitRecord, RootCommitError,
     begin_work::{
         ContextProviderBeginWorkError, ContextProviderBeginWorkRecord,
-        ContextProviderBeginWorkRequest, ContextProviderUseContextSingleChildBeginWorkRecord,
+        ContextProviderBeginWorkRequest,
+        ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+        ContextProviderUseContextSingleChildBeginWorkRecord,
         FunctionComponentSingleChildBeginWorkRecord, begin_work_context_provider_child,
         begin_work_context_provider_use_context_single_child,
+        begin_work_context_provider_use_context_single_child_for_complete_traversal,
         begin_work_reconcile_function_component_single_child,
     },
     commit_finished_host_root,
+    complete_work::{
+        ContextProviderStackRestorationError, ContextProviderStackRestorationPhase,
+        ContextProviderStackRestorationRecord, complete_context_provider_for_test,
+        unwind_context_provider_for_test,
+    },
     function_component::{
         FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
     },
@@ -1457,6 +1465,211 @@ impl From<HostRootCompleteWorkHandoffError>
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootContextProviderUseContextCompleteUnwindTraversalRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    original_root_element: RootElementHandle,
+    provider: FiberId,
+    function_component: FiberId,
+    begin_work: ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+    stack_depth_after_begin: usize,
+    stack_depth_after_host_child_complete: usize,
+    provider_complete: ContextProviderStackRestorationRecord,
+    complete_work: HostRootCompleteWorkHandoffRecord,
+}
+
+#[cfg(test)]
+impl HostRootContextProviderUseContextCompleteUnwindTraversalRecord {
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn original_root_element(self) -> RootElementHandle {
+        self.original_root_element
+    }
+
+    #[must_use]
+    const fn provider(self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    const fn function_component(self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    const fn begin_work(self) -> ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    const fn stack_depth_after_begin(self) -> usize {
+        self.stack_depth_after_begin
+    }
+
+    #[must_use]
+    const fn stack_depth_after_host_child_complete(self) -> usize {
+        self.stack_depth_after_host_child_complete
+    }
+
+    #[must_use]
+    const fn provider_complete(self) -> ContextProviderStackRestorationRecord {
+        self.provider_complete
+    }
+
+    #[must_use]
+    const fn complete_work(self) -> HostRootCompleteWorkHandoffRecord {
+        self.complete_work
+    }
+
+    #[must_use]
+    const fn child_element(self) -> RootElementHandle {
+        self.begin_work.child_element()
+    }
+
+    #[must_use]
+    const fn child_tag(self) -> FiberTag {
+        self.begin_work.child_tag()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootContextProviderUseContextCompleteUnwindTraversalError {
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    ContextProvider(ContextProviderBeginWorkError),
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    ProviderStackRestoration(ContextProviderStackRestorationError),
+    ProviderStackUnwindAfterCompleteWorkError {
+        complete_error: Box<HostRootCompleteWorkHandoffError>,
+        unwind_error: Box<ContextProviderStackRestorationError>,
+    },
+    MissingContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    CompletedChildTagMismatch {
+        expected: FiberTag,
+        actual: Option<FiberTag>,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootContextProviderUseContextCompleteUnwindTraversalError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ChildPreflight(error) => Display::fmt(error, formatter),
+            Self::ContextProvider(error) => Display::fmt(error, formatter),
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::ProviderStackRestoration(error) => Display::fmt(error, formatter),
+            Self::ProviderStackUnwindAfterCompleteWorkError {
+                complete_error,
+                unwind_error,
+            } => write!(
+                formatter,
+                "private context-provider complete traversal failed ({complete_error}) and provider unwind also failed: {unwind_error}"
+            ),
+            Self::MissingContextProviderChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no ContextProvider child for private provider complete/unwind traversal",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedContextProviderChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be ContextProvider for private provider complete/unwind traversal, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::CompletedChildTagMismatch { expected, actual } => write!(
+                formatter,
+                "private context-provider complete/unwind traversal resolved {:?}, but complete-work produced {:?}",
+                expected, actual
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootContextProviderUseContextCompleteUnwindTraversalError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::ChildPreflight(error) => Some(error.as_ref()),
+            Self::ContextProvider(error) => Some(error),
+            Self::CompleteWork(error) => Some(error),
+            Self::ProviderStackRestoration(error) => Some(error),
+            Self::ProviderStackUnwindAfterCompleteWorkError { complete_error, .. } => {
+                Some(complete_error.as_ref())
+            }
+            Self::MissingContextProviderChild { .. }
+            | Self::ExpectedContextProviderChild { .. }
+            | Self::CompletedChildTagMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootContextProviderUseContextCompleteUnwindTraversalError
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderBeginWorkError>
+    for HostRootContextProviderUseContextCompleteUnwindTraversalError
+{
+    fn from(error: ContextProviderBeginWorkError) -> Self {
+        Self::ContextProvider(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootContextProviderUseContextCompleteUnwindTraversalError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderStackRestorationError>
+    for HostRootContextProviderUseContextCompleteUnwindTraversalError
+{
+    fn from(error: ContextProviderStackRestorationError) -> Self {
+        Self::ProviderStackRestoration(error)
+    }
+}
+
+#[cfg(test)]
 fn handoff_completed_context_provider_use_context_child_to_test_complete_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -1546,6 +1759,142 @@ fn handoff_completed_context_provider_use_context_child_to_test_complete_work(
 }
 
 #[cfg(test)]
+fn handoff_completed_context_provider_use_context_child_to_test_complete_work_with_provider_unwind(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    request: HostRootContextProviderUseContextCompleteWorkHandoffRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    HostRootContextProviderUseContextCompleteUnwindTraversalRecord,
+    HostRootContextProviderUseContextCompleteUnwindTraversalError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        render.render_lanes(),
+    )?;
+    let provider = validated.child.ok_or(
+        HostRootContextProviderUseContextCompleteUnwindTraversalError::MissingContextProviderChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootContextProviderUseContextCompleteUnwindTraversalError::MissingContextProviderChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::ContextProvider {
+        return Err(
+            HostRootContextProviderUseContextCompleteUnwindTraversalError::ExpectedContextProviderChild {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                child: provider,
+                tag: child_tag,
+            },
+        );
+    }
+
+    let resolver = HostRootTestHostTreeFunctionOutputResolver::new(source);
+    let begin_work = begin_work_context_provider_use_context_single_child_for_complete_traversal(
+        store.fiber_arena_mut(),
+        ContextProviderBeginWorkRequest::new(
+            provider,
+            render.render_lanes(),
+            request.context(),
+            request.value(),
+        ),
+        context_store,
+        invoker,
+        &resolver,
+    )?;
+    let function_component = begin_work.child();
+    let child_element = begin_work.child_element();
+    let expected_child_tag = begin_work.child_tag();
+    let stack_depth_after_begin = context_store.stack_depth();
+
+    let host_work = mount_test_context_provider_function_component_single_host_child_work_until_provider_complete(
+        store,
+        host,
+        render,
+        provider,
+        function_component,
+        child_element,
+        source,
+    );
+    let host_work = match host_work {
+        Ok(host_work) => host_work,
+        Err(error) => {
+            match unwind_context_provider_for_test(
+                store.fiber_arena_mut(),
+                context_store,
+                begin_work.begin_work(),
+            ) {
+                Ok(_) => {
+                    return Err(
+                        HostRootContextProviderUseContextCompleteUnwindTraversalError::CompleteWork(
+                            error,
+                        ),
+                    );
+                }
+                Err(unwind_error) => {
+                    return Err(
+                        HostRootContextProviderUseContextCompleteUnwindTraversalError::ProviderStackUnwindAfterCompleteWorkError {
+                            complete_error: Box::new(error),
+                            unwind_error: Box::new(unwind_error),
+                        },
+                    );
+                }
+            }
+        }
+    };
+    let stack_depth_after_host_child_complete = context_store.stack_depth();
+
+    let provider_complete = complete_context_provider_for_test(
+        store.fiber_arena_mut(),
+        context_store,
+        begin_work.begin_work(),
+    )?;
+    complete_host_root_after_context_provider(store, render.work_in_progress())?;
+    let complete_work = host_root_complete_work_handoff_record_from_context_provider_host_work(
+        store,
+        render,
+        provider,
+        child_element,
+        &host_work,
+    )?;
+    if complete_work.completed_child_tag() != Some(expected_child_tag) {
+        return Err(
+            HostRootContextProviderUseContextCompleteUnwindTraversalError::CompletedChildTagMismatch {
+                expected: expected_child_tag,
+                actual: complete_work.completed_child_tag(),
+            },
+        );
+    }
+
+    Ok(
+        HostRootContextProviderUseContextCompleteUnwindTraversalRecord {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+            original_root_element: render.resulting_element(),
+            provider,
+            function_component,
+            begin_work,
+            stack_depth_after_begin,
+            stack_depth_after_host_child_complete,
+            provider_complete,
+            complete_work,
+        },
+    )
+}
+
+#[cfg(test)]
 fn mount_test_context_provider_function_component_single_host_child_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -1555,8 +1904,44 @@ fn mount_test_context_provider_function_component_single_host_child_work(
     child_element: RootElementHandle,
     source: &TestHostTree,
 ) -> Result<HostRootCompleteWorkHandoffRecord, HostRootCompleteWorkHandoffError> {
-    // Reuse the accepted direct FunctionComponent complete-work fixture, then
-    // restore the Provider parent before exposing the root-loop diagnostic.
+    let host_work =
+        mount_test_context_provider_function_component_single_host_child_work_until_provider_complete(
+            store,
+            host,
+            render,
+            provider,
+            function_component,
+            child_element,
+            source,
+        )?;
+
+    complete_context_provider_function_component_ancestors(
+        store,
+        render.work_in_progress(),
+        provider,
+    )?;
+    host_root_complete_work_handoff_record_from_context_provider_host_work(
+        store,
+        render,
+        provider,
+        child_element,
+        &host_work,
+    )
+}
+
+#[cfg(test)]
+fn mount_test_context_provider_function_component_single_host_child_work_until_provider_complete(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    provider: FiberId,
+    function_component: FiberId,
+    child_element: RootElementHandle,
+    source: &TestHostTree,
+) -> Result<HostWorkResult, HostRootCompleteWorkHandoffError> {
+    // Reuse the accepted direct FunctionComponent complete-work fixture for the
+    // child host work, then put the Provider parent back before the Provider
+    // complete/unwind canary restores context.
     store
         .fiber_arena_mut()
         .set_children(provider, &[])
@@ -1582,20 +1967,7 @@ fn mount_test_context_provider_function_component_single_host_child_work(
     );
 
     match (host_work, restore) {
-        (Ok(host_work), Ok(())) => {
-            complete_context_provider_function_component_ancestors(
-                store,
-                render.work_in_progress(),
-                provider,
-            )?;
-            host_root_complete_work_handoff_record_from_context_provider_host_work(
-                store,
-                render,
-                provider,
-                child_element,
-                &host_work,
-            )
-        }
+        (Ok(host_work), Ok(())) => Ok(host_work),
         (Err(error), Ok(())) => Err(HostRootCompleteWorkHandoffError::from(error)),
         (_, Err(error)) => Err(HostRootCompleteWorkHandoffError::from(error)),
     }
@@ -1633,6 +2005,20 @@ fn complete_context_provider_function_component_ancestors(
         provider_node.set_subtree_flags(provider_bubbled.subtree_flags());
     }
 
+    let root_bubbled = bubble_properties(store.fiber_arena(), host_root_work_in_progress)?;
+    let root_node = store
+        .fiber_arena_mut()
+        .get_mut(host_root_work_in_progress)?;
+    root_node.set_child_lanes(root_bubbled.child_lanes());
+    root_node.set_subtree_flags(root_bubbled.subtree_flags());
+    Ok(())
+}
+
+#[cfg(test)]
+fn complete_host_root_after_context_provider(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_root_work_in_progress: FiberId,
+) -> Result<(), HostRootCompleteWorkHandoffError> {
     let root_bubbled = bubble_properties(store.fiber_arena(), host_root_work_in_progress)?;
     let root_node = store
         .fiber_arena_mut()
@@ -3644,6 +4030,263 @@ mod tests {
                 "finalize_initial_children",
             ]
         );
+    }
+
+    #[test]
+    fn root_work_loop_context_provider_complete_unwind_restores_after_descendant_complete() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let child_element = source.insert_host_element_with_text("main", "provider traversal");
+        let original_root_element = RootElementHandle::from_raw(135);
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, original_root_element, None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (provider, function_component, component) =
+            attach_context_provider_wip_child(&mut store, render.work_in_progress());
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_020);
+        let provided_value = context_value(child_element.raw());
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+
+        let record =
+            handoff_completed_context_provider_use_context_child_to_test_complete_work_with_provider_unwind(
+                &mut store,
+                &mut host,
+                render,
+                &source,
+                HostRootContextProviderUseContextCompleteWorkHandoffRequest::new(
+                    context,
+                    provided_value,
+                ),
+                &mut context_store,
+                &mut registry,
+            )
+            .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(record.original_root_element(), original_root_element);
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.function_component(), function_component);
+        assert_eq!(record.child_element(), child_element);
+        assert_eq!(record.child_tag(), FiberTag::HostComponent);
+        assert_eq!(record.stack_depth_after_begin(), 1);
+        assert_eq!(record.stack_depth_after_host_child_complete(), 1);
+
+        let begin_work = record.begin_work();
+        assert_eq!(begin_work.provider(), provider);
+        assert_eq!(begin_work.child(), function_component);
+        assert_eq!(begin_work.context(), context);
+        assert_eq!(begin_work.value(), provided_value);
+        assert_eq!(begin_work.pushed_stack_depth(), 1);
+        assert_eq!(begin_work.child_context_read_count(), 1);
+        assert_eq!(
+            begin_work.child_output(),
+            FunctionComponentOutputHandle::from_raw(child_element.raw())
+        );
+
+        let read = begin_work.child_context_read();
+        assert_eq!(read.fiber(), function_component);
+        assert_eq!(read.context(), context);
+        assert_eq!(read.default_value(), default_value);
+        assert_eq!(read.value(), provided_value);
+        assert_eq!(read.active_provider_count(), 1);
+        assert_eq!(registry.reads(), &[read]);
+
+        let provider_complete = record.provider_complete();
+        assert_eq!(provider_complete.provider(), provider);
+        assert_eq!(provider_complete.context(), context);
+        assert_eq!(provider_complete.value(), provided_value);
+        assert_eq!(
+            provider_complete.provider_snapshot(),
+            begin_work.provider_snapshot()
+        );
+        assert_eq!(
+            provider_complete.phase(),
+            ContextProviderStackRestorationPhase::Complete
+        );
+        assert_eq!(provider_complete.stack_depth_before_restore(), 1);
+        assert_eq!(provider_complete.restored_stack_depth(), 0);
+        assert!(
+            provider_complete
+                .subtree_flags()
+                .contains_all(FiberFlags::PLACEMENT)
+        );
+
+        let complete_work = record.complete_work();
+        assert_eq!(complete_work.root_child(), Some(provider));
+        assert_eq!(
+            complete_work.root_child_tag(),
+            Some(FiberTag::ContextProvider)
+        );
+        assert_eq!(complete_work.completed_child_count(), 1);
+        assert_eq!(
+            complete_work.completed_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(complete_work.resulting_element(), child_element);
+        assert_eq!(complete_work.detached_instance_count(), 1);
+        assert_eq!(complete_work.detached_text_count(), 1);
+
+        let host_child = complete_work.completed_child().unwrap();
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(render.work_in_progress())
+                .unwrap()
+                .child(),
+            Some(provider)
+        );
+        assert_eq!(
+            store.fiber_arena().get(provider).unwrap().return_fiber(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(
+            store.fiber_arena().get(provider).unwrap().child(),
+            Some(function_component)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .return_fiber(),
+            Some(provider)
+        );
+        assert_eq!(
+            store.fiber_arena().get(function_component).unwrap().child(),
+            Some(host_child)
+        );
+        store.fiber_arena().validate_topology().unwrap();
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            host.operations(),
+            vec![
+                "root_host_context",
+                "child_host_context",
+                "should_set_text_content",
+                "create_text_instance",
+                "create_instance",
+                "append_initial_child",
+                "finalize_initial_children",
+            ]
+        );
+    }
+
+    #[test]
+    fn root_work_loop_context_provider_complete_unwind_restores_after_descendant_complete_error() {
+        let (mut store, root_id, mut host) = root_store();
+        let source = TestHostTree::new();
+        let missing_child_element = RootElementHandle::from_raw(1_036);
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(136), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (provider, function_component, component) =
+            attach_context_provider_wip_child(&mut store, render.work_in_progress());
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_030);
+        let provided_value = context_value(1_031);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        let output = FunctionComponentOutputHandle::from_raw(provided_value.raw());
+        let resolver = StaticSingleChildOutputResolver::new(
+            FunctionComponentSingleChildOutput::host_component(
+                output,
+                missing_child_element,
+                ElementTypeHandle::from_raw(1_037),
+                PropsHandle::from_raw(1_038),
+            ),
+        );
+
+        let begin_work =
+            begin_work_context_provider_use_context_single_child_for_complete_traversal(
+                store.fiber_arena_mut(),
+                ContextProviderBeginWorkRequest::new(
+                    provider,
+                    Lanes::DEFAULT,
+                    context,
+                    provided_value,
+                ),
+                &mut context_store,
+                &mut registry,
+                &resolver,
+            )
+            .unwrap();
+        assert_eq!(
+            context_store.current_value(context).unwrap(),
+            provided_value
+        );
+        assert_eq!(context_store.stack_depth(), 1);
+
+        let complete_error =
+            mount_test_context_provider_function_component_single_host_child_work_until_provider_complete(
+                &mut store,
+                &mut host,
+                render,
+                provider,
+                function_component,
+                missing_child_element,
+                &source,
+            )
+            .unwrap_err();
+        assert_eq!(
+            complete_error,
+            HostRootCompleteWorkHandoffError::HostWork(HostWorkError::MissingTestRootElement {
+                handle: missing_child_element,
+            },)
+        );
+
+        let unwind = unwind_context_provider_for_test(
+            store.fiber_arena_mut(),
+            &mut context_store,
+            begin_work.begin_work(),
+        )
+        .unwrap();
+
+        assert_eq!(unwind.provider(), provider);
+        assert_eq!(unwind.context(), context);
+        assert_eq!(unwind.value(), provided_value);
+        assert_eq!(unwind.phase(), ContextProviderStackRestorationPhase::Unwind);
+        assert_eq!(unwind.stack_depth_before_restore(), 1);
+        assert_eq!(unwind.restored_stack_depth(), 0);
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(render.work_in_progress())
+                .unwrap()
+                .child(),
+            Some(provider)
+        );
+        assert_eq!(
+            store.fiber_arena().get(provider).unwrap().child(),
+            Some(function_component)
+        );
+        assert_eq!(
+            store.fiber_arena().get(function_component).unwrap().child(),
+            None
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
     }
 
     #[test]
