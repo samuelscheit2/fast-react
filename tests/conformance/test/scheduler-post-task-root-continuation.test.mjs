@@ -11,6 +11,8 @@ const repoRoot = path.resolve(conformanceRoot, '..', '..');
 const {
   ACCEPTED_ROOT_CONTINUATION_STATUS,
   ROOT_CONTINUATION_BLOCKED_STATUS,
+  ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS,
+  ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS,
   ROOT_CONTINUATION_FALLBACK_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
   ROOT_CONTINUATION_REJECTED_STATUS,
@@ -81,6 +83,10 @@ test('private postTask root continuation metadata links delay and abort diagnost
   assert.equal(row.sourceDiagnostics.continuationSignalValidationDiagnostics, true);
   assert.equal(row.sourceDiagnostics.continuationAbortOrderingDiagnostics, true);
   assert.equal(
+    row.sourceDiagnostics.rootContinuationExecutionRouteDiagnostics,
+    true
+  );
+  assert.equal(
     row.signalValidation.status,
     ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS
   );
@@ -98,6 +104,47 @@ test('private postTask root continuation metadata links delay and abort diagnost
   assert.equal(row.abortOrdering.completionEventIndex, 4);
   assert.equal(row.abortOrdering.signalAfterAbort.aborted, true);
   assert.equal(row.abortOrdering.abortSignalStateAfterAbort, 'aborted');
+  assert.equal(
+    row.rootContinuationExecutionRoute.status,
+    ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS
+  );
+  assert.equal(
+    row.rootContinuationExecutionRoute.routeStatus,
+    ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS
+  );
+  assert.equal(row.rootContinuationExecutionRoute.accepted, true);
+  assert.equal(row.rootContinuationExecutionRoute.rejected, false);
+  assert.equal(row.rootContinuationExecutionRoute.continuationIndex, 0);
+  assert.equal(
+    row.rootContinuationExecutionRoute.continuationDiagnosticEventIndex,
+    2
+  );
+  assert.equal(row.rootContinuationExecutionRoute.delay.value, 0);
+  assert.equal(
+    row.rootContinuationExecutionRoute.abortSignal.aborted,
+    true
+  );
+  assert.equal(
+    row.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS
+  );
+  assert.equal(row.privateRootContinuationExecution.routeSelected, true);
+  assert.equal(
+    row.privateRootContinuationExecution.abortSemanticsPreserved,
+    true
+  );
+  assert.equal(
+    row.privateRootContinuationExecution.continuationCallbackExecuted,
+    false
+  );
+  assert.equal(row.privateRootContinuationExecution.rendererWorkExecuted, false);
+  assert.equal(row.privateRootContinuationExecution.reconcilerWorkExecuted, false);
+  assert.equal(
+    row.privateRootContinuationExecution.nativeRendererWorkExecuted,
+    false
+  );
+  assert.equal(row.privateRootContinuationExecution.publicRootExecution, false);
+  assert.equal(row.privateRootContinuationExecution.publicSchedulerFlush, false);
   assert.equal(row.continuationFallback.status, ROOT_CONTINUATION_FALLBACK_STATUS);
   assert.equal(row.continuationFallback.selectedFallback, 'scheduler.postTask');
   assert.equal(row.acceptedRootContinuation.status, ACCEPTED_ROOT_CONTINUATION_STATUS);
@@ -106,6 +153,14 @@ test('private postTask root continuation metadata links delay and abort diagnost
   assert.equal(
     row.acceptedRootContinuation.abortOrdering.status,
     'continuation-abort-ordering-observed-after-abort-call'
+  );
+  assert.equal(
+    row.acceptedRootContinuation.rootContinuationExecutionRoute.status,
+    ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS
+  );
+  assert.equal(
+    row.acceptedRootContinuation.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS
   );
   assert.equal(
     row.blockedRootExecution.status,
@@ -234,6 +289,40 @@ test('private postTask root continuation metadata rejects missing signal, stale 
     'record.continuationFallbacks.0.browserPostTaskCompatibilityClaimed'
   );
   assert.equal(publicCompatibilityClaimRow.compatibilityClaimed, false);
+
+  const missingRouteRecord = {
+    ...diagnostics,
+    rootContinuationExecutionRoute: null
+  };
+  const missingRouteRow =
+    createPrivatePostTaskRootContinuationMetadataRow(missingRouteRecord);
+  assert.equal(missingRouteRow.status, ROOT_CONTINUATION_REJECTED_STATUS);
+  assert.equal(
+    missingRouteRow.rejectionReason,
+    'missing-root-continuation-execution-route'
+  );
+  assert.equal(missingRouteRow.compatibilityClaimed, false);
+
+  const publicRootExecutionRecord = {
+    ...diagnostics,
+    rootContinuationExecutionRoute: {
+      ...diagnostics.rootContinuationExecutionRoute,
+      privateRootContinuationExecution: {
+        ...diagnostics.rootContinuationExecutionRoute.privateRootContinuationExecution,
+        publicRootExecution: true
+      }
+    }
+  };
+  const publicRootExecutionRow =
+    createPrivatePostTaskRootContinuationMetadataRow(
+      publicRootExecutionRecord
+    );
+  assert.equal(publicRootExecutionRow.status, ROOT_CONTINUATION_REJECTED_STATUS);
+  assert.equal(
+    publicRootExecutionRow.rejectionReason,
+    'unsupported-private-root-continuation-execution-route'
+  );
+  assert.equal(publicRootExecutionRow.compatibilityClaimed, false);
 });
 
 function loadPostTaskOracleModule() {
