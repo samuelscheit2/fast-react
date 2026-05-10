@@ -19,11 +19,12 @@
 
 Implemented a narrow internal HostRoot-only sync flush path.
 
-The new `sync_flush` module traverses the internal scheduled-root list, renders
-only sync lanes through `render_host_root_for_lanes`, commits completed HostRoot
-work through `commit_finished_host_root`, and returns explicit per-root records
-that expose render lanes, render counts, remaining lanes, pending lanes, and the
-underlying render/commit records.
+The new `sync_flush` module exposes
+`flush_sync_commit_work_on_all_roots`, traverses the internal scheduled-root
+list, renders only sync lanes through `render_host_root_for_lanes`, commits
+completed HostRoot work through `commit_finished_host_root`, and returns
+explicit per-root records that expose render lanes, render counts, remaining
+lanes, pending lanes, and the underlying render/commit records.
 
 The path is data-only: it does not call host mutation/config APIs, run effects,
 invoke update callbacks, touch DOM or test-renderer packages, or add public JS
@@ -133,22 +134,27 @@ git diff --name-only && git ls-files --others --exclude-standard
 
 ## Verification Results
 
-Passed:
-
-```sh
-cargo fmt --all --check
-cargo test -p fast-react-reconciler --all-features sync_flush
-cargo test -p fast-react-reconciler --all-features root_commit
-cargo test -p fast-react-reconciler --all-features root_scheduler
-cargo test -p fast-react-reconciler --all-features
-cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings
-git diff --check
-```
-
-Full reconciler result:
-
-- 73 unit tests passed.
-- 1 compile-fail doctest passed.
+- Worker-local verification passed before orchestration merge:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features sync_flush`
+  - `cargo test -p fast-react-reconciler --all-features root_commit`
+  - `cargo test -p fast-react-reconciler --all-features root_scheduler`
+  - `cargo test -p fast-react-reconciler --all-features`: 73 tests + 1 doctest
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+- Orchestrator merged current `main` into this branch and resolved
+  `root_scheduler.rs` by keeping the existing execution-context guarded
+  render-only `flush_sync_work_on_all_roots`, adding shared sync-lane filtering
+  helpers, and exporting the commit-capable path under the distinct
+  `flush_sync_commit_work_on_all_roots` name.
+- Post-merge orchestrator verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features sync_flush`: 12 tests
+  - `cargo test -p fast-react-reconciler --all-features root_commit`: 4 tests
+  - `cargo test -p fast-react-reconciler --all-features root_scheduler`: 22 tests
+  - `cargo test -p fast-react-reconciler --all-features`: 118 tests + 1 doctest
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
 
 Scoped changed paths:
 
