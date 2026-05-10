@@ -174,9 +174,20 @@ sequencing belong in `MASTER_PLAN.md`.
   internal unsupported-fiber-tag markers for Suspense, Offscreen, Activity, and
   ViewTransition plus expanded React 19.2.6 fiber tag mapping coverage, without
   wiring generic begin-work traversal or claiming those features.
+- Worker 176 act queue routing skeleton was merged, adding internal act queue
+  request records, a fake act callback-node sentinel, root-schedule act
+  microtask dedupe, and non-sync callback routing through the act queue when
+  active, without public `act`, task execution, continuation flushing, DOM, or
+  test-renderer facade behavior.
 
 ## Latest Accepted Verification
 
+- Worker 176 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `scheduler_bridge` and `root_scheduler`
+  tests, full `fast-react-reconciler` tests with 112 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`; the
+  `root_scheduler.rs` merge conflict preserved accepted scheduler callback and
+  sync-flush execution helpers plus the new act queue routing records.
 - Worker 175 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused fiber-tag and unsupported-feature tests,
   full `fast-react-core` tests with 112 unit tests, full
