@@ -11,6 +11,7 @@ import {
 import {
   DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS,
   DOM_TEXT_CONTENT_CONFORMANCE_GATE_ID,
+  DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_ADMISSION_KIND,
   DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS,
   DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS,
   DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS,
@@ -158,6 +159,9 @@ test("DOM text-content dual-run gate compares only admitted private helper rows"
   assert.equal(gate.summary.failureCount, 0);
   assert.equal(gate.summary.privateTextContentBehaviorCompared, true);
   assert.equal(gate.summary.fullDomTextContentCompatibilityAdmitted, false);
+  assert.equal(gate.summary.publicRootCompatibilityClaimed, false);
+  assert.equal(gate.summary.serverRenderingCompatibilityClaimed, false);
+  assert.equal(gate.summary.hydrationCompatibilityClaimed, false);
   assert.equal(gate.summary.compatibilityClaimed, false);
   assert.deepEqual(
     gate.admittedPrivateShouldSetRows.map((row) => row.scenarioId),
@@ -171,9 +175,15 @@ test("DOM text-content dual-run gate compares only admitted private helper rows"
   assert.ok(
     gate.admittedPrivateShouldSetRows.every(
       (row) =>
+        row.admissionKind ===
+          DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_ADMISSION_KIND &&
         row.gateStatus === DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS
     )
   );
+  for (const row of gate.admittedPrivateShouldSetRows) {
+    assert.equal(row.firstDifferencePath, null);
+    assert.deepEqual(row.localResult, row.checkedResult);
+  }
   assert.deepEqual(
     gate.skippedUnsupportedPrivateShouldSetRows.map((row) => row.scenarioId),
     ["should-set-textarea-special-case", "should-set-noscript-special-case"]
@@ -612,6 +622,7 @@ test("DOM text-content conformance gate CLI reports the focused fail-closed gate
     output,
     /Skipped unsupported DOM render\/mutation rows: 40/u
   );
+  assert.match(output, /Public root compatibility claimed: false/u);
 });
 
 test("print DOM text-content oracle markdown is readable", () => {

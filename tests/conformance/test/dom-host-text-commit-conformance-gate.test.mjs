@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS,
+  DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_ADMISSION_KIND,
   DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS,
   DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_HOST_TEXT_COMMIT_SCENARIOS,
   evaluateDomTextContentConformanceGate,
@@ -35,7 +36,14 @@ test("DOM HostText commit gate compares only admitted private fake-DOM rows", ()
   );
   assert.equal(gate.summary.privateHostTextCommitBehaviorCompared, true);
   assert.equal(gate.summary.fullDomTextContentCompatibilityAdmitted, false);
+  assert.equal(gate.summary.publicRootCompatibilityClaimed, false);
+  assert.equal(gate.summary.serverRenderingCompatibilityClaimed, false);
+  assert.equal(gate.summary.hydrationCompatibilityClaimed, false);
   assert.equal(gate.summary.compatibilityClaimed, false);
+  assert.equal(
+    gate.gate.unsupportedDomRenderPaths.publicRootCompatibilityClaimed,
+    false
+  );
   assert.deepEqual(
     gate.localHostTextCommitObservationMetadata.gateMetadata.supportedFakeDomRowIds,
     admittedRowIds
@@ -53,15 +61,37 @@ test("DOM HostText commit gate compares only admitted private fake-DOM rows", ()
     false
   );
   assert.equal(
+    gate.localHostTextCommitObservationMetadata.gateMetadata.browserDomCompared,
+    false
+  );
+  assert.equal(
     gate.localHostTextCommitObservationMetadata.gateMetadata.compatibilityClaimed,
     false
   );
-  assert.ok(
-    gate.admittedPrivateHostTextCommitRows.every(
-      (row) =>
-        row.gateStatus === DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS
-    )
-  );
+  for (const row of gate.admittedPrivateHostTextCommitRows) {
+    const admission = DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS.find(
+      (candidate) => candidate.rowId === row.rowId
+    );
+    assert.ok(admission, row.rowId);
+    assert.equal(
+      row.admissionKind,
+      DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_ADMISSION_KIND
+    );
+    assert.equal(
+      row.gateStatus,
+      DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS
+    );
+    assert.equal(row.localProbe, admission.localProbe);
+    assert.equal(row.oracleExtractor, admission.oracleExtractor);
+    assert.deepEqual(row.coverage, admission.coverage);
+    assert.equal(row.reason, admission.reason);
+    assert.deepEqual(row.localResult, row.reactOracleResult);
+    assert.equal(row.firstDifferencePath, null);
+    assert.equal(row.publicRootCompatibilityClaimed, false);
+    assert.equal(row.serverRenderingCompatibilityClaimed, false);
+    assert.equal(row.hydrationCompatibilityClaimed, false);
+    assert.equal(row.compatibilityClaimed, false);
+  }
   assert.deepEqual(
     gate.skippedUnsupportedPrivateHostTextCommitScenarioRows.map(
       (row) => row.scenarioId
@@ -101,6 +131,24 @@ test("DOM HostText commit gate fails closed on admitted row drift and metadata c
       (failure) =>
         failure.gateStatus ===
         "local-host-text-commit-metadata-compatibilityClaimed-mismatch"
+    )
+  );
+
+  const baseline = runDomTextContentConformanceGate({ checkedOracle: oracle });
+  const publicRootGate = evaluateDomTextContentConformanceGate({
+    checkedOracle: oracle,
+    localChecks: {
+      ...baseline.localChecks,
+      publicReactDomClientRootStillUnsupported: false,
+      publicReactDomClientRootRenderPathPresent: true
+    }
+  });
+  assert.equal(publicRootGate.ok, false);
+  assert.ok(
+    publicRootGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "local-public-react-dom-root-render-path-present-during-private-gate"
     )
   );
 });
