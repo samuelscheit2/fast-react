@@ -23,11 +23,17 @@ const hydrationGate = require(
     "packages/react-dom/src/client/hydration-boundary-gate.js"
   )
 );
+const rootBridge = require(
+  path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+);
 const domContainer = require(
   path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
 );
 const rootMarkers = require(
   path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+);
+const listenerRegistry = require(
+  path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
 );
 const ReactDOMClient = require(path.join(repoRoot, "packages/react-dom/client.js"));
 const ReactDOMProfiling = require(
@@ -238,6 +244,19 @@ test("private hydration boundary gate records unsupported hydrateRoot determinis
   );
   assert.equal(first.record.markerDiagnostics.status, "diagnostic-only");
   assert.equal(first.record.markerDiagnostics.acceptedMarkerCount, 2);
+  assert.deepEqual(first.record.markerEvidence, {
+    kind: "FastReactDomHydrationMarkerEvidence",
+    status: "accepted-marker-evidence-recorded",
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    canHydrate: false,
+    acceptedMarkerCount: 2,
+    commentMarkerCount: 2,
+    templateMarkerCount: 0,
+    unrecognizedMarkerCount: 0,
+    contractIds: ["suspense-completed-start", "suspense-end"]
+  });
   assert.deepEqual(
     first.record.markerDiagnostics.markers.map((marker) => marker.contractId),
     ["suspense-completed-start", "suspense-end"]
@@ -253,6 +272,129 @@ test("private hydration boundary gate records unsupported hydrateRoot determinis
   assert.equal(payload.hydrationOptions, first.hydrationOptions);
   assert.equal(hydrationGate.isPrivateHydrationBoundaryRecord(first.record), true);
   assert.equal(hydrationGate.isPrivateHydrationBoundaryRecord({}), false);
+});
+
+test("private root bridge hydrateRoot requests preserve accepted marker evidence record-only", () => {
+  const first = createRootBridgeHydrateRootScenario("root-bridge");
+  const second = createRootBridgeHydrateRootScenario("root-bridge");
+
+  assert.deepEqual(first.record, second.record);
+  assert.equal(first.record.$$typeof, rootBridge.privateRootHydrateRecordType);
+  assert.equal(first.record.kind, "FastReactDomPrivateRootHydrateRecord");
+  assert.equal(first.record.operation, "hydrate");
+  assert.equal(first.record.requestType, "hydrateRoot");
+  assert.equal(first.record.requestId, "hydrate-request:1");
+  assert.equal(first.record.hydrateId, "hydrate-root:1");
+  assert.equal(first.record.rootId, null);
+  assert.equal(first.record.rootKind, "unsupported-hydration");
+  assert.equal(first.record.rootTag, "ConcurrentRoot");
+  assert.equal(
+    first.record.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION
+  );
+  assert.equal(first.record.hydrationRequested, true);
+  assert.equal(first.record.canHydrate, false);
+  assert.equal(first.record.publicRootCreated, false);
+  assert.equal(first.record.containerMarked, false);
+  assert.equal(first.record.listenersAttached, false);
+  assert.equal(first.record.domMutated, false);
+  assert.equal(first.record.eventsReplayed, false);
+  assert.equal(first.record.rootScheduled, false);
+  assert.equal(first.record.suspenseHydrationScheduled, false);
+  assert.equal(first.record.nativeExecution, false);
+  assert.equal(first.record.reconcilerExecution, false);
+  assert.equal(first.record.domMutation, false);
+  assert.equal(first.record.markerWrites, false);
+  assert.equal(first.record.listenerInstallation, false);
+  assert.equal(first.record.hydration, false);
+  assert.equal(first.record.eventDispatch, false);
+  assert.equal(first.record.compatibilityClaimed, false);
+
+  assert.equal(
+    hydrationGate.isPrivateHydrationBoundaryRecord(
+      first.record.hydrationBoundaryRecord
+    ),
+    true
+  );
+  assert.equal(
+    first.record.markerDiagnostics,
+    first.record.hydrationBoundaryRecord.markerDiagnostics
+  );
+  assert.equal(
+    first.record.markerEvidence,
+    first.record.hydrationBoundaryRecord.markerEvidence
+  );
+  assert.deepEqual(first.record.markerEvidence, {
+    kind: "FastReactDomHydrationMarkerEvidence",
+    status: "accepted-marker-evidence-recorded",
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    canHydrate: false,
+    acceptedMarkerCount: 2,
+    commentMarkerCount: 2,
+    templateMarkerCount: 0,
+    unrecognizedMarkerCount: 0,
+    contractIds: ["suspense-completed-start", "suspense-end"]
+  });
+  assert.deepEqual(
+    first.record.markerDiagnostics.markers.map((marker) => marker.contractId),
+    ["suspense-completed-start", "suspense-end"]
+  );
+
+  assert.deepEqual(
+    {
+      admissionStatus: first.admission.admissionStatus,
+      compatibilityClaimed: first.admission.compatibilityClaimed,
+      executionStatus: first.admission.executionStatus,
+      hydrateId: first.admission.hydrateId,
+      hydration: first.admission.hydration,
+      markerEvidence: first.admission.markerEvidence,
+      operation: first.admission.operation,
+      requestType: first.admission.requestType,
+      rootKind: first.admission.lifecyclePrerequisites.rootKind,
+      transition: first.admission.lifecyclePrerequisites.lifecycleTransition
+    },
+    {
+      admissionStatus: "admitted-private-root-bridge-request-record",
+      compatibilityClaimed: false,
+      executionStatus: "blocked-private-root-bridge-execution",
+      hydrateId: "hydrate-root:1",
+      hydration: false,
+      markerEvidence: first.record.markerEvidence,
+      operation: "hydrate",
+      requestType: "hydrateRoot",
+      rootKind: "unsupported-hydration",
+      transition: "none->unsupported-hydration"
+    }
+  );
+
+  const rootPayload = rootBridge.getPrivateRootRecordPayload(first.record);
+  assert.equal(rootPayload.container, first.container);
+  assert.equal(rootPayload.initialChildren, first.initialChildren);
+  assert.equal(rootPayload.hydrationOptions, first.hydrationOptions);
+  assert.equal(
+    rootPayload.hydrationBoundaryRecord,
+    first.record.hydrationBoundaryRecord
+  );
+
+  assert.throws(
+    () => first.bridge.createNativeRequestHandoff(first.record),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST"
+    }
+  );
+  assert.deepEqual(first.container.__registrations, []);
+  assert.deepEqual(first.document.__registrations, []);
+  assert.equal(rootMarkers.inspectContainerRootMarker(first.container).propertyCount, 1);
+  assert.equal(
+    listenerRegistry.inspectListeningMarker(first.container).propertyCount,
+    1
+  );
+  assert.deepEqual(first.container.childNodes, [
+    { data: "$", nodeType: domContainer.COMMENT_NODE },
+    { data: "/$", nodeType: domContainer.COMMENT_NODE }
+  ]);
 });
 
 test("private hydration boundary gate does not mark containers, install listeners, or mutate DOM-like nodes", () => {
@@ -420,6 +562,57 @@ function createUnsupportedRecordScenario(label) {
   );
 
   return {
+    container,
+    document,
+    hydrationOptions,
+    initialChildren,
+    record
+  };
+}
+
+function createRootBridgeHydrateRootScenario(label) {
+  const document = createDocument(label);
+  const container = createElement("DIV", document);
+  container.childNodes = [
+    { data: "$", nodeType: domContainer.COMMENT_NODE },
+    { data: "/$", nodeType: domContainer.COMMENT_NODE }
+  ];
+
+  rootMarkers.markContainerAsRoot(
+    Object.freeze({
+      rootId: `${label}:existing-root`
+    }),
+    container
+  );
+  listenerRegistry.markTargetAsListening(container);
+
+  const initialChildren = {
+    props: {
+      children: "hello"
+    },
+    type: "App"
+  };
+  const hydrationOptions = {
+    identifierPrefix: `${label}-`
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hydrateIdPrefix: "hydrate-root",
+    hydrationRecordIdPrefix: "hydrate-boundary",
+    markerOracle: oracle,
+    markerOptions: {
+      development: true
+    },
+    requestIdPrefix: "hydrate-request"
+  });
+  const record = bridge.createHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+
+  return {
+    admission: bridge.admitRequest(record),
+    bridge,
     container,
     document,
     hydrationOptions,

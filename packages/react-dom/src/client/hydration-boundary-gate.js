@@ -305,6 +305,7 @@ function createUnsupportedHydrateRootRecordWithGate(
     container,
     gateState
   );
+  const markerEvidence = createHydrationMarkerEvidence(markerDiagnostics);
 
   const sequence = gateState.nextRecordSequence++;
   const recordId = `${gateState.recordIdPrefix}:${sequence}`;
@@ -332,6 +333,7 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerGuard,
     listenerGuard,
     markerDiagnostics,
+    markerEvidence,
     canHydrate: false,
     publicRootCreated: false,
     containerMarked: false,
@@ -406,6 +408,24 @@ function describeCreateRootWarning(message) {
   return freezeRecord({
     message,
     type: warningType
+  });
+}
+
+function createHydrationMarkerEvidence(markerDiagnostics) {
+  return freezeRecord({
+    kind: 'FastReactDomHydrationMarkerEvidence',
+    status: 'accepted-marker-evidence-recorded',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    canHydrate: false,
+    acceptedMarkerCount: markerDiagnostics.acceptedMarkerCount,
+    commentMarkerCount: markerDiagnostics.commentMarkerCount,
+    templateMarkerCount: markerDiagnostics.templateMarkerCount,
+    unrecognizedMarkerCount: markerDiagnostics.unrecognizedMarkerCount,
+    contractIds: freezeArray(
+      markerDiagnostics.markers.map((marker) => marker.contractId)
+    )
   });
 }
 
