@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 724
+
+- Worker 724 added the static private-admission ledger for Workers 722-723.
+  Worker 722 is recorded as skip/meta ledger work, and Worker 723 is recorded
+  as accepted private diagnostic evidence depending on Worker 720's
+  finished-work identity gate.
+- The accepted ledger keeps public/package compatibility blocked for
+  `toJSON`, `toTree`, `.root`, `TestInstance`, native bridge/addon execution,
+  `act`, root routing, update/unmount/multichild native serialization, React
+  DOM/root surfaces, Scheduler, hydration, events, refs, resources, forms, and
+  controlled inputs.
+- Worker 724 was accepted after independent audit and verification with focused
+  private-admission tests, conformance workspace tests, package-surface guard,
+  import-entrypoint smoke, full `npm run check`, conflict-marker scanning, and
+  `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. This is static ledger evidence only and does not execute runtime
+  paths.
+
 ### Worker 723
 
 - Worker 723 added a create-path private react-test-renderer native
