@@ -50,6 +50,24 @@ mod root_bridge_requests {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeLifecycleTransition {
+        NoneToActive,
+        ActiveToActive,
+        ActiveToRetired,
+    }
+
+    impl NativeRootBridgeLifecycleTransition {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::NoneToActive => "none->active",
+                Self::ActiveToActive => "active->active",
+                Self::ActiveToRetired => "active->retired",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) struct NativeRootBridgeCreateRequest {
         root_id: u64,
         container_handle: Option<BridgeHandle>,
@@ -198,9 +216,130 @@ mod root_bridge_requests {
         }
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeRequestValidationRecord {
+        request_id: u64,
+        kind: NativeRootBridgeRequestKind,
+        environment_id: BridgeEnvironmentId,
+        root_handle: BridgeHandle,
+        root_id: u64,
+        value_handle: Option<BridgeHandle>,
+        root_handle_state: NativeRootBridgeRootHandleState,
+        lifecycle_transition: NativeRootBridgeLifecycleTransition,
+        root_handle_validated: bool,
+        value_handle_validated: bool,
+    }
+
+    impl NativeRootBridgeRequestValidationRecord {
+        const fn from_request(
+            request: NativeRootBridgeRequestRecord,
+            lifecycle_transition: NativeRootBridgeLifecycleTransition,
+            value_handle_validated: bool,
+        ) -> Self {
+            Self {
+                request_id: request.request_id(),
+                kind: request.kind(),
+                environment_id: request.environment_id(),
+                root_handle: request.root_handle(),
+                root_id: request.root_id(),
+                value_handle: request.value_handle(),
+                root_handle_state: request.root_handle_state(),
+                lifecycle_transition,
+                root_handle_validated: true,
+                value_handle_validated,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(self) -> NativeRootBridgeRequestKind {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn environment_id(self) -> BridgeEnvironmentId {
+            self.environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle(self) -> BridgeHandle {
+            self.root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn root_id(self) -> u64 {
+            self.root_id
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle(self) -> Option<BridgeHandle> {
+            self.value_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_state(self) -> NativeRootBridgeRootHandleState {
+            self.root_handle_state
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_transition(self) -> NativeRootBridgeLifecycleTransition {
+            self.lifecycle_transition
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_validated(self) -> bool {
+            self.root_handle_validated
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle_validated(self) -> bool {
+            self.value_handle_validated
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeRequestError {
         HandleTable(BridgeHandleTableError),
+        RecordEnvironmentMismatch {
+            record_environment_id: BridgeEnvironmentId,
+            table_environment_id: BridgeEnvironmentId,
+        },
+        RecordRootHandleMismatch {
+            expected: BridgeHandle,
+            actual: BridgeHandle,
+        },
+        RecordRootHandleStateMismatch {
+            expected: NativeRootBridgeRootHandleState,
+            actual: NativeRootBridgeRootHandleState,
+        },
+        RecordRootIdMismatch {
+            expected: u64,
+            actual: u64,
+        },
+        RootHandleStillActive {
+            handle: BridgeHandle,
+        },
+        UnexpectedValueHandle {
+            kind: NativeRootBridgeRequestKind,
+            value_handle: BridgeHandle,
+        },
+        SequenceMustStartWithCreate {
+            actual: NativeRootBridgeRequestKind,
+        },
+        CreateAfterRootCreated {
+            request_id: u64,
+        },
+        RequestAfterUnmount {
+            request_id: u64,
+        },
+        RequestSequenceOutOfOrder {
+            previous_request_id: u64,
+            request_id: u64,
+        },
         RequestSequenceExhausted,
     }
 
@@ -209,6 +348,34 @@ mod root_bridge_requests {
         pub(crate) const fn code(&self) -> &'static str {
             match self {
                 Self::HandleTable(error) => error.code(),
+                Self::RecordEnvironmentMismatch { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ENVIRONMENT_MISMATCH"
+                }
+                Self::RecordRootHandleMismatch { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_MISMATCH"
+                }
+                Self::RecordRootHandleStateMismatch { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH"
+                }
+                Self::RecordRootIdMismatch { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ROOT_ID_MISMATCH"
+                }
+                Self::RootHandleStillActive { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_RETIRED_HANDLE_STILL_ACTIVE"
+                }
+                Self::UnexpectedValueHandle { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_UNEXPECTED_VALUE_HANDLE"
+                }
+                Self::SequenceMustStartWithCreate { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE"
+                }
+                Self::CreateAfterRootCreated { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED"
+                }
+                Self::RequestAfterUnmount { .. } => "FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT",
+                Self::RequestSequenceOutOfOrder { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER"
+                }
                 Self::RequestSequenceExhausted => "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_EXHAUSTED",
             }
         }
@@ -224,6 +391,60 @@ mod root_bridge_requests {
         fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
             match self {
                 Self::HandleTable(error) => Display::fmt(error, formatter),
+                Self::RecordEnvironmentMismatch {
+                    record_environment_id,
+                    table_environment_id,
+                } => write!(
+                    formatter,
+                    "native root bridge request record belongs to environment {}, expected environment {}",
+                    record_environment_id.raw(),
+                    table_environment_id.raw()
+                ),
+                Self::RecordRootHandleMismatch { expected, actual } => write!(
+                    formatter,
+                    "native root bridge request record uses root handle slot {}, expected slot {}",
+                    actual.slot(),
+                    expected.slot()
+                ),
+                Self::RecordRootHandleStateMismatch { expected, actual } => write!(
+                    formatter,
+                    "native root bridge request record has root handle state {:?}, expected {:?}",
+                    actual, expected
+                ),
+                Self::RecordRootIdMismatch { expected, actual } => write!(
+                    formatter,
+                    "native root bridge request record has root id {actual}, expected {expected}"
+                ),
+                Self::RootHandleStillActive { handle } => write!(
+                    formatter,
+                    "native root bridge unmount record did not retire root handle slot {}",
+                    handle.slot()
+                ),
+                Self::UnexpectedValueHandle { kind, .. } => write!(
+                    formatter,
+                    "native root bridge {} record cannot carry a value handle",
+                    kind.code()
+                ),
+                Self::SequenceMustStartWithCreate { actual } => write!(
+                    formatter,
+                    "native root bridge request sequence must start with create, got {}",
+                    actual.code()
+                ),
+                Self::CreateAfterRootCreated { request_id } => write!(
+                    formatter,
+                    "native root bridge request {request_id} attempted to create another root in an active sequence"
+                ),
+                Self::RequestAfterUnmount { request_id } => write!(
+                    formatter,
+                    "native root bridge request {request_id} was recorded after root unmount"
+                ),
+                Self::RequestSequenceOutOfOrder {
+                    previous_request_id,
+                    request_id,
+                } => write!(
+                    formatter,
+                    "native root bridge request id {request_id} must be greater than previous request id {previous_request_id}"
+                ),
                 Self::RequestSequenceExhausted => formatter
                     .write_str("native root bridge request sequence cannot allocate another id"),
             }
@@ -231,6 +452,135 @@ mod root_bridge_requests {
     }
 
     impl Error for NativeRootBridgeRequestError {}
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct NativeRootBridgeRequestSequenceValidator {
+        root_handle: Option<BridgeHandle>,
+        root_id: Option<u64>,
+        last_request_id: Option<u64>,
+        root_retired: bool,
+    }
+
+    impl Default for NativeRootBridgeRequestSequenceValidator {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl NativeRootBridgeRequestSequenceValidator {
+        #[must_use]
+        pub(crate) const fn new() -> Self {
+            Self {
+                root_handle: None,
+                root_id: None,
+                last_request_id: None,
+                root_retired: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle(&self) -> Option<BridgeHandle> {
+            self.root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn root_id(&self) -> Option<u64> {
+            self.root_id
+        }
+
+        #[must_use]
+        pub(crate) const fn last_request_id(&self) -> Option<u64> {
+            self.last_request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn root_retired(&self) -> bool {
+            self.root_retired
+        }
+
+        pub(crate) fn validate_next(
+            &mut self,
+            table: &BridgeHandleTable,
+            request: NativeRootBridgeRequestRecord,
+        ) -> Result<NativeRootBridgeRequestValidationRecord, NativeRootBridgeRequestError> {
+            self.validate_request_order(request.request_id())?;
+
+            if self.root_retired {
+                return Err(NativeRootBridgeRequestError::RequestAfterUnmount {
+                    request_id: request.request_id(),
+                });
+            }
+
+            let validation = match self.root_handle {
+                None => {
+                    if request.kind() != NativeRootBridgeRequestKind::Create {
+                        return Err(NativeRootBridgeRequestError::SequenceMustStartWithCreate {
+                            actual: request.kind(),
+                        });
+                    }
+
+                    validate_create_record(table, request)?
+                }
+                Some(root_handle) => {
+                    if request.kind() == NativeRootBridgeRequestKind::Create {
+                        return Err(NativeRootBridgeRequestError::CreateAfterRootCreated {
+                            request_id: request.request_id(),
+                        });
+                    }
+
+                    validate_sequence_root_identity(
+                        request,
+                        root_handle,
+                        self.root_id
+                            .expect("root id is present when root handle is set"),
+                    )?;
+
+                    match request.kind() {
+                        NativeRootBridgeRequestKind::Create => {
+                            unreachable!("create requests are rejected above")
+                        }
+                        NativeRootBridgeRequestKind::Render => {
+                            validate_render_record(table, request)?
+                        }
+                        NativeRootBridgeRequestKind::Unmount => {
+                            validate_unmount_record(table, request)?
+                        }
+                    }
+                }
+            };
+
+            self.last_request_id = Some(request.request_id());
+
+            if self.root_handle.is_none() {
+                self.root_handle = Some(request.root_handle());
+                self.root_id = Some(request.root_id());
+            }
+
+            if request.kind() == NativeRootBridgeRequestKind::Unmount {
+                self.root_retired = true;
+            }
+
+            Ok(validation)
+        }
+
+        fn validate_request_order(
+            &self,
+            request_id: u64,
+        ) -> Result<(), NativeRootBridgeRequestError> {
+            let Some(previous_request_id) = self.last_request_id else {
+                return Ok(());
+            };
+
+            if request_id > previous_request_id {
+                return Ok(());
+            }
+
+            Err(NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
+                previous_request_id,
+                request_id,
+            })
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub(crate) struct NativeRootBridgeRequestRecorder {
@@ -325,6 +675,145 @@ mod root_bridge_requests {
                 .ok_or(NativeRootBridgeRequestError::RequestSequenceExhausted)?;
             Ok(request_id)
         }
+    }
+
+    fn validate_create_record(
+        table: &BridgeHandleTable,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<NativeRootBridgeRequestValidationRecord, NativeRootBridgeRequestError> {
+        validate_record_environment(table, request)?;
+        validate_root_handle_state(request, NativeRootBridgeRootHandleState::Active)?;
+
+        let root = table.get_root(request.root_handle())?;
+        validate_root_id(request, root.root_id())?;
+        let value_handle_validated = validate_optional_value_handle(table, request)?;
+
+        Ok(NativeRootBridgeRequestValidationRecord::from_request(
+            request,
+            NativeRootBridgeLifecycleTransition::NoneToActive,
+            value_handle_validated,
+        ))
+    }
+
+    fn validate_render_record(
+        table: &BridgeHandleTable,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<NativeRootBridgeRequestValidationRecord, NativeRootBridgeRequestError> {
+        validate_record_environment(table, request)?;
+        validate_root_handle_state(request, NativeRootBridgeRootHandleState::Active)?;
+
+        let root = table.get_root(request.root_handle())?;
+        validate_root_id(request, root.root_id())?;
+        let value_handle_validated = validate_optional_value_handle(table, request)?;
+
+        Ok(NativeRootBridgeRequestValidationRecord::from_request(
+            request,
+            NativeRootBridgeLifecycleTransition::ActiveToActive,
+            value_handle_validated,
+        ))
+    }
+
+    fn validate_unmount_record(
+        table: &BridgeHandleTable,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<NativeRootBridgeRequestValidationRecord, NativeRootBridgeRequestError> {
+        validate_record_environment(table, request)?;
+        validate_root_handle_state(request, NativeRootBridgeRootHandleState::Retired)?;
+
+        if let Some(value_handle) = request.value_handle() {
+            return Err(NativeRootBridgeRequestError::UnexpectedValueHandle {
+                kind: request.kind(),
+                value_handle,
+            });
+        }
+
+        match table.get_root(request.root_handle()) {
+            Ok(_) => Err(NativeRootBridgeRequestError::RootHandleStillActive {
+                handle: request.root_handle(),
+            }),
+            Err(BridgeHandleTableError::StaleHandle { .. }) => {
+                Ok(NativeRootBridgeRequestValidationRecord::from_request(
+                    request,
+                    NativeRootBridgeLifecycleTransition::ActiveToRetired,
+                    false,
+                ))
+            }
+            Err(error) => Err(NativeRootBridgeRequestError::HandleTable(error)),
+        }
+    }
+
+    fn validate_sequence_root_identity(
+        request: NativeRootBridgeRequestRecord,
+        expected_root_handle: BridgeHandle,
+        expected_root_id: u64,
+    ) -> Result<(), NativeRootBridgeRequestError> {
+        if request.root_handle() != expected_root_handle {
+            return Err(NativeRootBridgeRequestError::RecordRootHandleMismatch {
+                expected: expected_root_handle,
+                actual: request.root_handle(),
+            });
+        }
+
+        if request.root_id() != expected_root_id {
+            return Err(NativeRootBridgeRequestError::RecordRootIdMismatch {
+                expected: expected_root_id,
+                actual: request.root_id(),
+            });
+        }
+
+        Ok(())
+    }
+
+    fn validate_record_environment(
+        table: &BridgeHandleTable,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<(), NativeRootBridgeRequestError> {
+        if request.environment_id() == table.environment_id() {
+            return Ok(());
+        }
+
+        Err(NativeRootBridgeRequestError::RecordEnvironmentMismatch {
+            record_environment_id: request.environment_id(),
+            table_environment_id: table.environment_id(),
+        })
+    }
+
+    fn validate_root_handle_state(
+        request: NativeRootBridgeRequestRecord,
+        expected: NativeRootBridgeRootHandleState,
+    ) -> Result<(), NativeRootBridgeRequestError> {
+        let actual = request.root_handle_state();
+        if actual == expected {
+            return Ok(());
+        }
+
+        Err(NativeRootBridgeRequestError::RecordRootHandleStateMismatch { expected, actual })
+    }
+
+    fn validate_root_id(
+        request: NativeRootBridgeRequestRecord,
+        actual: u64,
+    ) -> Result<(), NativeRootBridgeRequestError> {
+        if request.root_id() == actual {
+            return Ok(());
+        }
+
+        Err(NativeRootBridgeRequestError::RecordRootIdMismatch {
+            expected: request.root_id(),
+            actual,
+        })
+    }
+
+    fn validate_optional_value_handle(
+        table: &BridgeHandleTable,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<bool, NativeRootBridgeRequestError> {
+        let Some(value_handle) = request.value_handle() else {
+            return Ok(false);
+        };
+
+        table.get_value(value_handle)?;
+        Ok(true)
     }
 }
 
@@ -628,11 +1117,12 @@ mod tests {
     use super::*;
     use crate::handle_table::{
         BridgeEnvironmentId, BridgeHandleKind, BridgeHandleTable, BridgeHandleTableError,
-        PlaceholderValueRecord,
+        PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
-        NativeRootBridgeCreateRequest, NativeRootBridgeRenderRequest, NativeRootBridgeRequestError,
-        NativeRootBridgeRequestKind, NativeRootBridgeRequestRecorder,
+        NativeRootBridgeCreateRequest, NativeRootBridgeLifecycleTransition,
+        NativeRootBridgeRenderRequest, NativeRootBridgeRequestError, NativeRootBridgeRequestKind,
+        NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
     };
     use std::path::Path;
@@ -941,6 +1431,267 @@ mod tests {
                 handle: element_handle,
                 current_generation: element_handle.generation() + 1
             }
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_sequence_validator_admits_create_render_unmount_against_handle_table() {
+        let mut table = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(281));
+        let container_handle = table.insert_value(PlaceholderValueRecord::new(9401));
+        let element_handle = table.insert_value(PlaceholderValueRecord::new(9402));
+        let mut recorder = NativeRootBridgeRequestRecorder::new();
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+
+        let create = recorder
+            .record_create_root(
+                &mut table,
+                NativeRootBridgeCreateRequest::new(7401).with_container_handle(container_handle),
+            )
+            .unwrap();
+        let create_validation = validator.validate_next(&table, create).unwrap();
+
+        assert_eq!(create_validation.request_id(), create.request_id());
+        assert_eq!(
+            create_validation.kind(),
+            NativeRootBridgeRequestKind::Create
+        );
+        assert_eq!(create_validation.environment_id(), table.environment_id());
+        assert_eq!(create_validation.root_handle(), create.root_handle());
+        assert_eq!(create_validation.root_id(), 7401);
+        assert_eq!(create_validation.value_handle(), Some(container_handle));
+        assert_eq!(
+            create_validation.root_handle_state(),
+            NativeRootBridgeRootHandleState::Active
+        );
+        assert_eq!(
+            create_validation.lifecycle_transition(),
+            NativeRootBridgeLifecycleTransition::NoneToActive
+        );
+        assert_eq!(
+            create_validation.lifecycle_transition().code(),
+            "none->active"
+        );
+        assert!(create_validation.root_handle_validated());
+        assert!(create_validation.value_handle_validated());
+        assert_eq!(validator.root_handle(), Some(create.root_handle()));
+        assert_eq!(validator.root_id(), Some(7401));
+        assert_eq!(validator.last_request_id(), Some(create.request_id()));
+        assert!(!validator.root_retired());
+
+        let render = recorder
+            .record_render(
+                &table,
+                NativeRootBridgeRenderRequest::new(create.root_handle())
+                    .with_element_handle(element_handle),
+            )
+            .unwrap();
+        let render_validation = validator.validate_next(&table, render).unwrap();
+
+        assert_eq!(render_validation.request_id(), render.request_id());
+        assert_eq!(
+            render_validation.kind(),
+            NativeRootBridgeRequestKind::Render
+        );
+        assert_eq!(render_validation.value_handle(), Some(element_handle));
+        assert_eq!(
+            render_validation.lifecycle_transition(),
+            NativeRootBridgeLifecycleTransition::ActiveToActive
+        );
+        assert_eq!(
+            render_validation.lifecycle_transition().code(),
+            "active->active"
+        );
+        assert!(render_validation.root_handle_validated());
+        assert!(render_validation.value_handle_validated());
+        assert_eq!(validator.last_request_id(), Some(render.request_id()));
+        assert!(!validator.root_retired());
+
+        let unmount = recorder
+            .record_unmount(
+                &mut table,
+                NativeRootBridgeUnmountRequest::new(create.root_handle()),
+            )
+            .unwrap();
+        let unmount_validation = validator.validate_next(&table, unmount).unwrap();
+
+        assert_eq!(
+            unmount_validation.kind(),
+            NativeRootBridgeRequestKind::Unmount
+        );
+        assert_eq!(unmount_validation.root_handle(), create.root_handle());
+        assert_eq!(unmount_validation.value_handle(), None);
+        assert_eq!(
+            unmount_validation.root_handle_state(),
+            NativeRootBridgeRootHandleState::Retired
+        );
+        assert_eq!(
+            unmount_validation.lifecycle_transition(),
+            NativeRootBridgeLifecycleTransition::ActiveToRetired
+        );
+        assert_eq!(
+            unmount_validation.lifecycle_transition().code(),
+            "active->retired"
+        );
+        assert!(unmount_validation.root_handle_validated());
+        assert!(!unmount_validation.value_handle_validated());
+        assert_eq!(validator.last_request_id(), Some(unmount.request_id()));
+        assert!(validator.root_retired());
+        assert_eq!(
+            table.get_root(create.root_handle()).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: create.root_handle(),
+                current_generation: create.root_handle().generation() + 1
+            }
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_sequence_validator_rejects_value_handles_invalidated_after_recording() {
+        let mut table = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(281));
+        let element_handle = table.insert_value(PlaceholderValueRecord::new(9501));
+        let mut recorder = NativeRootBridgeRequestRecorder::new();
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+        let create = recorder
+            .record_create_root(&mut table, NativeRootBridgeCreateRequest::new(7501))
+            .unwrap();
+
+        validator.validate_next(&table, create).unwrap();
+        let render = recorder
+            .record_render(
+                &table,
+                NativeRootBridgeRenderRequest::new(create.root_handle())
+                    .with_element_handle(element_handle),
+            )
+            .unwrap();
+        table.remove_value(element_handle).unwrap();
+
+        let stale_value = validator.validate_next(&table, render).unwrap_err();
+
+        assert_eq!(
+            stale_value,
+            NativeRootBridgeRequestError::HandleTable(BridgeHandleTableError::StaleHandle {
+                handle: element_handle,
+                current_generation: element_handle.generation() + 1
+            })
+        );
+        assert_eq!(stale_value.code(), "FAST_REACT_NAPI_STALE_HANDLE");
+        assert_eq!(validator.last_request_id(), Some(create.request_id()));
+        assert!(!validator.root_retired());
+    }
+
+    #[test]
+    fn native_root_bridge_sequence_validator_rejects_wrong_environment_records() {
+        let mut first = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(281));
+        let second = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(282));
+        let mut recorder = NativeRootBridgeRequestRecorder::new();
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+        let create = recorder
+            .record_create_root(&mut first, NativeRootBridgeCreateRequest::new(7601))
+            .unwrap();
+
+        let wrong_environment = validator.validate_next(&second, create).unwrap_err();
+
+        assert_eq!(
+            wrong_environment,
+            NativeRootBridgeRequestError::RecordEnvironmentMismatch {
+                record_environment_id: first.environment_id(),
+                table_environment_id: second.environment_id()
+            }
+        );
+        assert_eq!(
+            wrong_environment.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ENVIRONMENT_MISMATCH"
+        );
+        assert_eq!(validator.last_request_id(), None);
+        assert_eq!(
+            first.get_root(create.root_handle()).unwrap().root_id(),
+            7601
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_sequence_validator_rejects_invalid_lifecycle_order() {
+        let mut table = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(281));
+        let manual_root = table.insert_root(PlaceholderRootRecord::new(7701));
+        let mut recorder = NativeRootBridgeRequestRecorder::new();
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+        let render_before_create = recorder
+            .record_render(&table, NativeRootBridgeRenderRequest::new(manual_root))
+            .unwrap();
+
+        let missing_create = validator
+            .validate_next(&table, render_before_create)
+            .unwrap_err();
+
+        assert_eq!(
+            missing_create,
+            NativeRootBridgeRequestError::SequenceMustStartWithCreate {
+                actual: NativeRootBridgeRequestKind::Render
+            }
+        );
+        assert_eq!(
+            missing_create.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE"
+        );
+
+        let create = recorder
+            .record_create_root(&mut table, NativeRootBridgeCreateRequest::new(7702))
+            .unwrap();
+        validator.validate_next(&table, create).unwrap();
+
+        let out_of_order = validator
+            .validate_next(&table, render_before_create)
+            .unwrap_err();
+
+        assert_eq!(
+            out_of_order,
+            NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
+                previous_request_id: create.request_id(),
+                request_id: render_before_create.request_id()
+            }
+        );
+
+        let foreign_root = table.insert_root(PlaceholderRootRecord::new(7703));
+        let foreign_render = recorder
+            .record_render(&table, NativeRootBridgeRenderRequest::new(foreign_root))
+            .unwrap();
+        let handle_mismatch = validator.validate_next(&table, foreign_render).unwrap_err();
+
+        assert_eq!(
+            handle_mismatch,
+            NativeRootBridgeRequestError::RecordRootHandleMismatch {
+                expected: create.root_handle(),
+                actual: foreign_root
+            }
+        );
+        assert_eq!(
+            handle_mismatch.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_MISMATCH"
+        );
+
+        let unmount = recorder
+            .record_unmount(
+                &mut table,
+                NativeRootBridgeUnmountRequest::new(create.root_handle()),
+            )
+            .unwrap();
+        validator.validate_next(&table, unmount).unwrap();
+        let create_after_unmount = recorder
+            .record_create_root(&mut table, NativeRootBridgeCreateRequest::new(7704))
+            .unwrap();
+        let after_unmount = validator
+            .validate_next(&table, create_after_unmount)
+            .unwrap_err();
+
+        assert_eq!(
+            after_unmount,
+            NativeRootBridgeRequestError::RequestAfterUnmount {
+                request_id: create_after_unmount.request_id()
+            }
+        );
+        assert_eq!(
+            after_unmount.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT"
         );
     }
 
