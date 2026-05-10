@@ -431,16 +431,30 @@ function assertReactTestRendererSchedulerPlaceholder(
   label
 ) {
   const propertyName = exportName.slice('_Scheduler.'.length);
+  const expectedSchedulerKeys = snapshot.keySets['scheduler.mock'];
 
-  assert.deepEqual(Object.keys(scheduler), [], `${label} scheduler keys`);
-  assert.deepEqual(Reflect.ownKeys(scheduler), [], `${label} scheduler ownKeys`);
+  assert.deepEqual(
+    Object.keys(scheduler),
+    expectedSchedulerKeys,
+    `${label} scheduler keys`
+  );
+  assert.deepEqual(
+    Reflect.ownKeys(scheduler),
+    expectedSchedulerKeys,
+    `${label} scheduler ownKeys`
+  );
+  assert.equal(
+    typeof scheduler[propertyName],
+    'function',
+    `${label}.${exportName} type`
+  );
   assert.throws(
-    () => scheduler[propertyName],
+    () => scheduler[propertyName](),
     (error) => {
       assertUnsupportedPlaceholderError(
         error,
         {
-          action: 'was accessed',
+          action: 'was called',
           compatibilityTarget: entry.metadata.compatibilityTarget,
           entrypoint: entry.metadata.entrypoint,
           exportName
