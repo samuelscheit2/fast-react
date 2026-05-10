@@ -1,6 +1,9 @@
 'use strict';
 
 const {
+  describeContainerCleanupTarget
+} = require('../client/dom-container.js');
+const {
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
   ENTRY_REMOVE_PROPERTY,
@@ -44,6 +47,10 @@ const DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF =
   'domPropertyUpdateLatestPropsHandoff';
 const CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD =
   'clearContainerForRootUnmount';
+const ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA =
+  'rootUnmountContainerCleanupMetadata';
+const ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS =
+  'accepted-fake-dom-root-container-cleanup';
 
 const latestPropsCommitRecordPayloads = new WeakMap();
 const domPropertyUpdateLatestPropsHandoffPayloads = new WeakMap();
@@ -160,6 +167,9 @@ function clearContainer(container) {
 function clearContainerForRootUnmount(container) {
   assertRemoveParent(container, 'clearContainerForRootUnmount');
 
+  const containerInfoBefore = Object.freeze(
+    describeContainerCleanupTarget(container)
+  );
   const removedChildren = [];
   let firstChild = getFirstChild(container);
   while (firstChild !== null) {
@@ -167,23 +177,63 @@ function clearContainerForRootUnmount(container) {
     container.removeChild(firstChild);
     firstChild = getFirstChild(container);
   }
+  const removedChildRecords = createRootUnmountRemovedChildCleanupRecords(
+    removedChildren
+  );
+  const containerInfoAfter = Object.freeze(
+    describeContainerCleanupTarget(container)
+  );
+  const containerCleanupMetadata = Object.freeze({
+    kind: ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA,
+    status: ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS,
+    mutation: 'clearContainer',
+    containerInfoBefore,
+    containerInfoAfter,
+    removedChildCount: removedChildren.length,
+    removedChildRecordCount: removedChildRecords.length,
+    removedChildRecords,
+    fakeDomOnly: true,
+    rootContainerCleanup: true,
+    portalContainerCleanup: false,
+    publicRootUnmount: false,
+    compatibilityClaimed: false
+  });
 
   const record = Object.freeze({
     kind: CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
     mutation: 'clearContainer',
     removedChildCount: removedChildren.length,
-    status: 'cleared'
+    status: 'cleared',
+    containerCleanupMetadata
   });
 
   clearContainerForRootUnmountRecordPayloads.set(
     record,
     Object.freeze({
       container,
+      containerCleanupMetadata,
       removedChildren: Object.freeze(removedChildren)
     })
   );
 
   return record;
+}
+
+function createRootUnmountRemovedChildCleanupRecords(removedChildren) {
+  return Object.freeze(
+    removedChildren.map((child, index) =>
+      Object.freeze({
+        kind: 'FastReactDomRootUnmountRemovedChildCleanupRecord',
+        index,
+        childInfo: Object.freeze(describeContainerCleanupTarget(child)),
+        removedFromRootContainer: true,
+        metadataOnly: true,
+        componentTreeDetachedByRootBridge: false,
+        publicRootUnmount: false,
+        compatibilityClaimed: false
+      })
+    )
+  );
 }
 
 function commitTextUpdate(textInstance, oldText, newText) {
@@ -1763,6 +1813,8 @@ module.exports = {
   DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA,
   DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
   CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
+  ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA,
+  ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS,
   appendChild,
   appendChildToContainer,
   appendInitialChild,

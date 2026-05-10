@@ -78,14 +78,18 @@ const {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
+  CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
   clearContainerForRootUnmount,
   commitDomPropertyUpdateForLatestProps,
   createDomHostElementInstance,
   createDomHostTextInstance,
   getClearContainerForRootUnmountRecordPayload,
   getDomPropertyUpdateLatestPropsHandoffPayload,
+  isClearContainerForRootUnmountRecord,
   removeChild,
   removeChildFromContainer,
+  ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA,
+  ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS,
   commitTextUpdate,
   rollbackDomPropertyUpdateLatestPropsHandoff
 } = require('../dom-host/mutation.js');
@@ -144,6 +148,8 @@ const privateRootPortalPrepareMountListenerIntentRecordType =
   'fast.react_dom.private_root_portal_prepare_mount_listener_intent_record';
 const privateRootPortalCommitHandoffRecordType =
   'fast.react_dom.private_root_portal_commit_handoff_record';
+const privateRootUnmountAdmissionRecordType =
+  'fast.react_dom.private_root_unmount_admission_record';
 const privateRootUnmountHostOutputCleanupRecordType =
   'fast.react_dom.private_root_unmount_host_output_cleanup_record';
 const privateRootPortalFakeDomMountRecordType =
@@ -233,6 +239,8 @@ const ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED =
   'blocked-private-root-portal-fake-dom-commit-apply';
 const ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED =
   'validated-private-root-portal-container-ownership';
+const ROOT_BRIDGE_UNMOUNT_ADMITTED =
+  'admitted-private-root-unmount-cleanup';
 const ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED =
   'cleaned-private-root-unmount-host-output';
 const ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED =
@@ -641,9 +649,27 @@ const ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES = freezeArray([
 ]);
 const ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
+    id: 'root-unmount-admission-metadata',
+    accepted: true,
+    reason:
+      'The private unmount cleanup recorded root ownership and lifecycle admission metadata.'
+  }),
+  freezeRecord({
     id: 'fake-dom-clear-container',
     accepted: true,
     reason: 'The private unmount cleanup cleared fake-DOM root children.'
+  }),
+  freezeRecord({
+    id: 'fake-dom-container-cleanup-metadata',
+    accepted: true,
+    reason:
+      'The fake-DOM root container cleanup record was validated before cleanup was published.'
+  }),
+  freezeRecord({
+    id: 'deletion-cleanup-metadata',
+    accepted: true,
+    reason:
+      'The private unmount cleanup connected removed root children to deletion cleanup metadata.'
   }),
   freezeRecord({
     id: 'component-tree-metadata-detach',
@@ -1656,6 +1682,18 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES =
         'The accepted unmount cleanup cleared the private fake-DOM root children through the bridge cleanup path.'
     }),
     freezeRecord({
+      id: 'root-unmount-admission-metadata',
+      accepted: true,
+      reason:
+        'The accepted unmount cleanup exposed private root ownership and cleanup-admission metadata.'
+    }),
+    freezeRecord({
+      id: 'fake-dom-container-cleanup-metadata',
+      accepted: true,
+      reason:
+        'The accepted unmount cleanup includes validated fake-DOM container cleanup metadata.'
+    }),
+    freezeRecord({
       id: 'component-tree-metadata-detach',
       accepted: true,
       reason:
@@ -1738,6 +1776,8 @@ const rootInitialHostOutputCleanupRecords = new WeakMap();
 const rootPortalBoundaryPayloads = new WeakMap();
 const rootPortalPrepareMountListenerIntentPayloads = new WeakMap();
 const rootPortalCommitHandoffPayloads = new WeakMap();
+const rootPortalContainerUsage = new WeakMap();
+const rootUnmountAdmissionPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupRecords = new WeakMap();
 const rootPortalFakeDomMountPayloads = new WeakMap();
@@ -3511,7 +3551,15 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
     unmountCleanupId: unmountCleanupRecord.cleanupId,
     unmountCleanupSequence: unmountCleanupRecord.cleanupSequence,
     unmountCleanupStatus: unmountCleanupRecord.cleanupStatus,
+    unmountAdmissionId: unmountCleanupRecord.unmountAdmissionId,
+    unmountAdmissionSequence: unmountCleanupRecord.unmountAdmissionSequence,
+    unmountAdmissionStatus: unmountCleanupRecord.unmountAdmissionStatus,
+    unmountAdmission: unmountCleanupRecord.unmountAdmission,
+    rootUnmountOwnership:
+      unmountCleanupRecord.unmountAdmission.rootOwnership,
     fakeDomCleanup: unmountCleanupRecord.fakeDomCleanup,
+    containerCleanupMetadata: unmountCleanupRecord.containerCleanupMetadata,
+    deletionCleanupMetadata: unmountCleanupRecord.deletionCleanupMetadata,
     removedRootChildCount:
       unmountCleanupRecord.fakeDomCleanup.removedRootChildCount,
     detachedHostInstanceCount:
@@ -5009,6 +5057,14 @@ function isPrivateRootPortalCommitHandoffRecord(value) {
   return rootPortalCommitHandoffPayloads.has(value);
 }
 
+function getPrivateRootUnmountAdmissionPayload(record) {
+  return rootUnmountAdmissionPayloads.get(record) || null;
+}
+
+function isPrivateRootUnmountAdmissionRecord(value) {
+  return rootUnmountAdmissionPayloads.has(value);
+}
+
 function getPrivateRootUnmountHostOutputCleanupPayload(record) {
   return rootUnmountHostOutputCleanupPayloads.get(record) || null;
 }
@@ -6098,6 +6154,14 @@ function createPortalRootBoundaryRecordWithBridge(bridgeState, record) {
     rootHandle: validation.payload.rootHandle,
     sourceRecord: record
   });
+  trackPrivatePortalContainerUsage({
+    boundaryRecord,
+    portal,
+    portalContainer,
+    rootContainer: validation.rootHandleState.container,
+    rootHandle: validation.payload.rootHandle,
+    sourceRecord: record
+  });
 
   return boundaryRecord;
 }
@@ -6357,6 +6421,15 @@ function cleanupPrivateRootUnmountHostOutputWithBridge(
     (total, record) => total + record.detachedHostInstanceCount,
     0
   );
+  const unmountAdmission = createPrivateRootUnmountAdmissionRecord({
+    admissionRecord,
+    clearContainerPayload,
+    clearContainerRecord,
+    componentTreeDetachRecords,
+    detachedHostInstanceCount,
+    unmountRecord,
+    validation
+  });
   const sideEffectCleanup = revertPrivateCreateRootSideEffectsWithBridge(
     rootBridgeState,
     validation.sideEffectRecord
@@ -6376,6 +6449,10 @@ function cleanupPrivateRootUnmountHostOutputWithBridge(
     sourceUnmountRequestId: unmountRecord.requestId,
     sourceUnmountRequestSequence: unmountRecord.requestSequence,
     sourceUnmountUpdateId: unmountRecord.updateId,
+    unmountAdmission,
+    unmountAdmissionId: unmountAdmission.admissionId,
+    unmountAdmissionSequence: unmountAdmission.admissionSequence,
+    unmountAdmissionStatus: unmountAdmission.admissionStatus,
     sideEffectId: validation.sideEffectRecord.sideEffectId,
     sideEffectCleanupStatus: sideEffectCleanup.sideEffectStatus,
     rootId: unmountRecord.rootId,
@@ -6392,11 +6469,15 @@ function cleanupPrivateRootUnmountHostOutputWithBridge(
     }),
     fakeDomCleanup: freezeRecord({
       clearContainerStatus: clearContainerRecord.status,
+      containerCleanupMetadataStatus:
+        unmountAdmission.containerCleanupMetadata.status,
       componentTreeDetachStatus: 'detached-host-instance-subtree',
       removedRootChildCount: clearContainerRecord.removedChildCount,
       detachedHostInstanceCount,
       detachRecordCount: componentTreeDetachRecords.length
     }),
+    containerCleanupMetadata: unmountAdmission.containerCleanupMetadata,
+    deletionCleanupMetadata: unmountAdmission.deletionCleanupMetadata,
     clearContainerRecord,
     componentTreeDetachRecords: freezeArray(componentTreeDetachRecords),
     sideEffectCleanup,
@@ -6433,11 +6514,256 @@ function cleanupPrivateRootUnmountHostOutputWithBridge(
       container: validation.container,
       sideEffectCleanup,
       sideEffectRecord: validation.sideEffectRecord,
+      unmountAdmission,
       unmountRecord
     })
   );
 
   return cleanupRecord;
+}
+
+function createPrivateRootUnmountAdmissionRecord({
+  admissionRecord,
+  clearContainerPayload,
+  clearContainerRecord,
+  componentTreeDetachRecords,
+  detachedHostInstanceCount,
+  unmountRecord,
+  validation
+}) {
+  const containerCleanupMetadata = validateRootUnmountContainerCleanupRecord(
+    clearContainerRecord,
+    clearContainerPayload,
+    validation.container
+  );
+  const deletionCleanupMetadata = createRootUnmountDeletionCleanupMetadata({
+    clearContainerPayload,
+    componentTreeDetachRecords,
+    detachedHostInstanceCount
+  });
+  const rootBridgeState = validation.bridgeState;
+  const sequence = rootBridgeState.nextUnmountAdmissionSequence++;
+  const admissionId = `${rootBridgeState.unmountAdmissionIdPrefix}:${sequence}`;
+  const rootOwnership = createRootUnmountOwnershipMetadata({
+    admissionRecord,
+    unmountRecord,
+    validation
+  });
+  const unmountAdmission = freezeRecord({
+    $$typeof: privateRootUnmountAdmissionRecordType,
+    kind: 'FastReactDomPrivateRootUnmountAdmissionRecord',
+    operation: 'unmount-host-output-cleanup-admission',
+    admissionId,
+    admissionSequence: sequence,
+    admissionStatus: ROOT_BRIDGE_UNMOUNT_ADMITTED,
+    cleanupStatus: ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED,
+    sourceAdmissionId: admissionRecord.admissionId,
+    sourceAdmissionSequence: admissionRecord.admissionSequence,
+    sourceRenderRequestId: admissionRecord.renderRequestId,
+    sourceRenderRequestSequence: admissionRecord.renderRequestSequence,
+    sourceUnmountRequestId: unmountRecord.requestId,
+    sourceUnmountRequestSequence: unmountRecord.requestSequence,
+    sourceUnmountUpdateId: unmountRecord.updateId,
+    rootId: unmountRecord.rootId,
+    rootKind: unmountRecord.rootKind,
+    rootTag: unmountRecord.rootTag,
+    rootOwnership,
+    containerCleanupMetadata,
+    deletionCleanupMetadata,
+    staleRootHandleRejected: true,
+    alreadyUnmountedRootRejected: true,
+    portalContainerRejected: true,
+    rootOwnerValidated: true,
+    rootContainerCleanupRecordValidated: true,
+    deletionCleanupMetadataAccepted: true,
+    fakeDomContainerCleanupMetadataAccepted: true,
+    publicRootUnmounted: false,
+    publicRootBehaviorChanged: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootUnmountAdmissionPayloads.set(
+    unmountAdmission,
+    freezeRecord({
+      admissionRecord,
+      clearContainerPayload,
+      clearContainerRecord,
+      componentTreeDetachRecords,
+      container: validation.container,
+      containerCleanupMetadata,
+      deletionCleanupMetadata,
+      rootHandle: validation.rootHandle,
+      rootOwnership,
+      unmountRecord
+    })
+  );
+
+  return unmountAdmission;
+}
+
+function validateRootUnmountContainerCleanupRecord(
+  clearContainerRecord,
+  clearContainerPayload,
+  container
+) {
+  if (
+    !isClearContainerForRootUnmountRecord(clearContainerRecord) ||
+    clearContainerRecord.kind !== CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD ||
+    clearContainerRecord.mutation !== 'clearContainer' ||
+    clearContainerRecord.status !== 'cleared'
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires an accepted clear-container cleanup record.'
+    );
+  }
+  if (
+    clearContainerPayload === null ||
+    clearContainerPayload.container !== container ||
+    !Array.isArray(clearContainerPayload.removedChildren)
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup container payload must match the admitted root container.'
+    );
+  }
+  if (
+    clearContainerRecord.removedChildCount !==
+    clearContainerPayload.removedChildren.length
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup child counts must match the clear-container payload.'
+    );
+  }
+
+  const metadata = clearContainerRecord.containerCleanupMetadata;
+  if (
+    metadata === null ||
+    typeof metadata !== 'object' ||
+    metadata.kind !== ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA ||
+    metadata.status !== ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS ||
+    metadata.mutation !== 'clearContainer' ||
+    metadata.fakeDomOnly !== true ||
+    metadata.rootContainerCleanup !== true ||
+    metadata.portalContainerCleanup !== false ||
+    metadata.publicRootUnmount !== false ||
+    metadata.compatibilityClaimed !== false ||
+    metadata.removedChildCount !== clearContainerRecord.removedChildCount ||
+    metadata.removedChildRecordCount !==
+      clearContainerPayload.removedChildren.length ||
+    !Array.isArray(metadata.removedChildRecords)
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires fake-DOM container cleanup metadata.'
+    );
+  }
+  if (
+    metadata.containerInfoBefore.fakeDomCleanupTarget !== true ||
+    metadata.containerInfoAfter.fakeDomCleanupTarget !== true ||
+    metadata.containerInfoAfter.childNodeCount !== 0
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires a cleared fake-DOM root container.'
+    );
+  }
+
+  return metadata;
+}
+
+function createRootUnmountDeletionCleanupMetadata({
+  clearContainerPayload,
+  componentTreeDetachRecords,
+  detachedHostInstanceCount
+}) {
+  if (!Array.isArray(componentTreeDetachRecords)) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires deletion cleanup records.'
+    );
+  }
+  const removedChildren =
+    clearContainerPayload === null ? [] : clearContainerPayload.removedChildren;
+  if (componentTreeDetachRecords.length !== removedChildren.length) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup deletion records must match removed root children.'
+    );
+  }
+
+  let visitedNodeCount = 0;
+  for (const record of componentTreeDetachRecords) {
+    if (
+      record === null ||
+      typeof record !== 'object' ||
+      record.status !== 'detached-host-instance-subtree' ||
+      record.includeRoot !== true ||
+      typeof record.detachedHostInstanceCount !== 'number' ||
+      typeof record.visitedNodeCount !== 'number' ||
+      record.exposesHostNodes !== false ||
+      record.exposesHostTokens !== false
+    ) {
+      throwInvalidUnmountHostOutputCleanupRecord(
+        'Private unmount host-output cleanup requires accepted deletion cleanup metadata.'
+      );
+    }
+    visitedNodeCount += record.visitedNodeCount;
+  }
+
+  return freezeRecord({
+    kind: 'FastReactDomPrivateRootDeletionCleanupMetadataRecord',
+    status: 'accepted-private-root-deletion-cleanup-metadata',
+    removedRootChildCount: removedChildren.length,
+    detachRecordCount: componentTreeDetachRecords.length,
+    detachedHostInstanceCount,
+    visitedNodeCount,
+    detachRecordsMatchRemovedChildren:
+      componentTreeDetachRecords.length === removedChildren.length,
+    componentTreeMetadataDetached: true,
+    publicRootUnmount: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRootUnmountOwnershipMetadata({
+  admissionRecord,
+  unmountRecord,
+  validation
+}) {
+  const containerOwner = getContainerRoot(validation.container);
+  return freezeRecord({
+    kind: 'FastReactDomPrivateRootUnmountOwnershipMetadata',
+    status: 'validated-private-root-unmount-ownership',
+    rootId: unmountRecord.rootId,
+    rootKind: unmountRecord.rootKind,
+    rootTag: unmountRecord.rootTag,
+    rootHandleMatchesCreateRecord:
+      validation.rootHandle === validation.createRecord.handle,
+    rootHandleMatchesUnmountRecord:
+      validation.rootHandle.rootId === unmountRecord.rootId &&
+      validation.rootHandle.rootKind === unmountRecord.rootKind &&
+      validation.rootHandle.rootTag === unmountRecord.rootTag,
+    rootOwnerMatchesCreateRecord:
+      validation.rootOwner === validation.createRecord.owner,
+    rootOwnerMatchesUnmountHandle:
+      validation.rootOwner === validation.rootHandle.owner,
+    rootContainerMatchesHandle:
+      validation.rootHandleState.container === validation.container,
+    rootContainerMarkerMatchesOwner: containerOwner === validation.rootOwner,
+    currentAdmissionMatchesRootHandle:
+      validation.rootHandleState.createRenderAdmissionRecord ===
+      admissionRecord,
+    lifecycleStatusBefore: unmountRecord.lifecycleStatusBefore,
+    lifecycleStatusAfter: unmountRecord.lifecycleStatusAfter,
+    staleRootHandleRejectionEnabled: true,
+    alreadyUnmountedRootRejectionEnabled: true,
+    portalContainerRejectionEnabled: true,
+    portalContainerUsage: validation.portalContainerUsageSummary
+  });
 }
 
 function createPortalFakeDomMountDiagnosticRecordWithBridge(
@@ -8056,6 +8382,10 @@ function createBridgeState(options) {
       options && options.unmountCleanupIdPrefix,
       'unmount-cleanup'
     ),
+    unmountAdmissionIdPrefix: getIdPrefix(
+      options && options.unmountAdmissionIdPrefix,
+      'unmount-admission'
+    ),
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
     nextNativeHandleSlot: 1,
     nextNativeRootId: 1,
@@ -8079,6 +8409,7 @@ function createBridgeState(options) {
     nextRootCommitRefMetadataSequence: 1,
     nextRootSequence: 1,
     nextSideEffectSequence: 1,
+    nextUnmountAdmissionSequence: 1,
     nextUnmountCleanupSequence: 1,
     nextUpdateSequence: 1,
     validationOptions: options && options.validationOptions
@@ -9559,9 +9890,38 @@ function validateUnmountHostOutputCleanupRecords(
     createValidation
   );
   const unmountPayload = rootRecordPayloads.get(unmountRecord);
+  if (unmountPayload === undefined) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Expected a private root.unmount payload for host-output cleanup.'
+    );
+  }
   if (unmountPayload.rootHandle !== admissionPayload.createRecord.handle) {
     throwInvalidUnmountHostOutputCleanupRecord(
       'Private unmount host-output cleanup requires an unmount request for the admitted root handle.'
+    );
+  }
+  if (
+    unmountValidation.rootHandleState.createRenderAdmissionRecord !==
+    admissionRecord
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup rejects stale root handle admission metadata.'
+    );
+  }
+  if (
+    unmountValidation.rootHandleState.lifecycleStatus !==
+    ROOT_LIFECYCLE_UNMOUNTED
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup requires the root handle to be retired by the accepted unmount request.'
+    );
+  }
+  if (
+    unmountPayload.rootHandle.owner !== admissionPayload.createRecord.owner ||
+    unmountValidation.rootHandleState.container !== sideEffectValidation.container
+  ) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup root ownership metadata is inconsistent.'
     );
   }
   if (createValidation.bridgeState !== unmountValidation.bridgeState) {
@@ -9591,11 +9951,31 @@ function validateUnmountHostOutputCleanupRecords(
       'Private unmount host-output cleanup requires root.unmount after the admitted render.'
     );
   }
+  if (admissionPayload.renderRecord.renderCount !== unmountRecord.renderCount) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup rejects stale root handle admission metadata.'
+    );
+  }
+  const portalContainerUsage = getPrivatePortalContainerUsage(
+    sideEffectValidation.container
+  );
+  if (portalContainerUsage !== null) {
+    throwInvalidUnmountHostOutputCleanupRecord(
+      'Private unmount host-output cleanup rejects portal containers.'
+    );
+  }
 
   return {
     bridgeState: unmountValidation.bridgeState,
     container: sideEffectValidation.container,
-    sideEffectRecord: admissionPayload.sideEffectRecord
+    createRecord: admissionPayload.createRecord,
+    renderRecord: admissionPayload.renderRecord,
+    rootHandle: unmountPayload.rootHandle,
+    rootHandleState: unmountValidation.rootHandleState,
+    rootOwner: admissionPayload.createRecord.owner,
+    sideEffectRecord: admissionPayload.sideEffectRecord,
+    portalContainerUsageSummary:
+      summarizePrivatePortalContainerUsage(portalContainerUsage)
   };
 }
 
@@ -11446,6 +11826,76 @@ function describePortalContainerOwnership(
     sameOwnerDocument:
       getOwnerDocument(portalContainer) === getOwnerDocument(rootContainer),
     containerOwnershipValidated: true
+  });
+}
+
+function trackPrivatePortalContainerUsage({
+  boundaryRecord,
+  portal,
+  portalContainer,
+  rootContainer,
+  rootHandle,
+  sourceRecord
+}) {
+  if (!isWeakMapKey(portalContainer)) {
+    return null;
+  }
+
+  const existing = rootPortalContainerUsage.get(portalContainer) || [];
+  const usage = freezeRecord({
+    kind: 'FastReactDomPrivatePortalContainerUsageRecord',
+    boundaryId: boundaryRecord.boundaryId,
+    boundarySequence: boundaryRecord.boundarySequence,
+    portalKey: portal.key,
+    portalContainerInfo: boundaryRecord.portalContainerInfo,
+    rootId: rootHandle.rootId,
+    rootKind: rootHandle.rootKind,
+    rootTag: rootHandle.rootTag,
+    rootContainerInfo: freezeRecord(describeContainer(rootContainer)),
+    sameContainerAsRoot: portalContainer === rootContainer,
+    sourceRequestId: sourceRecord.requestId,
+    sourceRequestSequence: sourceRecord.requestSequence,
+    sourceRequestType: sourceRecord.requestType,
+    portalContainerCleanupBlocked: true,
+    publicPortalMounting: false,
+    compatibilityClaimed: false
+  });
+
+  rootPortalContainerUsage.set(
+    portalContainer,
+    freezeArray([...existing, usage])
+  );
+  return usage;
+}
+
+function getPrivatePortalContainerUsage(container) {
+  if (!isWeakMapKey(container)) {
+    return null;
+  }
+  return rootPortalContainerUsage.get(container) || null;
+}
+
+function summarizePrivatePortalContainerUsage(usage) {
+  if (!Array.isArray(usage) || usage.length === 0) {
+    return freezeRecord({
+      portalContainer: false,
+      portalContainerCleanupBlocked: false,
+      portalUsageCount: 0,
+      status: 'not-a-private-portal-container'
+    });
+  }
+
+  const latest = usage[usage.length - 1];
+  return freezeRecord({
+    portalContainer: true,
+    portalContainerCleanupBlocked: true,
+    portalUsageCount: usage.length,
+    latestBoundaryId: latest.boundaryId,
+    latestBoundarySequence: latest.boundarySequence,
+    latestPortalKey: latest.portalKey,
+    latestRootId: latest.rootId,
+    sameContainerAsRoot: latest.sameContainerAsRoot,
+    status: 'blocked-private-portal-container'
   });
 }
 
@@ -13325,6 +13775,7 @@ module.exports = {
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_UNMOUNT_ADMITTED,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED,
@@ -13403,6 +13854,7 @@ module.exports = {
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
+  getPrivateRootUnmountAdmissionPayload,
   getPrivateRootUnmountHostOutputCleanupPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
@@ -13429,6 +13881,7 @@ module.exports = {
   isPrivateRootPublicFacadePreflightRecord,
   isPrivateRootPublicFacadePreflightRoot,
   isPrivateRootPublicFacadeRoot,
+  isPrivateRootUnmountAdmissionRecord,
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootEventListenerErrorRoutingRecord,
   isPrivateRootHydrationReplayErrorMetadataRecord,
@@ -13466,6 +13919,7 @@ module.exports = {
   privateRootPublicFacadePreflightSymbol,
   privateRootPublicFacadePreflightType,
   privateRootPublicFacadeRootType,
+  privateRootUnmountAdmissionRecordType,
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
   privateRootEventListenerErrorRoutingRecordType,
