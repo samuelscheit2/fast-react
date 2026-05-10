@@ -77,8 +77,9 @@ function assertSupportedPortalImplementation(implementation) {
 
   const error = new Error(
     '[fast-react] React DOM createPortal currently supports only the public ' +
-      'portal object record with implementation null. Portal reconciliation, ' +
-      'commit mounting, root scheduling, and event bubbling are not implemented.'
+      'portal object record with implementation null. Public portal ' +
+      'reconciliation, commit mounting, root scheduling, and event bubbling ' +
+      'are not implemented.'
   );
   error.name = 'FastReactDomPortalRecordError';
   error.code = unsupportedPortalImplementationErrorCode;
