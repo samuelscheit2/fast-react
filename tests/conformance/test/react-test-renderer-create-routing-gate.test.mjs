@@ -16,9 +16,17 @@ const repoRoot = path.resolve(
 const compatibilityTarget = "react-test-renderer@19.2.6";
 const routingGateStatus =
   "blocked-missing-react-test-renderer-create-routing-prerequisites";
+const actSchedulerGateStatus =
+  "blocked-private-react-test-renderer-act-scheduler-metadata-only";
 const missingPrerequisites = [
   "rust-native-test-renderer-create-bridge",
   "react-test-renderer-host-output-serialization"
+];
+const actSchedulerMissingBeforeExecution = [
+  "public-react-test-renderer-act-queue-drain",
+  "public-react-test-renderer-scheduler-flush-execution",
+  "public-react-test-renderer-root-sync-flush-route",
+  "react-test-renderer-renderer-roots-compatibility-admission"
 ];
 const privateRouteStatus = "blocked-js-native-bridge-not-loaded";
 const expectedPrivateRoutes = [
@@ -99,6 +107,28 @@ const schedulerMockKeys = [
   "unstable_setDisableYieldValue",
   "unstable_shouldYield",
   "unstable_wrapCallback"
+];
+const actSchedulerFlushHelperMetadata = [
+  ["unstable_flushAll", { type: "function", name: "", length: 0 }],
+  [
+    "unstable_flushAllWithoutAsserting",
+    {
+      type: "function",
+      name: "unstable_flushAllWithoutAsserting",
+      length: 0
+    }
+  ],
+  ["unstable_flushExpired", { type: "function", name: "", length: 0 }],
+  ["unstable_flushNumberOfYields", { type: "function", name: "", length: 1 }],
+  ["unstable_flushUntilNextPaint", { type: "function", name: "", length: 0 }]
+];
+const actSchedulerRootRecordIds = [
+  "act-root-schedule-request",
+  "act-render-callback-request"
+];
+const actSchedulerSyncFlushRecordIds = [
+  "sync-flush-act-continuation-record",
+  "sync-flush-act-post-passive-continuation-gate"
 ];
 const entrypoints = [
   {
@@ -226,6 +256,9 @@ test("react-test-renderer create shell keeps every behaviorful renderer surface 
       assert.equal(actCallbackInvoked, false, entry.entrypoint);
       assertReactTestRendererUnimplemented(actError, entry.entrypoint, "act");
       assert.equal(Object.hasOwn(actError, "routingGate"), false);
+      assertActSchedulerGate(actError.actSchedulerGate, entry.entrypoint);
+      assert.equal(actError.queuedWorkExecution, false);
+      assert.equal(actError.rendererRootsCompatibilityClaimed, false);
     }
 
     let scheduledCallbackInvoked = false;
@@ -244,6 +277,8 @@ test("react-test-renderer create shell keeps every behaviorful renderer surface 
       "_Scheduler.unstable_scheduleCallback"
     );
     assert.equal(Object.hasOwn(schedulerError, "routingGate"), false);
+    assertActSchedulerGate(schedulerError.actSchedulerGate, entry.entrypoint);
+    assert.equal(schedulerError.queuedWorkExecution, false);
   }
 });
 
@@ -466,6 +501,15 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(gate.serializationAvailable, false);
   assert.equal(gate.actIntegrationAvailable, false);
   assert.equal(gate.schedulerIntegrationAvailable, false);
+  assert.equal(gate.actSchedulerGateStatus, actSchedulerGateStatus);
+  assert.equal(error.actSchedulerGate, gate.actSchedulerGate);
+  assert.equal(error.actSchedulerGateStatus, gate.actSchedulerGate.status);
+  assert.equal(error.schedulerMockFlushHelperMetadataAccepted, true);
+  assert.equal(error.rootActRecordsAccepted, true);
+  assert.equal(error.syncFlushActRecordsAccepted, true);
+  assert.equal(error.queuedWorkExecution, false);
+  assert.equal(error.rendererRootsCompatibilityClaimed, false);
+  assertActSchedulerGate(gate.actSchedulerGate, entrypoint);
   assert.equal(gate.compatibilityClaimed, false);
   assert.equal(Object.isFrozen(gate.missingPrerequisites), true);
   assert.deepEqual(gate.missingPrerequisites, missingPrerequisites);
@@ -515,6 +559,62 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
+}
+
+function assertActSchedulerGate(gate, entrypoint) {
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
+  assert.equal(gate.status, actSchedulerGateStatus);
+  assert.equal(gate.entrypoint, entrypoint);
+  assert.equal(gate.deterministic, true);
+  assert.deepEqual(gate.acceptedWorkers, [
+    "worker-176-act-queue-routing-skeleton",
+    "worker-252-sync-flush-act-continuation-skeleton",
+    "worker-280-scheduler-mock-flush-helper-gate",
+    "worker-285-sync-flush-act-continuation-post-passive-gate"
+  ]);
+  assert.equal(gate.publicActBehaviorAvailable, false);
+  assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
+  assert.equal(gate.publicRootSyncFlushRouteAvailable, false);
+  assert.equal(gate.queuedWorkExecution, false);
+  assert.equal(gate.rendererRootsCompatibilityClaimed, false);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
+  assert.equal(gate.rootActRecordsAccepted, true);
+  assert.equal(gate.syncFlushActRecordsAccepted, true);
+  assert.deepEqual(
+    gate.recognizedSchedulerMockFlushHelpers.map((record) => [
+      record.key,
+      record.descriptor.value
+    ]),
+    actSchedulerFlushHelperMetadata
+  );
+  assert.deepEqual(
+    gate.recognizedRootActRecords.map((record) => record.id),
+    actSchedulerRootRecordIds
+  );
+  assert.deepEqual(
+    gate.recognizedSyncFlushActRecords.map((record) => record.id),
+    actSchedulerSyncFlushRecordIds
+  );
+  assert.deepEqual(
+    gate.missingBeforeExecution,
+    actSchedulerMissingBeforeExecution
+  );
+
+  for (const record of [
+    ...gate.recognizedRootActRecords,
+    ...gate.recognizedSyncFlushActRecords
+  ]) {
+    assert.equal(Object.isFrozen(record), true, record.id);
+    assert.equal(Object.isFrozen(record.acceptedFields), true, record.id);
+    assert.equal(record.queuedWorkExecution, false, record.id);
+  }
+
+  assert.equal(
+    gate.recognizedSyncFlushActRecords[1].passiveEffectExecution,
+    false
+  );
 }
 
 function captureThrown(callback) {

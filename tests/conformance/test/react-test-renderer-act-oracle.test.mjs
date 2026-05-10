@@ -33,6 +33,8 @@ const repoRoot = path.resolve(
 const compatibilityTarget = "react-test-renderer@19.2.6";
 const actBlockedGateStatus =
   "blocked-until-react-test-renderer-act-queue-effects-and-renderer-roots";
+const actSchedulerGateStatus =
+  "blocked-private-react-test-renderer-act-scheduler-metadata-only";
 const actUnblockingRequirements = [
   {
     id: "react-test-renderer-act-queue-flushing",
@@ -118,6 +120,62 @@ const MOCK_SCHEDULER_KEYS = [
   "unstable_setDisableYieldValue",
   "unstable_shouldYield",
   "unstable_wrapCallback"
+];
+const ACT_SCHEDULER_MISSING_BEFORE_EXECUTION = [
+  "public-react-test-renderer-act-queue-drain",
+  "public-react-test-renderer-scheduler-flush-execution",
+  "public-react-test-renderer-root-sync-flush-route",
+  "react-test-renderer-renderer-roots-compatibility-admission"
+];
+const ACT_SCHEDULER_FLUSH_HELPER_METADATA = [
+  [
+    "unstable_flushAll",
+    {
+      type: "function",
+      name: "",
+      length: 0
+    }
+  ],
+  [
+    "unstable_flushAllWithoutAsserting",
+    {
+      type: "function",
+      name: "unstable_flushAllWithoutAsserting",
+      length: 0
+    }
+  ],
+  [
+    "unstable_flushExpired",
+    {
+      type: "function",
+      name: "",
+      length: 0
+    }
+  ],
+  [
+    "unstable_flushNumberOfYields",
+    {
+      type: "function",
+      name: "",
+      length: 1
+    }
+  ],
+  [
+    "unstable_flushUntilNextPaint",
+    {
+      type: "function",
+      name: "",
+      length: 0
+    }
+  ]
+];
+const ACT_SCHEDULER_ROOT_RECORD_IDS = [
+  "act-root-schedule-request",
+  "act-render-callback-request"
+];
+const ACT_SCHEDULER_SYNC_FLUSH_RECORD_IDS = [
+  "sync-flush-act-continuation-record",
+  "sync-flush-act-post-passive-continuation-gate"
 ];
 
 test("checked react-test-renderer act oracle artifact has the expected schema and targets", () => {
@@ -443,6 +501,10 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
   assert.equal(localGate.actQueueFlushingReady, false);
   assert.equal(localGate.effectExecutionReady, false);
   assert.equal(localGate.rendererRootsReady, false);
+  assert.equal(localGate.actSchedulerPrivateGatePresent, true);
+  assert.equal(localGate.schedulerMockFlushHelperMetadataAccepted, true);
+  assert.equal(localGate.rootActRecordsAccepted, true);
+  assert.equal(localGate.syncFlushActRecordsAccepted, true);
   assert.equal(localGate.compatibilityClaimed, false);
 
   for (const requirement of actUnblockingRequirements) {
@@ -473,6 +535,30 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
     const renderer = moduleExports.create(null);
     assert.equal(renderer._Scheduler, moduleExports._Scheduler);
     assert.equal(renderer.unstable_flushSync.length, 1);
+    let flushSyncCallbackInvoked = false;
+    const flushSyncError = captureThrown(() =>
+      renderer.unstable_flushSync(() => {
+        flushSyncCallbackInvoked = true;
+      })
+    );
+    assert.equal(flushSyncCallbackInvoked, false, entry.entrypoint);
+    assertReactTestRendererUnimplementedError(
+      flushSyncError,
+      entry.entrypoint,
+      "create().unstable_flushSync"
+    );
+    assert.equal(
+      flushSyncError.actSchedulerGate,
+      flushSyncError.routingGate.actSchedulerGate
+    );
+    assertActSchedulerGate(
+      flushSyncError.actSchedulerGate,
+      entry.entrypoint
+    );
+    assertSchedulerFlushHelperDescriptorsMatchGate(
+      moduleExports._Scheduler,
+      flushSyncError.actSchedulerGate
+    );
     assertActSurface(entry, moduleExports);
     assertSchedulerSurfaceBlocked(entry, moduleExports._Scheduler);
   }
@@ -713,6 +799,26 @@ function inspectLocalReactTestRendererActBlockedGate() {
     /\bFastReactTestRendererUnimplementedError\b/u.test(testRendererSource) &&
     /Root updates are intentionally blocked/u.test(testRendererSource) &&
     /Synchronous flushing is intentionally blocked/u.test(testRendererSource);
+  const actSchedulerPrivateGatePresent =
+    /react-test-renderer-act-scheduler-private-gate/u.test(
+      testRendererSource
+    ) &&
+    /blocked-private-react-test-renderer-act-scheduler-metadata-only/u.test(
+      testRendererSource
+    );
+  const schedulerMockFlushHelperMetadataAccepted =
+    actSchedulerPrivateGatePresent &&
+    /unstable_flushAllWithoutAsserting/u.test(testRendererSource) &&
+    /scheduler-mock-export-shape/u.test(testRendererSource);
+  const rootActRecordsAccepted =
+    actSchedulerPrivateGatePresent &&
+    /SchedulerActQueueRequest/u.test(testRendererSource) &&
+    /SchedulerActQueueTaskKind::RootSchedule/u.test(testRendererSource) &&
+    /SchedulerActQueueTaskKind::RenderCallback/u.test(testRendererSource);
+  const syncFlushActRecordsAccepted =
+    actSchedulerPrivateGatePresent &&
+    /SchedulerActContinuationRecord/u.test(testRendererSource) &&
+    /SyncFlushActPostPassiveContinuationGateRecord/u.test(testRendererSource);
   const actQueueFlushingReady = actFlushExecutionPresent;
   const effectExecutionReady = effectCallbackExecutionPresent;
   const rendererRootsReady =
@@ -738,6 +844,10 @@ function inspectLocalReactTestRendererActBlockedGate() {
       : "public-renderer-roots-placeholder-blocked",
     actQueueRecordsPresent,
     actContinuationMetadataPresent,
+    actSchedulerPrivateGatePresent,
+    schedulerMockFlushHelperMetadataAccepted,
+    rootActRecordsAccepted,
+    syncFlushActRecordsAccepted,
     actQueueFlushingReady,
     effectExecutionReady,
     rendererRootsReady,
@@ -763,6 +873,9 @@ function assertActSurface(entry, moduleExports) {
   assertReactTestRendererUnimplementedError(error, entry.entrypoint, "act");
   assert.equal(Object.hasOwn(error, "routingGate"), false);
   assert.equal(Object.hasOwn(error, "missingPrerequisites"), false);
+  assertActSchedulerGate(error.actSchedulerGate, entry.entrypoint);
+  assert.equal(error.queuedWorkExecution, false);
+  assert.equal(error.rendererRootsCompatibilityClaimed, false);
 }
 
 function assertSchedulerSurfaceBlocked(entry, scheduler) {
@@ -801,6 +914,8 @@ function assertSchedulerSurfaceBlocked(entry, scheduler) {
     "_Scheduler.unstable_scheduleCallback"
   );
   assert.equal(Object.hasOwn(scheduleError, "routingGate"), false);
+  assertActSchedulerGate(scheduleError.actSchedulerGate, entry.entrypoint);
+  assert.equal(scheduledCallbackInvoked, false, entry.entrypoint);
 
   for (const method of [
     "unstable_flushAll",
@@ -814,6 +929,85 @@ function assertSchedulerSurfaceBlocked(entry, scheduler) {
       `_Scheduler.${method}`
     );
     assert.equal(Object.hasOwn(error, "routingGate"), false);
+    assertActSchedulerGate(error.actSchedulerGate, entry.entrypoint);
+  }
+}
+
+function assertActSchedulerGate(gate, entrypoint) {
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
+  assert.equal(gate.status, actSchedulerGateStatus);
+  assert.equal(gate.entrypoint, entrypoint);
+  assert.equal(gate.deterministic, true);
+  assert.deepEqual(gate.acceptedWorkers, [
+    "worker-176-act-queue-routing-skeleton",
+    "worker-252-sync-flush-act-continuation-skeleton",
+    "worker-280-scheduler-mock-flush-helper-gate",
+    "worker-285-sync-flush-act-continuation-post-passive-gate"
+  ]);
+  assert.equal(gate.publicActBehaviorAvailable, false);
+  assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
+  assert.equal(gate.publicRootSyncFlushRouteAvailable, false);
+  assert.equal(gate.queuedWorkExecution, false);
+  assert.equal(gate.rendererRootsCompatibilityClaimed, false);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
+  assert.equal(gate.rootActRecordsAccepted, true);
+  assert.equal(gate.syncFlushActRecordsAccepted, true);
+  assert.deepEqual(
+    gate.recognizedSchedulerMockFlushHelpers.map((record) => [
+      record.key,
+      record.descriptor.value
+    ]),
+    ACT_SCHEDULER_FLUSH_HELPER_METADATA
+  );
+  assert.deepEqual(
+    gate.recognizedRootActRecords.map((record) => record.id),
+    ACT_SCHEDULER_ROOT_RECORD_IDS
+  );
+  assert.deepEqual(
+    gate.recognizedSyncFlushActRecords.map((record) => record.id),
+    ACT_SCHEDULER_SYNC_FLUSH_RECORD_IDS
+  );
+
+  for (const record of [
+    ...gate.recognizedRootActRecords,
+    ...gate.recognizedSyncFlushActRecords
+  ]) {
+    assert.equal(Object.isFrozen(record), true, record.id);
+    assert.equal(record.queuedWorkExecution, false, record.id);
+    assert.equal(Object.isFrozen(record.acceptedFields), true, record.id);
+  }
+
+  assert.equal(
+    gate.recognizedSyncFlushActRecords[1].passiveEffectExecution,
+    false
+  );
+  assert.equal(Object.isFrozen(gate.missingBeforeExecution), true);
+  assert.deepEqual(
+    gate.missingBeforeExecution,
+    ACT_SCHEDULER_MISSING_BEFORE_EXECUTION
+  );
+}
+
+function assertSchedulerFlushHelperDescriptorsMatchGate(scheduler, gate) {
+  for (const helper of gate.recognizedSchedulerMockFlushHelpers) {
+    const descriptor = Object.getOwnPropertyDescriptor(scheduler, helper.key);
+    assert.deepEqual(
+      {
+        kind: "value" in descriptor ? "data" : "accessor",
+        configurable: descriptor.configurable,
+        enumerable: descriptor.enumerable,
+        writable: descriptor.writable,
+        value: {
+          type: typeof descriptor.value,
+          name: descriptor.value.name,
+          length: descriptor.value.length
+        }
+      },
+      helper.descriptor,
+      helper.key
+    );
   }
 }
 
