@@ -29,18 +29,21 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-- Workers 295, 296, and 305 were accepted from the 293-322 queue. The batch
-  added a private HostRoot visible-callback invocation metadata gate, threaded
-  passive effect create/destroy callback handles through data-only commit and
-  flush records, and added a private react-test-renderer `toJSON` facade gate
-  while keeping public serialization blocked.
-- Workers 295 and 296 were verified on `main` with
-  `cargo fmt --all --check`, focused `fast-react-reconciler` tests for
-  `root_callbacks`, `function_component`, `root_commit`, and
-  `passive_effects`, the full `cargo test -p fast-react-reconciler
-  --all-features` suite, and `git diff --check`. Worker 305 was verified on
-  `main` with the focused react-test-renderer serialization local gate test and
-  `git diff --check`.
+- Workers 293-322 were accepted as a complete implementation batch. The batch
+  added root commit placement canaries, callback and passive-effect metadata,
+  function-component, context, hook, root-scheduler, and sync-flush gates,
+  private react-test-renderer root, serialization, TestInstance, act, and
+  error-surface gates, private React DOM root/listener/component-tree/event/ref,
+  hydration, portal, resource/form, controlled input, and test-utils act gates,
+  native root bridge request-shape and boundary error metadata, benchmark
+  private diagnostic admissions, and package-surface private file hardening.
+- Workers 293-322 were merge-verified with focused Rust, JS, benchmark,
+  package-surface, React DOM, native loader, react-test-renderer, resource/form,
+  controlled input, event/ref/hydration/portal, and act/test-utils checks as
+  conflicts were resolved.
+- Final broad verification after accepting workers 293-322 passed: Rust fmt,
+  core/reconciler/test-renderer/napi package tests, workspace clippy,
+  `npm run check:js`, `npm run check:benchmarks`, and `git diff --check`.
 - Workers 263-292 were accepted as a complete implementation batch. The batch
   added root commit update/deletion apply canaries, private test-renderer JSON,
   routing, TestInstance, serialization, and act gates, DOM root bridge/public
