@@ -26,12 +26,14 @@ use fast_react_reconciler::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCommitError, RootElementHandle, RootOptions,
     RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateCallbackHandle, RootUpdateError,
-    RootWorkLoopError, ScheduledRootUpdateResult, TestRendererHostOutputCanaryCompletedFibers,
+    RootWorkLoopError, ScheduledRootUpdateResult, TestRendererCommittedFiberInspectionError,
+    TestRendererCommittedFiberTreeInspection, TestRendererHostOutputCanaryCompletedFibers,
     TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryFixture,
     TestRendererHostOutputCanaryPreparedFibers, UpdateContainerResult, commit_finished_host_root,
     ensure_root_is_scheduled, finish_test_renderer_host_output_canary_fibers,
-    prepare_test_renderer_host_output_canary_fibers, process_root_schedule_in_microtask,
-    render_host_root_for_lanes, scheduled_roots, update_container, update_container_sync,
+    inspect_test_renderer_committed_fiber_tree, prepare_test_renderer_host_output_canary_fibers,
+    process_root_schedule_in_microtask, render_host_root_for_lanes, scheduled_roots,
+    update_container, update_container_sync,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
@@ -765,6 +767,7 @@ pub struct TestRendererCommittedHostOutput {
     prepared_fibers: TestRendererHostOutputCanaryPreparedFibers,
     completed_fibers: TestRendererHostOutputCanaryCompletedFibers,
     commit: HostRootCommitRecord,
+    fiber_inspection: TestRendererCommittedFiberTreeInspection,
     snapshot: TestContainerSnapshot,
 }
 
@@ -787,6 +790,11 @@ impl TestRendererCommittedHostOutput {
     #[must_use]
     pub const fn commit(&self) -> &HostRootCommitRecord {
         &self.commit
+    }
+
+    #[must_use]
+    pub const fn fiber_inspection(&self) -> &TestRendererCommittedFiberTreeInspection {
+        &self.fiber_inspection
     }
 
     #[must_use]
@@ -1115,6 +1123,7 @@ pub struct TestRendererSerializationGateReport {
     oracle: TestRendererSerializationOracleDiagnostics,
     commit: TestRendererCommitDiagnostics,
     host_output: TestRendererHostOutputDiagnostics,
+    fiber_inspection: Option<Box<TestRendererCommittedFiberTreeInspection>>,
 }
 
 impl TestRendererSerializationGateReport {
@@ -1156,6 +1165,11 @@ impl TestRendererSerializationGateReport {
     #[must_use]
     pub const fn host_output(&self) -> TestRendererHostOutputDiagnostics {
         self.host_output
+    }
+
+    #[must_use]
+    pub fn fiber_inspection(&self) -> Option<&TestRendererCommittedFiberTreeInspection> {
+        self.fiber_inspection.as_deref()
     }
 }
 
@@ -1226,6 +1240,7 @@ pub enum TestRendererRootError {
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
     HostOutputCanary(TestRendererHostOutputCanaryError),
+    FiberInspection(TestRendererCommittedFiberInspectionError),
     MissingHostOutputFixture { element: RootElementHandle },
 }
 
@@ -1240,6 +1255,7 @@ impl Display for TestRendererRootError {
             Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::SerializationGate(error) => Display::fmt(error, formatter),
             Self::HostOutputCanary(error) => Display::fmt(error, formatter),
+            Self::FiberInspection(error) => Display::fmt(error, formatter),
             Self::MissingHostOutputFixture { element } => write!(
                 formatter,
                 "test-renderer host-output canary has no fixture for root element {}",
@@ -1260,6 +1276,7 @@ impl Error for TestRendererRootError {
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
             Self::HostOutputCanary(error) => Some(error),
+            Self::FiberInspection(error) => Some(error),
             Self::MissingHostOutputFixture { .. } => None,
         }
     }
@@ -1310,6 +1327,12 @@ impl From<TestRendererSerializationGateError> for TestRendererRootError {
 impl From<TestRendererHostOutputCanaryError> for TestRendererRootError {
     fn from(error: TestRendererHostOutputCanaryError) -> Self {
         Self::HostOutputCanary(error)
+    }
+}
+
+impl From<TestRendererCommittedFiberInspectionError> for TestRendererRootError {
+    fn from(error: TestRendererCommittedFiberInspectionError) -> Self {
+        Self::FiberInspection(error)
     }
 }
 
@@ -1528,10 +1551,15 @@ impl TestRendererRoot {
             text_count: self.renderer.texts.len(),
             real_host_output_available: !snapshot.children().is_empty(),
         };
+        let fiber_inspection = if host_output.real_host_output_available() {
+            Some(self.describe_committed_fiber_tree_for_canary(commit)?)
+        } else {
+            None
+        };
         let requirements = TestRendererSerializationGateRequirements {
             root_commit_diagnostics_available: true,
             real_host_output_available: host_output.real_host_output_available(),
-            committed_fiber_inspection_available: false,
+            committed_fiber_inspection_available: fiber_inspection.is_some(),
         };
         let status = if !requirements.real_host_output_available() {
             TestRendererSerializationGateStatus::ClosedMissingHostOutput
@@ -1584,7 +1612,19 @@ impl TestRendererRoot {
                 },
             },
             host_output,
+            fiber_inspection: fiber_inspection.map(Box::new),
         })
+    }
+
+    pub fn describe_committed_fiber_tree_for_canary(
+        &self,
+        commit: &HostRootCommitRecord,
+    ) -> Result<TestRendererCommittedFiberTreeInspection, TestRendererRootError> {
+        self.validate_serialization_gate_commit(commit)?;
+        Ok(inspect_test_renderer_committed_fiber_tree(
+            &self.store,
+            self.root_id,
+        )?)
     }
 
     pub fn require_serialization_gate_ready_for_canary(
@@ -1621,6 +1661,7 @@ impl TestRendererRoot {
             Self::text_state_node_raw(text),
         )?;
         let commit = self.commit_host_root_render_for_canary(render)?;
+        let fiber_inspection = self.describe_committed_fiber_tree_for_canary(&commit)?;
         let mut container = self.container;
         let commit_state = self.renderer.prepare_for_commit(&container)?;
         self.renderer
@@ -1633,6 +1674,7 @@ impl TestRendererRoot {
             prepared_fibers: prepared,
             completed_fibers: completed,
             commit,
+            fiber_inspection,
             snapshot,
         }))
     }
@@ -2536,6 +2578,7 @@ mod tests {
         let commit = output.commit();
         let completed = output.completed_fibers();
         let prepared = output.prepared_fibers();
+        let fiber_inspection = output.fiber_inspection();
         let snapshot = output.snapshot();
 
         assert_eq!(render.root(), root.root_id());
@@ -2552,6 +2595,37 @@ mod tests {
         assert_eq!(prepared.text_token().raw(), 1);
         assert_eq!(prepared.component_token().raw(), 2);
         assert_eq!(root.store().host_tokens().len(), 2);
+        assert_eq!(fiber_inspection.root(), root.root_id());
+        assert_eq!(fiber_inspection.current(), commit.current());
+        assert_eq!(
+            fiber_inspection.resulting_element(),
+            render.resulting_element()
+        );
+        assert_eq!(fiber_inspection.host_root().fiber(), commit.current());
+        assert_eq!(
+            fiber_inspection.host_root().child(),
+            Some(completed.component())
+        );
+        assert_eq!(
+            fiber_inspection.host_component().fiber(),
+            completed.component()
+        );
+        assert_eq!(
+            fiber_inspection.host_component().parent(),
+            Some(commit.current())
+        );
+        assert_eq!(
+            fiber_inspection.host_component().child(),
+            Some(completed.text())
+        );
+        assert_eq!(fiber_inspection.host_text().fiber(), completed.text());
+        assert_eq!(
+            fiber_inspection.host_text().parent(),
+            Some(completed.component())
+        );
+        assert_eq!(fiber_inspection.host_text().child(), None);
+        assert!(fiber_inspection.host_component().state_node_present());
+        assert!(fiber_inspection.host_text().state_node_present());
         assert_empty_root_update_callback_snapshot(commit, &render);
         assert_eq!(
             root.store().root(root.root_id()).unwrap().current(),
@@ -2598,6 +2672,50 @@ mod tests {
                 .unwrap()
                 .children()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_serialization_gate_sees_private_committed_fiber_inspection_after_host_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let commit = output.commit();
+
+        let report = root
+            .require_serialization_gate_ready_for_canary(commit)
+            .unwrap();
+        let requirements = report.requirements();
+        let fiber_inspection = report.fiber_inspection().unwrap();
+
+        assert_eq!(
+            report.status(),
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        );
+        assert!(report.is_ready());
+        assert!(requirements.root_commit_diagnostics_available());
+        assert!(requirements.real_host_output_available());
+        assert!(requirements.committed_fiber_inspection_available());
+        assert!(requirements.private_serialization_ready());
+        assert!(!report.oracle().compatibility_claimed());
+        assert_eq!(report.host_output().container_child_count(), 1);
+        assert_eq!(report.host_output().instance_count(), 1);
+        assert_eq!(report.host_output().text_count(), 1);
+        assert_eq!(fiber_inspection.current(), commit.current());
+        assert_eq!(
+            fiber_inspection.host_component().fiber(),
+            output.completed_fibers().component()
+        );
+        assert_eq!(
+            fiber_inspection.host_text().fiber(),
+            output.completed_fibers().text()
         );
     }
 
@@ -2839,6 +2957,7 @@ mod tests {
         assert!(!requirements.real_host_output_available());
         assert!(!requirements.committed_fiber_inspection_available());
         assert!(!requirements.private_serialization_ready());
+        assert!(report.fiber_inspection().is_none());
         assert_eq!(
             oracle.oracle_kind(),
             TEST_RENDERER_SERIALIZATION_ORACLE_KIND
@@ -2920,6 +3039,7 @@ mod tests {
         assert_eq!(report.commit().root(), root.root_id());
         assert_eq!(report.host_output().container_child_count(), 0);
         assert!(!report.requirements().real_host_output_available());
+        assert!(report.fiber_inspection().is_none());
     }
 
     #[test]

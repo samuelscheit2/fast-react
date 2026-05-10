@@ -14,6 +14,7 @@ mod host_tokens;
 #[cfg(test)]
 mod host_work;
 mod passive_effects;
+mod private_fiber_inspection;
 mod root_callbacks;
 mod root_commit;
 mod root_config;
@@ -58,6 +59,10 @@ pub use fiber_store::{FiberRootId, FiberRootStore, FiberRootStoreError};
 pub use host_tokens::{
     HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
     HostFiberTokenValidationError,
+};
+pub use private_fiber_inspection::{
+    TestRendererCommittedFiberInspectionError, TestRendererCommittedFiberNodeInspection,
+    TestRendererCommittedFiberTreeInspection, inspect_test_renderer_committed_fiber_tree,
 };
 pub use root_callbacks::{
     RootUpdateCallbackRecord, RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility,
