@@ -133,6 +133,34 @@ impl FunctionComponentStateDispatchHandle {
     }
 }
 
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct FunctionComponentRefObjectHandle(u64);
+
+impl FunctionComponentRefObjectHandle {
+    pub const NONE: Self = Self(0);
+
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+
+    #[must_use]
+    pub const fn is_some(self) -> bool {
+        self.0 != 0
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentStateDispatchEagerState {
     last_rendered_state: StateHandle,
@@ -562,6 +590,150 @@ impl FunctionComponentStateUpdateRenderLanes {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentMemoDependencyStatus {
+    Changed,
+    Unchanged,
+}
+
+impl FunctionComponentMemoDependencyStatus {
+    #[must_use]
+    pub const fn reused_previous_value(self) -> bool {
+        matches!(self, Self::Unchanged)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentMemoHookRecord {
+    hook: HookSlotId,
+    value: StateHandle,
+    dependencies: HookEffectDependencies,
+}
+
+impl FunctionComponentMemoHookRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn value(self) -> StateHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentMemoUpdateRecord {
+    hook: HookSlotId,
+    previous_value: StateHandle,
+    previous_dependencies: HookEffectDependencies,
+    requested_value: StateHandle,
+    value: StateHandle,
+    dependencies: HookEffectDependencies,
+    dependency_status: FunctionComponentMemoDependencyStatus,
+}
+
+impl FunctionComponentMemoUpdateRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> StateHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn previous_dependencies(self) -> HookEffectDependencies {
+        self.previous_dependencies
+    }
+
+    #[must_use]
+    pub const fn requested_value(self) -> StateHandle {
+        self.requested_value
+    }
+
+    #[must_use]
+    pub const fn value(self) -> StateHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> FunctionComponentMemoDependencyStatus {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn reused_previous_value(self) -> bool {
+        self.dependency_status.reused_previous_value()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentRefHookRecord {
+    hook: HookSlotId,
+    ref_object: FunctionComponentRefObjectHandle,
+    initial_value: StateHandle,
+}
+
+impl FunctionComponentRefHookRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn ref_object(self) -> FunctionComponentRefObjectHandle {
+        self.ref_object
+    }
+
+    #[must_use]
+    pub const fn initial_value(self) -> StateHandle {
+        self.initial_value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentRefUpdateRecord {
+    hook: HookSlotId,
+    ref_object: FunctionComponentRefObjectHandle,
+    initial_value: StateHandle,
+    ignored_initial_value: StateHandle,
+}
+
+impl FunctionComponentRefUpdateRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn ref_object(self) -> FunctionComponentRefObjectHandle {
+        self.ref_object
+    }
+
+    #[must_use]
+    pub const fn initial_value(self) -> StateHandle {
+        self.initial_value
+    }
+
+    #[must_use]
+    pub const fn ignored_initial_value(self) -> StateHandle {
+        self.ignored_initial_value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentStateUpdateRenderRecord {
     fiber: FiberId,
     hook: HookSlotId,
@@ -611,6 +783,49 @@ impl FunctionComponentUseStateRenderRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseMemoRenderRequest {
+    value: StateHandle,
+    dependencies: HookEffectDependencies,
+}
+
+impl FunctionComponentUseMemoRenderRequest {
+    #[must_use]
+    pub const fn new(value: StateHandle, dependencies: HookEffectDependencies) -> Self {
+        Self {
+            value,
+            dependencies,
+        }
+    }
+
+    #[must_use]
+    pub const fn value(self) -> StateHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseRefRenderRequest {
+    initial_value: StateHandle,
+}
+
+impl FunctionComponentUseRefRenderRequest {
+    #[must_use]
+    pub const fn new(initial_value: StateHandle) -> Self {
+        Self { initial_value }
+    }
+
+    #[must_use]
+    pub const fn initial_value(self) -> StateHandle {
+        self.initial_value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentReducerUpdateRenderRecord {
     fiber: FiberId,
     hook: HookSlotId,
@@ -635,6 +850,118 @@ pub(crate) struct FunctionComponentReducerUpdateRenderRecord {
 pub(crate) enum FunctionComponentUseStateHookRenderRecord {
     Mount(FunctionComponentStateHookRecord),
     Update(FunctionComponentStateUpdateRenderRecord),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentUseMemoHookRenderRecord {
+    Mount(FunctionComponentMemoHookRecord),
+    Update(FunctionComponentMemoUpdateRecord),
+}
+
+impl FunctionComponentUseMemoHookRenderRecord {
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentHookRenderPhase {
+        match self {
+            Self::Mount(_) => FunctionComponentHookRenderPhase::Mount,
+            Self::Update(_) => FunctionComponentHookRenderPhase::Update,
+        }
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        match self {
+            Self::Mount(record) => record.hook(),
+            Self::Update(record) => record.hook(),
+        }
+    }
+
+    #[must_use]
+    pub const fn value(self) -> StateHandle {
+        match self {
+            Self::Mount(record) => record.value(),
+            Self::Update(record) => record.value(),
+        }
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        match self {
+            Self::Mount(record) => record.dependencies(),
+            Self::Update(record) => record.dependencies(),
+        }
+    }
+
+    #[must_use]
+    pub const fn mount_record(self) -> Option<FunctionComponentMemoHookRecord> {
+        match self {
+            Self::Mount(record) => Some(record),
+            Self::Update(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn update_record(self) -> Option<FunctionComponentMemoUpdateRecord> {
+        match self {
+            Self::Update(record) => Some(record),
+            Self::Mount(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentUseRefHookRenderRecord {
+    Mount(FunctionComponentRefHookRecord),
+    Update(FunctionComponentRefUpdateRecord),
+}
+
+impl FunctionComponentUseRefHookRenderRecord {
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentHookRenderPhase {
+        match self {
+            Self::Mount(_) => FunctionComponentHookRenderPhase::Mount,
+            Self::Update(_) => FunctionComponentHookRenderPhase::Update,
+        }
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        match self {
+            Self::Mount(record) => record.hook(),
+            Self::Update(record) => record.hook(),
+        }
+    }
+
+    #[must_use]
+    pub const fn ref_object(self) -> FunctionComponentRefObjectHandle {
+        match self {
+            Self::Mount(record) => record.ref_object(),
+            Self::Update(record) => record.ref_object(),
+        }
+    }
+
+    #[must_use]
+    pub const fn initial_value(self) -> StateHandle {
+        match self {
+            Self::Mount(record) => record.initial_value(),
+            Self::Update(record) => record.initial_value(),
+        }
+    }
+
+    #[must_use]
+    pub const fn mount_record(self) -> Option<FunctionComponentRefHookRecord> {
+        match self {
+            Self::Mount(record) => Some(record),
+            Self::Update(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn update_record(self) -> Option<FunctionComponentRefUpdateRecord> {
+        match self {
+            Self::Update(record) => Some(record),
+            Self::Mount(_) => None,
+        }
+    }
 }
 
 impl FunctionComponentUseStateHookRenderRecord {
@@ -1144,6 +1471,20 @@ struct FunctionComponentEffectRingBinding {
     ring: HookEffectRing,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentMemoHookBinding {
+    hook: HookSlotId,
+    value: StateHandle,
+    dependencies: HookEffectDependencies,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentRefHookBinding {
+    hook: HookSlotId,
+    ref_object: FunctionComponentRefObjectHandle,
+    initial_value: StateHandle,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct FunctionComponentHookRenderStore {
     hook_lists: HookListArena,
@@ -1151,8 +1492,11 @@ pub(crate) struct FunctionComponentHookRenderStore {
     state_queues: FunctionComponentStateQueueStore,
     current_lists: Vec<FunctionComponentCurrentHookList>,
     effect_rings: Vec<FunctionComponentEffectRingBinding>,
+    memo_hooks: Vec<FunctionComponentMemoHookBinding>,
+    ref_hooks: Vec<FunctionComponentRefHookBinding>,
     state_dispatches: Vec<FunctionComponentStateDispatchBinding>,
     next_state_dispatch_raw: u64,
+    next_ref_object_raw: u64,
 }
 
 impl Default for FunctionComponentHookRenderStore {
@@ -1163,8 +1507,11 @@ impl Default for FunctionComponentHookRenderStore {
             state_queues: FunctionComponentStateQueueStore::default(),
             current_lists: Vec::new(),
             effect_rings: Vec::new(),
+            memo_hooks: Vec::new(),
+            ref_hooks: Vec::new(),
             state_dispatches: Vec::new(),
             next_state_dispatch_raw: 1,
+            next_ref_object_raw: 1,
         }
     }
 }
@@ -1377,6 +1724,116 @@ impl FunctionComponentHookRenderStore {
                 })
             }
         }
+    }
+
+    pub fn mount_memo_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        value: StateHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentMemoHookRecord, FunctionComponentRenderError> {
+        let state = cursor.state();
+        if state.phase() != FunctionComponentHookRenderPhase::Mount {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Mount,
+                actual: state.phase(),
+            });
+        }
+
+        let hook = self.mount_hook_metadata(cursor, HookSlotPayload::opaque(value))?;
+        self.bind_memo_hook_unchecked(hook, value, dependencies);
+
+        Ok(FunctionComponentMemoHookRecord {
+            hook,
+            value,
+            dependencies,
+        })
+    }
+
+    pub fn update_memo_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        requested_value: StateHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentMemoUpdateRecord, FunctionComponentRenderError> {
+        let previous_hook = self.next_current_hook_for_update_cursor(cursor)?;
+        let state = cursor.state();
+        let previous = self.memo_hook_record(state.render_fiber(), previous_hook)?;
+        let hook = self.update_hook_metadata(cursor)?;
+        let dependency_status = memo_dependency_status(previous.dependencies(), dependencies);
+        let value = if dependency_status.reused_previous_value() {
+            previous.value()
+        } else {
+            requested_value
+        };
+
+        self.hook_lists
+            .set_hook_payload(hook, HookSlotPayload::opaque(value))
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+        self.bind_memo_hook_unchecked(hook, value, dependencies);
+
+        Ok(FunctionComponentMemoUpdateRecord {
+            hook,
+            previous_value: previous.value(),
+            previous_dependencies: previous.dependencies(),
+            requested_value,
+            value,
+            dependencies,
+            dependency_status,
+        })
+    }
+
+    pub fn mount_ref_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        initial_value: StateHandle,
+    ) -> Result<FunctionComponentRefHookRecord, FunctionComponentRenderError> {
+        let state = cursor.state();
+        if state.phase() != FunctionComponentHookRenderPhase::Mount {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Mount,
+                actual: state.phase(),
+            });
+        }
+
+        let ref_object = self.create_ref_object()?;
+        let hook = self.mount_hook_metadata(cursor, ref_payload(ref_object))?;
+        self.bind_ref_hook_unchecked(hook, ref_object, initial_value);
+
+        Ok(FunctionComponentRefHookRecord {
+            hook,
+            ref_object,
+            initial_value,
+        })
+    }
+
+    pub fn update_ref_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        ignored_initial_value: StateHandle,
+    ) -> Result<FunctionComponentRefUpdateRecord, FunctionComponentRenderError> {
+        let previous_hook = self.next_current_hook_for_update_cursor(cursor)?;
+        let state = cursor.state();
+        let previous = self.ref_hook_record(state.render_fiber(), previous_hook)?;
+        let hook = self.update_hook_metadata(cursor)?;
+
+        self.hook_lists
+            .set_hook_payload(hook, ref_payload(previous.ref_object()))
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+        self.bind_ref_hook_unchecked(hook, previous.ref_object(), previous.initial_value());
+
+        Ok(FunctionComponentRefUpdateRecord {
+            hook,
+            ref_object: previous.ref_object(),
+            initial_value: previous.initial_value(),
+            ignored_initial_value,
+        })
     }
 
     pub fn mount_effect_metadata(
@@ -1719,6 +2176,50 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub fn create_current_memo_hook(
+        &mut self,
+        fiber: FiberId,
+        value: StateHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentMemoHookRecord, FunctionComponentRenderError> {
+        let list = self
+            .current_list(fiber)
+            .unwrap_or_else(|| self.create_current_list(fiber));
+        let hook = self
+            .hook_lists
+            .append_hook(list, HookSlotPayload::opaque(value))
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?;
+        self.bind_memo_hook_unchecked(hook, value, dependencies);
+
+        Ok(FunctionComponentMemoHookRecord {
+            hook,
+            value,
+            dependencies,
+        })
+    }
+
+    pub fn create_current_ref_hook(
+        &mut self,
+        fiber: FiberId,
+        initial_value: StateHandle,
+    ) -> Result<FunctionComponentRefHookRecord, FunctionComponentRenderError> {
+        let list = self
+            .current_list(fiber)
+            .unwrap_or_else(|| self.create_current_list(fiber));
+        let ref_object = self.create_ref_object()?;
+        let hook = self
+            .hook_lists
+            .append_hook(list, ref_payload(ref_object))
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?;
+        self.bind_ref_hook_unchecked(hook, ref_object, initial_value);
+
+        Ok(FunctionComponentRefHookRecord {
+            hook,
+            ref_object,
+            initial_value,
+        })
+    }
+
     pub fn create_current_effect_metadata(
         &mut self,
         arena: &mut FiberArena,
@@ -1887,6 +2388,38 @@ impl FunctionComponentHookRenderStore {
         queue_record.set_dispatch(dispatch);
         queue_record.set_last_rendered_reducer(FunctionComponentStateReducerId::Reducer(reducer));
         Ok(())
+    }
+
+    fn memo_hook_record(
+        &self,
+        fiber: FiberId,
+        hook: HookSlotId,
+    ) -> Result<FunctionComponentMemoHookRecord, FunctionComponentRenderError> {
+        self.memo_hooks
+            .iter()
+            .find(|binding| binding.hook == hook)
+            .map(|binding| FunctionComponentMemoHookRecord {
+                hook,
+                value: binding.value,
+                dependencies: binding.dependencies,
+            })
+            .ok_or(FunctionComponentRenderError::MissingMemoHookRecord { fiber, hook })
+    }
+
+    fn ref_hook_record(
+        &self,
+        fiber: FiberId,
+        hook: HookSlotId,
+    ) -> Result<FunctionComponentRefHookRecord, FunctionComponentRenderError> {
+        self.ref_hooks
+            .iter()
+            .find(|binding| binding.hook == hook)
+            .map(|binding| FunctionComponentRefHookRecord {
+                hook,
+                ref_object: binding.ref_object,
+                initial_value: binding.initial_value,
+            })
+            .ok_or(FunctionComponentRenderError::MissingRefHookRecord { fiber, hook })
     }
 
     fn state_hook_record(
@@ -2111,6 +2644,62 @@ impl FunctionComponentHookRenderStore {
             .ok_or(FunctionComponentRenderError::UnknownStateDispatch { dispatch })
     }
 
+    fn create_ref_object(
+        &mut self,
+    ) -> Result<FunctionComponentRefObjectHandle, FunctionComponentRenderError> {
+        let raw = self.next_ref_object_raw;
+        if raw == 0 {
+            return Err(FunctionComponentRenderError::RefObjectHandleOverflow);
+        }
+        let ref_object = FunctionComponentRefObjectHandle::from_raw(raw);
+        self.next_ref_object_raw = raw.checked_add(1).unwrap_or(0);
+        Ok(ref_object)
+    }
+
+    fn bind_memo_hook_unchecked(
+        &mut self,
+        hook: HookSlotId,
+        value: StateHandle,
+        dependencies: HookEffectDependencies,
+    ) {
+        if let Some(binding) = self
+            .memo_hooks
+            .iter_mut()
+            .find(|binding| binding.hook == hook)
+        {
+            binding.value = value;
+            binding.dependencies = dependencies;
+        } else {
+            self.memo_hooks.push(FunctionComponentMemoHookBinding {
+                hook,
+                value,
+                dependencies,
+            });
+        }
+    }
+
+    fn bind_ref_hook_unchecked(
+        &mut self,
+        hook: HookSlotId,
+        ref_object: FunctionComponentRefObjectHandle,
+        initial_value: StateHandle,
+    ) {
+        if let Some(binding) = self
+            .ref_hooks
+            .iter_mut()
+            .find(|binding| binding.hook == hook)
+        {
+            binding.ref_object = ref_object;
+            binding.initial_value = initial_value;
+        } else {
+            self.ref_hooks.push(FunctionComponentRefHookBinding {
+                hook,
+                ref_object,
+                initial_value,
+            });
+        }
+    }
+
     fn bind_current_list_unchecked(&mut self, fiber: FiberId, list: HookListId) {
         if let Some(binding) = self
             .current_lists
@@ -2121,6 +2710,33 @@ impl FunctionComponentHookRenderStore {
         } else {
             self.current_lists
                 .push(FunctionComponentCurrentHookList { fiber, list });
+        }
+    }
+
+    fn next_current_hook_for_update_cursor(
+        &self,
+        cursor: &FunctionComponentHookRenderCursor,
+    ) -> Result<HookSlotId, FunctionComponentRenderError> {
+        match cursor {
+            FunctionComponentHookRenderCursor::Update { state, cursor } => {
+                cursor.next_current().ok_or_else(|| {
+                    FunctionComponentRenderError::hook_list(
+                        state.render_fiber(),
+                        HookListError::RenderedMoreHooksThanPreviousRender {
+                            current_list: cursor.current_list(),
+                            work_in_progress_list: cursor.work_in_progress_list(),
+                            attempted_index: cursor.consumed(),
+                        },
+                    )
+                })
+            }
+            FunctionComponentHookRenderCursor::Mount { state, .. } => {
+                Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                    fiber: state.render_fiber(),
+                    expected: FunctionComponentHookRenderPhase::Update,
+                    actual: FunctionComponentHookRenderPhase::Mount,
+                })
+            }
         }
     }
 
@@ -2200,6 +2816,21 @@ fn state_slot_from_payload(payload: HookStatePayload) -> HookStateSlot<StateHand
     slot.set_base_state(payload.base_state());
     slot.set_base_queue(payload.base_queue());
     slot
+}
+
+fn memo_dependency_status(
+    previous: HookEffectDependencies,
+    next: HookEffectDependencies,
+) -> FunctionComponentMemoDependencyStatus {
+    if next.is_always_run() || previous != next {
+        FunctionComponentMemoDependencyStatus::Changed
+    } else {
+        FunctionComponentMemoDependencyStatus::Unchanged
+    }
+}
+
+fn ref_payload(ref_object: FunctionComponentRefObjectHandle) -> HookSlotPayload {
+    HookSlotPayload::opaque(StateHandle::from_raw(ref_object.raw()))
 }
 
 fn state_update_render_record_from_result(
@@ -2736,6 +3367,14 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         hook: HookSlotId,
     },
+    MissingMemoHookRecord {
+        fiber: FiberId,
+        hook: HookSlotId,
+    },
+    MissingRefHookRecord {
+        fiber: FiberId,
+        hook: HookSlotId,
+    },
     MissingStateDispatch {
         fiber: FiberId,
         queue: HookQueueId,
@@ -2758,6 +3397,7 @@ pub(crate) enum FunctionComponentRenderError {
         dispatch: FunctionComponentStateDispatchHandle,
     },
     StateDispatchHandleOverflow,
+    RefObjectHandleOverflow,
     HookCursorPhaseMismatch {
         fiber: FiberId,
         expected: FunctionComponentHookRenderPhase,
@@ -2853,6 +3493,18 @@ impl Display for FunctionComponentRenderError {
                 fiber.slot().get(),
                 hook.slot().get()
             ),
+            Self::MissingMemoHookRecord { fiber, hook } => write!(
+                formatter,
+                "function component fiber {} expected hook slot {} to contain private useMemo metadata",
+                fiber.slot().get(),
+                hook.slot().get()
+            ),
+            Self::MissingRefHookRecord { fiber, hook } => write!(
+                formatter,
+                "function component fiber {} expected hook slot {} to contain private useRef metadata",
+                fiber.slot().get(),
+                hook.slot().get()
+            ),
             Self::MissingStateDispatch { fiber, queue } => write!(
                 formatter,
                 "function component fiber {} state queue {} has no private dispatch handle",
@@ -2891,6 +3543,9 @@ impl Display for FunctionComponentRenderError {
             ),
             Self::StateDispatchHandleOverflow => {
                 formatter.write_str("private state hook dispatch handle counter overflowed")
+            }
+            Self::RefObjectHandleOverflow => {
+                formatter.write_str("private ref object handle counter overflowed")
             }
             Self::HookCursorPhaseMismatch {
                 fiber,
@@ -2941,6 +3596,8 @@ impl Error for FunctionComponentRenderError {
             Self::ExpectedEffectHookPayload { .. }
             | Self::MissingComponentHandle { .. }
             | Self::MissingCurrentHookList { .. }
+            | Self::MissingMemoHookRecord { .. }
+            | Self::MissingRefHookRecord { .. }
             | Self::MissingStateHookPayload { .. }
             | Self::MissingStateDispatch { .. }
             | Self::ExpectedReducerQueue { .. }
@@ -2948,6 +3605,7 @@ impl Error for FunctionComponentRenderError {
             | Self::StateDispatchEagerStateMismatch { .. }
             | Self::UnknownStateDispatch { .. }
             | Self::StateDispatchHandleOverflow
+            | Self::RefObjectHandleOverflow
             | Self::HookCursorPhaseMismatch { .. }
             | Self::Unsupported { .. }
             | Self::UnexpectedFiberTag { .. } => None,
@@ -3261,6 +3919,66 @@ impl FunctionComponentUseStateRenderRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseMemoUseRefRenderRecord {
+    render: FunctionComponentRenderRecord,
+    hook_result: FunctionComponentHookRenderResult,
+    memo_hook: FunctionComponentUseMemoHookRenderRecord,
+    ref_hook: FunctionComponentUseRefHookRenderRecord,
+}
+
+impl FunctionComponentUseMemoUseRefRenderRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn hook_result(self) -> FunctionComponentHookRenderResult {
+        self.hook_result
+    }
+
+    #[must_use]
+    pub const fn memo_hook(self) -> FunctionComponentUseMemoHookRenderRecord {
+        self.memo_hook
+    }
+
+    #[must_use]
+    pub const fn ref_hook(self) -> FunctionComponentUseRefHookRenderRecord {
+        self.ref_hook
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn hook_state(self) -> FunctionComponentHookRenderState {
+        self.hook_result.state()
+    }
+
+    #[must_use]
+    pub const fn hook_traversal(self) -> HookListTraversalResult {
+        self.hook_result.traversal()
+    }
+}
+
 pub(crate) fn render_function_component(
     arena: &mut FiberArena,
     work_in_progress: FiberId,
@@ -3345,6 +4063,75 @@ pub(crate) fn render_function_component_with_use_state(
         },
         hook_result,
         state_hook,
+    })
+}
+
+pub(crate) fn render_function_component_with_use_memo_and_ref(
+    arena: &mut FiberArena,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    memo_request: FunctionComponentUseMemoRenderRequest,
+    ref_request: FunctionComponentUseRefRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<FunctionComponentUseMemoUseRefRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
+    request = request.with_hook_state(hook_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    let mut cursor = hook_store.begin_render_cursor(hook_state)?;
+    let (memo_hook, ref_hook) = match hook_state.phase() {
+        FunctionComponentHookRenderPhase::Mount => (
+            FunctionComponentUseMemoHookRenderRecord::Mount(hook_store.mount_memo_hook(
+                &mut cursor,
+                memo_request.value(),
+                memo_request.dependencies(),
+            )?),
+            FunctionComponentUseRefHookRenderRecord::Mount(
+                hook_store.mount_ref_hook(&mut cursor, ref_request.initial_value())?,
+            ),
+        ),
+        FunctionComponentHookRenderPhase::Update => (
+            FunctionComponentUseMemoHookRenderRecord::Update(hook_store.update_memo_hook(
+                &mut cursor,
+                memo_request.value(),
+                memo_request.dependencies(),
+            )?),
+            FunctionComponentUseRefHookRenderRecord::Update(
+                hook_store.update_ref_hook(&mut cursor, ref_request.initial_value())?,
+            ),
+        ),
+    };
+    let hook_result = hook_store.finish_render_cursor(cursor)?;
+
+    let output = invoker
+        .invoke_function_component(request)
+        .map_err(|error| FunctionComponentRenderError::Invocation {
+            fiber: request.fiber(),
+            component: request.component(),
+            error,
+        })?;
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    Ok(FunctionComponentUseMemoUseRefRenderRecord {
+        render: FunctionComponentRenderRecord {
+            current: arena.get(work_in_progress)?.alternate(),
+            work_in_progress,
+            component: request.component(),
+            props: request.props(),
+            render_lanes: request.render_lanes(),
+            hook_state: request.hook_state(),
+            context_state: request.context_state(),
+            context_read_count: 0,
+            output,
+        },
+        hook_result,
+        memo_hook,
+        ref_hook,
     })
 }
 
@@ -3687,6 +4474,13 @@ mod tests {
 
     fn opaque(raw: u64) -> HookSlotPayload {
         HookSlotPayload::opaque(StateHandle::from_raw(raw))
+    }
+
+    fn opaque_value(payload: HookSlotPayload) -> StateHandle {
+        match payload {
+            HookSlotPayload::Opaque(payload) => payload.memoized_state(),
+            other => panic!("expected opaque hook payload, got {other:?}"),
+        }
     }
 
     fn callback(raw: u64) -> HookEffectCallbackHandle {
@@ -4934,6 +5728,311 @@ mod tests {
     }
 
     #[test]
+    fn private_use_memo_ref_render_path_mounts_hooks_before_invocation() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let output = FunctionComponentOutputHandle::from_raw(75);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let memo_request =
+            FunctionComponentUseMemoRenderRequest::new(StateHandle::from_raw(710), deps(7100));
+        let ref_request = FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(720));
+
+        let record = render_function_component_with_use_memo_and_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            memo_request,
+            ref_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let hook_state = record.hook_state();
+        let memo_hook = record.memo_hook();
+        let ref_hook = record.ref_hook();
+        let memo_mount = memo_hook.mount_record().unwrap();
+        let ref_mount = ref_hook.mount_record().unwrap();
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.output(), output);
+        assert_eq!(record.render().hook_state(), Some(hook_state));
+        assert_eq!(hook_state.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert_eq!(record.hook_traversal().traversed_count(), 2);
+        assert_eq!(memo_hook.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert_eq!(memo_hook.value(), StateHandle::from_raw(710));
+        assert_eq!(memo_hook.dependencies(), deps(7100));
+        assert_eq!(memo_hook.hook(), memo_mount.hook());
+        assert_eq!(ref_hook.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert!(ref_hook.ref_object().is_some());
+        assert_eq!(FunctionComponentRefObjectHandle::NONE.raw(), 0);
+        assert!(FunctionComponentRefObjectHandle::NONE.is_none());
+        assert_eq!(ref_hook.initial_value(), StateHandle::from_raw(720));
+        assert_eq!(ref_hook.hook(), ref_mount.hook());
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].hook_state(), Some(hook_state));
+
+        let hooks = hook_store
+            .hook_lists()
+            .ordered_hooks(hook_state.work_in_progress_list())
+            .unwrap();
+        assert_eq!(hooks, vec![memo_mount.hook(), ref_mount.hook()]);
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(memo_mount.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(710)
+        );
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(ref_mount.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(ref_mount.ref_object().raw())
+        );
+    }
+
+    #[test]
+    fn private_use_memo_ref_render_path_reuses_memo_value_when_deps_match() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_memo = hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(730), deps(7300))
+            .unwrap();
+        let current_ref = hook_store
+            .create_current_ref_hook(current, StateHandle::from_raw(740))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(76)));
+        let memo_request =
+            FunctionComponentUseMemoRenderRequest::new(StateHandle::from_raw(731), deps(7300));
+        let ref_request = FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(741));
+
+        let record = render_function_component_with_use_memo_and_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            memo_request,
+            ref_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let memo_update = record.memo_hook().update_record().unwrap();
+        let ref_update = record.ref_hook().update_record().unwrap();
+        assert_eq!(
+            record.hook_state().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(record.hook_traversal().traversed_count(), 2);
+        assert_ne!(memo_update.hook(), current_memo.hook());
+        assert_eq!(memo_update.previous_value(), StateHandle::from_raw(730));
+        assert_eq!(memo_update.previous_dependencies(), deps(7300));
+        assert_eq!(memo_update.requested_value(), StateHandle::from_raw(731));
+        assert_eq!(memo_update.value(), StateHandle::from_raw(730));
+        assert_eq!(memo_update.dependencies(), deps(7300));
+        assert_eq!(
+            memo_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(memo_update.reused_previous_value());
+        assert_eq!(record.memo_hook().value(), StateHandle::from_raw(730));
+
+        assert_ne!(ref_update.hook(), current_ref.hook());
+        assert_eq!(ref_update.ref_object(), current_ref.ref_object());
+        assert_eq!(ref_update.initial_value(), StateHandle::from_raw(740));
+        assert_eq!(
+            ref_update.ignored_initial_value(),
+            StateHandle::from_raw(741)
+        );
+        assert_eq!(record.ref_hook().ref_object(), current_ref.ref_object());
+
+        let hooks = hook_store
+            .hook_lists()
+            .ordered_hooks(record.hook_state().work_in_progress_list())
+            .unwrap();
+        assert_eq!(hooks, vec![memo_update.hook(), ref_update.hook()]);
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(memo_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(730)
+        );
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(ref_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(current_ref.ref_object().raw())
+        );
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(current_memo.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(730)
+        );
+    }
+
+    #[test]
+    fn private_use_memo_ref_render_path_records_changed_memo_dependencies() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(750), deps(7500))
+            .unwrap();
+        let current_ref = hook_store
+            .create_current_ref_hook(current, StateHandle::from_raw(760))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(77)));
+        let memo_request =
+            FunctionComponentUseMemoRenderRequest::new(StateHandle::from_raw(751), deps(7510));
+        let ref_request = FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(761));
+
+        let record = render_function_component_with_use_memo_and_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            memo_request,
+            ref_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let memo_update = record.memo_hook().update_record().unwrap();
+        let ref_update = record.ref_hook().update_record().unwrap();
+        assert_eq!(memo_update.previous_value(), StateHandle::from_raw(750));
+        assert_eq!(memo_update.previous_dependencies(), deps(7500));
+        assert_eq!(memo_update.requested_value(), StateHandle::from_raw(751));
+        assert_eq!(memo_update.value(), StateHandle::from_raw(751));
+        assert_eq!(memo_update.dependencies(), deps(7510));
+        assert_eq!(
+            memo_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert!(!memo_update.reused_previous_value());
+        assert_eq!(record.memo_hook().value(), StateHandle::from_raw(751));
+        assert_eq!(ref_update.ref_object(), current_ref.ref_object());
+        assert_eq!(
+            ref_update.ignored_initial_value(),
+            StateHandle::from_raw(761)
+        );
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(memo_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(751)
+        );
+    }
+
+    #[test]
+    fn private_use_memo_update_treats_missing_dependencies_as_always_changed() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(770), deps(7700))
+            .unwrap();
+        hook_store
+            .create_current_ref_hook(current, StateHandle::from_raw(780))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(78)));
+        let memo_request = FunctionComponentUseMemoRenderRequest::new(
+            StateHandle::from_raw(771),
+            HookEffectDependencies::AlwaysRun,
+        );
+        let ref_request = FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(781));
+
+        let record = render_function_component_with_use_memo_and_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            memo_request,
+            ref_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let memo_update = record.memo_hook().update_record().unwrap();
+        assert_eq!(
+            memo_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert_eq!(memo_update.value(), StateHandle::from_raw(771));
+        assert_eq!(
+            memo_update.dependencies(),
+            HookEffectDependencies::AlwaysRun
+        );
+        assert!(memo_update.dependencies().is_always_run());
+    }
+
+    #[test]
+    fn private_use_memo_and_ref_updates_require_matching_hook_metadata() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_list = hook_store.create_current_list(current);
+        let opaque_hook = hook_store
+            .hook_lists_mut()
+            .append_hook(current_list, opaque(790))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(79)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let mut cursor = hook_store
+            .begin_render_cursor(record.hook_state().unwrap())
+            .unwrap();
+
+        assert_eq!(
+            hook_store.update_memo_hook(&mut cursor, StateHandle::from_raw(791), deps(7910)),
+            Err(FunctionComponentRenderError::MissingMemoHookRecord {
+                fiber: work_in_progress,
+                hook: opaque_hook,
+            })
+        );
+        assert_eq!(
+            hook_store.update_ref_hook(&mut cursor, StateHandle::from_raw(792)),
+            Err(FunctionComponentRenderError::MissingRefHookRecord {
+                fiber: work_in_progress,
+                hook: opaque_hook,
+            })
+        );
+    }
+
+    #[test]
     fn private_use_state_dispatch_records_validates_and_rebases_eager_metadata() {
         let (mut arena, current, work_in_progress, component) = function_component_pair();
         let mut hook_store = FunctionComponentHookRenderStore::new();
@@ -5971,6 +7070,8 @@ mod tests {
     fn function_component_render_propagates_unsupported_hooks_context_and_thrown_values() {
         let unsupported = [
             FunctionComponentInvocationError::unsupported_hook("useState"),
+            FunctionComponentInvocationError::unsupported_hook("useMemo"),
+            FunctionComponentInvocationError::unsupported_hook("useRef"),
             FunctionComponentInvocationError::unsupported_context(),
             FunctionComponentInvocationError::unsupported_thrown_value(),
         ];
