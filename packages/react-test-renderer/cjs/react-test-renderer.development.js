@@ -813,6 +813,67 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'public-test-instance-and-totree-serialization-contract'
   ])
 });
+const privateToTreeHostOutputMetadataSymbol = Symbol.for(
+  'fast.react_test_renderer.private_totree_host_output_metadata'
+);
+const privateToTreeHostOutputMetadataStatus =
+  'private-host-output-totree-metadata-ready-public-totree-blocked';
+const toTreePrivateHostOutputMetadataGate = Object.freeze({
+  id: 'react-test-renderer-totree-private-host-output-metadata-gate',
+  publicSurface: 'create().toTree',
+  status: 'ready-for-private-diagnostics-public-totree-blocked',
+  deterministic: true,
+  privateHostOutputTreeMetadataAvailable: true,
+  privateMetadataSymbol: privateToTreeHostOutputMetadataSymbol.description,
+  privateMetadataStatus: privateToTreeHostOutputMetadataStatus,
+  acceptedMinimalFiberShape: Object.freeze([
+    'HostRoot',
+    'HostComponent',
+    'HostText'
+  ]),
+  acceptedReactSourceAlgorithm: 'ReactTestRenderer.js toTree',
+  hostRootBehavior: 'childrenToTree(node.child)',
+  hostComponentBehavior:
+    "returns nodeType 'host' with element type, props, null instance, and rendered children",
+  hostTextBehavior: 'returns text string from the HostText state node',
+  acceptedRustPrivateJsonDiagnostics: true,
+  acceptedCommittedFiberInspection: true,
+  publicTreeAvailable: false,
+  publicRouteAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false,
+  acceptedWorker: 'worker-364-test-renderer-totree-private-host-output',
+  acceptedRustWorkers: Object.freeze([
+    'worker-235-test-renderer-private-fiber-inspection',
+    'worker-265-test-renderer-private-json-ready-diagnostics'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'inspect_test_renderer_committed_fiber_tree',
+    'TestRendererCommittedFiberTreeInspection::host_root',
+    'TestRendererCommittedFiberTreeInspection::host_component',
+    'TestRendererCommittedFiberTreeInspection::host_text',
+    'TestRendererRoot::describe_private_json_serialization_for_canary',
+    'TestRendererPrivateJsonSerializationReport'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'committed_fiber_inspection_describes_host_root_component_and_text',
+    'root_private_json_serialization_canary_describes_minimal_host_component_with_text'
+  ]),
+  blockedPublicSurfaces: Object.freeze([
+    'create().toTree',
+    'create().toJSON',
+    'create().root',
+    'ReactTestInstance',
+    'public-js-react-test-renderer-routing',
+    'compatibility-claim'
+  ]),
+  missingPrerequisites: Object.freeze([
+    'rust-native-test-renderer-create-bridge',
+    'public-react-test-renderer-totree-bridge',
+    'public-test-instance-and-totree-serialization-contract'
+  ])
+});
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   'fast.react_test_renderer.private_test_instance_wrapper_record'
 );
@@ -1359,6 +1420,7 @@ const createRoutingGate = Object.freeze({
   updatePrivateRoute,
   unmountPrivateRoute,
   toJSONSerializationFacadeGate: toJSONPrivateSerializationFacadeGate,
+  toTreeHostOutputMetadataGate: toTreePrivateHostOutputMetadataGate,
   privateTestInstanceWrapperSkeleton
 });
 const rootRequestBridgeSymbol = Symbol.for(
@@ -1723,6 +1785,8 @@ function createUnsupportedError(
     error.unmountPrivateRoute = routingGate.unmountPrivateRoute;
     error.toJSONSerializationFacadeGate =
       routingGate.toJSONSerializationFacadeGate;
+    error.toTreeHostOutputMetadataGate =
+      routingGate.toTreeHostOutputMetadataGate;
   }
 
   if (privateRootDiagnostics !== undefined) {
@@ -2563,6 +2627,103 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
   });
 }
 
+function createPrivateToTreeHostOutputMetadata(rootRequest) {
+  return freezeRecord({
+    id: 'react-test-renderer-totree-private-host-output-metadata',
+    status: privateToTreeHostOutputMetadataStatus,
+    entrypoint,
+    publicSurface: 'create().toTree',
+    symbol: privateToTreeHostOutputMetadataSymbol.description,
+    gate: toTreePrivateHostOutputMetadataGate,
+    rootRequest,
+    privateHostOutputTreeMetadataAvailable: true,
+    publicTreeAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false,
+    canDescribeAcceptedHostOutputDiagnostic(report) {
+      try {
+        validatePrivateToTreeHostOutputDiagnostic(report);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    describeAcceptedHostOutputDiagnostic(report) {
+      return describePrivateToTreeHostOutputDiagnostic(report);
+    }
+  });
+}
+
+function describePrivateToTreeHostOutputDiagnostic(report) {
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-totree-minimal-host-output-metadata',
+    status: privateToTreeHostOutputMetadataStatus,
+    entrypoint,
+    publicSurface: 'create().toTree',
+    sourceDiagnostic: privateToJSONAcceptedDiagnosticName,
+    acceptedMinimalFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedMinimalFiberShape,
+    traversal: freezeRecord({
+      source: 'ReactTestRenderer.js toTree',
+      order: freezeArray(['HostRoot', 'HostComponent', 'HostText']),
+      hostRootDelegatesToChild: true,
+      hostComponentProducesHostNodeMetadata: true,
+      hostTextProducesTextValueMetadata: true
+    }),
+    hostRoot: freezeRecord({
+      fiberTag: 'HostRoot',
+      source: 'ReactTestRenderer.js toTree HostRoot',
+      delegatesToChild: true,
+      childFiberTag: 'HostComponent',
+      publicTreeObject: false
+    }),
+    hostComponent: freezeRecord({
+      fiberTag: 'HostComponent',
+      source: 'ReactTestRenderer.js toTree HostComponent',
+      treeNodeType: 'host',
+      elementType: diagnostic.type,
+      props: diagnostic.props,
+      renderedChildCount: 1,
+      renderedText: diagnostic.text,
+      publicTreeObject: false
+    }),
+    hostText: freezeRecord({
+      fiberTag: 'HostText',
+      source: 'ReactTestRenderer.js toTree HostText',
+      text: diagnostic.text,
+      returnsTextValue: true,
+      publicTreeObject: false
+    }),
+    publicTreeObjectAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function validatePrivateToTreeHostOutputDiagnostic(report) {
+  try {
+    return validatePrivateToJSONHostOutputDiagnostic(report);
+  } catch (error) {
+    const message =
+      error instanceof Error && typeof error.message === 'string'
+        ? error.message
+        : 'The accepted private host output diagnostic shape was rejected.';
+    const marker = ' private facade ';
+    const markerIndex = message.indexOf(marker);
+    throwPrivateToTreeMetadataError(
+      markerIndex === -1
+        ? message
+        : message.slice(markerIndex + marker.length)
+    );
+  }
+}
+
 function serializePrivateToJSONHostOutputDiagnostic(report) {
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
 
@@ -2986,6 +3147,20 @@ function throwPrivateToJSONSerializationError(message) {
   throw error;
 }
 
+function throwPrivateToTreeMetadataError(message) {
+  const error = new Error(`[fast-react] ${entrypoint}.create().toTree private metadata ${message}`);
+  error.name = 'FastReactTestRendererPrivateToTreeMetadataError';
+  error.code = 'FAST_REACT_TEST_RENDERER_PRIVATE_TOTREE_METADATA';
+  error.entrypoint = entrypoint;
+  error.exportName = 'create().toTree';
+  error.compatibilityTarget = compatibilityTarget;
+  error.publicTreeAvailable = false;
+  error.nativeBridgeAvailable = false;
+  error.nativeExecution = false;
+  error.compatibilityClaimed = false;
+  throw error;
+}
+
 function definePlaceholderMetadata(exportsObject) {
   Object.defineProperties(exportsObject, {
     __FAST_REACT_PLACEHOLDER__: {
@@ -3024,18 +3199,25 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
     value: createPrivateToJSONSerializationFacade(createRequest),
     writable: false
   });
+  const toTree = createRendererUnsupportedFunction(
+    'create().toTree',
+    0,
+    'Fiber tree inspection is intentionally blocked for the public API. The JS facade records private toTree metadata for the accepted HostRoot, HostComponent, and HostText canary; it has no native bridge, public toTree serializer, or compatibility claim.',
+    routingGate,
+    undefined,
+    () => createRequest
+  );
+  Object.defineProperty(toTree, privateToTreeHostOutputMetadataSymbol, {
+    configurable: false,
+    enumerable: false,
+    value: createPrivateToTreeHostOutputMetadata(createRequest),
+    writable: false
+  });
   const renderer = {
     _Scheduler: schedulerPlaceholder,
     root: undefined,
     toJSON,
-    toTree: createRendererUnsupportedFunction(
-      'create().toTree',
-      0,
-      'Fiber tree inspection is intentionally blocked for the public API. The JS facade only records private TestInstance query metadata; it has no native bridge, public toTree serializer, or compatibility claim.',
-      routingGate,
-      undefined,
-      () => createRequest
-    ),
+    toTree,
     update: createRendererUnsupportedFunction(
       'create().update',
       1,

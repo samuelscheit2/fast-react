@@ -74,6 +74,27 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
   }
 ];
 
+export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
+  {
+    id: "js-totree-private-host-output-metadata-gate",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The JS react-test-renderer facade must record private toTree metadata without exposing public toTree output."
+  },
+  {
+    id: "js-totree-recognizes-accepted-minimal-host-output-shape",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree metadata must be tied to the accepted HostRoot -> HostComponent -> HostText canary shape."
+  },
+  {
+    id: "js-totree-public-tree-blocked",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree metadata must keep public toTree, native bridge execution, and compatibility claims false."
+  }
+];
+
 export const REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS =
   "blocked-public-react-test-renderer-serialization-compatibility";
 
@@ -238,9 +259,15 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics &&
     localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
-  const requiredLocalTargetsReady = privateToJSONFacadeGateReady;
+  const privateToTreeMetadataGateReady =
+    privateDiagnosticsReady &&
+    localChecks.privateToTreeHostOutputMetadataGatePresent &&
+    localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape &&
+    localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
+  const requiredLocalTargetsReady =
+    privateToJSONFacadeGateReady && privateToTreeMetadataGateReady;
   const publicCompatibilityReady =
-    privateToJSONFacadeGateReady &&
+    requiredLocalTargetsReady &&
     localChecks.publicJsFacadeRoutingPresent &&
     localChecks.publicToJSONAvailable &&
     localChecks.publicToTreeAvailable &&
@@ -259,6 +286,24 @@ export function evaluateReactTestRendererSerializationLocalGate({
         }
         if (requirement.id === "private-json-diagnostics") {
           return !localChecks.privateJsonDiagnosticsPresent;
+        }
+        return true;
+      }
+    ).map((requirement) => requirement.id);
+  const privateToTreeMetadataBlockers =
+    REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS.filter(
+      (requirement) => {
+        if (requirement.id === "js-totree-private-host-output-metadata-gate") {
+          return !localChecks.privateToTreeHostOutputMetadataGatePresent;
+        }
+        if (
+          requirement.id ===
+          "js-totree-recognizes-accepted-minimal-host-output-shape"
+        ) {
+          return !localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape;
+        }
+        if (requirement.id === "js-totree-public-tree-blocked") {
+          return !localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
         }
         return true;
       }
@@ -356,7 +401,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     status:
       violations.length > 0
         ? "blocked-with-violations"
-        : privateToJSONFacadeGateReady
+        : requiredLocalTargetsReady
         ? REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS
         : REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS,
     requiredLocalTargetsReady,
@@ -364,6 +409,8 @@ export function evaluateReactTestRendererSerializationLocalGate({
     privateDiagnosticBlockers,
     privateToJSONFacadeGateReady,
     privateToJSONFacadeBlockers,
+    privateToTreeMetadataGateReady,
+    privateToTreeMetadataBlockers,
     publicCompatibilityReady,
     publicCompatibilityClaimed,
     publicCompatibilityBlockers,
@@ -657,6 +704,73 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bcreateRendererUnsupportedFunction\(\s*['"]create\(\)\.toJSON['"]/u
     );
+  const privateToTreeHostOutputMetadataGatePresent =
+    publicJsReactTestRendererFacadePresent &&
+    publicJsReactTestRendererFacadePlaceholder &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\btoTreePrivateHostOutputMetadataGate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-totree-private-host-output-metadata-gate\b/u
+    );
+  const privateToTreeHostOutputMetadataRecognizesMinimalShape =
+    privateToTreeHostOutputMetadataGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateHostOutputTreeMetadataAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast\.react_test_renderer\.private_totree_host_output_metadata/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedMinimalFiberShape\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /HostRoot[\s\S]*HostComponent[\s\S]*HostText/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bdescribePrivateToTreeHostOutputDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bReactTestRenderer\.js toTree\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-364-test-renderer-totree-private-host-output\b/u
+    );
+  const privateToTreeHostOutputMetadataPubliclyBlocked =
+    privateToTreeHostOutputMetadataGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicTreeAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicRouteAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bnativeBridgeAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bnativeExecution\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcompatibilityClaimed\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreateRendererUnsupportedFunction\(\s*['"]create\(\)\.toTree['"]/u
+    );
   const privateRecordOnlyTestInstanceWrapperPresent =
     publicJsReactTestRendererFacadePresent &&
     publicJsReactTestRendererFacadePlaceholder &&
@@ -767,6 +881,9 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
     privateToJSONSerializationFacadePubliclyBlocked,
+    privateToTreeHostOutputMetadataGatePresent,
+    privateToTreeHostOutputMetadataRecognizesMinimalShape,
+    privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,
     publicToJSONAvailable,
