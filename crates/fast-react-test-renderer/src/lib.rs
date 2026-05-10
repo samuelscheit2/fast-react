@@ -3322,6 +3322,17 @@ pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_ACCEPTED_RECORDS: [&str
     "PassiveEffectSchedulerFlushExecutionRecord",
     "PassiveEffectsFlushResult",
 ];
+pub const TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.act.private-nested-scope-passive-flush-canary";
+pub const TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS: &str =
+    "private-act-nested-scope-passive-flush-public-act-blocked";
+pub const TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER: [&str; 5] = [
+    "outer-act-scope-enter",
+    "inner-act-scope-enter",
+    "accepted-passive-work-flush",
+    "inner-act-scope-exit",
+    "outer-act-scope-exit",
+];
 pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
     ["HostRoot", "HostComponent", "HostText"];
 pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE: [&str; 4] =
@@ -5249,6 +5260,144 @@ impl TestRendererPrivateActPassiveEffectDrainDiagnostics {
     #[must_use]
     pub const fn public_update_compatibility_claimed(&self) -> bool {
         self.public_update_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(&self) -> bool {
+        self.public_act_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateActNestedScopePassiveFlushDiagnostics {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    passive_drain: TestRendererPrivateActPassiveEffectDrainDiagnostics,
+    flush_order: [&'static str; 5],
+    outer_scope_depth: usize,
+    inner_scope_depth: usize,
+    passive_flush_order_index: usize,
+    pending_unmount_count: usize,
+    pending_mount_count: usize,
+    pending_passive_record_count: usize,
+    nested_scope_metadata_accepted: bool,
+    private_passive_flush_metadata_accepted: bool,
+    drains_accepted_pending_passive_flush_metadata: bool,
+    deterministic_flush_order: bool,
+    public_act_scope_depth_tracking_available: bool,
+    public_nested_act_queue_reuse_available: bool,
+    public_overlapping_act_warning_emission_available: bool,
+    invokes_act_callback: bool,
+    executes_passive_effects: bool,
+    invokes_effect_callbacks: bool,
+    public_act_compatibility_claimed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateActNestedScopePassiveFlushDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn passive_drain(&self) -> &TestRendererPrivateActPassiveEffectDrainDiagnostics {
+        &self.passive_drain
+    }
+
+    #[must_use]
+    pub const fn flush_order(&self) -> &[&'static str; 5] {
+        &self.flush_order
+    }
+
+    #[must_use]
+    pub const fn outer_scope_depth(&self) -> usize {
+        self.outer_scope_depth
+    }
+
+    #[must_use]
+    pub const fn inner_scope_depth(&self) -> usize {
+        self.inner_scope_depth
+    }
+
+    #[must_use]
+    pub const fn passive_flush_order_index(&self) -> usize {
+        self.passive_flush_order_index
+    }
+
+    #[must_use]
+    pub const fn pending_unmount_count(&self) -> usize {
+        self.pending_unmount_count
+    }
+
+    #[must_use]
+    pub const fn pending_mount_count(&self) -> usize {
+        self.pending_mount_count
+    }
+
+    #[must_use]
+    pub const fn pending_passive_record_count(&self) -> usize {
+        self.pending_passive_record_count
+    }
+
+    #[must_use]
+    pub const fn nested_scope_metadata_accepted(&self) -> bool {
+        self.nested_scope_metadata_accepted
+    }
+
+    #[must_use]
+    pub const fn private_passive_flush_metadata_accepted(&self) -> bool {
+        self.private_passive_flush_metadata_accepted
+    }
+
+    #[must_use]
+    pub const fn drains_accepted_pending_passive_flush_metadata(&self) -> bool {
+        self.drains_accepted_pending_passive_flush_metadata
+    }
+
+    #[must_use]
+    pub const fn deterministic_flush_order(&self) -> bool {
+        self.deterministic_flush_order
+    }
+
+    #[must_use]
+    pub const fn public_act_scope_depth_tracking_available(&self) -> bool {
+        self.public_act_scope_depth_tracking_available
+    }
+
+    #[must_use]
+    pub const fn public_nested_act_queue_reuse_available(&self) -> bool {
+        self.public_nested_act_queue_reuse_available
+    }
+
+    #[must_use]
+    pub const fn public_overlapping_act_warning_emission_available(&self) -> bool {
+        self.public_overlapping_act_warning_emission_available
+    }
+
+    #[must_use]
+    pub const fn invokes_act_callback(&self) -> bool {
+        self.invokes_act_callback
+    }
+
+    #[must_use]
+    pub const fn executes_passive_effects(&self) -> bool {
+        self.executes_passive_effects
+    }
+
+    #[must_use]
+    pub const fn invokes_effect_callbacks(&self) -> bool {
+        self.invokes_effect_callbacks
     }
 
     #[must_use]
@@ -8536,6 +8685,41 @@ impl Display for TestRendererPrivateErrorBoundaryNativeExecutionError {
 impl Error for TestRendererPrivateErrorBoundaryNativeExecutionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateActNestedScopePassiveFlushError {
+    RootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    RecordMismatch {
+        reason: &'static str,
+    },
+    PublicActOpened {
+        reason: &'static str,
+    },
+}
+
+impl Display for TestRendererPrivateActNestedScopePassiveFlushError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootMismatch { expected, actual } => write!(
+                formatter,
+                "private nested act passive flush expected root {expected:?}, found {actual:?}",
+            ),
+            Self::RecordMismatch { reason } => write!(
+                formatter,
+                "private nested act passive flush rejected passive metadata: {reason}",
+            ),
+            Self::PublicActOpened { reason } => write!(
+                formatter,
+                "private nested act passive flush cannot open public act behavior: {reason}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateActNestedScopePassiveFlushError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererPrivateUnmountNativeBridgeAdmissionError {
     AlreadyUnmountedRoot,
     MissingDeletionCommitHandoff,
@@ -8973,6 +9157,7 @@ pub enum TestRendererRootError {
     PrivateUpdateRoute(Box<TestRendererPrivateUpdateRouteError>),
     PrivateUpdateNativeBridgeAdmission(Box<TestRendererPrivateUpdateNativeBridgeAdmissionError>),
     PrivateErrorBoundaryNativeExecution(Box<TestRendererPrivateErrorBoundaryNativeExecutionError>),
+    PrivateActNestedScopePassiveFlush(Box<TestRendererPrivateActNestedScopePassiveFlushError>),
     PrivateUnmountNativeBridgeAdmission(Box<TestRendererPrivateUnmountNativeBridgeAdmissionError>),
     PrivateTestInstanceNativeQueryExecution(
         Box<TestRendererPrivateTestInstanceNativeQueryExecutionError>,
@@ -9017,6 +9202,7 @@ impl Display for TestRendererRootError {
             Self::PrivateUpdateRoute(error) => Display::fmt(error, formatter),
             Self::PrivateUpdateNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateErrorBoundaryNativeExecution(error) => Display::fmt(error, formatter),
+            Self::PrivateActNestedScopePassiveFlush(error) => Display::fmt(error, formatter),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateTestInstanceNativeQueryExecution(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
@@ -9072,6 +9258,7 @@ impl Error for TestRendererRootError {
             Self::PrivateUpdateRoute(error) => Some(error),
             Self::PrivateUpdateNativeBridgeAdmission(error) => Some(error),
             Self::PrivateErrorBoundaryNativeExecution(error) => Some(error),
+            Self::PrivateActNestedScopePassiveFlush(error) => Some(error),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
             Self::PrivateTestInstanceNativeQueryExecution(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
@@ -9146,6 +9333,12 @@ impl From<TestRendererPrivateUpdateNativeBridgeAdmissionError> for TestRendererR
 impl From<TestRendererPrivateErrorBoundaryNativeExecutionError> for TestRendererRootError {
     fn from(error: TestRendererPrivateErrorBoundaryNativeExecutionError) -> Self {
         Self::PrivateErrorBoundaryNativeExecution(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateActNestedScopePassiveFlushError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateActNestedScopePassiveFlushError) -> Self {
+        Self::PrivateActNestedScopePassiveFlush(Box::new(error))
     }
 }
 
@@ -10305,6 +10498,83 @@ impl TestRendererRoot {
             public_act_compatibility_claimed: false,
             compatibility_claimed: false,
         }
+    }
+
+    pub fn describe_private_act_nested_scope_passive_flush_for_canary(
+        &self,
+        metadata: TestRendererPrivateActPendingPassiveFlushMetadata,
+    ) -> Result<TestRendererPrivateActNestedScopePassiveFlushDiagnostics, TestRendererRootError>
+    {
+        if metadata.root() != self.root_id {
+            return Err(
+                TestRendererPrivateActNestedScopePassiveFlushError::RootMismatch {
+                    expected: self.root_id,
+                    actual: metadata.root(),
+                }
+                .into(),
+            );
+        }
+        if metadata.pending_record_count() == 0 {
+            return Err(
+                TestRendererPrivateActNestedScopePassiveFlushError::RecordMismatch {
+                    reason: "missing-pending-passive-work",
+                }
+                .into(),
+            );
+        }
+
+        let passive_drain =
+            self.consume_private_act_pending_passive_flush_metadata_for_canary(metadata);
+        if !passive_drain.metadata_root_matches_renderer_root()
+            || !passive_drain.consumes_pending_passive_flush_metadata()
+            || !passive_drain.consumes_accepted_scheduler_flush_metadata()
+            || !passive_drain.private_scheduler_flush_request_metadata_consumed()
+        {
+            return Err(
+                TestRendererPrivateActNestedScopePassiveFlushError::RecordMismatch {
+                    reason: "passive-drain-metadata-not-accepted",
+                }
+                .into(),
+            );
+        }
+        if passive_drain.executes_passive_effects()
+            || passive_drain.invokes_effect_callbacks()
+            || passive_drain.invokes_act_callback()
+            || passive_drain.public_act_compatibility_claimed()
+            || passive_drain.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateActNestedScopePassiveFlushError::PublicActOpened {
+                    reason: "passive-drain-claimed-public-execution",
+                }
+                .into(),
+            );
+        }
+
+        Ok(TestRendererPrivateActNestedScopePassiveFlushDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS,
+            passive_drain,
+            flush_order: TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER,
+            outer_scope_depth: 1,
+            inner_scope_depth: 2,
+            passive_flush_order_index: 2,
+            pending_unmount_count: metadata.pending_unmount_count(),
+            pending_mount_count: metadata.pending_mount_count(),
+            pending_passive_record_count: metadata.pending_record_count(),
+            nested_scope_metadata_accepted: true,
+            private_passive_flush_metadata_accepted: true,
+            drains_accepted_pending_passive_flush_metadata: true,
+            deterministic_flush_order: true,
+            public_act_scope_depth_tracking_available: false,
+            public_nested_act_queue_reuse_available: false,
+            public_overlapping_act_warning_emission_available: false,
+            invokes_act_callback: false,
+            executes_passive_effects: false,
+            invokes_effect_callbacks: false,
+            public_act_compatibility_claimed: false,
+            compatibility_claimed: false,
+        })
     }
 
     pub fn scheduled_roots_for_canary(&self) -> Result<Vec<FiberRootId>, TestRendererRootError> {
@@ -22407,6 +22677,111 @@ mod tests {
         assert!(!diagnostics.public_update_compatibility_claimed());
         assert!(!diagnostics.public_act_compatibility_claimed());
         assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_act_nested_scope_passive_flush_keeps_deterministic_private_order() {
+        let root = TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let finished_work =
+            TestRendererFiberHandleDiagnostics::from_raw_parts_for_canary(11, 12, 13);
+        let metadata = TestRendererPrivateActPendingPassiveFlushMetadata::new_for_canary(
+            root.root_id(),
+            finished_work,
+            1,
+            1,
+        );
+
+        let diagnostics = root
+            .describe_private_act_nested_scope_passive_flush_for_canary(metadata)
+            .unwrap();
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.status(),
+            TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS
+        );
+        assert_eq!(
+            diagnostics.flush_order(),
+            &TEST_RENDERER_PRIVATE_ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+        );
+        assert_eq!(diagnostics.outer_scope_depth(), 1);
+        assert_eq!(diagnostics.inner_scope_depth(), 2);
+        assert_eq!(diagnostics.passive_flush_order_index(), 2);
+        assert_eq!(diagnostics.pending_unmount_count(), 1);
+        assert_eq!(diagnostics.pending_mount_count(), 1);
+        assert_eq!(diagnostics.pending_passive_record_count(), 2);
+        assert!(diagnostics.nested_scope_metadata_accepted());
+        assert!(diagnostics.private_passive_flush_metadata_accepted());
+        assert!(diagnostics.drains_accepted_pending_passive_flush_metadata());
+        assert!(diagnostics.deterministic_flush_order());
+
+        let passive_drain = diagnostics.passive_drain();
+        assert_eq!(passive_drain.metadata(), metadata);
+        assert!(passive_drain.metadata_root_matches_renderer_root());
+        assert!(passive_drain.consumes_pending_passive_flush_metadata());
+        assert!(passive_drain.consumes_accepted_scheduler_flush_metadata());
+        assert!(passive_drain.private_scheduler_flush_request_metadata_consumed());
+        assert!(!passive_drain.executes_passive_effects());
+        assert!(!passive_drain.invokes_effect_callbacks());
+        assert!(!passive_drain.invokes_act_callback());
+        assert!(!passive_drain.public_act_compatibility_claimed());
+        assert!(!passive_drain.compatibility_claimed());
+
+        assert!(!diagnostics.public_act_scope_depth_tracking_available());
+        assert!(!diagnostics.public_nested_act_queue_reuse_available());
+        assert!(!diagnostics.public_overlapping_act_warning_emission_available());
+        assert!(!diagnostics.invokes_act_callback());
+        assert!(!diagnostics.executes_passive_effects());
+        assert!(!diagnostics.invokes_effect_callbacks());
+        assert!(!diagnostics.public_act_compatibility_claimed());
+        assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_act_nested_scope_passive_flush_rejects_stale_or_empty_metadata() {
+        let root = TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let finished_work =
+            TestRendererFiberHandleDiagnostics::from_raw_parts_for_canary(21, 22, 23);
+        let stale_root = FiberRootId::new(root.root_id().raw() + 1).unwrap();
+        let stale_metadata = TestRendererPrivateActPendingPassiveFlushMetadata::new_for_canary(
+            stale_root,
+            finished_work,
+            1,
+            0,
+        );
+
+        let error = root
+            .describe_private_act_nested_scope_passive_flush_for_canary(stale_metadata)
+            .unwrap_err();
+        let TestRendererRootError::PrivateActNestedScopePassiveFlush(error) = error else {
+            panic!("expected private nested act passive flush rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateActNestedScopePassiveFlushError::RootMismatch { .. }
+        ));
+
+        let empty_metadata = TestRendererPrivateActPendingPassiveFlushMetadata::new_for_canary(
+            root.root_id(),
+            finished_work,
+            0,
+            0,
+        );
+        let error = root
+            .describe_private_act_nested_scope_passive_flush_for_canary(empty_metadata)
+            .unwrap_err();
+        let TestRendererRootError::PrivateActNestedScopePassiveFlush(error) = error else {
+            panic!("expected private nested act passive flush rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateActNestedScopePassiveFlushError::RecordMismatch {
+                reason: "missing-pending-passive-work"
+            }
+        ));
     }
 
     #[test]
