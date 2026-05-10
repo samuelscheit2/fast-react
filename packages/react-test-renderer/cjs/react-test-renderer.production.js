@@ -9,6 +9,16 @@ const actSchedulerGateStatus =
   'blocked-private-react-test-renderer-act-scheduler-metadata-only';
 const createRoutingGateStatus =
   'blocked-missing-react-test-renderer-create-routing-prerequisites';
+const privateCreateRouteAdmissionDiagnosticName =
+  'fast-react-test-renderer.create-route.private-admission';
+const privateCreateRouteAdmissionStatus =
+  'private-create-route-admission-rust-root-create-work-loop-evidence-public-create-blocked';
+const privateCreateRouteAdmissionRecordId =
+  'react-test-renderer-create-route-admission-private-diagnostic';
+const privateCreateRouteAdmissionMetadataId =
+  'fast-react-test-renderer-create-route-admission-metadata';
+const privateCreateRouteAdmissionMetadataStatus =
+  'accepted-create-route-rust-root-create-work-loop-admission-metadata';
 const actSchedulerMissingBeforeExecution = Object.freeze([
   'public-react-test-renderer-act-queue-drain',
   'public-react-test-renderer-scheduler-flush-execution',
@@ -1132,6 +1142,82 @@ const updateUnmountRustLifecycleDiagnosticGate = Object.freeze({
   hostOutputProducedFromJs: false,
   compatibilityClaimed: false
 });
+const privateCreateRouteAdmissionGate = Object.freeze({
+  id: privateCreateRouteAdmissionRecordId,
+  status: privateCreateRouteAdmissionStatus,
+  publicSurface: 'create()',
+  deterministic: true,
+  diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedWorker:
+    'worker-610-test-renderer-create-native-bridge-admission',
+  acceptedRustRecords: Object.freeze([
+    'TestRendererRootScheduledUpdate',
+    'TestRendererRootCreatePreflightDiagnostics',
+    'TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics',
+    'TestRendererPrivateCreateRouteAdmissionDiagnostics'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::create',
+    'TestRendererRoot::describe_private_root_create_preflight_for_canary',
+    'TestRendererRoot::describe_private_create_route_admission_for_canary',
+    'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_create_route_admission_consumes_create_and_work_loop_evidence',
+    'root_private_create_route_admission_rejects_missing_rust_admission_record',
+    'root_private_create_route_admission_rejects_stale_rust_admission_record',
+    'root_private_create_route_admission_rejects_missing_root_create_preflight'
+  ]),
+  consumesJsFacadeCreateMetadata: true,
+  consumesAcceptedRustRootCreateExecutionEvidence: true,
+  consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+  consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+  missingRustAdmissionRecordRejection: true,
+  staleRustAdmissionRecordRejection: true,
+  publicRouteAvailable: false,
+  publicRendererRootCreated: false,
+  publicRootAvailable: false,
+  publicCreateBehaviorAvailable: false,
+  publicSerializationAvailable: false,
+  nativeAddonLoaded: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  reconcilerExecutionFromJs: false,
+  hostOutputProducedFromJs: false,
+  compatibilityClaimed: false
+});
+const createPrivateRoute = Object.freeze({
+  id: 'react-test-renderer-create-private-route',
+  publicSurface: 'create()',
+  status: 'blocked-js-native-bridge-not-loaded',
+  deterministic: true,
+  publicRouteAvailable: false,
+  privateRustCanaryAccepted: true,
+  acceptedRustLifecycleDiagnostics: true,
+  consumesAcceptedRustLifecycleDiagnostics: true,
+  lifecycleDiagnosticGate: updateUnmountRustLifecycleDiagnosticGate,
+  acceptedRustRecords: updateUnmountRustLifecycleDiagnosticGate.acceptedRustRecords,
+  acceptedLifecycleStates:
+    updateUnmountRustLifecycleDiagnosticGate.acceptedLifecycleStates,
+  acceptedOutcomes: Object.freeze(['Scheduled']),
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  acceptedWorker:
+    'worker-610-test-renderer-create-native-bridge-admission',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  createRouteAdmissionGate: privateCreateRouteAdmissionGate,
+  consumesJsFacadeCreateMetadata: true,
+  consumesAcceptedRustRootCreateExecutionEvidence: true,
+  consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+  consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+  publicCreateBehaviorAvailable: false,
+  publicSerializationAvailable: false,
+  compatibilityClaimed: false,
+  acceptedRustApis: privateCreateRouteAdmissionGate.acceptedRustApis,
+  acceptedRustTests: privateCreateRouteAdmissionGate.acceptedRustTests
+});
 const updatePrivateRoute = Object.freeze({
   id: 'react-test-renderer-update-private-route',
   publicSurface: 'create().update',
@@ -2067,6 +2153,7 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   queryMethodRecords: privateTestInstanceQueryMethodRecords
 });
 const privateRoutes = Object.freeze([
+  createPrivateRoute,
   updatePrivateRoute,
   unmountPrivateRoute
 ]);
@@ -2155,8 +2242,12 @@ const createRoutingGate = Object.freeze({
   missingPrerequisites: createRoutingMissingPrerequisites,
   prerequisites: createRoutingPrerequisites,
   privateRoutes,
+  createPrivateRoute,
   updatePrivateRoute,
   unmountPrivateRoute,
+  privateCreateRouteAdmissionGate,
+  privateCreateRouteAdmissionAvailable: true,
+  privateCreateRouteAdmissionConsumptionAvailable: false,
   updateUnmountRustLifecycleDiagnosticGate,
   privateUpdateUnmountLifecycleDiagnosticsAccepted: true,
   privateUpdateUnmountLifecycleDiagnosticConsumptionAvailable: true,
@@ -2301,14 +2392,16 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-195-test-renderer-root-callback-snapshot',
     'worker-208-test-renderer-host-output-canary',
     'worker-234-test-renderer-host-output-update-unmount-canary',
-    'worker-265-test-renderer-private-json-ready-diagnostics'
+    'worker-265-test-renderer-private-json-ready-diagnostics',
+    'worker-610-test-renderer-create-native-bridge-admission'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
     'worker-306-test-renderer-testinstance-private-wrapper-skeleton',
     'worker-307-test-renderer-update-unmount-private-js-bridge',
     'worker-423-test-renderer-native-root-execution-bridge',
-    'worker-426-test-renderer-testinstance-bridge-query'
+    'worker-426-test-renderer-testinstance-bridge-query',
+    'worker-610-test-renderer-create-native-bridge-admission'
   ]),
   root: freezeRecord({
     rustType: 'TestRendererRoot',
@@ -2355,6 +2448,47 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     fixtureText: 'hello',
     realHostOutputCanaryAvailable: true,
     generalMutationTraversalAvailable: false
+  }),
+  rootCreateRouteAdmission: freezeRecord({
+    metadataId: privateCreateRouteAdmissionMetadataId,
+    metadataStatus: privateCreateRouteAdmissionMetadataStatus,
+    diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+    status: privateCreateRouteAdmissionStatus,
+    recordId: privateCreateRouteAdmissionRecordId,
+    gate: privateCreateRouteAdmissionGate,
+    bridgeMetadataSource:
+      'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.rootCreateRouteAdmission',
+    acceptedWorker:
+      'worker-610-test-renderer-create-native-bridge-admission',
+    acceptedRustCrate: 'fast-react-test-renderer',
+    acceptedRustApis: privateCreateRouteAdmissionGate.acceptedRustApis,
+    acceptedRustTests: privateCreateRouteAdmissionGate.acceptedRustTests,
+    rootApi: 'TestRendererRoot::create',
+    preflightApi:
+      'TestRendererRoot::describe_private_root_create_preflight_for_canary',
+    workLoopRenderPhaseApi:
+      'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff',
+    lifecycleRecord: 'TestRendererRootScheduledUpdate',
+    executionResultRecord:
+      'TestRendererPrivateCreateRouteAdmissionDiagnostics',
+    acceptedInputShape: 'HostComponentWithTextChild',
+    consumesJsFacadeCreateMetadata: true,
+    consumesAcceptedRustRootCreateExecutionEvidence: true,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+    consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+    missingRustAdmissionRecordRejection: true,
+    staleRustAdmissionRecordRejection: true,
+    publicRendererRootCreated: false,
+    publicRootAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    publicSerializationAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    reconcilerExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
   }),
   privateJson: freezeRecord({
     diagnosticName:
@@ -2601,8 +2735,11 @@ function createUnsupportedError(
     error.serializationAvailable = routingGate.serializationAvailable;
     error.compatibilityClaimed = routingGate.compatibilityClaimed;
     error.privateRoutes = routingGate.privateRoutes;
+    error.createPrivateRoute = routingGate.createPrivateRoute;
     error.updatePrivateRoute = routingGate.updatePrivateRoute;
     error.unmountPrivateRoute = routingGate.unmountPrivateRoute;
+    error.privateCreateRouteAdmissionGate =
+      routingGate.privateCreateRouteAdmissionGate;
     error.toJSONSerializationFacadeGate =
       routingGate.toJSONSerializationFacadeGate;
     error.toTreeHostOutputMetadataGate =
