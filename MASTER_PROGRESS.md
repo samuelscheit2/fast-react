@@ -108,9 +108,19 @@ sequencing belong in `MASTER_PLAN.md`.
   ordered circular iteration from `lastEffect.next`, and all-flags-present
   filtering with `HookEffectFlags`, without function-component render, commit,
   passive scheduler, DOM, or JS package integration.
+- Worker 158 core hook state queue was merged, adding pure-core generic hook
+  queue/update storage, circular pending and base queue handling, lane-aware
+  rebase results, eager state and optimistic revert metadata, render-phase
+  queue helpers, staged update finishing, and generational stale-handle guards,
+  without reconciler dispatcher, function-component render, public hook facade,
+  DOM, package, or native bridge integration.
 
 ## Latest Accepted Verification
 
+- Worker 158 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `hook` tests with 24 unit tests, full
+  `fast-react-core` tests with 112 unit tests, core clippy with warnings
+  denied, and `git diff --check`.
 - Worker 157 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `hook_effect` tests, full
   `fast-react-core` tests with 98 unit tests, core clippy with warnings denied,
