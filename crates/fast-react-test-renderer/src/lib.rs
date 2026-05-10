@@ -1772,6 +1772,17 @@ pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
     "private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked";
+pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.act.private-passive-effect-drain-canary";
+pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_STATUS: &str =
+    "accepted-private-act-pending-passive-flush-metadata-public-act-blocked";
+pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_ACCEPTED_RECORDS: [&str; 5] = [
+    "PendingPassiveCommitHandoff",
+    "PassiveEffectSchedulerFlushGateRecord",
+    "SchedulerPassiveEffectsFlushRequest",
+    "PassiveEffectSchedulerFlushExecutionRecord",
+    "PassiveEffectsFlushResult",
+];
 pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
     ["HostRoot", "HostComponent", "HostText"];
 pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE: [&str; 4] =
@@ -2111,6 +2122,15 @@ pub struct TestRendererFiberHandleDiagnostics {
 
 impl TestRendererFiberHandleDiagnostics {
     #[must_use]
+    pub const fn from_raw_parts_for_canary(arena_id: u64, slot: usize, generation: u64) -> Self {
+        Self {
+            arena_id,
+            slot,
+            generation,
+        }
+    }
+
+    #[must_use]
     pub const fn arena_id(self) -> u64 {
         self.arena_id
     }
@@ -2123,6 +2143,154 @@ impl TestRendererFiberHandleDiagnostics {
     #[must_use]
     pub const fn generation(self) -> u64 {
         self.generation
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateActPendingPassiveFlushMetadata {
+    root: FiberRootId,
+    finished_work: TestRendererFiberHandleDiagnostics,
+    pending_unmount_count: usize,
+    pending_mount_count: usize,
+    scheduler_request_order: usize,
+    scheduler_priority: &'static str,
+}
+
+impl TestRendererPrivateActPendingPassiveFlushMetadata {
+    #[must_use]
+    pub const fn new_for_canary(
+        root: FiberRootId,
+        finished_work: TestRendererFiberHandleDiagnostics,
+        pending_unmount_count: usize,
+        pending_mount_count: usize,
+    ) -> Self {
+        Self {
+            root,
+            finished_work,
+            pending_unmount_count,
+            pending_mount_count,
+            scheduler_request_order: 0,
+            scheduler_priority: "Normal",
+        }
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn pending_unmount_count(self) -> usize {
+        self.pending_unmount_count
+    }
+
+    #[must_use]
+    pub const fn pending_mount_count(self) -> usize {
+        self.pending_mount_count
+    }
+
+    #[must_use]
+    pub const fn pending_record_count(self) -> usize {
+        self.pending_unmount_count + self.pending_mount_count
+    }
+
+    #[must_use]
+    pub const fn scheduler_request_order(self) -> usize {
+        self.scheduler_request_order
+    }
+
+    #[must_use]
+    pub const fn scheduler_priority(self) -> &'static str {
+        self.scheduler_priority
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateActPassiveEffectDrainDiagnostics {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    accepted_reconciler_records: [&'static str; 5],
+    metadata: TestRendererPrivateActPendingPassiveFlushMetadata,
+    metadata_root_matches_renderer_root: bool,
+    consumes_pending_passive_flush_metadata: bool,
+    consumes_accepted_scheduler_flush_metadata: bool,
+    private_scheduler_flush_request_metadata_consumed: bool,
+    executes_passive_effects: bool,
+    invokes_effect_callbacks: bool,
+    invokes_act_callback: bool,
+    public_act_compatibility_claimed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateActPassiveEffectDrainDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn accepted_reconciler_records(&self) -> &[&'static str; 5] {
+        &self.accepted_reconciler_records
+    }
+
+    #[must_use]
+    pub const fn metadata(&self) -> TestRendererPrivateActPendingPassiveFlushMetadata {
+        self.metadata
+    }
+
+    #[must_use]
+    pub const fn metadata_root_matches_renderer_root(&self) -> bool {
+        self.metadata_root_matches_renderer_root
+    }
+
+    #[must_use]
+    pub const fn consumes_pending_passive_flush_metadata(&self) -> bool {
+        self.consumes_pending_passive_flush_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_scheduler_flush_metadata(&self) -> bool {
+        self.consumes_accepted_scheduler_flush_metadata
+    }
+
+    #[must_use]
+    pub const fn private_scheduler_flush_request_metadata_consumed(&self) -> bool {
+        self.private_scheduler_flush_request_metadata_consumed
+    }
+
+    #[must_use]
+    pub const fn executes_passive_effects(&self) -> bool {
+        self.executes_passive_effects
+    }
+
+    #[must_use]
+    pub const fn invokes_effect_callbacks(&self) -> bool {
+        self.invokes_effect_callbacks
+    }
+
+    #[must_use]
+    pub const fn invokes_act_callback(&self) -> bool {
+        self.invokes_act_callback
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(&self) -> bool {
+        self.public_act_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
     }
 }
 
@@ -4197,6 +4365,29 @@ impl TestRendererRoot {
             public_root_error_callbacks_invoked: false,
             compatibility_claimed: false,
         })
+    }
+
+    #[must_use]
+    pub fn consume_private_act_pending_passive_flush_metadata_for_canary(
+        &self,
+        metadata: TestRendererPrivateActPendingPassiveFlushMetadata,
+    ) -> TestRendererPrivateActPassiveEffectDrainDiagnostics {
+        TestRendererPrivateActPassiveEffectDrainDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_STATUS,
+            accepted_reconciler_records:
+                TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_ACCEPTED_RECORDS,
+            metadata,
+            metadata_root_matches_renderer_root: metadata.root() == self.root_id,
+            consumes_pending_passive_flush_metadata: true,
+            consumes_accepted_scheduler_flush_metadata: true,
+            private_scheduler_flush_request_metadata_consumed: true,
+            executes_passive_effects: false,
+            invokes_effect_callbacks: false,
+            invokes_act_callback: false,
+            public_act_compatibility_claimed: false,
+            compatibility_claimed: false,
+        }
     }
 
     pub fn scheduled_roots_for_canary(&self) -> Result<Vec<FiberRootId>, TestRendererRootError> {
@@ -9206,6 +9397,50 @@ mod tests {
             assert!(!row.public_error_boundary_behavior_available());
             assert!(!row.compatibility_claimed());
         }
+    }
+
+    #[test]
+    fn root_private_act_passive_effect_drain_consumes_metadata_without_public_act() {
+        let root = TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let finished_work = TestRendererFiberHandleDiagnostics::from_raw_parts_for_canary(7, 8, 9);
+        let metadata = TestRendererPrivateActPendingPassiveFlushMetadata::new_for_canary(
+            root.root_id(),
+            finished_work,
+            1,
+            2,
+        );
+
+        let diagnostics =
+            root.consume_private_act_pending_passive_flush_metadata_for_canary(metadata);
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.status(),
+            TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_STATUS
+        );
+        assert_eq!(
+            diagnostics.accepted_reconciler_records(),
+            &TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_ACCEPTED_RECORDS
+        );
+        assert_eq!(diagnostics.metadata(), metadata);
+        assert!(diagnostics.metadata_root_matches_renderer_root());
+        assert!(diagnostics.consumes_pending_passive_flush_metadata());
+        assert!(diagnostics.consumes_accepted_scheduler_flush_metadata());
+        assert!(diagnostics.private_scheduler_flush_request_metadata_consumed());
+        assert_eq!(metadata.finished_work(), finished_work);
+        assert_eq!(metadata.pending_unmount_count(), 1);
+        assert_eq!(metadata.pending_mount_count(), 2);
+        assert_eq!(metadata.pending_record_count(), 3);
+        assert_eq!(metadata.scheduler_request_order(), 0);
+        assert_eq!(metadata.scheduler_priority(), "Normal");
+        assert!(!diagnostics.executes_passive_effects());
+        assert!(!diagnostics.invokes_effect_callbacks());
+        assert!(!diagnostics.invokes_act_callback());
+        assert!(!diagnostics.public_act_compatibility_claimed());
+        assert!(!diagnostics.compatibility_claimed());
     }
 
     #[test]

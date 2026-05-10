@@ -223,6 +223,12 @@ const actSchedulerPassiveRecordIds = [
   "passive-effect-callback-invocation-gate-snapshot",
   "passive-effect-destroy-callback-execution-records"
 ];
+const actSchedulerCjsPassiveRecordIds = [
+  ...actSchedulerPassiveRecordIds,
+  "passive-effect-scheduler-flush-gate-record",
+  "scheduler-passive-effects-flush-request",
+  "passive-effect-scheduler-flush-execution-record"
+];
 const actSchedulerRootFlushRecordIds = [
   "test-renderer-private-root-request-bridge",
   "test-renderer-private-root-update-unmount-lifecycle",
@@ -242,6 +248,11 @@ const acceptedPrivateActFlushPrerequisiteIds = [
   "passive-effect-private-callback-execution-metadata",
   "test-renderer-private-root-output-diagnostics",
   "test-renderer-private-root-request-records"
+];
+const acceptedPrivateActFlushCjsPrerequisiteIds = [
+  ...acceptedPrivateActFlushPrerequisiteIds.slice(0, 8),
+  "passive-effect-scheduler-flush-metadata",
+  ...acceptedPrivateActFlushPrerequisiteIds.slice(8)
 ];
 const blockedPrivateActFlushPrerequisiteIds = [
   "private-act-queue-drain-execution",
@@ -3796,19 +3807,20 @@ function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
 }
 
 function assertActSchedulerGate(gate, entrypoint) {
-  const expectedRootFlushRecordIds = entrypoint.includes("/cjs/")
+  const isCjs = entrypoint.includes("/cjs/");
+  const expectedRootFlushRecordIds = isCjs
     ? [
         ...actSchedulerRootFlushRecordIds,
         "test-renderer-private-getinstance-class-root-diagnostic"
       ]
     : actSchedulerRootFlushRecordIds;
-
-  assert.equal(Object.isFrozen(gate), true, entrypoint);
-  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
-  assert.equal(gate.status, actSchedulerGateStatus);
-  assert.equal(gate.entrypoint, entrypoint);
-  assert.equal(gate.deterministic, true);
-  assert.deepEqual(gate.acceptedWorkers, [
+  const expectedPassiveRecordIds = isCjs
+    ? actSchedulerCjsPassiveRecordIds
+    : actSchedulerPassiveRecordIds;
+  const expectedAcceptedPrerequisiteIds = isCjs
+    ? acceptedPrivateActFlushCjsPrerequisiteIds
+    : acceptedPrivateActFlushPrerequisiteIds;
+  const expectedAcceptedWorkers = [
     "worker-176-act-queue-routing-skeleton",
     "worker-252-sync-flush-act-continuation-skeleton",
     "worker-277-react-act-queue-private-dispatcher-gate",
@@ -3827,7 +3839,20 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-426-test-renderer-testinstance-bridge-query",
     "worker-349-hook-effect-destroy-callback-execution-private",
     "worker-377-scheduler-act-queue-flush-helper-private"
-  ]);
+  ];
+  if (isCjs) {
+    expectedAcceptedWorkers.push(
+      "worker-449-passive-effect-scheduler-flush-gate",
+      "worker-473-test-renderer-act-passive-effect-drain"
+    );
+  }
+
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
+  assert.equal(gate.status, actSchedulerGateStatus);
+  assert.equal(gate.entrypoint, entrypoint);
+  assert.equal(gate.deterministic, true);
+  assert.deepEqual(gate.acceptedWorkers, expectedAcceptedWorkers);
   assert.equal(gate.publicActBehaviorAvailable, false);
   assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
   assert.equal(gate.publicRootSyncFlushRouteAvailable, false);
@@ -3855,6 +3880,14 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.privateFlushExecutionMetadataAccepted, true);
   assert.equal(gate.privateSyncFlushExecutionMetadataAccepted, true);
   assert.equal(gate.privatePassiveCallbackExecutionMetadataAccepted, true);
+  assert.equal(
+    gate.privatePassiveSchedulerFlushMetadataAccepted,
+    isCjs ? true : undefined
+  );
+  assert.equal(
+    gate.privatePassiveEffectDrainDiagnosticsConsumed,
+    isCjs ? true : undefined
+  );
   assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
   assert.equal(gate.privateFlushExecutionReady, false);
@@ -3889,7 +3922,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.recognizedPassiveActFlushRecords.map((record) => record.id),
-    actSchedulerPassiveRecordIds
+    expectedPassiveRecordIds
   );
   assert.deepEqual(
     gate.recognizedRootActFlushRecords.map((record) => record.id),
@@ -3897,7 +3930,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.acceptedPrivateFlushPrerequisiteIds,
-    acceptedPrivateActFlushPrerequisiteIds
+    expectedAcceptedPrerequisiteIds
   );
   assert.deepEqual(
     gate.blockedPrivateFlushPrerequisiteIds,
@@ -3957,6 +3990,20 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.recognizedPassiveActFlushRecords[4].privateDestroyExecutionMetadata,
     true
   );
+  if (isCjs) {
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[5].consumesPendingPassiveMetadata,
+      true
+    );
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[6].schedulerPriority,
+      "Normal"
+    );
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[7].metadataOnlyFlush,
+      true
+    );
+  }
   assert.equal(
     gate.recognizedRootActFlushRecords[0].privateRootRequestExecution,
     false

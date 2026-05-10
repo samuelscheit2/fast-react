@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { REACT_TEST_RENDERER_ACT_ORACLE_ARTIFACT_PATH } from "./react-test-renderer-act-targets.mjs";
 
+export const REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS_EXPORT =
+  "__FAST_REACT_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS__";
+const REACT_TEST_RENDERER_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT =
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+
 export function stringifyReactTestRendererActOracle(oracle) {
   return `${JSON.stringify(oracle, null, 2)}\n`;
 }
@@ -80,4 +85,50 @@ export function findReactTestRendererActObservation(
     );
   }
   return observation;
+}
+
+export function inspectReactTestRendererPrivateActPassiveEffectDrainDiagnostics(
+  moduleExports
+) {
+  const scheduler = moduleExports?._Scheduler;
+  const helperKeys = [
+    "unstable_flushAll",
+    "unstable_flushAllWithoutAsserting",
+    "unstable_flushExpired",
+    "unstable_flushNumberOfYields",
+    "unstable_flushUntilNextPaint"
+  ];
+  const helperDiagnostics = helperKeys.map((key) => {
+    const helper = scheduler?.[key];
+    const descriptor =
+      helper === undefined
+        ? undefined
+        : Object.getOwnPropertyDescriptor(
+            helper,
+            REACT_TEST_RENDERER_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
+          );
+    const diagnostics =
+      descriptor?.value?.privateActPassiveEffectDrainDiagnostics ?? null;
+    return {
+      key,
+      hasDiagnostics: diagnostics !== null,
+      descriptor:
+        descriptor === undefined
+          ? null
+          : {
+              enumerable: descriptor.enumerable,
+              writable: descriptor.writable,
+              configurable: descriptor.configurable
+            },
+      diagnostics
+    };
+  });
+
+  return {
+    exportName:
+      REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS_EXPORT,
+    helperKeys,
+    available: helperDiagnostics.every((row) => row.hasDiagnostics),
+    helperDiagnostics
+  };
 }
