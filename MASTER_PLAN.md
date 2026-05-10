@@ -45,21 +45,21 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 655 and 676 from queue 655-684 have
-been accepted; the remaining queue is running in isolated `worker/<slug>`
-branches and worktrees from queue base `243817c`.
+Top-level cap: 30 workers. Workers 655, 657-658, 660, 664-665, 671, 676,
+678, and 684 from queue 655-684 have been accepted; the remaining queue is
+running in isolated `worker/<slug>` branches and worktrees from queue base
+`243817c`.
 
-- 656-666: Rust reconciler execution paths for commit mutation, effects, refs,
-  context, Suspense, Offscreen, error recovery, sync flush callbacks, and
-  reducer transition lanes.
-- 667-672: React test-renderer private native execution evidence for `toTree`,
-  TestInstance queries, error boundaries, act/passive flushing, update
-  serialization, and unmount ref/passive ordering.
-- 673-675 and 677-682: React DOM private root live-container preflight, root
-  unmount ref/passive cleanup, fragment/array fake-DOM rendering, hydration
-  recovery/replay, resource execution, and form action callback preflight.
-- 683-684: Scheduler postTask act/root continuation evidence and package
-  surface/private-admission guard refresh.
+- 656, 659, 661-663, and 666: Rust reconciler execution paths for
+  HostComponent prop/style commit, layout effects, context, Suspense,
+  Offscreen, and reducer transition lanes.
+- 667-670 and 672: React test-renderer private native execution evidence for
+  `toTree`, TestInstance queries, error boundaries, act/passive flushing, and
+  unmount ref/passive ordering.
+- 673-675, 677, and 679-682: React DOM private root live-container preflight,
+  root unmount ref/passive cleanup, fragment/array fake-DOM rendering,
+  hydration recovery, resource execution, and form action callback preflight.
+- 683: Scheduler postTask act/root continuation evidence.
 
 ## Near-Term Sequencing
 

@@ -31,15 +31,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ### Queue 655-684
 
-- Workers 655 and 676 were accepted from the active queue. The batch added a
-  private HostText root-commit execution path with a validated text-update
-  ledger and committed-current/final-work proof, plus controlled-input live
-  text restore preflight evidence that descriptor and value-tracker access stay
-  blocked for DOM-like nodes.
+- Workers 655, 657-658, 660, 664-665, 671, 676, 678, and 684 were accepted
+  from the active queue. The batch added private HostText root-commit
+  execution, multi-child placement execution, function passive destroy/create
+  execution, HostComponent ref detach/update/attach order evidence, root render
+  failure recovery metadata, cross-root sync-flush visible callback execution,
+  test-renderer HostComponent prop-plus-text update serialization evidence,
+  controlled-input live preflight descriptor/value-tracker blockers, hydration
+  replay click-dispatch diagnostics, and queue 625-654 private-admission
+  guards while keeping public compatibility blocked.
+- Worker 665 conflicted with worker 664 only in `sync_flush.rs` imports; the
+  merge keeps both root render-error metadata and cross-root callback execution
+  paths.
 - The batch was verified after merge with `cargo fmt --all --check`, focused
-  `fast-react-reconciler` HostText root-commit and host-node ledger tests,
-  focused DOM controlled-input and resource/form conformance checks, `npm run
-  check --workspace @fast-react/react-dom`, and `git diff --check`.
+  `fast-react-reconciler` `root_commit`, `sync_flush`, placement, and passive
+  filters, focused `fast-react-test-renderer` update coverage, React DOM
+  workspace checks, test-renderer serialization conformance, package-surface
+  and private-admission guards, conflict-marker scanning, and `git diff
+  --check`.
 
 ### Queue 625-654
 
