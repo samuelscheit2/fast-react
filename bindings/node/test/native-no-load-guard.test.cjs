@@ -46,9 +46,62 @@ Module._load = function guardedModuleLoad(request, parent, isMain) {
 async function main() {
   try {
     const native = require('../index.cjs');
+    const expectedBoundaryErrorCodeMap = {
+      unsupportedNativeExecution: 'FAST_REACT_NATIVE_BINDING_UNIMPLEMENTED',
+      rustNativeExportsNotBuilt: 'FAST_REACT_NAPI_EXPORTS_NOT_BUILT',
+      rootBridgeWrongEnvironment:
+        'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT',
+      rootBridgeStaleHandle: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      rootBridgeWrongLifecycleOrder:
+        'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER'
+    };
+    const expectedRootBridgeEvidence = [
+      {
+        scenario: 'wrong-environment-root-handle',
+        sourceErrorCode: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+        boundaryErrorCode:
+          'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT',
+        nativeExecution: false,
+        reactBehaviorError: false
+      },
+      {
+        scenario: 'stale-root-or-value-handle',
+        sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+        boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+        nativeExecution: false,
+        reactBehaviorError: false
+      },
+      {
+        scenario: 'wrong-root-lifecycle-order',
+        sourceErrorCode:
+          'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+        boundaryErrorCode:
+          'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER',
+        nativeExecution: false,
+        reactBehaviorError: false
+      }
+    ];
 
     assert.equal(native.bindingStatus, 'placeholder');
     assert.equal(native.nativeBindingManifest.status, 'placeholder');
+    const actualRootBridgeEvidence =
+      native.nativeBindingManifest.nativeRootBridgeValidationEvidence;
+
+    assert.deepEqual(
+      native.nativeBindingManifest.nativeBoundaryErrorCodeMap,
+      expectedBoundaryErrorCodeMap
+    );
+    assert.ok(
+      Object.isFrozen(native.nativeBindingManifest.nativeBoundaryErrorCodeMap)
+    );
+    assert.deepEqual(
+      actualRootBridgeEvidence,
+      expectedRootBridgeEvidence
+    );
+    assert.ok(Object.isFrozen(actualRootBridgeEvidence));
+    for (const evidence of actualRootBridgeEvidence) {
+      assert.ok(Object.isFrozen(evidence));
+    }
     assert.deepEqual(
       native.getNativeBindingLoadPlan({
         platform: 'linux',
@@ -67,7 +120,21 @@ async function main() {
           arch: 'x64',
           libc: 'musl'
         }),
-      native.FastReactNativeBindingUnavailableError
+      (error) => {
+        assert.ok(error instanceof native.FastReactNativeBindingUnavailableError);
+        assert.equal(error.code, native.unavailableErrorCode);
+        assert.equal(error.nativeExecution, false);
+        assert.equal(
+          error.nativeBoundaryErrorCode,
+          expectedBoundaryErrorCodeMap.unsupportedNativeExecution
+        );
+        assert.equal(error.loadPlan.nativeExecution, false);
+        assert.equal(
+          error.loadPlan.unsupportedNativeExecutionCode,
+          expectedBoundaryErrorCodeMap.unsupportedNativeExecution
+        );
+        return true;
+      }
     );
 
     const esmNative = await import('../index.mjs');

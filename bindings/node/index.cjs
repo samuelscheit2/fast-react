@@ -6,6 +6,7 @@ const nativeAddonName = 'fast_react_napi';
 const nodeApiVersionFloor = 8;
 const supportedNodeEngineRange = '>=22.0.0';
 const unavailableErrorCode = 'FAST_REACT_NATIVE_BINDING_UNIMPLEMENTED';
+const rustNativeExportsNotBuiltErrorCode = 'FAST_REACT_NAPI_EXPORTS_NOT_BUILT';
 const platformArtifactPolicy =
   'future per-platform optional npm packages; no native addon is built or loaded yet';
 const optionalPackagePrefix = '@fast-react/native-';
@@ -80,6 +81,49 @@ const supportedNativeTargets = Object.freeze(
   nativeTargetMatrix.map((target) => target.target)
 );
 
+const nativeBoundaryErrorCodeMap = Object.freeze({
+  unsupportedNativeExecution: unavailableErrorCode,
+  rustNativeExportsNotBuilt: rustNativeExportsNotBuiltErrorCode,
+  rootBridgeWrongEnvironment:
+    'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT',
+  rootBridgeStaleHandle: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+  rootBridgeWrongLifecycleOrder:
+    'FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER'
+});
+
+function freezeNativeRootBridgeValidationEvidence({
+  scenario,
+  sourceErrorCode,
+  boundaryErrorCode
+}) {
+  return Object.freeze({
+    scenario,
+    sourceErrorCode,
+    boundaryErrorCode,
+    nativeExecution: false,
+    reactBehaviorError: false
+  });
+}
+
+const nativeRootBridgeValidationEvidence = Object.freeze([
+  freezeNativeRootBridgeValidationEvidence({
+    scenario: 'wrong-environment-root-handle',
+    sourceErrorCode: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeWrongEnvironment
+  }),
+  freezeNativeRootBridgeValidationEvidence({
+    scenario: 'stale-root-or-value-handle',
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle
+  }),
+  freezeNativeRootBridgeValidationEvidence({
+    scenario: 'wrong-root-lifecycle-order',
+    sourceErrorCode:
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+    boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeWrongLifecycleOrder
+  })
+]);
+
 const nativeBindingManifest = Object.freeze({
   status: bindingStatus,
   packageName,
@@ -90,7 +134,9 @@ const nativeBindingManifest = Object.freeze({
   optionalPackagePrefix,
   nativeTargetMatrix,
   platformPackages,
-  supportedNativeTargets
+  supportedNativeTargets,
+  nativeBoundaryErrorCodeMap,
+  nativeRootBridgeValidationEvidence
 });
 
 function hasOwn(object, key) {
@@ -166,6 +212,9 @@ function getNativeBindingLoadPlan(options = {}) {
     nodeApiVersionFloor,
     supportedNodeEngineRange,
     platformArtifactPolicy,
+    nativeExecution: false,
+    unsupportedNativeExecutionCode:
+      nativeBoundaryErrorCodeMap.unsupportedNativeExecution,
     reason: 'Fast React native artifacts are intentionally not built or loaded yet.'
   });
 }
@@ -204,6 +253,8 @@ class FastReactNativeBindingUnavailableError extends Error {
     this.nodeApiVersionFloor = nodeApiVersionFloor;
     this.supportedNodeEngineRange = supportedNodeEngineRange;
     this.reason = loadPlan.reason;
+    this.nativeExecution = loadPlan.nativeExecution;
+    this.nativeBoundaryErrorCode = loadPlan.unsupportedNativeExecutionCode;
     this.loadPlan = loadPlan;
   }
 }
