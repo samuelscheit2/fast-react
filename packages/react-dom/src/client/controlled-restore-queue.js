@@ -38,6 +38,8 @@ const controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus =
   'recorded-private-controlled-radio-group-restore-intent';
 const controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus =
   'skipped-private-controlled-radio-group-restore-intent';
+const controlledInputPostEventRestoreQueueWriteFlushOrderingStatus =
+  'private-controlled-input-post-event-restore-queue-write-flush-ordering';
 const controlledInputPostEventRestoreQueueInvalidEventCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_EVENT';
 const controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode =
@@ -65,11 +67,14 @@ const controlledInputPostEventRestoreQueueNoSideEffects = freezeRecord({
   postEventRestoreIntentSkipped: false,
   fakeDomValueChangeObserved: false,
   restoreQueueRecordCreated: false,
+  restoreQueueWriteOrderRecorded: false,
+  restoreQueueFlushOrderRecorded: false,
   restoreQueueWritten: false,
   restoreQueueFlushed: false,
   controlledStateRestoreScheduled: false,
   controlledStateRestoreInvoked: false,
   hostWrapperInvoked: false,
+  hostWrapperRestoreOrderRecorded: false,
   checkableRestoreMetadataRecorded: false,
   radioGroupRestoreIntentRecorded: false,
   radioGroupLookupRequired: false,
@@ -173,6 +178,13 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     normalizedAdmission,
     intentRecorded
   );
+  const restoreQueueOrdering = createPostEventRestoreQueueOrdering(
+    'private-event-dispatch-latest-props-evidence',
+    controlledTarget,
+    normalizedAdmission,
+    intentRecorded,
+    groupIntentRecords
+  );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
   const status = intentRecorded
@@ -205,6 +217,7 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     controlledTarget,
     checkableRestoreMetadata,
     groupIntentRecords,
+    restoreQueueOrdering,
     restoreIntent: createPostEventRestoreIntentSummary(
       eventEvidence,
       latestPropsEvidence,
@@ -265,6 +278,13 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
     normalizedAdmission,
     intentRecorded
   );
+  const restoreQueueOrdering = createPostEventRestoreQueueOrdering(
+    'private-fake-dom-observation-latest-props-evidence',
+    controlledTarget,
+    normalizedAdmission,
+    intentRecorded,
+    groupIntentRecords
+  );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
   const status = intentRecorded
@@ -303,6 +323,7 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
     controlledTarget,
     checkableRestoreMetadata,
     groupIntentRecords,
+    restoreQueueOrdering,
     restoreIntent:
       createPostEventRestoreIntentSummaryFromFakeDomObservation(
         observationEvidence,
@@ -351,6 +372,16 @@ function describeControlledInputPostEventRestoreQueueGate() {
     consumesLatestPropsEvidence: true,
     recordsCheckableRestoreMetadata: true,
     recordsRadioGroupIntentMetadata: true,
+    recordsRestoreQueueWriteFlushOrdering: true,
+    acceptedRestoreMetadataKinds: freezeArray([
+      'input-text-value',
+      'input-checkbox-checked',
+      'input-radio-checked',
+      'select-single-value',
+      'select-multiple-value',
+      'textarea-value'
+    ]),
+    restoreQueueOrdering: createPostEventRestoreQueueGateOrderingSummary(),
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawLatestPropsRetained: false,
@@ -825,6 +856,9 @@ function createPostEventRestoreIntentSummary(
     intentRecorded,
     restoreTargetWouldBeQueued: intentRecorded,
     queuePosition: intentRecorded ? 'primary' : null,
+    restoreQueueWriteOrderRecorded: intentRecorded,
+    restoreQueueFlushOrderRecorded: intentRecorded,
+    hostWrapperRestoreOrderRecorded: intentRecorded,
     latestPropsLookupRequired: true,
     latestPropsLookupPerformed: latestPropsEvidence.accepted,
     eventDispatchRecordAccepted: true,
@@ -881,6 +915,9 @@ function createPostEventRestoreIntentSummaryFromFakeDomObservation(
     intentRecorded,
     restoreTargetWouldBeQueued: intentRecorded,
     queuePosition: intentRecorded ? 'primary' : null,
+    restoreQueueWriteOrderRecorded: intentRecorded,
+    restoreQueueFlushOrderRecorded: intentRecorded,
+    hostWrapperRestoreOrderRecorded: intentRecorded,
     latestPropsLookupRequired: observationRecord.trackerRecord.changed === true,
     latestPropsLookupPerformed: latestPropsEvidence.accepted,
     fakeDomTrackerObservationAccepted: true,
@@ -1084,10 +1121,223 @@ function createPostEventRestoreBoundary(
     restoreIntentRecorded: intentRecorded,
     latestPropsLookup: latestPropsEvidence.accepted,
     eventPluginDispatch: false,
+    restoreQueueWriteOrderRecorded: intentRecorded,
+    restoreQueueFlushOrderRecorded: intentRecorded,
+    hostWrapperRestoreOrderRecorded: intentRecorded,
     restoreQueued: false,
     restoreFlushed: false,
     compatibilityClaimed: false
   });
+}
+
+function createPostEventRestoreQueueOrdering(
+  source,
+  controlledTarget,
+  admission,
+  intentRecorded,
+  groupIntentRecords
+) {
+  const acceptedRestoreKind = getAcceptedRestoreMetadataKind(
+    controlledTarget
+  );
+  const radioGroupIntent = getRecordedRadioGroupIntent(groupIntentRecords);
+  const orderingRecorded = intentRecorded === true;
+
+  return freezeRecord({
+    status:
+      controlledInputPostEventRestoreQueueWriteFlushOrderingStatus,
+    source,
+    metadataOnly: true,
+    acceptedRestoreMetadata: orderingRecorded,
+    acceptedRestoreKind: orderingRecorded ? acceptedRestoreKind : null,
+    hostTag: controlledTarget.hostTag,
+    inputType: controlledTarget.inputType,
+    multiple: controlledTarget.multiple,
+    controlKind: controlledTarget.controlKind,
+    trackedField: controlledTarget.trackedField,
+    queueKind: admission.queueKind,
+    queueId: admission.queueId,
+    writeOrder: createRestoreQueueWriteOrdering(
+      admission,
+      orderingRecorded,
+      acceptedRestoreKind
+    ),
+    flushOrder: createRestoreQueueFlushOrdering(
+      orderingRecorded,
+      acceptedRestoreKind
+    ),
+    hostWrapperOrder: createHostWrapperRestoreOrdering(
+      controlledTarget,
+      orderingRecorded,
+      acceptedRestoreKind,
+      radioGroupIntent
+    ),
+    actualQueueWritePerformed: false,
+    actualQueueFlushPerformed: false,
+    hostWrapperInvoked: false,
+    liveValueTrackerInstalled: false,
+    valueTrackerFieldWritten: false,
+    propertyDescriptorInstalled: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRestoreQueueWriteOrdering(
+  admission,
+  orderingRecorded,
+  acceptedRestoreKind
+) {
+  return freezeRecord({
+    status:
+      controlledInputPostEventRestoreQueueWriteFlushOrderingStatus,
+    metadataOnly: true,
+    queueKind: admission.queueKind,
+    queueId: admission.queueId,
+    acceptedRestoreKind: orderingRecorded ? acceptedRestoreKind : null,
+    targetWouldBeQueued: orderingRecorded,
+    queueSlot: orderingRecorded ? 'primary' : null,
+    primaryTargetWriteWouldPrecedeAdditionalTargets: orderingRecorded,
+    additionalTargetsWouldAppendInInsertionOrder: orderingRecorded,
+    writeWouldPrecedePostEventFlush: orderingRecorded,
+    writeSequence: createRestoreQueueWriteSequence(orderingRecorded),
+    restoreQueueWritten: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    liveDomNodeAccepted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRestoreQueueFlushOrdering(
+  orderingRecorded,
+  acceptedRestoreKind
+) {
+  return freezeRecord({
+    status:
+      controlledInputPostEventRestoreQueueWriteFlushOrderingStatus,
+    metadataOnly: true,
+    acceptedRestoreKind: orderingRecorded ? acceptedRestoreKind : null,
+    flushWouldBeRequiredAfterWrite: orderingRecorded,
+    pendingRestoreCheckWouldRunAfterEventBatch: orderingRecorded,
+    syncWorkFlushWouldPrecedeControlledRestore: orderingRecorded,
+    queueSnapshotWouldPrecedeHostWrapperRestore: orderingRecorded,
+    queueClearWouldPrecedeHostWrapperRestore: orderingRecorded,
+    primaryTargetWouldFlushBeforeAdditionalTargets: orderingRecorded,
+    additionalTargetsWouldFlushInInsertionOrder: orderingRecorded,
+    flushSequence: createRestoreQueueFlushSequence(orderingRecorded),
+    controlledStateRestoreInvoked: false,
+    restoreQueueFlushed: false,
+    hostWrapperInvoked: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createHostWrapperRestoreOrdering(
+  controlledTarget,
+  orderingRecorded,
+  acceptedRestoreKind,
+  radioGroupIntent
+) {
+  const radioGroupOrderingRecorded = radioGroupIntent !== null;
+
+  return freezeRecord({
+    status:
+      controlledInputPostEventRestoreQueueWriteFlushOrderingStatus,
+    metadataOnly: true,
+    acceptedRestoreKind: orderingRecorded ? acceptedRestoreKind : null,
+    hostTag: controlledTarget.hostTag,
+    inputType: controlledTarget.inputType,
+    multiple: controlledTarget.multiple,
+    controlKind: controlledTarget.controlKind,
+    wrapperKind: controlledTarget.wrapperKind,
+    wrapperOperation: getHostWrapperRestoreOperation(controlledTarget),
+    wrapperDispatchWouldFollowQueueSnapshot: orderingRecorded,
+    primaryHostWrapperWouldRun: orderingRecorded,
+    primaryHostWrapperRan: false,
+    wrapperWriteWouldBeRequired: orderingRecorded,
+    wrapperWritePerformed: false,
+    radioGroupRestoreWouldFollowPrimaryInputRestore:
+      radioGroupOrderingRecorded,
+    radioGroupLookupRequired:
+      radioGroupIntent === null
+        ? false
+        : radioGroupIntent.groupLookupRequired,
+    radioGroupLookupPerformed: false,
+    radioGroupMembersEnumerated: false,
+    radioSiblingPropsRead: false,
+    radioSiblingHostWrapperWouldRun: radioGroupOrderingRecorded,
+    radioSiblingHostWrapperRan: false,
+    radioValueTrackerRefreshWouldFollowSiblingRestore:
+      radioGroupOrderingRecorded,
+    radioValueTrackerRefreshed: false,
+    liveValueTrackerInstalled: false,
+    valueTrackerFieldWritten: false,
+    propertyDescriptorInstalled: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueGateOrderingSummary() {
+  return freezeRecord({
+    status:
+      controlledInputPostEventRestoreQueueWriteFlushOrderingStatus,
+    metadataOnly: true,
+    recordsQueueWriteOrder: true,
+    recordsQueueFlushOrder: true,
+    recordsHostWrapperRestoreOrder: true,
+    queueWriteBeforePostEventFlush: true,
+    pendingRestoreCheckAfterEventBatch: true,
+    syncWorkFlushBeforeControlledRestore: true,
+    queueSnapshotBeforeHostWrapperRestore: true,
+    primaryTargetBeforeAdditionalTargets: true,
+    additionalTargetsInInsertionOrder: true,
+    radioGroupRestoreAfterPrimaryInputRestore: true,
+    radioValueTrackerRefreshAfterSiblingRestore: true,
+    actualQueueWrites: false,
+    actualQueueFlushes: false,
+    hostWrapperInvocations: false,
+    valueTrackerWrites: false,
+    liveDomMutations: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRestoreQueueWriteSequence(orderingRecorded) {
+  if (orderingRecorded !== true) {
+    return freezeArray([]);
+  }
+
+  return freezeArray([
+    'accept-restore-metadata',
+    'record-latest-props-evidence',
+    'would-store-primary-restore-target',
+    'would-defer-controlled-restore-until-batch-exit'
+  ]);
+}
+
+function createRestoreQueueFlushSequence(orderingRecorded) {
+  if (orderingRecorded !== true) {
+    return freezeArray([]);
+  }
+
+  return freezeArray([
+    'event-batch-exit',
+    'pending-restore-check',
+    'synchronous-work-flush',
+    'snapshot-and-clear-private-queue',
+    'restore-primary-target',
+    'restore-additional-targets-in-order',
+    'host-wrapper-restore-dispatch'
+  ]);
 }
 
 function createPostEventRestoreQueueSideEffects(
@@ -1107,6 +1357,9 @@ function createPostEventRestoreQueueSideEffects(
     postEventRestoreIntentRecorded: intentRecorded,
     postEventRestoreIntentSkipped: !intentRecorded,
     restoreQueueRecordCreated: true,
+    restoreQueueWriteOrderRecorded: intentRecorded,
+    restoreQueueFlushOrderRecorded: intentRecorded,
+    hostWrapperRestoreOrderRecorded: intentRecorded,
     checkableRestoreMetadataRecorded: checkable,
     radioGroupRestoreIntentRecorded: radioGroupIntent !== null,
     radioGroupLookupRequired:
@@ -1139,6 +1392,9 @@ function createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
     postEventRestoreIntentRecorded: intentRecorded,
     postEventRestoreIntentSkipped: !intentRecorded,
     restoreQueueRecordCreated: true,
+    restoreQueueWriteOrderRecorded: intentRecorded,
+    restoreQueueFlushOrderRecorded: intentRecorded,
+    hostWrapperRestoreOrderRecorded: intentRecorded,
     checkableRestoreMetadataRecorded: checkable,
     radioGroupRestoreIntentRecorded: radioGroupIntent !== null,
     radioGroupLookupRequired:
@@ -1450,6 +1706,50 @@ function getWrapperKind(hostTag) {
   return null;
 }
 
+function getAcceptedRestoreMetadataKind(controlledTarget) {
+  if (controlledTarget.hostTag === 'input') {
+    if (controlledTarget.controlKind === 'checked') {
+      if (controlledTarget.inputType === 'radio') {
+        return 'input-radio-checked';
+      }
+      return 'input-checkbox-checked';
+    }
+    return 'input-text-value';
+  }
+
+  if (controlledTarget.hostTag === 'select') {
+    return controlledTarget.controlKind === 'multiple'
+      ? 'select-multiple-value'
+      : 'select-single-value';
+  }
+
+  if (controlledTarget.hostTag === 'textarea') {
+    return 'textarea-value';
+  }
+
+  return null;
+}
+
+function getHostWrapperRestoreOperation(controlledTarget) {
+  if (controlledTarget.hostTag === 'input') {
+    return controlledTarget.controlKind === 'checked'
+      ? 'input-checked-sync'
+      : 'input-value-sync';
+  }
+
+  if (controlledTarget.hostTag === 'select') {
+    return controlledTarget.controlKind === 'multiple'
+      ? 'select-multiple-options-sync'
+      : 'select-single-options-sync';
+  }
+
+  if (controlledTarget.hostTag === 'textarea') {
+    return 'textarea-value-sync';
+  }
+
+  return null;
+}
+
 function isSupportedPostEventRestoreTrigger(domEventName, hostTag, controlKind) {
   if (hostTag === 'input' && controlKind === 'checked') {
     return domEventName === 'click' || domEventName === 'change';
@@ -1627,6 +1927,7 @@ module.exports = {
   controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
   controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
   controlledInputPostEventRestoreQueueStatus,
+  controlledInputPostEventRestoreQueueWriteFlushOrderingStatus,
   createControlledInputPostEventRestoreQueueGate,
   createUnsupportedControlledInputPostEventRestoreQueueError,
   describeControlledInputPostEventRestoreQueueGate,
