@@ -27,6 +27,13 @@ const minimalRootMilestoneManifest = readManifest(
 const privateDiagnosticManifest = readManifest(
   "private-diagnostic-gate-admissions.json"
 );
+const privateRootHostOutputTimingManifest = readManifest(
+  "private-root-host-output-timing-canaries.json"
+);
+const privateBenchmarkManifestIds = new Set([
+  privateDiagnosticManifest.manifestId,
+  privateRootHostOutputTimingManifest.manifestId
+]);
 const privateRootHostOutputDiagnosticScenarioIds = [
   "private-root-host-output-create-mark-listen-diagnostics",
   "private-root-host-output-initial-render-diagnostics",
@@ -37,9 +44,9 @@ const privateRootHostOutputDiagnosticScenarioIds = [
 test("checked benchmark manifests pass the fail-closed gate", () => {
   const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
 
-  assert.equal(result.manifestCount, 5);
-  assert.equal(result.scenarioCount, 78);
-  assert.equal(result.milestoneCount, 17);
+  assert.equal(result.manifestCount, 6);
+  assert.equal(result.scenarioCount, 86);
+  assert.equal(result.milestoneCount, 19);
   assert.equal(result.resultCount, 0);
   assert.deepEqual(COMPATIBILITY_STATUSES, [
     "blocked-by-conformance",
@@ -103,7 +110,7 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
   const diagnosticScenarios = result.manifests
     .flatMap((manifest) => manifest.scenarios)
     .filter((scenario) => scenario.timingStatus === "diagnostic-only");
-  assert.equal(diagnosticScenarios.length, 13);
+  assert.equal(diagnosticScenarios.length, 21);
   for (const scenario of diagnosticScenarios) {
     assert.equal(
       scenario.compatibilityStatus,
@@ -127,7 +134,7 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
       (milestone) =>
         milestone.benchmarkReadinessStatus === "diagnostic-admitted"
     );
-  assert.equal(diagnosticMilestones.length, 5);
+  assert.equal(diagnosticMilestones.length, 6);
   for (const milestone of diagnosticMilestones) {
     assert.equal(
       milestone.compatibilityStatus,
@@ -145,8 +152,8 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
       return counts;
     }, {});
   assert.deepEqual(acceptedGateStatusCounts, {
-    "accepted-blocked": 5,
-    "accepted-private-partial": 17,
+    "accepted-blocked": 7,
+    "accepted-private-partial": 18,
     "accepted-oracle-only": 5
   });
 
@@ -158,13 +165,13 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
         acceptedGate?.status === "accepted-private-partial" &&
         acceptedGate.admitted === true
     ).length;
-  assert.equal(admittedPrivateGateCount, 9);
+  assert.equal(admittedPrivateGateCount, 10);
 });
 
 test("public benchmark manifests stay blocked despite private diagnostics", () => {
   const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
   const publicManifests = result.manifests.filter(
-    (manifest) => manifest.manifestId !== privateDiagnosticManifest.manifestId
+    (manifest) => !privateBenchmarkManifestIds.has(manifest.manifestId)
   );
 
   assert.equal(publicManifests.length, 4);

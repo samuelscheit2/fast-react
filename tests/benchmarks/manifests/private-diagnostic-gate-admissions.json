@@ -68,7 +68,7 @@
         "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
         "admitted": true,
         "compatibilityClaimed": false,
-        "notes": "Worker 352 proves 8 private host-output diagnostic scenario-mode rows for createRoot marker/listener apply-revert, initial render, update render, and unmount cleanup while public root E2E compatibility remains blocked."
+        "notes": "Workers 352 and 380 prove 16 private host-output diagnostic scenario-mode rows for createRoot marker/listener apply-revert, initial render, update render, replacement, render-null clearing, unmount cleanup, double-unmount, and render-after-unmount guards while public root E2E compatibility remains blocked."
       }
     },
     {
