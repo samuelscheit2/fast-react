@@ -117,7 +117,7 @@ use crate::{
         SuspenseThenableRetryRootSchedulerStatus, execute_pinged_retry_root_callback,
         execute_suspense_thenable_retry_root_callback,
         execute_sync_scheduler_continuation_for_render_handoff,
-        request_suspense_thenable_retry_root_scheduler,
+        request_suspense_thenable_retry_root_scheduler, root_sync_flush_record_for_canary,
     },
     test_support::{RecordingHost, TestHostNode, TestHostTree},
 };
@@ -9718,6 +9718,103 @@ mod tests {
         assert_eq!(commit.previous_current(), current);
         assert_eq!(commit.current(), render.finished_work());
         assert_eq!(commit.finished_lanes(), Lanes::SYNC);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(commit.mutation_log().len(), 1);
+        assert_eq!(commit.mutation_apply_log().len(), 1);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(
+            host.operations().len(),
+            host_operation_count_after_complete_work
+        );
+    }
+
+    #[test]
+    fn root_work_loop_complete_work_handoff_feeds_expired_lane_sync_scheduler_continuation() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("main", "expired scheduler commit");
+        let current = store.root(root_id).unwrap().current();
+        let update = update_container(&mut store, root_id, element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+        assert!(
+            store
+                .root_mut(root_id)
+                .unwrap()
+                .lanes_mut()
+                .set_expiration_time(Lane::DEFAULT, 625)
+        );
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_starved_lanes_as_expired(625);
+
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let complete_work = handoff_completed_host_root_render_to_test_complete_work(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap();
+        let pending_finished_work =
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, 625).unwrap();
+        let host_operation_count_after_complete_work = host.operations().len();
+        let expired_handoff = root_sync_flush_record_for_canary(0, root_id, Lanes::DEFAULT, render);
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            expired_handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(complete_work.root(), root_id);
+        assert_eq!(
+            complete_work.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(
+            complete_work.root_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(complete_work.completed_child_count(), 1);
+        assert_eq!(pending_finished_work.root(), root_id);
+        assert_eq!(pending_finished_work.previous_current(), current);
+        assert_eq!(
+            pending_finished_work.finished_work(),
+            render.finished_work()
+        );
+        assert_eq!(pending_finished_work.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_finished_work.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_finished_work.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            pending_finished_work.pending_lanes_before_commit(),
+            Lanes::DEFAULT
+        );
+        assert!(pending_finished_work.records_finished_work());
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert_eq!(execution.handoff(), expired_handoff);
+        assert_eq!(execution.selected_lanes(), Lanes::DEFAULT);
+        assert!(execution.did_execute_private_sync_scheduler_continuation());
+        assert!(execution.consumed_accepted_render_handoff());
+        assert!(execution.async_callback_execution_blocked());
+        assert!(execution.public_update_scheduling_blocked());
+        assert!(!execution.public_root_compatibility_claimed());
+        assert!(!execution.executes_public_effects());
+        let commit = execution.commit().unwrap();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
         assert_eq!(commit.pending_lanes(), Lanes::NO);
         assert_eq!(commit.mutation_log().len(), 1);
         assert_eq!(commit.mutation_apply_log().len(), 1);
