@@ -1,5 +1,7 @@
 'use strict';
 
+const resourceFormInternalsGate = require('../resource-form-internals-gate.js');
+
 const ENTRY_SET_ATTRIBUTE = 'setAttribute';
 const ENTRY_REMOVE_ATTRIBUTE = 'removeAttribute';
 const ENTRY_SET_PROPERTY = 'setProperty';
@@ -13,6 +15,8 @@ const CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS =
   'blocked-controlled-form-property-payload';
 const CONTROLLED_VALUE_TRACKER_GATE_STATUS =
   'private-controlled-value-tracker-metadata-only';
+const CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS =
+  resourceFormInternalsGate.controlledInputPrivateWrapperGateStatus;
 
 const emptyProps = Object.freeze({});
 
@@ -270,7 +274,7 @@ function createEntries(tag, propName, value, previousValue, props) {
   }
 
   if (isControlledFormProp(tag, propName)) {
-    return createControlledFormUnsupportedEntry(tag, propName);
+    return createControlledFormUnsupportedEntry(tag, propName, props);
   }
 
   if (formActionProps.has(propName)) {
@@ -640,7 +644,14 @@ function createUnsupportedEntry(propName, category, reason, details) {
   return entry;
 }
 
-function createControlledFormUnsupportedEntry(tag, propName) {
+function createControlledFormUnsupportedEntry(tag, propName, props) {
+  const privateWrapperGateRecord =
+    createControlledPrivateWrapperPropertyPayloadRecordOrNull(
+      tag,
+      propName,
+      props
+    );
+
   return createUnsupportedEntry(
     propName,
     `controlled-${tag}`,
@@ -648,6 +659,11 @@ function createControlledFormUnsupportedEntry(tag, propName) {
     {
       controlledFormBoundary: {
         propertyPayloadStatus: CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+        privateWrapperGateStatus:
+          privateWrapperGateRecord === null
+            ? null
+            : CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+        privateWrapperGateRecord,
         valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
         hostTag: tag,
         ordinaryPayloadAccepted: false,
@@ -659,6 +675,23 @@ function createControlledFormUnsupportedEntry(tag, propName) {
       }
     }
   );
+}
+
+function createControlledPrivateWrapperPropertyPayloadRecordOrNull(
+  tag,
+  propName,
+  props
+) {
+  if (tag !== 'input' && tag !== 'select' && tag !== 'textarea') {
+    return null;
+  }
+
+  return resourceFormInternalsGate
+    .createControlledInputPrivateWrapperPropertyPayloadRecord({
+      hostTag: tag,
+      propName,
+      props
+    });
 }
 
 function isControlledFormProp(tag, propName) {
@@ -745,6 +778,7 @@ function getStyleMutationTarget(styleName) {
 
 module.exports = {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,

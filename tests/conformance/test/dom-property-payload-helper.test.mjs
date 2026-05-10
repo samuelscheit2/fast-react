@@ -22,6 +22,15 @@ const propertyPayload = require(
     "property-payload.js"
   )
 );
+const resourceFormGate = require(
+  path.join(
+    repoRoot,
+    "packages",
+    "react-dom",
+    "src",
+    "resource-form-internals-gate.js"
+  )
+);
 const domMutation = require(
   path.join(repoRoot, "packages", "react-dom", "src", "dom-host", "mutation.js")
 );
@@ -41,6 +50,7 @@ const reactDomPackageJson = require(
 
 const {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
@@ -990,24 +1000,25 @@ test("private DOM style and innerHTML applier rejects ordinary attribute records
 });
 
 test("private DOM property payload reports controlled form and document resource host entries as unsupported", () => {
+  const inputProps = orderedProps([
+    ["id", "name-field"],
+    ["type", "text"],
+    ["value", "Ada"],
+    ["checked", false],
+    ["defaultValue", "Grace"]
+  ]);
   assert.deepEqual(
     diffDomPropertyPayload(
       "input",
       {},
-      orderedProps([
-        ["id", "name-field"],
-        ["type", "text"],
-        ["value", "Ada"],
-        ["checked", false],
-        ["defaultValue", "Grace"]
-      ])
+      inputProps
     ),
     [
       setAttribute("id", "id", "name-field"),
-      controlledUnsupported("input", "type"),
-      controlledUnsupported("input", "value"),
-      controlledUnsupported("input", "checked"),
-      controlledUnsupported("input", "defaultValue")
+      controlledUnsupported("input", "type", inputProps),
+      controlledUnsupported("input", "value", inputProps),
+      controlledUnsupported("input", "checked", inputProps),
+      controlledUnsupported("input", "defaultValue", inputProps)
     ]
   );
 
@@ -1034,35 +1045,37 @@ test("private DOM property payload reports controlled form and document resource
     ]
   );
 
+  const selectProps = orderedProps([
+    ["value", "a"],
+    ["defaultValue", "b"],
+    ["multiple", true]
+  ]);
   assert.deepEqual(
     diffDomPropertyPayload(
       "select",
       {},
-      orderedProps([
-        ["value", "a"],
-        ["defaultValue", "b"],
-        ["multiple", true]
-      ])
+      selectProps
     ),
     [
-      controlledUnsupported("select", "value"),
-      controlledUnsupported("select", "defaultValue"),
-      controlledUnsupported("select", "multiple")
+      controlledUnsupported("select", "value", selectProps),
+      controlledUnsupported("select", "defaultValue", selectProps),
+      controlledUnsupported("select", "multiple", selectProps)
     ]
   );
 
+  const textareaProps = orderedProps([
+    ["value", "Ada"],
+    ["defaultValue", "Grace"]
+  ]);
   assert.deepEqual(
     diffDomPropertyPayload(
       "textarea",
       {},
-      orderedProps([
-        ["value", "Ada"],
-        ["defaultValue", "Grace"]
-      ])
+      textareaProps
     ),
     [
-      controlledUnsupported("textarea", "value"),
-      controlledUnsupported("textarea", "defaultValue")
+      controlledUnsupported("textarea", "value", textareaProps),
+      controlledUnsupported("textarea", "defaultValue", textareaProps)
     ]
   );
 
@@ -1088,6 +1101,253 @@ test("private DOM property payload reports controlled form and document resource
       )
     ]
   );
+});
+
+test("private DOM controlled payload rows carry wrapper metadata without live tracker effects", () => {
+  const cases = [
+    {
+      tag: "input",
+      props: orderedProps([
+        ["type", "checkbox"],
+        ["name", "accepted"],
+        ["checked", true],
+        ["defaultChecked", false]
+      ])
+    },
+    {
+      tag: "select",
+      props: orderedProps([
+        ["value", ["a"]],
+        ["defaultValue", ["b"]],
+        ["multiple", true]
+      ])
+    },
+    {
+      tag: "textarea",
+      props: orderedProps([
+        ["value", "Ada"],
+        ["defaultValue", "Grace"]
+      ])
+    }
+  ];
+  const summaries = [];
+
+  for (const { tag, props } of cases) {
+    const controlledEntries = diffDomPropertyPayload(
+      tag,
+      {},
+      props
+    ).filter((entry) => entry.kind === ENTRY_UNSUPPORTED);
+
+    for (const entry of controlledEntries) {
+      const boundary = entry.controlledFormBoundary;
+      const record = boundary.privateWrapperGateRecord;
+
+      assert.equal(
+        boundary.privateWrapperGateStatus,
+        CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS
+      );
+      assert.equal(Object.isFrozen(record), true);
+      assert.equal(
+        resourceFormGate.isPrivateControlledInputWrapperPropertyPayloadRecord(
+          record
+        ),
+        true
+      );
+      assert.equal(
+        resourceFormGate.getPrivateControlledInputWrapperPropertyPayloadRecordPayload(
+          record
+        ),
+        record
+      );
+      assert.deepEqual(
+        record.sideEffects,
+        resourceFormGate.controlledInputPrivateWrapperSideEffects
+      );
+      assert.equal(record.sideEffects.hostValueRead, false);
+      assert.equal(record.sideEffects.hostValueWritten, false);
+      assert.equal(record.sideEffects.propertyDescriptorInstalled, false);
+      assert.equal(record.sideEffects.trackerAttached, false);
+      assert.equal(record.sideEffects.hostWrapperInvoked, false);
+      assert.equal(record.sideEffects.wrapperPropertyWritten, false);
+      assert.equal(record.sideEffects.postEventRestoreQueued, false);
+      assert.equal(record.sideEffects.latestPropsLookup, false);
+      assert.equal(record.wrapperMetadata.deterministicMetadataOnly, true);
+      assert.equal(record.wrapperMetadata.propertyPayloadRowAccepted, false);
+      assert.equal(record.wrapperMetadata.hostWrapperInvoked, false);
+      assert.equal(record.wrapperMetadata.wrapperPropertyWritten, false);
+      assert.equal(record.wrapperMetadata.liveHostNodeRequired, false);
+      assert.equal(record.wrapperMetadata.rawTargetCaptured, false);
+      assert.equal(record.wrapperMetadata.trackerAttached, false);
+      assert.equal(record.valueTrackerMetadata.trackerAttached, false);
+      assert.equal(record.valueTrackerMetadata.currentValueSnapshot, null);
+      assert.equal(record.postEventRestoreBoundary.latestPropsLookup, false);
+      assert.equal(record.postEventRestoreBoundary.eventPluginDispatch, false);
+      assert.equal(record.postEventRestoreBoundary.restoreQueued, false);
+      assert.equal(record.postEventRestoreBoundary.restoreFlushed, false);
+      assert.equal(
+        record.publicControlledBehaviorBoundary.hostWrapperWrites,
+        false
+      );
+
+      summaries.push({
+        requestType: record.requestType,
+        contractId: record.contractId,
+        hostTag: record.hostTag,
+        propName: record.propName,
+        controlKind: record.controlKind,
+        inputType: record.inputType,
+        multiple: record.multiple,
+        wrapperKind: record.wrapperMetadata.wrapperKind,
+        wrapperOperations: record.wrapperMetadata.wrapperOperations,
+        valueTrackerContractId:
+          record.wrapperMetadata.valueTrackerContractId,
+        trackedField: record.wrapperMetadata.trackedField
+      });
+    }
+  }
+
+  assert.deepEqual(summaries, [
+    {
+      requestType: "controlled-wrapper.input.type",
+      contractId: "input-wrapper-type-payload",
+      hostTag: "input",
+      propName: "type",
+      controlKind: "checked",
+      inputType: "checkbox",
+      multiple: false,
+      wrapperKind: "input-host-wrapper",
+      wrapperOperations: ["validateInputProps", "initInput", "updateInput"],
+      valueTrackerContractId: "input-checked-tracker",
+      trackedField: "checked"
+    },
+    {
+      requestType: "controlled-wrapper.input.name",
+      contractId: "input-wrapper-name-payload",
+      hostTag: "input",
+      propName: "name",
+      controlKind: "checked",
+      inputType: "checkbox",
+      multiple: false,
+      wrapperKind: "input-host-wrapper",
+      wrapperOperations: [
+        "initInput",
+        "updateInput",
+        "restoreControlledInputState"
+      ],
+      valueTrackerContractId: "input-checked-tracker",
+      trackedField: "checked"
+    },
+    {
+      requestType: "controlled-wrapper.input.checked",
+      contractId: "input-wrapper-checked-payload",
+      hostTag: "input",
+      propName: "checked",
+      controlKind: "checked",
+      inputType: "checkbox",
+      multiple: false,
+      wrapperKind: "input-host-wrapper",
+      wrapperOperations: [
+        "validateInputProps",
+        "initInput",
+        "updateInput",
+        "restoreControlledInputState"
+      ],
+      valueTrackerContractId: "input-checked-tracker",
+      trackedField: "checked"
+    },
+    {
+      requestType: "controlled-wrapper.input.defaultChecked",
+      contractId: "input-wrapper-default-checked-payload",
+      hostTag: "input",
+      propName: "defaultChecked",
+      controlKind: "checked",
+      inputType: "checkbox",
+      multiple: false,
+      wrapperKind: "input-host-wrapper",
+      wrapperOperations: [
+        "validateInputProps",
+        "initInput",
+        "updateInput",
+        "restoreControlledInputState"
+      ],
+      valueTrackerContractId: "input-checked-tracker",
+      trackedField: "checked"
+    },
+    {
+      requestType: "controlled-wrapper.select.value",
+      contractId: "select-wrapper-value-payload",
+      hostTag: "select",
+      propName: "value",
+      controlKind: "multiple",
+      inputType: null,
+      multiple: true,
+      wrapperKind: "select-host-wrapper",
+      wrapperOperations: ["validateSelectProps", "initSelect", "updateSelect"],
+      valueTrackerContractId: "select-multiple-value-tracker",
+      trackedField: "selectedOptions"
+    },
+    {
+      requestType: "controlled-wrapper.select.defaultValue",
+      contractId: "select-wrapper-default-value-payload",
+      hostTag: "select",
+      propName: "defaultValue",
+      controlKind: "multiple",
+      inputType: null,
+      multiple: true,
+      wrapperKind: "select-host-wrapper",
+      wrapperOperations: ["validateSelectProps", "initSelect", "updateSelect"],
+      valueTrackerContractId: "select-multiple-value-tracker",
+      trackedField: "selectedOptions"
+    },
+    {
+      requestType: "controlled-wrapper.select.multiple",
+      contractId: "select-wrapper-multiple-payload",
+      hostTag: "select",
+      propName: "multiple",
+      controlKind: "multiple",
+      inputType: null,
+      multiple: true,
+      wrapperKind: "select-host-wrapper",
+      wrapperOperations: ["validateSelectProps", "initSelect", "updateSelect"],
+      valueTrackerContractId: "select-multiple-value-tracker",
+      trackedField: "selectedOptions"
+    },
+    {
+      requestType: "controlled-wrapper.textarea.value",
+      contractId: "textarea-wrapper-value-payload",
+      hostTag: "textarea",
+      propName: "value",
+      controlKind: "value",
+      inputType: null,
+      multiple: false,
+      wrapperKind: "textarea-host-wrapper",
+      wrapperOperations: [
+        "validateTextareaProps",
+        "initTextarea",
+        "updateTextarea"
+      ],
+      valueTrackerContractId: "textarea-value-tracker",
+      trackedField: "value"
+    },
+    {
+      requestType: "controlled-wrapper.textarea.defaultValue",
+      contractId: "textarea-wrapper-default-value-payload",
+      hostTag: "textarea",
+      propName: "defaultValue",
+      controlKind: "value",
+      inputType: null,
+      multiple: false,
+      wrapperKind: "textarea-host-wrapper",
+      wrapperOperations: [
+        "validateTextareaProps",
+        "initTextarea",
+        "updateTextarea"
+      ],
+      valueTrackerContractId: "textarea-value-tracker",
+      trackedField: "value"
+    }
+  ]);
 });
 
 test("private DOM property payload helper remains private to the package surface", () => {
@@ -1299,7 +1559,10 @@ function unsupported(propName, category, reason, details) {
   return entry;
 }
 
-function controlledUnsupported(hostTag, propName) {
+function controlledUnsupported(hostTag, propName, props = {}) {
+  const privateWrapperGateRecord =
+    createExpectedPrivateWrapperGateRecordOrNull(hostTag, propName, props);
+
   return unsupported(
     propName,
     `controlled-${hostTag}`,
@@ -1307,6 +1570,11 @@ function controlledUnsupported(hostTag, propName) {
     {
       controlledFormBoundary: {
         propertyPayloadStatus: CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+        privateWrapperGateStatus:
+          privateWrapperGateRecord === null
+            ? null
+            : CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+        privateWrapperGateRecord,
         valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
         hostTag,
         ordinaryPayloadAccepted: false,
@@ -1316,6 +1584,24 @@ function controlledUnsupported(hostTag, propName) {
         publicControlledBehaviorEnabled: false,
         compatibilityClaimed: false
       }
+    }
+  );
+}
+
+function createExpectedPrivateWrapperGateRecordOrNull(
+  hostTag,
+  propName,
+  props
+) {
+  if (hostTag !== "input" && hostTag !== "select" && hostTag !== "textarea") {
+    return null;
+  }
+
+  return resourceFormGate.createControlledInputPrivateWrapperPropertyPayloadRecord(
+    {
+      hostTag,
+      propName,
+      props
     }
   );
 }
