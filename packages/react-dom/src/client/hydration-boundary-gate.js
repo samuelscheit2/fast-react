@@ -16,6 +16,11 @@ const {
 const {
   describeRootListenerGuard
 } = require('../events/root-listeners.js');
+const {
+  EVENT_DISPATCH_BLOCKED_CODE,
+  EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+  HYDRATION_REPLAY_BLOCKED_CODE
+} = require('../events/plugin-event-system.js');
 
 const HYDRATION_MARKER_ORACLE_KIND =
   'react-19.2.6-react-dom-hydration-marker-oracle';
@@ -203,6 +208,45 @@ const unsupportedHydrationPrerequisites = freezeArray([
   )
 ]);
 
+const hydrationEventReplayBlockerContracts = freezeArray([
+  replayBlocker(
+    'no-dehydrated-host-root',
+    'reconciler',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'No dehydrated HostRoot state exists for event replay blocker detection.'
+  ),
+  replayBlocker(
+    'no-dehydrated-boundary-target',
+    'reconciler',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Suspense and Activity dehydrated boundary targets are not claimable.'
+  ),
+  replayBlocker(
+    'no-event-target-hydration-resolution',
+    'react-dom-events',
+    EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    'Event target diagnostics cannot resolve a hydratable boundary target.'
+  ),
+  replayBlocker(
+    'no-explicit-hydration-target-queue',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Explicit hydration target priority queues are not implemented.'
+  ),
+  replayBlocker(
+    'no-continuous-event-replay-queues',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Continuous event replay queues and retry scheduling are not implemented.'
+  ),
+  replayBlocker(
+    'no-dispatch-replay-route',
+    'react-dom-events',
+    EVENT_DISPATCH_BLOCKED_CODE,
+    'The accepted event dispatch gate remains blocked before replay execution.'
+  )
+]);
+
 const hydrationBoundaryRecordPayloads = new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
@@ -305,6 +349,8 @@ function createUnsupportedHydrateRootRecordWithGate(
     container,
     gateState
   );
+  const markerParserEvidence =
+    createHydrationMarkerParserEvidence(markerDiagnostics);
   const markerEvidence = createHydrationMarkerEvidence(markerDiagnostics);
 
   const sequence = gateState.nextRecordSequence++;
@@ -315,6 +361,11 @@ function createUnsupportedHydrateRootRecordWithGate(
   );
   const listenerGuard = describeRootListenerGuard(container, {
     action: 'defer-listen-to-all-supported-events-for-hydrate-root'
+  });
+  const eventReplayBlockers = createHydrationEventReplayBlockers({
+    listenerGuard,
+    markerDiagnostics,
+    markerParserEvidence
   });
   const record = freezeRecord({
     $$typeof: privateHydrationBoundaryRecordType,
@@ -333,7 +384,9 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerGuard,
     listenerGuard,
     markerDiagnostics,
+    markerParserEvidence,
     markerEvidence,
+    eventReplayBlockers,
     canHydrate: false,
     publicRootCreated: false,
     containerMarked: false,
@@ -429,6 +482,83 @@ function createHydrationMarkerEvidence(markerDiagnostics) {
   });
 }
 
+function createHydrationMarkerParserEvidence(markerDiagnostics) {
+  return freezeRecord({
+    kind: 'FastReactDomHydrationMarkerParserEvidence',
+    status: 'accepted-marker-parser-evidence-recorded',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    canHydrate: false,
+    parserKind: markerDiagnostics.kind,
+    parserStatus: markerDiagnostics.status,
+    traversal: markerDiagnostics.traversal,
+    markerContractCount: markerDiagnostics.markerContractCount,
+    nodeCount: markerDiagnostics.nodeCount,
+    acceptedMarkerCount: markerDiagnostics.acceptedMarkerCount,
+    commentMarkerCount: markerDiagnostics.commentMarkerCount,
+    templateMarkerCount: markerDiagnostics.templateMarkerCount,
+    unrecognizedMarkerCount: markerDiagnostics.unrecognizedMarkerCount,
+    contractIds: freezeArray(
+      markerDiagnostics.markers.map((marker) => marker.contractId)
+    ),
+    acceptedMarkerRows: freezeArray(
+      markerDiagnostics.markers.map((marker) =>
+        freezeRecord({
+          area: marker.area,
+          companionStatus:
+            marker.companion === null ? null : marker.companion.status,
+          contractId: marker.contractId,
+          kind: marker.kind,
+          lifecycle: marker.lifecycle,
+          path: marker.path
+        })
+      )
+    ),
+    summaryByContract: freezeArray(
+      markerDiagnostics.summaryByContract.map((summary) =>
+        freezeRecord({
+          count: summary.count,
+          id: summary.id
+        })
+      )
+    )
+  });
+}
+
+function createHydrationEventReplayBlockers({
+  listenerGuard,
+  markerDiagnostics,
+  markerParserEvidence
+}) {
+  return freezeRecord({
+    kind: 'FastReactDomHydrationEventReplayBlockers',
+    status: 'blocked-after-private-root-and-event-gates',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    hydrationReplaySupported: false,
+    eventsReplayed: false,
+    explicitHydrationTargetsQueued: false,
+    continuousEventReplayQueued: false,
+    formReplayQueued: false,
+    rootListenerGateAccepted: true,
+    rootListenerInstallationDeferred: true,
+    eventDispatchGateAccepted: true,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    hydrationReplayBlockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    markerParserEvidenceAccepted:
+      markerParserEvidence.status ===
+      'accepted-marker-parser-evidence-recorded',
+    acceptedMarkerCount: markerDiagnostics.acceptedMarkerCount,
+    canInstallRootListeners: listenerGuard.canInstallRootListeners,
+    hasRootListeningMarker: listenerGuard.hasRootListeningMarker,
+    blockerCount: hydrationEventReplayBlockerContracts.length,
+    blockers: hydrationEventReplayBlockerContracts
+  });
+}
+
 function createMarkerOracleInfo(source) {
   const markerContractIds = freezeArray(
     acceptedHydrationMarkerContracts.map((contract) => contract.id)
@@ -490,6 +620,16 @@ function markerContract(
 
 function prerequisite(id, owner, reason) {
   return freezeRecord({
+    id,
+    owner,
+    reason
+  });
+}
+
+function replayBlocker(id, owner, blockedReason, reason) {
+  return freezeRecord({
+    blocked: true,
+    blockedReason,
     id,
     owner,
     reason
@@ -610,6 +750,7 @@ module.exports = {
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
+  hydrationEventReplayBlockerContracts,
   inspectHydrationContainerMarkers,
   isPrivateHydrationBoundaryRecord,
   privateHydrationBoundaryRecordType,

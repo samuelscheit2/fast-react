@@ -25,6 +25,10 @@ const listenerRegistry = require(path.join(
   packageRoot,
   'src/events/listener-registry.js'
 ));
+const pluginEventSystem = require(path.join(
+  packageRoot,
+  'src/events/plugin-event-system.js'
+));
 const ReactDOMClient = require(path.join(packageRoot, 'client.js'));
 
 test('unsupported hydrateRoot records bridge hydration parser evidence with root guards', () => {
@@ -51,6 +55,56 @@ test('unsupported hydrateRoot records bridge hydration parser evidence with root
   assert.equal(first.record.markerDiagnostics.canHydrate, false);
   assert.equal(first.record.markerDiagnostics.eventReplaySupported, false);
   assert.equal(first.record.markerDiagnostics.domMutationSupported, false);
+  assert.deepEqual(first.record.markerParserEvidence, {
+    kind: 'FastReactDomHydrationMarkerParserEvidence',
+    status: 'accepted-marker-parser-evidence-recorded',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    canHydrate: false,
+    parserKind: 'FastReactDomHydrationContainerMarkerDiagnostics',
+    parserStatus: 'diagnostic-only',
+    traversal: 'container.childNodes depth-first',
+    markerContractCount: hydrationGate.acceptedHydrationMarkerContracts.length,
+    nodeCount: 2,
+    acceptedMarkerCount: 2,
+    commentMarkerCount: 2,
+    templateMarkerCount: 0,
+    unrecognizedMarkerCount: 0,
+    contractIds: ['suspense-completed-start', 'suspense-end'],
+    acceptedMarkerRows: [
+      {
+        area: 'Suspense boundary',
+        companionStatus: null,
+        contractId: 'suspense-completed-start',
+        kind: 'comment',
+        lifecycle: 'server-emitted-client-consumed',
+        path: 'container.childNodes[0]'
+      },
+      {
+        area: 'Suspense boundary',
+        companionStatus: null,
+        contractId: 'suspense-end',
+        kind: 'comment',
+        lifecycle: 'server-emitted-client-consumed',
+        path: 'container.childNodes[1]'
+      }
+    ],
+    summaryByContract:
+      hydrationGate.acceptedHydrationMarkerContracts.map((contract) => ({
+        count:
+          contract.id === 'suspense-completed-start' ||
+          contract.id === 'suspense-end'
+            ? 1
+            : 0,
+        id: contract.id
+      }))
+  });
+  assertHydrationEventReplayBlockers(first.record.eventReplayBlockers, {
+    acceptedMarkerCount: 2,
+    canInstallRootListeners: true,
+    hasRootListeningMarker: true
+  });
 
   assert.deepEqual(first.record.markerGuard, {
     action: 'defer-mark-container-as-root-for-hydrate-root',
@@ -142,6 +196,10 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
     first.record.markerDiagnostics,
     first.record.hydrationBoundaryRecord.markerDiagnostics
   );
+  assert.equal(
+    first.record.markerParserEvidence,
+    first.record.hydrationBoundaryRecord.markerParserEvidence
+  );
   assert.deepEqual(first.record.markerEvidence, {
     kind: 'FastReactDomHydrationMarkerEvidence',
     status: 'accepted-marker-evidence-recorded',
@@ -154,6 +212,15 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
     templateMarkerCount: 0,
     unrecognizedMarkerCount: 0,
     contractIds: ['suspense-completed-start', 'suspense-end']
+  });
+  assert.equal(
+    first.record.eventReplayBlockers,
+    first.record.hydrationBoundaryRecord.eventReplayBlockers
+  );
+  assertHydrationEventReplayBlockers(first.record.eventReplayBlockers, {
+    acceptedMarkerCount: 2,
+    canInstallRootListeners: true,
+    hasRootListeningMarker: true
   });
 
   assert.deepEqual(
@@ -170,8 +237,10 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
       admissionStatus: first.admission.admissionStatus,
       compatibilityClaimed: first.admission.compatibilityClaimed,
       executionStatus: first.admission.executionStatus,
+      eventReplayBlockers: first.admission.eventReplayBlockers,
       hydrateId: first.admission.hydrateId,
       hydration: first.admission.hydration,
+      markerParserEvidence: first.admission.markerParserEvidence,
       markerEvidence: first.admission.markerEvidence,
       operation: first.admission.operation,
       transition: first.admission.lifecyclePrerequisites.lifecycleTransition
@@ -180,8 +249,10 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
       admissionStatus: rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
       compatibilityClaimed: false,
       executionStatus: rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED,
+      eventReplayBlockers: first.record.eventReplayBlockers,
       hydrateId: 'hydration-root-bridge:1',
       hydration: false,
+      markerParserEvidence: first.record.markerParserEvidence,
       markerEvidence: first.record.markerEvidence,
       operation: 'hydrate',
       transition: 'none->unsupported-hydration'
@@ -259,6 +330,64 @@ test('public hydrateRoot remains an unsupported placeholder with no guard side e
 
 function markerContractId(marker) {
   return marker.contractId;
+}
+
+function assertHydrationEventReplayBlockers(blockers, expected) {
+  assert.equal(Object.isFrozen(blockers), true);
+  assert.equal(blockers.kind, 'FastReactDomHydrationEventReplayBlockers');
+  assert.equal(
+    blockers.status,
+    'blocked-after-private-root-and-event-gates'
+  );
+  assert.equal(blockers.diagnosticOnly, true);
+  assert.equal(blockers.readOnly, true);
+  assert.equal(blockers.compatibilityClaimed, false);
+  assert.equal(blockers.hydrationReplaySupported, false);
+  assert.equal(blockers.eventsReplayed, false);
+  assert.equal(blockers.explicitHydrationTargetsQueued, false);
+  assert.equal(blockers.continuousEventReplayQueued, false);
+  assert.equal(blockers.formReplayQueued, false);
+  assert.equal(blockers.rootListenerGateAccepted, true);
+  assert.equal(blockers.rootListenerInstallationDeferred, true);
+  assert.equal(blockers.eventDispatchGateAccepted, true);
+  assert.equal(
+    blockers.eventDispatchBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(
+    blockers.eventTargetResolutionBlockedReason,
+    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  );
+  assert.equal(
+    blockers.hydrationReplayBlockedReason,
+    pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+  );
+  assert.equal(blockers.markerParserEvidenceAccepted, true);
+  assert.equal(blockers.acceptedMarkerCount, expected.acceptedMarkerCount);
+  assert.equal(
+    blockers.canInstallRootListeners,
+    expected.canInstallRootListeners
+  );
+  assert.equal(blockers.hasRootListeningMarker, expected.hasRootListeningMarker);
+  assert.equal(
+    blockers.blockerCount,
+    hydrationGate.hydrationEventReplayBlockerContracts.length
+  );
+  assert.equal(
+    blockers.blockers,
+    hydrationGate.hydrationEventReplayBlockerContracts
+  );
+  assert.deepEqual(
+    blockers.blockers.map((blocker) => blocker.id),
+    [
+      'no-dehydrated-host-root',
+      'no-dehydrated-boundary-target',
+      'no-event-target-hydration-resolution',
+      'no-explicit-hydration-target-queue',
+      'no-continuous-event-replay-queues',
+      'no-dispatch-replay-route'
+    ]
+  );
 }
 
 function createUnsupportedHydrateRootScenario(label) {
