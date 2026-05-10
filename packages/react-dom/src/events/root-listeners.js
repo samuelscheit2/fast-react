@@ -6,6 +6,12 @@ const {
   getOwnerDocument
 } = require('../client/dom-container.js');
 const {
+  PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND,
+  createPrivateRootHostOutputEventTargetRecord,
+  getPrivateRootHostOutputEventTargetRecordPayload,
+  isPrivateRootHostOutputEventTargetRecord
+} = require('../client/component-tree.js');
+const {
   allNativeEvents,
   isKnownNativeEvent,
   isNonDelegatedEvent,
@@ -26,6 +32,8 @@ const {
 } = require('./react-dom-event-listener.js');
 const {
   createEventDispatchRecordFromWrapperRecord,
+  getDispatchQueueInvocationCanaryRecordPayload,
+  invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord
 } = require('./plugin-event-system.js');
 const {
@@ -41,11 +49,18 @@ const ROOT_LISTENERS_REGISTERED =
   'registered-private-root-listeners';
 const ROOT_LISTENERS_REVERTED =
   'reverted-private-root-listeners';
+const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND =
+  'FastReactDomPrivateRootHostOutputClickDispatchCanaryRecord';
+const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS =
+  'controlled-private-root-host-output-click-dispatch-canary';
+const INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH';
 
 const rootListenerRegistrationPayloads = new WeakMap();
 const rootListenerCleanupRecords = new WeakMap();
 const rootListenerDispatchRecords = new WeakMap();
 const rootListenerInvocationCanaryRecords = new WeakMap();
+const privateRootHostOutputClickDispatchCanaryPayloads = new WeakMap();
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
   const priorityWrapperRecord = createEventListenerWrapperRecordWithPriority(
@@ -147,6 +162,130 @@ function getLastRootListenerInvocationCanaryRecord(listener) {
   }
 
   return rootListenerInvocationCanaryRecords.get(listener) || null;
+}
+
+function invokePrivateRootHostOutputClickDispatchCanary(
+  listenerRegistrationRecord,
+  hostOutputPayloadOrTargetRecord,
+  options
+) {
+  const registrationPayload =
+    assertActiveRootListenerRegistrationPayload(listenerRegistrationRecord);
+  const targetRecord = isPrivateRootHostOutputEventTargetRecord(
+    hostOutputPayloadOrTargetRecord
+  )
+    ? hostOutputPayloadOrTargetRecord
+    : createPrivateRootHostOutputEventTargetRecord(
+        hostOutputPayloadOrTargetRecord,
+        options
+      );
+  const targetPayload =
+    getPrivateRootHostOutputEventTargetRecordPayload(targetRecord);
+  if (targetPayload === null) {
+    throwRootHostOutputClickDispatchError(
+      'Expected private React DOM root host-output event target metadata.'
+    );
+  }
+
+  const clickListeners = getInstalledRootListenerPair(
+    registrationPayload,
+    'click'
+  );
+  const nativeEvent = createPrivateFakeClickEvent(targetPayload.targetNode);
+  const captureDispatchRecord = dispatchInstalledRootListener(
+    clickListeners.capture,
+    nativeEvent
+  );
+  const bubbleDispatchRecord = dispatchInstalledRootListener(
+    clickListeners.bubble,
+    nativeEvent
+  );
+  const queueInvocationRecord = invokeDispatchQueueCanaryFromDispatchRecords(
+    [captureDispatchRecord, bubbleDispatchRecord],
+    {
+      useProcessingOrder: true
+    }
+  );
+  const queueInvocationPayload =
+    getDispatchQueueInvocationCanaryRecordPayload(queueInvocationRecord);
+  const invocationRecords =
+    queueInvocationPayload === null
+      ? []
+      : queueInvocationPayload.invocationRecords;
+  const record = freezeRecord({
+    browserDomEventCompatibilityClaimed: false,
+    captureDispatchRecordKind: captureDispatchRecord.kind,
+    clickDispatchOrder: freezeArray(['capture', 'bubble']),
+    dispatchQueueInvocationRecordKind: queueInvocationRecord.kind,
+    dispatchRecordCount: 2,
+    domEventName: 'click',
+    eventDispatch: false,
+    fakeDomEventCompatibilityClaimed: false,
+    invocationOrder: freezeArray(queueInvocationRecord.invocationOrder),
+    invocationRecordCount: queueInvocationRecord.invocationRecordCount,
+    kind: PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
+    listenerErrorCount: queueInvocationRecord.listenerErrorCount,
+    listenerInvocationCount: queueInvocationRecord.listenerInvocationCount,
+    nativeEventPreventDefaultCallCount:
+      nativeEvent.preventDefaultCallCount,
+    nativeEventStopPropagationCallCount:
+      nativeEvent.stopPropagationCallCount,
+    privateCanaryInvocation: true,
+    publicDispatchBlockedReason:
+      queueInvocationRecord.publicDispatchBlockedReason,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    rootListenerDispatchOrder: freezeArray(['capture', 'bubble']),
+    selectedFromProcessingOrder:
+      queueInvocationRecord.selectedFromProcessingOrder,
+    status: PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS,
+    syntheticEventBlockedReason:
+      queueInvocationRecord.syntheticEventBlockedReason,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetRecordKind: PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND,
+    targetInst: targetRecord.targetInst,
+    targetInstStatus: targetRecord.targetInstStatus,
+    willInvokePublicListeners: false,
+    bubbleDispatchRecordKind: bubbleDispatchRecord.kind,
+    bubbleListenerInvocationCount:
+      queueInvocationRecord.bubbleListenerInvocationCount,
+    captureListenerInvocationCount:
+      queueInvocationRecord.captureListenerInvocationCount
+  });
+
+  privateRootHostOutputClickDispatchCanaryPayloads.set(
+    record,
+    freezeRecord({
+      bubbleDispatchRecord,
+      bubbleListenerRecord: clickListeners.bubble,
+      captureDispatchRecord,
+      captureListenerRecord: clickListeners.capture,
+      invocationRecords,
+      listenerRegistrationRecord,
+      nativeEvent,
+      queueInvocationRecord,
+      targetPayload,
+      targetRecord
+    })
+  );
+
+  return record;
+}
+
+function getPrivateRootHostOutputClickDispatchCanaryPayload(record) {
+  if (
+    record === null ||
+    (typeof record !== 'object' && typeof record !== 'function')
+  ) {
+    return null;
+  }
+
+  return privateRootHostOutputClickDispatchCanaryPayloads.get(record) || null;
+}
+
+function isPrivateRootHostOutputClickDispatchCanaryRecord(record) {
+  return getPrivateRootHostOutputClickDispatchCanaryPayload(record) !== null;
 }
 
 function getAddEventListenerOptions(
@@ -678,6 +817,79 @@ function describeListenerOptions(options) {
   });
 }
 
+function assertActiveRootListenerRegistrationPayload(registrationRecord) {
+  const payload = rootListenerRegistrationPayloads.get(registrationRecord);
+  if (payload === undefined) {
+    throwRootHostOutputClickDispatchError(
+      'Expected a private React DOM root listener registration record.'
+    );
+  }
+  if (!payload.active) {
+    throwRootHostOutputClickDispatchError(
+      'Cannot dispatch a private root host-output click after root listeners were reverted.'
+    );
+  }
+  return payload;
+}
+
+function getInstalledRootListenerPair(registrationPayload, domEventName) {
+  const capture = registrationPayload.installedListeners.find(
+    (listenerRecord) =>
+      listenerRecord.domEventName === domEventName &&
+      listenerRecord.isCapturePhaseListener === true
+  );
+  const bubble = registrationPayload.installedListeners.find(
+    (listenerRecord) =>
+      listenerRecord.domEventName === domEventName &&
+      listenerRecord.isCapturePhaseListener === false
+  );
+
+  if (capture === undefined || bubble === undefined) {
+    throwRootHostOutputClickDispatchError(
+      'Private root host-output click dispatch requires capture and bubble root listener shells.'
+    );
+  }
+
+  return {
+    bubble,
+    capture
+  };
+}
+
+function dispatchInstalledRootListener(listenerRecord, nativeEvent) {
+  listenerRecord.listener(nativeEvent);
+  const dispatchRecord = getLastRootListenerDispatchRecord(
+    listenerRecord.listener
+  );
+  if (dispatchRecord === null) {
+    throwRootHostOutputClickDispatchError(
+      'Private root host-output click dispatch did not produce a dispatch record.'
+    );
+  }
+  return dispatchRecord;
+}
+
+function createPrivateFakeClickEvent(target) {
+  return {
+    preventDefaultCallCount: 0,
+    stopPropagationCallCount: 0,
+    target,
+    type: 'click',
+    preventDefault() {
+      this.preventDefaultCallCount++;
+    },
+    stopPropagation() {
+      this.stopPropagationCallCount++;
+    }
+  };
+}
+
+function throwRootHostOutputClickDispatchError(message) {
+  const error = new Error(message);
+  error.code = INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE;
+  throw error;
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
 }
@@ -689,6 +901,9 @@ function freezeArray(array) {
 module.exports = {
   IS_CAPTURE_PHASE,
   IS_NON_DELEGATED,
+  INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE,
+  PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
+  PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS,
   ROOT_LISTENERS_REGISTERED,
   ROOT_LISTENERS_REVERTED,
   addTrappedEventListener,
@@ -699,7 +914,10 @@ module.exports = {
   getLastRootListenerInvocationCanaryRecord,
   getLastRootListenerDispatchRecord,
   getRootEventTargetOwnerDocument,
+  getPrivateRootHostOutputClickDispatchCanaryPayload,
   invokeLastRootListenerSingleListenerCanary,
+  invokePrivateRootHostOutputClickDispatchCanary,
+  isPrivateRootHostOutputClickDispatchCanaryRecord,
   listenToAllSupportedEvents,
   listenToNativeEvent,
   listenToNonDelegatedEvent,

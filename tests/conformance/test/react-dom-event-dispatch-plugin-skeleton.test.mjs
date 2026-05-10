@@ -32,6 +32,9 @@ const eventListener = require(
 const eventSystemFlags = require(
   path.join(repoRoot, "packages/react-dom/src/events/event-system-flags.js")
 );
+const rootBridge = require(
+  path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+);
 const pluginEventSystem = require(
   path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
 );
@@ -909,6 +912,225 @@ test("installed private root listener canary invokes one listener only after exp
   );
 });
 
+test("private root host-output fake click dispatch proves capture before bubble ordering", () => {
+  const document = createHostOutputDocument("root-output-event-order");
+  const container = document.createElement("div");
+  const calls = [];
+  const element = {
+    props: {
+      children: "click target",
+      id: "root-output-click-target",
+      onClick(event) {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          phase: "bubble",
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst
+        });
+        return "bubble-return";
+      },
+      onClickCapture(event) {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          phase: "capture",
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst
+        });
+        return "capture-return";
+      },
+      title: "Root output click target"
+    },
+    type: "button"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "event-order-admission",
+    initialHostOutputIdPrefix: "event-order-output",
+    sideEffectIdPrefix: "event-order-side-effect"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      hostOutputPayload
+    );
+
+  assert.equal(
+    targetRecord.kind,
+    componentTree.PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND
+  );
+  assert.equal(
+    componentTree.isPrivateRootHostOutputEventTargetRecord(targetRecord),
+    true
+  );
+  assert.equal(
+    targetRecord.status,
+    "validated-private-root-host-output-event-target"
+  );
+  assert.equal(targetRecord.rootOwner, create.owner);
+  assert.equal(targetRecord.targetInst, hostOutputPayload.hostToken);
+  assert.equal(targetRecord.latestPropsStatus, "present");
+  assert.equal(targetRecord.eventDispatch, false);
+  assert.equal(targetRecord.browserDomEventCompatibilityClaimed, false);
+  assert.equal(targetRecord.compatibilityClaimed, false);
+
+  const clickRecord =
+    rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+      sideEffects.listenerRegistration,
+      targetRecord
+    );
+
+  assert.equal(Object.isFrozen(clickRecord), true);
+  assert.equal(
+    clickRecord.kind,
+    rootListeners.PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND
+  );
+  assert.equal(
+    rootListeners.isPrivateRootHostOutputClickDispatchCanaryRecord(
+      clickRecord
+    ),
+    true
+  );
+  assert.equal(
+    clickRecord.status,
+    rootListeners.PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS
+  );
+  assert.equal(clickRecord.privateCanaryInvocation, true);
+  assert.equal(clickRecord.publicDispatchEnabled, false);
+  assert.equal(clickRecord.publicRootBehaviorChanged, false);
+  assert.equal(clickRecord.browserDomEventCompatibilityClaimed, false);
+  assert.equal(clickRecord.fakeDomEventCompatibilityClaimed, false);
+  assert.equal(clickRecord.syntheticEventCount, 0);
+  assert.equal(clickRecord.syntheticEventStatus, "blocked-not-created");
+  assert.equal(clickRecord.dispatchRecordCount, 2);
+  assert.equal(clickRecord.invocationRecordCount, 2);
+  assert.equal(clickRecord.listenerInvocationCount, 2);
+  assert.equal(clickRecord.captureListenerInvocationCount, 1);
+  assert.equal(clickRecord.bubbleListenerInvocationCount, 1);
+  assert.deepEqual(clickRecord.rootListenerDispatchOrder, [
+    "capture",
+    "bubble"
+  ]);
+  assert.deepEqual(
+    clickRecord.invocationOrder.map((entry) => [
+      entry.phase,
+      entry.registrationName,
+      entry.targetInst
+    ]),
+    [
+      ["capture", "onClickCapture", hostOutputPayload.hostToken],
+      ["bubble", "onClick", hostOutputPayload.hostToken]
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => [
+      call.phase,
+      call.registrationName,
+      call.currentTarget,
+      call.target,
+      call.targetInst
+    ]),
+    [
+      [
+        "capture",
+        "onClickCapture",
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostToken
+      ],
+      [
+        "bubble",
+        "onClick",
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostToken
+      ]
+    ]
+  );
+  for (const call of calls) {
+    assert.equal(Object.isFrozen(call.event), true);
+    assert.equal(call.event.syntheticEvent, false);
+    assert.equal(call.event.status, "private-canary-not-synthetic-event");
+    assert.equal(Object.hasOwn(call.event, "nativeEvent"), false);
+    assert.equal(Object.hasOwn(call.event, "preventDefault"), false);
+    assert.equal(Object.hasOwn(call.event, "stopPropagation"), false);
+  }
+
+  const clickPayload =
+    rootListeners.getPrivateRootHostOutputClickDispatchCanaryPayload(
+      clickRecord
+    );
+  assert.equal(clickPayload.targetRecord, targetRecord);
+  assert.equal(clickPayload.targetPayload.hostOutputPayload, hostOutputPayload);
+  assert.equal(clickPayload.targetPayload.targetNode, hostOutputPayload.hostNode);
+  assert.equal(clickPayload.nativeEvent.target, hostOutputPayload.hostNode);
+  assert.equal(clickPayload.nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(clickPayload.nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(clickPayload.captureDispatchRecord.inCapturePhase, true);
+  assert.equal(clickPayload.bubbleDispatchRecord.inCapturePhase, false);
+  assert.equal(
+    clickPayload.captureDispatchRecord.dispatchQueue.listenerCount,
+    1
+  );
+  assert.equal(
+    clickPayload.bubbleDispatchRecord.dispatchQueue.listenerCount,
+    1
+  );
+  assert.deepEqual(
+    clickPayload.invocationRecords.map((record) => [
+      record.phase,
+      record.registrationName,
+      record.listenerReturnStatus
+    ]),
+    [
+      ["capture", "onClickCapture", "string"],
+      ["bubble", "onClick", "string"]
+    ]
+  );
+  const queuePayload =
+    pluginEventSystem.getDispatchQueueInvocationCanaryRecordPayload(
+      clickPayload.queueInvocationRecord
+    );
+  assert.equal(queuePayload.dispatchRecords.length, 2);
+  assert.deepEqual(
+    queuePayload.invocationRecords.map((record) => record.currentTarget),
+    [hostOutputPayload.hostNode, hostOutputPayload.hostNode]
+  );
+  assert.equal(
+    clickPayload.queueInvocationRecord.kind,
+    pluginEventSystem.DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND
+  );
+  assert.equal(
+    clickPayload.queueInvocationRecord.status,
+    pluginEventSystem.PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS
+  );
+  assert.equal(clickPayload.queueInvocationRecord.publicDispatchEnabled, false);
+  assert.equal(
+    clickPayload.queueInvocationRecord.exposesSyntheticEvent,
+    false
+  );
+  assert.equal(hostOutputPayload.hostNode.__registrations.length, 0);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.textContent, "click target");
+
+  bridge.cleanupInitialRenderHostOutput(handoff);
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
   const root = createEventTarget("plugin-root");
   assert.equal(
@@ -1282,4 +1504,203 @@ function createNativeEvent(type, target) {
       this.stopPropagationCallCount++;
     }
   };
+}
+
+function createHostOutputDocument(label) {
+  const document = createHostOutputTarget({
+    label,
+    nodeName: "#document",
+    nodeType: domContainer.DOCUMENT_NODE
+  });
+  document.ownerDocument = document;
+  document.defaultView = createHostOutputTarget({
+    label: `${label}-window`
+  });
+  document.createElement = function createElementForHostOutput(tagName) {
+    return createHostOutputTarget({
+      nodeName: String(tagName).toUpperCase(),
+      nodeType: domContainer.ELEMENT_NODE,
+      ownerDocument: document
+    });
+  };
+  document.createTextNode = function createTextForHostOutput(text) {
+    const node = createHostOutputTarget({
+      nodeName: "#text",
+      nodeType: domContainer.TEXT_NODE,
+      ownerDocument: document
+    });
+    let textValue = String(text);
+    node.writeLog = [];
+    Object.defineProperties(node, {
+      data: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+          this.writeLog.push(["data", textValue]);
+        }
+      },
+      nodeValue: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+          this.writeLog.push(["nodeValue", textValue]);
+        }
+      },
+      textContent: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+          this.writeLog.push(["textContent", textValue]);
+        }
+      }
+    });
+    return node;
+  };
+  return document;
+}
+
+function createHostOutputTarget(fields) {
+  const target = {
+    ...fields,
+    __registrations: [],
+    __removals: [],
+    attributeLog: [],
+    attributes: new Map(),
+    childNodes: [],
+    mutationLog: [],
+    parentNode: null,
+    addEventListener(type, listener, options) {
+      this.__registrations.push({
+        listener,
+        options,
+        type
+      });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.type === type &&
+          entry.listener === listener &&
+          entry.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
+      this.__removals.push({
+        listener,
+        options,
+        type
+      });
+    },
+    appendChild(child) {
+      detachHostOutputTarget(child);
+      this.childNodes.push(child);
+      child.parentNode = this;
+      this.mutationLog.push(["appendChild", child.nodeName]);
+      return child;
+    },
+    insertBefore(child, beforeChild) {
+      if (beforeChild.parentNode !== this) {
+        throw new Error("Cannot insert before a child from another parent.");
+      }
+      detachHostOutputTarget(child);
+      const index = this.childNodes.indexOf(beforeChild);
+      this.childNodes.splice(index, 0, child);
+      child.parentNode = this;
+      this.mutationLog.push([
+        "insertBefore",
+        child.nodeName,
+        beforeChild.nodeName
+      ]);
+      return child;
+    },
+    removeChild(child) {
+      if (child.parentNode !== this) {
+        throw new Error("Cannot remove a child from another parent.");
+      }
+      detachHostOutputTarget(child);
+      this.mutationLog.push(["removeChild", child.nodeName]);
+      return child;
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributes.set(attributeName, stringValue);
+      this.attributeLog.push(["setAttribute", attributeName, stringValue]);
+    },
+    removeAttribute(name) {
+      const attributeName = String(name);
+      const hadAttribute = this.attributes.has(attributeName);
+      this.attributes.delete(attributeName);
+      this.attributeLog.push([
+        "removeAttribute",
+        attributeName,
+        hadAttribute
+      ]);
+    }
+  };
+  let textContent = "";
+  Object.defineProperties(target, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    lastChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[this.childNodes.length - 1] || null;
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map((child) => child.textContent).join("");
+        }
+        return textContent;
+      },
+      set(value) {
+        for (const child of [...this.childNodes]) {
+          detachHostOutputTarget(child);
+        }
+        textContent = String(value);
+        this.mutationLog.push(["textContent", textContent]);
+      }
+    }
+  });
+  return target;
+}
+
+function detachHostOutputTarget(child) {
+  if (child == null || typeof child !== "object") {
+    throw new Error("Expected a fake-DOM child object.");
+  }
+  if (child.parentNode === null || child.parentNode === undefined) {
+    child.parentNode = null;
+    return;
+  }
+
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }

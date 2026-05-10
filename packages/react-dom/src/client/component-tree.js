@@ -42,12 +42,18 @@ const HOST_INSTANCE_SUBTREE_DETACH_RECORD_KIND =
   'FastReactDomComponentTreeHostInstanceSubtreeDetachRecord';
 const REF_CALLBACK_FAKE_HOST_NODE_RECORD_KIND =
   'FastReactDomRefCallbackFakeHostNodeRecord';
+const PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND =
+  'FastReactDomPrivateRootHostOutputEventTargetRecord';
 const privateHostInstanceNodeRecordType =
   'fast.react_dom.private_component_tree_host_instance_node_record';
 const privateHostInstanceSubtreeDetachRecordType =
   'fast.react_dom.private_component_tree_host_instance_subtree_detach_record';
 const privateRefCallbackFakeHostNodeRecordType =
   'fast.react_dom.private_ref_callback_fake_host_node_record';
+const privateRootHostOutputEventTargetRecordType =
+  'fast.react_dom.private_root_host_output_event_target_record';
+const INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET';
 
 const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
@@ -55,6 +61,7 @@ const eventListenerTargetLookupRecordPayloads = new WeakMap();
 const hostInstanceNodeRecordPayloads = new WeakMap();
 const hostInstanceSubtreeDetachRecordPayloads = new WeakMap();
 const refCallbackFakeHostNodeRecordPayloads = new WeakMap();
+const privateRootHostOutputEventTargetRecordPayloads = new WeakMap();
 
 const disabledMouseEventRegistrationNames = new Set([
   'onClick',
@@ -491,6 +498,114 @@ function createRefCallbackFakeHostNodeRecord(hostNodeRecord) {
   return record;
 }
 
+function createPrivateRootHostOutputEventTargetRecord(
+  hostOutputPayload,
+  options
+) {
+  const normalizedPayload =
+    assertPrivateRootHostOutputEventTargetPayload(hostOutputPayload);
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const sourceHostNode = normalizedPayload.hostNode;
+  const sourceHostToken = normalizedPayload.hostToken || null;
+  const expectedRootOwner =
+    normalizedOptions.rootOwner === undefined
+      ? normalizedPayload.rootOwner
+      : normalizedOptions.rootOwner;
+  const targetNode =
+    normalizedOptions.targetNode === undefined
+      ? sourceHostNode
+      : normalizedOptions.targetNode;
+
+  assertHostInstanceNode(sourceHostNode);
+  assertHostInstanceNode(targetNode);
+
+  if (sourceHostToken !== null) {
+    const mountedSourceNode = assertMountedHostInstanceToken(sourceHostToken);
+    if (mountedSourceNode !== sourceHostNode) {
+      throw createComponentTreeError(
+        'Private React DOM root host-output metadata does not match the mounted source host node.',
+        INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+      );
+    }
+  }
+
+  const sourceRootOwner = getRootOwnerFromNode(sourceHostNode);
+  if (sourceRootOwner === null) {
+    throw createComponentTreeError(
+      'Private React DOM root host-output metadata must reference a mounted source host node.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+  if (expectedRootOwner !== null && expectedRootOwner !== sourceRootOwner) {
+    throw createComponentTreeError(
+      'Private React DOM root host-output metadata belongs to a different root owner.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+
+  const targetHostInstanceToken = getMountedHostInstanceTokenFromNode(
+    targetNode
+  );
+  if (targetHostInstanceToken === null) {
+    throw createComponentTreeError(
+      'Private React DOM root host-output event targets must be mounted host instances.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+
+  const targetRootOwner =
+    getRootOwnerFromHostInstanceToken(targetHostInstanceToken);
+  if (targetRootOwner !== sourceRootOwner) {
+    throw createComponentTreeError(
+      'Private React DOM root host-output event targets must belong to the source root owner.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+
+  const targetLatestProps = getLatestPropsFromNode(targetNode);
+  const record = Object.freeze({
+    $$typeof: privateRootHostOutputEventTargetRecordType,
+    browserDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    eventDispatch: false,
+    exposesHostNode: false,
+    exposesLatestProps: false,
+    hostOwner: getHostInstanceOwnerFromToken(targetHostInstanceToken),
+    isSourceHostNode: targetNode === sourceHostNode,
+    isSourceTextNode:
+      normalizedPayload.textNode !== undefined &&
+      targetNode === normalizedPayload.textNode,
+    kind: PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND,
+    latestPropsStatus: targetLatestProps === null ? 'missing' : 'present',
+    nodeType:
+      typeof targetNode.nodeType === 'number' ? targetNode.nodeType : null,
+    publicRootBehaviorChanged: false,
+    rootOwner: targetRootOwner,
+    sourceHostInstanceStatus: 'mounted-host-instance',
+    status: 'validated-private-root-host-output-event-target',
+    syntheticEventCount: 0,
+    targetHostInstanceStatus: 'mounted-host-instance',
+    targetHostInstanceToken,
+    targetInst: targetHostInstanceToken,
+    targetInstStatus: 'resolved-component-tree-host-instance'
+  });
+
+  privateRootHostOutputEventTargetRecordPayloads.set(
+    record,
+    Object.freeze({
+      hostOutputPayload: normalizedPayload,
+      latestProps: targetLatestProps,
+      sourceHostNode,
+      sourceHostToken,
+      targetNode,
+      targetHostInstanceToken,
+      targetRootOwner
+    })
+  );
+
+  return record;
+}
+
 function createEventListenerTargetLookupRecord(
   targetNormalizationRecord,
   registrationName
@@ -672,6 +787,18 @@ function isPrivateRefCallbackFakeHostNodeRecord(value) {
   return getPrivateRefCallbackFakeHostNodeRecordPayload(value) !== null;
 }
 
+function getPrivateRootHostOutputEventTargetRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return privateRootHostOutputEventTargetRecordPayloads.get(record) || null;
+}
+
+function isPrivateRootHostOutputEventTargetRecord(value) {
+  return getPrivateRootHostOutputEventTargetRecordPayload(value) !== null;
+}
+
 function createEventListenerTargetLookupRecordFromPayload(payload) {
   const record = Object.freeze({
     blockedReason: EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
@@ -776,6 +903,39 @@ function normalizeEventListenerRegistrationName(registrationName) {
   }
 
   return registrationName;
+}
+
+function assertPrivateRootHostOutputEventTargetPayload(payload) {
+  if (!isObjectLike(payload) || !isObjectLike(payload.hostNode)) {
+    throw createComponentTreeError(
+      'Cannot create a private React DOM root host-output event target without a host-output payload.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+
+  if (
+    payload.rootOwner === undefined ||
+    payload.rootOwner === null ||
+    !isObjectLike(payload.rootOwner)
+  ) {
+    throw createComponentTreeError(
+      'Private React DOM root host-output event targets require a root owner.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+
+  if (
+    payload.hostToken !== undefined &&
+    payload.hostToken !== null &&
+    !isHostInstanceToken(payload.hostToken)
+  ) {
+    throw createComponentTreeError(
+      'Private React DOM root host-output event targets require a host instance token.',
+      INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE
+    );
+  }
+
+  return payload;
 }
 
 function shouldPreventMouseEvent(registrationName, node, latestProps) {
@@ -1228,6 +1388,8 @@ module.exports = {
   INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE,
   INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE,
   REF_CALLBACK_FAKE_HOST_NODE_RECORD_KIND,
+  PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND,
+  INVALID_PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_CODE,
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
@@ -1240,6 +1402,7 @@ module.exports = {
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
   createMountedHostInstanceNodeRecord,
+  createPrivateRootHostOutputEventTargetRecord,
   createRefCallbackFakeHostNodeRecord,
   detachHostInstanceNode,
   detachHostInstanceSubtree,
@@ -1258,6 +1421,7 @@ module.exports = {
   getPrivateHostInstanceNodeRecordPayload,
   getPrivateHostInstanceSubtreeDetachRecordPayload,
   getPrivateRefCallbackFakeHostNodeRecordPayload,
+  getPrivateRootHostOutputEventTargetRecordPayload,
   getRootOwnerFromHostInstanceToken,
   getRootOwnerFromNode,
   hostInstanceMarkerPrefix,
@@ -1268,11 +1432,13 @@ module.exports = {
   isPrivateHostInstanceNodeRecord,
   isPrivateHostInstanceSubtreeDetachRecord,
   isPrivateRefCallbackFakeHostNodeRecord,
+  isPrivateRootHostOutputEventTargetRecord,
   isHostInstanceToken,
   latestPropsMarkerPrefix,
   privateHostInstanceNodeRecordType,
   privateHostInstanceSubtreeDetachRecordType,
   privateRefCallbackFakeHostNodeRecordType,
+  privateRootHostOutputEventTargetRecordType,
   updateLatestPropsForHostInstanceToken,
   updateLatestPropsForNode
 };
