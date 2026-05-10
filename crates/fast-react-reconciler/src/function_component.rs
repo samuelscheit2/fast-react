@@ -9,14 +9,16 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, FiberTypeHandle,
-    HookEffectArena, HookEffectArenaError, HookEffectCallbackHandle, HookEffectDependencies,
-    HookEffectFlags, HookEffectId, HookEffectInstanceId, HookEffectPayload, HookEffectRing,
-    HookListArena, HookListError, HookListId, HookListMountCursor, HookListTraversalResult,
-    HookListUpdateCursor, HookQueueError, HookQueueId, HookQueueStore, HookSlotId, HookSlotPayload,
-    HookStatePayload, HookStateSlot, HookUpdateId, HookUpdateLane, Lanes, PropsHandle, StateHandle,
-    UpdateQueueHandle,
+    ElementTypeHandle, FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError,
+    FiberTypeHandle, HookEffectArena, HookEffectArenaError, HookEffectCallbackHandle,
+    HookEffectDependencies, HookEffectFlags, HookEffectId, HookEffectInstanceId, HookEffectPayload,
+    HookEffectRing, HookListArena, HookListError, HookListId, HookListMountCursor,
+    HookListTraversalResult, HookListUpdateCursor, HookQueueError, HookQueueId, HookQueueStore,
+    HookSlotId, HookSlotPayload, HookStatePayload, HookStateSlot, HookUpdateId, HookUpdateLane,
+    Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
 };
+
+use crate::RootElementHandle;
 
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -1095,6 +1097,97 @@ pub(crate) trait FunctionComponentInvoker {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentSingleChildOutput {
+    output: FunctionComponentOutputHandle,
+    element: RootElementHandle,
+    tag: FiberTag,
+    element_type: ElementTypeHandle,
+    props: PropsHandle,
+}
+
+impl FunctionComponentSingleChildOutput {
+    #[must_use]
+    pub const fn new(
+        output: FunctionComponentOutputHandle,
+        element: RootElementHandle,
+        tag: FiberTag,
+        element_type: ElementTypeHandle,
+        props: PropsHandle,
+    ) -> Self {
+        Self {
+            output,
+            element,
+            tag,
+            element_type,
+            props,
+        }
+    }
+
+    #[must_use]
+    pub const fn host_component(
+        output: FunctionComponentOutputHandle,
+        element: RootElementHandle,
+        element_type: ElementTypeHandle,
+        props: PropsHandle,
+    ) -> Self {
+        Self::new(
+            output,
+            element,
+            FiberTag::HostComponent,
+            element_type,
+            props,
+        )
+    }
+
+    #[must_use]
+    pub const fn host_text(
+        output: FunctionComponentOutputHandle,
+        element: RootElementHandle,
+        props: PropsHandle,
+    ) -> Self {
+        Self::new(
+            output,
+            element,
+            FiberTag::HostText,
+            ElementTypeHandle::NONE,
+            props,
+        )
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.output
+    }
+
+    #[must_use]
+    pub const fn element(self) -> RootElementHandle {
+        self.element
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn element_type(self) -> ElementTypeHandle {
+        self.element_type
+    }
+
+    #[must_use]
+    pub const fn props(self) -> PropsHandle {
+        self.props
+    }
+}
+
+pub(crate) trait FunctionComponentSingleChildOutputResolver {
+    fn resolve_function_component_single_child_output(
+        &self,
+        output: FunctionComponentOutputHandle,
+    ) -> Option<FunctionComponentSingleChildOutput>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnsupportedFunctionComponentFeature {
     Hook { name: &'static str },
     Context,
@@ -1374,6 +1467,187 @@ impl From<FiberTopologyError> for FunctionComponentRenderError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FunctionComponentSingleChildReconciliationError {
+    FiberTopology(FiberTopologyError),
+    UnexpectedFiberTag {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingOutput {
+        fiber: FiberId,
+    },
+    UnknownOutput {
+        fiber: FiberId,
+        output: FunctionComponentOutputHandle,
+    },
+    OutputMismatch {
+        fiber: FiberId,
+        expected: FunctionComponentOutputHandle,
+        actual: FunctionComponentOutputHandle,
+    },
+    MissingChildElement {
+        fiber: FiberId,
+        output: FunctionComponentOutputHandle,
+    },
+    UnsupportedChildTag {
+        fiber: FiberId,
+        output: FunctionComponentOutputHandle,
+        tag: FiberTag,
+    },
+    ExistingCurrentChild {
+        fiber: FiberId,
+        current: FiberId,
+        child: FiberId,
+    },
+    ExistingWorkInProgressChild {
+        fiber: FiberId,
+        child: FiberId,
+    },
+}
+
+impl Display for FunctionComponentSingleChildReconciliationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UnexpectedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be FunctionComponent for private single-child reconciliation, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingOutput { fiber } => write!(
+                formatter,
+                "function component fiber {} returned no output for private single-child reconciliation",
+                fiber.slot().get()
+            ),
+            Self::UnknownOutput { fiber, output } => write!(
+                formatter,
+                "function component fiber {} output handle {} is not a supported private single-child output",
+                fiber.slot().get(),
+                output.raw()
+            ),
+            Self::OutputMismatch {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} resolved output handle {} while render returned {}",
+                fiber.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::MissingChildElement { fiber, output } => write!(
+                formatter,
+                "function component fiber {} output handle {} resolved to an empty child element",
+                fiber.slot().get(),
+                output.raw()
+            ),
+            Self::UnsupportedChildTag { fiber, output, tag } => write!(
+                formatter,
+                "function component fiber {} output handle {} resolved to unsupported private single-child tag {:?}; only HostComponent and HostText are admitted",
+                fiber.slot().get(),
+                output.raw(),
+                tag
+            ),
+            Self::ExistingCurrentChild {
+                fiber,
+                current,
+                child,
+            } => write!(
+                formatter,
+                "function component fiber {} current alternate {} already has child {}; update/list reconciliation is not supported by this canary",
+                fiber.slot().get(),
+                current.slot().get(),
+                child.slot().get()
+            ),
+            Self::ExistingWorkInProgressChild { fiber, child } => write!(
+                formatter,
+                "function component fiber {} already has work-in-progress child {}; this canary only admits one fresh child handoff",
+                fiber.slot().get(),
+                child.slot().get()
+            ),
+        }
+    }
+}
+
+impl Error for FunctionComponentSingleChildReconciliationError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::UnexpectedFiberTag { .. }
+            | Self::MissingOutput { .. }
+            | Self::UnknownOutput { .. }
+            | Self::OutputMismatch { .. }
+            | Self::MissingChildElement { .. }
+            | Self::UnsupportedChildTag { .. }
+            | Self::ExistingCurrentChild { .. }
+            | Self::ExistingWorkInProgressChild { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for FunctionComponentSingleChildReconciliationError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentSingleChildReconciliationRecord {
+    function_component: FiberId,
+    current: Option<FiberId>,
+    output: FunctionComponentOutputHandle,
+    child_element: RootElementHandle,
+    child_tag: FiberTag,
+    child_element_type: ElementTypeHandle,
+    child_props: PropsHandle,
+    render_lanes: Lanes,
+}
+
+impl FunctionComponentSingleChildReconciliationRecord {
+    #[must_use]
+    pub const fn function_component(self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.output
+    }
+
+    #[must_use]
+    pub const fn child_element(self) -> RootElementHandle {
+        self.child_element
+    }
+
+    #[must_use]
+    pub const fn child_tag(self) -> FiberTag {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub const fn child_element_type(self) -> ElementTypeHandle {
+        self.child_element_type
+    }
+
+    #[must_use]
+    pub const fn child_props(self) -> PropsHandle {
+        self.child_props
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRenderRecord {
     current: Option<FiberId>,
@@ -1445,6 +1719,107 @@ pub(crate) fn render_function_component_with_hook_state(
         invoker,
         Some(hook_store),
     )
+}
+
+pub(crate) fn reconcile_function_component_single_child_output(
+    arena: &mut FiberArena,
+    render: FunctionComponentRenderRecord,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+) -> Result<
+    FunctionComponentSingleChildReconciliationRecord,
+    FunctionComponentSingleChildReconciliationError,
+> {
+    let function_component = render.work_in_progress();
+    let node = arena.get(function_component)?;
+    let tag = node.tag();
+    if tag != FiberTag::FunctionComponent {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::UnexpectedFiberTag {
+                fiber: function_component,
+                tag,
+            },
+        );
+    }
+    if let Some(child) = node.child() {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::ExistingWorkInProgressChild {
+                fiber: function_component,
+                child,
+            },
+        );
+    }
+    if let Some(current) = render.current()
+        && let Some(child) = arena.get(current)?.child()
+    {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::ExistingCurrentChild {
+                fiber: function_component,
+                current,
+                child,
+            },
+        );
+    }
+
+    let output = render.output();
+    if output.is_none() {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::MissingOutput {
+                fiber: function_component,
+            },
+        );
+    }
+    let single_child = resolver
+        .resolve_function_component_single_child_output(output)
+        .ok_or(
+            FunctionComponentSingleChildReconciliationError::UnknownOutput {
+                fiber: function_component,
+                output,
+            },
+        )?;
+    if single_child.output() != output {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::OutputMismatch {
+                fiber: function_component,
+                expected: output,
+                actual: single_child.output(),
+            },
+        );
+    }
+    if single_child.element().is_none() {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::MissingChildElement {
+                fiber: function_component,
+                output,
+            },
+        );
+    }
+    if !matches!(
+        single_child.tag(),
+        FiberTag::HostComponent | FiberTag::HostText
+    ) {
+        return Err(
+            FunctionComponentSingleChildReconciliationError::UnsupportedChildTag {
+                fiber: function_component,
+                output,
+                tag: single_child.tag(),
+            },
+        );
+    }
+
+    arena
+        .get_mut(function_component)?
+        .merge_flags(FiberFlags::PERFORMED_WORK);
+
+    Ok(FunctionComponentSingleChildReconciliationRecord {
+        function_component,
+        current: render.current(),
+        output,
+        child_element: single_child.element(),
+        child_tag: single_child.tag(),
+        child_element_type: single_child.element_type(),
+        child_props: single_child.props(),
+        render_lanes: render.render_lanes(),
+    })
 }
 
 fn render_function_component_impl(
@@ -1600,6 +1975,26 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct StaticSingleChildResolver {
+        child: Option<FunctionComponentSingleChildOutput>,
+    }
+
+    impl StaticSingleChildResolver {
+        const fn new(child: Option<FunctionComponentSingleChildOutput>) -> Self {
+            Self { child }
+        }
+    }
+
+    impl FunctionComponentSingleChildOutputResolver for StaticSingleChildResolver {
+        fn resolve_function_component_single_child_output(
+            &self,
+            _output: FunctionComponentOutputHandle,
+        ) -> Option<FunctionComponentSingleChildOutput> {
+            self.child
+        }
+    }
+
     fn function_component_pair() -> (FiberArena, FiberId, FiberId, FiberTypeHandle) {
         let mut arena = FiberArena::new();
         let current = arena.create_fiber(
@@ -1699,6 +2094,179 @@ mod tests {
         assert_eq!(work_node.update_queue(), UpdateQueueHandle::NONE);
         assert_eq!(work_node.lanes(), Lanes::NO);
         assert_eq!(work_node.child(), None);
+    }
+
+    #[test]
+    fn function_component_single_child_reconciliation_records_host_component_handoff() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(56);
+        let child_element = RootElementHandle::from_raw(56);
+        let element_type = ElementTypeHandle::from_raw(560);
+        let child_props = PropsHandle::from_raw(561);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let render =
+            render_function_component(&mut arena, work_in_progress, Lanes::DEFAULT, &mut registry)
+                .unwrap();
+        let resolver = StaticSingleChildResolver::new(Some(
+            FunctionComponentSingleChildOutput::host_component(
+                output,
+                child_element,
+                element_type,
+                child_props,
+            ),
+        ));
+
+        let record =
+            reconcile_function_component_single_child_output(&mut arena, render, &resolver)
+                .unwrap();
+
+        assert_eq!(record.function_component(), work_in_progress);
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.output(), output);
+        assert_eq!(record.child_element(), child_element);
+        assert_eq!(record.child_tag(), FiberTag::HostComponent);
+        assert_eq!(record.child_element_type(), element_type);
+        assert_eq!(record.child_props(), child_props);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(arena.get(work_in_progress).unwrap().child(), None);
+        assert!(
+            arena
+                .get(work_in_progress)
+                .unwrap()
+                .flags()
+                .contains_all(FiberFlags::PERFORMED_WORK)
+        );
+        assert_eq!(arena.get(current).unwrap().child(), None);
+    }
+
+    #[test]
+    fn function_component_single_child_reconciliation_records_host_text_handoff() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(57);
+        let child_element = RootElementHandle::from_raw(57);
+        let child_props = PropsHandle::from_raw(571);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let render =
+            render_function_component(&mut arena, work_in_progress, Lanes::SYNC, &mut registry)
+                .unwrap();
+        let resolver = StaticSingleChildResolver::new(Some(
+            FunctionComponentSingleChildOutput::host_text(output, child_element, child_props),
+        ));
+
+        let record =
+            reconcile_function_component_single_child_output(&mut arena, render, &resolver)
+                .unwrap();
+
+        assert_eq!(record.child_tag(), FiberTag::HostText);
+        assert_eq!(record.child_element_type(), ElementTypeHandle::NONE);
+        assert_eq!(record.child_props(), child_props);
+        assert_eq!(record.render_lanes(), Lanes::SYNC);
+    }
+
+    #[test]
+    fn function_component_single_child_reconciliation_fails_closed_for_unknown_output() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(58);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let render =
+            render_function_component(&mut arena, work_in_progress, Lanes::DEFAULT, &mut registry)
+                .unwrap();
+        let resolver = StaticSingleChildResolver::new(None);
+
+        let error = reconcile_function_component_single_child_output(&mut arena, render, &resolver)
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentSingleChildReconciliationError::UnknownOutput {
+                fiber: work_in_progress,
+                output,
+            }
+        );
+        assert_eq!(arena.get(work_in_progress).unwrap().flags(), FiberFlags::NO);
+    }
+
+    #[test]
+    fn function_component_single_child_reconciliation_rejects_unsupported_child_tags() {
+        for tag in [
+            FiberTag::Fragment,
+            FiberTag::Portal,
+            FiberTag::Suspense,
+            FiberTag::HostSingleton,
+        ] {
+            let (mut arena, _current, work_in_progress, component) = function_component_pair();
+            let output = FunctionComponentOutputHandle::from_raw(59);
+            let mut registry = TestFunctionComponentRegistry::default();
+            registry.register(component, Ok(output));
+            let render = render_function_component(
+                &mut arena,
+                work_in_progress,
+                Lanes::DEFAULT,
+                &mut registry,
+            )
+            .unwrap();
+            let resolver =
+                StaticSingleChildResolver::new(Some(FunctionComponentSingleChildOutput::new(
+                    output,
+                    RootElementHandle::from_raw(59),
+                    tag,
+                    ElementTypeHandle::from_raw(590),
+                    PropsHandle::from_raw(591),
+                )));
+
+            let error =
+                reconcile_function_component_single_child_output(&mut arena, render, &resolver)
+                    .unwrap_err();
+
+            assert_eq!(
+                error,
+                FunctionComponentSingleChildReconciliationError::UnsupportedChildTag {
+                    fiber: work_in_progress,
+                    output,
+                    tag,
+                }
+            );
+            assert_eq!(arena.get(work_in_progress).unwrap().child(), None);
+        }
+    }
+
+    #[test]
+    fn function_component_single_child_reconciliation_rejects_existing_children() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let existing = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(590),
+            FiberMode::NO,
+        );
+        arena.set_children(current, &[existing]).unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(60);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let render =
+            render_function_component(&mut arena, work_in_progress, Lanes::DEFAULT, &mut registry)
+                .unwrap();
+        let resolver =
+            StaticSingleChildResolver::new(Some(FunctionComponentSingleChildOutput::host_text(
+                output,
+                RootElementHandle::from_raw(60),
+                PropsHandle::from_raw(601),
+            )));
+
+        let error = reconcile_function_component_single_child_output(&mut arena, render, &resolver)
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentSingleChildReconciliationError::ExistingCurrentChild {
+                fiber: work_in_progress,
+                current,
+                child: existing,
+            }
+        );
     }
 
     #[test]
