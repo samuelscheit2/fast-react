@@ -20,12 +20,12 @@ use crate::scheduler_bridge::{SchedulerActContinuationRecord, SchedulerActContin
 use crate::{
     ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootErrorCallbackHandle,
-    RootRecoverableErrorCallbackHandle, RootScheduleUpdateRecord, RootSchedulerCallbackHandle,
-    RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge, SchedulerCallbackRequest,
-    SchedulerCallbackValidationRecord, SchedulerCancellationRecord, SchedulerMicrotaskKind,
-    SchedulerMicrotaskRequest, SchedulerPriority, SyncFlushExecutionContextRecord,
-    commit_finished_host_root, render_host_root_for_lanes, render_host_root_via_scheduler_callback,
-    validate_scheduled_host_root_callback,
+    RootRecoverableErrorCallbackHandle, RootRenderExitStatus, RootScheduleUpdateRecord,
+    RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
+    SchedulerCallbackRequest, SchedulerCallbackValidationRecord, SchedulerCancellationRecord,
+    SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
+    SyncFlushExecutionContextRecord, commit_finished_host_root, render_host_root_for_lanes,
+    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
 
 pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
@@ -596,6 +596,90 @@ impl RootSyncFlushRecord {
     #[must_use]
     pub const fn render_phase(self) -> HostRootRenderPhaseRecord {
         self.render_phase
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for private error workers"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushRootRecoverySnapshotForCanary {
+    root: FiberRootId,
+    selected_lanes: Lanes,
+    pending_lanes: Lanes,
+    callback_node: RootSchedulerCallbackHandle,
+    callback_priority: RootCallbackPriority,
+    render_phase_work: Option<FiberId>,
+    render_phase_lanes: Lanes,
+    render_exit_status: RootRenderExitStatus,
+    might_have_pending_sync_work: bool,
+    is_flushing_work: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for private error workers"
+)]
+impl SyncFlushRootRecoverySnapshotForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes(self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_node(self) -> RootSchedulerCallbackHandle {
+        self.callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_priority(self) -> RootCallbackPriority {
+        self.callback_priority
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_work(self) -> Option<FiberId> {
+        self.render_phase_work
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_lanes(self) -> Lanes {
+        self.render_phase_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn render_exit_status(self) -> RootRenderExitStatus {
+        self.render_exit_status
+    }
+
+    #[must_use]
+    pub(crate) const fn might_have_pending_sync_work(self) -> bool {
+        self.might_have_pending_sync_work
+    }
+
+    #[must_use]
+    pub(crate) const fn is_flushing_work(self) -> bool {
+        self.is_flushing_work
+    }
+
+    #[must_use]
+    pub(crate) fn preserves_lane_and_callback_metadata_from(self, before: Self) -> bool {
+        self.root == before.root
+            && self.selected_lanes == before.selected_lanes
+            && self.pending_lanes == before.pending_lanes
+            && self.callback_node == before.callback_node
+            && self.callback_priority == before.callback_priority
+            && self.might_have_pending_sync_work == before.might_have_pending_sync_work
     }
 }
 
@@ -1790,6 +1874,31 @@ pub(crate) fn sync_flush_lanes_for_root<H: HostTypes>(
     Ok(next_lanes_for_root(store, root_id)?.intersect(SYNC_FLUSH_LANES))
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for private error workers"
+)]
+pub(crate) fn sync_flush_root_recovery_snapshot_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    selected_lanes: Lanes,
+) -> Result<SyncFlushRootRecoverySnapshotForCanary, RootSchedulerError> {
+    let root = store.root(root_id)?;
+    let scheduling = root.scheduling();
+    Ok(SyncFlushRootRecoverySnapshotForCanary {
+        root: root_id,
+        selected_lanes,
+        pending_lanes: root.lanes().pending_lanes(),
+        callback_node: scheduling.callback_node(),
+        callback_priority: scheduling.callback_priority(),
+        render_phase_work: scheduling.work_in_progress(),
+        render_phase_lanes: scheduling.work_in_progress_root_render_lanes(),
+        render_exit_status: scheduling.render_exit_status(),
+        might_have_pending_sync_work: store.root_scheduler().might_have_pending_sync_work(),
+        is_flushing_work: store.root_scheduler().is_flushing_work(),
+    })
+}
+
 pub(crate) fn recompute_might_have_pending_sync_work<H: HostTypes>(
     store: &mut FiberRootStore<H>,
 ) -> Result<bool, RootSchedulerError> {
@@ -2358,6 +2467,41 @@ mod tests {
 
     fn activate_act_queue(store: &mut FiberRootStore<RecordingHost>) {
         store.scheduler_bridge_mut().set_act_queue_active(true);
+    }
+
+    #[test]
+    fn root_scheduler_recovery_snapshot_preserves_reentry_guard_callback_metadata() {
+        let (mut store, root_id, host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let scheduled = processed.records()[0];
+        assert_eq!(scheduled.outcome(), RootTaskScheduleOutcome::Scheduled);
+        let callback_node = store.root(root_id).unwrap().scheduling().callback_node();
+        let callback_priority = store
+            .root(root_id)
+            .unwrap()
+            .scheduling()
+            .callback_priority();
+
+        let before =
+            sync_flush_root_recovery_snapshot_for_canary(&store, root_id, Lanes::DEFAULT).unwrap();
+        store.root_scheduler_mut().set_is_flushing_work(true);
+        let guarded =
+            sync_flush_root_recovery_snapshot_for_canary(&store, root_id, Lanes::DEFAULT).unwrap();
+        store.root_scheduler_mut().set_is_flushing_work(false);
+
+        assert_eq!(before.root(), root_id);
+        assert_eq!(before.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(before.pending_lanes(), Lanes::DEFAULT);
+        assert_eq!(before.callback_node(), callback_node);
+        assert_eq!(before.callback_priority(), callback_priority);
+        assert_eq!(before.render_phase_work(), None);
+        assert_eq!(before.render_phase_lanes(), Lanes::NO);
+        assert_eq!(before.render_exit_status(), RootRenderExitStatus::NoWork);
+        assert!(!before.is_flushing_work());
+        assert!(guarded.is_flushing_work());
+        assert!(guarded.preserves_lane_and_callback_metadata_from(before));
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     fn scheduled_callback_request(

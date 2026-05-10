@@ -12,15 +12,19 @@ use std::fmt::{self, Display, Formatter};
 use fast_react_core::{FiberId, Lanes, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
-use crate::root_commit::PendingPassiveCommitHandoff;
+use crate::root_commit::{
+    HostRootCommitRecoverySnapshotForCanary, PendingPassiveCommitHandoff,
+    host_root_commit_recovery_snapshot_for_canary,
+};
 use crate::root_scheduler::{
     SchedulerBridgeActContinuationExecutionError, SchedulerBridgeActContinuationExecutionResult,
     SyncFlushActContinuationDrainRecord, SyncFlushActPostPassiveContinuationGateRecord,
-    SyncFlushPostPassiveContinuationExecutionGateRecord,
+    SyncFlushPostPassiveContinuationExecutionGateRecord, SyncFlushRootRecoverySnapshotForCanary,
     execute_scheduler_bridge_act_continuations, recompute_might_have_pending_sync_work,
     sync_flush_act_continuation_drain_record_after_host_output_canary,
     sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
     sync_flush_lanes_for_root, sync_flush_post_passive_continuation_execution_gate,
+    sync_flush_root_recovery_snapshot_for_canary,
 };
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
@@ -327,6 +331,199 @@ impl SyncFlushActPrivateExecutionDiagnosticsForCanary {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncFlushErrorRecoveryRootStatusForCanary {
+    Committed,
+    RenderFailed,
+    CommitFailed,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for render/commit error workers"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushErrorRecoveryRootRecordForCanary {
+    order: usize,
+    root: FiberRootId,
+    lanes: Lanes,
+    status: SyncFlushErrorRecoveryRootStatusForCanary,
+    scheduler_before: SyncFlushRootRecoverySnapshotForCanary,
+    scheduler_after: SyncFlushRootRecoverySnapshotForCanary,
+    commit_before: Option<HostRootCommitRecoverySnapshotForCanary>,
+    commit_after: Option<HostRootCommitRecoverySnapshotForCanary>,
+    render_error: Option<RootWorkLoopError>,
+    commit_error: Option<RootCommitError>,
+    committed: Option<SyncFlushRootRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for render/commit error workers"
+)]
+impl SyncFlushErrorRecoveryRootRecordForCanary {
+    #[must_use]
+    pub(crate) const fn order(&self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> SyncFlushErrorRecoveryRootStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_before(&self) -> SyncFlushRootRecoverySnapshotForCanary {
+        self.scheduler_before
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_after(&self) -> SyncFlushRootRecoverySnapshotForCanary {
+        self.scheduler_after
+    }
+
+    #[must_use]
+    pub(crate) fn commit_before(&self) -> Option<&HostRootCommitRecoverySnapshotForCanary> {
+        self.commit_before.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn commit_after(&self) -> Option<&HostRootCommitRecoverySnapshotForCanary> {
+        self.commit_after.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn render_error(&self) -> Option<&RootWorkLoopError> {
+        self.render_error.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn commit_error(&self) -> Option<&RootCommitError> {
+        self.commit_error.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn committed(&self) -> Option<&SyncFlushRootRecord> {
+        self.committed.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn is_failure(&self) -> bool {
+        matches!(
+            self.status,
+            SyncFlushErrorRecoveryRootStatusForCanary::RenderFailed
+                | SyncFlushErrorRecoveryRootStatusForCanary::CommitFailed
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn preserved_scheduler_metadata(&self) -> bool {
+        self.scheduler_after
+            .preserves_lane_and_callback_metadata_from(self.scheduler_before)
+    }
+
+    #[must_use]
+    pub(crate) fn preserved_commit_metadata(&self) -> bool {
+        match (&self.commit_before, &self.commit_after) {
+            (Some(before), Some(after)) => after.preserves_lane_and_callback_metadata_from(before),
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn preserved_lane_and_callback_metadata(&self) -> bool {
+        self.preserved_scheduler_metadata() && self.preserved_commit_metadata()
+    }
+
+    #[must_use]
+    pub(crate) const fn retried_public_work(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn invoked_public_callbacks(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for render/commit error workers"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushErrorRecoveryDiagnosticsForCanary {
+    skipped_reentrant_flush: bool,
+    skipped_no_sync_work: bool,
+    records: Vec<SyncFlushErrorRecoveryRootRecordForCanary>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for render/commit error workers"
+)]
+impl SyncFlushErrorRecoveryDiagnosticsForCanary {
+    #[must_use]
+    pub(crate) const fn skipped_reentrant_flush(&self) -> bool {
+        self.skipped_reentrant_flush
+    }
+
+    #[must_use]
+    pub(crate) const fn skipped_no_sync_work(&self) -> bool {
+        self.skipped_no_sync_work
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[SyncFlushErrorRecoveryRootRecordForCanary] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn did_capture_failure(&self) -> bool {
+        self.records
+            .iter()
+            .any(SyncFlushErrorRecoveryRootRecordForCanary::is_failure)
+    }
+
+    #[must_use]
+    pub(crate) fn preserved_failed_root_metadata(&self) -> bool {
+        self.records
+            .iter()
+            .filter(|record| record.is_failure())
+            .all(SyncFlushErrorRecoveryRootRecordForCanary::preserved_lane_and_callback_metadata)
+    }
+
+    #[must_use]
+    pub(crate) const fn retried_public_work(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn invoked_public_callbacks(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[doc(hidden)]
 pub struct SyncFlushCrossRootRenderDiagnosticsForCanary {
@@ -526,6 +723,69 @@ impl SyncFlushRootRecord {
         let committed = Self::commit_rendered_sync_flush_record(store, record)?;
         let diagnostics = committed.host_output_commit_diagnostics_for_canary(store)?;
         Ok((committed, diagnostics))
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush commit recovery diagnostic reserved for private error workers"
+    )]
+    pub(crate) fn commit_rendered_sync_flush_record_with_error_recovery_diagnostics_for_canary<
+        H: HostTypes,
+    >(
+        store: &mut FiberRootStore<H>,
+        record: RootSyncFlushRecord,
+    ) -> Result<SyncFlushErrorRecoveryRootRecordForCanary, SyncFlushError> {
+        let scheduler_before =
+            sync_flush_root_recovery_snapshot_for_canary(store, record.root(), record.lanes())?;
+        let commit_before =
+            host_root_commit_recovery_snapshot_for_canary(store, record.render_phase())?;
+
+        match commit_render_phase(store, record.order(), record.render_phase()) {
+            Ok(committed) => {
+                recompute_might_have_pending_sync_work(store)?;
+                let scheduler_after = sync_flush_root_recovery_snapshot_for_canary(
+                    store,
+                    record.root(),
+                    record.lanes(),
+                )?;
+                Ok(SyncFlushErrorRecoveryRootRecordForCanary {
+                    order: record.order(),
+                    root: record.root(),
+                    lanes: record.lanes(),
+                    status: SyncFlushErrorRecoveryRootStatusForCanary::Committed,
+                    scheduler_before,
+                    scheduler_after,
+                    commit_before: Some(commit_before),
+                    commit_after: None,
+                    render_error: None,
+                    commit_error: None,
+                    committed: Some(committed),
+                })
+            }
+            Err(SyncFlushError::RootCommit(error)) => {
+                let scheduler_after = sync_flush_root_recovery_snapshot_for_canary(
+                    store,
+                    record.root(),
+                    record.lanes(),
+                )?;
+                let commit_after =
+                    host_root_commit_recovery_snapshot_for_canary(store, record.render_phase())?;
+                Ok(SyncFlushErrorRecoveryRootRecordForCanary {
+                    order: record.order(),
+                    root: record.root(),
+                    lanes: record.lanes(),
+                    status: SyncFlushErrorRecoveryRootStatusForCanary::CommitFailed,
+                    scheduler_before,
+                    scheduler_after,
+                    commit_before: Some(commit_before),
+                    commit_after: Some(commit_after),
+                    render_error: None,
+                    commit_error: Some(error),
+                    committed: None,
+                })
+            }
+            Err(error) => Err(error),
+        }
     }
 
     #[doc(hidden)]
@@ -860,6 +1120,50 @@ pub fn flush_sync_commit_work_on_all_roots<H: HostTypes>(
     })
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush recovery diagnostics are reserved for render/commit error workers"
+)]
+pub(crate) fn flush_sync_commit_work_on_all_roots_with_error_recovery_diagnostics_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+) -> Result<SyncFlushErrorRecoveryDiagnosticsForCanary, SyncFlushError> {
+    if store.root_scheduler().is_flushing_work() {
+        return Ok(SyncFlushErrorRecoveryDiagnosticsForCanary {
+            skipped_reentrant_flush: true,
+            skipped_no_sync_work: false,
+            records: Vec::new(),
+        });
+    }
+
+    if !store.root_scheduler().might_have_pending_sync_work() {
+        return Ok(SyncFlushErrorRecoveryDiagnosticsForCanary {
+            skipped_reentrant_flush: false,
+            skipped_no_sync_work: true,
+            records: Vec::new(),
+        });
+    }
+
+    store.root_scheduler_mut().set_is_flushing_work(true);
+    let records =
+        flush_sync_work_across_scheduled_roots_with_error_recovery_diagnostics_for_canary(store);
+    store.root_scheduler_mut().set_is_flushing_work(false);
+    let records = records?;
+
+    let diagnostics = SyncFlushErrorRecoveryDiagnosticsForCanary {
+        skipped_reentrant_flush: false,
+        skipped_no_sync_work: false,
+        records,
+    };
+
+    if !diagnostics.did_capture_failure() {
+        recompute_might_have_pending_sync_work(store)?;
+    }
+
+    Ok(diagnostics)
+}
+
 fn flush_sync_work_across_scheduled_roots<H: HostTypes>(
     store: &mut FiberRootStore<H>,
 ) -> Result<Vec<SyncFlushRootRecord>, SyncFlushError> {
@@ -877,6 +1181,112 @@ fn flush_sync_work_across_scheduled_roots<H: HostTypes>(
                 let render_phase = render_host_root_for_lanes(store, root_id, render_lanes)?;
                 records.push(commit_render_phase(store, records.len(), render_phase)?);
                 did_perform_some_work = true;
+            }
+
+            root = next_root;
+        }
+
+        if !did_perform_some_work {
+            return Ok(records);
+        }
+    }
+}
+
+fn flush_sync_work_across_scheduled_roots_with_error_recovery_diagnostics_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+) -> Result<Vec<SyncFlushErrorRecoveryRootRecordForCanary>, SyncFlushError> {
+    let mut records = Vec::new();
+
+    loop {
+        let mut did_perform_some_work = false;
+        let mut root = store.root_scheduler().first_scheduled_root();
+
+        while let Some(root_id) = root {
+            let next_root = store.root(root_id)?.scheduling().next_scheduled_root();
+            let render_lanes = sync_flush_lanes_for_root(store, root_id)?;
+
+            if render_lanes.is_non_empty() {
+                let scheduler_before =
+                    sync_flush_root_recovery_snapshot_for_canary(store, root_id, render_lanes)?;
+                match render_host_root_for_lanes(store, root_id, render_lanes) {
+                    Ok(render_phase) => {
+                        let order = records.len();
+                        let commit_before =
+                            host_root_commit_recovery_snapshot_for_canary(store, render_phase)?;
+                        match commit_render_phase(store, order, render_phase) {
+                            Ok(committed) => {
+                                let scheduler_after = sync_flush_root_recovery_snapshot_for_canary(
+                                    store,
+                                    root_id,
+                                    render_lanes,
+                                )?;
+                                records.push(SyncFlushErrorRecoveryRootRecordForCanary {
+                                    order,
+                                    root: root_id,
+                                    lanes: render_lanes,
+                                    status: SyncFlushErrorRecoveryRootStatusForCanary::Committed,
+                                    scheduler_before,
+                                    scheduler_after,
+                                    commit_before: Some(commit_before),
+                                    commit_after: None,
+                                    render_error: None,
+                                    commit_error: None,
+                                    committed: Some(committed),
+                                });
+                                did_perform_some_work = true;
+                            }
+                            Err(SyncFlushError::RootCommit(error)) => {
+                                let scheduler_after = sync_flush_root_recovery_snapshot_for_canary(
+                                    store,
+                                    root_id,
+                                    render_lanes,
+                                )?;
+                                let commit_after = host_root_commit_recovery_snapshot_for_canary(
+                                    store,
+                                    render_phase,
+                                )?;
+                                records.push(SyncFlushErrorRecoveryRootRecordForCanary {
+                                    order,
+                                    root: root_id,
+                                    lanes: render_lanes,
+                                    status: SyncFlushErrorRecoveryRootStatusForCanary::CommitFailed,
+                                    scheduler_before,
+                                    scheduler_after,
+                                    commit_before: Some(commit_before),
+                                    commit_after: Some(commit_after),
+                                    render_error: None,
+                                    commit_error: Some(error),
+                                    committed: None,
+                                });
+                                return Ok(records);
+                            }
+                            Err(error) => return Err(error),
+                        }
+                    }
+                    Err(error) => {
+                        let scheduler_after = sync_flush_root_recovery_snapshot_for_canary(
+                            store,
+                            root_id,
+                            render_lanes,
+                        )?;
+                        records.push(SyncFlushErrorRecoveryRootRecordForCanary {
+                            order: records.len(),
+                            root: root_id,
+                            lanes: render_lanes,
+                            status: SyncFlushErrorRecoveryRootStatusForCanary::RenderFailed,
+                            scheduler_before,
+                            scheduler_after,
+                            commit_before: None,
+                            commit_after: None,
+                            render_error: Some(error),
+                            commit_error: None,
+                            committed: None,
+                        });
+                        return Ok(records);
+                    }
+                }
             }
 
             root = next_root;
@@ -936,7 +1346,7 @@ mod tests {
         update_container_sync,
     };
     use crate::{RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackVisibility};
-    use fast_react_core::{FiberTag, Lane, Lanes};
+    use fast_react_core::{FiberTag, Lane, Lanes, UpdateQueueHandle};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -1070,6 +1480,181 @@ mod tests {
         assert!(callbacks.hidden().is_empty());
         assert!(callbacks.deferred_hidden().is_empty());
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_error_recovery_diagnostics_preserve_render_failure_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(4501);
+        let update = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(4501),
+            Some(callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
+        let invalid_queue = UpdateQueueHandle::from_raw(999_450);
+        store
+            .fiber_arena_mut()
+            .get_mut(previous_current)
+            .unwrap()
+            .set_update_queue(invalid_queue);
+
+        let diagnostics =
+            flush_sync_commit_work_on_all_roots_with_error_recovery_diagnostics_for_canary(
+                &mut store,
+            )
+            .unwrap();
+
+        assert!(!diagnostics.skipped_reentrant_flush());
+        assert!(!diagnostics.skipped_no_sync_work());
+        assert!(diagnostics.did_capture_failure());
+        assert!(diagnostics.preserved_failed_root_metadata());
+        assert!(!diagnostics.retried_public_work());
+        assert!(!diagnostics.invoked_public_callbacks());
+        assert!(!diagnostics.public_flush_sync_compatibility_claimed());
+        assert_eq!(diagnostics.records().len(), 1);
+        let record = &diagnostics.records()[0];
+        assert_eq!(record.order(), 0);
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.lanes(), Lanes::SYNC);
+        assert_eq!(
+            record.status(),
+            SyncFlushErrorRecoveryRootStatusForCanary::RenderFailed
+        );
+        assert!(record.commit_error().is_none());
+        assert!(record.committed().is_none());
+        assert!(matches!(
+            record.render_error(),
+            Some(RootWorkLoopError::UpdateQueue(
+                crate::UpdateQueueError::InvalidQueueHandle { handle }
+            )) if *handle == invalid_queue
+        ));
+        assert_eq!(record.scheduler_before().pending_lanes(), pending_lanes);
+        assert_eq!(record.scheduler_after().pending_lanes(), pending_lanes);
+        assert!(record.preserved_lane_and_callback_metadata());
+        assert!(!record.retried_public_work());
+        assert!(!record.invoked_public_callbacks());
+        assert!(!record.public_flush_sync_compatibility_claimed());
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            pending_lanes
+        );
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+        assert!(!store.root_scheduler().is_flushing_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_error_recovery_diagnostics_respect_reentry_guard_without_public_retry() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(4503));
+        let previous_current = store.root(root_id).unwrap().current();
+        let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
+        store.root_scheduler_mut().set_is_flushing_work(true);
+
+        let diagnostics =
+            flush_sync_commit_work_on_all_roots_with_error_recovery_diagnostics_for_canary(
+                &mut store,
+            )
+            .unwrap();
+        store.root_scheduler_mut().set_is_flushing_work(false);
+
+        assert!(diagnostics.skipped_reentrant_flush());
+        assert!(!diagnostics.skipped_no_sync_work());
+        assert!(!diagnostics.did_capture_failure());
+        assert!(diagnostics.records().is_empty());
+        assert!(!diagnostics.retried_public_work());
+        assert!(!diagnostics.invoked_public_callbacks());
+        assert!(!diagnostics.public_flush_sync_compatibility_claimed());
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            pending_lanes
+        );
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_commit_recovery_diagnostics_preserve_callbacks_without_public_retry() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(4502);
+        let previous_current = store.root(root_id).unwrap().current();
+        let update = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(4502),
+            Some(callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+        let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .clear_render_phase_work();
+
+        let diagnostic =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_error_recovery_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+
+        assert_eq!(diagnostic.order(), 0);
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(diagnostic.lanes(), Lanes::SYNC);
+        assert_eq!(
+            diagnostic.status(),
+            SyncFlushErrorRecoveryRootStatusForCanary::CommitFailed
+        );
+        assert!(diagnostic.render_error().is_none());
+        assert!(diagnostic.committed().is_none());
+        assert!(matches!(
+            diagnostic.commit_error(),
+            Some(RootCommitError::RenderPhaseWorkMismatch {
+                root,
+                expected,
+                actual,
+            }) if *root == root_id
+                && expected.is_none()
+                && *actual == render_phase.finished_work()
+        ));
+        let before = diagnostic.commit_before().unwrap();
+        let after = diagnostic.commit_after().unwrap();
+        assert_eq!(
+            before.callback_queue(),
+            render_phase.work_in_progress_update_queue()
+        );
+        assert_eq!(before.visible_callback_count(), 1);
+        assert_eq!(before.hidden_callback_count(), 0);
+        assert_eq!(before.deferred_hidden_callback_count(), 0);
+        assert_eq!(
+            callback_handles(before.root_update_callbacks().visible()),
+            vec![callback]
+        );
+        assert!(after.preserves_lane_and_callback_metadata_from(before));
+        assert!(diagnostic.preserved_lane_and_callback_metadata());
+        assert!(!diagnostic.retried_public_work());
+        assert!(!diagnostic.invoked_public_callbacks());
+        assert!(!diagnostic.public_flush_sync_compatibility_claimed());
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            pending_lanes
+        );
+        assert!(store.root_scheduler().might_have_pending_sync_work());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

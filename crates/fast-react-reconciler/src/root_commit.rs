@@ -31,9 +31,10 @@ use crate::root_config::{
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId,
     HostFiberTokenValidationError, HostRootRenderPhaseRecord, HostRootStateStoreError,
-    RootRenderExitStatus, RootSchedulingState, RootUpdateCallbackSnapshot,
-    TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryPreparedFibers,
-    TestRendererHostOutputCanaryUpdatedFibers, UpdateQueueError,
+    RootCallbackPriority, RootRenderExitStatus, RootSchedulerCallbackHandle, RootSchedulingState,
+    RootUpdateCallbackSnapshot, TestRendererHostOutputCanaryError,
+    TestRendererHostOutputCanaryPreparedFibers, TestRendererHostOutputCanaryUpdatedFibers,
+    UpdateQueueError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -878,6 +879,109 @@ impl FunctionComponentCommittedPassiveEffectsSnapshot {
             .iter()
             .flat_map(|fiber| fiber.records().iter().copied())
             .collect()
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private HostRoot commit recovery diagnostics are reserved for private sync-flush error workers"
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootCommitRecoverySnapshotForCanary {
+    root: FiberRootId,
+    current: FiberId,
+    render_lanes: Lanes,
+    pending_lanes: Lanes,
+    callback_node: RootSchedulerCallbackHandle,
+    callback_priority: RootCallbackPriority,
+    render_phase_work: Option<FiberId>,
+    render_phase_lanes: Lanes,
+    callback_queue: UpdateQueueHandle,
+    root_update_callbacks: RootUpdateCallbackSnapshot,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private HostRoot commit recovery diagnostics are reserved for private sync-flush error workers"
+)]
+impl HostRootCommitRecoverySnapshotForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn current(&self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes(&self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_priority(&self) -> RootCallbackPriority {
+        self.callback_priority
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_work(&self) -> Option<FiberId> {
+        self.render_phase_work
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_lanes(&self) -> Lanes {
+        self.render_phase_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_queue(&self) -> UpdateQueueHandle {
+        self.callback_queue
+    }
+
+    #[must_use]
+    pub(crate) fn root_update_callbacks(&self) -> &RootUpdateCallbackSnapshot {
+        &self.root_update_callbacks
+    }
+
+    #[must_use]
+    pub(crate) fn visible_callback_count(&self) -> usize {
+        self.root_update_callbacks.visible().len()
+    }
+
+    #[must_use]
+    pub(crate) fn hidden_callback_count(&self) -> usize {
+        self.root_update_callbacks.hidden().len()
+    }
+
+    #[must_use]
+    pub(crate) fn deferred_hidden_callback_count(&self) -> usize {
+        self.root_update_callbacks.deferred_hidden().len()
+    }
+
+    #[must_use]
+    pub(crate) fn preserves_lane_and_callback_metadata_from(&self, before: &Self) -> bool {
+        self.root == before.root
+            && self.current == before.current
+            && self.render_lanes == before.render_lanes
+            && self.pending_lanes == before.pending_lanes
+            && self.callback_node == before.callback_node
+            && self.callback_priority == before.callback_priority
+            && self.render_phase_work == before.render_phase_work
+            && self.render_phase_lanes == before.render_phase_lanes
+            && self.callback_queue == before.callback_queue
+            && self.root_update_callbacks == before.root_update_callbacks
     }
 }
 
@@ -2118,6 +2222,34 @@ pub fn commit_finished_host_root<H: HostTypes>(
         ref_commit_metadata,
         dom_ref_callback_commit_gate,
         ref_callback_execution_handoff,
+    })
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private HostRoot commit recovery diagnostics are reserved for private sync-flush error workers"
+)]
+pub(crate) fn host_root_commit_recovery_snapshot_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+) -> Result<HostRootCommitRecoverySnapshotForCanary, RootCommitError> {
+    let root = store.root(render.root())?;
+    let scheduling = root.scheduling();
+    let root_update_callbacks = store
+        .update_queues()
+        .peek_root_update_callback_records(render.work_in_progress_update_queue())?;
+
+    Ok(HostRootCommitRecoverySnapshotForCanary {
+        root: render.root(),
+        current: root.current(),
+        render_lanes: render.render_lanes(),
+        pending_lanes: root.lanes().pending_lanes(),
+        callback_node: scheduling.callback_node(),
+        callback_priority: scheduling.callback_priority(),
+        render_phase_work: scheduling.work_in_progress(),
+        render_phase_lanes: scheduling.work_in_progress_root_render_lanes(),
+        callback_queue: render.work_in_progress_update_queue(),
+        root_update_callbacks,
     })
 }
 
@@ -7663,6 +7795,62 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().scheduling().work_in_progress(),
             Some(render.finished_work())
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_recovery_snapshot_preserves_failed_root_lane_and_callback_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(450);
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(4500),
+            Some(callback),
+        )
+        .unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let fixture = attach_deletion_metadata_fixture(&mut store, render.finished_work());
+        let parent_node = store
+            .fiber_arena_mut()
+            .get_mut(fixture.first_parent)
+            .unwrap();
+        parent_node.set_flags(parent_node.flags() - FiberFlags::CHILD_DELETION);
+        let before = host_root_commit_recovery_snapshot_for_canary(&store, render).unwrap();
+
+        let error = commit_finished_host_root(&mut store, render).unwrap_err();
+        let after = host_root_commit_recovery_snapshot_for_canary(&store, render).unwrap();
+
+        assert!(matches!(
+            error,
+            RootCommitError::FiberTopology(FiberTopologyError::DeletionListMissingFlag {
+                parent,
+                list,
+            }) if parent == fixture.first_parent && list == fixture.first_list
+        ));
+        assert_eq!(before.root(), root_id);
+        assert_eq!(before.current(), previous_current);
+        assert_eq!(before.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(before.pending_lanes(), pending_lanes);
+        assert_eq!(
+            before.callback_queue(),
+            render.work_in_progress_update_queue()
+        );
+        assert_eq!(before.visible_callback_count(), 1);
+        assert_eq!(before.hidden_callback_count(), 0);
+        assert_eq!(before.deferred_hidden_callback_count(), 0);
+        assert_eq!(
+            callback_handles(before.root_update_callbacks().visible()),
+            vec![callback]
+        );
+        assert!(after.preserves_lane_and_callback_metadata_from(&before));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            pending_lanes
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
