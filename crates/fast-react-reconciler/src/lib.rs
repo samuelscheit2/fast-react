@@ -18,6 +18,7 @@ mod root_scheduler;
 mod root_updates;
 mod root_work_loop;
 mod scheduler_bridge;
+mod sync_flush;
 #[cfg(test)]
 mod test_support;
 mod unsupported_features;
@@ -86,6 +87,9 @@ pub use scheduler_bridge::{
     SchedulerCallbackRequest, SchedulerCancellationRecord, SchedulerMicrotaskHandle,
     SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
 };
+pub use sync_flush::{
+    SyncFlushError, SyncFlushResult, SyncFlushRootRecord, flush_sync_commit_work_on_all_roots,
+};
 pub use update_priority::{UpdatePriorityState, request_update_lane};
 pub use update_queue::{
     CollectedRootUpdateCallback, RootUpdate, RootUpdateCallbackHandle, RootUpdatePayload,
@@ -114,6 +118,7 @@ pub enum ReconcilerError {
     RootScheduler(RootSchedulerError),
     RootWorkLoop(RootWorkLoopError),
     RootCommit(RootCommitError),
+    SyncFlush(SyncFlushError),
     WorkInProgress(WorkInProgressError),
 }
 
@@ -141,6 +146,7 @@ impl Display for ReconcilerError {
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::SyncFlush(error) => Display::fmt(error, formatter),
             Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
@@ -163,6 +169,7 @@ impl Error for ReconcilerError {
             Self::RootScheduler(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
             Self::RootCommit(error) => Some(error),
+            Self::SyncFlush(error) => Some(error),
             Self::WorkInProgress(error) => Some(error),
         }
     }
@@ -252,6 +259,12 @@ impl From<RootWorkLoopError> for ReconcilerError {
 impl From<RootCommitError> for ReconcilerError {
     fn from(error: RootCommitError) -> Self {
         Self::RootCommit(error)
+    }
+}
+
+impl From<SyncFlushError> for ReconcilerError {
+    fn from(error: SyncFlushError) -> Self {
+        Self::SyncFlush(error)
     }
 }
 
