@@ -704,7 +704,9 @@ function createHydrateRootRecordWithBridge(
     blockedOn: hydrationBoundaryRecord.blockedOn,
     hydrationBoundaryRecord,
     markerDiagnostics: hydrationBoundaryRecord.markerDiagnostics,
+    markerParserEvidence: hydrationBoundaryRecord.markerParserEvidence,
     markerEvidence: hydrationBoundaryRecord.markerEvidence,
+    eventReplayBlockers: hydrationBoundaryRecord.eventReplayBlockers,
     markerGuard: hydrationBoundaryRecord.markerGuard,
     listenerGuard: hydrationBoundaryRecord.listenerGuard,
     hydrationRequested: true,
@@ -958,8 +960,18 @@ function validateHydrateRootBridgeRequestRecord(record) {
   );
   assertRecordField(
     record,
+    'markerParserEvidence',
+    hydrationBoundaryRecord.markerParserEvidence
+  );
+  assertRecordField(
+    record,
     'markerEvidence',
     hydrationBoundaryRecord.markerEvidence
+  );
+  assertRecordField(
+    record,
+    'eventReplayBlockers',
+    hydrationBoundaryRecord.eventReplayBlockers
   );
   assertRecordField(record, 'markerGuard', hydrationBoundaryRecord.markerGuard);
   assertRecordField(
@@ -1074,7 +1086,9 @@ function createRootBridgeAdmissionRecord(record, validation) {
       rootKind: record.rootKind,
       rootTag: record.rootTag
     }),
+    markerParserEvidence: record.markerParserEvidence || null,
     markerEvidence: record.markerEvidence || null,
+    eventReplayBlockers: record.eventReplayBlockers || null,
     blockedCapabilities: ROOT_BRIDGE_BLOCKED_CAPABILITIES,
     nativeExecution: false,
     reconcilerExecution: false,
