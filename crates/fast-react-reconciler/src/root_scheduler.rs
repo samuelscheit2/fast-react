@@ -2,9 +2,10 @@
 //!
 //! This module models the React-style scheduled-root list and per-root
 //! callback bookkeeping on top of HostRoot update records. Most scheduler
-//! helpers remain planning-only; the sync-flush record path may render HostRoot
-//! lanes for a later commit handoff, but it still does not commit, flush host
-//! effects, or apply host containers.
+//! helpers remain planning-only; the public sync-flush record path may render
+//! HostRoot lanes for a later commit handoff, while one crate-private sync
+//! continuation can consume an accepted handoff without opening broad
+//! scheduler compatibility, passive effects, or public host containers.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -1027,6 +1028,186 @@ pub(crate) const fn root_sync_flush_record_for_canary(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootSyncSchedulerContinuationExecutionStatus {
+    StaleCallbackNode,
+    BlockedByPendingPassive,
+    NoSyncWork,
+    BlockedByLaneMismatch,
+    RenderedAndCommitted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootSyncSchedulerPendingPassiveBlockerRecord {
+    root: FiberRootId,
+    finished_work: Option<FiberId>,
+    lanes: Lanes,
+    pending_unmount_count: usize,
+    pending_mount_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync scheduler continuation metadata is reserved for private root execution workers"
+)]
+impl RootSyncSchedulerPendingPassiveBlockerRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> Option<FiberId> {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_unmount_count(self) -> usize {
+        self.pending_unmount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_mount_count(self) -> usize {
+        self.pending_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_record_count(self) -> usize {
+        self.pending_unmount_count + self.pending_mount_count
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootSyncSchedulerContinuationExecutionRecord {
+    handoff: RootSyncFlushRecord,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    current_callback_node: RootSchedulerCallbackHandle,
+    selected_lanes: Lanes,
+    pending_passive_blocker: Option<RootSyncSchedulerPendingPassiveBlockerRecord>,
+    status: RootSyncSchedulerContinuationExecutionStatus,
+    commit: Option<HostRootCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync scheduler continuation metadata is reserved for private root execution workers"
+)]
+impl RootSyncSchedulerContinuationExecutionRecord {
+    #[must_use]
+    pub(crate) const fn handoff(&self) -> RootSyncFlushRecord {
+        self.handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.handoff.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn requested_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.requested_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn current_callback_node(&self) -> RootSchedulerCallbackHandle {
+        self.current_callback_node
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff_lanes(&self) -> Lanes {
+        self.handoff.lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_blocker(
+        &self,
+    ) -> Option<RootSyncSchedulerPendingPassiveBlockerRecord> {
+        self.pending_passive_blocker
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> RootSyncSchedulerContinuationExecutionStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) fn commit(&self) -> Option<&HostRootCommitRecord> {
+        self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn did_execute_private_sync_scheduler_continuation(&self) -> bool {
+        matches!(
+            self.status,
+            RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn rejected_stale_callback_node(&self) -> bool {
+        matches!(
+            self.status,
+            RootSyncSchedulerContinuationExecutionStatus::StaleCallbackNode
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_pending_passive(&self) -> bool {
+        matches!(
+            self.status,
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByPendingPassive
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_lane_mismatch(&self) -> bool {
+        matches!(
+            self.status,
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByLaneMismatch
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn consumed_accepted_render_handoff(&self) -> bool {
+        self.commit.as_ref().is_some_and(|commit| {
+            self.did_execute_private_sync_scheduler_continuation()
+                && commit.root() == self.root()
+                && commit.current() == self.handoff.render_phase().finished_work()
+                && commit.finished_lanes() == self.handoff.lanes()
+        })
+    }
+
+    #[must_use]
+    pub(crate) const fn async_callback_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_update_scheduling_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+}
+
 #[allow(
     dead_code,
     reason = "crate-private sync-flush recovery diagnostics are reserved for private error workers"
@@ -1924,6 +2105,42 @@ impl From<RootSchedulerError> for SchedulerBridgeActContinuationExecutionError {
 }
 
 impl From<RootCommitError> for SchedulerBridgeActContinuationExecutionError {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RootSyncSchedulerContinuationExecutionError {
+    RootScheduler(RootSchedulerError),
+    RootCommit(RootCommitError),
+}
+
+impl Display for RootSyncSchedulerContinuationExecutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootScheduler(error) => Display::fmt(error, formatter),
+            Self::RootCommit(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for RootSyncSchedulerContinuationExecutionError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::RootScheduler(error) => Some(error),
+            Self::RootCommit(error) => Some(error),
+        }
+    }
+}
+
+impl From<RootSchedulerError> for RootSyncSchedulerContinuationExecutionError {
+    fn from(error: RootSchedulerError) -> Self {
+        Self::RootScheduler(error)
+    }
+}
+
+impl From<RootCommitError> for RootSyncSchedulerContinuationExecutionError {
     fn from(error: RootCommitError) -> Self {
         Self::RootCommit(error)
     }
@@ -2836,6 +3053,121 @@ fn scheduler_bridge_act_continuation_execution_record(
         selected_lanes,
         status,
         render_phase,
+        commit,
+    }
+}
+
+pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    handoff: RootSyncFlushRecord,
+    requested_callback_node: RootSchedulerCallbackHandle,
+) -> Result<RootSyncSchedulerContinuationExecutionRecord, RootSyncSchedulerContinuationExecutionError>
+{
+    let current_callback_node = store
+        .root(handoff.root())
+        .map_err(RootSchedulerError::from)?
+        .scheduling()
+        .callback_node();
+    if current_callback_node != requested_callback_node {
+        return Ok(sync_scheduler_continuation_execution_record(
+            handoff,
+            requested_callback_node,
+            current_callback_node,
+            Lanes::NO,
+            None,
+            RootSyncSchedulerContinuationExecutionStatus::StaleCallbackNode,
+            None,
+        ));
+    }
+
+    let selected_lanes = sync_flush_lanes_for_root(store, handoff.root())?;
+    let pending_passive_blocker =
+        sync_scheduler_pending_passive_blocker_for_root(store, handoff.root())?;
+    if pending_passive_blocker.is_some() {
+        return Ok(sync_scheduler_continuation_execution_record(
+            handoff,
+            requested_callback_node,
+            current_callback_node,
+            selected_lanes,
+            pending_passive_blocker,
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByPendingPassive,
+            None,
+        ));
+    }
+
+    if selected_lanes.is_empty() {
+        return Ok(sync_scheduler_continuation_execution_record(
+            handoff,
+            requested_callback_node,
+            current_callback_node,
+            selected_lanes,
+            None,
+            RootSyncSchedulerContinuationExecutionStatus::NoSyncWork,
+            None,
+        ));
+    }
+
+    if selected_lanes != handoff.lanes() {
+        return Ok(sync_scheduler_continuation_execution_record(
+            handoff,
+            requested_callback_node,
+            current_callback_node,
+            selected_lanes,
+            None,
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByLaneMismatch,
+            None,
+        ));
+    }
+
+    let commit = commit_finished_host_root(store, handoff.render_phase())?;
+    recompute_might_have_pending_sync_work(store)?;
+
+    Ok(sync_scheduler_continuation_execution_record(
+        handoff,
+        requested_callback_node,
+        current_callback_node,
+        selected_lanes,
+        None,
+        RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted,
+        Some(commit),
+    ))
+}
+
+fn sync_scheduler_pending_passive_blocker_for_root<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<Option<RootSyncSchedulerPendingPassiveBlockerRecord>, RootSchedulerError> {
+    let root = store.root(root_id)?;
+    let pending_passive = root.scheduling().pending_passive();
+    if !pending_passive.has_commit_handoff() {
+        return Ok(None);
+    }
+
+    Ok(Some(RootSyncSchedulerPendingPassiveBlockerRecord {
+        root: pending_passive.root().unwrap_or(root_id),
+        finished_work: pending_passive.finished_work(),
+        lanes: pending_passive.lanes(),
+        pending_unmount_count: pending_passive.passive_unmounts().len(),
+        pending_mount_count: pending_passive.passive_mounts().len(),
+    }))
+}
+
+fn sync_scheduler_continuation_execution_record(
+    handoff: RootSyncFlushRecord,
+    requested_callback_node: RootSchedulerCallbackHandle,
+    current_callback_node: RootSchedulerCallbackHandle,
+    selected_lanes: Lanes,
+    pending_passive_blocker: Option<RootSyncSchedulerPendingPassiveBlockerRecord>,
+    status: RootSyncSchedulerContinuationExecutionStatus,
+    commit: Option<HostRootCommitRecord>,
+) -> RootSyncSchedulerContinuationExecutionRecord {
+    RootSyncSchedulerContinuationExecutionRecord {
+        handoff,
+        requested_callback_node,
+        current_callback_node,
+        selected_lanes,
+        pending_passive_blocker,
+        status,
         commit,
     }
 }
@@ -5501,6 +5833,198 @@ mod tests {
         let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
         assert!(pending_lanes.contains_lane(Lane::SYNC));
         assert!(pending_lanes.contains_lane(Lane::DEFAULT));
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_execution_commits_accepted_render_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5961));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let handoff = rendered.records()[0];
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert_eq!(execution.handoff(), handoff);
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(
+            execution.requested_callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(
+            execution.current_callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(execution.handoff_lanes(), Lanes::SYNC);
+        assert_eq!(execution.selected_lanes(), Lanes::SYNC);
+        assert!(execution.did_execute_private_sync_scheduler_continuation());
+        assert!(execution.consumed_accepted_render_handoff());
+        assert!(execution.async_callback_execution_blocked());
+        assert!(execution.public_update_scheduling_blocked());
+        assert!(!execution.public_root_compatibility_claimed());
+        assert!(!execution.executes_public_effects());
+        let commit = execution.commit().unwrap();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), handoff.render_phase().finished_work());
+        assert_eq!(commit.finished_lanes(), Lanes::SYNC);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            handoff.render_phase().finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_rejects_stale_callback_node() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let stale_callback = scheduled_callback_request(&mut store, root_id);
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5962));
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            rendered.records()[0],
+            stale_callback.node(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::StaleCallbackNode
+        );
+        assert!(execution.rejected_stale_callback_node());
+        assert_eq!(execution.requested_callback_node(), stale_callback.node());
+        assert_eq!(
+            execution.current_callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(execution.selected_lanes(), Lanes::NO);
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::SYNC)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_rejects_pending_passive_blocker() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5963));
+        let passive_render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let passive_finished_work = passive_render.finished_work();
+        {
+            let scheduling = store.root_mut(root_id).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(root_id, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(passive_finished_work, Lanes::SYNC)
+                .unwrap();
+        }
+        let passive_commit = commit_finished_host_root(&mut store, passive_render).unwrap();
+        assert!(passive_commit.pending_passive_handoff().is_some());
+
+        let current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5964));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            rendered.records()[0],
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByPendingPassive
+        );
+        assert!(execution.blocked_by_pending_passive());
+        assert_eq!(execution.selected_lanes(), Lanes::SYNC);
+        let blocker = execution.pending_passive_blocker().unwrap();
+        assert_eq!(blocker.root(), root_id);
+        assert_eq!(blocker.finished_work(), Some(passive_finished_work));
+        assert_eq!(blocker.lanes(), Lanes::SYNC);
+        assert_eq!(blocker.pending_unmount_count(), 0);
+        assert_eq!(blocker.pending_mount_count(), 1);
+        assert_eq!(blocker.pending_record_count(), 1);
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_continuation_rejects_mismatched_lanes() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(5965));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_finished(RootFinishedLanes::new(
+                Lanes::SYNC,
+                Lanes::from(Lane::SYNC_HYDRATION),
+            ));
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            rendered.records()[0],
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByLaneMismatch
+        );
+        assert!(execution.blocked_by_lane_mismatch());
+        assert_eq!(execution.handoff_lanes(), Lanes::SYNC);
+        assert_eq!(
+            execution.selected_lanes(),
+            Lanes::from(Lane::SYNC_HYDRATION)
+        );
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
