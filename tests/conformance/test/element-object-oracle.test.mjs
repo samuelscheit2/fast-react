@@ -224,6 +224,36 @@ test("React oracle captures JSX runtime identity, child-array, and jsxDEV condit
   ]);
 });
 
+test("element-object oracle captures cloneElement child-array freeze states", () => {
+  for (const modeId of ["default-node-development", "react-server-development"]) {
+    const reactClone = operationValue(modeId, "clone-multiple-children");
+    const fastReactClone = fastOperationValue(modeId, "clone-multiple-children");
+    const comparison = fastReactComparison(modeId, "clone-multiple-children");
+
+    assert.equal(reactClone.childArray.state.frozen, false, modeId);
+    assert.equal(fastReactClone.childArray.state.frozen, true, modeId);
+    assert.equal(comparison.status, "known-mismatch", modeId);
+    assert.equal(comparison.compatibilityClaimed, false, modeId);
+    assert.notEqual(comparison.firstDifferencePath, null, modeId);
+  }
+
+  for (const modeId of ["default-node-production", "react-server-production"]) {
+    const reactClone = operationValue(modeId, "clone-multiple-children");
+    const fastReactClone = fastOperationValue(modeId, "clone-multiple-children");
+    const comparison = fastReactComparison(modeId, "clone-multiple-children");
+
+    assert.equal(reactClone.childArray.state.frozen, false, modeId);
+    assert.equal(fastReactClone.childArray.state.frozen, false, modeId);
+    assert.equal(
+      comparison.status,
+      "unexpected-match-compatibility-not-claimed",
+      modeId
+    );
+    assert.equal(comparison.compatibilityClaimed, false, modeId);
+    assert.equal(comparison.firstDifferencePath, null, modeId);
+  }
+});
+
 test("Fast React comparisons distinguish exact normalized matches from compatibility claims", () => {
   const allowedStatuses = new Set([
     "known-mismatch",
@@ -252,8 +282,8 @@ test("Fast React comparison status counts stay focused on matched element behavi
     Object.values(oracle.fastReactComparisons).flat()
   );
   assert.deepEqual(totalCounts, {
-    "known-mismatch": 4,
-    "unexpected-match-compatibility-not-claimed": 84,
+    "known-mismatch": 6,
+    "unexpected-match-compatibility-not-claimed": 82,
     "unsupported-placeholder": 0
   });
 
@@ -263,11 +293,17 @@ test("Fast React comparison status counts stay focused on matched element behavi
     );
     assert.deepEqual(
       modeCounts,
-      {
-        "known-mismatch": 1,
-        "unexpected-match-compatibility-not-claimed": 21,
-        "unsupported-placeholder": 0
-      },
+      mode.nodeEnv === "development"
+        ? {
+            "known-mismatch": 2,
+            "unexpected-match-compatibility-not-claimed": 20,
+            "unsupported-placeholder": 0
+          }
+        : {
+            "known-mismatch": 1,
+            "unexpected-match-compatibility-not-claimed": 21,
+            "unsupported-placeholder": 0
+          },
       mode.id
     );
   }
@@ -319,6 +355,20 @@ function operationValue(modeId, scenarioId) {
   const operation = reactObservation(modeId, scenarioId).result.result;
   assert.equal(operation.status, "ok", `${modeId}:${scenarioId} should be ok`);
   return unwrapNestedOperation(operation.value);
+}
+
+function fastOperationValue(modeId, scenarioId) {
+  const operation = fastReactObservation(modeId, scenarioId).result.result;
+  assert.equal(operation.status, "ok", `${modeId}:${scenarioId} should be ok`);
+  return unwrapNestedOperation(operation.value);
+}
+
+function fastReactComparison(modeId, scenarioId) {
+  const comparison = oracle.fastReactComparisons[modeId].find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  assert.ok(comparison, `missing comparison ${modeId}:${scenarioId}`);
+  return comparison;
 }
 
 function unwrapNestedOperation(value) {
