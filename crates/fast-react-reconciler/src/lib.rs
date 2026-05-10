@@ -3,6 +3,7 @@
 //! Real reconciliation is intentionally absent from the scaffold. The module
 //! layout reserves the boundary where lane/update/hook semantics will be built.
 
+mod begin_work;
 mod concurrent_updates;
 mod execution_context;
 mod fiber_root;

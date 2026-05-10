@@ -1,0 +1,386 @@
+//! Private begin-work handoff for function components.
+//!
+//! This is intentionally below the public work loop. It delegates only the
+//! accepted function-component render skeleton and does not reconcile children,
+//! complete host work, commit effects, mutate hosts, or switch roots.
+
+#![allow(dead_code)]
+
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+
+use fast_react_core::{FiberArena, FiberId, FiberTag, FiberTopologyError, Lanes};
+
+use crate::function_component::{
+    FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
+    FunctionComponentRenderRecord, render_function_component,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BeginWorkRequest {
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+}
+
+impl BeginWorkRequest {
+    #[must_use]
+    pub const fn new(work_in_progress: FiberId, render_lanes: Lanes) -> Self {
+        Self {
+            work_in_progress,
+            render_lanes,
+        }
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.work_in_progress
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BeginWorkResult {
+    FunctionComponent(FunctionComponentBeginWorkRecord),
+}
+
+impl BeginWorkResult {
+    #[must_use]
+    pub const fn function_component(self) -> FunctionComponentBeginWorkRecord {
+        match self {
+            Self::FunctionComponent(record) => record,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentBeginWorkRecord {
+    render: FunctionComponentRenderRecord,
+}
+
+impl FunctionComponentBeginWorkRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum BeginWorkError {
+    FiberTopology(FiberTopologyError),
+    FunctionComponent(FunctionComponentRenderError),
+    UnsupportedFiberTag { fiber: FiberId, tag: FiberTag },
+}
+
+impl Display for BeginWorkError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::FunctionComponent(error) => Display::fmt(error, formatter),
+            Self::UnsupportedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} has unsupported begin-work tag {:?}; only FunctionComponent is delegated by this private handoff",
+                fiber.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+impl Error for BeginWorkError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::FunctionComponent(error) => Some(error),
+            Self::UnsupportedFiberTag { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for BeginWorkError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+impl From<FunctionComponentRenderError> for BeginWorkError {
+    fn from(error: FunctionComponentRenderError) -> Self {
+        Self::FunctionComponent(error)
+    }
+}
+
+pub(crate) fn begin_work(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<BeginWorkResult, BeginWorkError> {
+    let work_in_progress = request.work_in_progress();
+    let tag = arena.get(work_in_progress)?.tag();
+
+    if tag != FiberTag::FunctionComponent {
+        return Err(BeginWorkError::UnsupportedFiberTag {
+            fiber: work_in_progress,
+            tag,
+        });
+    }
+
+    let render =
+        render_function_component(arena, work_in_progress, request.render_lanes(), invoker)?;
+
+    Ok(BeginWorkResult::FunctionComponent(
+        FunctionComponentBeginWorkRecord { render },
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::function_component::{
+        FunctionComponentInvocationError, FunctionComponentInvocationRequest,
+    };
+    use crate::test_support::{FakeContainer, RecordingHost};
+    use crate::{FiberRootStore, RootOptions};
+    use fast_react_core::{
+        FiberMode, FiberTypeHandle, PropsHandle, StateHandle, UpdateQueueHandle,
+    };
+
+    #[derive(Debug, Clone)]
+    struct RegisteredComponent {
+        component: FiberTypeHandle,
+        result: Result<FunctionComponentOutputHandle, FunctionComponentInvocationError>,
+    }
+
+    #[derive(Debug, Default)]
+    struct TestFunctionComponentRegistry {
+        components: Vec<RegisteredComponent>,
+        calls: Vec<FunctionComponentInvocationRequest>,
+    }
+
+    impl TestFunctionComponentRegistry {
+        fn register(
+            &mut self,
+            component: FiberTypeHandle,
+            result: Result<FunctionComponentOutputHandle, FunctionComponentInvocationError>,
+        ) {
+            self.components
+                .push(RegisteredComponent { component, result });
+        }
+
+        fn calls(&self) -> &[FunctionComponentInvocationRequest] {
+            &self.calls
+        }
+    }
+
+    impl FunctionComponentInvoker for TestFunctionComponentRegistry {
+        fn invoke_function_component(
+            &mut self,
+            request: FunctionComponentInvocationRequest,
+        ) -> Result<FunctionComponentOutputHandle, FunctionComponentInvocationError> {
+            self.calls.push(request);
+            self.components
+                .iter()
+                .find(|component| component.component == request.component())
+                .map(|component| component.result.clone())
+                .unwrap_or_else(|| {
+                    Err(FunctionComponentInvocationError::component_error(
+                        "missing test component registration",
+                    ))
+                })
+        }
+    }
+
+    fn function_component_pair() -> (FiberArena, FiberId, FiberId, FiberTypeHandle) {
+        let mut arena = FiberArena::new();
+        let current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(200);
+        arena.get_mut(current).unwrap().set_fiber_type(component);
+        let work_in_progress = arena
+            .create_work_in_progress(current, PropsHandle::from_raw(2))
+            .unwrap();
+
+        (arena, current, work_in_progress, component)
+    }
+
+    #[test]
+    fn begin_work_delegates_function_component_to_render_skeleton() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let existing_child = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(work_in_progress, &[existing_child])
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(77);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let result = begin_work(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut registry,
+        )
+        .unwrap()
+        .function_component();
+
+        assert_eq!(result.current(), Some(current));
+        assert_eq!(result.work_in_progress(), work_in_progress);
+        assert_eq!(result.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(result.output(), output);
+        assert_eq!(result.render().component(), component);
+        assert_eq!(result.render().props(), PropsHandle::from_raw(2));
+        assert_eq!(registry.calls().len(), 1);
+        let call = registry.calls()[0];
+        assert_eq!(call.fiber(), work_in_progress);
+        assert_eq!(call.component(), component);
+        assert_eq!(call.props(), PropsHandle::from_raw(2));
+        assert_eq!(call.render_lanes(), Lanes::DEFAULT);
+
+        let work_node = arena.get(work_in_progress).unwrap();
+        assert_eq!(work_node.memoized_props(), PropsHandle::from_raw(2));
+        assert_eq!(work_node.memoized_state(), StateHandle::NONE);
+        assert_eq!(work_node.update_queue(), UpdateQueueHandle::NONE);
+        assert_eq!(work_node.lanes(), Lanes::NO);
+        assert_eq!(work_node.child(), Some(existing_child));
+        assert_eq!(
+            arena.get(existing_child).unwrap().return_fiber(),
+            Some(work_in_progress)
+        );
+    }
+
+    #[test]
+    fn begin_work_rejects_non_function_component_tags_without_invoking() {
+        let unsupported_tags = [
+            FiberTag::HostRoot,
+            FiberTag::ClassComponent,
+            FiberTag::ContextProvider,
+            FiberTag::Suspense,
+        ];
+
+        for tag in unsupported_tags {
+            let mut arena = FiberArena::new();
+            let work_in_progress = arena.create_fiber(tag, None, PropsHandle::NONE, FiberMode::NO);
+            let mut registry = TestFunctionComponentRegistry::default();
+
+            let error = begin_work(
+                &mut arena,
+                BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+                &mut registry,
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                error,
+                BeginWorkError::UnsupportedFiberTag {
+                    fiber: work_in_progress,
+                    tag,
+                }
+            );
+            assert!(registry.calls().is_empty());
+        }
+    }
+
+    #[test]
+    fn begin_work_propagates_function_component_invocation_errors() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let invocation_error = FunctionComponentInvocationError::component_error("boom");
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Err(invocation_error.clone()));
+
+        let error = begin_work(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            BeginWorkError::FunctionComponent(FunctionComponentRenderError::Invocation {
+                fiber: work_in_progress,
+                component,
+                error: invocation_error,
+            })
+        );
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn begin_work_does_not_commit_switch_root_or_mutate_host() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let root_current = store.root(root_id).unwrap().current();
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(201);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(2))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(88)));
+
+        let result = begin_work(
+            store.fiber_arena_mut(),
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut registry,
+        )
+        .unwrap()
+        .function_component();
+
+        assert_eq!(result.output(), FunctionComponentOutputHandle::from_raw(88));
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), root_current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+    }
+}
