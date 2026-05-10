@@ -1816,22 +1816,38 @@ const privateErrorBoundaryDiagnosticsStatus =
   'private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked';
 const privateErrorBoundaryDiagnosticName =
   'fast-react-test-renderer.error-boundary.private-root-options-canary';
+const privateErrorBoundaryRootOptionsRustApi =
+  'TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary';
+const privateErrorBoundaryUpdateRustApi =
+  'TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary';
 const privateErrorBoundaryDiagnosticPhases = Object.freeze([
-  'Render',
+  'Update',
   'Commit'
+]);
+const privateErrorBoundaryDiagnosticDependencyIds = Object.freeze([
+  'react-test-renderer-update-private-route',
+  'react-test-renderer-serialization-private-json-diagnostic',
+  'react-test-renderer-test-instance-private-fiber-diagnostic',
+  'react-test-renderer-act-scheduler-private-diagnostic'
 ]);
 const privateErrorBoundaryDiagnosticRows = Object.freeze([
   Object.freeze({
-    id: 'react-test-renderer-render-error-root-option-private-diagnostic',
-    phase: 'Render',
+    id: 'react-test-renderer-update-error-root-option-private-diagnostic',
+    phase: 'Update',
+    hostOutputUpdateKind: 'Update',
     rootErrorChannel: 'onUncaughtError',
-    reactReference: 'ReactFiberThrow.createRootErrorUpdate'
+    reactReference: 'ReactTestRenderer.js update -> updateContainer',
+    acceptedPrivateDiagnosticDependencyIds:
+      privateErrorBoundaryDiagnosticDependencyIds
   }),
   Object.freeze({
     id: 'react-test-renderer-commit-error-root-option-private-diagnostic',
     phase: 'Commit',
+    hostOutputUpdateKind: 'Update',
     rootErrorChannel: 'onUncaughtError',
-    reactReference: 'ReactFiberWorkLoop.captureCommitPhaseError'
+    reactReference: 'ReactFiberWorkLoop.captureCommitPhaseError',
+    acceptedPrivateDiagnosticDependencyIds:
+      privateErrorBoundaryDiagnosticDependencyIds
   })
 ]);
 const privateErrorBoundaryDiagnosticsGate = Object.freeze({
@@ -1845,17 +1861,35 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
   acceptedRustRecords: Object.freeze([
     'TestRendererPrivateErrorBoundaryDiagnostics',
     'TestRendererPrivateErrorDiagnosticRow',
+    'TestRendererPrivateErrorBoundaryDependencyDiagnostics',
     'TestRendererRootErrorOptionDiagnostics'
   ]),
   acceptedRustApis: Object.freeze([
-    'TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary'
+    privateErrorBoundaryRootOptionsRustApi,
+    privateErrorBoundaryUpdateRustApi
   ]),
   acceptedRustTests: Object.freeze([
     'root_options_store_error_callback_handles_without_invocation',
-    'root_private_error_boundary_diagnostics_record_render_and_commit_rows_from_options'
+    'root_private_error_boundary_diagnostics_record_update_and_commit_rows_from_options'
   ]),
   phases: privateErrorBoundaryDiagnosticPhases,
   rows: privateErrorBoundaryDiagnosticRows,
+  acceptedWorker: 'worker-530-test-renderer-error-boundary-update-refresh',
+  acceptedDependencyWorkers: Object.freeze([
+    'worker-307-test-renderer-update-unmount-private-js-bridge',
+    'worker-333-test-renderer-tojson-host-output-private-path',
+    'worker-426-test-renderer-testinstance-bridge-query',
+    'worker-473-test-renderer-act-passive-effect-drain',
+    'worker-482-test-renderer-act-scheduler-flush-gate',
+    'worker-484-test-instance-find-by-private-query-gate',
+    'worker-485-test-renderer-totree-multichild-gate'
+  ]),
+  acceptedPrivateDiagnosticDependencyIds:
+    privateErrorBoundaryDiagnosticDependencyIds,
+  updateRouteDiagnosticsAvailable: true,
+  serializationDiagnosticsAvailable: true,
+  testInstanceQueryDiagnosticsAvailable: true,
+  actSchedulerMetadataAvailable: true,
   rootErrorOptionFields: Object.freeze([
     'onUncaughtError',
     'onCaughtError',
@@ -1865,6 +1899,9 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
   publicErrorBoundaryBehaviorAvailable: false,
   publicErrorBoundaryBehaviorExposed: false,
   publicRootErrorCallbacksInvoked: false,
+  publicRendererRootsExecuted: false,
+  publicLifecycleMethodsExecuted: false,
+  errorBoundaryRecoveryExecuted: false,
   compatibilityClaimed: false
 });
 const privateTestInstanceEmptyProps = Object.freeze({});
@@ -2803,7 +2840,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-208-test-renderer-host-output-canary',
     'worker-234-test-renderer-host-output-update-unmount-canary',
     'worker-265-test-renderer-private-json-ready-diagnostics',
-    'worker-465-test-renderer-error-boundary-diagnostics'
+    'worker-465-test-renderer-error-boundary-diagnostics',
+    'worker-530-test-renderer-error-boundary-update-refresh'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
@@ -5317,7 +5355,8 @@ function createRootRequestRecord({
       operation === 'create' ? describeCreateOptions(rootOptions) : null,
     callbackInfo: describeRootRequestValue(callback),
     privateErrorBoundaryDiagnosticsGate,
-    privateErrorBoundaryDiagnosticsAvailable: operation === 'create',
+    privateErrorBoundaryDiagnosticsAvailable:
+      operation === 'create' || operation === 'update',
     rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       operation
@@ -6040,6 +6079,28 @@ function isRootRequestRecord(record) {
   );
 }
 
+function getRootErrorOptionsSourceRequestForRootRequest(rootRequest) {
+  if (rootRequest.optionsInfo !== null) {
+    return rootRequest;
+  }
+
+  const handleState = rootHandleStates.get(rootRequest.rootHandle);
+  if (handleState === undefined) {
+    return null;
+  }
+
+  return (
+    handleState.requests.find((request) => request.operation === 'create') ||
+    null
+  );
+}
+
+function getRootErrorOptionsForRootRequest(rootRequest) {
+  const sourceRequest =
+    getRootErrorOptionsSourceRequestForRootRequest(rootRequest);
+  return sourceRequest?.optionsInfo?.rootErrorOptions ?? describeRootErrorOptions(null);
+}
+
 function getCurrentRustCanaryOperationMetadata(operation) {
   const metadata =
     currentRustTestRendererRootCanaryMetadata.operations[operation];
@@ -6401,12 +6462,21 @@ function getPrivateErrorBoundaryDiagnosticsForRootRequest(record) {
 }
 
 function createPrivateErrorBoundaryDiagnosticsForRootRequest(rootRequest) {
-  const rootErrorOptions =
-    rootRequest.optionsInfo === null
-      ? describeRootErrorOptions(null)
-      : rootRequest.optionsInfo.rootErrorOptions;
+  const rootErrorOptionsSourceRequest =
+    getRootErrorOptionsSourceRequestForRootRequest(rootRequest);
+  const rootErrorOptions = getRootErrorOptionsForRootRequest(rootRequest);
+  const dependencyDiagnostics =
+    createPrivateErrorBoundaryDependencyDiagnostics(rootRequest);
+  const acceptedRustApi =
+    getPrivateErrorBoundaryAcceptedRustApiForRootRequest(rootRequest);
   const rows = privateErrorBoundaryDiagnosticRows.map((row) =>
-    createPrivateErrorBoundaryDiagnosticRow(rootRequest, rootErrorOptions, row)
+    createPrivateErrorBoundaryDiagnosticRow(
+      rootRequest,
+      rootErrorOptions,
+      dependencyDiagnostics,
+      acceptedRustApi,
+      row
+    )
   );
 
   return freezeRecord({
@@ -6422,16 +6492,37 @@ function createPrivateErrorBoundaryDiagnosticsForRootRequest(rootRequest) {
     rootHandle: rootRequest.rootHandle,
     rootId: rootRequest.rootId,
     rootSequence: rootRequest.rootSequence,
+    rootOperation: rootRequest.operation,
+    rootRequestType: rootRequest.requestType,
     rootErrorOptions,
+    rootErrorOptionsSourceRequest: rootErrorOptionsSourceRequest,
+    rootErrorOptionsSourceRequestId:
+      rootErrorOptionsSourceRequest?.requestId ?? null,
+    rootErrorOptionsInheritedFromCreateRequest:
+      rootRequest.operation !== 'create' &&
+      rootErrorOptionsSourceRequest?.operation === 'create',
+    dependencyDiagnostics,
+    acceptedRustApi,
+    acceptedPrivateDiagnosticDependencyIds:
+      privateErrorBoundaryDiagnosticDependencyIds,
     phases: privateErrorBoundaryDiagnosticPhases,
     rows: freezeArray(rows),
     rowCount: rows.length,
+    hostOutputUpdateKind: 'Update',
     privateRootErrorOptionMetadataAvailable: true,
-    renderErrorRowAvailable: true,
+    updateErrorRowAvailable: true,
+    renderErrorRowAvailable: false,
     commitErrorRowAvailable: true,
+    updateRouteDiagnosticsAvailable: true,
+    serializationDiagnosticsAvailable: true,
+    testInstanceQueryDiagnosticsAvailable: true,
+    actSchedulerMetadataAvailable: true,
     publicErrorBoundaryBehaviorAvailable: false,
     publicErrorBoundaryBehaviorExposed: false,
     publicRootErrorCallbacksInvoked: false,
+    publicRendererRootsExecuted: false,
+    publicLifecycleMethodsExecuted: false,
+    errorBoundaryRecoveryExecuted: false,
     nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecution: false,
@@ -6443,6 +6534,8 @@ function createPrivateErrorBoundaryDiagnosticsForRootRequest(rootRequest) {
 function createPrivateErrorBoundaryDiagnosticRow(
   rootRequest,
   rootErrorOptions,
+  dependencyDiagnostics,
+  acceptedRustApi,
   row
 ) {
   return freezeRecord({
@@ -6459,17 +6552,63 @@ function createPrivateErrorBoundaryDiagnosticRow(
     rootRequest,
     rootId: rootRequest.rootId,
     rootSequence: rootRequest.rootSequence,
+    rootOperation: rootRequest.operation,
+    rootRequestType: rootRequest.requestType,
+    hostOutputUpdateKind: row.hostOutputUpdateKind,
     rootErrorOptions,
+    dependencyDiagnostics,
+    acceptedRustApi,
+    acceptedPrivateDiagnosticDependencyIds:
+      row.acceptedPrivateDiagnosticDependencyIds,
     capturesRootErrorOptions: true,
     rootErrorUpdateScheduled: false,
     publicRootErrorCallbackInvoked: false,
     publicRootErrorCallbacksInvoked: false,
     publicErrorBoundaryBehaviorAvailable: false,
     publicErrorBoundaryBehaviorExposed: false,
+    publicRendererRootsExecuted: false,
+    publicLifecycleMethodsExecuted: false,
+    errorBoundaryRecoveryExecuted: false,
     nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecution: false,
     reconcilerExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getPrivateErrorBoundaryAcceptedRustApiForRootRequest(rootRequest) {
+  return rootRequest.operation === 'update'
+    ? privateErrorBoundaryUpdateRustApi
+    : privateErrorBoundaryRootOptionsRustApi;
+}
+
+function createPrivateErrorBoundaryDependencyDiagnostics(rootRequest) {
+  return freezeRecord({
+    id: 'react-test-renderer-error-boundary-update-dependency-diagnostics',
+    status: privateErrorBoundaryDiagnosticsStatus,
+    rootRequest,
+    rootOperation: rootRequest.operation,
+    acceptedPrivateDiagnosticDependencyIds:
+      privateErrorBoundaryDiagnosticDependencyIds,
+    updateRouteDiagnosticsAvailable: true,
+    serializationDiagnosticsAvailable: true,
+    serializationDiagnosticResultAvailable:
+      toJSONPrivateSerializationFacadeGate.privateDiagnosticResultAvailable,
+    testInstanceQueryDiagnosticsAvailable: true,
+    testInstanceFindByDiagnosticsAvailable:
+      currentRustTestRendererRootCanaryMetadata.testInstanceQuery
+        .findByDiagnosticsAvailable,
+    actSchedulerMetadataAvailable: true,
+    actPassiveEffectDrainDiagnosticsConsumed:
+      actSchedulerGate.privatePassiveEffectDrainDiagnosticsConsumed,
+    mockSchedulerFlushHelperMetadataRouted:
+      actSchedulerGate.privateMockSchedulerFlushHelperMetadataRouted,
+    publicRendererRootsExecuted: false,
+    publicLifecycleMethodsExecuted: false,
+    errorBoundaryRecoveryExecuted: false,
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicRootErrorCallbacksInvoked: false,
     compatibilityClaimed: false
   });
 }
