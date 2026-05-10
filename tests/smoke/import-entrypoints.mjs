@@ -589,6 +589,9 @@ const reactTestRendererPrivateRuntimeFacadeSymbols = {
     'fast.react_test_renderer.private_error_boundary_diagnostics',
     'fast.react_test_renderer.private_test_instance_wrapper_record'
   ],
+  flushSyncCjs: [
+    'fast.react_test_renderer.private_flushsync_act_routing_diagnostics'
+  ],
   getInstanceCjs: ['fast.react_test_renderer.private_get_instance_diagnostics'],
   toJSON: ['fast.react_test_renderer.private_tojson_serialization_facade'],
   toTree: [
@@ -607,6 +610,12 @@ function reactTestRendererRendererSymbolsForEntrypoint(entrypoint) {
 function reactTestRendererGetInstanceSymbolsForEntrypoint(entrypoint) {
   return entrypoint.resolvedFileName.startsWith(`cjs${path.sep}`)
     ? reactTestRendererPrivateRuntimeFacadeSymbols.getInstanceCjs
+    : [];
+}
+
+function reactTestRendererFlushSyncSymbolsForEntrypoint(entrypoint) {
+  return entrypoint.resolvedFileName.startsWith(`cjs${path.sep}`)
+    ? reactTestRendererPrivateRuntimeFacadeSymbols.flushSyncCjs
     : [];
 }
 
@@ -1553,6 +1562,15 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
     renderer.unstable_flushSync.length,
     1,
     `${label}.unstable_flushSync length`
+  );
+  assertNoPrivateDiagnosticRuntimeExports(
+    renderer.unstable_flushSync,
+    `${label}.unstable_flushSync`
+  );
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.unstable_flushSync,
+    reactTestRendererFlushSyncSymbolsForEntrypoint(entrypoint),
+    `${label}.create().unstable_flushSync`
   );
   assert.equal(
     renderer._Scheduler,
@@ -4315,6 +4333,17 @@ async function runReactTestRendererPackageProbe(tempRoot) {
           specifier + ' getInstance'
         );
         assert.equal(renderer.unstable_flushSync.length, 1, specifier);
+        assertNoPrivateDiagnosticRuntimeExports(
+          renderer.unstable_flushSync,
+          specifier + ' unstable_flushSync'
+        );
+        assertPrivateRuntimeFacadeSymbols(
+          renderer.unstable_flushSync,
+          resolvedFileName.startsWith('cjs/')
+            ? privateRuntimeFacadeSymbols.flushSyncCjs
+            : [],
+          specifier + ' unstable_flushSync'
+        );
         assert.equal(renderer._Scheduler, cjsModule._Scheduler, specifier);
         assertSchedulerShell(
           renderer._Scheduler,
