@@ -2484,6 +2484,7 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
   const bridge = rootBridge.createPrivateRootBridgeShell({
     createRenderAdmissionIdPrefix: 'unmount-admission',
     sideEffectIdPrefix: 'unmount-side-effects',
+    unmountAdmissionIdPrefix: 'unmount-admission-meta',
     unmountCleanupIdPrefix: 'unmount-cleanup'
   });
   const otherBridge = rootBridge.createPrivateRootBridgeShell();
@@ -2528,6 +2529,9 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
   const cleanup = bridge.cleanupUnmountHostOutput(admission, unmount);
   const hiddenCleanup =
     rootBridge.getPrivateRootUnmountHostOutputCleanupPayload(cleanup);
+  const unmountAdmission = cleanup.unmountAdmission;
+  const hiddenUnmountAdmission =
+    rootBridge.getPrivateRootUnmountAdmissionPayload(unmountAdmission);
 
   assert.equal(
     rootBridge.cleanupPrivateRootUnmountHostOutput(admission, unmount),
@@ -2546,15 +2550,66 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
   assert.equal(cleanup.cleanupId, 'unmount-cleanup:1');
   assert.equal(cleanup.sourceAdmissionId, 'unmount-admission:1');
   assert.equal(cleanup.sourceUnmountRequestId, unmount.requestId);
+  assert.equal(
+    cleanup.unmountAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_UNMOUNT_ADMITTED
+  );
+  assert.equal(cleanup.unmountAdmissionId, 'unmount-admission-meta:1');
+  assert.equal(
+    unmountAdmission.$$typeof,
+    rootBridge.privateRootUnmountAdmissionRecordType
+  );
+  assert.equal(
+    unmountAdmission.admissionStatus,
+    rootBridge.ROOT_BRIDGE_UNMOUNT_ADMITTED
+  );
+  assert.equal(
+    rootBridge.isPrivateRootUnmountAdmissionRecord(unmountAdmission),
+    true
+  );
+  assert.equal(hiddenUnmountAdmission.container, container);
+  assert.equal(hiddenUnmountAdmission.unmountRecord, unmount);
+  assert.equal(
+    unmountAdmission.rootOwnership.rootHandleMatchesCreateRecord,
+    true
+  );
+  assert.equal(
+    unmountAdmission.rootOwnership.currentAdmissionMatchesRootHandle,
+    true
+  );
+  assert.equal(
+    unmountAdmission.rootOwnership.portalContainerUsage.portalContainer,
+    false
+  );
   assert.equal(cleanup.sideEffectId, sideEffects.sideEffectId);
   assert.deepEqual(cleanup.fakeDomCleanup, {
     clearContainerStatus: 'cleared',
+    containerCleanupMetadataStatus:
+      domHost.ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS,
     componentTreeDetachStatus: 'detached-host-instance-subtree',
     removedRootChildCount: 1,
     detachedHostInstanceCount: 2,
     detachRecordCount: 1
   });
   assert.equal(cleanup.clearContainerRecord.removedChildCount, 1);
+  assert.equal(
+    cleanup.clearContainerRecord.containerCleanupMetadata.kind,
+    domHost.ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA
+  );
+  assert.equal(
+    cleanup.containerCleanupMetadata.status,
+    domHost.ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS
+  );
+  assert.equal(cleanup.containerCleanupMetadata.removedChildRecordCount, 1);
+  assert.equal(cleanup.containerCleanupMetadata.portalContainerCleanup, false);
+  assert.equal(
+    cleanup.deletionCleanupMetadata.status,
+    'accepted-private-root-deletion-cleanup-metadata'
+  );
+  assert.equal(
+    cleanup.deletionCleanupMetadata.detachRecordsMatchRemovedChildren,
+    true
+  );
   assert.equal(cleanup.componentTreeDetachRecords.length, 1);
   assert.equal(
     cleanup.componentTreeDetachRecords[0].detachedHostInstanceCount,
@@ -2567,7 +2622,10 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
   assert.deepEqual(
     cleanup.acceptedCapabilities.map((capability) => capability.id),
     [
+      'root-unmount-admission-metadata',
       'fake-dom-clear-container',
+      'fake-dom-container-cleanup-metadata',
+      'deletion-cleanup-metadata',
       'component-tree-metadata-detach',
       'root-marker-listener-revert'
     ]
@@ -2602,10 +2660,13 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
   assert.equal(hiddenCleanup.container, container);
   assert.equal(hiddenCleanup.clearContainerPayload.removedChildren[0], hostChild);
   assert.equal(hiddenCleanup.componentTreeDetachRecords.length, 1);
+  assert.equal(hiddenCleanup.unmountAdmission, unmountAdmission);
   assert.equal(
     rootBridge.isPrivateRootUnmountHostOutputCleanupRecord(cleanup),
     true
   );
+  assert.equal(rootBridge.isPrivateRootUnmountAdmissionRecord({}), false);
+  assert.equal(rootBridge.getPrivateRootUnmountAdmissionPayload({}), null);
   assert.equal(
     rootBridge.getPrivateRootUnmountHostOutputCleanupPayload({}),
     null
@@ -2638,6 +2699,142 @@ test('private root unmount host-output cleanup clears fake DOM and metadata', ()
       code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
     }
   );
+});
+
+test('private root unmount admission rejects stale roots and portal containers', () => {
+  const document = createDocument('private-unmount-admission-rejections');
+  const staleContainer = createElement('DIV', document);
+  const staleBridge = rootBridge.createPrivateRootBridgeShell();
+  const staleCreate = staleBridge.createClientRoot(staleContainer);
+  const staleSideEffects =
+    staleBridge.applyCreateRootSideEffects(staleCreate);
+  const firstRender = staleBridge.renderContainer(staleCreate.handle, {
+    props: {children: 'first'},
+    type: 'section'
+  });
+  const firstAdmission = staleBridge.admitCreateRenderPath(
+    staleCreate,
+    staleSideEffects,
+    firstRender
+  );
+  const secondRender = staleBridge.renderContainer(staleCreate.handle, {
+    props: {children: 'second'},
+    type: 'section'
+  });
+  const secondAdmission = staleBridge.admitCreateRenderPath(
+    staleCreate,
+    staleSideEffects,
+    secondRender
+  );
+  const staleChild = createElement('SECTION', document);
+  staleContainer.appendChild(staleChild);
+  staleContainer.__mutationLog.length = 0;
+
+  const staleUnmount = staleBridge.unmountContainer(staleCreate.handle);
+  assert.throws(
+    () => staleBridge.cleanupUnmountHostOutput(firstAdmission, staleUnmount),
+    {
+      code: 'FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD',
+      message: /stale root handle admission metadata/
+    }
+  );
+  assert.deepEqual(staleContainer.childNodes, [staleChild]);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(staleContainer), true);
+  assert.equal(listenerRegistry.hasListeningMarker(staleContainer), true);
+
+  const staleCleanup = staleBridge.cleanupUnmountHostOutput(
+    secondAdmission,
+    staleUnmount
+  );
+  assert.equal(staleCleanup.unmountAdmission.staleRootHandleRejected, true);
+  assert.deepEqual(staleContainer.childNodes, []);
+
+  const noOpContainer = createElement('DIV', document);
+  const noOpBridge = rootBridge.createPrivateRootBridgeShell();
+  const noOpCreate = noOpBridge.createClientRoot(noOpContainer);
+  const noOpSideEffects = noOpBridge.applyCreateRootSideEffects(noOpCreate);
+  const noOpRender = noOpBridge.renderContainer(noOpCreate.handle, {
+    props: {children: 'no-op'},
+    type: 'article'
+  });
+  const noOpAdmission = noOpBridge.admitCreateRenderPath(
+    noOpCreate,
+    noOpSideEffects,
+    noOpRender
+  );
+  const noOpChild = createElement('ARTICLE', document);
+  noOpContainer.appendChild(noOpChild);
+  noOpContainer.__mutationLog.length = 0;
+  const firstUnmount = noOpBridge.unmountContainer(noOpCreate.handle);
+  const secondUnmount = noOpBridge.unmountContainer(noOpCreate.handle);
+
+  assert.equal(secondUnmount.noOp, true);
+  assert.throws(
+    () => noOpBridge.cleanupUnmountHostOutput(noOpAdmission, secondUnmount),
+    {
+      code: 'FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD',
+      message: /no-op private root\.unmount request/
+    }
+  );
+  assert.deepEqual(noOpContainer.childNodes, [noOpChild]);
+  const noOpCleanup = noOpBridge.cleanupUnmountHostOutput(
+    noOpAdmission,
+    firstUnmount
+  );
+  assert.equal(
+    noOpCleanup.unmountAdmission.alreadyUnmountedRootRejected,
+    true
+  );
+
+  const portalBridge = rootBridge.createPrivateRootBridgeShell();
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('ASIDE', document);
+  const portalCreate = portalBridge.createClientRoot(rootContainer);
+  const portal = reactDom.createPortal(
+    {
+      props: {children: 'portal child'},
+      type: 'span'
+    },
+    portalContainer
+  );
+  const portalRender = portalBridge.renderContainer(
+    portalCreate.handle,
+    portal
+  );
+  portalBridge.createPortalRootBoundary(portalRender);
+
+  const portalRootCreate = portalBridge.createClientRoot(portalContainer);
+  const portalSideEffects =
+    portalBridge.applyCreateRootSideEffects(portalRootCreate);
+  const portalRootRender = portalBridge.renderContainer(
+    portalRootCreate.handle,
+    {
+      props: {children: 'portal root'},
+      type: 'aside'
+    }
+  );
+  const portalAdmission = portalBridge.admitCreateRenderPath(
+    portalRootCreate,
+    portalSideEffects,
+    portalRootRender
+  );
+  const portalChild = createElement('ASIDE', document);
+  portalContainer.appendChild(portalChild);
+  portalContainer.__mutationLog.length = 0;
+  const portalUnmount =
+    portalBridge.unmountContainer(portalRootCreate.handle);
+
+  assert.throws(
+    () => portalBridge.cleanupUnmountHostOutput(portalAdmission, portalUnmount),
+    {
+      code: 'FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD',
+      message: /rejects portal containers/
+    }
+  );
+  assert.deepEqual(portalContainer.childNodes, [portalChild]);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(portalContainer), true);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), true);
+  portalBridge.revertCreateRootSideEffects(portalSideEffects);
 });
 
 test('private portal fake-DOM mount diagnostic appends one explicit HostComponent and HostText child', () => {
@@ -6375,6 +6572,7 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
     requestIdPrefix: 'facade-unmount-request',
     rootIdPrefix: 'facade-unmount-root',
     sideEffectIdPrefix: 'facade-unmount-side-effect',
+    unmountAdmissionIdPrefix: 'facade-unmount-admission-meta',
     unmountCleanupIdPrefix: 'facade-unmount-cleanup',
     updateIdPrefix: 'facade-unmount-update'
   });
@@ -6466,17 +6664,39 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
     diagnostic.unmountCleanupStatus,
     rootBridge.ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED
   );
+  assert.equal(
+    diagnostic.unmountAdmissionId,
+    'facade-unmount-admission-meta:1'
+  );
+  assert.equal(
+    diagnostic.unmountAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_UNMOUNT_ADMITTED
+  );
+  assert.equal(
+    diagnostic.rootUnmountOwnership.rootHandleMatchesCreateRecord,
+    true
+  );
   assert.equal(diagnostic.hostType, 'article');
   assert.equal(diagnostic.containerChildCountBeforeUnmount, 1);
   assert.equal(diagnostic.hostChildCountBeforeUnmount, 1);
   assert.equal(diagnostic.textContent, 'facade unmount output');
   assert.deepEqual(diagnostic.fakeDomCleanup, {
     clearContainerStatus: 'cleared',
+    containerCleanupMetadataStatus:
+      domHost.ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS,
     componentTreeDetachStatus: 'detached-host-instance-subtree',
     removedRootChildCount: 1,
     detachedHostInstanceCount: 2,
     detachRecordCount: 1
   });
+  assert.equal(
+    diagnostic.containerCleanupMetadata.status,
+    domHost.ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS
+  );
+  assert.equal(
+    diagnostic.deletionCleanupMetadata.componentTreeMetadataDetached,
+    true
+  );
   assert.equal(diagnostic.removedRootChildCount, 1);
   assert.equal(diagnostic.detachedHostInstanceCount, 2);
   assert.equal(diagnostic.containerChildCountAfterCleanup, 0);
@@ -6491,6 +6711,8 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
       'create-render-admission',
       'fake-dom-host-output-mutation',
       'fake-dom-unmount-cleanup',
+      'root-unmount-admission-metadata',
+      'fake-dom-container-cleanup-metadata',
       'component-tree-metadata-detach',
       'latest-props-publication'
     ]

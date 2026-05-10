@@ -81,6 +81,33 @@ function describeContainer(container) {
   };
 }
 
+function describeContainerCleanupTarget(container) {
+  const info = describeContainer(container);
+  if (container == null || typeof container !== 'object') {
+    return {
+      ...info,
+      canRemoveChild: false,
+      childNodeCount: 0,
+      cleanupTarget: false,
+      fakeDomCleanupTarget: false,
+      hasChildNodesArray: false
+    };
+  }
+
+  const hasChildNodesArray = Array.isArray(container.childNodes);
+  return {
+    ...info,
+    canRemoveChild: typeof container.removeChild === 'function',
+    childNodeCount: hasChildNodesArray ? container.childNodes.length : 0,
+    cleanupTarget: isValidContainer(container),
+    fakeDomCleanupTarget:
+      isValidContainer(container) &&
+      hasChildNodesArray &&
+      typeof container.removeChild === 'function',
+    hasChildNodesArray
+  };
+}
+
 module.exports = {
   COMMENT_NODE,
   DOCUMENT_FRAGMENT_NODE,
@@ -90,6 +117,7 @@ module.exports = {
   assertValidContainer,
   createInvalidContainerError,
   describeContainer,
+  describeContainerCleanupTarget,
   getOwnerDocument,
   invalidContainerDevelopmentMessage,
   invalidContainerErrorCode,
