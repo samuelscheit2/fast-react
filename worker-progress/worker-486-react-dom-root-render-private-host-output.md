@@ -7,7 +7,7 @@ Date: 2026-05-10
 - `create_goal` was called as the first action before research, file reads,
   implementation, or verification.
 - `get_goal` was available after setup and again before this report.
-- Active goal status recorded from `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active goal objective recorded from `get_goal`: add a private React DOM root
   facade diagnostic that routes an accepted host-output render through the
   bridge and fake-DOM mutation adapter without opening public root
