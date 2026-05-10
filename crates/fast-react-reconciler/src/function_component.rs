@@ -18,8 +18,13 @@ use fast_react_core::{
     HookRevertLane, HookSlotId, HookSlotPayload, HookStatePayload, HookStateSlot, HookUpdateId,
     HookUpdateLane, Lanes, ProcessHookQueueResult, PropsHandle, StateHandle, UpdateQueueHandle,
 };
+use fast_react_host_config::HostTypes;
 
-use crate::RootElementHandle;
+use crate::root_scheduler::{RootRescheduleRequestRecord, ensure_root_is_rescheduled};
+use crate::{
+    ConcurrentUpdateError, FiberRootId, FiberRootStore, RootElementHandle, RootSchedulerError,
+    ScheduledRootUpdateResult, mark_update_lane_from_fiber_to_root,
+};
 
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -560,6 +565,36 @@ impl FunctionComponentStateDispatchRecord {
     #[must_use]
     pub const fn has_eager_state(self) -> bool {
         self.eager_state.is_some()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentStateDispatchRootRescheduleRecord {
+    dispatch: FunctionComponentStateDispatchRecord,
+    root: FiberRootId,
+    reschedule: RootRescheduleRequestRecord,
+    scheduled: ScheduledRootUpdateResult,
+}
+
+impl FunctionComponentStateDispatchRootRescheduleRecord {
+    #[must_use]
+    pub(crate) const fn dispatch(&self) -> FunctionComponentStateDispatchRecord {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn reschedule(&self) -> RootRescheduleRequestRecord {
+        self.reschedule
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled(&self) -> ScheduledRootUpdateResult {
+        self.scheduled
     }
 }
 
@@ -2300,6 +2335,38 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub(crate) fn dispatch_state_update_and_reschedule_root<H: HostTypes>(
+        &mut self,
+        store: &mut FiberRootStore<H>,
+        request: FunctionComponentStateDispatchRequest,
+    ) -> Result<
+        FunctionComponentStateDispatchRootRescheduleRecord,
+        FunctionComponentStateDispatchRootRescheduleError,
+    > {
+        let dispatch = self.dispatch_state_update(request)?;
+        let lane = dispatch.lane().priority_lanes().highest_priority_lane();
+        if lane.is_empty() {
+            return Err(
+                FunctionComponentStateDispatchRootRescheduleError::EmptyDispatchLane {
+                    fiber: dispatch.fiber(),
+                    dispatch: dispatch.dispatch(),
+                    lane: dispatch.lane(),
+                },
+            );
+        }
+
+        let root = mark_update_lane_from_fiber_to_root(store, dispatch.fiber(), lane)?;
+        let reschedule = RootRescheduleRequestRecord::new(root, dispatch.fiber(), lane);
+        let scheduled = ensure_root_is_rescheduled(store, reschedule)?;
+
+        Ok(FunctionComponentStateDispatchRootRescheduleRecord {
+            dispatch,
+            root,
+            reschedule,
+            scheduled,
+        })
+    }
+
     pub fn dispatch_reducer_update(
         &mut self,
         request: FunctionComponentReducerDispatchRequest,
@@ -3418,6 +3485,68 @@ pub(crate) enum FunctionComponentRenderError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FunctionComponentStateDispatchRootRescheduleError {
+    Render(FunctionComponentRenderError),
+    ConcurrentUpdate(ConcurrentUpdateError),
+    RootScheduler(RootSchedulerError),
+    EmptyDispatchLane {
+        fiber: FiberId,
+        dispatch: FunctionComponentStateDispatchHandle,
+        lane: HookUpdateLane,
+    },
+}
+
+impl Display for FunctionComponentStateDispatchRootRescheduleError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Render(error) => Display::fmt(error, formatter),
+            Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
+            Self::RootScheduler(error) => Display::fmt(error, formatter),
+            Self::EmptyDispatchLane {
+                fiber,
+                dispatch,
+                lane,
+            } => write!(
+                formatter,
+                "function component fiber {} dispatch handle {} cannot reschedule root from empty hook lane {}",
+                fiber.slot().get(),
+                dispatch.raw(),
+                lane.lanes().bits()
+            ),
+        }
+    }
+}
+
+impl Error for FunctionComponentStateDispatchRootRescheduleError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Render(error) => Some(error),
+            Self::ConcurrentUpdate(error) => Some(error),
+            Self::RootScheduler(error) => Some(error),
+            Self::EmptyDispatchLane { .. } => None,
+        }
+    }
+}
+
+impl From<FunctionComponentRenderError> for FunctionComponentStateDispatchRootRescheduleError {
+    fn from(error: FunctionComponentRenderError) -> Self {
+        Self::Render(error)
+    }
+}
+
+impl From<ConcurrentUpdateError> for FunctionComponentStateDispatchRootRescheduleError {
+    fn from(error: ConcurrentUpdateError) -> Self {
+        Self::ConcurrentUpdate(error)
+    }
+}
+
+impl From<RootSchedulerError> for FunctionComponentStateDispatchRootRescheduleError {
+    fn from(error: RootSchedulerError) -> Self {
+        Self::RootScheduler(error)
+    }
+}
+
 impl FunctionComponentRenderError {
     fn hook_list(fiber: FiberId, error: HookListError) -> Self {
         Self::HookList {
@@ -4470,6 +4599,35 @@ mod tests {
             .unwrap();
 
         (arena, current, work_in_progress, component)
+    }
+
+    fn attached_function_component_pair(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) -> (FiberId, FiberId, FiberTypeHandle) {
+        let host_root = store.root(root_id).unwrap().current();
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(100);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(2))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_in_progress])
+            .unwrap();
+
+        (current, work_in_progress, component)
     }
 
     fn opaque(raw: u64) -> HookSlotPayload {
@@ -5579,6 +5737,128 @@ mod tests {
                 .unwrap(),
             vec![mount.hook()]
         );
+    }
+
+    #[test]
+    fn private_use_state_dispatch_after_initial_render_records_root_reschedule_request() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let root_current = store.root(root_id).unwrap().current();
+        let (current, work_in_progress, component) =
+            attached_function_component_pair(&mut store, root_id);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let output = FunctionComponentOutputHandle::from_raw(75);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let state_request =
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(640), lanes);
+
+        let render = render_function_component_with_use_state(
+            store.fiber_arena_mut(),
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            state_request,
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+        let mount = render.state_hook().mount_record().unwrap();
+        assert_eq!(render.current(), Some(current));
+        assert_eq!(render.output(), output);
+        assert_eq!(mount.memoized_state(), StateHandle::from_raw(640));
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(mount.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            crate::scheduled_roots(&store).unwrap(),
+            Vec::<FiberRootId>::new()
+        );
+
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let rescheduled = hook_store
+            .dispatch_state_update_and_reschedule_root(
+                &mut store,
+                FunctionComponentStateDispatchRequest::new(mount.dispatch(), action(641), lane),
+            )
+            .unwrap();
+
+        assert_eq!(rescheduled.root(), root_id);
+        assert_eq!(rescheduled.dispatch().fiber(), work_in_progress);
+        assert_eq!(rescheduled.dispatch().queue(), mount.queue());
+        assert_eq!(rescheduled.dispatch().dispatch(), mount.dispatch());
+        assert_eq!(rescheduled.dispatch().lane(), lane);
+        assert_eq!(rescheduled.reschedule().root(), root_id);
+        assert_eq!(rescheduled.reschedule().fiber(), work_in_progress);
+        assert_eq!(rescheduled.reschedule().lane(), Lane::DEFAULT);
+        assert_eq!(rescheduled.scheduled().root(), root_id);
+        assert!(rescheduled.scheduled().inserted());
+        assert!(rescheduled.scheduled().microtask().is_some());
+        assert_eq!(crate::scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(mount.queue())
+                .unwrap(),
+            vec![rescheduled.dispatch().update()]
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(work_in_progress)
+                .unwrap()
+                .lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(current)
+                .unwrap()
+                .lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(root_current)
+                .unwrap()
+                .child_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+
+        let processed = crate::process_root_schedule_in_microtask(&mut store).unwrap();
+        assert_eq!(processed.records().len(), 1);
+        let task = processed.records()[0];
+        assert_eq!(task.root(), root_id);
+        assert_eq!(task.next_lanes(), Lanes::DEFAULT);
+        assert_eq!(task.outcome(), crate::RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(task.scheduled_callback().unwrap().root(), root_id);
+        assert_eq!(store.scheduler_bridge().callback_requests().len(), 1);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), root_current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
     }
 
     #[test]
