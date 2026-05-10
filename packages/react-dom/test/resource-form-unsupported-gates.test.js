@@ -3678,6 +3678,430 @@ test('private controlled restore queue write preflight records deterministic wri
   componentTree.detachHostInstanceToken(skippedDispatch.token);
 });
 
+test('private controlled restore queue write execution records mutation intent only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'write-execution'
+    });
+  const rows = [
+    {
+      domEventName: 'input',
+      latestProps: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'text-write-execution'
+    },
+    {
+      domEventName: 'click',
+      latestProps: {
+        type: 'radio',
+        name: 'choice',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'radio-write-execution'
+    },
+    {
+      domEventName: 'input',
+      latestProps: {
+        value: 'body',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'TEXTAREA',
+      queueId: 'textarea-write-execution'
+    }
+  ];
+  const preflightAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+    queueId: 'controlled-write-execution-preflight-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+  };
+  const executionAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-execution',
+    queueId: 'controlled-write-execution-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-write-execution'
+  };
+  const records = rows.map((row) => {
+    const dispatch = createControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      value: 'browser-mutated'
+    });
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+    return {dispatch, intent};
+  });
+  const preflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    preflightAdmission
+  );
+  const execution = gate.recordRestoreQueueWriteExecution(
+    preflight,
+    executionAdmission
+  );
+
+  assert.equal(Object.isFrozen(execution), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueWriteExecutionRecord(
+      execution
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueWriteExecutionRecordPayload(
+      execution
+    ),
+    execution
+  );
+  assert.equal(
+    execution.$$typeof,
+    controlledRestoreQueue.privateControlledInputPostEventRestoreQueueWriteExecutionRecordType
+  );
+  assert.equal(
+    execution.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWriteExecutionStatus
+  );
+  assert.equal(execution.requestId, 'write-execution:5');
+  assert.equal(execution.sourcePreflightRequestId, 'write-execution:4');
+  assert.equal(execution.sourceWriteIntentRowCount, 3);
+  assert.deepEqual(execution.acceptedRestoreKinds, [
+    'input-text-value',
+    'input-radio-checked',
+    'textarea-value'
+  ]);
+  assert.deepEqual(
+    execution.sourcePreflightRows.map((row) => ({
+      rowId: row.rowId,
+      sourceRequestId: row.sourceRequestId,
+      queueSlot: row.queueSlot,
+      queueSlotIndex: row.queueSlotIndex,
+      hostTag: row.hostTag,
+      controlKind: row.controlKind,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      writeWouldRun: row.writeWouldRun,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        rowId: 'write-execution:4:row:1',
+        sourceRequestId: 'write-execution:1',
+        queueSlot: 'restore-target',
+        queueSlotIndex: 0,
+        hostTag: 'input',
+        controlKind: 'value',
+        acceptedRestoreKind: 'input-text-value',
+        writeWouldRun: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-execution:4:row:2',
+        sourceRequestId: 'write-execution:2',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 0,
+        hostTag: 'input',
+        controlKind: 'checked',
+        acceptedRestoreKind: 'input-radio-checked',
+        writeWouldRun: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-execution:4:row:3',
+        sourceRequestId: 'write-execution:3',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 1,
+        hostTag: 'textarea',
+        controlKind: 'value',
+        acceptedRestoreKind: 'textarea-value',
+        writeWouldRun: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    execution.writeExecutionRows.map((row) => ({
+      rowId: row.rowId,
+      sourcePreflightRowId: row.sourcePreflightRowId,
+      sourceRequestId: row.sourceRequestId,
+      writeOrder: row.writeOrder,
+      queueSlot: row.queueSlot,
+      queueMutationKind: row.queueMutationKind,
+      restoreTargetWriteOrder: row.restoreTargetWriteOrder,
+      restoreQueueWriteOrder: row.restoreQueueWriteOrder,
+      restoreTargetMutationRecorded:
+        row.restoreTargetMutationRecorded,
+      restoreQueueAppendMutationRecorded:
+        row.restoreQueueAppendMutationRecorded,
+      metadataRestoreTargetWritten: row.metadataRestoreTargetWritten,
+      metadataRestoreQueueWritten: row.metadataRestoreQueueWritten,
+      hostTag: row.hostTag,
+      controlKind: row.controlKind,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      radioGroupLookupRequired: row.radioGroupLookupRequired,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      hostValueRead: row.hostValueRead,
+      hostValueWritten: row.hostValueWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        rowId: 'write-execution:5:row:1',
+        sourcePreflightRowId: 'write-execution:4:row:1',
+        sourceRequestId: 'write-execution:1',
+        writeOrder: 1,
+        queueSlot: 'restore-target',
+        queueMutationKind: 'set-restore-target',
+        restoreTargetWriteOrder: 1,
+        restoreQueueWriteOrder: null,
+        restoreTargetMutationRecorded: true,
+        restoreQueueAppendMutationRecorded: false,
+        metadataRestoreTargetWritten: true,
+        metadataRestoreQueueWritten: false,
+        hostTag: 'input',
+        controlKind: 'value',
+        acceptedRestoreKind: 'input-text-value',
+        radioGroupLookupRequired: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-execution:5:row:2',
+        sourcePreflightRowId: 'write-execution:4:row:2',
+        sourceRequestId: 'write-execution:2',
+        writeOrder: 2,
+        queueSlot: 'restore-queue',
+        queueMutationKind: 'append-restore-queue',
+        restoreTargetWriteOrder: null,
+        restoreQueueWriteOrder: 1,
+        restoreTargetMutationRecorded: false,
+        restoreQueueAppendMutationRecorded: true,
+        metadataRestoreTargetWritten: false,
+        metadataRestoreQueueWritten: true,
+        hostTag: 'input',
+        controlKind: 'checked',
+        acceptedRestoreKind: 'input-radio-checked',
+        radioGroupLookupRequired: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-execution:5:row:3',
+        sourcePreflightRowId: 'write-execution:4:row:3',
+        sourceRequestId: 'write-execution:3',
+        writeOrder: 3,
+        queueSlot: 'restore-queue',
+        queueMutationKind: 'append-restore-queue',
+        restoreTargetWriteOrder: null,
+        restoreQueueWriteOrder: 2,
+        restoreTargetMutationRecorded: false,
+        restoreQueueAppendMutationRecorded: true,
+        metadataRestoreTargetWritten: false,
+        metadataRestoreQueueWritten: true,
+        hostTag: 'textarea',
+        controlKind: 'value',
+        acceptedRestoreKind: 'textarea-value',
+        radioGroupLookupRequired: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    {
+      slot: execution.restoreTargetMutation.slot,
+      mutationKind: execution.restoreTargetMutation.mutationKind,
+      writeOrder: execution.restoreTargetMutation.writeOrder,
+      sourceRequestId: execution.restoreTargetMutation.sourceRequestId,
+      acceptedRestoreKind:
+        execution.restoreTargetMutation.acceptedRestoreKind,
+      metadataRestoreTargetWritten:
+        execution.restoreTargetMutation.metadataRestoreTargetWritten,
+      restoreQueueWritten:
+        execution.restoreTargetMutation.restoreQueueWritten,
+      hostWrapperInvoked:
+        execution.restoreTargetMutation.hostWrapperInvoked
+    },
+    {
+      slot: 'restoreTarget',
+      mutationKind: 'set-restore-target',
+      writeOrder: 1,
+      sourceRequestId: 'write-execution:1',
+      acceptedRestoreKind: 'input-text-value',
+      metadataRestoreTargetWritten: true,
+      restoreQueueWritten: false,
+      hostWrapperInvoked: false
+    }
+  );
+  assert.deepEqual(
+    execution.restoreQueueMutations.map((row) => ({
+      slot: row.slot,
+      mutationKind: row.mutationKind,
+      writeOrder: row.writeOrder,
+      appendOrder: row.appendOrder,
+      queueIndex: row.queueIndex,
+      sourceRequestId: row.sourceRequestId,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      metadataRestoreQueueWritten: row.metadataRestoreQueueWritten,
+      restoreQueueWritten: row.restoreQueueWritten,
+      hostWrapperInvoked: row.hostWrapperInvoked
+    })),
+    [
+      {
+        slot: 'restoreQueue',
+        mutationKind: 'append-restore-queue',
+        writeOrder: 2,
+        appendOrder: 1,
+        queueIndex: 0,
+        sourceRequestId: 'write-execution:2',
+        acceptedRestoreKind: 'input-radio-checked',
+        metadataRestoreQueueWritten: true,
+        restoreQueueWritten: false,
+        hostWrapperInvoked: false
+      },
+      {
+        slot: 'restoreQueue',
+        mutationKind: 'append-restore-queue',
+        writeOrder: 3,
+        appendOrder: 2,
+        queueIndex: 1,
+        sourceRequestId: 'write-execution:3',
+        acceptedRestoreKind: 'textarea-value',
+        metadataRestoreQueueWritten: true,
+        restoreQueueWritten: false,
+        hostWrapperInvoked: false
+      }
+    ]
+  );
+  assert.deepEqual(execution.queueMutationPlan.writeSequence, [
+    'consume-restore-queue-write-preflight',
+    'record-restore-target-mutation-intent',
+    'record-restore-queue-append-mutation-intents',
+    'keep-post-event-controlled-restore-flush-blocked',
+    'keep-host-wrapper-restore-blocked'
+  ]);
+  assert.equal(execution.queueMutationPlan.restoreTargetWriteRecorded, true);
+  assert.equal(execution.queueMutationPlan.restoreQueueAppendRecorded, true);
+  assert.equal(execution.queueMutationPlan.restoreQueueAppendCount, 2);
+  assert.equal(execution.queueMutationPlan.postEventFlushBlocked, true);
+  assert.equal(execution.queueMutationPlan.hostWrapperInvocationBlocked, true);
+  assert.equal(execution.queueMutationPlan.restoreQueueWritten, false);
+  assert.equal(execution.queueMutationPlan.restoreQueueFlushed, false);
+  assert.equal(execution.queueMutationPlan.hostWrapperInvoked, false);
+  assert.equal(execution.queueMutationPlan.radioGroupLookupPerformed, false);
+  assert.equal(execution.postEventRestoreBoundary.sourcePreflightAccepted, true);
+  assert.equal(
+    execution.postEventRestoreBoundary.restoreQueueWriteExecutionRecorded,
+    true
+  );
+  assert.equal(execution.postEventRestoreBoundary.restoreQueueWritten, false);
+  assert.equal(execution.postEventRestoreBoundary.restoreQueueFlushed, false);
+  assert.equal(execution.postEventRestoreBoundary.hostWrapperInvoked, false);
+  assert.equal(
+    execution.sideEffects.sourceRestoreQueueWritePreflightAccepted,
+    true
+  );
+  assert.equal(execution.sideEffects.restoreQueueWriteExecutionRecorded, true);
+  assert.equal(execution.sideEffects.restoreQueueMutationIntentRecorded, true);
+  assert.equal(execution.sideEffects.restoreTargetMutationRecorded, true);
+  assert.equal(execution.sideEffects.restoreQueueAppendMutationRecorded, true);
+  assert.equal(execution.sideEffects.metadataRestoreTargetWritten, true);
+  assert.equal(execution.sideEffects.metadataRestoreQueueWritten, true);
+  assert.equal(execution.sideEffects.restoreQueueWritten, false);
+  assert.equal(execution.sideEffects.restoreQueueFlushed, false);
+  assert.equal(execution.sideEffects.hostWrapperInvoked, false);
+  assert.equal(execution.sideEffects.radioGroupLookupRequired, true);
+  assert.equal(execution.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(execution.sideEffects.hostValueRead, false);
+  assert.equal(execution.sideEffects.hostValueWritten, false);
+  assert.equal(execution.sideEffects.browserInputMutated, false);
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(summary.recordsRestoreQueueWriteExecution, true);
+  assert.equal(
+    summary.restoreQueueWriteExecution.consumesWritePreflightRows,
+    true
+  );
+  assert.equal(
+    summary.restoreQueueWriteExecution.recordsRestoreTargetVsRestoreQueueOrder,
+    true
+  );
+  assert.equal(summary.restoreQueueWriteExecution.actualQueueWrites, false);
+  assert.equal(summary.restoreQueueWriteExecution.actualQueueFlushes, false);
+  assert.equal(
+    summary.restoreQueueWriteExecution.hostWrapperInvocations,
+    false
+  );
+  assert.equal(summary.restoreQueueWriteExecution.radioGroupQueries, false);
+  assert.equal(summary.restoreQueueWriteExecution.liveDomMutations, false);
+
+  assert.throws(
+    () =>
+      gate.recordRestoreQueueWriteExecution(
+        records[0].intent,
+        executionAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWriteExecutionCode,
+      compatibilityTarget,
+      reason:
+        'expected a private controlled restore queue write preflight record'
+    }
+  );
+
+  for (const {dispatch} of records) {
+    assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+});
+
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
   const gate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'fake-tracker-error'
