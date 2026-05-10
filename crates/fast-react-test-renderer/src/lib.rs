@@ -1676,6 +1676,10 @@ pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-json-canary";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.private-facade-result";
+pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.serialization.private-tree-canary";
+pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
+    ["HostRoot", "HostComponent", "HostText"];
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
     "react-19.2.6-react-test-renderer-serialization-oracle";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
@@ -2434,6 +2438,212 @@ impl TestRendererPrivateJsonSerializationReport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererPrivateTreeNodeType {
+    Host,
+}
+
+impl TestRendererPrivateTreeNodeType {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Host => "host",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeHostRootDiagnostic {
+    fiber_tag: &'static str,
+    delegates_to_child: bool,
+    child_fiber_tag: &'static str,
+    public_tree_object_available: bool,
+}
+
+impl TestRendererPrivateTreeHostRootDiagnostic {
+    #[must_use]
+    pub const fn fiber_tag(&self) -> &'static str {
+        self.fiber_tag
+    }
+
+    #[must_use]
+    pub const fn delegates_to_child(&self) -> bool {
+        self.delegates_to_child
+    }
+
+    #[must_use]
+    pub const fn child_fiber_tag(&self) -> &'static str {
+        self.child_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn public_tree_object_available(&self) -> bool {
+        self.public_tree_object_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeHostTextDiagnostic {
+    fiber_tag: &'static str,
+    text: String,
+    returns_text_value: bool,
+    public_tree_object_available: bool,
+}
+
+impl TestRendererPrivateTreeHostTextDiagnostic {
+    #[must_use]
+    pub const fn fiber_tag(&self) -> &'static str {
+        self.fiber_tag
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    #[must_use]
+    pub const fn returns_text_value(&self) -> bool {
+        self.returns_text_value
+    }
+
+    #[must_use]
+    pub const fn public_tree_object_available(&self) -> bool {
+        self.public_tree_object_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeHostComponentDiagnostic {
+    fiber_tag: &'static str,
+    node_type: TestRendererPrivateTreeNodeType,
+    element_type: TestElementType,
+    props: TestProps,
+    instance_available: bool,
+    rendered_child_count: usize,
+    rendered_text: String,
+    public_tree_object_available: bool,
+}
+
+impl TestRendererPrivateTreeHostComponentDiagnostic {
+    #[must_use]
+    pub const fn fiber_tag(&self) -> &'static str {
+        self.fiber_tag
+    }
+
+    #[must_use]
+    pub const fn node_type(&self) -> TestRendererPrivateTreeNodeType {
+        self.node_type
+    }
+
+    #[must_use]
+    pub fn element_type(&self) -> &TestElementType {
+        &self.element_type
+    }
+
+    #[must_use]
+    pub fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn instance_available(&self) -> bool {
+        self.instance_available
+    }
+
+    #[must_use]
+    pub const fn rendered_child_count(&self) -> usize {
+        self.rendered_child_count
+    }
+
+    #[must_use]
+    pub fn rendered_text(&self) -> &str {
+        &self.rendered_text
+    }
+
+    #[must_use]
+    pub const fn public_tree_object_available(&self) -> bool {
+        self.public_tree_object_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeMetadataReport {
+    diagnostic_name: &'static str,
+    source_json_diagnostic_name: &'static str,
+    gate: TestRendererSerializationGateReport,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    accepted_fiber_shape: [&'static str; 3],
+    root_child_count: usize,
+    host_root: TestRendererPrivateTreeHostRootDiagnostic,
+    host_component: TestRendererPrivateTreeHostComponentDiagnostic,
+    host_text: TestRendererPrivateTreeHostTextDiagnostic,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_tree_object_available: bool,
+}
+
+impl TestRendererPrivateTreeMetadataReport {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_json_diagnostic_name(&self) -> &'static str {
+        self.source_json_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn gate(&self) -> &TestRendererSerializationGateReport {
+        &self.gate
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn accepted_fiber_shape(&self) -> &[&'static str; 3] {
+        &self.accepted_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn host_root(&self) -> &TestRendererPrivateTreeHostRootDiagnostic {
+        &self.host_root
+    }
+
+    #[must_use]
+    pub const fn host_component(&self) -> &TestRendererPrivateTreeHostComponentDiagnostic {
+        &self.host_component
+    }
+
+    #[must_use]
+    pub const fn host_text(&self) -> &TestRendererPrivateTreeHostTextDiagnostic {
+        &self.host_text
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_tree_object_available(&self) -> bool {
+        self.public_tree_object_available
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
@@ -3183,6 +3393,25 @@ impl TestRendererRoot {
     ) -> Result<TestRendererPrivateToJsonFacadeResult, TestRendererRootError> {
         let report = self.describe_private_json_serialization_after_update_for_canary(output)?;
         Ok(Self::private_to_json_facade_result_from_report(&report))
+    }
+
+    pub fn describe_private_tree_metadata_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateTreeMetadataReport, TestRendererRootError> {
+        let json_report = self.describe_private_json_serialization_for_canary(output)?;
+
+        Ok(Self::private_tree_metadata_from_json_report(json_report))
+    }
+
+    pub fn describe_private_tree_metadata_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateTreeMetadataReport, TestRendererRootError> {
+        let json_report =
+            self.describe_private_json_serialization_after_update_for_canary(output)?;
+
+        Ok(Self::private_tree_metadata_from_json_report(json_report))
     }
 
     fn describe_private_json_serialization_from_current_fibers_for_canary(
@@ -4356,6 +4585,47 @@ impl TestRendererRoot {
                 hidden: text.is_hidden(),
             },
         })
+    }
+
+    fn private_tree_metadata_from_json_report(
+        json_report: TestRendererPrivateJsonSerializationReport,
+    ) -> TestRendererPrivateTreeMetadataReport {
+        let component = json_report.component();
+        let text = component.text_child();
+
+        TestRendererPrivateTreeMetadataReport {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            source_json_diagnostic_name: json_report.diagnostic_name(),
+            gate: json_report.gate().clone(),
+            host_output_update_kind: json_report.host_output_update_kind(),
+            host_output_snapshot_current: json_report.host_output_snapshot_current(),
+            accepted_fiber_shape: TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE,
+            root_child_count: json_report.root_child_count(),
+            host_root: TestRendererPrivateTreeHostRootDiagnostic {
+                fiber_tag: "HostRoot",
+                delegates_to_child: true,
+                child_fiber_tag: "HostComponent",
+                public_tree_object_available: false,
+            },
+            host_component: TestRendererPrivateTreeHostComponentDiagnostic {
+                fiber_tag: "HostComponent",
+                node_type: TestRendererPrivateTreeNodeType::Host,
+                element_type: component.element_type().clone(),
+                props: component.props().clone(),
+                instance_available: false,
+                rendered_child_count: component.child_count(),
+                rendered_text: text.text().to_owned(),
+                public_tree_object_available: false,
+            },
+            host_text: TestRendererPrivateTreeHostTextDiagnostic {
+                fiber_tag: "HostText",
+                text: text.text().to_owned(),
+                returns_text_value: true,
+                public_tree_object_available: false,
+            },
+            public_blockers: json_report.public_blockers(),
+            public_tree_object_available: false,
+        }
     }
 
     const fn instance_state_node_raw(instance: TestInstance) -> u64 {
@@ -5674,6 +5944,159 @@ mod tests {
         assert!(result.public_blockers().all_blocked());
         assert!(!result.public_serialization_available());
         assert!(!result.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_tree_metadata_canary_describes_minimal_host_component_with_text() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_tree_metadata_for_canary(&output)
+            .unwrap();
+        let gate = report.gate();
+        let host_root = report.host_root();
+        let component = report.host_component();
+        let text = report.host_text();
+        let blockers = report.public_blockers();
+
+        assert_eq!(
+            report.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.source_json_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(report.host_output_snapshot_current());
+        assert_eq!(
+            gate.status(),
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        );
+        assert_eq!(
+            gate.fiber_inspection().unwrap().current(),
+            output.commit().current()
+        );
+        assert_eq!(
+            report.accepted_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(report.root_child_count(), 1);
+        assert_eq!(host_root.fiber_tag(), "HostRoot");
+        assert!(host_root.delegates_to_child());
+        assert_eq!(host_root.child_fiber_tag(), "HostComponent");
+        assert!(!host_root.public_tree_object_available());
+        assert_eq!(component.fiber_tag(), "HostComponent");
+        assert_eq!(component.node_type(), TestRendererPrivateTreeNodeType::Host);
+        assert_eq!(component.node_type().as_str(), "host");
+        assert_eq!(component.element_type().as_str(), "span");
+        assert_eq!(component.props(), &TestProps::new());
+        assert!(!component.instance_available());
+        assert_eq!(component.rendered_child_count(), 1);
+        assert_eq!(component.rendered_text(), "hello");
+        assert!(!component.public_tree_object_available());
+        assert_eq!(text.fiber_tag(), "HostText");
+        assert_eq!(text.text(), "hello");
+        assert!(text.returns_text_value());
+        assert!(!text.public_tree_object_available());
+        assert!(!report.public_tree_object_available());
+        assert!(blockers.all_blocked());
+        assert!(blockers.tree_method_blocked());
+        assert!(blockers.json_method_blocked());
+        assert!(blockers.instance_wrapper_blocked());
+        assert!(blockers.js_facade_routing_blocked());
+        assert!(blockers.compatibility_claim_blocked());
+    }
+
+    #[test]
+    fn root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_tree_metadata_after_update_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            report.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(report.host_output_snapshot_current());
+        assert_eq!(
+            report.gate().status(),
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        );
+        assert_eq!(
+            report.gate().fiber_inspection().unwrap(),
+            updated.fiber_inspection()
+        );
+        assert_eq!(report.root_child_count(), 1);
+        assert_eq!(report.host_component().element_type().as_str(), "span");
+        assert_eq!(report.host_component().props(), &TestProps::new());
+        assert_eq!(report.host_component().node_type().as_str(), "host");
+        assert!(!report.host_component().instance_available());
+        assert_eq!(report.host_component().rendered_child_count(), 1);
+        assert_eq!(report.host_component().rendered_text(), "goodbye");
+        assert_eq!(report.host_text().text(), "goodbye");
+        assert!(report.host_text().returns_text_value());
+        assert!(!report.public_tree_object_available());
+        assert!(report.public_blockers().all_blocked());
+    }
+
+    #[test]
+    fn root_private_tree_metadata_canary_rejects_stale_host_output_snapshot() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let mut output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        output.snapshot = TestContainerSnapshot { children: vec![] };
+
+        let error = root
+            .describe_private_tree_metadata_for_canary(&output)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
     }
 
     #[test]
