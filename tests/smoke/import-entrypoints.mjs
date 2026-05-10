@@ -251,6 +251,9 @@ const reactDomClientPrivateRuntimeFacadeSymbols = {
   createRoot: [
     'fast.react_dom.client.private_root_public_facade_adapter',
     'fast.react_dom.client.private_root_public_facade_preflight'
+  ],
+  hydrateRoot: [
+    'fast.react_dom.client.private_hydrate_root_public_facade_preflight'
   ]
 };
 const reactDomServerNodeKeys = [
@@ -2858,6 +2861,11 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
       reactDomClientPrivateRuntimeFacadeSymbols.createRoot,
       `${labelPrefix}.createRoot`
     );
+    assertPrivateRuntimeFacadeSymbols(
+      cjsModule.hydrateRoot,
+      reactDomClientPrivateRuntimeFacadeSymbols.hydrateRoot,
+      `${labelPrefix}.hydrateRoot`
+    );
   }
 
   if (entrypoint.specifier === '@fast-react/react-dom/server.bun') {
@@ -3769,6 +3777,11 @@ async function runReactDomPackageProbe(
             cjsModule.createRoot,
             privateRuntimeFacadeSymbols.createRoot,
             specifier + ' createRoot'
+          );
+          assertPrivateRuntimeFacadeSymbols(
+            cjsModule.hydrateRoot,
+            privateRuntimeFacadeSymbols.hydrateRoot,
+            specifier + ' hydrateRoot'
           );
         }
 
