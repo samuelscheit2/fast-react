@@ -101,6 +101,24 @@ git diff -- crates/fast-react-reconciler/src/root_scheduler.rs
 - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`: passed.
 - `git diff --check`: passed.
 
+## Post-Merge Orchestrator Verification
+
+- Orchestrator merged current `main` into this branch and resolved the
+  `crates/fast-react-reconciler/src/root_scheduler.rs` conflict by preserving
+  accepted act-queue routing and sync-flush commit behavior while using
+  `RootLaneState::get_next_lanes` for microtask and scheduled-callback priority
+  selection.
+- Post-merge verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features root_scheduler`: 28
+    tests
+  - `cargo test -p fast-react-reconciler --all-features root_work_loop`: 7
+    tests
+  - `cargo test -p fast-react-reconciler --all-features`: 131 unit tests plus
+    1 doctest
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+
 ## Risks Or Blockers
 
 - Pending-commit state currently has no local reconciler test setter in the allowed write scope, so the pending-commit prewarm case is covered through the scheduler's root-lane selection helper rather than by mutating a live `FiberRoot`.
