@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "private-root-host-output-timing-canaries",
+  "description": "Diagnostic-only timing canary manifest for private React DOM root host-output rows; public comparable timing remains blocked until public compatibility gates are green.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "private-root-host-output-create-mark-listen-timing-canary",
+    "private-root-host-output-initial-render-timing-canary",
+    "private-root-host-output-update-render-timing-canary",
+    "private-root-host-output-replace-tree-timing-canary",
+    "private-root-host-output-render-null-clear-timing-canary",
+    "private-root-host-output-unmount-cleanup-timing-canary",
+    "private-root-host-output-double-unmount-timing-canary",
+    "private-root-host-output-render-after-unmount-guard-timing-canary"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-dom-root-private-host-output-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-host-output-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 352 and 380 prove 16 private host-output diagnostic scenario-mode rows for createRoot side effects, initial render, update, replacement, render-null clearing, unmount, double-unmount, and render-after-unmount guards while public root E2E compatibility remains blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-render-e2e-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-dual-run-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public root render E2E gate still admits 0 public scenario-mode rows, so private host-output timing canaries cannot become public comparable timing evidence."
+      }
+    },
+    {
+      "id": "react-dom-root-public-facade-blocked-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-public-facade-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public facade gate keeps createRoot, hydrateRoot, render, unmount, listener setup, browser DOM mutation, portals, and compatibility claims blocked despite private fake-DOM host-output diagnostics."
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "private-root-host-output-timing-canaries-diagnostic-admission",
+      "description": "Private root host-output timing canaries may collect diagnostic timing for the admitted fake-DOM rows only.",
+      "scenarioIds": [
+        "private-root-host-output-create-mark-listen-timing-canary",
+        "private-root-host-output-initial-render-timing-canary",
+        "private-root-host-output-update-render-timing-canary",
+        "private-root-host-output-replace-tree-timing-canary",
+        "private-root-host-output-render-null-clear-timing-canary",
+        "private-root-host-output-unmount-cleanup-timing-canary",
+        "private-root-host-output-double-unmount-timing-canary",
+        "private-root-host-output-render-after-unmount-guard-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private host-output timing canaries are admitted only for diagnostic fake-DOM timing; public React DOM root compatibility and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-public-timing-promotion-blocked",
+      "description": "Public comparable timing promotion remains blocked until public root render and public facade gates become green.",
+      "scenarioIds": [
+        "private-root-host-output-create-mark-listen-timing-canary",
+        "private-root-host-output-initial-render-timing-canary",
+        "private-root-host-output-update-render-timing-canary",
+        "private-root-host-output-replace-tree-timing-canary",
+        "private-root-host-output-render-null-clear-timing-canary",
+        "private-root-host-output-unmount-cleanup-timing-canary",
+        "private-root-host-output-double-unmount-timing-canary",
+        "private-root-host-output-render-after-unmount-guard-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e-public-compatibility",
+        "react-dom-root-public-facade-blocked-gate"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Comparable public timing remains blocked until public root render E2E and public facade gates are green-admitted and claim compatibility; private timing canaries do not satisfy public root behavior."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "private-root-host-output-create-mark-listen-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/client/root-markers.js",
+        "packages/react-dom/src/events/root-listeners.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The createRoot marker/listener timing canary is private fake-DOM evidence only; public root creation, listener setup, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-initial-render-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The initial render timing canary covers only private fake-DOM HostComponent/HostText output; public createRoot render, browser DOM mutation, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-update-render-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The update render timing canary covers only private fake-DOM property/text mutation and latest-props publication; public update rendering, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-replace-tree-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The replacement timing canary covers only private fake-DOM remove/place output and latest-props detach/attach diagnostics; public replacement rendering, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-render-null-clear-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The render(null) clear timing canary covers only private fake-DOM clearContainer and detach diagnostics; public container clearing, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-unmount-cleanup-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The unmount cleanup timing canary covers only private fake-DOM cleanup, latest-props detach, and marker/listener revert diagnostics; public root unmount, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-double-unmount-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The double-unmount timing canary covers only private fake-DOM first-unmount cleanup and second-unmount no-op mutation diagnostics; public repeated unmount behavior, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-render-after-unmount-guard-timing-canary",
+      "area": "react-dom private root host-output timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The render-after-unmount guard timing canary covers only private stale-root throw and no-extra-mutation diagnostics; public error surface compatibility and comparable timing remain blocked."
+    }
+  ]
+}
