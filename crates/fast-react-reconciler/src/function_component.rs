@@ -11753,6 +11753,123 @@ mod tests {
     }
 
     #[test]
+    fn private_use_memo_reuses_recomputed_value_across_update_renders_when_deps_match() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_memo = hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(900), deps(9000))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(94)));
+
+        let changed_render = render_function_component_with_use_memo(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseMemoRenderRequest::new(StateHandle::from_raw(901), deps(9010)),
+            &mut registry,
+        )
+        .unwrap();
+
+        let changed_update = changed_render.memo_hook().update_record().unwrap();
+        let changed_diagnostic = changed_render.memo_update_diagnostic().unwrap();
+        assert_eq!(changed_update.previous_hook(), current_memo.hook());
+        assert_eq!(
+            changed_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert_eq!(changed_update.previous_value(), StateHandle::from_raw(900));
+        assert_eq!(changed_update.requested_value(), StateHandle::from_raw(901));
+        assert_eq!(changed_update.value(), StateHandle::from_raw(901));
+        assert_eq!(changed_update.dependencies(), deps(9010));
+        assert!(changed_diagnostic.recomputed_value());
+        assert_eq!(changed_diagnostic.value(), StateHandle::from_raw(901));
+        assert_eq!(
+            changed_render.output(),
+            FunctionComponentOutputHandle::from_raw(94)
+        );
+        assert_eq!(
+            changed_render.hook_state().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(changed_render.hook_traversal().traversed_count(), 1);
+        hook_store.bind_current_list_unchecked(
+            current,
+            changed_render.hook_state().work_in_progress_list(),
+        );
+
+        let reused_render = render_function_component_with_use_memo(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            FunctionComponentUseMemoRenderRequest::new(StateHandle::from_raw(902), deps(9010)),
+            &mut registry,
+        )
+        .unwrap();
+
+        let reused_update = reused_render.memo_hook().update_record().unwrap();
+        let reused_diagnostic = reused_render.memo_update_diagnostic().unwrap();
+        assert_eq!(reused_update.previous_hook(), changed_update.hook());
+        assert_eq!(reused_update.previous_value(), StateHandle::from_raw(901));
+        assert_eq!(reused_update.previous_dependencies(), deps(9010));
+        assert_eq!(reused_update.requested_value(), StateHandle::from_raw(902));
+        assert_eq!(reused_update.value(), StateHandle::from_raw(901));
+        assert_eq!(reused_update.dependencies(), deps(9010));
+        assert_eq!(
+            reused_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(reused_update.reused_previous_value());
+        assert_eq!(
+            reused_render.memo_hook().value(),
+            StateHandle::from_raw(901)
+        );
+        assert_eq!(
+            reused_diagnostic.current_hook_list(),
+            changed_render.hook_state().work_in_progress_list()
+        );
+        assert_eq!(reused_diagnostic.previous_hook(), changed_update.hook());
+        assert_eq!(reused_diagnostic.hook(), reused_update.hook());
+        assert_eq!(reused_diagnostic.render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            reused_diagnostic.previous_value(),
+            StateHandle::from_raw(901)
+        );
+        assert_eq!(
+            reused_diagnostic.requested_value(),
+            StateHandle::from_raw(902)
+        );
+        assert_eq!(reused_diagnostic.value(), StateHandle::from_raw(901));
+        assert_eq!(
+            reused_diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(reused_diagnostic.reused_previous_value());
+        assert!(!reused_diagnostic.recomputed_value());
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(reused_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(901)
+        );
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(
+            registry.calls()[0].hook_state(),
+            Some(changed_render.hook_state())
+        );
+        assert_eq!(
+            registry.calls()[1].hook_state(),
+            Some(reused_render.hook_state())
+        );
+    }
+
+    #[test]
     fn private_use_memo_update_diagnostics_count_reuse_and_recompute() {
         let (arena, current, work_in_progress, _component) = function_component_pair();
         let mut hook_store = FunctionComponentHookRenderStore::new();
@@ -12163,6 +12280,122 @@ mod tests {
                     .payload()
             ),
             StateHandle::from_raw(830)
+        );
+    }
+
+    #[test]
+    fn private_use_callback_reuses_replaced_callback_across_update_renders_when_deps_match() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_callback = hook_store
+            .create_current_callback_hook(current, component_callback(910), deps(9100))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(95)));
+
+        let replaced_render = render_function_component_with_use_callback(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseCallbackRenderRequest::new(component_callback(911), deps(9110)),
+            &mut registry,
+        )
+        .unwrap();
+
+        let replaced_update = replaced_render.callback_hook().update_record().unwrap();
+        let replaced_diagnostic = replaced_render.callback_update_diagnostic().unwrap();
+        assert_eq!(replaced_update.previous_hook(), current_callback.hook());
+        assert_eq!(
+            replaced_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert_eq!(replaced_update.previous_callback(), component_callback(910));
+        assert_eq!(
+            replaced_update.requested_callback(),
+            component_callback(911)
+        );
+        assert_eq!(replaced_update.callback(), component_callback(911));
+        assert_eq!(replaced_update.dependencies(), deps(9110));
+        assert!(replaced_diagnostic.replaced_callback());
+        assert_eq!(replaced_diagnostic.callback(), component_callback(911));
+        assert_eq!(
+            replaced_render.hook_state().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(replaced_render.hook_traversal().traversed_count(), 1);
+        hook_store.bind_current_list_unchecked(
+            current,
+            replaced_render.hook_state().work_in_progress_list(),
+        );
+
+        let reused_render = render_function_component_with_use_callback(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            FunctionComponentUseCallbackRenderRequest::new(component_callback(912), deps(9110)),
+            &mut registry,
+        )
+        .unwrap();
+
+        let reused_update = reused_render.callback_hook().update_record().unwrap();
+        let reused_diagnostic = reused_render.callback_update_diagnostic().unwrap();
+        assert_eq!(reused_update.previous_hook(), replaced_update.hook());
+        assert_eq!(reused_update.previous_callback(), component_callback(911));
+        assert_eq!(reused_update.previous_dependencies(), deps(9110));
+        assert_eq!(reused_update.requested_callback(), component_callback(912));
+        assert_eq!(reused_update.callback(), component_callback(911));
+        assert_eq!(reused_update.dependencies(), deps(9110));
+        assert_eq!(
+            reused_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(reused_update.reused_previous_callback());
+        assert_eq!(
+            reused_render.callback_hook().callback(),
+            component_callback(911)
+        );
+        assert_eq!(
+            reused_diagnostic.current_hook_list(),
+            replaced_render.hook_state().work_in_progress_list()
+        );
+        assert_eq!(reused_diagnostic.previous_hook(), replaced_update.hook());
+        assert_eq!(reused_diagnostic.hook(), reused_update.hook());
+        assert_eq!(reused_diagnostic.render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            reused_diagnostic.previous_callback(),
+            component_callback(911)
+        );
+        assert_eq!(
+            reused_diagnostic.requested_callback(),
+            component_callback(912)
+        );
+        assert_eq!(reused_diagnostic.callback(), component_callback(911));
+        assert_eq!(
+            reused_diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(reused_diagnostic.reused_previous_callback());
+        assert!(!reused_diagnostic.replaced_callback());
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(reused_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(911)
+        );
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(
+            registry.calls()[0].hook_state(),
+            Some(replaced_render.hook_state())
+        );
+        assert_eq!(
+            registry.calls()[1].hook_state(),
+            Some(reused_render.hook_state())
         );
     }
 
