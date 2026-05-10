@@ -490,6 +490,75 @@ function runSmokeChecks() {
     const rootOwner = {kind: 'LatestPropsStyleRoot'};
     const hostOwner = {kind: 'LatestPropsStyleHost'};
     const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialStyle = orderedProps([
+      ['color', 'red'],
+      ['--gap', '4px']
+    ]);
+    const initialProps = orderedProps([['style', initialStyle]]);
+    const nextProps = orderedProps([
+      [
+        'style',
+        orderedProps([
+          ['color', 'blue'],
+          ['width', 12]
+        ])
+      ]
+    ]);
+
+    domHost.applyStyleDangerousHtmlPayload(
+      element,
+      propertyPayload.diffDomPropertyPayload(
+        'div',
+        {},
+        orderedProps([['style', initialStyle]])
+      )
+    );
+    element.styleLog = [];
+    componentTree.attachHostInstanceNode(element, token, initialProps);
+
+    const handoff = domHost.commitDomPropertyUpdateForLatestProps(
+      element,
+      'div',
+      initialProps,
+      nextProps
+    );
+    const hiddenHandoff =
+      domHost.getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+
+    assert.deepEqual(hiddenHandoff.mutationRecords, [
+      {
+        kind: propertyPayload.ENTRY_REMOVE_STYLE,
+        propName: 'style',
+        styleName: '--gap',
+        mutation: 'setProperty',
+        value: ''
+      },
+      styleSet('color', 'propertyAssignment', 'blue'),
+      styleSet('width', 'propertyAssignment', '12px')
+    ]);
+    assert.deepEqual(element.styleLog, [
+      ['styleSetProperty', '--gap', ''],
+      ['stylePropertyAssignment', 'color', 'blue'],
+      ['stylePropertyAssignment', 'width', '12px']
+    ]);
+    assert.deepEqual(element.activeStyleProperties(), [
+      ['color', 'blue'],
+      ['width', '12px']
+    ]);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(
+      componentTree.commitLatestPropsFromMutationHandoff(handoff),
+      nextProps
+    );
+    assert.equal(componentTree.getLatestPropsFromNode(element), nextProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
+  }
+
+  {
+    const element = createElement('div');
+    const rootOwner = {kind: 'LatestPropsInvalidStyleRoot'};
+    const hostOwner = {kind: 'LatestPropsInvalidStyleHost'};
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
     const initialProps = {};
 
     componentTree.attachHostInstanceNode(element, token, initialProps);

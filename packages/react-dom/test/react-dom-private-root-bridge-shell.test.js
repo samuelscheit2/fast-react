@@ -848,6 +848,24 @@ test('private root host-output update mutates props/text before publishing lates
     latestPropsCommitRecordStatus: 'safe-for-latest-props',
     mutationRecordCount: 4,
     payloadCount: 4,
+    propertyPayloadEvidence: {
+      propertyPayloadBacked: true,
+      rowCount: 4,
+      mutatingRowCount: 3,
+      updateRowCount: 3,
+      removalRowCount: 0,
+      setAttributeCount: 3,
+      removeAttributeCount: 0,
+      setPropertyCount: 0,
+      removePropertyCount: 0,
+      setStyleCount: 0,
+      removeStyleCount: 0,
+      nonPayloadRowCount: 1,
+      attributeRowCount: 3,
+      propertyRowCount: 0,
+      styleRowCount: 0,
+      rowKinds: ['setAttribute', 'nonPayload']
+    },
     status: 'mutated'
   });
   assert.deepEqual(handoff.textMutation, {
@@ -870,8 +888,10 @@ test('private root host-output update mutates props/text before publishing lates
     handoff.acceptedCapabilities.map((capability) => capability.id),
     [
       'fake-dom-property-update',
+      'property-payload-evidence',
       'fake-dom-text-update',
-      'latest-props-after-mutation'
+      'latest-props-after-mutation',
+      'attribute-payload-rows'
     ]
   );
   assert.deepEqual(
@@ -929,6 +949,137 @@ test('private root host-output update mutates props/text before publishing lates
   assert.equal(serialized.includes('goodbye'), false);
   assert.equal(serialized.includes('updated title'), false);
   assert.equal(serialized.includes('__registrations'), false);
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(mounted.token),
+    mounted.token
+  );
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test('private root host-output update admits attribute and style rows without text canary', () => {
+  const document = createHostOutputDocument('private-host-output-prop-update');
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hostOutputUpdateIdPrefix: 'host-prop-update',
+    sideEffectIdPrefix: 'host-prop-side-effect'
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputAttributeStyleProps('initial');
+  const nextProps = createHostOutputAttributeStyleProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+
+  mounted.host.attributeLog = [];
+  mounted.host.styleLog = [];
+  mounted.text.writeLog = [];
+
+  const handoff = bridge.applyHostOutputUpdate(update, {
+    hostInstanceToken: mounted.token,
+    nextProps,
+    tag: 'div'
+  });
+  const hiddenHandoff =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(handoff);
+
+  assert.equal(handoff.handoffId, 'host-prop-update:1');
+  assert.equal(
+    handoff.updateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.deepEqual(handoff.propertyMutation, {
+    handoffKind: domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+    latestPropsCommitRecordKind: domHost.LATEST_PROPS_COMMIT_RECORD,
+    latestPropsCommitRecordStatus: 'safe-for-latest-props',
+    mutationRecordCount: 8,
+    payloadCount: 8,
+    propertyPayloadEvidence: {
+      propertyPayloadBacked: true,
+      rowCount: 8,
+      mutatingRowCount: 8,
+      updateRowCount: 4,
+      removalRowCount: 4,
+      setAttributeCount: 2,
+      removeAttributeCount: 2,
+      setPropertyCount: 0,
+      removePropertyCount: 0,
+      setStyleCount: 2,
+      removeStyleCount: 2,
+      nonPayloadRowCount: 0,
+      attributeRowCount: 4,
+      propertyRowCount: 0,
+      styleRowCount: 4,
+      rowKinds: [
+        'removeAttribute',
+        'setAttribute',
+        'removeStyle',
+        'setStyle'
+      ]
+    },
+    status: 'mutated'
+  });
+  assert.deepEqual(handoff.textMutation, {
+    newTextLength: null,
+    oldTextLength: null,
+    status: 'not-requested'
+  });
+  assert.equal(handoff.latestPropsPublished, true);
+  assert.equal(handoff.latestPropsPublishOrder, 'after-property-mutation');
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'fake-dom-property-update',
+      'property-payload-evidence',
+      'latest-props-after-mutation',
+      'attribute-payload-rows',
+      'style-payload-rows'
+    ]
+  );
+  assert.equal(hiddenHandoff.sourceRecord, update);
+  assert.equal(hiddenHandoff.hostInstanceNode, mounted.host);
+  assert.equal(hiddenHandoff.textInstance, null);
+  assert.equal(hiddenHandoff.textUpdate, null);
+  assert.equal(hiddenHandoff.previousProps, initialProps);
+  assert.equal(hiddenHandoff.nextProps, nextProps);
+  assert.equal(hiddenHandoff.propertyMutationEvidence.styleRowCount, 4);
+
+  assert.deepEqual(activeHostOutputAttributes(mounted.host), [
+    ['class', 'root-card updated'],
+    ['data-phase', 'updated'],
+    ['id', 'message']
+  ]);
+  assert.deepEqual(activeHostOutputStyleProperties(mounted.host), [
+    ['color', 'blue'],
+    ['width', '12px']
+  ]);
+  assert.deepEqual(mounted.host.attributeLog, [
+    ['removeAttribute', 'title', true],
+    ['removeAttribute', 'hidden', true],
+    ['setAttribute', 'class', 'root-card updated'],
+    ['setAttribute', 'data-phase', 'updated']
+  ]);
+  assert.deepEqual(mounted.host.styleLog, [
+    ['stylePropertyAssignment', 'marginTop', ''],
+    ['styleSetProperty', '--gap', ''],
+    ['stylePropertyAssignment', 'color', 'blue'],
+    ['stylePropertyAssignment', 'width', '12px']
+  ]);
+  assert.deepEqual(mounted.text.writeLog, []);
+  assert.equal(container.textContent, 'stable');
+  assert.equal(componentTree.getLatestPropsFromNode(mounted.host), nextProps);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('blue'), false);
+  assert.equal(serialized.includes('root-card updated'), false);
 
   assert.equal(
     componentTree.detachHostInstanceToken(mounted.token),
@@ -2123,6 +2274,35 @@ function createHostOutputProps(phase) {
   };
 }
 
+function createHostOutputAttributeStyleProps(phase) {
+  if (phase === 'updated') {
+    return {
+      id: 'message',
+      className: 'root-card updated',
+      style: {
+        color: 'blue',
+        width: 12
+      },
+      'data-phase': 'updated',
+      children: 'stable'
+    };
+  }
+
+  return {
+    id: 'message',
+    className: 'root-card',
+    title: 'initial title',
+    hidden: true,
+    style: {
+      color: 'red',
+      marginTop: 4,
+      '--gap': '4px'
+    },
+    'data-phase': 'initial',
+    children: 'stable'
+  };
+}
+
 function mountPrivateHostOutput(container, rootOwner, initialProps) {
   const host = container.ownerDocument.createElement('div');
   const text = container.ownerDocument.createTextNode(initialProps.children);
@@ -2153,6 +2333,12 @@ function activeHostOutputAttributes(element) {
   return Array.from(element.attributes.entries()).sort(([left], [right]) =>
     left.localeCompare(right)
   );
+}
+
+function activeHostOutputStyleProperties(element) {
+  return Array.from(element.style.properties.entries())
+    .filter(([, value]) => value !== '')
+    .sort(([left], [right]) => left.localeCompare(right));
 }
 
 function assertNativeHandoff(handoff, expected) {
@@ -2384,6 +2570,8 @@ class HostOutputElement extends HostOutputNode {
     super(nodeName, ELEMENT_NODE, ownerDocument);
     this.attributes = new Map();
     this.attributeLog = [];
+    this.styleLog = [];
+    this.style = new HostOutputStyle(this);
   }
 
   setAttribute(name, value) {
@@ -2413,6 +2601,47 @@ class HostOutputElement extends HostOutputNode {
   hasAttribute(name) {
     return this.attributes.has(String(name));
   }
+}
+
+class HostOutputStyle {
+  constructor(ownerElement) {
+    this.ownerElement = ownerElement;
+    this.properties = new Map();
+
+    return new Proxy(this, {
+      set(target, property, value, receiver) {
+        if (shouldRecordHostOutputStyleProperty(property)) {
+          const stringValue = String(value);
+          target.properties.set(property, stringValue);
+          target.ownerElement.styleLog.push([
+            'stylePropertyAssignment',
+            property,
+            stringValue
+          ]);
+        }
+        return Reflect.set(target, property, value, receiver);
+      }
+    });
+  }
+
+  setProperty(name, value) {
+    const propertyName = String(name);
+    const stringValue = String(value);
+    this.properties.set(propertyName, stringValue);
+    this.ownerElement.styleLog.push([
+      'styleSetProperty',
+      propertyName,
+      stringValue
+    ]);
+  }
+}
+
+function shouldRecordHostOutputStyleProperty(property) {
+  return (
+    typeof property === 'string' &&
+    !property.startsWith('_') &&
+    !['ownerElement', 'properties', 'setProperty'].includes(property)
+  );
 }
 
 class HostOutputText extends HostOutputNode {

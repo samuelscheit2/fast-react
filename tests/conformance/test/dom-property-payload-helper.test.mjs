@@ -606,6 +606,88 @@ test("private DOM latest-props handoff accepts ordinary property payload rows", 
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private DOM latest-props handoff accepts style update and removal rows", () => {
+  const element = new FakeElement("div");
+  const rootOwner = { kind: "LatestPropsStyleRoot" };
+  const hostOwner = { kind: "LatestPropsStyleHost" };
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const initialProps = orderedProps([
+    [
+      "style",
+      orderedProps([
+        ["color", "red"],
+        ["marginTop", 4],
+        ["--gap", "4px"]
+      ])
+    ],
+    ["children", "stable"]
+  ]);
+  const nextProps = orderedProps([
+    [
+      "style",
+      orderedProps([
+        ["color", "blue"],
+        ["width", 12]
+      ])
+    ],
+    ["children", "stable"]
+  ]);
+
+  applyStyleDangerousHtmlPayload(
+    element,
+    diffDomPropertyPayload(
+      "div",
+      {},
+      orderedProps([["style", initialProps.style]])
+    )
+  );
+  element.mutationLog = [];
+  componentTree.attachHostInstanceNode(element, token, initialProps);
+
+  const handoff = commitDomPropertyUpdateForLatestProps(
+    element,
+    "div",
+    initialProps,
+    nextProps
+  );
+  const hiddenHandoff =
+    domMutation.getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+  const latestPropsPayload = domMutation.getLatestPropsCommitRecordPayload(
+    hiddenHandoff.latestPropsCommitRecord
+  );
+
+  assert.equal(handoff.payloadCount, 4);
+  assert.deepEqual(hiddenHandoff.mutationRecords, [
+    removeStyle("marginTop", "propertyAssignment"),
+    removeStyle("--gap", "setProperty"),
+    setStyle("color", "propertyAssignment", "blue"),
+    setStyle("width", "propertyAssignment", "12px")
+  ]);
+  assert.deepEqual(latestPropsPayload.payloadRecords, [
+    removeStyle("marginTop", "propertyAssignment"),
+    removeStyle("--gap", "setProperty"),
+    setStyle("color", "propertyAssignment", "blue"),
+    setStyle("width", "propertyAssignment", "12px")
+  ]);
+  assert.deepEqual(element.mutationLog, [
+    ["stylePropertyAssignment", "marginTop", ""],
+    ["styleSetProperty", "--gap", ""],
+    ["stylePropertyAssignment", "color", "blue"],
+    ["stylePropertyAssignment", "width", "12px"]
+  ]);
+  assert.deepEqual(element.activeStyleProperties(), [
+    ["color", "blue"],
+    ["width", "12px"]
+  ]);
+  assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationHandoff(handoff),
+    nextProps
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(element), nextProps);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("private DOM admitted payload adapter accepts property rows and skips non-payload rows", () => {
   const element = new FakeElement("fast-widget");
   const value = { answer: 42 };
@@ -736,8 +818,8 @@ test("private DOM latest-props handoff keeps failed payloads out of the componen
 
   const styled = new FakeElement("div");
   const styledToken = componentTree.createHostInstanceToken(
-    { kind: "LatestPropsStyleHost" },
-    { kind: "LatestPropsStyleRoot" }
+    { kind: "LatestPropsInvalidStyleHost" },
+    { kind: "LatestPropsInvalidStyleRoot" }
   );
   const styledInitialProps = {};
   componentTree.attachHostInstanceNode(styled, styledToken, styledInitialProps);
@@ -750,7 +832,7 @@ test("private DOM latest-props handoff keeps failed payloads out of the componen
         {},
         orderedProps([
           ["id", "must-not-apply"],
-          ["style", orderedProps([["color", "red"]])]
+          ["style", orderedProps([["width", Number.NaN]])]
         ])
       ),
     {
@@ -804,7 +886,14 @@ test("private DOM latest-props handoff rolls back partial fake-DOM mutations on 
     { kind: "LatestPropsRollbackHost" },
     { kind: "LatestPropsRollbackRoot" }
   );
-  const initialProps = orderedProps([["title", "old-title"]]);
+  const initialStyle = orderedProps([
+    ["color", "red"],
+    ["--gap", "4px"]
+  ]);
+  const initialProps = orderedProps([
+    ["title", "old-title"],
+    ["style", initialStyle]
+  ]);
   const nextProps = orderedProps([
     ["id", "temporary-id"],
     ["data-state", "ready"]
@@ -813,6 +902,10 @@ test("private DOM latest-props handoff rolls back partial fake-DOM mutations on 
   const originalSetAttribute = element.setAttribute;
 
   element.setAttribute("title", "old-title");
+  applyStyleDangerousHtmlPayload(
+    element,
+    diffDomPropertyPayload("div", {}, orderedProps([["style", initialStyle]]))
+  );
   element.mutationLog = [];
   element.setAttribute = function setAttribute(name, value) {
     originalSetAttribute.call(this, name, value);
@@ -834,12 +927,20 @@ test("private DOM latest-props handoff rolls back partial fake-DOM mutations on 
     (error) => error === thrownError
   );
   assert.deepEqual(element.activeAttributeEntries(), [["title", "old-title"]]);
+  assert.deepEqual(element.activeStyleProperties(), [
+    ["--gap", "4px"],
+    ["color", "red"]
+  ]);
   assert.deepEqual(element.mutationLog, [
     ["removeAttribute", "title", true],
+    ["stylePropertyAssignment", "color", ""],
+    ["styleSetProperty", "--gap", ""],
     ["setAttribute", "id", "temporary-id"],
     ["setAttribute", "data-state", "ready"],
     ["removeAttribute", "data-state", true],
     ["removeAttribute", "id", true],
+    ["styleSetProperty", "--gap", "4px"],
+    ["stylePropertyAssignment", "color", "red"],
     ["setAttribute", "title", "old-title"]
   ]);
   assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
