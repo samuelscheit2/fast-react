@@ -522,6 +522,8 @@ function describeFormActionResetDispatcherBoundary(behaviorArea) {
     metadataGateAvailable: true,
     dispatcherRecordsAccepted:
       behaviorArea === null || behaviorArea === 'form-action',
+    submitRequestSubmitActionMetadataRecorded: true,
+    resetDispatcherOrderingRecorded: true,
     realFormAccepted: false,
     rawTargetCaptured: false,
     formInspected: false,
