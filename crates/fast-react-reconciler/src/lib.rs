@@ -13,6 +13,7 @@ mod host_nodes;
 mod host_tokens;
 #[cfg(test)]
 mod host_work;
+mod passive_effects;
 mod root_callbacks;
 mod root_commit;
 mod root_config;
