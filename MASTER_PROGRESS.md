@@ -29,6 +29,16 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 475 and 497 were accepted from queue 473-502. Worker 475 added
+  private passive effect root error routing diagnostics for passive destroy and
+  mount-create failures, preserving commit-phase root option callback metadata
+  while keeping public callbacks, error boundaries, recoverable-error behavior,
+  and act aggregation blocked. Worker 497 hardened React package private-file
+  guards by mirroring the current private implementation inventory in
+  package-surface and import-smoke checks without changing public exports.
+- Workers 475 and 497 were verified after merge with focused passive-effect
+  reconciler tests, package-surface guard checks, import-entrypoint smoke,
+  conflict-marker scanning, and `git diff --check`.
 - Workers 443-465 and 467-472 were accepted from queue 443-472. Worker 466
   exited with no mergeable changes and was removed as a stale empty branch.
   The accepted batch added private layout-effect handoff and committed metadata

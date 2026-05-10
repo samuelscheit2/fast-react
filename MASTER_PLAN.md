@@ -46,12 +46,13 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
+Workers 475 and 497 have been accepted, leaving 28 active top-level workers
+from this queue.
 
 | Worker | Focus |
 | --- | --- |
 | 473 | Test renderer act passive-effect drain gate |
 | 474 | Passive effect mount/unmount execution gate |
-| 475 | Passive effect error routing gate |
 | 476 | Root commit effect ordering canary |
 | 477 | Function component `useMemo` bailout gate |
 | 478 | Function component `useEffect` update gate |
@@ -73,7 +74,6 @@ Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
 | 494 | Scheduler postTask abort diagnostics |
 | 495 | Native batched JSON transport gate |
 | 496 | Native cross-environment teardown gate |
-| 497 | Package-surface private facade audit |
 | 498 | Benchmark act/passive timing canaries |
 | 499 | Root-render E2E act/passive admission |
 | 500 | Conformance act/passive local gate refresh |
