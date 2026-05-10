@@ -45,19 +45,19 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 655-684 is running in isolated
-`worker/<slug>` branches and worktrees from queue base `243817c`.
+Top-level cap: 30 workers. Workers 655 and 676 from queue 655-684 have
+been accepted; the remaining queue is running in isolated `worker/<slug>`
+branches and worktrees from queue base `243817c`.
 
-- 655-666: Rust reconciler execution paths for commit mutation, effects, refs,
+- 656-666: Rust reconciler execution paths for commit mutation, effects, refs,
   context, Suspense, Offscreen, error recovery, sync flush callbacks, and
   reducer transition lanes.
 - 667-672: React test-renderer private native execution evidence for `toTree`,
   TestInstance queries, error boundaries, act/passive flushing, update
   serialization, and unmount ref/passive ordering.
-- 673-682: React DOM private root live-container preflight, root unmount
-  ref/passive cleanup, fragment/array fake-DOM rendering, controlled-input live
-  preflight, hydration recovery/replay, resource execution, and form action
-  callback preflight.
+- 673-675 and 677-682: React DOM private root live-container preflight, root
+  unmount ref/passive cleanup, fragment/array fake-DOM rendering, hydration
+  recovery/replay, resource execution, and form action callback preflight.
 - 683-684: Scheduler postTask act/root continuation evidence and package
   surface/private-admission guard refresh.
 
@@ -68,7 +68,9 @@ Top-level cap: 30 workers. Queue 655-684 is running in isolated
    worktree status, changed files, verification, and risks.
 3. Merge accepted completed work in batches, resolving overlap conflicts on
    `main`, then clean accepted sessions/worktrees/branches.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Fill open top-level slots with replacement workers only after current
+   completions are merged and cleaned.
+5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates

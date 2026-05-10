@@ -29,6 +29,18 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Queue 655-684
+
+- Workers 655 and 676 were accepted from the active queue. The batch added a
+  private HostText root-commit execution path with a validated text-update
+  ledger and committed-current/final-work proof, plus controlled-input live
+  text restore preflight evidence that descriptor and value-tracker access stay
+  blocked for DOM-like nodes.
+- The batch was verified after merge with `cargo fmt --all --check`, focused
+  `fast-react-reconciler` HostText root-commit and host-node ledger tests,
+  focused DOM controlled-input and resource/form conformance checks, `npm run
+  check --workspace @fast-react/react-dom`, and `git diff --check`.
+
 ### Queue 625-654
 
 - Workers 625, 628, 630, 634, 636-640, 643, 645, and 652 were accepted,
