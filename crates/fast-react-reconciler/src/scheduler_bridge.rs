@@ -4,6 +4,8 @@
 //! deterministic model of the callback identity, priority, cancellation, and
 //! root-schedule microtask requests that the reconciler root scheduler owns.
 
+use fast_react_core::{FiberId, Lanes};
+
 use crate::{FiberRootId, RootCallbackPriority, RootSchedulerCallbackHandle};
 
 pub const FAKE_ACT_CALLBACK_NODE: RootSchedulerCallbackHandle =
@@ -218,6 +220,84 @@ impl SchedulerCallbackRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SchedulerPassiveEffectsFlushRequest {
+    order: usize,
+    node: RootSchedulerCallbackHandle,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+    pending_unmount_count: usize,
+    pending_mount_count: usize,
+    scheduler_priority: SchedulerPriority,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private passive scheduler flush request metadata is reserved for passive-effect workers"
+)]
+impl SchedulerPassiveEffectsFlushRequest {
+    #[must_use]
+    pub(crate) const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn node(self) -> RootSchedulerCallbackHandle {
+        self.node
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_unmount_count(self) -> usize {
+        self.pending_unmount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_mount_count(self) -> usize {
+        self.pending_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_record_count(self) -> usize {
+        self.pending_unmount_count + self.pending_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_priority(self) -> SchedulerPriority {
+        self.scheduler_priority
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_package_behavior_changed(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SchedulerCancellationRecord {
     node: RootSchedulerCallbackHandle,
 }
@@ -239,6 +319,7 @@ pub struct SchedulerBridge {
     act_continuation_records: Vec<SchedulerActContinuationRecord>,
     act_queue_requests: Vec<SchedulerActQueueRequest>,
     callback_requests: Vec<SchedulerCallbackRequest>,
+    passive_effects_flush_requests: Vec<SchedulerPassiveEffectsFlushRequest>,
     cancellation_records: Vec<SchedulerCancellationRecord>,
     microtask_requests: Vec<SchedulerMicrotaskRequest>,
 }
@@ -255,6 +336,7 @@ impl SchedulerBridge {
             act_continuation_records: Vec::new(),
             act_queue_requests: Vec::new(),
             callback_requests: Vec::new(),
+            passive_effects_flush_requests: Vec::new(),
             cancellation_records: Vec::new(),
             microtask_requests: Vec::new(),
         }
@@ -383,6 +465,33 @@ impl SchedulerBridge {
         request
     }
 
+    #[allow(
+        dead_code,
+        reason = "crate-private passive scheduler flush requests are currently exercised by canary tests"
+    )]
+    pub(crate) fn schedule_passive_effects_flush(
+        &mut self,
+        root: FiberRootId,
+        finished_work: FiberId,
+        lanes: Lanes,
+        pending_unmount_count: usize,
+        pending_mount_count: usize,
+    ) -> SchedulerPassiveEffectsFlushRequest {
+        let request = SchedulerPassiveEffectsFlushRequest {
+            order: self.passive_effects_flush_requests.len(),
+            node: RootSchedulerCallbackHandle::from_raw(self.next_callback_handle),
+            root,
+            finished_work,
+            lanes,
+            pending_unmount_count,
+            pending_mount_count,
+            scheduler_priority: SchedulerPriority::Normal,
+        };
+        self.next_callback_handle += 1;
+        self.passive_effects_flush_requests.push(request);
+        request
+    }
+
     pub fn schedule_act_callback(
         &mut self,
         root: FiberRootId,
@@ -435,6 +544,15 @@ impl SchedulerBridge {
         &self.callback_requests
     }
 
+    #[allow(
+        dead_code,
+        reason = "crate-private passive scheduler flush request log is currently exercised by canary tests"
+    )]
+    #[must_use]
+    pub(crate) fn passive_effects_flush_requests(&self) -> &[SchedulerPassiveEffectsFlushRequest] {
+        &self.passive_effects_flush_requests
+    }
+
     #[must_use]
     pub fn cancellation_records(&self) -> &[SchedulerCancellationRecord] {
         &self.cancellation_records
@@ -460,6 +578,16 @@ mod tests {
 
     fn root_id(raw: u64) -> FiberRootId {
         FiberRootId::new(raw).unwrap()
+    }
+
+    fn fiber_id(slot: usize) -> FiberId {
+        use fast_react_core::{FiberArenaId, FiberGeneration, FiberSlot};
+
+        FiberId::new(
+            FiberArenaId::new(1).unwrap(),
+            FiberSlot::new(slot),
+            FiberGeneration::INITIAL,
+        )
     }
 
     #[test]
@@ -518,6 +646,39 @@ mod tests {
         assert_eq!(request.scheduler_priority(), SchedulerPriority::Normal);
         assert_eq!(bridge.callback_requests(), &[request]);
         assert!(bridge.act_queue_requests().is_empty());
+    }
+
+    #[test]
+    fn scheduler_bridge_records_passive_effects_flush_request_order_without_public_scheduler() {
+        let mut bridge = SchedulerBridge::new();
+        let root = root_id(1);
+        let finished_work = fiber_id(4);
+
+        let passive =
+            bridge.schedule_passive_effects_flush(root, finished_work, Lanes::DEFAULT, 1, 2);
+        let render = bridge.schedule_callback(
+            root,
+            SchedulerPriority::Normal,
+            RootCallbackPriority::new(Lane::DEFAULT),
+        );
+
+        assert_eq!(passive.order(), 0);
+        assert_eq!(passive.node(), RootSchedulerCallbackHandle::from_raw(1));
+        assert_eq!(passive.root(), root);
+        assert_eq!(passive.finished_work(), finished_work);
+        assert_eq!(passive.lanes(), Lanes::DEFAULT);
+        assert_eq!(passive.pending_unmount_count(), 1);
+        assert_eq!(passive.pending_mount_count(), 2);
+        assert_eq!(passive.pending_record_count(), 3);
+        assert_eq!(passive.scheduler_priority(), SchedulerPriority::Normal);
+        assert!(!passive.executes_public_effects());
+        assert!(!passive.public_act_compatibility_claimed());
+        assert!(!passive.public_scheduler_package_behavior_changed());
+        assert_eq!(render.node(), RootSchedulerCallbackHandle::from_raw(2));
+        assert_eq!(bridge.passive_effects_flush_requests(), &[passive]);
+        assert_eq!(bridge.callback_requests(), &[render]);
+        assert!(bridge.act_queue_requests().is_empty());
+        assert!(bridge.microtask_requests().is_empty());
     }
 
     #[test]

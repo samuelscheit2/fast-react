@@ -26,10 +26,11 @@ use crate::root_config::{
     PendingPassiveUnmountOrigin, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
 };
 use crate::root_scheduler::{
-    RootErrorCaptureScheduleRecord, RootErrorCaptureSource,
+    PassiveEffectSchedulerFlushGateRecord, RootErrorCaptureScheduleRecord, RootErrorCaptureSource,
     SyncFlushPostPassiveContinuationExecutionGateRecord, capture_passive_effect_root_error,
     sync_flush_post_passive_continuation_execution_gate,
 };
+use crate::scheduler_bridge::SchedulerPassiveEffectsFlushRequest;
 use crate::sync_flush::{
     SyncFlushError, SyncFlushPostPassiveContinuationExecutionRecord,
     flush_sync_post_passive_continuation_after_passive_effects,
@@ -1219,6 +1220,92 @@ impl PassiveEffectsFlushResult {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PassiveEffectSchedulerFlushExecutionRecord {
+    execution_order: usize,
+    scheduler_gate: PassiveEffectSchedulerFlushGateRecord,
+    scheduler_request: SchedulerPassiveEffectsFlushRequest,
+    passive_effects: PassiveEffectsFlushResult,
+}
+
+impl PassiveEffectSchedulerFlushExecutionRecord {
+    #[must_use]
+    pub(crate) const fn execution_order(&self) -> usize {
+        self.execution_order
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_gate(&self) -> PassiveEffectSchedulerFlushGateRecord {
+        self.scheduler_gate
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_request(&self) -> SchedulerPassiveEffectsFlushRequest {
+        self.scheduler_request
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_effects(&self) -> &PassiveEffectsFlushResult {
+        &self.passive_effects
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.scheduler_request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.scheduler_request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(&self) -> Lanes {
+        self.scheduler_request.lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_unmount_count(&self) -> usize {
+        self.scheduler_request.pending_unmount_count()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_mount_count(&self) -> usize {
+        self.scheduler_request.pending_mount_count()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_record_count(&self) -> usize {
+        self.scheduler_request.pending_record_count()
+    }
+
+    #[must_use]
+    pub(crate) fn did_flush_pending_passive(&self) -> bool {
+        self.passive_effects.consumed_pending_passive()
+    }
+
+    #[must_use]
+    pub(crate) fn did_execute_private_callback_executors(&self) -> bool {
+        self.passive_effects.did_execute_destroy_callbacks()
+            || self.passive_effects.did_execute_mount_create_callbacks()
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_public_effects(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_package_behavior_changed(&self) -> bool {
+        false
+    }
+}
+
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct PassiveEffectCallbackInvocationErrorHandle(u64);
@@ -2176,6 +2263,37 @@ pub(crate) fn flush_passive_effects_after_commit_from_committed_fiber_effects_fo
 
 #[allow(
     dead_code,
+    reason = "crate-private scheduler-driven passive flush gate for committed fiber effect canaries"
+)]
+pub(crate) fn flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    scheduler_gate: PassiveEffectSchedulerFlushGateRecord,
+) -> Result<Option<PassiveEffectSchedulerFlushExecutionRecord>, PassiveEffectsFlushError> {
+    let Some(scheduler_request) = scheduler_gate.scheduler_request() else {
+        return Ok(None);
+    };
+
+    let passive_effects = flush_passive_effects_after_commit_inner(
+        store,
+        commit,
+        PassiveEffectRecordSource::CommittedFiberEffects,
+        None,
+        None,
+    )?;
+
+    Ok(Some(PassiveEffectSchedulerFlushExecutionRecord {
+        execution_order: scheduler_request.order(),
+        scheduler_gate,
+        scheduler_request,
+        passive_effects,
+    }))
+}
+
+#[allow(
+    dead_code,
     reason = "crate-private passive hook-effect destroy execution path for deterministic canaries"
 )]
 pub(crate) fn flush_passive_effects_after_commit_with_destroy_executor<H: HostTypes>(
@@ -2827,12 +2945,13 @@ mod tests {
     };
     use crate::root_commit::queue_function_component_pending_passive_effects;
     use crate::root_config::PendingPassiveUnmountOrigin;
+    use crate::root_scheduler::schedule_passive_effects_flush_after_commit_for_canary;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         RootElementHandle, RootErrorCallbackHandle, RootOptions,
-        RootRecoverableErrorCallbackHandle, RootSyncFlushExitStatus, commit_finished_host_root,
-        ensure_root_is_scheduled, render_host_root_for_lanes, update_container,
-        update_container_sync,
+        RootRecoverableErrorCallbackHandle, RootSchedulerCallbackHandle, RootSyncFlushExitStatus,
+        SchedulerPriority, commit_finished_host_root, ensure_root_is_scheduled,
+        render_host_root_for_lanes, update_container, update_container_sync,
     };
     use fast_react_core::{
         DependenciesHandle, FiberTag, FiberTypeHandle, HookEffectCallbackHandle,
@@ -3947,6 +4066,203 @@ mod tests {
         assert_eq!(pending_passive.passive_mounts().len(), 1);
         assert_eq!(pending_passive.passive_mounts()[0].fiber(), function_fiber);
         assert!(pending_passive.has_commit_handoff());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_scheduler_flush_gate_flushes_metadata_without_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(1040);
+        let current_function = append_function_component_child(
+            &mut store,
+            previous_current,
+            PropsHandle::from_raw(1041),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(1042),
+                deps(1043),
+                Some(callback(1044)),
+            )
+            .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(1045), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(1046),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(1047),
+                deps(1048),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let queued_effect = queued.records()[0];
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        commit
+            .record_function_component_committed_passive_effects_for_canary(std::slice::from_ref(
+                &queued,
+            ))
+            .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let microtask_request_count = store.scheduler_bridge().microtask_requests().len();
+
+        let scheduler_gate =
+            schedule_passive_effects_flush_after_commit_for_canary(&mut store, &commit).unwrap();
+
+        assert!(scheduler_gate.did_schedule_scheduler_flush_request());
+        assert_eq!(scheduler_gate.root(), root_id);
+        assert_eq!(scheduler_gate.finished_work(), Some(finished_work));
+        assert_eq!(scheduler_gate.lanes(), Lanes::DEFAULT);
+        assert_eq!(scheduler_gate.pending_unmount_count(), 1);
+        assert_eq!(scheduler_gate.pending_mount_count(), 1);
+        assert_eq!(scheduler_gate.pending_record_count(), 2);
+        assert!(!scheduler_gate.executes_public_effects());
+        assert!(!scheduler_gate.public_act_compatibility_claimed());
+        assert!(!scheduler_gate.public_scheduler_package_behavior_changed());
+        let scheduler_request = scheduler_gate.scheduler_request().unwrap();
+        assert_eq!(scheduler_request.order(), 0);
+        assert_eq!(
+            scheduler_request.node(),
+            RootSchedulerCallbackHandle::from_raw(1)
+        );
+        assert_eq!(scheduler_request.root(), root_id);
+        assert_eq!(scheduler_request.finished_work(), finished_work);
+        assert_eq!(scheduler_request.lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            scheduler_request.scheduler_priority(),
+            SchedulerPriority::Normal
+        );
+        assert_eq!(
+            store.scheduler_bridge().passive_effects_flush_requests(),
+            &[scheduler_request]
+        );
+        let pending_before_execution = store.root(root_id).unwrap().scheduling().pending_passive();
+        assert_eq!(
+            pending_before_execution.finished_work(),
+            Some(finished_work)
+        );
+        assert!(pending_before_execution.has_commit_handoff());
+        assert_eq!(pending_before_execution.passive_unmounts().len(), 1);
+        assert_eq!(pending_before_execution.passive_mounts().len(), 1);
+
+        let execution =
+            flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary(
+                &mut store,
+                &commit,
+                scheduler_gate,
+            )
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(execution.execution_order(), scheduler_request.order());
+        assert_eq!(execution.scheduler_gate(), scheduler_gate);
+        assert_eq!(execution.scheduler_request(), scheduler_request);
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.finished_work(), finished_work);
+        assert_eq!(execution.lanes(), Lanes::DEFAULT);
+        assert_eq!(execution.pending_unmount_count(), 1);
+        assert_eq!(execution.pending_mount_count(), 1);
+        assert_eq!(execution.pending_record_count(), 2);
+        assert!(execution.did_flush_pending_passive());
+        assert!(!execution.did_execute_private_callback_executors());
+        assert!(!execution.executes_public_effects());
+        assert!(!execution.public_act_compatibility_claimed());
+        assert!(!execution.public_scheduler_package_behavior_changed());
+
+        let passive = execution.passive_effects();
+        assert_eq!(passive.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(passive.consumed_pending_passive());
+        assert_eq!(passive.records().len(), 2);
+        assert!(!passive.did_execute_destroy_callbacks());
+        assert!(!passive.did_execute_mount_create_callbacks());
+        assert!(!passive.public_effect_execution_enabled());
+        assert!(!passive.public_act_compatibility_claimed());
+        assert!(!passive.scheduler_driven_passive_execution_enabled());
+
+        let unmount = passive.records()[0];
+        let mount = passive.records()[1];
+        assert_eq!(unmount.flush_index(), 0);
+        assert_eq!(mount.flush_index(), 1);
+        assert_eq!(unmount.phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(mount.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(
+            unmount.pending_order(),
+            queued_effect.unmount_order().unwrap()
+        );
+        assert_eq!(mount.pending_order(), queued_effect.mount_order());
+        assert!(unmount.pending_order() < mount.pending_order());
+        assert_eq!(unmount.fiber(), finished_function);
+        assert_eq!(mount.fiber(), finished_function);
+        assert_eq!(unmount.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(mount.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(unmount.effect_index(), Some(0));
+        assert_eq!(mount.effect_index(), Some(0));
+        assert_eq!(unmount.effect(), Some(registration.effect()));
+        assert_eq!(mount.effect(), Some(registration.effect()));
+        assert_eq!(unmount.effect_instance(), Some(previous.instance()));
+        assert_eq!(mount.effect_instance(), Some(registration.instance()));
+        assert_eq!(unmount.destroy_callback(), Some(callback(1044)));
+        assert_eq!(mount.create_callback(), Some(callback(1047)));
+        assert!(!unmount.destroy_callback_invoked());
+        assert!(!mount.create_callback_invoked());
+        assert!(!unmount.create_callback_invoked());
+        assert!(!mount.destroy_callback_invoked());
+
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().microtask_requests().len(),
+            microtask_request_count
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
