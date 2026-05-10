@@ -14,6 +14,7 @@ const resourceHintFakeDomAdapterGateSchemaVersion = 1;
 const resourceHintFakeDomInsertionGateSchemaVersion = 1;
 const resourceHintHeadBoundaryGateSchemaVersion = 1;
 const resourceHintHeadClearRetainGateSchemaVersion = 1;
+const resourceHintPreloadPreinitOrderGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputValueTrackerFakeDomDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion = 1;
@@ -30,6 +31,8 @@ const privateResourceHintHeadBoundaryRecordType =
   'fast.react_dom.private_resource_hint_head_singleton_boundary_record';
 const privateResourceHintHeadClearRetainRecordType =
   'fast.react_dom.private_resource_hint_head_clear_retain_record';
+const privateResourceHintPreloadPreinitOrderRecordType =
+  'fast.react_dom.private_resource_hint_preload_preinit_order_record';
 const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputValueTrackerFakeDomDiagnosticRecordType =
@@ -48,6 +51,8 @@ const privateResourceHintHeadBoundaryGateId =
   'resource-hint-head-singleton-private-gate-1';
 const privateResourceHintHeadClearRetainGateId =
   'resource-hint-head-clear-retain-private-gate-1';
+const privateResourceHintPreloadPreinitOrderGateId =
+  'resource-hint-preload-preinit-dedupe-order-private-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
   'blocked-private-resource-hint-fake-dom-adapter-admission-required';
 const privateResourceHintFakeDomAdapterAdmissionStatus =
@@ -82,6 +87,14 @@ const privateResourceHintHeadClearRetainCompatibilityBlockedStatus =
   'blocked-private-resource-hint-head-clear-retain-compatibility';
 const privateResourceHintHeadStylesheetPrecedenceBlockedStatus =
   'blocked-private-resource-hint-head-stylesheet-precedence';
+const privateResourceHintPreloadPreinitOrderAdmissionRequiredStatus =
+  'blocked-private-resource-hint-preload-preinit-dedupe-order-admission-required';
+const privateResourceHintPreloadPreinitOrderStatus =
+  'admitted-private-resource-hint-preload-preinit-dedupe-order-record';
+const privateResourceHintPreloadPreinitOrderExecutionStatus =
+  'diagnosed-private-resource-hint-fake-dom-preload-preinit-dedupe-order';
+const privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus =
+  'blocked-private-resource-hint-preload-preinit-dedupe-order-compatibility';
 const privateResourceFormActionGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE';
 const privateResourceFormActionGateUnknownRequestCode =
@@ -116,6 +129,12 @@ const privateResourceHintHeadClearRetainInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_HINT_HEAD_CLEAR_RETAIN_INVALID_RECORD';
 const privateResourceHintHeadClearRetainInvalidAdmissionCode =
   'FAST_REACT_DOM_RESOURCE_HINT_HEAD_CLEAR_RETAIN_INVALID_ADMISSION';
+const privateResourceHintPreloadPreinitOrderGateErrorCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_PRELOAD_PREINIT_ORDER_GATE';
+const privateResourceHintPreloadPreinitOrderInvalidRecordCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_PRELOAD_PREINIT_ORDER_INVALID_RECORD';
+const privateResourceHintPreloadPreinitOrderInvalidAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_PRELOAD_PREINIT_ORDER_INVALID_ADMISSION';
 const privateControlledInputValueTrackerGateErrorCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
 const privateControlledInputValueTrackerGateUnknownScenarioCode =
@@ -306,6 +325,37 @@ const resourceHintHeadClearRetainSideEffects = freezeRecord({
   stylesheetPrecedenceOrderQueried: false,
   stylesheetPrecedenceOrderMutated: false,
   publicStylesheetPrecedenceBehavior: false
+});
+
+const resourceHintPreloadPreinitOrderBlockedSideEffects = freezeRecord({
+  ...resourceHintHeadClearRetainBlockedSideEffects,
+  fakePreloadPreinitOrderDiagnosticInvoked: false,
+  fakeHeadInsertionOrderObserved: false,
+  fakeHeadInsertionOrderMutated: false,
+  resourceHintDedupeRowsRecorded: false,
+  resourceHintPrecedenceRowsRecorded: false,
+  resourceHintHeadOrderRowsRecorded: false,
+  preloadPreinitResourceMapCreated: false,
+  preloadPreinitResourceMapMutated: false,
+  publicPreloadPreinitDedupeBehavior: false
+});
+
+const resourceHintPreloadPreinitOrderSideEffects = freezeRecord({
+  ...resourceHintHeadClearRetainBlockedSideEffects,
+  fakeHeadRead: true,
+  fakeHeadChildrenScanned: true,
+  fakePreloadPreinitOrderDiagnosticInvoked: true,
+  fakeHeadInsertionOrderObserved: true,
+  fakeHeadInsertionOrderMutated: false,
+  resourceHintDedupeRowsRecorded: true,
+  resourceHintPrecedenceRowsRecorded: true,
+  resourceHintHeadOrderRowsRecorded: true,
+  stylesheetPrecedenceBlockedCapabilitiesRecorded: true,
+  stylesheetPrecedenceOrderQueried: true,
+  stylesheetPrecedenceOrderMutated: false,
+  preloadPreinitResourceMapCreated: false,
+  preloadPreinitResourceMapMutated: false,
+  publicPreloadPreinitDedupeBehavior: false
 });
 
 const controlledInputValueTrackerSideEffects = freezeRecord({
@@ -509,6 +559,34 @@ const resourceHintHeadClearRetainMissingPrerequisites = freezeArray([
   )
 ]);
 
+const resourceHintPreloadPreinitOrderMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-resource-map-commit',
+    'react-dom-resource',
+    'Preload and preinit resource maps are not wired to root-owned DOM resources.'
+  ),
+  prerequisite(
+    'no-preload-preinit-dedupe-commit',
+    'react-dom-resource',
+    'Preload/preinit dedupe is recorded as deterministic fake-DOM metadata only.'
+  ),
+  prerequisite(
+    'no-stylesheet-precedence-insertion',
+    'react-dom-resource',
+    'Stylesheet precedence order is observed but not applied to fake or real head insertion.'
+  ),
+  prerequisite(
+    'no-real-head-insertion-order',
+    'react-dom-resource',
+    'Real document head ordering, querySelector, and insertBefore behavior remain blocked.'
+  ),
+  prerequisite(
+    'no-public-resource-hint-dom-insertion',
+    'react-dom-resource',
+    'Public resource hint APIs remain placeholders and do not reach this diagnostic.'
+  )
+]);
+
 const resourceHintHeadClearRetainBlockedCapabilities = freezeArray([
   blockedCapability(
     'head-singleton-release',
@@ -552,6 +630,29 @@ const resourceHintHeadStylesheetPrecedenceBlockedCapabilities = freezeArray([
   blockedCapability(
     'stylesheet-precedence-commit-suspension',
     'Stylesheet load, error, and suspended commit behavior remains blocked.'
+  )
+]);
+
+const resourceHintPreloadPreinitOrderBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'preload-preinit-resource-map',
+    'No root-owned preload or preinit resource map is created or mutated.'
+  ),
+  blockedCapability(
+    'resource-key-dedupe-commit',
+    'Dedupe rows use explicit opaque diagnostic keys and do not commit resource records.'
+  ),
+  blockedCapability(
+    'stylesheet-precedence-insertion',
+    'Stylesheet precedence order is recorded without insertBefore or load tracking.'
+  ),
+  blockedCapability(
+    'real-document-head-ordering',
+    'Real document head query and insertion order behavior remains blocked.'
+  ),
+  blockedCapability(
+    'public-resource-compatibility',
+    'Public preload/preinit compatibility remains unclaimed.'
   )
 ]);
 
@@ -773,6 +874,33 @@ const resourceHintHeadClearRetainContracts = freezeArray([
   )
 ]);
 
+const resourceHintPreloadPreinitOrderContracts = freezeArray([
+  resourceHintPreloadPreinitOrderContract(
+    'preload-preinit-order-preload',
+    'preload',
+    'L',
+    'link',
+    'preload',
+    ['style', 'script', 'font', 'image', 'other']
+  ),
+  resourceHintPreloadPreinitOrderContract(
+    'preload-preinit-order-preinit-style',
+    'preinit-style',
+    'S',
+    'link',
+    'stylesheet',
+    ['style']
+  ),
+  resourceHintPreloadPreinitOrderContract(
+    'preload-preinit-order-preinit-script',
+    'preinit-script',
+    'X',
+    'script',
+    'script',
+    ['script']
+  )
+]);
+
 const singletonContracts = freezeArray([
   singletonContract('html-singleton', 'html'),
   singletonContract('head-singleton', 'head'),
@@ -980,6 +1108,7 @@ const resourceHintFakeDomAdapterAdmissionPayloads = new WeakMap();
 const resourceHintFakeDomInsertionPayloads = new WeakMap();
 const resourceHintHeadBoundaryPayloads = new WeakMap();
 const resourceHintHeadClearRetainPayloads = new WeakMap();
+const resourceHintPreloadPreinitOrderPayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticStates = new WeakMap();
@@ -1169,6 +1298,24 @@ function createResourceHintHeadClearRetainGate(options) {
   });
 }
 
+function createResourceHintPreloadPreinitOrderGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'resource-hint-preload-preinit-order'
+  );
+  gateState.preloadPreinitOrderConsumed = false;
+
+  return Object.freeze({
+    recordPreloadPreinitOrderDiagnostic(records, diagnostic) {
+      return recordResourceHintPreloadPreinitOrderWithGate(
+        gateState,
+        records,
+        diagnostic
+      );
+    }
+  });
+}
+
 function recordUnsupportedResourceHintRequest(requestName, args) {
   return defaultGate.recordResourceHintRequest(requestName, args);
 }
@@ -1328,6 +1475,14 @@ function isPrivateResourceHintHeadClearRetainRecord(value) {
   return resourceHintHeadClearRetainPayloads.has(value);
 }
 
+function getPrivateResourceHintPreloadPreinitOrderRecordPayload(record) {
+  return resourceHintPreloadPreinitOrderPayloads.get(record) || null;
+}
+
+function isPrivateResourceHintPreloadPreinitOrderRecord(value) {
+  return resourceHintPreloadPreinitOrderPayloads.has(value);
+}
+
 function getPrivateControlledInputValueTrackerRecordPayload(record) {
   return controlledInputValueTrackerRecordPayloads.get(record) || null;
 }
@@ -1383,6 +1538,8 @@ function describeResourceFormActionInternalsGate() {
       resourceHintFakeDomInsertions: resourceHintFakeDomInsertionContracts,
       resourceHintHeadBoundaries: resourceHintHeadBoundaryContracts,
       resourceHintHeadClearRetain: resourceHintHeadClearRetainContracts,
+      resourceHintPreloadPreinitOrder:
+        resourceHintPreloadPreinitOrderContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
       controlledForms: controlledFormContracts,
@@ -1433,7 +1590,9 @@ function describePrivateResourceHintFakeDomAdapterGate() {
     contracts: resourceHintFakeDomAdapterContracts,
     sideEffects: resourceHintFakeDomAdapterSideEffects,
     missingPrerequisites: resourceHintFakeDomAdapterMissingPrerequisites,
-    fakeDomInsertion: describePrivateResourceHintFakeDomInsertionGate()
+    fakeDomInsertion: describePrivateResourceHintFakeDomInsertionGate(),
+    preloadPreinitOrder:
+      describePrivateResourceHintPreloadPreinitOrderGate()
   });
 }
 
@@ -1522,6 +1681,47 @@ function describePrivateResourceHintHeadClearRetainGate() {
     contracts: resourceHintHeadClearRetainContracts,
     sideEffects: resourceHintHeadClearRetainBlockedSideEffects,
     missingPrerequisites: resourceHintHeadClearRetainMissingPrerequisites
+  });
+}
+
+function describePrivateResourceHintPreloadPreinitOrderGate() {
+  return freezeRecord({
+    schemaVersion: resourceHintPreloadPreinitOrderGateSchemaVersion,
+    gateId: privateResourceHintPreloadPreinitOrderGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    admissionStatus:
+      privateResourceHintPreloadPreinitOrderAdmissionRequiredStatus,
+    executionStatus: null,
+    compatibilityStatus:
+      privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus,
+    acceptedRecordType: privateResourceHintFakeDomAdapterAdmissionRecordType,
+    acceptsFakeDomAdapterAdmissions: true,
+    acceptsContractIds: freezeArray([
+      'preload',
+      'preinit-style',
+      'preinit-script'
+    ]),
+    deterministicFakeDomOnly: true,
+    mutatesFakeHead: false,
+    mutatesRealHead: false,
+    recordsDedupeRows: true,
+    recordsPrecedenceRows: true,
+    recordsHeadOrderRows: true,
+    rawValuesRetained: false,
+    publicResourceHintDomInsertion: false,
+    publicStylesheetPrecedenceBehavior: false,
+    stylesheetPrecedenceBoundary:
+      createStylesheetPrecedenceOrderDiagnosticBoundary(
+        freezeArray([]),
+        freezeArray([])
+      ),
+    blockedCapabilities: resourceHintPreloadPreinitOrderBlockedCapabilities,
+    contracts: resourceHintPreloadPreinitOrderContracts,
+    sideEffects: resourceHintPreloadPreinitOrderBlockedSideEffects,
+    missingPrerequisites:
+      resourceHintPreloadPreinitOrderMissingPrerequisites
   });
 }
 
@@ -1827,6 +2027,29 @@ function createUnsupportedResourceHintHeadClearRetainError(record) {
   error.clearRetainStatus = payload.clearRetainStatus;
   error.executionStatus = payload.executionStatus;
   error.compatibilityStatus = payload.compatibilityStatus;
+  error.blockedCapabilities = payload.blockedCapabilities;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedResourceHintPreloadPreinitOrderError(record) {
+  const payload = assertPrivateResourceHintPreloadPreinitOrderRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private resource hint preload/preinit dedupe and order gate is a deterministic fake-DOM diagnostic only.'
+  );
+
+  error.code = privateResourceHintPreloadPreinitOrderGateErrorCode;
+  error.orderDiagnosticId = payload.orderDiagnosticId;
+  error.orderDiagnosticSequence = payload.orderDiagnosticSequence;
+  error.requestType = payload.requestType;
+  error.orderStatus = payload.orderStatus;
+  error.executionStatus = payload.executionStatus;
+  error.compatibilityStatus = payload.compatibilityStatus;
+  error.sourceAdapterAdmissionIds = payload.sourceAdapterAdmissionIds;
   error.blockedCapabilities = payload.blockedCapabilities;
   error.sideEffects = payload.sideEffects;
 
@@ -2193,6 +2416,82 @@ function recordResourceHintHeadClearRetainWithGate(
   });
 
   resourceHintHeadClearRetainPayloads.set(payload, payload);
+  return payload;
+}
+
+function recordResourceHintPreloadPreinitOrderWithGate(
+  gateState,
+  records,
+  diagnostic
+) {
+  if (gateState.preloadPreinitOrderConsumed === true) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'preload/preinit order gate admits exactly one diagnostic record'
+    );
+  }
+
+  const adapterAdmissions =
+    assertFakeDomAdapterAdmissionRecordsForPreloadPreinitOrder(records);
+  const diagnosticAdmission =
+    normalizeResourceHintPreloadPreinitOrderAdmission(
+      diagnostic,
+      adapterAdmissions
+    );
+  const orderPlan = createResourceHintPreloadPreinitOrderPlan(
+    adapterAdmissions,
+    diagnosticAdmission,
+    diagnostic.fakeDocument,
+    diagnostic.fakeHead
+  );
+  gateState.preloadPreinitOrderConsumed = true;
+
+  const orderDiagnosticSequence = gateState.nextRequestSequence++;
+  const orderDiagnosticId =
+    `${gateState.requestIdPrefix}:${orderDiagnosticSequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: resourceHintPreloadPreinitOrderGateSchemaVersion,
+    $$typeof: privateResourceHintPreloadPreinitOrderRecordType,
+    kind: 'FastReactDomPrivateResourceHintPreloadPreinitOrderRecord',
+    gateId: privateResourceHintPreloadPreinitOrderGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    orderDiagnosticId,
+    orderDiagnosticSequence,
+    requestType: 'resource-hint-preload-preinit-dedupe-order',
+    oracleKind: resourceHintOracleKind,
+    oracleSchemaVersion: 1,
+    sourceAdapterAdmissionIds: freezeArray(
+      adapterAdmissions.map((admission) => admission.adapterAdmissionId)
+    ),
+    sourceRequestIds: freezeArray(
+      adapterAdmissions.map((admission) => admission.sourceRequestId)
+    ),
+    acceptedContractIds: freezeArray(
+      adapterAdmissions.map((admission) => admission.contractId)
+    ),
+    orderStatus: privateResourceHintPreloadPreinitOrderStatus,
+    executionStatus: privateResourceHintPreloadPreinitOrderExecutionStatus,
+    compatibilityStatus:
+      privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus,
+    orderAdmission: diagnosticAdmission.admission,
+    dedupeRows: orderPlan.dedupeRows,
+    precedenceRows: orderPlan.precedenceRows,
+    plannedHeadInsertionOrder: orderPlan.plannedHeadInsertionOrder,
+    observedHeadOrder: orderPlan.observedHeadOrder,
+    resourceMapPlan: orderPlan.resourceMapPlan,
+    stylesheetPrecedenceBoundary:
+      orderPlan.stylesheetPrecedenceBoundary,
+    publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
+    publicHeadBoundary: createPublicHeadSingletonBoundary(),
+    blockedCapabilities: resourceHintPreloadPreinitOrderBlockedCapabilities,
+    sideEffects: resourceHintPreloadPreinitOrderSideEffects,
+    missingPrerequisites:
+      resourceHintPreloadPreinitOrderMissingPrerequisites
+  });
+
+  resourceHintPreloadPreinitOrderPayloads.set(payload, payload);
   return payload;
 }
 
@@ -2776,6 +3075,25 @@ function getResourceHintHeadClearRetainResourceContract(contractId) {
   throw error;
 }
 
+function getResourceHintPreloadPreinitOrderContract(contractId) {
+  for (const contract of resourceHintPreloadPreinitOrderContracts) {
+    if (contract.sourceContractId === contractId) {
+      return contract;
+    }
+  }
+
+  const error = new Error(
+    `Unsupported private React DOM resource hint preload/preinit order contract: ${String(
+      contractId
+    )}.`
+  );
+  error.name = 'FastReactDomResourceHintPreloadPreinitOrderGateError';
+  error.code = privateResourceHintPreloadPreinitOrderInvalidRecordCode;
+  error.contractId = contractId;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertPrivateResourceHintDispatcherMetadataRecord(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -2850,6 +3168,22 @@ function assertPrivateResourceHintHeadClearRetainRecord(record) {
   );
   error.name = 'FastReactDomResourceHintHeadClearRetainGateError';
   error.code = privateResourceHintHeadClearRetainInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertPrivateResourceHintPreloadPreinitOrderRecord(record) {
+  const payload =
+    getPrivateResourceHintPreloadPreinitOrderRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint preload/preinit order record.'
+  );
+  error.name = 'FastReactDomResourceHintPreloadPreinitOrderGateError';
+  error.code = privateResourceHintPreloadPreinitOrderInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -2965,6 +3299,48 @@ function assertHeadBoundaryRecordForClearRetain(record) {
   error.code = privateResourceHintHeadClearRetainInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
+}
+
+function assertFakeDomAdapterAdmissionRecordsForPreloadPreinitOrder(records) {
+  if (!Array.isArray(records) || records.length === 0) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'records must be a non-empty array of fake DOM adapter admissions'
+    );
+  }
+
+  const seen = new Set();
+  return freezeArray(
+    records.map((record) => {
+      const payload =
+        getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload(record);
+      if (
+        payload !== null &&
+        payload.admissionStatus ===
+          privateResourceHintFakeDomAdapterAdmissionStatus &&
+        payload.executionStatus ===
+          privateResourceHintFakeDomAdapterExecutionBlockedStatus &&
+        payload.compatibilityStatus ===
+          privateResourceHintFakeDomAdapterCompatibilityBlockedStatus
+      ) {
+        getResourceHintPreloadPreinitOrderContract(payload.contractId);
+        if (seen.has(payload.adapterAdmissionId)) {
+          throwInvalidResourceHintPreloadPreinitOrderAdmission(
+            'adapter admissions must be unique within the diagnostic'
+          );
+        }
+        seen.add(payload.adapterAdmissionId);
+        return payload;
+      }
+
+      const error = new Error(
+        'Expected admitted private React DOM preload/preinit fake DOM adapter records for the order diagnostic.'
+      );
+      error.name = 'FastReactDomResourceHintPreloadPreinitOrderGateError';
+      error.code = privateResourceHintPreloadPreinitOrderInvalidRecordCode;
+      error.compatibilityTarget = compatibilityTarget;
+      throw error;
+    })
+  );
 }
 
 function validateResourceHintDispatcherShape(contract, args) {
@@ -4275,6 +4651,711 @@ function createStylesheetPrecedenceBlockedBoundary(
   });
 }
 
+function normalizeResourceHintPreloadPreinitOrderAdmission(
+  diagnostic,
+  adapterAdmissions
+) {
+  if (diagnostic == null || typeof diagnostic !== 'object') {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'preload/preinit order admission metadata must be an object'
+    );
+  }
+
+  if (diagnostic.explicitOrderDiagnostic !== true) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'explicitOrderDiagnostic must be true'
+    );
+  }
+
+  const orderKind = getAdmissionStringProperty(
+    diagnostic,
+    'orderKind',
+    'deterministic-fake-dom-preload-preinit-dedupe-order'
+  );
+  if (
+    orderKind !==
+    'deterministic-fake-dom-preload-preinit-dedupe-order'
+  ) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'orderKind must be deterministic-fake-dom-preload-preinit-dedupe-order'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    diagnostic,
+    'targetKind',
+    'document-head'
+  );
+  if (targetKind !== 'document-head') {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'targetKind must be document-head'
+    );
+  }
+
+  assertDeterministicFakePreloadPreinitOrderTarget(
+    diagnostic.fakeDocument,
+    diagnostic.fakeHead
+  );
+
+  const descriptors = normalizePreloadPreinitResourceDescriptors(
+    diagnostic.resourceDescriptors,
+    adapterAdmissions
+  );
+
+  return {
+    descriptors,
+    admission: freezeRecord({
+      orderKind,
+      orderId: getAdmissionStringProperty(
+        diagnostic,
+        'orderId',
+        'anonymous-fake-dom-preload-preinit-order'
+      ),
+      targetKind,
+      explicitOrderDiagnostic: true,
+      deterministicFakeDomOnly: true,
+      rawDocumentCaptured: false,
+      rawHeadCaptured: false,
+      rawElementCaptured: false,
+      rawValuesRetained: false,
+      resourceMapCreationAllowed: false,
+      resourceMapMutationAllowed: false,
+      fakeHeadMutationAllowed: false,
+      realHeadMutationAllowed: false,
+      publicResourceHintDomInsertion: false,
+      publicStylesheetPrecedenceBehavior: false,
+      publicRootTouched: false,
+      compatibilityClaimed: false,
+      resourceDescriptors: descriptors
+    })
+  };
+}
+
+function normalizePreloadPreinitResourceDescriptors(
+  descriptors,
+  adapterAdmissions
+) {
+  if (!Array.isArray(descriptors)) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'resourceDescriptors must be an array'
+    );
+  }
+
+  if (descriptors.length !== adapterAdmissions.length) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'resourceDescriptors must match the adapter admission count'
+    );
+  }
+
+  return freezeArray(
+    descriptors.map((descriptor, index) =>
+      normalizePreloadPreinitResourceDescriptor(
+        descriptor,
+        adapterAdmissions[index],
+        index
+      )
+    )
+  );
+}
+
+function normalizePreloadPreinitResourceDescriptor(
+  descriptor,
+  adapterAdmission,
+  index
+) {
+  if (descriptor == null || typeof descriptor !== 'object') {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'resource descriptor metadata must be an object'
+    );
+  }
+
+  if (
+    descriptor.sourceAdapterAdmissionId !==
+    adapterAdmission.adapterAdmissionId
+  ) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'resource descriptor sourceAdapterAdmissionId must match the adapter admission order'
+    );
+  }
+
+  const contract = getResourceHintPreloadPreinitOrderContract(
+    adapterAdmission.contractId
+  );
+  const resourceKind = getPreloadPreinitResourceKind(descriptor);
+  if (!contract.resourceKinds.includes(resourceKind)) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      `resourceKind ${resourceKind} is not accepted for ${contract.sourceContractId}`
+    );
+  }
+
+  const precedenceKey = getOptionalOpaqueDiagnosticToken(
+    descriptor,
+    'precedenceKey'
+  );
+  if (contract.sourceContractId === 'preinit-style') {
+    if (precedenceKey === null) {
+      throwInvalidResourceHintPreloadPreinitOrderAdmission(
+        'preinit-style descriptors must include precedenceKey'
+      );
+    }
+  } else if (precedenceKey !== null && resourceKind !== 'style') {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'precedenceKey is only accepted for style resources'
+    );
+  }
+
+  return freezeRecord({
+    index,
+    sourceAdapterAdmissionId: adapterAdmission.adapterAdmissionId,
+    sourceRequestId: adapterAdmission.sourceRequestId,
+    contractId: adapterAdmission.contractId,
+    privateDispatcherKey: adapterAdmission.privateDispatcherKey,
+    resourceKind,
+    resourceKey: getOpaqueDiagnosticToken(descriptor, 'resourceKey'),
+    precedenceKey,
+    rawResourceKeyRetained: false,
+    rawPrecedenceValueRetained: false
+  });
+}
+
+function getPreloadPreinitResourceKind(descriptor) {
+  const resourceKind = getOpaqueDiagnosticToken(descriptor, 'resourceKind');
+  if (
+    resourceKind === 'style' ||
+    resourceKind === 'script' ||
+    resourceKind === 'font' ||
+    resourceKind === 'image' ||
+    resourceKind === 'other'
+  ) {
+    return resourceKind;
+  }
+
+  throwInvalidResourceHintPreloadPreinitOrderAdmission(
+    'resourceKind must be style, script, font, image, or other'
+  );
+}
+
+function getOpaqueDiagnosticToken(record, key) {
+  const value = record[key];
+  if (
+    typeof value === 'string' &&
+    /^[a-z][a-z0-9-]*$/u.test(value)
+  ) {
+    return value;
+  }
+
+  throwInvalidResourceHintPreloadPreinitOrderAdmission(
+    `${key} must be an opaque lowercase diagnostic token`
+  );
+}
+
+function getOptionalOpaqueDiagnosticToken(record, key) {
+  if (!hasOwnProp(record, key) || record[key] == null) {
+    return null;
+  }
+  return getOpaqueDiagnosticToken(record, key);
+}
+
+function assertDeterministicFakePreloadPreinitOrderTarget(
+  fakeDocument,
+  fakeHead
+) {
+  if (
+    fakeDocument == null ||
+    typeof fakeDocument !== 'object' ||
+    fakeDocument.__fastReactFakeResourceDocument !== true
+  ) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'fakeDocument must be an explicit deterministic fake resource document'
+    );
+  }
+
+  if (
+    fakeHead == null ||
+    typeof fakeHead !== 'object' ||
+    fakeHead.__fastReactFakeResourceHead !== true ||
+    fakeHead.ownerDocument !== fakeDocument
+  ) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'fakeHead must belong to the deterministic fake resource document'
+    );
+  }
+
+  if (!Array.isArray(fakeHead.childNodes)) {
+    throwInvalidResourceHintPreloadPreinitOrderAdmission(
+      'fakeHead must expose deterministic childNodes for order diagnostics'
+    );
+  }
+}
+
+function createResourceHintPreloadPreinitOrderPlan(
+  adapterAdmissions,
+  diagnosticAdmission,
+  fakeDocument,
+  fakeHead
+) {
+  const stateByResourceKey = new Map();
+  const dedupeRows = [];
+  const plannedRows = [];
+
+  for (let index = 0; index < adapterAdmissions.length; index++) {
+    const adapterAdmission = adapterAdmissions[index];
+    const descriptor = diagnosticAdmission.descriptors[index];
+    const contract = getResourceHintPreloadPreinitOrderContract(
+      adapterAdmission.contractId
+    );
+    const resourceKey = `${descriptor.resourceKind}:${descriptor.resourceKey}`;
+    const existingState = stateByResourceKey.get(resourceKey) || null;
+    const dedupeDecision = getPreloadPreinitDedupeDecision(
+      contract,
+      existingState
+    );
+    const wouldInsert = dedupeDecision.wouldInsert;
+    const row = createPreloadPreinitDedupeRow(
+      adapterAdmission,
+      descriptor,
+      contract,
+      resourceKey,
+      existingState,
+      dedupeDecision,
+      index
+    );
+
+    dedupeRows.push(row);
+    if (wouldInsert) {
+      plannedRows.push(
+        createPlannedPreloadPreinitHeadInsertionRow(row, contract)
+      );
+    }
+    updatePreloadPreinitResourceState(
+      stateByResourceKey,
+      resourceKey,
+      row,
+      contract
+    );
+  }
+
+  const precedenceRows = createPreloadPreinitPrecedenceRows(plannedRows);
+  const plannedHeadInsertionOrder =
+    createPlannedPreloadPreinitHeadInsertionOrder(
+      plannedRows,
+      precedenceRows
+    );
+  const observedHeadOrder =
+    createObservedPreloadPreinitFakeHeadOrder(fakeDocument, fakeHead);
+
+  return freezeRecord({
+    dedupeRows: freezeArray(dedupeRows),
+    precedenceRows,
+    plannedHeadInsertionOrder,
+    observedHeadOrder,
+    stylesheetPrecedenceBoundary:
+      createStylesheetPrecedenceOrderDiagnosticBoundary(
+        precedenceRows,
+        observedHeadOrder.rows
+      ),
+    resourceMapPlan: createPreloadPreinitResourceMapPlan(
+      stateByResourceKey,
+      dedupeRows
+    )
+  });
+}
+
+function getPreloadPreinitDedupeDecision(contract, existingState) {
+  if (contract.resourceStage === 'preload') {
+    if (existingState !== null && existingState.preinitRow !== null) {
+      return freezeRecord({
+        dedupeAction: 'skip-preload-existing-preinit',
+        wouldInsert: false,
+        matchedSourceAdapterAdmissionId:
+          existingState.preinitRow.sourceAdapterAdmissionId
+      });
+    }
+    if (existingState !== null && existingState.preloadRow !== null) {
+      return freezeRecord({
+        dedupeAction: 'dedupe-preload',
+        wouldInsert: false,
+        matchedSourceAdapterAdmissionId:
+          existingState.preloadRow.sourceAdapterAdmissionId
+      });
+    }
+    return freezeRecord({
+      dedupeAction: 'insert-preload',
+      wouldInsert: true,
+      matchedSourceAdapterAdmissionId: null
+    });
+  }
+
+  if (existingState !== null && existingState.preinitRow !== null) {
+    return freezeRecord({
+      dedupeAction: 'dedupe-preinit',
+      wouldInsert: false,
+      matchedSourceAdapterAdmissionId:
+        existingState.preinitRow.sourceAdapterAdmissionId
+    });
+  }
+  if (existingState !== null && existingState.preloadRow !== null) {
+    return freezeRecord({
+      dedupeAction: 'preinit-adopts-preload',
+      wouldInsert: true,
+      matchedSourceAdapterAdmissionId:
+        existingState.preloadRow.sourceAdapterAdmissionId
+    });
+  }
+  return freezeRecord({
+    dedupeAction: 'insert-preinit',
+    wouldInsert: true,
+    matchedSourceAdapterAdmissionId: null
+  });
+}
+
+function createPreloadPreinitDedupeRow(
+  adapterAdmission,
+  descriptor,
+  contract,
+  resourceKey,
+  existingState,
+  dedupeDecision,
+  index
+) {
+  return freezeRecord({
+    rowId: `preload-preinit-dedupe-${index}`,
+    rowType: 'resource-hint',
+    inputIndex: index,
+    sourceAdapterAdmissionId: adapterAdmission.adapterAdmissionId,
+    sourceRequestId: adapterAdmission.sourceRequestId,
+    sourceRequestType: adapterAdmission.sourceRequestType,
+    contractId: adapterAdmission.contractId,
+    privateDispatcherKey: adapterAdmission.privateDispatcherKey,
+    publicName: adapterAdmission.publicName,
+    resourceStage: contract.resourceStage,
+    resourceKind: descriptor.resourceKind,
+    resourceKey,
+    opaqueResourceKey: descriptor.resourceKey,
+    precedenceKey: descriptor.precedenceKey,
+    elementTag: contract.elementTag,
+    relationship: contract.relationship,
+    dedupeAction: dedupeDecision.dedupeAction,
+    dedupeMatched: dedupeDecision.matchedSourceAdapterAdmissionId !== null,
+    matchedSourceAdapterAdmissionId:
+      dedupeDecision.matchedSourceAdapterAdmissionId,
+    preloadSeenBefore:
+      existingState !== null && existingState.preloadRow !== null,
+    preinitSeenBefore:
+      existingState !== null && existingState.preinitRow !== null,
+    wouldInsertIntoHead: dedupeDecision.wouldInsert,
+    resourceMapCreated: false,
+    resourceMapMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function updatePreloadPreinitResourceState(
+  stateByResourceKey,
+  resourceKey,
+  row,
+  contract
+) {
+  const existingState = stateByResourceKey.get(resourceKey) || {
+    preloadRow: null,
+    preinitRow: null
+  };
+
+  if (contract.resourceStage === 'preload') {
+    if (existingState.preloadRow === null) {
+      existingState.preloadRow = row;
+    }
+  } else if (existingState.preinitRow === null) {
+    existingState.preinitRow = row;
+  }
+
+  stateByResourceKey.set(resourceKey, existingState);
+}
+
+function createPlannedPreloadPreinitHeadInsertionRow(row, contract) {
+  const placementKind =
+    contract.sourceContractId === 'preinit-style'
+      ? 'stylesheet-precedence'
+      : 'append';
+  return freezeRecord({
+    rowId: `planned-head-${row.inputIndex}`,
+    sourceDedupeRowId: row.rowId,
+    inputIndex: row.inputIndex,
+    sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+    contractId: row.contractId,
+    resourceStage: row.resourceStage,
+    resourceKind: row.resourceKind,
+    resourceKey: row.resourceKey,
+    precedenceKey: row.precedenceKey,
+    elementTag: row.elementTag,
+    relationship: row.relationship,
+    placementKind,
+    insertionMethod:
+      placementKind === 'stylesheet-precedence'
+        ? 'insert-before-or-after-precedence-peer'
+        : 'appendChild',
+    wouldMutateFakeHead: false,
+    wouldMutateRealHead: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPreloadPreinitPrecedenceRows(plannedRows) {
+  const rowsByPrecedence = new Map();
+  const order = [];
+  for (const row of plannedRows) {
+    if (row.placementKind !== 'stylesheet-precedence') {
+      continue;
+    }
+    const precedenceKey = row.precedenceKey || 'default-precedence';
+    if (!rowsByPrecedence.has(precedenceKey)) {
+      rowsByPrecedence.set(precedenceKey, []);
+      order.push(precedenceKey);
+    }
+    rowsByPrecedence.get(precedenceKey).push(row);
+  }
+
+  return freezeArray(
+    order.map((precedenceKey, index) => {
+      const rows = rowsByPrecedence.get(precedenceKey);
+      return freezeRecord({
+        rowId: `stylesheet-precedence-${index}`,
+        precedenceIndex: index,
+        precedenceKey,
+        sourceAdapterAdmissionIds: freezeArray(
+          rows.map((row) => row.sourceAdapterAdmissionId)
+        ),
+        resourceKeys: freezeArray(rows.map((row) => row.resourceKey)),
+        plannedStylesheetCount: rows.length,
+        orderingApplied: false,
+        precedenceMapCreated: false,
+        precedenceQueryRun: false,
+        rawPrecedenceValueRetained: false,
+        compatibilityClaimed: false
+      });
+    })
+  );
+}
+
+function createPlannedPreloadPreinitHeadInsertionOrder(
+  plannedRows,
+  precedenceRows
+) {
+  const stylesheetRows = [];
+  for (const precedenceRow of precedenceRows) {
+    for (const row of plannedRows) {
+      if (
+        row.placementKind === 'stylesheet-precedence' &&
+        (row.precedenceKey || 'default-precedence') ===
+          precedenceRow.precedenceKey
+      ) {
+        stylesheetRows.push(row);
+      }
+    }
+  }
+
+  const appendRows = plannedRows.filter(
+    (row) => row.placementKind !== 'stylesheet-precedence'
+  );
+  const orderedRows = freezeArray(
+    stylesheetRows.concat(appendRows).map((row, headOrderIndex) =>
+      freezeRecord({
+        headOrderIndex,
+        sourceDedupeRowId: row.sourceDedupeRowId,
+        inputIndex: row.inputIndex,
+        sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+        contractId: row.contractId,
+        resourceStage: row.resourceStage,
+        resourceKind: row.resourceKind,
+        resourceKey: row.resourceKey,
+        precedenceKey: row.precedenceKey,
+        elementTag: row.elementTag,
+        relationship: row.relationship,
+        placementKind: row.placementKind,
+        insertionMethod: row.insertionMethod,
+        insertionApplied: false,
+        rawValuesRetained: false,
+        compatibilityClaimed: false
+      })
+    )
+  );
+
+  return freezeRecord({
+    targetKind: 'document-head',
+    hostTag: 'head',
+    orderKind:
+      'react-19.2.6-preload-preinit-head-order-diagnostic',
+    rowCount: orderedRows.length,
+    rows: orderedRows,
+    fakeHeadMutated: false,
+    realHeadMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createObservedPreloadPreinitFakeHeadOrder(fakeDocument, fakeHead) {
+  const rows = freezeArray(
+    fakeHead.childNodes.map((node, index) =>
+      createObservedPreloadPreinitFakeHeadRow(node, index, fakeDocument)
+    )
+  );
+
+  return freezeRecord({
+    targetKind: 'document-head',
+    hostTag: 'head',
+    rowCount: rows.length,
+    rows,
+    fakeHeadRead: true,
+    fakeHeadMutated: false,
+    realHeadMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createObservedPreloadPreinitFakeHeadRow(
+  node,
+  childIndex,
+  fakeDocument
+) {
+  const nodeName =
+    node != null && typeof node.nodeName === 'string'
+      ? node.nodeName.toUpperCase()
+      : 'UNKNOWN';
+  const relationship = getFakeHeadNodeRelationship(node);
+  const resourceKey = getOptionalOpaqueFakeHeadAttribute(
+    node,
+    'data-fast-react-resource-key'
+  );
+  const precedenceKey = getOptionalOpaqueFakeHeadAttribute(
+    node,
+    'data-fast-react-precedence-key'
+  );
+  const resourceKind = getObservedFakeHeadResourceKind(nodeName, relationship);
+
+  return freezeRecord({
+    rowId: `observed-head-child-${childIndex}`,
+    rowType: 'head-child',
+    childIndex,
+    nodeName,
+    relationship,
+    resourceKind,
+    resourceKey,
+    precedenceKey,
+    deterministicFakeResourceElement:
+      node != null &&
+      typeof node === 'object' &&
+      node.__fastReactFakeResourceElement === true &&
+      node.ownerDocument === fakeDocument,
+    stylesheetPrecedenceCandidate:
+      (nodeName === 'LINK' || nodeName === 'STYLE') &&
+      hasFakeHeadNodeAttribute(node, 'data-precedence'),
+    orderObserved: true,
+    orderMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getObservedFakeHeadResourceKind(nodeName, relationship) {
+  if (nodeName === 'SCRIPT') {
+    return 'script';
+  }
+  if (relationship === 'stylesheet') {
+    return 'style';
+  }
+  if (relationship === 'preload') {
+    return 'preload';
+  }
+  return null;
+}
+
+function getOptionalOpaqueFakeHeadAttribute(node, attributeName) {
+  const value = getFakeHeadNodeAttribute(node, attributeName);
+  if (value === undefined) {
+    return null;
+  }
+  if (
+    typeof value === 'string' &&
+    /^[a-z][a-z0-9-]*$/u.test(value)
+  ) {
+    return value;
+  }
+
+  throwInvalidResourceHintPreloadPreinitOrderAdmission(
+    `${attributeName} must be an opaque lowercase diagnostic token`
+  );
+}
+
+function createStylesheetPrecedenceOrderDiagnosticBoundary(
+  precedenceRows,
+  observedRows
+) {
+  const observedStylesheetRows = observedRows.filter(
+    (row) => row.stylesheetPrecedenceCandidate === true
+  );
+  return freezeRecord({
+    status: privateResourceHintHeadStylesheetPrecedenceBlockedStatus,
+    stylesheetPrecedenceRowsObserved:
+      precedenceRows.length > 0 || observedStylesheetRows.length > 0,
+    stylesheetRowCount: precedenceRows.length,
+    observedStylesheetRowCount: observedStylesheetRows.length,
+    precedenceRows,
+    observedStylesheetRows: freezeArray(
+      observedStylesheetRows.map((row) =>
+        freezeRecord({
+          rowId: row.rowId,
+          childIndex: row.childIndex,
+          nodeName: row.nodeName,
+          relationship: row.relationship,
+          precedenceKey: row.precedenceKey,
+          precedenceValueRetained: false,
+          orderingApplied: false
+        })
+      )
+    ),
+    precedenceMapCreated: false,
+    precedenceQueryRun: false,
+    precedenceInsertionApplied: false,
+    publicStylesheetPrecedenceBehavior: false,
+    compatibilityClaimed: false,
+    blockedCapabilities:
+      resourceHintHeadStylesheetPrecedenceBlockedCapabilities
+  });
+}
+
+function createPreloadPreinitResourceMapPlan(stateByResourceKey, dedupeRows) {
+  let preloadResourceCount = 0;
+  let preinitResourceCount = 0;
+  for (const state of stateByResourceKey.values()) {
+    if (state.preloadRow !== null) {
+      preloadResourceCount++;
+    }
+    if (state.preinitRow !== null) {
+      preinitResourceCount++;
+    }
+  }
+
+  return freezeRecord({
+    resourceMapKind:
+      'react-19.2.6-preload-preinit-resource-map-diagnostic',
+    resourceMapCreated: false,
+    resourceMapMutated: false,
+    inputRowCount: dedupeRows.length,
+    uniqueResourceCount: stateByResourceKey.size,
+    preloadResourceCount,
+    preinitResourceCount,
+    dedupedRowCount: dedupeRows.filter(
+      (row) => row.wouldInsertIntoHead === false
+    ).length,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getAdmissionStringProperty(record, key, fallback) {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : fallback;
@@ -4319,6 +5400,17 @@ function throwInvalidResourceHintHeadClearRetainAdmission(reason) {
   );
   error.name = 'FastReactDomResourceHintHeadClearRetainGateError';
   error.code = privateResourceHintHeadClearRetainInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidResourceHintPreloadPreinitOrderAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM resource hint preload/preinit order admission: ${reason}.`
+  );
+  error.name = 'FastReactDomResourceHintPreloadPreinitOrderGateError';
+  error.code = privateResourceHintPreloadPreinitOrderInvalidAdmissionCode;
   error.compatibilityTarget = compatibilityTarget;
   error.reason = reason;
   throw error;
@@ -5305,6 +6397,30 @@ function resourceHintHeadClearRetainContract(
   });
 }
 
+function resourceHintPreloadPreinitOrderContract(
+  id,
+  sourceContractId,
+  privateDispatcherKey,
+  elementTag,
+  relationship,
+  resourceKinds
+) {
+  return freezeRecord({
+    id,
+    sourceContractId,
+    privateDispatcherKey,
+    elementTag,
+    relationship,
+    resourceKinds: freezeArray(resourceKinds),
+    resourceStage:
+      sourceContractId === 'preload' ? 'preload' : 'preinit',
+    capability: 'react-dom-resource-preload-preinit-dedupe-order-diagnostic',
+    oracleKind: resourceHintOracleKind,
+    deterministicFakeDomOnly: true,
+    compatibilityClaimed: false
+  });
+}
+
 function singletonContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -5464,6 +6580,7 @@ module.exports = {
   createResourceHintFakeDomInsertionGate,
   createResourceHintHeadBoundaryGate,
   createResourceHintHeadClearRetainGate,
+  createResourceHintPreloadPreinitOrderGate,
   createResourceFormActionInternalsGate,
   createUnsupportedControlledInputValueTrackerError,
   createUnsupportedControlledInputRestoreQueueDiagnosticError,
@@ -5471,6 +6588,7 @@ module.exports = {
   createUnsupportedResourceHintFakeDomInsertionError,
   createUnsupportedResourceHintHeadBoundaryError,
   createUnsupportedResourceHintHeadClearRetainError,
+  createUnsupportedResourceHintPreloadPreinitOrderError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
   describeControlledInputValueTrackerGate,
@@ -5481,6 +6599,7 @@ module.exports = {
   describePrivateResourceHintFakeDomInsertionGate,
   describePrivateResourceHintHeadBoundaryGate,
   describePrivateResourceHintHeadClearRetainGate,
+  describePrivateResourceHintPreloadPreinitOrderGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
   formActionContracts,
@@ -5493,12 +6612,14 @@ module.exports = {
   getPrivateResourceHintFakeDomInsertionRecordPayload,
   getPrivateResourceHintHeadBoundaryRecordPayload,
   getPrivateResourceHintHeadClearRetainRecordPayload,
+  getPrivateResourceHintPreloadPreinitOrderRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
   isPrivateResourceHintFakeDomAdapterAdmissionRecord,
   isPrivateResourceHintFakeDomInsertionRecord,
   isPrivateResourceHintHeadBoundaryRecord,
   isPrivateResourceHintHeadClearRetainRecord,
+  isPrivateResourceHintPreloadPreinitOrderRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
   isPrivateControlledInputRestoreQueueDiagnosticRecord,
@@ -5561,6 +6682,15 @@ module.exports = {
   privateResourceHintHeadClearRetainRecordType,
   privateResourceHintHeadClearRetainStatus,
   privateResourceHintHeadStylesheetPrecedenceBlockedStatus,
+  privateResourceHintPreloadPreinitOrderAdmissionRequiredStatus,
+  privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus,
+  privateResourceHintPreloadPreinitOrderExecutionStatus,
+  privateResourceHintPreloadPreinitOrderGateErrorCode,
+  privateResourceHintPreloadPreinitOrderGateId,
+  privateResourceHintPreloadPreinitOrderInvalidAdmissionCode,
+  privateResourceHintPreloadPreinitOrderInvalidRecordCode,
+  privateResourceHintPreloadPreinitOrderRecordType,
+  privateResourceHintPreloadPreinitOrderStatus,
   privateResourceHintDispatcherMetadataGateErrorCode,
   privateResourceHintDispatcherMetadataGateId,
   privateResourceHintDispatcherMetadataInvalidShapeCode,
@@ -5597,6 +6727,12 @@ module.exports = {
   resourceHintHeadClearRetainMissingPrerequisites,
   resourceHintHeadClearRetainSideEffects,
   resourceHintHeadStylesheetPrecedenceBlockedCapabilities,
+  resourceHintPreloadPreinitOrderBlockedCapabilities,
+  resourceHintPreloadPreinitOrderBlockedSideEffects,
+  resourceHintPreloadPreinitOrderContracts,
+  resourceHintPreloadPreinitOrderGateSchemaVersion,
+  resourceHintPreloadPreinitOrderMissingPrerequisites,
+  resourceHintPreloadPreinitOrderSideEffects,
   resourceHintDispatcherMetadataContracts,
   resourceHintDispatcherMetadataGateSchemaVersion,
   resourceHintDispatcherMissingPrerequisites,
