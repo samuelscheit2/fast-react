@@ -7033,6 +7033,8 @@ pub struct TestRendererPrivateToTreeNativeExecutionEvidence {
     consumes_accepted_native_unmount_execution_record: bool,
     consumes_private_to_tree_evidence: bool,
     consumes_accepted_host_output_row: bool,
+    source_finished_work_identity_diagnostic_name: Option<&'static str>,
+    consumes_private_sibling_text_finished_work_identity_gate: bool,
     minimal_tree_shape: bool,
     function_component_above_host_output_shape: bool,
     public_to_tree_available: bool,
@@ -7137,6 +7139,16 @@ impl TestRendererPrivateToTreeNativeExecutionEvidence {
     #[must_use]
     pub const fn consumes_accepted_host_output_row(&self) -> bool {
         self.consumes_accepted_host_output_row
+    }
+
+    #[must_use]
+    pub const fn source_finished_work_identity_diagnostic_name(&self) -> Option<&'static str> {
+        self.source_finished_work_identity_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn consumes_private_sibling_text_finished_work_identity_gate(&self) -> bool {
+        self.consumes_private_sibling_text_finished_work_identity_gate
     }
 
     #[must_use]
@@ -14207,6 +14219,38 @@ impl TestRendererRoot {
         )
     }
 
+    pub fn describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        identity: Option<TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate>,
+    ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
+        self.validate_private_to_tree_update_native_execution_record_for_canary(execution)?;
+        let row = self.describe_private_to_json_sibling_text_host_output_row_for_canary(output)?;
+        let identity = self
+            .validate_private_to_json_sibling_text_native_execution_identity_for_canary(
+                output, execution, identity,
+            )
+            .map_err(|reason| {
+                TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                    operation: "update",
+                    reason,
+                }
+            })?;
+
+        let mut evidence = self.private_to_tree_native_execution_evidence_from_sibling_text_row(
+            "update",
+            "create().update -> create().toTree",
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+            row,
+            output.snapshot(),
+        )?;
+        evidence.source_finished_work_identity_diagnostic_name = Some(identity.diagnostic_name());
+        evidence.consumes_private_sibling_text_finished_work_identity_gate = true;
+        Ok(evidence)
+    }
+
     pub fn describe_private_to_tree_after_unmount_native_execution_for_canary(
         &self,
         output: &TestRendererUnmountedHostOutput,
@@ -14267,6 +14311,8 @@ impl TestRendererRoot {
             consumes_accepted_native_unmount_execution_record: true,
             consumes_private_to_tree_evidence: true,
             consumes_accepted_host_output_row: true,
+            source_finished_work_identity_diagnostic_name: None,
+            consumes_private_sibling_text_finished_work_identity_gate: false,
             minimal_tree_shape,
             function_component_above_host_output_shape: false,
             public_to_tree_available: false,
@@ -14513,6 +14559,14 @@ impl TestRendererRoot {
                 .into(),
             );
         };
+        if report.host_output_shape() == TestRendererPrivateToJsonHostOutputShape::SiblingText {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-finished-work-identity-gate-not-implemented",
+                }
+                .into(),
+            );
+        }
 
         self.describe_private_serialization_finished_work_identity_gate_for_canary(
             "create().toTree",
@@ -15319,7 +15373,102 @@ impl TestRendererRoot {
             consumes_accepted_native_unmount_execution_record: consumes_unmount,
             consumes_private_to_tree_evidence: true,
             consumes_accepted_host_output_row: report.host_output_row().is_some(),
+            source_finished_work_identity_diagnostic_name: None,
+            consumes_private_sibling_text_finished_work_identity_gate: false,
             minimal_tree_shape,
+            function_component_above_host_output_shape,
+            public_to_tree_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn private_to_tree_native_execution_evidence_from_sibling_text_row(
+        &self,
+        operation: &'static str,
+        public_surface: &'static str,
+        source_execution_record_id: &'static str,
+        source_execution_status: &'static str,
+        row: TestRendererPrivateToJsonHostOutputRow,
+        snapshot: &TestContainerSnapshot,
+    ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
+        Self::validate_private_to_json_host_output_row(
+            row.host_output_update_kind(),
+            Some(row),
+            Some(TestRendererPrivateToJsonHostOutputShape::SiblingText),
+        )?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(snapshot);
+        if shape.shape() != TestRendererPrivateToJsonHostOutputShape::SiblingText
+            || shape.shape() != row.host_output_shape()
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostOutputRowShapeMismatch {
+                    row_id: row.id(),
+                    expected: TestRendererPrivateToJsonHostOutputShape::SiblingText,
+                    actual: shape.shape(),
+                }
+                .into(),
+            );
+        }
+        if row.current_root_child_count() != snapshot.children().len()
+            || row.current_host_component_count() != shape.host_component_count()
+            || row.current_host_text_count() != shape.host_text_count()
+            || row.current_root_text_count() != shape.root_text_count()
+            || row.current_max_host_component_depth() != shape.max_host_component_depth()
+        {
+            return self.private_to_tree_native_execution_record_error(
+                operation,
+                "host-output-row-counts-stale",
+            );
+        }
+        if !Self::private_to_json_native_execution_shape_is_accepted(row, shape) {
+            return self.private_to_tree_native_execution_record_error(
+                operation,
+                "accepted-sibling-text-host-output-row-shape-missing",
+            );
+        }
+
+        let rendered_root =
+            Self::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics(
+                snapshot,
+            );
+        let function_component_above_host_output_shape =
+            Self::private_to_tree_rendered_root_wraps_sibling_text_output(&rendered_root);
+        if !function_component_above_host_output_shape {
+            return self.private_to_tree_native_execution_record_error(
+                operation,
+                "function-component-above-sibling-text-output-shape-missing",
+            );
+        }
+
+        Ok(TestRendererPrivateToTreeNativeExecutionEvidence {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_STATUS,
+            root: self.root_id,
+            operation,
+            public_surface,
+            source_execution_record_id,
+            source_execution_status,
+            source_tree_diagnostic_name: TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            host_output_update_kind: row.host_output_update_kind(),
+            host_output_shape: row.host_output_shape(),
+            host_output_row: Some(row),
+            rendered_root,
+            source_fiber_count:
+                TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE.len(),
+            root_child_count: snapshot.children().len(),
+            consumes_accepted_native_create_execution_record: false,
+            consumes_accepted_native_update_execution_record: true,
+            consumes_accepted_native_unmount_execution_record: false,
+            consumes_private_to_tree_evidence: true,
+            consumes_accepted_host_output_row: true,
+            source_finished_work_identity_diagnostic_name: None,
+            consumes_private_sibling_text_finished_work_identity_gate: false,
+            minimal_tree_shape: false,
             function_component_above_host_output_shape,
             public_to_tree_available: false,
             public_serialization_available: false,
@@ -15423,6 +15572,34 @@ impl TestRendererRoot {
             && !function_component.public_tree_object_available()
             && report.host_component().fiber_tag() == function_component.rendered_child_fiber_tag()
             && report.host_component().node_type() == function_component.rendered_child_node_type()
+    }
+
+    fn private_to_tree_rendered_root_wraps_sibling_text_output(
+        rendered_root: &TestRendererPrivateTreeRenderedRoot,
+    ) -> bool {
+        let Some(component) = rendered_root.as_function_component() else {
+            return false;
+        };
+        let Some(rendered_children) = component.rendered().as_array() else {
+            return false;
+        };
+        if component.node_type() != TestRendererPrivateTreeNodeType::Component
+            || component.component_type() != TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+            || !component.props().attributes().is_empty()
+            || component.instance_available()
+            || !component.wraps_committed_host_output()
+            || rendered_children.len() != 2
+            || rendered_children[0].as_text().is_none()
+        {
+            return false;
+        }
+        let Some(host_component) = rendered_children[1].as_host_component() else {
+            return false;
+        };
+        host_component.node_type() == TestRendererPrivateTreeNodeType::Host
+            && !host_component.instance_available()
+            && host_component.rendered_child_count() == 1
+            && host_component.rendered()[0].as_text().is_some()
     }
 
     #[allow(
@@ -20485,6 +20662,26 @@ mod tests {
         }
     }
 
+    fn assert_to_tree_native_execution_error_reason(
+        error: TestRendererRootError,
+        expected_operation: &'static str,
+        expected_reason: &'static str,
+    ) {
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree native execution error");
+        };
+        match error.as_ref() {
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation,
+                reason,
+            } => {
+                assert_eq!(*operation, expected_operation);
+                assert_eq!(*reason, expected_reason);
+            }
+            other => panic!("unexpected private toTree native execution error: {other:?}"),
+        }
+    }
+
     fn accepted_nested_update_route_admission_for_root(
         root: &TestRendererRoot,
         output: &TestRendererNestedHostParentPlacedHostOutput,
@@ -23358,6 +23555,213 @@ mod tests {
     }
 
     #[test]
+    fn root_private_to_tree_sibling_text_real_output_native_execution_consumes_identity_gate() {
+        let (root, output, route, report) = sibling_text_identity_inputs_for_canary();
+        let identity = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&report),
+            )
+            .unwrap();
+
+        let evidence = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(identity),
+            )
+            .unwrap();
+
+        assert_eq!(evidence.operation(), "update");
+        assert_eq!(
+            evidence.public_surface(),
+            "create().update -> create().toTree"
+        );
+        assert_eq!(
+            evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            evidence.source_tree_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert_eq!(
+            evidence.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            evidence.source_fiber_count(),
+            TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE.len()
+        );
+        assert_eq!(evidence.root_child_count(), 2);
+        assert!(evidence.consumes_accepted_native_update_execution_record());
+        assert!(evidence.consumes_private_to_tree_evidence());
+        assert!(evidence.consumes_accepted_host_output_row());
+        assert_eq!(
+            evidence.source_finished_work_identity_diagnostic_name(),
+            Some(TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME)
+        );
+        assert!(evidence.consumes_private_sibling_text_finished_work_identity_gate());
+        assert!(!evidence.minimal_tree_shape());
+        assert!(evidence.function_component_above_host_output_shape());
+        assert!(!evidence.public_to_tree_available());
+        assert!(!evidence.public_serialization_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+
+        let component = evidence.rendered_root().as_function_component().unwrap();
+        let children = component.rendered().as_array().unwrap();
+        assert_eq!(component.component_type(), "CanaryFunctionComponent");
+        assert!(component.wraps_committed_host_output());
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].as_text(), Some("first sibling"));
+        let host = children[1].as_host_component().unwrap();
+        assert_eq!(host.element_type().as_str(), "span");
+        assert_eq!(host.rendered()[0].as_text(), Some("second sibling"));
+    }
+
+    #[test]
+    fn root_private_to_tree_sibling_text_real_output_native_execution_rejects_missing_or_tampered_identity()
+     {
+        let (root, mut output, route, report) = sibling_text_identity_inputs_for_canary();
+        let identity = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&report),
+            )
+            .unwrap();
+
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output, route, None,
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "finished-work-identity-missing",
+        );
+
+        let mut wrong_source_identity = identity;
+        wrong_source_identity.source_serialization_diagnostic_name =
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME;
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(wrong_source_identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "sibling-text-finished-work-identity-source-mismatch",
+        );
+
+        let mut wrong_surface_identity = identity;
+        wrong_surface_identity.public_surface = "create().update -> create().toTree";
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(wrong_surface_identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "sibling-text-finished-work-identity-source-mismatch",
+        );
+
+        let mut wrong_route_identity = identity;
+        wrong_route_identity.route_commit_current.slot += 1;
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(wrong_route_identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "sibling-text-route-finished-work-identity-mismatch",
+        );
+
+        let mut stale_route = route;
+        stale_route.commit_current.slot += 1;
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                stale_route,
+                Some(identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "update-admission-handoff-mismatch",
+        );
+
+        let mut lane_identity = identity;
+        lane_identity.report_finished_lanes_bits += 1;
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(lane_identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "sibling-text-finished-work-identity-lane-mismatch",
+        );
+
+        let mut public_identity = identity;
+        public_identity.package_compatibility_claimed = true;
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(public_identity),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "update",
+            "public-or-native-package-js-compatibility-claim",
+        );
+
+        output.snapshot.children.clear();
+        let error = root
+            .describe_private_to_tree_after_sibling_text_update_native_execution_for_canary(
+                &output,
+                route,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
     fn root_sibling_text_host_output_update_commits_real_root_text_before_component() {
         let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
             "span",
@@ -23860,6 +24264,31 @@ mod tests {
 
         let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
             panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason: "sibling-text-finished-work-identity-gate-not-implemented"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_to_tree_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate()
+     {
+        let (root, output, _route, json_report) = sibling_text_identity_inputs_for_canary();
+        let tree_report = TestRendererRoot::private_tree_metadata_from_json_report(json_report);
+
+        let error = root
+            .describe_private_to_tree_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                Some(&tree_report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private toTree finished-work identity error");
         };
         assert!(matches!(
             error.as_ref(),
