@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 494 was accepted from queue 473-502. It extended private
+  `scheduler/unstable_post_task` abort and continuation diagnostics for the
+  controlled shim path, keeping the public node shape, checked oracle, and
+  browser postTask compatibility claims unchanged. It was verified after merge
+  with the focused scheduler post-task oracle test, scheduler workspace import
+  smoke, regenerated oracle byte comparison, conflict-marker scanning, and
+  `git diff --check`.
 - Workers 474, 476, 483, 487, 489, 493, 496, 498, 501, and 502 were accepted
   from queue 473-502. The batch added private passive mount/unmount callback
   execution, root commit effect ordering, react-test-renderer `flushSync` act
