@@ -5,7 +5,7 @@
 - `create_goal` was called as the first action before research, file reads,
   implementation, or verification.
 - `get_goal` was available after setup and before this report.
-- Active status from `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active objective from `get_goal`: Worker 477: add private
   function-component diagnostics for useMemo dependency reuse versus recompute
   across updates, aligned with accepted hook queue and render metadata.
