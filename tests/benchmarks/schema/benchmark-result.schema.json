@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fast-react.local/schemas/benchmark-result.schema.json",
+  "title": "Fast React benchmark result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "manifestId",
+    "generatedTimestampIncluded",
+    "scenarioResults"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "fast-react-benchmark-result"
+    },
+    "manifestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedTimestampIncluded": {
+      "const": false
+    },
+    "scenarioResults": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scenarioResult"
+      }
+    }
+  },
+  "$defs": {
+    "timingStatus": {
+      "enum": [
+        "not-collected",
+        "blocked-by-conformance",
+        "diagnostic-only",
+        "compared-not-compatible",
+        "comparable",
+        "noise-bound",
+        "regression",
+        "improvement"
+      ]
+    },
+    "scenarioResult": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["scenarioId", "implementation", "lane", "timingStatus"],
+      "properties": {
+        "scenarioId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timingStatus": {
+          "$ref": "#/$defs/timingStatus"
+        }
+      }
+    }
+  }
+}

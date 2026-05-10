@@ -179,6 +179,70 @@ impl BridgeHandleEntry {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BridgeEnvironmentTeardown {
+    requested_environment_id: BridgeEnvironmentId,
+    table_environment_id: BridgeEnvironmentId,
+    root_handles_invalidated: usize,
+    value_handles_invalidated: usize,
+}
+
+impl BridgeEnvironmentTeardown {
+    const fn new(
+        requested_environment_id: BridgeEnvironmentId,
+        table_environment_id: BridgeEnvironmentId,
+    ) -> Self {
+        Self {
+            requested_environment_id,
+            table_environment_id,
+            root_handles_invalidated: 0,
+            value_handles_invalidated: 0,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn requested_environment_id(self) -> BridgeEnvironmentId {
+        self.requested_environment_id
+    }
+
+    #[must_use]
+    pub(crate) const fn table_environment_id(self) -> BridgeEnvironmentId {
+        self.table_environment_id
+    }
+
+    #[must_use]
+    pub(crate) const fn environment_matched(self) -> bool {
+        self.requested_environment_id.raw() == self.table_environment_id.raw()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_handles_invalidated(self) -> usize {
+        self.root_handles_invalidated
+    }
+
+    #[must_use]
+    pub(crate) const fn value_handles_invalidated(self) -> usize {
+        self.value_handles_invalidated
+    }
+
+    #[must_use]
+    pub(crate) const fn total_handles_invalidated(self) -> usize {
+        self.root_handles_invalidated + self.value_handles_invalidated
+    }
+
+    #[must_use]
+    pub(crate) const fn tore_down_handles(self) -> bool {
+        self.total_handles_invalidated() > 0
+    }
+
+    fn record_invalidated(&mut self, kind: BridgeHandleKind) {
+        match kind {
+            BridgeHandleKind::Root => self.root_handles_invalidated += 1,
+            BridgeHandleKind::Value => self.value_handles_invalidated += 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BridgeHandleSlot {
     Vacant { next_generation: u64 },
@@ -382,6 +446,33 @@ impl BridgeHandleTable {
 
         entry.disposed = true;
         Ok(())
+    }
+
+    pub(crate) fn teardown_environment(
+        &mut self,
+        environment_id: BridgeEnvironmentId,
+    ) -> BridgeEnvironmentTeardown {
+        let mut teardown = BridgeEnvironmentTeardown::new(environment_id, self.environment_id);
+
+        if environment_id != self.environment_id {
+            return teardown;
+        }
+
+        for slot in &mut self.slots {
+            let BridgeHandleSlot::Occupied(entry) = slot else {
+                continue;
+            };
+
+            teardown.record_invalidated(entry.record.kind());
+
+            if let Some(next_generation) = entry.generation.checked_add(1) {
+                *slot = BridgeHandleSlot::Vacant { next_generation };
+            } else {
+                entry.disposed = true;
+            }
+        }
+
+        teardown
     }
 
     fn insert_record(&mut self, record: BridgeRecord) -> BridgeHandle {
@@ -672,6 +763,151 @@ mod tests {
             BridgeHandleTableError::StaleHandle {
                 handle,
                 current_generation: 2
+            }
+        );
+    }
+
+    #[test]
+    fn teardown_invalidates_multiple_root_and_value_handles() {
+        let mut table = environment(1);
+        let first_root = table.insert_root(PlaceholderRootRecord::new(11));
+        let value = table.insert_value(PlaceholderValueRecord::new(22));
+        let second_root = table.insert_root(PlaceholderRootRecord::new(33));
+
+        let teardown = table.teardown_environment(table.environment_id());
+
+        assert_eq!(teardown.requested_environment_id(), table.environment_id());
+        assert_eq!(teardown.table_environment_id(), table.environment_id());
+        assert!(teardown.environment_matched());
+        assert_eq!(teardown.root_handles_invalidated(), 2);
+        assert_eq!(teardown.value_handles_invalidated(), 1);
+        assert_eq!(teardown.total_handles_invalidated(), 3);
+        assert!(teardown.tore_down_handles());
+        assert_eq!(
+            table.get_root(first_root).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: first_root,
+                current_generation: first_root.generation() + 1
+            }
+        );
+        assert_eq!(
+            table.get_value(value).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: value,
+                current_generation: value.generation() + 1
+            }
+        );
+        assert_eq!(
+            table.get_root(second_root).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: second_root,
+                current_generation: second_root.generation() + 1
+            }
+        );
+
+        let empty_teardown = table.teardown_environment(table.environment_id());
+
+        assert!(empty_teardown.environment_matched());
+        assert!(!empty_teardown.tore_down_handles());
+        assert_eq!(empty_teardown.total_handles_invalidated(), 0);
+    }
+
+    #[test]
+    fn teardown_is_idempotent_when_environment_is_empty() {
+        let mut table = environment(1);
+
+        let first_teardown = table.teardown_environment(table.environment_id());
+        let second_teardown = table.teardown_environment(table.environment_id());
+
+        assert!(first_teardown.environment_matched());
+        assert!(!first_teardown.tore_down_handles());
+        assert_eq!(first_teardown.total_handles_invalidated(), 0);
+        assert_eq!(second_teardown, first_teardown);
+    }
+
+    #[test]
+    fn teardown_does_not_cross_environment_tables() {
+        let mut first = environment(1);
+        let mut second = environment(2);
+        let first_root = first.insert_root(PlaceholderRootRecord::new(10));
+        let second_root = second.insert_root(PlaceholderRootRecord::new(20));
+        let second_disposed = second.insert_value(PlaceholderValueRecord::new(30));
+        let second_removed = second.insert_value(PlaceholderValueRecord::new(40));
+        second.dispose(second_disposed).unwrap();
+        second.remove_value(second_removed).unwrap();
+
+        let mismatched_teardown = first.teardown_environment(second.environment_id());
+
+        assert!(!mismatched_teardown.environment_matched());
+        assert!(!mismatched_teardown.tore_down_handles());
+        assert_eq!(first.get_root(first_root).unwrap().root_id(), 10);
+
+        let first_teardown = first.teardown_environment(first.environment_id());
+
+        assert!(first_teardown.tore_down_handles());
+        assert_eq!(second.get_root(second_root).unwrap().root_id(), 20);
+        assert_eq!(
+            first.get_root(second_root).unwrap_err(),
+            BridgeHandleTableError::WrongEnvironment {
+                handle: second_root,
+                expected: first.environment_id()
+            }
+        );
+        assert_eq!(
+            second.get_value(second_root).unwrap_err(),
+            BridgeHandleTableError::WrongKind {
+                handle: second_root,
+                expected: BridgeHandleKind::Value,
+                actual: BridgeHandleKind::Root
+            }
+        );
+        assert_eq!(
+            second.dispose(second_disposed).unwrap_err(),
+            BridgeHandleTableError::DuplicateDispose {
+                handle: second_disposed
+            }
+        );
+        assert_eq!(
+            second.get_value(second_removed).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: second_removed,
+                current_generation: second_removed.generation() + 1
+            }
+        );
+    }
+
+    #[test]
+    fn post_teardown_lookup_removal_and_dispose_use_stale_handle_errors() {
+        let mut table = environment(1);
+        let handle = table.insert_root(PlaceholderRootRecord::new(51));
+
+        table.teardown_environment(table.environment_id());
+
+        let expected = BridgeHandleTableError::StaleHandle {
+            handle,
+            current_generation: handle.generation() + 1,
+        };
+        assert_eq!(table.get_root(handle).unwrap_err(), expected);
+        assert_eq!(table.remove_root(handle).unwrap_err(), expected);
+        assert_eq!(table.dispose(handle).unwrap_err(), expected);
+    }
+
+    #[test]
+    fn insertion_after_teardown_reuses_slots_without_reviving_old_handles() {
+        let mut table = environment(1);
+        let old_handle = table.insert_root(PlaceholderRootRecord::new(61));
+
+        table.teardown_environment(table.environment_id());
+        let new_handle = table.insert_root(PlaceholderRootRecord::new(62));
+
+        assert_eq!(new_handle.slot(), old_handle.slot());
+        assert_eq!(new_handle.generation(), old_handle.generation() + 1);
+        assert_eq!(table.get_root(new_handle).unwrap().root_id(), 62);
+        assert_eq!(
+            table.get_root(old_handle).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: old_handle,
+                current_generation: new_handle.generation()
             }
         );
     }

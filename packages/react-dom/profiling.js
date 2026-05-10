@@ -7,6 +7,7 @@ const {
   definePlaceholderMetadata,
   reactDomVersion
 } = require('./placeholder-utils.js');
+const {createPortal} = require('./src/shared/create-portal.js');
 
 const entrypoint = 'react-dom/profiling';
 
@@ -16,7 +17,7 @@ exports.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE =
     '__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE',
     'react-dom-export-oracle-shape'
   );
-exports.createPortal = createUnsupportedFunction(entrypoint, 'createPortal', 2);
+exports.createPortal = createPortal;
 exports.createRoot = createUnsupportedFunction(entrypoint, 'createRoot', 2);
 exports.flushSync = createUnsupportedFunction(entrypoint, 'flushSync', 1);
 exports.hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot', 3);
