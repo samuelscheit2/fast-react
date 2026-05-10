@@ -61,11 +61,19 @@ const privateRootBridgeStatus =
   "blocked-private-test-renderer-root-bridge-execution";
 const privateRootCompatibilityStatus =
   "blocked-private-test-renderer-root-bridge-compatibility";
+const lifecycleDiagnosticGateStatus =
+  "accepted-private-update-unmount-lifecycle-diagnostics-public-root-blocked";
 const rootLifecycleActive = "Active";
 const rootLifecycleUnmountScheduled = "UnmountScheduled";
 const rootUpdateOutcomeScheduled = "Scheduled";
 const rootUpdateOutcomeIgnoredAfterUnmount = "IgnoredAfterUnmount";
 const rootUpdateOutcomeAlreadyUnmountScheduled = "AlreadyUnmountScheduled";
+const acceptedRustLifecycleDiagnosticRecords = [
+  "TestRendererRootLifecycle",
+  "TestRendererRootUpdateKind",
+  "TestRendererRootUpdateOutcome",
+  "TestRendererRootScheduledUpdate"
+];
 const errorSurfacePrivateRoutingRowIds = [
   "react-test-renderer-create-routing-private-diagnostic",
   "react-test-renderer-update-route-private-diagnostic",
@@ -87,6 +95,10 @@ const expectedPrivateRoutes = [
       "root_host_output_canary_updates_committed_text_with_update_diagnostics",
       "root_host_output_update_canary_fails_closed_without_committed_output"
     ],
+    acceptedOutcomes: [
+      rootUpdateOutcomeScheduled,
+      rootUpdateOutcomeIgnoredAfterUnmount
+    ],
     id: "react-test-renderer-update-private-route",
     publicSurface: "create().update"
   },
@@ -97,6 +109,10 @@ const expectedPrivateRoutes = [
     ],
     acceptedRustTests: [
       "root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics"
+    ],
+    acceptedOutcomes: [
+      rootUpdateOutcomeScheduled,
+      rootUpdateOutcomeAlreadyUnmountScheduled
     ],
     id: "react-test-renderer-unmount-private-route",
     publicSurface: "create().unmount"
@@ -730,6 +746,100 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
   }
 });
 
+test("react-test-renderer private root request bridge consumes accepted Rust lifecycle diagnostics", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const renderer = moduleExports.create({ type: "lifecycle" });
+
+    const updateError = captureThrown(() =>
+      renderer.update({ type: "updated" })
+    );
+    const unmountError = captureThrown(() => renderer.unmount());
+    const ignoredUpdateError = captureThrown(() =>
+      renderer.update({ type: "ignored" })
+    );
+    const secondUnmountError = captureThrown(() => renderer.unmount());
+
+    for (const request of [
+      updateError.rootRequest,
+      unmountError.rootRequest,
+      ignoredUpdateError.rootRequest,
+      secondUnmountError.rootRequest
+    ]) {
+      const sourceDiagnostic = createRustLifecycleDiagnosticSource(request);
+      assert.equal(
+        bridge.canConsumeAcceptedRustLifecycleDiagnostic(
+          request,
+          sourceDiagnostic
+        ),
+        true,
+        `${entry.entrypoint} ${request.operation} ${request.rustOutcome}`
+      );
+      const consumed = bridge.consumeAcceptedRustLifecycleDiagnostic(
+        request,
+        sourceDiagnostic
+      );
+
+      assertRootRequestRustLifecycleDiagnostic(
+        consumed,
+        expectedRootRequestDiagnosticFromRecord(request)
+      );
+      assert.equal(consumed.consumedFromExternalDiagnostic, true);
+      assert.equal(Object.isFrozen(consumed.sourceDiagnostic), true);
+      assert.equal(consumed.sourceDiagnostic.operation, request.operation);
+      assert.equal(consumed.sourceDiagnostic.updateKind, request.updateKind);
+      assert.equal(
+        consumed.sourceDiagnostic.updateOutcome,
+        request.rustOutcome
+      );
+      assert.equal(
+        consumed.sourceDiagnostic.hasScheduledUpdate,
+        request.scheduled
+      );
+    }
+
+    const mismatchedDiagnostic = {
+      ...createRustLifecycleDiagnosticSource(updateError.rootRequest),
+      updateOutcome: rootUpdateOutcomeAlreadyUnmountScheduled
+    };
+    assert.equal(
+      bridge.canConsumeAcceptedRustLifecycleDiagnostic(
+        updateError.rootRequest,
+        mismatchedDiagnostic
+      ),
+      false,
+      entry.entrypoint
+    );
+    const mismatchError = captureThrown(() =>
+      bridge.consumeAcceptedRustLifecycleDiagnostic(
+        updateError.rootRequest,
+        mismatchedDiagnostic
+      )
+    );
+    assert.equal(
+      mismatchError.name,
+      "FastReactTestRendererPrivateRootRequestError"
+    );
+    assert.equal(
+      mismatchError.code,
+      "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST"
+    );
+
+    assert.equal(
+      bridge.canConsumeAcceptedRustLifecycleDiagnostic(
+        bridge.getRendererRootRequests(renderer)[0],
+        createRustLifecycleDiagnosticSource(updateError.rootRequest)
+      ),
+      false,
+      entry.entrypoint
+    );
+  }
+});
+
 test("react-test-renderer create routing gate feeds only private error diagnostic rows", () => {
   const gate = evaluateReactTestRendererErrorSurfaceLocalGate({
     oracle: readCheckedReactTestRendererErrorSurfaceOracle()
@@ -753,7 +863,15 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
   assert.deepEqual(gate.admittedPublicScenarios, []);
   assert.equal(gate.localChecks.createRoutingGatePresent, true);
   assert.equal(gate.localChecks.updatePrivateRoutePresent, true);
+  assert.equal(
+    gate.localChecks.updatePrivateRouteConsumesLifecycleDiagnostics,
+    true
+  );
   assert.equal(gate.localChecks.unmountPrivateRoutePresent, true);
+  assert.equal(
+    gate.localChecks.unmountPrivateRouteConsumesLifecycleDiagnostics,
+    true
+  );
   assert.equal(
     gate.localChecks.privateToJSONSerializationFacadeGatePresent,
     true
@@ -994,6 +1112,14 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(typeof bridge.getRequestPayload, "function");
   assert.equal(typeof bridge.getRustCanaryMetadata, "function");
   assert.equal(typeof bridge.getRustCanaryOperationMetadata, "function");
+  assert.equal(
+    typeof bridge.canConsumeAcceptedRustLifecycleDiagnostic,
+    "function"
+  );
+  assert.equal(
+    typeof bridge.consumeAcceptedRustLifecycleDiagnostic,
+    "function"
+  );
   assert.equal(bridge.getRustCanaryMetadata(), bridge.rustCanaryMetadata);
 
   return bridge;
@@ -1018,6 +1144,14 @@ function assertRootRequest(request, expected) {
   assert.equal(request.lifecycleStatusAfter, expected.lifecycleStatusAfter);
   assert.equal(request.scheduled, expected.scheduled);
   assert.equal(request.rustOutcome, expected.rustOutcome);
+  assert.equal(
+    request.acceptedRustLifecycleDiagnostic,
+    request.rustLifecycleDiagnostic
+  );
+  assertRootRequestRustLifecycleDiagnostic(
+    request.rustLifecycleDiagnostic,
+    expected
+  );
   assert.equal(request.rootHandle, expected.rootHandle);
   assert.equal(request.rootElementHandle.raw, expected.rootElementHandleRaw);
   assert.equal(
@@ -1085,6 +1219,157 @@ function assertRootRequest(request, expected) {
       "public-compatibility"
     ]
   );
+}
+
+function createRustLifecycleDiagnosticSource(request) {
+  return {
+    operation: request.operation,
+    updateKind: request.updateKind,
+    updateOutcome: request.rustOutcome,
+    lifecycleStatusBefore: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusBefore
+    ),
+    lifecycleStatusAfter: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusAfter
+    ),
+    scheduledUpdate: request.scheduled
+      ? {
+          kind: request.updateKind,
+          element: request.rootElementHandle.isNone
+            ? {
+                kind: "RootElementHandle::NONE",
+                isNone: true
+              }
+            : {
+                kind: "RootElementHandle",
+                isNone: false
+              },
+          containerUpdate: {
+            api: request.containerUpdateApi
+          },
+          rootSchedule: {
+            api: "ensure_root_is_scheduled"
+          }
+        }
+      : null
+  };
+}
+
+function expectedRootRequestDiagnosticFromRecord(request) {
+  return {
+    entrypoint: request.entrypoint,
+    operation: request.operation,
+    requestType: request.requestType,
+    lifecycleStatusBefore: request.lifecycleStatusBefore,
+    lifecycleStatusAfter: request.lifecycleStatusAfter,
+    updateKind: request.updateKind,
+    rustOutcome: request.rustOutcome,
+    rootElementHandleRaw: request.rootElementHandle.raw,
+    scheduled: request.scheduled,
+    sync: request.sync
+  };
+}
+
+function assertRootRequestRustLifecycleDiagnostic(diagnostic, expected) {
+  assert.equal(Object.isFrozen(diagnostic), true, expected.entrypoint);
+  assert.equal(
+    diagnostic.kind,
+    "FastReactTestRendererAcceptedRustLifecycleDiagnostic",
+    expected.entrypoint
+  );
+  assert.equal(
+    diagnostic.status,
+    lifecycleDiagnosticGateStatus,
+    expected.entrypoint
+  );
+  assert.equal(Object.isFrozen(diagnostic.gate), true, expected.entrypoint);
+  assert.equal(
+    diagnostic.gate.id,
+    "react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate",
+    expected.entrypoint
+  );
+  assert.deepEqual(
+    diagnostic.rustRecords,
+    acceptedRustLifecycleDiagnosticRecords
+  );
+  assert.equal(diagnostic.operation, expected.operation);
+  assert.equal(diagnostic.requestType, expected.requestType);
+  assert.equal(
+    diagnostic.lifecycleStatusBefore,
+    normalizeExpectedRustLifecycle(expected.lifecycleStatusBefore)
+  );
+  assert.equal(
+    diagnostic.lifecycleStatusAfter,
+    normalizeExpectedRustLifecycle(expected.lifecycleStatusAfter)
+  );
+  assert.equal(diagnostic.jsLifecycleStatusBefore, expected.lifecycleStatusBefore);
+  assert.equal(diagnostic.jsLifecycleStatusAfter, expected.lifecycleStatusAfter);
+  assert.equal(diagnostic.updateKind, expected.updateKind);
+  assert.equal(diagnostic.updateOutcome, expected.rustOutcome);
+  assert.equal(
+    diagnostic.outcomeRecord,
+    `TestRendererRootUpdateOutcome::${expected.rustOutcome}`
+  );
+  assert.equal(
+    diagnostic.scheduledUpdateRecord,
+    expected.scheduled ? "TestRendererRootScheduledUpdate" : null
+  );
+  assert.equal(
+    diagnostic.rootElementHandleKind,
+    expected.rootElementHandleRaw === 0
+      ? "RootElementHandle::NONE"
+      : "RootElementHandle"
+  );
+  assert.equal(
+    diagnostic.rootElementHandleIsNone,
+    expected.rootElementHandleRaw === 0
+  );
+  assert.equal(
+    diagnostic.containerUpdateApi,
+    expected.scheduled
+      ? expected.operation === "unmount"
+        ? "update_container_sync"
+        : "update_container"
+      : null
+  );
+  assert.equal(
+    diagnostic.schedulerApi,
+    expected.scheduled ? "ensure_root_is_scheduled" : null
+  );
+  assert.equal(diagnostic.sync, expected.scheduled ? expected.sync : null);
+  assert.equal(diagnostic.schedulesRootUpdate, expected.scheduled);
+  assert.equal(
+    diagnostic.consumesAcceptedRustLifecycleDiagnostics,
+    expected.operation === "update" || expected.operation === "unmount"
+  );
+  assert.equal(
+    diagnostic.privateDiagnosticConsumed,
+    expected.operation === "update" || expected.operation === "unmount"
+  );
+  assert.equal(diagnostic.publicRouteAvailable, false);
+  assert.equal(
+    diagnostic.publicCreateUpdateUnmountBehaviorAvailable,
+    false
+  );
+  assert.equal(diagnostic.nativeBridgeAvailable, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.rustExecutionFromJs, false);
+  assert.equal(diagnostic.reconcilerExecutionFromJs, false);
+  assert.equal(diagnostic.hostOutputProducedFromJs, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+}
+
+function normalizeExpectedRustLifecycle(value) {
+  if (value === null) {
+    return undefined;
+  }
+  if (value === "active") {
+    return rootLifecycleActive;
+  }
+  if (value === "unmount-scheduled") {
+    return rootLifecycleUnmountScheduled;
+  }
+  return value;
 }
 
 function assertRustCanaryMetadata(metadata, label) {
@@ -1472,6 +1757,12 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(gate.privateRoutes[1], gate.unmountPrivateRoute);
   assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[0]);
   assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[1]);
+  assertLifecycleDiagnosticGate(gate.updateUnmountRustLifecycleDiagnosticGate);
+  assert.equal(gate.privateUpdateUnmountLifecycleDiagnosticsAccepted, true);
+  assert.equal(
+    gate.privateUpdateUnmountLifecycleDiagnosticConsumptionAvailable,
+    true
+  );
   assert.equal(
     error.toTreeHostOutputMetadataGate,
     gate.toTreeHostOutputMetadataGate
@@ -1494,6 +1785,18 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.equal(privateRoute.deterministic, true);
   assert.equal(privateRoute.publicRouteAvailable, false);
   assert.equal(privateRoute.privateRustCanaryAccepted, true);
+  assert.equal(privateRoute.acceptedRustLifecycleDiagnostics, true);
+  assert.equal(privateRoute.consumesAcceptedRustLifecycleDiagnostics, true);
+  assertLifecycleDiagnosticGate(privateRoute.lifecycleDiagnosticGate);
+  assert.deepEqual(
+    privateRoute.acceptedRustRecords,
+    acceptedRustLifecycleDiagnosticRecords
+  );
+  assert.deepEqual(privateRoute.acceptedLifecycleStates, [
+    rootLifecycleActive,
+    rootLifecycleUnmountScheduled
+  ]);
+  assert.deepEqual(privateRoute.acceptedOutcomes, expected.acceptedOutcomes);
   assert.equal(privateRoute.nativeBridgeAvailable, false);
   assert.equal(privateRoute.nativeExecution, false);
   assert.equal(
@@ -1505,6 +1808,56 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
+}
+
+function assertLifecycleDiagnosticGate(gate) {
+  assert.equal(Object.isFrozen(gate), true);
+  assert.equal(
+    gate.id,
+    "react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate"
+  );
+  assert.equal(gate.status, lifecycleDiagnosticGateStatus);
+  assert.equal(gate.deterministic, true);
+  assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer");
+  assert.deepEqual(gate.acceptedRustRecords, acceptedRustLifecycleDiagnosticRecords);
+  assert.deepEqual(gate.acceptedOperations, ["update", "unmount"]);
+  assert.deepEqual(gate.acceptedLifecycleStates, [
+    rootLifecycleActive,
+    rootLifecycleUnmountScheduled
+  ]);
+  assert.deepEqual(gate.acceptedOutcomes, [
+    rootUpdateOutcomeScheduled,
+    rootUpdateOutcomeIgnoredAfterUnmount,
+    rootUpdateOutcomeAlreadyUnmountScheduled
+  ]);
+  assert.deepEqual(gate.acceptedScheduledElementKinds, [
+    "RootElementHandle",
+    "RootElementHandle::NONE"
+  ]);
+  assert.deepEqual(gate.acceptedContainerUpdateApis, [
+    "update_container",
+    "update_container_sync"
+  ]);
+  assert.deepEqual(gate.acceptedWorkers, [
+    "worker-153-test-renderer-root-canary",
+    "worker-234-test-renderer-host-output-update-unmount-canary",
+    "worker-307-test-renderer-update-unmount-private-js-bridge"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_update_reuses_same_fiber_root_and_shared_scheduler_record",
+    "root_update_after_unmount_does_not_mutate_or_reschedule",
+    "root_unmount_enqueues_sync_null_update_before_wrapper_invalidation",
+    "root_unmount_is_idempotent"
+  ]);
+  assert.equal(gate.privateDiagnosticConsumptionAvailable, true);
+  assert.equal(gate.publicCreateUpdateUnmountBehaviorAvailable, false);
+  assert.equal(gate.publicRouteAvailable, false);
+  assert.equal(gate.nativeBridgeAvailable, false);
+  assert.equal(gate.nativeExecution, false);
+  assert.equal(gate.rustExecutionFromJs, false);
+  assert.equal(gate.reconcilerExecutionFromJs, false);
+  assert.equal(gate.hostOutputProducedFromJs, false);
+  assert.equal(gate.compatibilityClaimed, false);
 }
 
 function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
@@ -2335,6 +2688,14 @@ function assertPrivateRootRequest(record, expected) {
   assert.equal(record.updateKind, expected.updateKind);
   assert.equal(record.updateOutcome, expected.updateOutcome);
   assert.equal(
+    record.acceptedRustLifecycleDiagnostic,
+    record.rustLifecycleDiagnostic
+  );
+  assertPrivateRootRustLifecycleDiagnostic(
+    record.rustLifecycleDiagnostic,
+    expected
+  );
+  assert.equal(
     record.scheduledUpdateCountBefore,
     expected.scheduledUpdateCountBefore
   );
@@ -2429,6 +2790,84 @@ function assertPrivateRootRequest(record, expected) {
     assert.equal(record.rootSchedule.nativeExecution, false);
     assert.equal(record.rootSchedule.reconcilerExecution, false);
   }
+}
+
+function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    diagnostic.kind,
+    "FastReactTestRendererAcceptedRustLifecycleDiagnostic"
+  );
+  assert.equal(diagnostic.status, lifecycleDiagnosticGateStatus);
+  assert.equal(
+    diagnostic.gate.id,
+    "react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate"
+  );
+  assert.deepEqual(
+    diagnostic.rustRecords,
+    acceptedRustLifecycleDiagnosticRecords
+  );
+  assert.equal(diagnostic.operation, expected.operation);
+  assert.equal(diagnostic.requestType, expected.requestType);
+  assert.equal(diagnostic.lifecycleStatusBefore, expected.lifecycleStatusBefore);
+  assert.equal(diagnostic.lifecycleStatusAfter, expected.lifecycleStatusAfter);
+  assert.equal(
+    diagnostic.lifecycleTransition,
+    `${expected.lifecycleStatusBefore === null ? "none" : expected.lifecycleStatusBefore}->${expected.lifecycleStatusAfter}`
+  );
+  assert.equal(diagnostic.updateKind, expected.updateKind);
+  assert.equal(diagnostic.updateOutcome, expected.updateOutcome);
+  assert.equal(
+    diagnostic.outcomeRecord,
+    `TestRendererRootUpdateOutcome::${expected.updateOutcome}`
+  );
+  assert.equal(
+    diagnostic.scheduledUpdateRecord,
+    expected.schedulesRootUpdate ? "TestRendererRootScheduledUpdate" : null
+  );
+  assert.equal(
+    diagnostic.scheduledUpdateSequence,
+    expected.scheduledUpdateSequence
+  );
+  assert.equal(
+    diagnostic.scheduledElementKind,
+    expected.scheduledElement === null
+      ? null
+      : expected.scheduledElement?.kind ?? "OpaqueJsRootElement"
+  );
+  assert.equal(
+    diagnostic.scheduledElementIsNone,
+    expected.scheduledElement?.isNone === true
+  );
+  assert.equal(
+    diagnostic.containerUpdateApi,
+    expected.schedulesRootUpdate ? expected.containerUpdateApi : null
+  );
+  assert.equal(
+    diagnostic.schedulerApi,
+    expected.schedulesRootUpdate ? "ensure_root_is_scheduled" : null
+  );
+  assert.equal(diagnostic.sync, expected.schedulesRootUpdate ? expected.sync : null);
+  assert.equal(diagnostic.schedulesRootUpdate, expected.schedulesRootUpdate);
+  assert.equal(
+    diagnostic.consumesAcceptedRustLifecycleDiagnostics,
+    expected.operation === "update" || expected.operation === "unmount"
+  );
+  assert.equal(
+    diagnostic.privateDiagnosticConsumed,
+    expected.operation === "update" || expected.operation === "unmount"
+  );
+  assert.equal(diagnostic.publicRouteAvailable, false);
+  assert.equal(
+    diagnostic.publicCreateUpdateUnmountBehaviorAvailable,
+    false
+  );
+  assert.equal(diagnostic.nativeBridgeAvailable, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.rustExecutionFromJs, false);
+  assert.equal(diagnostic.reconcilerExecutionFromJs, false);
+  assert.equal(diagnostic.hostOutputProducedFromJs, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
 }
 
 function assertActSchedulerGate(gate, entrypoint) {

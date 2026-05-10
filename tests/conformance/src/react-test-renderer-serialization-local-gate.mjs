@@ -942,6 +942,23 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
       testRendererSource,
       /\bprivateRustCanaryAccepted:\s*true\b/u
     );
+  const updatePrivateRouteConsumesLifecycleDiagnostics =
+    updatePrivateRoutePresent &&
+    hasSourcePattern(
+      testRendererSource,
+      /\breact-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bacceptedRustLifecycleDiagnostics:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bconsumesAcceptedRustLifecycleDiagnostics:\s*true\b/u
+    ) &&
+    hasSourcePattern(testRendererSource, /\bTestRendererRootLifecycle\b/u) &&
+    hasSourcePattern(testRendererSource, /\bTestRendererRootUpdateOutcome\b/u) &&
+    hasSourcePattern(testRendererSource, /\bIgnoredAfterUnmount\b/u);
   const unmountPrivateRoutePresent =
     hasSourcePattern(
       testRendererSource,
@@ -951,6 +968,22 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
       testRendererSource,
       /\bprivateRustCanaryAccepted:\s*true\b/u
     );
+  const unmountPrivateRouteConsumesLifecycleDiagnostics =
+    unmountPrivateRoutePresent &&
+    hasSourcePattern(
+      testRendererSource,
+      /\breact-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bacceptedRustLifecycleDiagnostics:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bconsumeAcceptedRustLifecycleDiagnostic\b/u
+    ) &&
+    hasSourcePattern(testRendererSource, /\bRootElementHandle::NONE\b/u) &&
+    hasSourcePattern(testRendererSource, /\bAlreadyUnmountScheduled\b/u);
   const publicCreateUpdateUnmountErrorSurfaceBlocked =
     hasSourcePattern(
       testRendererSource,
@@ -1054,7 +1087,9 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
     ...serializationLocalChecks,
     createRoutingGatePresent,
     updatePrivateRoutePresent,
+    updatePrivateRouteConsumesLifecycleDiagnostics,
     unmountPrivateRoutePresent,
+    unmountPrivateRouteConsumesLifecycleDiagnostics,
     publicCreateUpdateUnmountErrorSurfaceBlocked,
     publicSerializationErrorSurfaceBlocked,
     publicTestInstanceErrorSurfaceBlocked,
@@ -1083,12 +1118,14 @@ function isErrorSurfacePrivateDiagnosticRowReady(rowId, localChecks) {
   if (rowId === "react-test-renderer-update-route-private-diagnostic") {
     return (
       localChecks.updatePrivateRoutePresent &&
+      localChecks.updatePrivateRouteConsumesLifecycleDiagnostics &&
       localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked
     );
   }
   if (rowId === "react-test-renderer-unmount-route-private-diagnostic") {
     return (
       localChecks.unmountPrivateRoutePresent &&
+      localChecks.unmountPrivateRouteConsumesLifecycleDiagnostics &&
       localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked
     );
   }

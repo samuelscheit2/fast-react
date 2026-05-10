@@ -710,6 +710,53 @@ const createRoutingPrerequisites = Object.freeze([
       'The JS package has no public bridge to Rust host-output serialization for toJSON, toTree, or TestInstance surfaces.'
   })
 ]);
+const updateUnmountRustLifecycleDiagnosticGate = Object.freeze({
+  id: 'react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate',
+  status: 'accepted-private-update-unmount-lifecycle-diagnostics-public-root-blocked',
+  deterministic: true,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustRecords: Object.freeze([
+    'TestRendererRootLifecycle',
+    'TestRendererRootUpdateKind',
+    'TestRendererRootUpdateOutcome',
+    'TestRendererRootScheduledUpdate'
+  ]),
+  acceptedOperations: Object.freeze(['update', 'unmount']),
+  acceptedLifecycleStates: Object.freeze(['Active', 'UnmountScheduled']),
+  acceptedOutcomes: Object.freeze([
+    'Scheduled',
+    'IgnoredAfterUnmount',
+    'AlreadyUnmountScheduled'
+  ]),
+  acceptedScheduledElementKinds: Object.freeze([
+    'RootElementHandle',
+    'RootElementHandle::NONE'
+  ]),
+  acceptedContainerUpdateApis: Object.freeze([
+    'update_container',
+    'update_container_sync'
+  ]),
+  acceptedWorkers: Object.freeze([
+    'worker-153-test-renderer-root-canary',
+    'worker-234-test-renderer-host-output-update-unmount-canary',
+    'worker-307-test-renderer-update-unmount-private-js-bridge'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_update_reuses_same_fiber_root_and_shared_scheduler_record',
+    'root_update_after_unmount_does_not_mutate_or_reschedule',
+    'root_unmount_enqueues_sync_null_update_before_wrapper_invalidation',
+    'root_unmount_is_idempotent'
+  ]),
+  privateDiagnosticConsumptionAvailable: true,
+  publicCreateUpdateUnmountBehaviorAvailable: false,
+  publicRouteAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  reconcilerExecutionFromJs: false,
+  hostOutputProducedFromJs: false,
+  compatibilityClaimed: false
+});
 const updatePrivateRoute = Object.freeze({
   id: 'react-test-renderer-update-private-route',
   publicSurface: 'create().update',
@@ -717,6 +764,13 @@ const updatePrivateRoute = Object.freeze({
   deterministic: true,
   publicRouteAvailable: false,
   privateRustCanaryAccepted: true,
+  acceptedRustLifecycleDiagnostics: true,
+  consumesAcceptedRustLifecycleDiagnostics: true,
+  lifecycleDiagnosticGate: updateUnmountRustLifecycleDiagnosticGate,
+  acceptedRustRecords: updateUnmountRustLifecycleDiagnosticGate.acceptedRustRecords,
+  acceptedLifecycleStates:
+    updateUnmountRustLifecycleDiagnosticGate.acceptedLifecycleStates,
+  acceptedOutcomes: Object.freeze(['Scheduled', 'IgnoredAfterUnmount']),
   nativeBridgeAvailable: false,
   nativeExecution: false,
   acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
@@ -737,6 +791,13 @@ const unmountPrivateRoute = Object.freeze({
   deterministic: true,
   publicRouteAvailable: false,
   privateRustCanaryAccepted: true,
+  acceptedRustLifecycleDiagnostics: true,
+  consumesAcceptedRustLifecycleDiagnostics: true,
+  lifecycleDiagnosticGate: updateUnmountRustLifecycleDiagnosticGate,
+  acceptedRustRecords: updateUnmountRustLifecycleDiagnosticGate.acceptedRustRecords,
+  acceptedLifecycleStates:
+    updateUnmountRustLifecycleDiagnosticGate.acceptedLifecycleStates,
+  acceptedOutcomes: Object.freeze(['Scheduled', 'AlreadyUnmountScheduled']),
   nativeBridgeAvailable: false,
   nativeExecution: false,
   acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
@@ -1419,6 +1480,9 @@ const createRoutingGate = Object.freeze({
   privateRoutes,
   updatePrivateRoute,
   unmountPrivateRoute,
+  updateUnmountRustLifecycleDiagnosticGate,
+  privateUpdateUnmountLifecycleDiagnosticsAccepted: true,
+  privateUpdateUnmountLifecycleDiagnosticConsumptionAvailable: true,
   toJSONSerializationFacadeGate: toJSONPrivateSerializationFacadeGate,
   toTreeHostOutputMetadataGate: toTreePrivateHostOutputMetadataGate,
   privateTestInstanceWrapperSkeleton
@@ -1997,6 +2061,19 @@ function createPrivateRootRequestRecord(state, request) {
   }
 
   state.lifecycle = lifecycleAfter;
+  const rustLifecycleDiagnostic = createRustLifecycleDiagnosticConsumptionRecord({
+    containerUpdateApi,
+    lifecycleAfter,
+    lifecycleBefore,
+    operation: request.operation,
+    outcome,
+    requestType: request.requestType,
+    scheduledElement,
+    scheduledUpdateSequence,
+    schedulesRootUpdate,
+    sync,
+    updateKind: request.updateKind
+  });
 
   const record = Object.freeze({
     $$typeof: privateRootRequestRecordType,
@@ -2016,6 +2093,8 @@ function createPrivateRootRequestRecord(state, request) {
     ),
     updateKind: request.updateKind,
     updateOutcome: outcome,
+    rustLifecycleDiagnostic,
+    acceptedRustLifecycleDiagnostic: rustLifecycleDiagnostic,
     scheduledUpdateId,
     scheduledUpdateSequence,
     scheduledUpdateCountBefore,
@@ -2053,6 +2132,66 @@ function createPrivateRootRequestRecord(state, request) {
 
   state.history.push(record);
   return record;
+}
+
+function createRustLifecycleDiagnosticConsumptionRecord(options) {
+  const acceptsUpdateUnmountDiagnostic =
+    options.operation === 'update' || options.operation === 'unmount';
+  const scheduledElementKind =
+    options.scheduledElement === null
+      ? null
+      : options.scheduledElement.kind;
+  const scheduledElementIsNone = Boolean(
+    options.scheduledElement && options.scheduledElement.isNone
+  );
+
+  return Object.freeze({
+    id: `react-test-renderer-${options.operation}-rust-lifecycle-diagnostic`,
+    kind: 'FastReactTestRendererAcceptedRustLifecycleDiagnostic',
+    status: updateUnmountRustLifecycleDiagnosticGate.status,
+    gate: updateUnmountRustLifecycleDiagnosticGate,
+    operation: options.operation,
+    requestType: options.requestType,
+    rustRecords: updateUnmountRustLifecycleDiagnosticGate.acceptedRustRecords,
+    lifecycleEnum: 'TestRendererRootLifecycle',
+    lifecycleStatusBefore: options.lifecycleBefore,
+    lifecycleStatusAfter: options.lifecycleAfter,
+    lifecycleTransition: describeLifecycleTransition(
+      options.lifecycleBefore,
+      options.lifecycleAfter
+    ),
+    updateKindEnum: 'TestRendererRootUpdateKind',
+    updateKind: options.updateKind,
+    updateOutcomeEnum: 'TestRendererRootUpdateOutcome',
+    updateOutcome: options.outcome,
+    outcomeRecord: `TestRendererRootUpdateOutcome::${options.outcome}`,
+    scheduledUpdateRecord: options.schedulesRootUpdate
+      ? 'TestRendererRootScheduledUpdate'
+      : null,
+    scheduledUpdateSequence: options.scheduledUpdateSequence,
+    scheduledElement: options.scheduledElement,
+    scheduledElementKind,
+    scheduledElementIsNone,
+    containerUpdateApi: options.schedulesRootUpdate
+      ? options.containerUpdateApi
+      : null,
+    schedulerApi: options.schedulesRootUpdate
+      ? 'ensure_root_is_scheduled'
+      : null,
+    sync: options.schedulesRootUpdate ? options.sync : null,
+    schedulesRootUpdate: options.schedulesRootUpdate,
+    consumesAcceptedRustLifecycleDiagnostics:
+      acceptsUpdateUnmountDiagnostic,
+    privateDiagnosticConsumed: acceptsUpdateUnmountDiagnostic,
+    publicRouteAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    reconcilerExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
 }
 
 function createContainerUpdateDiagnostics(options) {
@@ -2247,6 +2386,20 @@ function createTestRendererRootRequestBridge(options) {
     getRustCanaryOperationMetadata(record) {
       return getRustCanaryOperationMetadataForRequestRecord(record);
     },
+    canConsumeAcceptedRustLifecycleDiagnostic(record, diagnostic) {
+      try {
+        consumeAcceptedRustLifecycleDiagnosticForRequest(record, diagnostic);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumeAcceptedRustLifecycleDiagnostic(record, diagnostic) {
+      return consumeAcceptedRustLifecycleDiagnosticForRequest(
+        record,
+        diagnostic
+      );
+    },
     isRootRequestRecord(record) {
       return isRootRequestRecord(record);
     }
@@ -2372,6 +2525,22 @@ function createRootRequestRecord({
   const containerUpdateApi =
     operation === 'unmount' ? 'update_container_sync' : 'update_container';
   const rootApi = `TestRendererRoot::${operation}`;
+  const sync = operation === 'unmount' && scheduled === true;
+  const rustLifecycleDiagnostic =
+    createRootRequestRustLifecycleDiagnosticRecord({
+      consumedFromExternalDiagnostic: false,
+      containerUpdateApi,
+      lifecycleStatusAfter,
+      lifecycleStatusBefore,
+      operation,
+      requestType,
+      rootElementHandle,
+      rustOutcome,
+      scheduled,
+      sourceDiagnostic: null,
+      sync,
+      updateKind
+    });
 
   const record = freezeRecord({
     $$typeof: privateRootRequestRecordType,
@@ -2391,6 +2560,8 @@ function createRootRequestRecord({
     lifecycleStatusAfter,
     scheduled,
     rustOutcome,
+    rustLifecycleDiagnostic,
+    acceptedRustLifecycleDiagnostic: rustLifecycleDiagnostic,
     rootHandle,
     rootElementHandle,
     updateKind,
@@ -2405,7 +2576,7 @@ function createRootRequestRecord({
     hostOutputProduced: false,
     serializationAvailable: false,
     compatibilityClaimed: false,
-    sync: operation === 'unmount' && scheduled === true,
+    sync,
     elementInfo: describeRootRequestValue(element),
     optionsInfo:
       operation === 'create' ? describeCreateOptions(rootOptions) : null,
@@ -2439,6 +2610,388 @@ function createRootRequestRecord({
   });
 
   return record;
+}
+
+function createRootRequestRustLifecycleDiagnosticRecord(options) {
+  const consumesUpdateUnmountDiagnostic =
+    options.operation === 'update' || options.operation === 'unmount';
+  const rustLifecycleStatusBefore = toRustLifecycleStatus(
+    options.lifecycleStatusBefore
+  );
+  const rustLifecycleStatusAfter = toRustLifecycleStatus(
+    options.lifecycleStatusAfter
+  );
+  const rootElementHandleKind = options.rootElementHandle.isNone
+    ? 'RootElementHandle::NONE'
+    : 'RootElementHandle';
+
+  return freezeRecord({
+    id: `react-test-renderer-${options.operation}-accepted-rust-lifecycle-diagnostic`,
+    kind: 'FastReactTestRendererAcceptedRustLifecycleDiagnostic',
+    status: updateUnmountRustLifecycleDiagnosticGate.status,
+    gate: updateUnmountRustLifecycleDiagnosticGate,
+    operation: options.operation,
+    requestType: options.requestType,
+    sourceDiagnostic: options.sourceDiagnostic,
+    consumedFromExternalDiagnostic: options.consumedFromExternalDiagnostic,
+    rustRecords: updateUnmountRustLifecycleDiagnosticGate.acceptedRustRecords,
+    lifecycleEnum: 'TestRendererRootLifecycle',
+    lifecycleStatusBefore: rustLifecycleStatusBefore,
+    lifecycleStatusAfter: rustLifecycleStatusAfter,
+    jsLifecycleStatusBefore: options.lifecycleStatusBefore,
+    jsLifecycleStatusAfter: options.lifecycleStatusAfter,
+    updateKindEnum: 'TestRendererRootUpdateKind',
+    updateKind: options.updateKind,
+    updateOutcomeEnum: 'TestRendererRootUpdateOutcome',
+    updateOutcome: options.rustOutcome,
+    outcomeRecord: `TestRendererRootUpdateOutcome::${options.rustOutcome}`,
+    scheduledUpdateRecord: options.scheduled
+      ? 'TestRendererRootScheduledUpdate'
+      : null,
+    rootElementHandleKind,
+    rootElementHandleIsNone: options.rootElementHandle.isNone,
+    containerUpdateApi: options.scheduled
+      ? options.containerUpdateApi
+      : null,
+    schedulerApi: options.scheduled ? 'ensure_root_is_scheduled' : null,
+    sync: options.scheduled ? options.sync : null,
+    schedulesRootUpdate: options.scheduled,
+    consumesAcceptedRustLifecycleDiagnostics:
+      consumesUpdateUnmountDiagnostic,
+    privateDiagnosticConsumed: consumesUpdateUnmountDiagnostic,
+    publicRouteAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    reconcilerExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function consumeAcceptedRustLifecycleDiagnosticForRequest(record, diagnostic) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  if (record.operation !== 'update' && record.operation !== 'unmount') {
+    throwInvalidRootRequest(
+      'Only private update and unmount requests consume accepted Rust lifecycle diagnostics.'
+    );
+  }
+
+  const normalized = normalizeAcceptedRustLifecycleDiagnostic(diagnostic);
+  assertAcceptedRustLifecycleDiagnosticMatchesRequest(record, normalized);
+
+  return createRootRequestRustLifecycleDiagnosticRecord({
+    consumedFromExternalDiagnostic: true,
+    containerUpdateApi: record.containerUpdateApi,
+    lifecycleStatusAfter: record.lifecycleStatusAfter,
+    lifecycleStatusBefore: record.lifecycleStatusBefore,
+    operation: record.operation,
+    requestType: record.requestType,
+    rootElementHandle: record.rootElementHandle,
+    rustOutcome: record.rustOutcome,
+    scheduled: record.scheduled,
+    sourceDiagnostic: normalized,
+    sync: record.sync,
+    updateKind: record.updateKind
+  });
+}
+
+function normalizeAcceptedRustLifecycleDiagnostic(diagnostic) {
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a Rust test-renderer lifecycle diagnostic object.'
+    );
+  }
+
+  const operation = readDiagnosticField(diagnostic, [
+    'operation',
+    'rootOperation'
+  ]);
+  const updateKind = normalizeRustUpdateKind(
+    readDiagnosticField(diagnostic, ['updateKind', 'kind', 'rustUpdateKind'])
+  );
+  const updateOutcome = normalizeRustUpdateOutcome(
+    readDiagnosticField(diagnostic, [
+      'updateOutcome',
+      'outcome',
+      'rustOutcome'
+    ])
+  );
+  const lifecycleStatusBefore = normalizeRustLifecycleStatusOrUndefined(
+    readDiagnosticField(diagnostic, [
+      'lifecycleStatusBefore',
+      'lifecycleBefore'
+    ])
+  );
+  const lifecycleStatusAfter = normalizeRustLifecycleStatus(
+    readDiagnosticField(diagnostic, [
+      'lifecycleStatusAfter',
+      'lifecycleAfter',
+      'lifecycle'
+    ])
+  );
+  const scheduledUpdate = readDiagnosticField(diagnostic, [
+    'scheduledUpdate',
+    'scheduled_update',
+    'scheduled'
+  ]);
+  const hasScheduledUpdate =
+    scheduledUpdate !== undefined && scheduledUpdate !== null;
+
+  return freezeRecord({
+    operation,
+    updateKind,
+    updateOutcome,
+    lifecycleStatusBefore,
+    lifecycleStatusAfter,
+    hasScheduledUpdate,
+    scheduledUpdate:
+      hasScheduledUpdate === true
+        ? normalizeAcceptedRustScheduledUpdate(scheduledUpdate)
+        : null
+  });
+}
+
+function normalizeAcceptedRustScheduledUpdate(scheduledUpdate) {
+  if (scheduledUpdate === null || typeof scheduledUpdate !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a TestRendererRootScheduledUpdate diagnostic object.'
+    );
+  }
+
+  const element = readDiagnosticField(scheduledUpdate, [
+    'element',
+    'rootElement',
+    'root_element'
+  ]);
+  const containerUpdate = readDiagnosticField(scheduledUpdate, [
+    'containerUpdate',
+    'container_update'
+  ]);
+  const rootSchedule = readDiagnosticField(scheduledUpdate, [
+    'rootSchedule',
+    'root_schedule'
+  ]);
+
+  return freezeRecord({
+    kind: normalizeRustUpdateKind(
+      readDiagnosticField(scheduledUpdate, ['kind', 'updateKind'])
+    ),
+    elementKind: normalizeRustRootElementKind(element),
+    elementIsNone: normalizeRustRootElementIsNone(element),
+    containerUpdateApi: readDiagnosticField(containerUpdate, ['api']),
+    rootScheduleApi: readDiagnosticField(rootSchedule, ['api'])
+  });
+}
+
+function assertAcceptedRustLifecycleDiagnosticMatchesRequest(
+  record,
+  diagnostic
+) {
+  if (
+    diagnostic.operation !== undefined &&
+    diagnostic.operation !== record.operation
+  ) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic operation does not match the private request.'
+    );
+  }
+  if (diagnostic.updateKind !== record.updateKind) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic update kind does not match the private request.'
+    );
+  }
+  if (diagnostic.updateOutcome !== record.rustOutcome) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic outcome does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.lifecycleStatusBefore !== undefined &&
+    diagnostic.lifecycleStatusBefore !==
+      toRustLifecycleStatus(record.lifecycleStatusBefore)
+  ) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic previous lifecycle does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.lifecycleStatusAfter !==
+    toRustLifecycleStatus(record.lifecycleStatusAfter)
+  ) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic current lifecycle does not match the private request.'
+    );
+  }
+  if (diagnostic.hasScheduledUpdate !== record.scheduled) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic scheduled update presence does not match the private request.'
+    );
+  }
+
+  if (!record.scheduled) {
+    return;
+  }
+
+  if (diagnostic.scheduledUpdate.kind !== record.updateKind) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic scheduled update kind does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.scheduledUpdate.containerUpdateApi !==
+    record.containerUpdateApi
+  ) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic container update API does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.scheduledUpdate.rootScheduleApi !==
+    'ensure_root_is_scheduled'
+  ) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic root schedule API is not accepted.'
+    );
+  }
+
+  const expectedElementKind = record.rootElementHandle.isNone
+    ? 'RootElementHandle::NONE'
+    : 'RootElementHandle';
+  if (diagnostic.scheduledUpdate.elementKind !== expectedElementKind) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic scheduled element kind does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.scheduledUpdate.elementIsNone !==
+    record.rootElementHandle.isNone
+  ) {
+    throwInvalidRootRequest(
+      'Rust lifecycle diagnostic scheduled element NONE flag does not match the private request.'
+    );
+  }
+}
+
+function readDiagnosticField(record, names) {
+  if (record === undefined || record === null) {
+    return undefined;
+  }
+
+  for (const name of names) {
+    if (Object.hasOwn(record, name)) {
+      return record[name];
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeRustLifecycleStatus(value) {
+  const normalized = normalizeRustLifecycleStatusOrUndefined(value);
+  if (normalized === undefined) {
+    throwInvalidRootRequest(
+      'Expected a TestRendererRootLifecycle diagnostic value.'
+    );
+  }
+  return normalized;
+}
+
+function normalizeRustLifecycleStatusOrUndefined(value) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (
+    value === 'Active' ||
+    value === 'active' ||
+    value === rootRequestLifecycleActive
+  ) {
+    return 'Active';
+  }
+  if (
+    value === 'UnmountScheduled' ||
+    value === 'unmount-scheduled' ||
+    value === rootRequestLifecycleUnmountScheduled
+  ) {
+    return 'UnmountScheduled';
+  }
+  throwInvalidRootRequest(
+    `Unsupported TestRendererRootLifecycle diagnostic value: ${String(value)}.`
+  );
+}
+
+function toRustLifecycleStatus(value) {
+  return normalizeRustLifecycleStatusOrUndefined(value);
+}
+
+function normalizeRustUpdateKind(value) {
+  if (typeof value === 'string') {
+    const normalized = value.replace(/^TestRendererRootUpdateKind::/u, '');
+    if (
+      normalized === 'Create' ||
+      normalized === 'Update' ||
+      normalized === 'Unmount'
+    ) {
+      return normalized;
+    }
+  }
+  throwInvalidRootRequest(
+    `Unsupported TestRendererRootUpdateKind diagnostic value: ${String(value)}.`
+  );
+}
+
+function normalizeRustUpdateOutcome(value) {
+  if (typeof value === 'string') {
+    const normalized = value.replace(/^TestRendererRootUpdateOutcome::/u, '');
+    if (
+      normalized === 'Scheduled' ||
+      normalized === 'IgnoredAfterUnmount' ||
+      normalized === 'AlreadyUnmountScheduled'
+    ) {
+      return normalized;
+    }
+  }
+  throwInvalidRootRequest(
+    `Unsupported TestRendererRootUpdateOutcome diagnostic value: ${String(value)}.`
+  );
+}
+
+function normalizeRustRootElementKind(element) {
+  if (element === 'RootElementHandle::NONE') {
+    return 'RootElementHandle::NONE';
+  }
+  if (element !== null && typeof element === 'object') {
+    const kind = readDiagnosticField(element, ['kind', 'type']);
+    if (kind === 'RootElementHandle::NONE') {
+      return 'RootElementHandle::NONE';
+    }
+    if (kind === 'RootElementHandle') {
+      return 'RootElementHandle';
+    }
+  }
+  throwInvalidRootRequest(
+    'Unsupported RootElementHandle diagnostic element kind.'
+  );
+}
+
+function normalizeRustRootElementIsNone(element) {
+  if (element === 'RootElementHandle::NONE') {
+    return true;
+  }
+  if (element !== null && typeof element === 'object') {
+    if (Object.hasOwn(element, 'isNone')) {
+      return element.isNone === true;
+    }
+    if (Object.hasOwn(element, 'is_none')) {
+      return element.is_none === true;
+    }
+  }
+  return false;
 }
 
 function createRootElementHandle(handleState) {
