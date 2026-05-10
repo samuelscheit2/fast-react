@@ -148,6 +148,8 @@ function createPrivateActQueueFlushDiagnostics(
     mockSchedulerExpiredActRootWorkDiagnosticsReady: true,
     recognizesExpiredActRootWorkMetadata: true,
     linksExpiredCallbacksToAcceptedActRootWorkRecords: true,
+    routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
     rejectsStaleExpiredActQueues: true,
     rejectsExpiredActRootWorkPublicCompatibilityClaims: true,
     drainExpiredMockSchedulerWork(lanePriorityRootSchedulerMetadata) {
@@ -284,6 +286,24 @@ function wrapSchedulerFunction(
       clearShadowYieldLog(shadowState);
       return result;
     };
+  } else if (isFlushAllOrExpiredHelper(key)) {
+    wrappedFunction = function (privateMetadata) {
+      if (
+        arguments.length > 0 &&
+        isExpiredActRootWorkMetadataObject(privateMetadata)
+      ) {
+        return drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
+          sourceScheduler,
+          shadowState,
+          sourceScheduler.unstable_flushAllWithoutAsserting[
+            privateActQueueFlushDiagnosticsExport
+          ],
+          privateMetadata,
+          key
+        );
+      }
+      return sourceFunction.apply(sourceScheduler, arguments);
+    };
   } else {
     wrappedFunction = createForwardingFunction(sourceScheduler, sourceFunction);
   }
@@ -347,6 +367,14 @@ function shouldAttachPrivateActQueueFlushDiagnostics(key) {
     key === 'unstable_flushExpired' ||
     key === 'unstable_flushNumberOfYields' ||
     key === 'unstable_flushUntilNextPaint'
+  );
+}
+
+function isFlushAllOrExpiredHelper(key) {
+  return (
+    key === 'unstable_flushAll' ||
+    key === 'unstable_flushAllWithoutAsserting' ||
+    key === 'unstable_flushExpired'
   );
 }
 
@@ -923,6 +951,8 @@ function describeExpiredActRootWorkMetadataForDiagnostics(
     metadata: metadataSummary,
     recognizesExpiredActRootWorkMetadata: true,
     linksExpiredCallbacksToAcceptedActRootWorkRecords: true,
+    routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
     rejectsStaleExpiredActQueues: true,
     rejectsExpiredActRootWorkPublicCompatibilityClaims: true,
     drainsExpiredMockSchedulerWork: false,
@@ -943,7 +973,8 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
   sourceScheduler,
   shadowState,
   sourceDiagnostics,
-  expiredActRootWorkMetadata
+  expiredActRootWorkMetadata,
+  flushHelperName = 'unstable_flushExpired'
 ) {
   const before = getMockSchedulerYieldPaintSnapshot(
     sourceScheduler,
@@ -975,9 +1006,18 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
   );
 
   const expiredDrainReport = sourceDiagnostics.drainExpiredMockSchedulerWork();
+  const rootWorkRecordConsumptionReport =
+    consumeAcceptedExpiredActRootWorkRecords(validation.rootWorkRecords);
   const actQueueDrainReport = sourceDiagnostics.drainAcceptedInternalActQueue(
     validation.actQueue
   );
+  const flushRouteReport =
+    createExpiredActRootWorkFlushRouteReportForDiagnostics(
+      flushHelperName,
+      expiredDrainReport,
+      rootWorkRecordConsumptionReport,
+      actQueueDrainReport
+    );
 
   const after = getMockSchedulerYieldPaintSnapshot(
     sourceScheduler,
@@ -1010,8 +1050,16 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
     actQueuePendingBefore: validation.actQueuePendingCount,
     actQueuePendingAfter: validation.actQueue.records.length,
     actQueueDrainReport,
+    flushAllOrFlushExpiredRoute: flushRouteReport,
     rootWorkRecords: metadataSummary.rootWorkRecords,
     rootWorkRecordCount: metadataSummary.rootWorkRecordCount,
+    rootWorkRecordsPendingBefore:
+      rootWorkRecordConsumptionReport.pendingBefore,
+    rootWorkRecordsPendingAfter:
+      rootWorkRecordConsumptionReport.remainingCount,
+    rootWorkRecordsConsumedCount:
+      rootWorkRecordConsumptionReport.consumedCount,
+    rootWorkRecordConsumptionReport,
     yieldLogBefore,
     yieldLogAfter,
     nowBefore: before.now,
@@ -1032,6 +1080,8 @@ function drainExpiredMockSchedulerWorkWithActRootMetadataForDiagnostics(
       expiredDrainReport.hasMoreWorkAfterDrain,
     recognizesExpiredActRootWorkMetadata: true,
     linksExpiredCallbacksToAcceptedActRootWorkRecords: true,
+    routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
     rejectsStaleExpiredActQueues: true,
     rejectsExpiredActRootWorkPublicCompatibilityClaims: true,
     drainsExpiredMockSchedulerWork: true,
@@ -1418,6 +1468,9 @@ function validateExpiredActRootWorkRecords(rootWorkRecords) {
   if (!Array.isArray(rootWorkRecords)) {
     return invalid('root-work-records-not-array');
   }
+  if (Object.isFrozen(rootWorkRecords)) {
+    return invalid('root-work-records-not-consumable');
+  }
   if (rootWorkRecords.length === 0) {
     return invalid('root-work-records-empty');
   }
@@ -1481,6 +1534,99 @@ function getRejectedExpiredActRootWorkRecordReason(record, index) {
 
 function getExpiredActRootWorkRecordKind(record) {
   return record.recordKind ?? record.kind ?? record.rootWorkRecordKind;
+}
+
+function consumeAcceptedExpiredActRootWorkRecords(rootWorkRecords) {
+  const pendingBefore = rootWorkRecords.length;
+  const consumedRecords = [];
+
+  while (rootWorkRecords.length > 0) {
+    const record = rootWorkRecords.shift();
+    const index = consumedRecords.length;
+    const rejectionReason = getRejectedExpiredActRootWorkRecordReason(
+      record,
+      index
+    );
+    if (rejectionReason !== null) {
+      throw createExpiredActRootWorkMetadataError(rejectionReason);
+    }
+    consumedRecords.push(summarizeExpiredActRootWorkRecord(record, index));
+  }
+
+  return Object.freeze({
+    status: 'consumed-accepted-expired-act-root-work-records',
+    accepted: true,
+    pendingBefore,
+    consumedCount: consumedRecords.length,
+    remainingCount: rootWorkRecords.length,
+    consumedRecords: Object.freeze(consumedRecords),
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false
+  });
+}
+
+function createExpiredActRootWorkFlushRouteReportForDiagnostics(
+  flushHelperName,
+  expiredDrainReport,
+  rootWorkRecordConsumptionReport,
+  actQueueDrainReport
+) {
+  const selectedFlushHelper = isFlushAllOrExpiredHelper(flushHelperName)
+    ? flushHelperName
+    : 'unstable_flushExpired';
+
+  return Object.freeze({
+    status: 'executed-expired-act-root-work-flush-all-or-expired-route',
+    routeKind: 'flush-all-or-expired-act-root-work-diagnostics',
+    availableFlushHelpers: Object.freeze([
+      'unstable_flushAll',
+      'unstable_flushExpired'
+    ]),
+    selectedFlushHelper,
+    effectivePrivateDrainHelper: 'drainExpiredMockSchedulerWork',
+    sourceDrainStatus: expiredDrainReport.status,
+    sourceDrainFlushedExpiredWork:
+      expiredDrainReport.flushedExpiredWork === true,
+    rootWorkRecordConsumptionStatus:
+      rootWorkRecordConsumptionReport.status,
+    rootWorkRecordsPendingBefore:
+      rootWorkRecordConsumptionReport.pendingBefore,
+    rootWorkRecordsPendingAfter:
+      rootWorkRecordConsumptionReport.remainingCount,
+    rootWorkRecordsConsumedCount:
+      rootWorkRecordConsumptionReport.consumedCount,
+    actQueueDrainStatus: actQueueDrainReport.status,
+    actQueuePendingBefore: actQueueDrainReport.pendingBefore,
+    actQueuePendingAfter: actQueueDrainReport.remainingCount,
+    routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
+    drainsExpiredMockSchedulerWork: true,
+    drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesAcceptedInternalTestCallbacks: true,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    executesScheduledCallbacks: true
+  });
 }
 
 function summarizeExpiredActRootWorkMetadataForDiagnostics(
