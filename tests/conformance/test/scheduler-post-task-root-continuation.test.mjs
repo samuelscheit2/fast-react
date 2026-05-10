@@ -10,11 +10,13 @@ const conformanceRoot = path.resolve(testDirectory, '..');
 const repoRoot = path.resolve(conformanceRoot, '..', '..');
 const {
   ACCEPTED_ROOT_CONTINUATION_STATUS,
+  ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS,
   ROOT_CONTINUATION_BLOCKED_STATUS,
   ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS,
   ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS,
   ROOT_CONTINUATION_FALLBACK_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
+  ROOT_CONTINUATION_PENDING_EXECUTION_STATUS,
   ROOT_CONTINUATION_REJECTED_STATUS,
   ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS,
   createPrivatePostTaskRootContinuationMetadataRow,
@@ -145,6 +147,11 @@ test('private postTask root continuation metadata links delay and abort diagnost
   );
   assert.equal(row.privateRootContinuationExecution.publicRootExecution, false);
   assert.equal(row.privateRootContinuationExecution.publicSchedulerFlush, false);
+  assert.equal(row.acceptedActRootWorkHandoff, null);
+  assert.equal(
+    row.acceptedRootContinuation.acceptedActRootWorkHandoff,
+    null
+  );
   assert.equal(row.continuationFallback.status, ROOT_CONTINUATION_FALLBACK_STATUS);
   assert.equal(row.continuationFallback.selectedFallback, 'scheduler.postTask');
   assert.equal(row.acceptedRootContinuation.status, ACCEPTED_ROOT_CONTINUATION_STATUS);
@@ -194,6 +201,95 @@ test('private postTask root continuation metadata links delay and abort diagnost
     }
   ]);
   assert.equal(flow.diagnosticsAfterFinalFlush.callbackRuns.length, 1);
+});
+
+test('private postTask delayed continuation metadata accepts act/root handoff without public timing claims', async () => {
+  const {inspectSchedulerPostTaskPriorityDiagnostics} =
+    await loadPostTaskOracleModule();
+  const report = inspectSchedulerPostTaskPriorityDiagnostics({
+    nodeEnv: 'development',
+    withYield: false
+  });
+  const diagnostics =
+    report.delayedContinuationActRootHandoff.diagnosticsAfterFallback;
+  const continuation = diagnostics.continuationFallbacks[0];
+  const row = createPrivatePostTaskRootContinuationMetadataRow(diagnostics);
+
+  assert.equal(row.status, ROOT_CONTINUATION_METADATA_STATUS);
+  assert.equal(row.accepted, true);
+  assert.equal(row.rejected, false);
+  assert.equal(
+    row.continuationId,
+    derivePrivatePostTaskRootContinuationId(diagnostics, continuation)
+  );
+  assert.equal(row.priorityLabel, 'low');
+  assert.equal(row.priorityLevel, 4);
+  assert.equal(row.schedulerPriorityName, 'unstable_LowPriority');
+  assert.equal(row.delay.value, 17);
+  assert.equal(row.delay.delayClassification, 'delayed-task');
+  assert.equal(row.abortSignalState, 'not-aborted');
+  assert.equal(
+    row.rootContinuationExecutionRoute.routeStatus,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    row.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    row.acceptedRootContinuation.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    row.acceptedActRootWorkHandoff.status,
+    ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS
+  );
+  assert.equal(row.acceptedActRootWorkHandoff.accepted, true);
+  assert.equal(row.acceptedActRootWorkHandoff.delayedCallbackPathAccepted, true);
+  assert.equal(row.acceptedActRootWorkHandoff.delay.value, 17);
+  assert.equal(
+    row.acceptedActRootWorkHandoff.routeStatus,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(row.acceptedActRootWorkHandoff.actQueueHandoffOnly, true);
+  assert.equal(row.acceptedActRootWorkHandoff.rootWorkMetadataOnly, true);
+  assert.equal(
+    row.acceptedActRootWorkHandoff.rendererWorkExecutionBlocked,
+    true
+  );
+  assert.deepEqual(
+    row.acceptedActRootWorkHandoff.rootWorkRecords.map(
+      (record) => record.recordKind
+    ),
+    ['RootLaneSchedulingSnapshot', 'RootTaskScheduleRecord']
+  );
+  assert.equal(
+    row.acceptedRootContinuation.acceptedActRootWorkHandoff.status,
+    ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS
+  );
+  assert.equal(row.blockedRootExecution.status, ROOT_CONTINUATION_BLOCKED_STATUS);
+  assert.equal(row.blockedRootExecution.rendererWorkExecuted, false);
+  assert.equal(row.blockedRootExecution.publicRootExecution, false);
+  assert.equal(row.acceptedActRootWorkHandoff.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(row.acceptedActRootWorkHandoff.drainsPublicReactActQueue, false);
+  assert.equal(row.acceptedActRootWorkHandoff.executesQueuedWork, false);
+  assert.equal(row.acceptedActRootWorkHandoff.executesEffects, false);
+  assert.equal(row.acceptedActRootWorkHandoff.executesRendererWork, false);
+  assert.equal(row.acceptedActRootWorkHandoff.executesRendererRoots, false);
+  assert.equal(
+    row.acceptedActRootWorkHandoff.publicSchedulerTimingCompatibilityClaimed,
+    false
+  );
+  assert.equal(row.acceptedActRootWorkHandoff.publicReactActCompatibilityClaimed, false);
+  assert.equal(
+    row.acceptedActRootWorkHandoff.publicRootSchedulerCompatibilityClaimed,
+    false
+  );
+  assert.equal(row.acceptedActRootWorkHandoff.publicRendererCompatibilityClaimed, false);
+  assert.equal(row.browserPostTaskCompatibilityClaimed, false);
+  assert.equal(row.browserTaskOrderingCompatibilityClaimed, false);
+  assert.equal(row.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(row.compatibilityClaimed, false);
 });
 
 test('private postTask root continuation metadata rejects missing signal, stale continuation, and unsupported priority records', async () => {
@@ -289,6 +385,58 @@ test('private postTask root continuation metadata rejects missing signal, stale 
     'record.continuationFallbacks.0.browserPostTaskCompatibilityClaimed'
   );
   assert.equal(publicCompatibilityClaimRow.compatibilityClaimed, false);
+
+  const delayedDiagnostics =
+    report.delayedContinuationActRootHandoff.diagnosticsAfterFallback;
+  const publicActRootHandoffClaimRecord = {
+    ...delayedDiagnostics,
+    rootContinuationExecutionRoute: {
+      ...delayedDiagnostics.rootContinuationExecutionRoute,
+      actRootWorkHandoff: {
+        ...delayedDiagnostics.rootContinuationExecutionRoute.actRootWorkHandoff,
+        publicReactActCompatibilityClaimed: true
+      }
+    }
+  };
+  const publicActRootHandoffClaimRow =
+    createPrivatePostTaskRootContinuationMetadataRow(
+      publicActRootHandoffClaimRecord
+    );
+  assert.equal(
+    publicActRootHandoffClaimRow.status,
+    ROOT_CONTINUATION_REJECTED_STATUS
+  );
+  assert.equal(
+    publicActRootHandoffClaimRow.rejectionReason,
+    'public-compatibility-claimed'
+  );
+  assert.equal(
+    publicActRootHandoffClaimRow.rejectionDetails.claimPath,
+    'record.rootContinuationExecutionRoute.actRootWorkHandoff.publicReactActCompatibilityClaimed'
+  );
+  assert.equal(publicActRootHandoffClaimRow.compatibilityClaimed, false);
+
+  const missingActRootHandoffRecord = {
+    ...delayedDiagnostics,
+    rootContinuationExecutionRoute: {
+      ...delayedDiagnostics.rootContinuationExecutionRoute,
+      hasActRootWorkHandoff: true,
+      actRootWorkHandoff: null
+    }
+  };
+  const missingActRootHandoffRow =
+    createPrivatePostTaskRootContinuationMetadataRow(
+      missingActRootHandoffRecord
+    );
+  assert.equal(
+    missingActRootHandoffRow.status,
+    ROOT_CONTINUATION_REJECTED_STATUS
+  );
+  assert.equal(
+    missingActRootHandoffRow.rejectionReason,
+    'missing-act-root-work-handoff'
+  );
+  assert.equal(missingActRootHandoffRow.compatibilityClaimed, false);
 
   const missingRouteRecord = {
     ...diagnostics,

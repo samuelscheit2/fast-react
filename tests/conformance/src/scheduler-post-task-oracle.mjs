@@ -278,6 +278,32 @@ export function inspectSchedulerPostTaskPriorityDiagnostics({
       const continuationAbortAfterFinalFlush =
         readSchedulerPostTaskPriorityDiagnostics(continuationAbortNode);
 
+      const delayedContinuationEvents = [];
+      const delayedContinuationNode = Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_LowPriority,
+        () => {
+          delayedContinuationEvents.push({
+            label: "delayed-start",
+            currentPriorityLevel: Scheduler.unstable_getCurrentPriorityLevel()
+          });
+          return () => {
+            delayedContinuationEvents.push({
+              label: "delayed-continuation",
+              currentPriorityLevel:
+                Scheduler.unstable_getCurrentPriorityLevel()
+            });
+          };
+        },
+        { delay: 17 }
+      );
+      const delayedContinuationScheduleEvents = shim.takeEvents();
+      const delayedContinuationBeforeFlush =
+        readSchedulerPostTaskPriorityDiagnostics(delayedContinuationNode);
+      const delayedContinuationInitialFlush = shim.flushPostTasks(1);
+      const delayedContinuationAfterFallback =
+        readSchedulerPostTaskPriorityDiagnostics(delayedContinuationNode);
+      const delayedContinuationFallbackEvents = shim.takeEvents();
+
       return {
         nodeEnv,
         withYield,
@@ -329,6 +355,19 @@ export function inspectSchedulerPostTaskPriorityDiagnostics({
           finalFlush: continuationAbortFinalFlush,
           diagnosticsAfterFinalFlush: continuationAbortAfterFinalFlush,
           events: continuationAbortEvents
+        },
+        delayedContinuationActRootHandoff: {
+          publicNodeKeys: Object.keys(delayedContinuationNode),
+          privateDiagnosticSymbolPresent:
+            Reflect.ownKeys(delayedContinuationNode).includes(
+              SCHEDULER_POST_TASK_PRIORITY_DIAGNOSTICS_SYMBOL
+            ),
+          scheduleEvents: delayedContinuationScheduleEvents,
+          diagnosticsBeforeFlush: delayedContinuationBeforeFlush,
+          initialFlush: delayedContinuationInitialFlush,
+          diagnosticsAfterFallback: delayedContinuationAfterFallback,
+          fallbackEvents: delayedContinuationFallbackEvents,
+          events: delayedContinuationEvents
         }
       };
     }
