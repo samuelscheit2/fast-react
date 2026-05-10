@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 190: native handle environment teardown in
-  `/Users/user/Developer/Developer/fast-react-worker-190-native-handle-environment-teardown`.
 - Worker 191: root scheduler lane-selection integration in
   `/Users/user/Developer/Developer/fast-react-worker-191-root-scheduler-lane-selection-integration`.
 - Worker 192: core hook list foundation in

@@ -244,9 +244,20 @@ sequencing belong in `MASTER_PLAN.md`.
   implementation handles, without JS `createPortal`, DOM behavior,
   reconciliation, commit traversal, host config behavior, serialization, or
   compatibility claims.
+- Worker 190 native handle environment teardown was merged, adding a private
+  `fast-react-napi` handle-table environment teardown report and drain
+  operation that invalidates environment-local root/value slots by advancing
+  generations, with wrong-environment isolation and stale-handle behavior,
+  without N-API dependencies, JS package wiring, reconciler integration, raw JS
+  values, raw pointers, Node-API types, or public native APIs.
 
 ## Latest Accepted Verification
 
+- Worker 190 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused handle-table tests, full
+  `fast-react-napi` tests with 17 unit tests and 0 doctests, native clippy with
+  warnings denied, and `git diff --check`; merging current `main` into the
+  worker branch produced no conflicts.
 - Worker 189 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused portal/element/symbol tests, full
   `fast-react-core` tests with 122 unit tests and 0 doctests, core clippy with
