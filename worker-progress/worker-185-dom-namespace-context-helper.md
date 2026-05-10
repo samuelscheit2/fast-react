@@ -43,6 +43,14 @@ creation only.
   - Passed, including conformance workspace: 432 tests.
 - `git diff --check`
   - Passed after removing an extra blank line in this progress report.
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `node --test tests/conformance/test/react-dom-namespace-context-helper.test.mjs`
+  - `node --test tests/conformance/test/dom-namespace-svg-oracle.test.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `npm run check:js`: 460 conformance tests plus package surface,
+    benchmark, native loader, and workspace smoke checks
+  - `git diff --check`
 
 ## Quality Review
 
