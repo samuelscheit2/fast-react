@@ -96,6 +96,20 @@ git diff -- crates/fast-react-test-renderer/src/lib.rs
   -- -D warnings`: passed.
 - Final `git diff --check`: passed.
 
+## Post-Merge Orchestrator Verification
+
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-test-renderer --all-features`: 29 unit tests and
+    0 doctests
+  - `cargo test -p fast-react-reconciler --all-features root_commit`: 4
+    filtered tests
+  - `cargo test -p fast-react-reconciler --all-features root_work_loop`: 7
+    filtered tests
+  - `cargo clippy -p fast-react-test-renderer --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+
 ## Review
 
 Quality:
