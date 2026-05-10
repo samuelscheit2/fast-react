@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 168: DOM component tree map shell in
-  `/Users/user/Developer/Developer/fast-react-worker-168-dom-component-tree-map-shell`.
 - Worker 169: hydration boundary skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-169-hydration-boundary-skeleton`.
 - Worker 172: resource/form unsupported gates in

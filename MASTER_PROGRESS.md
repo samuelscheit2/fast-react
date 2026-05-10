@@ -151,9 +151,20 @@ sequencing belong in `MASTER_PLAN.md`.
   WeakMap payloads for raw containers/elements/callbacks, and a focused smoke
   test proving public `react-dom/client` root APIs remain placeholders with no
   marker, listener, native, or Rust side effects.
+- Worker 168 DOM component tree map shell was merged, adding private
+  element/text host-node attach/detach helpers, opaque host instance tokens,
+  reverse-map wrong-node validation, latest-props storage and cleanup, and a
+  focused smoke test proving no public React DOM export, event, ref, hydration,
+  portal, Rust, or DOM mutation commit wiring changed.
 
 ## Latest Accepted Verification
 
+- Worker 168 was verified on its integrated worktree and again on `main` with
+  component-tree and smoke-test syntax checks, the focused
+  `react-dom-component-tree-map-shell` smoke test,
+  `npm run check:package-surface`, `npm run check:js` covering the package
+  guard, smoke imports, benchmark gate, workspace checks, and 428 conformance
+  tests, plus `git diff --check`.
 - Worker 167 was verified on its integrated worktree and again on `main` with
   root-bridge and smoke-test syntax checks, the focused
   `react-dom-private-root-bridge-shell` smoke test,
