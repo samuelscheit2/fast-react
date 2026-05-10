@@ -1140,6 +1140,215 @@ test("private dispatch queue canary advances and resets currentTarget across cap
   );
 });
 
+test("private dispatch queue default-prevented diagnostics route preventDefault through native state", () => {
+  const root = createEventTarget("default-prevented-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "DefaultPreventedRootOwner"};
+  const parentHostOwner = {kind: "DefaultPreventedParentHostOwner"};
+  const childHostOwner = {kind: "DefaultPreventedChildHostOwner"};
+  const calls = [];
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, {});
+  componentTree.attachHostInstanceNode(child, childToken, {});
+  const childFirstQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        const before = {
+          defaultPrevented: event.defaultPrevented,
+          isDefaultPrevented: event.isDefaultPrevented()
+        };
+        event.preventDefault();
+        calls.push({
+          afterDefaultPrevented: event.defaultPrevented,
+          afterIsDefaultPrevented: event.isDefaultPrevented(),
+          before,
+          currentTarget: event.currentTarget,
+          event,
+          name: "child-first",
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const childSecondQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        calls.push({
+          beforeDefaultPrevented: event.defaultPrevented,
+          beforeIsDefaultPrevented: event.isDefaultPrevented(),
+          currentTarget: event.currentTarget,
+          event,
+          name: "child-second",
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const parentQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      parent,
+      "click",
+      false,
+      event => {
+        calls.push({
+          beforeDefaultPrevented: event.defaultPrevented,
+          beforeIsDefaultPrevented: event.isDefaultPrevented(),
+          currentTarget: event.currentTarget,
+          event,
+          name: "parent",
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      nativeEvent
+    );
+
+  const queueRecord =
+    pluginEventSystem.invokeDispatchQueueCanaryFromDispatchRecords(
+      dispatchRecord,
+      {
+        enableDefaultPreventedDiagnostics: true
+      }
+    );
+
+  assert.equal(queueRecord.publicDispatchEnabled, false);
+  assert.equal(queueRecord.syntheticEventCount, 0);
+  assert.equal(queueRecord.exposesSyntheticEvent, false);
+  assert.equal(queueRecord.listenerCandidateCount, 3);
+  assert.equal(queueRecord.listenerInvocationCount, 3);
+  assert.equal(queueRecord.defaultPreventedDiagnosticEnabled, true);
+  assert.equal(
+    queueRecord.defaultPreventedDiagnosticStatus,
+    pluginEventSystem.PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS
+  );
+  assert.equal(queueRecord.defaultPrevented, true);
+  assert.equal(queueRecord.isDefaultPrevented, true);
+  assert.equal(queueRecord.preventDefaultCallCount, 1);
+  assert.equal(queueRecord.nativeDefaultPreventedBeforeDispatch, false);
+  assert.equal(queueRecord.nativeDefaultPreventedAfterDispatch, true);
+  assert.equal(queueRecord.nativeEventPreventDefaultCallCount, 1);
+  assert.equal(queueRecord.nativeEventPreventDefaultCallCountDelta, 1);
+  assert.deepEqual(
+    queueRecord.invocationOrder.map((entry) => [
+      entry.currentTarget,
+      entry.defaultPreventedBeforeInvocation,
+      entry.defaultPreventedAfterInvocation,
+      entry.preventDefaultInvoked,
+      entry.targetInst
+    ]),
+    [
+      [child, false, true, true, childToken],
+      [child, true, true, false, childToken],
+      [parent, true, true, false, parentToken]
+    ]
+  );
+  assert.equal(queueRecord.defaultPreventedDiagnostics.length, 1);
+  assert.deepEqual(
+    queueRecord.defaultPreventedDiagnostics.map((record) => [
+      record.kind,
+      record.action,
+      record.phase,
+      record.registrationName,
+      record.defaultPrevented,
+      record.isDefaultPrevented,
+      record.nativeDefaultPrevented,
+      record.nativeEventPreventDefaultCallCount,
+      record.preventedByTargetInst
+    ]),
+    [
+      [
+        pluginEventSystem.DISPATCH_DEFAULT_PREVENTED_DIAGNOSTIC_RECORD_KIND,
+        "prevent-default",
+        "bubble",
+        "onClick",
+        true,
+        true,
+        true,
+        1,
+        childToken
+      ]
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => [
+      call.name,
+      call.currentTarget,
+      call.targetInst,
+      call.before?.defaultPrevented ?? call.beforeDefaultPrevented,
+      call.before?.isDefaultPrevented ?? call.beforeIsDefaultPrevented,
+      call.afterDefaultPrevented ?? call.beforeDefaultPrevented,
+      call.afterIsDefaultPrevented ?? call.beforeIsDefaultPrevented
+    ]),
+    [
+      ["child-first", child, childToken, false, false, true, true],
+      ["child-second", child, childToken, true, true, true, true],
+      ["parent", parent, parentToken, true, true, true, true]
+    ]
+  );
+  assert.equal(calls[0].event, calls[1].event);
+  assert.equal(calls[1].event, calls[2].event);
+  assert.equal(calls[0].event.defaultPrevented, true);
+  assert.equal(calls[0].event.isDefaultPrevented(), true);
+  assert.equal(typeof calls[0].event.preventDefault, "function");
+  assert.equal(typeof calls[0].event.isDefaultPrevented, "function");
+  assert.equal(calls[0].event.syntheticEvent, false);
+  assert.equal(Object.hasOwn(calls[0].event, "nativeEvent"), false);
+  assert.equal(nativeEvent.preventDefaultCallCount, 1);
+  assert.equal(nativeEvent.defaultPrevented, true);
+  assert.equal(nativeEvent.returnValue, false);
+
+  const queuePayload =
+    pluginEventSystem.getDispatchQueueInvocationCanaryRecordPayload(
+      queueRecord
+    );
+  assert.equal(queuePayload.defaultPreventedDiagnostics.length, 1);
+  assert.equal(
+    queuePayload.defaultPreventedDiagnostics[0],
+    queueRecord.defaultPreventedDiagnostics[0]
+  );
+  assert.deepEqual(
+    queuePayload.invocationRecords.map((record) => [
+      record.defaultPreventedBeforeInvocation,
+      record.defaultPreventedAfterInvocation,
+      record.isDefaultPreventedAfterInvocation,
+      record.preventDefaultCallCountDelta,
+      record.nativeDefaultPreventedAfterInvocation
+    ]),
+    [
+      [false, true, true, 1, true],
+      [true, true, true, 0, true],
+      [true, true, true, 0, true]
+    ]
+  );
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childSecondQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childFirstQueue);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
+});
+
 test("private root host-output fake click dispatch proves capture before bubble ordering", () => {
   const document = createHostOutputDocument("root-output-event-order");
   const container = document.createElement("div");
@@ -1379,6 +1588,165 @@ test("private root host-output fake click dispatch proves capture before bubble 
   assert.equal(document.__registrations.length, 1);
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.textContent, "click target");
+
+  bridge.cleanupInitialRenderHostOutput(handoff);
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test("private root host-output click canary records preventDefault diagnostics without browser dispatch", () => {
+  const document = createHostOutputDocument("root-output-default-prevented");
+  const container = document.createElement("div");
+  const calls = [];
+  const element = {
+    props: {
+      children: "default-prevented target",
+      onClick(event) {
+        calls.push({
+          currentTarget: event.currentTarget,
+          defaultPreventedBefore: event.defaultPrevented,
+          event,
+          isDefaultPreventedBefore: event.isDefaultPrevented(),
+          phase: "bubble"
+        });
+      },
+      onClickCapture(event) {
+        const defaultPreventedBefore = event.defaultPrevented;
+        const isDefaultPreventedBefore = event.isDefaultPrevented();
+        event.preventDefault();
+        calls.push({
+          currentTarget: event.currentTarget,
+          defaultPreventedAfter: event.defaultPrevented,
+          defaultPreventedBefore,
+          event,
+          isDefaultPreventedAfter: event.isDefaultPrevented(),
+          isDefaultPreventedBefore,
+          phase: "capture"
+        });
+      }
+    },
+    type: "button"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "event-default-admission",
+    initialHostOutputIdPrefix: "event-default-output",
+    sideEffectIdPrefix: "event-default-side-effect"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      hostOutputPayload
+    );
+
+  const clickRecord =
+    rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+      sideEffects.listenerRegistration,
+      targetRecord,
+      {
+        enableDefaultPreventedDiagnostics: true
+      }
+    );
+
+  assert.equal(clickRecord.publicDispatchEnabled, false);
+  assert.equal(clickRecord.syntheticEventCount, 0);
+  assert.equal(clickRecord.defaultPreventedDiagnosticEnabled, true);
+  assert.equal(
+    clickRecord.defaultPreventedDiagnosticStatus,
+    pluginEventSystem.PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS
+  );
+  assert.equal(clickRecord.defaultPrevented, true);
+  assert.equal(clickRecord.preventDefaultCallCount, 1);
+  assert.equal(clickRecord.nativeDefaultPreventedBeforeDispatch, false);
+  assert.equal(clickRecord.nativeDefaultPreventedAfterDispatch, true);
+  assert.equal(clickRecord.nativeEventPreventDefaultCallCount, 1);
+  assert.equal(clickRecord.listenerInvocationCount, 2);
+  assert.equal(clickRecord.defaultPreventedDiagnostics.length, 1);
+  assert.deepEqual(
+    clickRecord.defaultPreventedDiagnostics.map((record) => [
+      record.kind,
+      record.action,
+      record.phase,
+      record.registrationName,
+      record.preventedByTargetInst
+    ]),
+    [
+      [
+        pluginEventSystem.DISPATCH_DEFAULT_PREVENTED_DIAGNOSTIC_RECORD_KIND,
+        "prevent-default",
+        "capture",
+        "onClickCapture",
+        hostOutputPayload.hostToken
+      ]
+    ]
+  );
+  assert.deepEqual(
+    clickRecord.invocationOrder.map((entry) => [
+      entry.phase,
+      entry.defaultPreventedBeforeInvocation,
+      entry.defaultPreventedAfterInvocation,
+      entry.preventDefaultInvoked
+    ]),
+    [
+      ["capture", false, true, true],
+      ["bubble", true, true, false]
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => [
+      call.phase,
+      call.currentTarget,
+      call.defaultPreventedBefore,
+      call.isDefaultPreventedBefore,
+      call.defaultPreventedAfter ?? call.defaultPreventedBefore,
+      call.isDefaultPreventedAfter ?? call.isDefaultPreventedBefore
+    ]),
+    [
+      [
+        "capture",
+        hostOutputPayload.hostNode,
+        false,
+        false,
+        true,
+        true
+      ],
+      ["bubble", hostOutputPayload.hostNode, true, true, true, true]
+    ]
+  );
+  assert.notEqual(calls[0].event, calls[1].event);
+  assert.equal(calls[0].event.currentTarget, null);
+  assert.equal(calls[0].event.defaultPrevented, true);
+  assert.equal(calls[0].event.isDefaultPrevented(), true);
+  assert.equal(calls[0].event.syntheticEvent, false);
+  assert.equal(calls[1].event.currentTarget, null);
+  assert.equal(calls[1].event.defaultPrevented, true);
+  assert.equal(calls[1].event.isDefaultPrevented(), true);
+  assert.equal(calls[1].event.syntheticEvent, false);
+  assert.equal(Object.hasOwn(calls[0].event, "nativeEvent"), false);
+
+  const clickPayload =
+    rootListeners.getPrivateRootHostOutputClickDispatchCanaryPayload(
+      clickRecord
+    );
+  assert.equal(clickPayload.nativeEvent.preventDefaultCallCount, 1);
+  assert.equal(clickPayload.nativeEvent.defaultPrevented, true);
+  assert.equal(clickPayload.nativeEvent.returnValue, false);
+  assert.equal(
+    clickPayload.queueInvocationRecord.defaultPreventedDiagnosticStatus,
+    pluginEventSystem.PRIVATE_DEFAULT_PREVENTED_DIAGNOSTIC_STATUS
+  );
+  assert.equal(hostOutputPayload.hostNode.__registrations.length, 0);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+  assert.equal(container.childNodes.length, 1);
 
   bridge.cleanupInitialRenderHostOutput(handoff);
   bridge.revertCreateRootSideEffects(sideEffects);
@@ -2818,14 +3186,18 @@ function createNode(nodeName, nodeType, parentNode) {
 
 function createNativeEvent(type, target) {
   return {
+    defaultPrevented: false,
     immediatePropagationStopped: false,
     preventDefaultCallCount: 0,
+    returnValue: true,
     stopImmediatePropagationCallCount: 0,
     stopPropagationCallCount: 0,
     target,
     type,
     preventDefault() {
+      this.defaultPrevented = true;
       this.preventDefaultCallCount++;
+      this.returnValue = false;
     },
     stopPropagation() {
       this.stopPropagationCallCount++;
