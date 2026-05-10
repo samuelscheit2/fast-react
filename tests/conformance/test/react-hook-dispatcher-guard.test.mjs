@@ -291,6 +291,7 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
   assert.equal(metadata.compatibilityClaimed, false);
   assert.equal(metadata.exposesPublicHookImplementation, false);
   assert.equal(metadata.rendererIntegration, false);
+  assert.equal(metadata.schedulesPublicJsUpdates, false);
   assert.deepEqual(metadata.hookNames, ["useReducer", "useState"]);
   assert.deepEqual(metadata.hookStateRecordFields, [
     "memoizedState",
@@ -314,10 +315,16 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
     "eagerState",
     "next"
   ]);
+  assert.deepEqual(metadata.stateDispatchEagerStateFields, [
+    "lastRenderedState",
+    "eagerState"
+  ]);
   assert.deepEqual(metadata.stateDispatchRequestFields, [
     "dispatch",
     "action",
-    "lane"
+    "lane",
+    "revertLane",
+    "eagerState"
   ]);
   assert.deepEqual(metadata.stateDispatchRecordFields, [
     "fiber",
@@ -325,12 +332,16 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
     "dispatch",
     "update",
     "lane",
-    "action"
+    "revertLane",
+    "action",
+    "hasEagerState",
+    "eagerState"
   ]);
   assert.deepEqual(metadata.acceptedReconcilerRecords, [
     "HookStateSlot",
     "HookQueue",
     "HookUpdate",
+    "FunctionComponentStateDispatchEagerState",
     "FunctionComponentStateDispatchRequest",
     "FunctionComponentStateDispatchRecord"
   ]);
@@ -362,6 +373,33 @@ test("private state-hook dispatcher marker rejects lane and update metadata drif
   const driftedMetadata = {
     ...hookDispatcher.privateStateHookDispatcherMetadata,
     hookUpdateRecordFields: ["lane", "action", "next"]
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateStateHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertStateHookDispatcherUnavailable(
+    () =>
+      hookDispatcher.markPrivateStateHookDispatcher(dispatcher, driftedMetadata),
+    "useState"
+  );
+  assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), false);
+});
+
+test("private state-hook dispatcher marker rejects eager dispatch metadata drift", () => {
+  const dispatcher = {
+    useReducer() {
+      throw new Error("unreachable reducer dispatch");
+    },
+    useState() {
+      throw new Error("unreachable state dispatch");
+    }
+  };
+  const driftedMetadata = {
+    ...hookDispatcher.privateStateHookDispatcherMetadata,
+    stateDispatchEagerStateFields: ["eagerState"],
+    stateDispatchRequestFields: ["dispatch", "action", "lane"]
   };
 
   assert.equal(

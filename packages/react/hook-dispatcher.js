@@ -102,6 +102,7 @@ const privateStateHookDispatcherMetadata = freezeRecord({
   compatibilityClaimed: false,
   exposesPublicHookImplementation: false,
   rendererIntegration: false,
+  schedulesPublicJsUpdates: false,
   hookNames: freezeArray(['useReducer', 'useState']),
   hookStateRecordFields: freezeArray([
     'memoizedState',
@@ -125,19 +126,33 @@ const privateStateHookDispatcherMetadata = freezeRecord({
     'eagerState',
     'next'
   ]),
-  stateDispatchRequestFields: freezeArray(['dispatch', 'action', 'lane']),
+  stateDispatchEagerStateFields: freezeArray([
+    'lastRenderedState',
+    'eagerState'
+  ]),
+  stateDispatchRequestFields: freezeArray([
+    'dispatch',
+    'action',
+    'lane',
+    'revertLane',
+    'eagerState'
+  ]),
   stateDispatchRecordFields: freezeArray([
     'fiber',
     'queue',
     'dispatch',
     'update',
     'lane',
-    'action'
+    'revertLane',
+    'action',
+    'hasEagerState',
+    'eagerState'
   ]),
   acceptedReconcilerRecords: freezeArray([
     'HookStateSlot',
     'HookQueue',
     'HookUpdate',
+    'FunctionComponentStateDispatchEagerState',
     'FunctionComponentStateDispatchRequest',
     'FunctionComponentStateDispatchRecord'
   ])
@@ -148,6 +163,7 @@ const privateStateHookDispatcherMetadataArrayKeys = freezeArray([
   'hookStateRecordFields',
   'hookQueueRecordFields',
   'hookUpdateRecordFields',
+  'stateDispatchEagerStateFields',
   'stateDispatchRequestFields',
   'stateDispatchRecordFields',
   'acceptedReconcilerRecords'
@@ -435,7 +451,8 @@ function isPrivateStateHookDispatcherMetadata(metadata) {
       privateStateHookDispatcherMetadata.compatibilityTarget ||
     metadata.compatibilityClaimed !== false ||
     metadata.exposesPublicHookImplementation !== false ||
-    metadata.rendererIntegration !== false
+    metadata.rendererIntegration !== false ||
+    metadata.schedulesPublicJsUpdates !== false
   ) {
     return false;
   }
