@@ -57,6 +57,8 @@ const HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayEventQueueDiagnostic';
 const HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND =
   'FastReactDomHydrationReplayEventQueueEntryRecord';
+const HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationReplayQueueDrainOrderDiagnostic';
 const HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND =
   'FastReactDomHydrationDehydratedTargetResolutionDiagnostic';
 const HYDRATION_DEHYDRATED_ROOT_OWNER_RECORD_KIND =
@@ -2951,11 +2953,6 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
       : 'private-event-dispatch-records';
   const normalizedDispatchRecords =
     normalizeHydrationReplayDispatchRecords(dispatchRecords);
-  const blockedEventReplayTargets = Object.freeze(
-    normalizedDispatchRecords.map((dispatchRecord, index) =>
-      createHydrationReplayEventQueueEntryRecord(dispatchRecord, index)
-    )
-  );
   const markerReplayTargetCandidates = Object.freeze(
     Array.isArray(normalizedOptions.markerReplayTargetCandidates)
       ? normalizedOptions.markerReplayTargetCandidates.slice()
@@ -2979,6 +2976,28 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
             source
           }
         );
+  const hydratableEventTargetLookups = Array.isArray(
+    dehydratedTargetResolutionDiagnostics.hydratableEventTargetLookups
+  )
+    ? dehydratedTargetResolutionDiagnostics.hydratableEventTargetLookups
+    : [];
+  const blockedEventReplayTargets = Object.freeze(
+    normalizedDispatchRecords.map((dispatchRecord, index) =>
+      createHydrationReplayEventQueueEntryRecord(
+        dispatchRecord,
+        index,
+        hydratableEventTargetLookups[index] || null
+      )
+    )
+  );
+  const replayQueueDrainOrderDiagnostics =
+    createHydrationReplayQueueDrainOrderDiagnostic(
+      blockedEventReplayTargets,
+      {
+        dehydratedTargetResolutionDiagnostics,
+        source
+      }
+    );
 
   return Object.freeze({
     kind: HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
@@ -2999,6 +3018,8 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
     hostInstanceHydrationAttempted: false,
     hasScheduledReplayAttempt: false,
     queueMutationAllowed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
     eventsReplayed: false,
     willDispatchEvents: false,
     willHydrateHostInstances: false,
@@ -3025,6 +3046,12 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
       createHydrationReplayEventQueueOrder(blockedEventReplayTargets),
     priorityQueueOrder:
       createHydrationReplayEventPriorityOrder(blockedEventReplayTargets),
+    replayQueueDrainOrderDiagnostics,
+    drainOrderDiagnosticsAccepted:
+      replayQueueDrainOrderDiagnostics.kind ===
+      HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND,
+    drainOrderCount: replayQueueDrainOrderDiagnostics.drainOrderCount,
+    drainOrder: replayQueueDrainOrderDiagnostics.drainOrder,
     blockedEventReplayTargets
   });
 }
@@ -3733,9 +3760,233 @@ function popHydrationBoundaryOwnerForEndMarker(boundaryStack, contractId) {
   }
 }
 
+function createHydrationReplayQueueDrainOrderDiagnostic(
+  blockedEventReplayTargets,
+  options
+) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const dehydratedTargetResolutionDiagnostics =
+    normalizedOptions.dehydratedTargetResolutionDiagnostics || null;
+  const drainOrderCandidates = blockedEventReplayTargets.map(
+    createHydrationReplayQueueDrainOrderCandidate
+  );
+  const drainOrder = Object.freeze(
+    drainOrderCandidates
+      .slice()
+      .sort(compareHydrationReplayQueueDrainOrderCandidates)
+      .map((candidate, drainOrderIndex) =>
+        Object.freeze({
+          ...candidate,
+          drainOrder: drainOrderIndex
+        })
+      )
+  );
+
+  return Object.freeze({
+    kind: HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND,
+    status:
+      drainOrder.length === 0
+        ? 'blocked-no-replay-queue-drain-order-targets-recorded'
+        : 'blocked-replay-queue-drain-order-recorded',
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-hydration-replay-queue-drain-order',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    hostInstanceHydrationAttempted: false,
+    hasScheduledReplayAttempt: false,
+    queueMutationAllowed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
+    eventsReplayed: false,
+    willDispatchEvents: false,
+    willHydrateHostInstances: false,
+    blockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    orderSource: 'dehydrated-target-root-metadata',
+    targetResolutionDiagnosticsAccepted:
+      dehydratedTargetResolutionDiagnostics !== null &&
+      dehydratedTargetResolutionDiagnostics.kind ===
+        HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND,
+    dehydratedRootOwnerStatus:
+      dehydratedTargetResolutionDiagnostics === null
+        ? null
+        : dehydratedTargetResolutionDiagnostics.dehydratedRootOwnerStatus,
+    dehydratedBoundaryOwnerCount:
+      dehydratedTargetResolutionDiagnostics === null
+        ? 0
+        : dehydratedTargetResolutionDiagnostics.dehydratedBoundaryOwnerCount,
+    hydratableEventTargetLookupCount:
+      dehydratedTargetResolutionDiagnostics === null
+        ? 0
+        : dehydratedTargetResolutionDiagnostics
+            .hydratableEventTargetLookupCount,
+    blockedEventReplayTargetCount: blockedEventReplayTargets.length,
+    queuedEventReplayTargetCount: 0,
+    replayedEventCount: 0,
+    drainOrderCount: drainOrder.length,
+    drainOrder
+  });
+}
+
+function createHydrationReplayQueueDrainOrderCandidate(entry) {
+  const targetPathSegments =
+    getHydrationReplayDrainTargetPathSegments(entry.targetPath);
+
+  return {
+    kind: 'FastReactDomHydrationReplayQueueDrainOrderEntryRecord',
+    status: 'blocked-replay-queue-drain-order-entry-recorded',
+    inputOrder: entry.inputOrder,
+    replayQueueOrder: entry.replayQueueOrder,
+    prioritySortKey: entry.prioritySortKey,
+    domEventName: entry.domEventName,
+    nativeEventType: entry.nativeEventType,
+    queueCategory: entry.queueCategory,
+    queueName: entry.queueName,
+    queuePolicy: entry.queuePolicy,
+    replayableEvent: entry.replayableEvent,
+    rootOwnershipStatus: entry.rootOwnershipStatus,
+    dehydratedRootOwnerStatus: entry.dehydratedRootOwnerStatus,
+    dehydratedBoundaryOwnerId: entry.dehydratedBoundaryOwnerId,
+    dehydratedBoundaryOwnerIndex: entry.dehydratedBoundaryOwnerIndex,
+    dehydratedBoundaryOwnerPath: entry.dehydratedBoundaryOwnerPath,
+    dehydratedBoundaryOwnerStatus: entry.dehydratedBoundaryOwnerStatus,
+    blockedOnKind: entry.blockedOnKind,
+    blockedOnStatus: entry.blockedOnStatus,
+    blockedOnSortKey: createHydrationReplayDrainBlockedOnSortKey(entry),
+    ownerSortKey: getHydrationReplayDrainOwnerSortKey(entry),
+    targetPath: entry.targetPath,
+    targetPathStatus: entry.targetPathStatus,
+    targetPathSegments,
+    targetPathSortKey: createHydrationReplayDrainTargetPathSortKey(
+      targetPathSegments,
+      entry.inputOrder
+    ),
+    queued: false,
+    replayQueueDrained: false,
+    willDrainReplayQueues: false,
+    willDispatch: false,
+    willHydrate: false,
+    willReplay: false
+  };
+}
+
+function compareHydrationReplayQueueDrainOrderCandidates(a, b) {
+  const targetPathComparison = compareHydrationReplayDrainPathSegments(
+    a.targetPathSegments,
+    b.targetPathSegments
+  );
+  if (targetPathComparison !== 0) {
+    return targetPathComparison;
+  }
+
+  if (a.ownerSortKey !== b.ownerSortKey) {
+    return a.ownerSortKey - b.ownerSortKey;
+  }
+
+  if (a.dehydratedBoundaryOwnerIndex !== b.dehydratedBoundaryOwnerIndex) {
+    return (
+      normalizeHydrationReplayDrainBoundaryIndex(
+        a.dehydratedBoundaryOwnerIndex
+      ) -
+      normalizeHydrationReplayDrainBoundaryIndex(
+        b.dehydratedBoundaryOwnerIndex
+      )
+    );
+  }
+
+  return a.inputOrder - b.inputOrder;
+}
+
+function compareHydrationReplayDrainPathSegments(a, b) {
+  if (a === null && b === null) {
+    return 0;
+  }
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    if (a[index] !== b[index]) {
+      return a[index] - b[index];
+    }
+  }
+
+  return a.length - b.length;
+}
+
+function normalizeHydrationReplayDrainBoundaryIndex(index) {
+  return Number.isSafeInteger(index) ? index : Number.MAX_SAFE_INTEGER;
+}
+
+function getHydrationReplayDrainTargetPathSegments(targetPath) {
+  const segments = parseHydrationContainerPathSegments(targetPath);
+  return segments === null ? null : Object.freeze(segments.slice());
+}
+
+function createHydrationReplayDrainTargetPathSortKey(
+  targetPathSegments,
+  inputOrder
+) {
+  if (targetPathSegments === null) {
+    return `unlisted:${inputOrder}`;
+  }
+
+  if (targetPathSegments.length === 0) {
+    return 'container';
+  }
+
+  return targetPathSegments
+    .map((segment) => String(segment).padStart(8, '0'))
+    .join('.');
+}
+
+function getHydrationReplayDrainOwnerSortKey(entry) {
+  if (entry.dehydratedBoundaryOwnerId !== null) {
+    return 0;
+  }
+  if (entry.rootOwnershipStatus === 'owned-by-dehydrated-root') {
+    return 1;
+  }
+  return 2;
+}
+
+function createHydrationReplayDrainBlockedOnSortKey(entry) {
+  if (entry.dehydratedBoundaryOwnerId !== null) {
+    const ownerPath =
+      typeof entry.dehydratedBoundaryOwnerPath === 'string'
+        ? entry.dehydratedBoundaryOwnerPath
+        : 'unknown-boundary-path';
+    return `boundary:${ownerPath}:${entry.dehydratedBoundaryOwnerId}`;
+  }
+
+  if (entry.rootOwnershipStatus === 'owned-by-dehydrated-root') {
+    const targetPath =
+      typeof entry.targetPath === 'string'
+        ? entry.targetPath
+        : 'unknown-root-target-path';
+    return `root:${targetPath}:${entry.dehydratedRootOwnerStatus}`;
+  }
+
+  return `unowned:${entry.inputOrder}`;
+}
+
 function createHydrationReplayEventQueueEntryRecord(
   dispatchRecord,
-  inputOrder
+  inputOrder,
+  hydratableEventTargetLookup
 ) {
   const queueInfo = getHydrationReplayEventQueueInfo(
     dispatchRecord.domEventName
@@ -3744,6 +3995,13 @@ function createHydrationReplayEventQueueEntryRecord(
     typeof dispatchRecord.eventPriorityLane === 'number'
       ? dispatchRecord.eventPriorityLane
       : Number.MAX_SAFE_INTEGER;
+  const targetLookup = isObjectLike(hydratableEventTargetLookup)
+    ? hydratableEventTargetLookup
+    : null;
+  const dehydratedBoundaryOwner =
+    targetLookup !== null && isObjectLike(targetLookup.dehydratedBoundaryOwner)
+      ? targetLookup.dehydratedBoundaryOwner
+      : null;
 
   return Object.freeze({
     kind: HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND,
@@ -3771,7 +4029,49 @@ function createHydrationReplayEventQueueEntryRecord(
     willHydrate: false,
     willReplay: false,
     blockedOn: null,
-    blockedOnStatus: 'unavailable-no-dehydrated-boundary',
+    blockedOnKind:
+      targetLookup === null ? null : targetLookup.blockedOnKind,
+    blockedOnStatus:
+      targetLookup === null
+        ? 'unavailable-no-dehydrated-boundary'
+        : targetLookup.blockedOnStatus,
+    hydrationTargetResolutionStatus:
+      targetLookup === null
+        ? 'unavailable-no-hydratable-event-target-lookup'
+        : targetLookup.status,
+    rootOwnershipStatus:
+      targetLookup === null
+        ? 'unavailable-no-dehydrated-root-container-payload'
+        : targetLookup.rootOwnershipStatus,
+    dehydratedRootOwnerStatus:
+      targetLookup === null
+        ? 'blocked-no-dehydrated-root-container-payload'
+        : targetLookup.dehydratedRootOwnerStatus,
+    dehydratedBoundaryOwner:
+      dehydratedBoundaryOwner === null ? null : dehydratedBoundaryOwner,
+    dehydratedBoundaryOwnerId:
+      dehydratedBoundaryOwner === null
+        ? null
+        : dehydratedBoundaryOwner.ownerId,
+    dehydratedBoundaryOwnerIndex:
+      dehydratedBoundaryOwner === null ? null : dehydratedBoundaryOwner.index,
+    dehydratedBoundaryOwnerPath:
+      dehydratedBoundaryOwner === null ? null : dehydratedBoundaryOwner.path,
+    dehydratedBoundaryOwnerStatus:
+      targetLookup === null
+        ? 'not-found'
+        : targetLookup.dehydratedBoundaryOwnerStatus,
+    targetPath: targetLookup === null ? null : targetLookup.targetPath,
+    targetPathStatus:
+      targetLookup === null
+        ? 'unavailable-no-hydratable-event-target-lookup'
+        : targetLookup.targetPathStatus,
+    targetContainerMatchesRoot:
+      targetLookup === null ? false : targetLookup.targetContainerMatchesRoot,
+    targetWithinRootContainer:
+      targetLookup === null ? false : targetLookup.targetWithinRootContainer,
+    replayQueueDrained: false,
+    willDrainReplayQueues: false,
     targetContainerInfo: describeHydrationReplayEventTargetInfo(
       dispatchRecord.targetContainer
     ),
@@ -4061,6 +4361,7 @@ module.exports = {
   HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND,
   HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND,
   HYDRATION_REPLAY_BLOCKED_CODE,
+  HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND,
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,

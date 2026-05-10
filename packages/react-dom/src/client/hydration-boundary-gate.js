@@ -1040,6 +1040,8 @@ function createHydrationMarkerReplayQueueDiagnostics({
     queueMutationAllowed: false,
     hydrationReplaySupported: false,
     eventReplaySupported: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
     eventsReplayed: false,
     hasScheduledReplayAttempt: false,
     explicitHydrationTargetsQueued: false,
@@ -1172,6 +1174,12 @@ function createHydrationEventReplayBlockers({
       eventReplayQueueDiagnostics.queuedEventReplayTargetCount,
     eventQueueOrder: eventReplayQueueDiagnostics.eventQueueOrder,
     priorityQueueOrder: eventReplayQueueDiagnostics.priorityQueueOrder,
+    replayQueueDrainOrderDiagnostics:
+      eventReplayQueueDiagnostics.replayQueueDrainOrderDiagnostics,
+    drainOrderDiagnosticsAccepted:
+      eventReplayQueueDiagnostics.drainOrderDiagnosticsAccepted,
+    drainOrderCount: eventReplayQueueDiagnostics.drainOrderCount,
+    drainOrder: eventReplayQueueDiagnostics.drainOrder,
     replayQueueDiagnostics,
     replayQueueDiagnosticsAccepted:
       replayQueueDiagnostics.status ===
