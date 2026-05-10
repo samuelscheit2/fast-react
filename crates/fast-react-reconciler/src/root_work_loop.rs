@@ -24,7 +24,10 @@ use fast_react_host_config::HostTypes;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
-    begin_work::{BeginWorkError, BeginWorkRequest, BeginWorkResult, begin_work},
+    begin_work::{
+        BeginWorkError, BeginWorkRequest, BeginWorkResult, UnsupportedPortalBeginWorkRecord,
+        begin_work, unsupported_portal_begin_work_record,
+    },
     create_host_root_work_in_progress,
     function_component::FunctionComponentInvoker,
     unsupported_features::unsupported_reconciler_feature_for_fiber_tag,
@@ -174,6 +177,11 @@ enum HostRootChildBeginWorkPreflightError {
         tag: FiberTag,
         feature: &'static str,
     },
+    UnsupportedPortal {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        portal: Box<UnsupportedPortalBeginWorkRecord>,
+    },
 }
 
 impl Display for HostRootChildBeginWorkPreflightError {
@@ -213,6 +221,18 @@ impl Display for HostRootChildBeginWorkPreflightError {
                 fiber.slot().get(),
                 tag
             ),
+            Self::UnsupportedPortal {
+                root,
+                host_root_work_in_progress,
+                portal,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} cannot admit portal child {} into root work: {}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                portal.fiber().slot().get(),
+                portal.feature()
+            ),
         }
     }
 }
@@ -225,7 +245,8 @@ impl Error for HostRootChildBeginWorkPreflightError {
             Self::BeginWork(error) => Some(error),
             Self::ExpectedHostRootWorkInProgress { .. }
             | Self::WorkInProgressNotLinkedToRootCurrent { .. }
-            | Self::UnsupportedReconcilerFiberFeature { .. } => None,
+            | Self::UnsupportedReconcilerFiberFeature { .. }
+            | Self::UnsupportedPortal { .. } => None,
         }
     }
 }
@@ -295,6 +316,18 @@ fn preflight_host_root_child_begin_work<H: HostTypes>(
     };
 
     let child_tag = store.fiber_arena().get(child)?.tag();
+    if child_tag == FiberTag::Portal {
+        let portal = unsupported_portal_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(child, render_lanes),
+        )?;
+        return Err(HostRootChildBeginWorkPreflightError::UnsupportedPortal {
+            root: root_id,
+            host_root_work_in_progress,
+            portal: Box::new(portal),
+        });
+    }
+
     if let Some(feature) = unsupported_reconciler_feature_for_fiber_tag(child_tag) {
         return Err(
             HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
@@ -804,7 +837,7 @@ fn refresh_update_queue_for_work_in_progress<H: HostTypes>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::begin_work::BeginWorkError;
+    use crate::begin_work::{BeginWorkError, PORTAL_RECONCILER_UNSUPPORTED_FEATURE};
     use crate::function_component::{
         FunctionComponentInvocationError, FunctionComponentInvocationRequest,
         FunctionComponentOutputHandle,
@@ -819,8 +852,8 @@ mod tests {
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
-        FiberFlags, FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, StateHandle,
-        UpdateQueueHandle,
+        FiberFlags, FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, ReactKey,
+        StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -944,6 +977,39 @@ mod tests {
             .set_children(host_root_work_in_progress, &[child])
             .unwrap();
         child
+    }
+
+    fn attach_portal_wip_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId) {
+        let portal = store.fiber_arena_mut().create_fiber(
+            FiberTag::Portal,
+            Some(ReactKey::from_normalized("portal-root")),
+            PropsHandle::from_raw(701),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(portal)
+            .unwrap()
+            .set_state_node(StateNodeHandle::from_raw(702));
+        let portal_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(703),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(portal, &[portal_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[portal])
+            .unwrap();
+
+        (portal, portal_child)
     }
 
     #[test]
@@ -1261,6 +1327,67 @@ mod tests {
             assert_eq!(store.root(root_id).unwrap().finished_work(), None);
             assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
         }
+    }
+
+    #[test]
+    fn root_work_loop_preflight_fails_closed_for_portal_child_without_delegating_or_mounting() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(21), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (portal, portal_child) = attach_portal_wip_child(&mut store, render.work_in_progress());
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        let portal_record = match error {
+            HostRootChildBeginWorkPreflightError::UnsupportedPortal {
+                root,
+                host_root_work_in_progress,
+                portal,
+            } => {
+                assert_eq!(root, root_id);
+                assert_eq!(host_root_work_in_progress, render.work_in_progress());
+                portal
+            }
+            other => panic!("expected portal admission diagnostic, got {other:?}"),
+        };
+
+        assert_eq!(portal_record.fiber(), portal);
+        assert_eq!(
+            portal_record.key().map(ReactKey::as_str),
+            Some("portal-root")
+        );
+        assert_eq!(portal_record.pending_props(), PropsHandle::from_raw(701));
+        assert_eq!(portal_record.state_node(), StateNodeHandle::from_raw(702));
+        assert_eq!(portal_record.child(), Some(portal_child));
+        assert_eq!(portal_record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            portal_record.feature(),
+            PORTAL_RECONCILER_UNSUPPORTED_FEATURE
+        );
+        assert!(registry.calls().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+
+        let portal_node = store.fiber_arena().get(portal).unwrap();
+        assert_eq!(portal_node.return_fiber(), Some(render.work_in_progress()));
+        assert_eq!(portal_node.child(), Some(portal_child));
+        assert_eq!(portal_node.memoized_props(), PropsHandle::NONE);
+        assert_eq!(portal_node.lanes(), Lanes::NO);
+        let portal_child_node = store.fiber_arena().get(portal_child).unwrap();
+        assert_eq!(portal_child_node.return_fiber(), Some(portal));
+        assert_eq!(portal_child_node.memoized_props(), PropsHandle::NONE);
+        assert_eq!(portal_child_node.lanes(), Lanes::NO);
     }
 
     #[test]
