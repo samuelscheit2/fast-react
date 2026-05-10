@@ -912,6 +912,231 @@ test("installed private root listener canary invokes one listener only after exp
   );
 });
 
+test("private dispatch queue canary advances and resets currentTarget across capture and bubble listeners", () => {
+  const root = createEventTarget("current-target-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "CurrentTargetRootOwner"};
+  const parentHostOwner = {kind: "CurrentTargetParentHostOwner"};
+  const childHostOwner = {kind: "CurrentTargetChildHostOwner"};
+  const calls = [];
+  const parentProps = {
+    onClick(event) {
+      calls.push({
+        currentTarget: event.currentTarget,
+        event,
+        phase: "bubble",
+        target: event.target,
+        targetInst: event.targetInst,
+        who: "parent"
+      });
+    },
+    onClickCapture(event) {
+      calls.push({
+        currentTarget: event.currentTarget,
+        event,
+        phase: "capture",
+        target: event.target,
+        targetInst: event.targetInst,
+        who: "parent"
+      });
+    }
+  };
+  const childProps = {
+    onClick(event) {
+      calls.push({
+        currentTarget: event.currentTarget,
+        event,
+        phase: "bubble",
+        target: event.target,
+        targetInst: event.targetInst,
+        who: "child"
+      });
+    },
+    onClickCapture(event) {
+      calls.push({
+        currentTarget: event.currentTarget,
+        event,
+        phase: "capture",
+        target: event.target,
+        targetInst: event.targetInst,
+        who: "child"
+      });
+    }
+  };
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+  const captureWrapper = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    rootListeners.IS_CAPTURE_PHASE
+  );
+  const bubbleWrapper = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  const captureDispatch =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      captureWrapper,
+      nativeEvent
+    );
+  const bubbleDispatch =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      bubbleWrapper,
+      nativeEvent
+    );
+
+  const queueInvocation =
+    pluginEventSystem.invokeDispatchQueueCanaryFromDispatchRecords([
+      captureDispatch,
+      bubbleDispatch
+    ]);
+
+  assert.equal(queueInvocation.publicDispatchEnabled, false);
+  assert.equal(queueInvocation.syntheticEventCount, 0);
+  assert.equal(queueInvocation.listenerInvocationCount, 4);
+  assert.equal(queueInvocation.captureListenerInvocationCount, 2);
+  assert.equal(queueInvocation.bubbleListenerInvocationCount, 2);
+  assert.equal(
+    queueInvocation.currentTargetDiagnosticStatus,
+    pluginEventSystem.PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+  );
+  assert.equal(queueInvocation.currentTargetResetAfterDispatch, true);
+  assert.equal(queueInvocation.currentTargetResetCount, 4);
+  assert.deepEqual(
+    calls.map((call) => [
+      call.phase,
+      call.who,
+      call.currentTarget,
+      call.target,
+      call.targetInst
+    ]),
+    [
+      ["capture", "parent", parent, child, childToken],
+      ["capture", "child", child, child, childToken],
+      ["bubble", "child", child, child, childToken],
+      ["bubble", "parent", parent, child, childToken]
+    ]
+  );
+  assert.equal(calls[0].event, calls[1].event);
+  assert.equal(calls[2].event, calls[3].event);
+  assert.notEqual(calls[0].event, calls[2].event);
+  assert.deepEqual(
+    calls.map((call) => call.event.currentTarget),
+    [null, null, null, null]
+  );
+  for (const call of calls) {
+    assert.equal(Object.isFrozen(call.event), true);
+    assert.equal(call.event.syntheticEvent, false);
+    assert.equal(Object.hasOwn(call.event, "nativeEvent"), false);
+    assert.equal(Object.hasOwn(call.event, "preventDefault"), false);
+    assert.equal(Object.hasOwn(call.event, "stopPropagation"), false);
+  }
+  assert.deepEqual(
+    queueInvocation.currentTargetProgression.map((entry) => [
+      entry.phase,
+      entry.registrationName,
+      entry.currentTargetBeforeInvocation,
+      entry.currentTargetDuringInvocation,
+      entry.currentTargetAfterInvocation,
+      entry.currentTargetResetAfterInvocation,
+      entry.targetInst
+    ]),
+    [
+      ["capture", "onClickCapture", null, parent, null, true, parentToken],
+      ["capture", "onClickCapture", null, child, null, true, childToken],
+      ["bubble", "onClick", null, child, null, true, childToken],
+      ["bubble", "onClick", null, parent, null, true, parentToken]
+    ]
+  );
+  assert.deepEqual(
+    queueInvocation.invocationOrder.map((entry) => [
+      entry.phase,
+      entry.currentTargetDuringInvocation,
+      entry.currentTargetAfterInvocation,
+      entry.currentTargetResetAfterInvocation
+    ]),
+    [
+      ["capture", parent, null, true],
+      ["capture", child, null, true],
+      ["bubble", child, null, true],
+      ["bubble", parent, null, true]
+    ]
+  );
+
+  const queuePayload =
+    pluginEventSystem.getDispatchQueueInvocationCanaryRecordPayload(
+      queueInvocation
+    );
+  assert.equal(queuePayload.dispatchRecords.length, 2);
+  assert.equal(queuePayload.invocationRecords.length, 4);
+  assert.deepEqual(
+    queuePayload.invocationRecords.map((record) => [
+      record.currentTargetBeforeInvocation,
+      record.currentTargetDuringInvocation,
+      record.currentTargetAfterInvocation,
+      record.currentTargetResetAfterInvocation,
+      record.currentTargetResetDiagnosticStatus
+    ]),
+    [
+      [
+        null,
+        parent,
+        null,
+        true,
+        pluginEventSystem.PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+      ],
+      [
+        null,
+        child,
+        null,
+        true,
+        pluginEventSystem.PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+      ],
+      [
+        null,
+        child,
+        null,
+        true,
+        pluginEventSystem.PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+      ],
+      [
+        null,
+        parent,
+        null,
+        true,
+        pluginEventSystem.PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+      ]
+    ]
+  );
+  assert.deepEqual(
+    queuePayload.invocationRecords.map(
+      (record) =>
+        pluginEventSystem.getDispatchListenerInvocationCanaryRecordPayload(
+          record
+        ).canaryEvent.currentTarget
+    ),
+    [null, null, null, null]
+  );
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(parentToken),
+    parentToken
+  );
+});
+
 test("private root host-output fake click dispatch proves capture before bubble ordering", () => {
   const document = createHostOutputDocument("root-output-event-order");
   const container = document.createElement("div");
@@ -1062,6 +1287,7 @@ test("private root host-output fake click dispatch proves capture before bubble 
   for (const call of calls) {
     assert.equal(Object.isFrozen(call.event), true);
     assert.equal(call.event.syntheticEvent, false);
+    assert.equal(call.event.currentTarget, null);
     assert.equal(call.event.status, "private-canary-not-synthetic-event");
     assert.equal(Object.hasOwn(call.event, "nativeEvent"), false);
     assert.equal(Object.hasOwn(call.event, "preventDefault"), false);
@@ -1115,6 +1341,30 @@ test("private root host-output fake click dispatch proves capture before bubble 
   assert.equal(
     clickPayload.queueInvocationRecord.status,
     pluginEventSystem.PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS
+  );
+  assert.equal(
+    clickPayload.queueInvocationRecord.currentTargetDiagnosticStatus,
+    pluginEventSystem.PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+  );
+  assert.equal(
+    clickPayload.queueInvocationRecord.currentTargetResetAfterDispatch,
+    true
+  );
+  assert.equal(clickPayload.queueInvocationRecord.currentTargetResetCount, 2);
+  assert.deepEqual(
+    clickPayload.queueInvocationRecord.currentTargetProgression.map(
+      (entry) => [
+        entry.phase,
+        entry.registrationName,
+        entry.currentTargetDuringInvocation,
+        entry.currentTargetAfterInvocation,
+        entry.currentTargetResetAfterInvocation
+      ]
+    ),
+    [
+      ["capture", "onClickCapture", hostOutputPayload.hostNode, null, true],
+      ["bubble", "onClick", hostOutputPayload.hostNode, null, true]
+    ]
   );
   assert.equal(clickPayload.queueInvocationRecord.publicDispatchEnabled, false);
   assert.equal(
