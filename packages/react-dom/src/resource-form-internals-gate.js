@@ -664,6 +664,11 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   scriptResourceMapCommitRowsRecorded: false,
   moduleResourceMapOrderRowsRecorded: false,
   moduleResourceMapDedupeKeysRecorded: false,
+  stylesheetLoadErrorStateRecordConsumed: false,
+  stylesheetLoadStateCommitOrderRowsRecorded: false,
+  stylesheetLoadStateResourceMapRowsValidated: false,
+  duplicateStylesheetPrecedenceRowsRejected: false,
+  staleStylesheetResourceMapEntriesRejected: false,
   realResourceMapsCreated: false,
   realResourceMapsMutated: false,
   fakeResourceMapsCreated: false,
@@ -677,6 +682,7 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   scriptExecutionStarted: false,
   publicScriptModuleResourceDispatch: false,
   resourceLoadStateMutated: false,
+  publicStylesheetLoadStateDispatch: false,
   publicResourceMapCommitBehavior: false
 });
 
@@ -692,6 +698,11 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   scriptResourceMapCommitRowsRecorded: true,
   moduleResourceMapOrderRowsRecorded: true,
   moduleResourceMapDedupeKeysRecorded: true,
+  stylesheetLoadErrorStateRecordConsumed: true,
+  stylesheetLoadStateCommitOrderRowsRecorded: true,
+  stylesheetLoadStateResourceMapRowsValidated: true,
+  duplicateStylesheetPrecedenceRowsRejected: true,
+  staleStylesheetResourceMapEntriesRejected: true,
   realResourceMapsCreated: false,
   realResourceMapsMutated: false,
   fakeResourceMapsCreated: false,
@@ -705,6 +716,7 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   scriptExecutionStarted: false,
   publicScriptModuleResourceDispatch: false,
   resourceLoadStateMutated: false,
+  publicStylesheetLoadStateDispatch: false,
   publicResourceMapCommitBehavior: false
 });
 
@@ -2262,13 +2274,15 @@ function createResourceHintResourceMapCommitGate(options) {
     recordResourceMapCommitDiagnostic(
       orderRecord,
       stylesheetPrecedenceRecord,
-      diagnostic
+      diagnostic,
+      stylesheetLoadErrorStateRecord
     ) {
       return recordResourceHintResourceMapCommitWithGate(
         gateState,
         orderRecord,
         stylesheetPrecedenceRecord,
-        diagnostic
+        diagnostic,
+        stylesheetLoadErrorStateRecord
       );
     }
   });
@@ -2963,6 +2977,8 @@ function describePrivateResourceHintResourceMapCommitGate() {
       privateResourceHintPreloadPreinitOrderRecordType,
     acceptedStylesheetPrecedenceRecordType:
       privateResourceHintStylesheetPrecedenceRecordType,
+    acceptedStylesheetLoadErrorStateRecordType:
+      privateResourceHintStylesheetLoadErrorStateRecordType,
     acceptedRecordKinds: freezeArray(['stylesheet', 'preload', 'script']),
     deterministicPrivateRecordsOnly: true,
     recordsPrivateResourceMapRows: true,
@@ -2973,8 +2989,14 @@ function describePrivateResourceHintResourceMapCommitGate() {
     recordsModuleScriptRows: true,
     recordsModuleResourceMapOrderRows: true,
     recordsModuleResourceMapDedupeKeys: true,
+    consumesStylesheetLoadErrorState: true,
+    recordsStylesheetLoadStateCommitOrderRows: true,
+    validatesStylesheetLoadStateResourceMapRows: true,
     rejectsMalformedModuleRows: true,
     rejectsConflictingDuplicateRecords: true,
+    rejectsDuplicateStylesheetPrecedenceRows: true,
+    rejectsStaleStylesheetResourceMapEntries: true,
+    rejectsPublicResourceDispatchClaims: true,
     mutatesRealResourceMaps: false,
     mutatesFakeResourceMaps: false,
     mutatesFakeHead: false,
@@ -2986,6 +3008,7 @@ function describePrivateResourceHintResourceMapCommitGate() {
     rawValuesRetained: false,
     publicResourceHintDomInsertion: false,
     publicScriptModuleResourceDispatch: false,
+    publicStylesheetLoadStateDispatch: false,
     publicResourceMapCommitBehavior: false,
     blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities,
     contracts: resourceHintResourceMapCommitContracts,
@@ -3023,6 +3046,7 @@ function describePrivateResourceHintStylesheetLoadErrorStateGate() {
     fetchesStylesheets: false,
     suspendsCommits: false,
     schedulesRealTimers: false,
+    rejectsPublicResourceDispatchClaims: true,
     rawValuesRetained: false,
     publicResourceHintDomInsertion: false,
     publicStylesheetResourceBehavior: false,
@@ -3481,6 +3505,8 @@ function createUnsupportedResourceHintResourceMapCommitError(record) {
   error.sourceOrderDiagnosticId = payload.sourceOrderDiagnosticId;
   error.sourceStylesheetPrecedenceId =
     payload.sourceStylesheetPrecedenceId;
+  error.sourceStylesheetLoadErrorStateId =
+    payload.sourceStylesheetLoadErrorStateId;
   error.blockedCapabilities = payload.blockedCapabilities;
   error.sideEffects = payload.sideEffects;
 
@@ -4212,7 +4238,8 @@ function recordResourceHintResourceMapCommitWithGate(
   gateState,
   orderRecord,
   stylesheetPrecedenceRecord,
-  diagnostic
+  diagnostic,
+  stylesheetLoadErrorStateRecord
 ) {
   if (gateState.resourceMapCommitConsumed === true) {
     throwInvalidResourceHintResourceMapCommitAdmission(
@@ -4227,11 +4254,19 @@ function recordResourceHintResourceMapCommitWithGate(
       stylesheetPrecedenceRecord,
       order
     );
+  const stylesheetLoadErrorState =
+    stylesheetLoadErrorStateRecord == null
+      ? null
+      : assertStylesheetLoadErrorStateRecordForResourceMapCommit(
+          stylesheetLoadErrorStateRecord,
+          stylesheetPrecedence
+        );
   const commitAdmission =
     normalizeResourceHintResourceMapCommitAdmission(diagnostic);
   const commitPlan = createResourceHintResourceMapCommitPlan(
     order,
-    stylesheetPrecedence
+    stylesheetPrecedence,
+    stylesheetLoadErrorState
   );
   gateState.resourceMapCommitConsumed = true;
 
@@ -4255,6 +4290,14 @@ function recordResourceHintResourceMapCommitWithGate(
       stylesheetPrecedence.stylesheetPrecedenceId,
     sourceStylesheetPrecedenceSequence:
       stylesheetPrecedence.stylesheetPrecedenceSequence,
+    sourceStylesheetLoadErrorStateId:
+      stylesheetLoadErrorState === null
+        ? null
+        : stylesheetLoadErrorState.stylesheetLoadErrorStateId,
+    sourceStylesheetLoadErrorStateSequence:
+      stylesheetLoadErrorState === null
+        ? null
+        : stylesheetLoadErrorState.stylesheetLoadErrorStateSequence,
     requestType: 'resource-hint-resource-map-commit',
     hostTag: 'head',
     oracleKind: resourceHintOracleKind,
@@ -4277,6 +4320,8 @@ function recordResourceHintResourceMapCommitWithGate(
     preloadResourceMapRecords: commitPlan.preloadResourceMapRecords,
     scriptResourceMapRecords: commitPlan.scriptResourceMapRecords,
     moduleResourceMapOrder: commitPlan.moduleResourceMapOrder,
+    stylesheetLoadStateCommitOrder:
+      commitPlan.stylesheetLoadStateCommitOrder,
     resourceMapConflictBoundary: commitPlan.resourceMapConflictBoundary,
     stylesheetPrecedenceBoundary:
       commitPlan.stylesheetPrecedenceBoundary,
@@ -5580,6 +5625,65 @@ function assertStylesheetPrecedenceRecordForResourceMapCommit(record, order) {
   error.code = privateResourceHintResourceMapCommitInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
+}
+
+function assertStylesheetLoadErrorStateRecordForResourceMapCommit(
+  record,
+  stylesheetPrecedence
+) {
+  const payload =
+    getPrivateResourceHintStylesheetLoadErrorStateRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.stylesheetLoadErrorStateStatus ===
+      privateResourceHintStylesheetLoadErrorStateStatus &&
+    payload.executionStatus ===
+      privateResourceHintStylesheetLoadErrorStateExecutionStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus &&
+    payload.publicResourceBoundary?.publicResourceHintCallsReachable === false
+  ) {
+    if (
+      payload.sourceStylesheetPrecedenceId !==
+      stylesheetPrecedence.stylesheetPrecedenceId
+    ) {
+      throwInvalidResourceHintResourceMapCommitAdmission(
+        'stale resource-map entries: stylesheet load/error state record must reference the source stylesheet precedence record'
+      );
+    }
+
+    assertNoPublicResourceDispatchFromStylesheetLoadErrorStateRecord(
+      payload
+    );
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM stylesheet load/error state record for the resource-map commit diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintResourceMapCommitGateError';
+  error.code = privateResourceHintResourceMapCommitInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertNoPublicResourceDispatchFromStylesheetLoadErrorStateRecord(
+  payload
+) {
+  if (
+    payload.sideEffects?.stylesheetFetchStarted !== false ||
+    payload.sideEffects?.stylesheetLoadListenerInstalled !== false ||
+    payload.sideEffects?.stylesheetErrorListenerInstalled !== false ||
+    payload.sideEffects?.stylesheetCommitSuspended !== false ||
+    payload.sideEffects?.publicResourceHintDomInsertion !== false ||
+    payload.stateAdmission?.publicResourceHintDomInsertion !== false ||
+    payload.stateAdmission?.publicStylesheetResourceBehavior !== false ||
+    payload.stateAdmission?.compatibilityClaimed !== false
+  ) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'stylesheet load/error state record must remain fake-state metadata without public resource dispatch'
+    );
+  }
 }
 
 
@@ -8543,6 +8647,11 @@ function normalizeResourceHintResourceMapCommitAdmission(diagnostic) {
   }
 
   assertNoResourceMapCommitTargets(diagnostic);
+  assertNoPublicResourceDispatchClaims(
+    diagnostic,
+    throwInvalidResourceHintResourceMapCommitAdmission,
+    'resource-map commit gate'
+  );
 
   return freezeRecord({
     commitKind,
@@ -8616,6 +8725,11 @@ function normalizeResourceHintStylesheetLoadErrorStateAdmission(diagnostic) {
   }
 
   assertNoRawStylesheetLoadErrorStateFields(diagnostic);
+  assertNoPublicResourceDispatchClaims(
+    diagnostic,
+    throwInvalidResourceHintStylesheetLoadErrorStateAdmission,
+    'stylesheet load/error state metadata gate'
+  );
 
   const stateKind = getAdmissionStringProperty(
     diagnostic,
@@ -8694,6 +8808,28 @@ function assertNoRawStylesheetLoadErrorStateFields(diagnostic) {
   }
 }
 
+function assertNoPublicResourceDispatchClaims(
+  diagnostic,
+  throwInvalid,
+  gateName
+) {
+  for (const field of [
+    'publicResourceHintDomInsertion',
+    'publicResourceMapCommitBehavior',
+    'publicStylesheetResourceBehavior',
+    'publicStylesheetLoadStateDispatch',
+    'publicStylesheetPrecedenceBehavior',
+    'publicScriptModuleResourceDispatch',
+    'publicResourceApisReachable',
+    'compatibilityClaimed'
+  ]) {
+    if (diagnostic[field] === true) {
+      throwInvalid(
+        `${field} must not claim public resource dispatch in the ${gateName}`
+      );
+    }
+  }
+}
 
 function createResourceHintStylesheetLoadErrorStatePlan(stylesheetPrecedence) {
   const resourceStates = collectStylesheetLoadErrorResourceStates(
@@ -9181,7 +9317,8 @@ function assertNoResourceMapCommitTargets(diagnostic) {
 
 function createResourceHintResourceMapCommitPlan(
   order,
-  stylesheetPrecedence
+  stylesheetPrecedence,
+  stylesheetLoadErrorState
 ) {
   const privateResourceMapRecords = freezeArray(
     order.dedupeRows
@@ -9198,6 +9335,11 @@ function createResourceHintResourceMapCommitPlan(
     createResourceMapCommitConflictBoundary(privateResourceMapRecords);
   const moduleResourceMapOrder =
     createResourceMapCommitModuleResourceOrder(privateResourceMapRecords);
+  const stylesheetLoadStateCommitOrder =
+    createResourceMapCommitStylesheetLoadStateOrder(
+      privateResourceMapRecords,
+      stylesheetLoadErrorState
+    );
   const stylesheetResourceMapRecords = freezeArray(
     privateResourceMapRecords.filter((row) => row.recordKind === 'stylesheet')
   );
@@ -9216,13 +9358,15 @@ function createResourceHintResourceMapCommitPlan(
       createResourceMapCommitPlanSummary(
         privateResourceMapRecords,
         moduleResourceMapOrder,
-        resourceMapConflictBoundary
+        resourceMapConflictBoundary,
+        stylesheetLoadStateCommitOrder
       ),
     privateResourceMapRecords,
     stylesheetResourceMapRecords,
     preloadResourceMapRecords,
     scriptResourceMapRecords,
     moduleResourceMapOrder,
+    stylesheetLoadStateCommitOrder,
     resourceMapConflictBoundary,
     stylesheetPrecedenceBoundary:
       createResourceMapCommitStylesheetPrecedenceBoundary(
@@ -9351,6 +9495,10 @@ function getResourceMapCommitMapKind(recordKind) {
 
 function createResourceMapCommitConflictBoundary(privateResourceMapRecords) {
   assertWellFormedResourceMapCommitModuleRows(privateResourceMapRecords);
+  const stylesheetPrecedenceValidation =
+    assertNoDuplicateStylesheetPrecedenceResourceMapRows(
+      privateResourceMapRecords
+    );
 
   const stateByMapDedupeKey = new Map();
   for (const row of privateResourceMapRecords) {
@@ -9388,12 +9536,42 @@ function createResourceMapCommitConflictBoundary(privateResourceMapRecords) {
         0
       ),
     checkedDedupeKeyCount: stateByMapDedupeKey.size,
+    checkedStylesheetPrecedenceRecordCount:
+      stylesheetPrecedenceValidation.checkedRecordCount,
+    checkedStylesheetPrecedenceKeyCount:
+      stylesheetPrecedenceValidation.checkedDedupeKeyCount,
     malformedModuleRowCount: 0,
     conflictingDuplicateRecordCount: 0,
+    duplicateStylesheetPrecedenceRowCount: 0,
     validationMutatedRecords: false,
     realResourceMapsMutated: false,
     fakeResourceMapsMutated: false,
     compatibilityClaimed: false
+  });
+}
+
+function assertNoDuplicateStylesheetPrecedenceResourceMapRows(
+  privateResourceMapRecords
+) {
+  const seenByResourceMapDedupeKey = new Set();
+  let checkedRecordCount = 0;
+  for (const row of privateResourceMapRecords) {
+    if (row.recordKind !== 'stylesheet') {
+      continue;
+    }
+
+    checkedRecordCount++;
+    if (seenByResourceMapDedupeKey.has(row.resourceMapDedupeKey)) {
+      throwInvalidResourceHintResourceMapCommitAdmission(
+        `duplicate stylesheet precedence rows for ${row.resourceMapDedupeKey}`
+      );
+    }
+    seenByResourceMapDedupeKey.add(row.resourceMapDedupeKey);
+  }
+
+  return freezeRecord({
+    checkedRecordCount,
+    checkedDedupeKeyCount: seenByResourceMapDedupeKey.size
   });
 }
 
@@ -9607,10 +9785,176 @@ function createResourceMapCommitModuleDedupeKeyRows(orderRows) {
   );
 }
 
+function createResourceMapCommitStylesheetLoadStateOrder(
+  privateResourceMapRecords,
+  stylesheetLoadErrorState
+) {
+  const stylesheetRecords = freezeArray(
+    privateResourceMapRecords.filter((row) => row.recordKind === 'stylesheet')
+  );
+
+  if (stylesheetLoadErrorState === null) {
+    return freezeRecord({
+      orderKind:
+        'react-19.2.6-stylesheet-load-state-resource-map-commit-order-diagnostic',
+      targetKind: 'document-head',
+      hostTag: 'head',
+      sourceStylesheetLoadErrorStateId: null,
+      sourceStylesheetLoadErrorStateSequence: null,
+      rowCount: 0,
+      stylesheetResourceMapRecordCount: stylesheetRecords.length,
+      loadStateResourceCount: 0,
+      matchedResourceCount: 0,
+      unmatchedLoadStateResourceCount: 0,
+      staleResourceMapEntryCount: 0,
+      duplicateStylesheetPrecedenceRowCount: 0,
+      rows: freezeArray([]),
+      loadStateConsumed: false,
+      resourceMapEntriesValidated: false,
+      loadEventSubscribed: false,
+      errorEventSubscribed: false,
+      loadingStateMutated: false,
+      resourceFetchStarted: false,
+      commitSuspended: false,
+      publicResourceDispatchBlocked: true,
+      publicStylesheetLoadStateDispatch: false,
+      rawValuesRetained: false,
+      compatibilityClaimed: false
+    });
+  }
+
+  const stateRowsByResourceKey = new Map();
+  for (const row of stylesheetLoadErrorState.resourceStateRows) {
+    if (stateRowsByResourceKey.has(row.resourceKey)) {
+      throwInvalidResourceHintResourceMapCommitAdmission(
+        `duplicate stylesheet load/error state rows for ${row.resourceKey}`
+      );
+    }
+    stateRowsByResourceKey.set(row.resourceKey, row);
+  }
+
+  const rows = freezeArray(
+    stylesheetRecords.map((row, index) => {
+      const stateRow = stateRowsByResourceKey.get(row.resourceKey);
+      if (stateRow === undefined) {
+        throwInvalidResourceHintResourceMapCommitAdmission(
+          `stale resource-map entries for ${row.resourceMapDedupeKey}`
+        );
+      }
+
+      return createResourceMapCommitStylesheetLoadStateOrderRow(
+        row,
+        stateRow,
+        stylesheetLoadErrorState,
+        index
+      );
+    })
+  );
+  const matchedResourceKeys = new Set(rows.map((row) => row.resourceKey));
+  const unmatchedLoadStateResourceCount =
+    stylesheetLoadErrorState.resourceStateRows.filter(
+      (row) => !matchedResourceKeys.has(row.resourceKey)
+    ).length;
+
+  return freezeRecord({
+    orderKind:
+      'react-19.2.6-stylesheet-load-state-resource-map-commit-order-diagnostic',
+    targetKind: 'document-head',
+    hostTag: 'head',
+    sourceStylesheetLoadErrorStateId:
+      stylesheetLoadErrorState.stylesheetLoadErrorStateId,
+    sourceStylesheetLoadErrorStateSequence:
+      stylesheetLoadErrorState.stylesheetLoadErrorStateSequence,
+    rowCount: rows.length,
+    stylesheetResourceMapRecordCount: stylesheetRecords.length,
+    loadStateResourceCount:
+      stylesheetLoadErrorState.resourceStateRows.length,
+    matchedResourceCount: rows.length,
+    unmatchedLoadStateResourceCount,
+    staleResourceMapEntryCount: 0,
+    duplicateStylesheetPrecedenceRowCount: 0,
+    rows,
+    loadStateConsumed: true,
+    resourceMapEntriesValidated: true,
+    loadEventSubscribed: false,
+    errorEventSubscribed: false,
+    loadingStateMutated: false,
+    resourceFetchStarted: false,
+    commitSuspended: false,
+    publicResourceDispatchBlocked: true,
+    publicStylesheetLoadStateDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceMapCommitStylesheetLoadStateOrderRow(
+  resourceMapRow,
+  stateRow,
+  stylesheetLoadErrorState,
+  index
+) {
+  const loadingRows = stylesheetLoadErrorState.loadingStateRows.filter(
+    (row) => row.sourceResourceStateRowId === stateRow.rowId
+  );
+  const preloadStateRow =
+    stylesheetLoadErrorState.preloadStateRows.find(
+      (row) => row.sourceResourceStateRowId === stateRow.rowId
+    ) || null;
+  const commitSuspensionRow =
+    stylesheetLoadErrorState.commitSuspensionRows.find(
+      (row) => row.sourceResourceStateRowId === stateRow.rowId
+    ) || null;
+
+  return freezeRecord({
+    rowId: `stylesheet-load-state-commit-order-${index}`,
+    rowType: 'stylesheet-load-state-commit-order',
+    sourceResourceMapCommitRowId: resourceMapRow.rowId,
+    sourceStylesheetLoadErrorStateRowId: stateRow.rowId,
+    sourcePreloadStateRowId:
+      preloadStateRow === null ? null : preloadStateRow.rowId,
+    sourceCommitSuspensionRowId:
+      commitSuspensionRow === null ? null : commitSuspensionRow.rowId,
+    resourceMapOrderIndex: resourceMapRow.resourceMapOrderIndex,
+    resourceIndex: stateRow.resourceIndex,
+    resourceKey: resourceMapRow.resourceKey,
+    resourceMapDedupeKey: resourceMapRow.resourceMapDedupeKey,
+    precedenceKey: resourceMapRow.precedenceKey,
+    mapKind: resourceMapRow.mapKind,
+    recordKind: resourceMapRow.recordKind,
+    contractId: resourceMapRow.contractId,
+    sourceStylesheetDedupeRowId:
+      resourceMapRow.sourceStylesheetDedupeRowId,
+    fakeLoadingStateBitmasks: freezeArray(
+      loadingRows.map((row) => row.bitmask)
+    ),
+    fakeLoadingStateLabels: freezeArray(
+      loadingRows.map((row) => row.label)
+    ),
+    preloadWouldBeTracked: stateRow.preloadSeenBefore,
+    preinitSeenBefore: stateRow.preinitSeenBefore,
+    plannedInsertionCount: stateRow.plannedInsertionCount,
+    observedStylesheetCount: stateRow.observedStylesheetCount,
+    commitOrderConsumesFakeLoadState: true,
+    resourceMapEntryStale: false,
+    duplicatePrecedenceRow: false,
+    loadEventSubscribed: false,
+    errorEventSubscribed: false,
+    loadingStateMutated: false,
+    resourceFetchStarted: false,
+    commitSuspended: false,
+    publicResourceDispatchBlocked: true,
+    publicStylesheetLoadStateDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createResourceMapCommitPlanSummary(
   privateResourceMapRecords,
   moduleResourceMapOrder,
-  resourceMapConflictBoundary
+  resourceMapConflictBoundary,
+  stylesheetLoadStateCommitOrder
 ) {
   const uniquePrivateRecordKeys = new Set(
     privateResourceMapRecords.map(
@@ -9647,10 +9991,20 @@ function createResourceMapCommitPlanSummary(
     moduleScriptRecordCount,
     moduleResourceMapOrderRowCount: moduleResourceMapOrder.rowCount,
     moduleResourceMapDedupeKeyCount: moduleResourceMapOrder.dedupeKeyCount,
+    stylesheetLoadStateCommitOrderRowCount:
+      stylesheetLoadStateCommitOrder.rowCount,
+    stylesheetLoadStateResourceCount:
+      stylesheetLoadStateCommitOrder.loadStateResourceCount,
+    unmatchedStylesheetLoadStateResourceCount:
+      stylesheetLoadStateCommitOrder.unmatchedLoadStateResourceCount,
     malformedModuleRowCount:
       resourceMapConflictBoundary.malformedModuleRowCount,
     conflictingDuplicateRecordCount:
       resourceMapConflictBoundary.conflictingDuplicateRecordCount,
+    duplicateStylesheetPrecedenceRowCount:
+      resourceMapConflictBoundary.duplicateStylesheetPrecedenceRowCount,
+    staleResourceMapEntryCount:
+      stylesheetLoadStateCommitOrder.staleResourceMapEntryCount,
     dedupedRecordCount: privateResourceMapRecords.filter(
       (row) => row.wouldInsertIntoHead === false
     ).length,
@@ -9714,6 +10068,13 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
       commitPlan.resourceMapCommitPlan.modulePreloadRecordCount,
     moduleScriptRecordCount:
       commitPlan.resourceMapCommitPlan.moduleScriptRecordCount,
+    stylesheetLoadStateCommitOrderRowCount:
+      commitPlan.resourceMapCommitPlan
+        .stylesheetLoadStateCommitOrderRowCount,
+    stylesheetLoadStateRecordConsumed:
+      commitPlan.stylesheetLoadStateCommitOrder.loadStateConsumed,
+    stylesheetLoadStateResourceMapRowsValidated:
+      commitPlan.stylesheetLoadStateCommitOrder.resourceMapEntriesValidated,
     singletonOwnershipClaimed: false,
     resourceCountIncremented: false,
     resourceInstanceCreated: false,

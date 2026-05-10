@@ -70,6 +70,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintPreloadPreinitOrderBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetPrecedenceBlockedSideEffects,
   ...internalsGate.resourceHintResourceMapCommitBlockedSideEffects,
+  ...internalsGate.resourceHintStylesheetLoadErrorStateBlockedSideEffects,
   ...internalsGate.formActionResetDispatcherBlockedSideEffects,
   ...internalsGate.formActionEventExtractionBlockedSideEffects,
   ...internalsGate.formActionResetQueueCommitBlockedSideEffects,
@@ -507,6 +508,13 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     stylesheetResourceMapCommitRowsRecorded: false,
     preloadResourceMapCommitRowsRecorded: false,
     scriptResourceMapCommitRowsRecorded: false,
+    moduleResourceMapOrderRowsRecorded: false,
+    moduleResourceMapDedupeKeysRecorded: false,
+    stylesheetLoadErrorStateRecordConsumed: false,
+    stylesheetLoadStateCommitOrderRowsRecorded: false,
+    stylesheetLoadStateResourceMapRowsValidated: false,
+    duplicateStylesheetPrecedenceRowsRejected: false,
+    staleStylesheetResourceMapEntriesRejected: false,
     realResourceMapsCreated: false,
     realResourceMapsMutated: false,
     fakeResourceMapsCreated: false,
@@ -515,7 +523,20 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     preloadRecordStarted: false,
     scriptRecordLoaded: false,
     resourceLoadStateMutated: false,
+    publicStylesheetLoadStateDispatch: false,
     publicResourceMapCommitBehavior: false,
+    fakeStylesheetLoadErrorStateDiagnosticInvoked: false,
+    stylesheetResourceStateRowsRecorded: false,
+    stylesheetLoadingStateRowsRecorded: false,
+    stylesheetPreloadStateRowsRecorded: false,
+    stylesheetCommitSuspensionRowsRecorded: false,
+    stylesheetLoadListenerInstalled: false,
+    stylesheetErrorListenerInstalled: false,
+    stylesheetPromiseCreated: false,
+    stylesheetPreloadListenerInstalled: false,
+    stylesheetFetchStarted: false,
+    stylesheetCommitSuspended: false,
+    stylesheetRealTimerScheduled: false,
     resourceFetchStarted: false,
     realDocumentMutated: false,
     publicResourceHintDomInsertion: false,
@@ -532,7 +553,9 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     stylesheetPrecedenceGate:
       internalsGate.describePrivateResourceHintStylesheetPrecedenceGate(),
     resourceMapCommitGate:
-      internalsGate.describePrivateResourceHintResourceMapCommitGate()
+      internalsGate.describePrivateResourceHintResourceMapCommitGate(),
+    stylesheetLoadErrorStateGate:
+      internalsGate.describePrivateResourceHintStylesheetLoadErrorStateGate()
   });
 }
 
