@@ -1655,6 +1655,122 @@ test("private root host-output click canary records listener error routing witho
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test("private portal event owner-root gate records portal child path ownership without bubbling", () => {
+  const document = createHostOutputDocument("portal-event-owner-root");
+  const rootContainer = document.createElement("div");
+  const portalContainer = document.createElement("section");
+  const portalChild = {
+    props: {
+      children: "portal event target",
+      onClick() {
+        throw new Error("portal listener should remain blocked");
+      }
+    },
+    type: "button"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: "portal-boundary",
+    portalCommitIdPrefix: "portal-commit",
+    portalEventOwnerRootIdPrefix: "portal-owner",
+    portalMountIdPrefix: "portal-mount",
+    sideEffectIdPrefix: "portal-owner-side-effect"
+  });
+  const create = bridge.createClientRoot(rootContainer);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const ownerGate = bridge.createPortalEventOwnerRootGate(mount);
+  const ownerGatePayload =
+    rootBridge.getPrivateRootPortalEventOwnerRootGatePayload(ownerGate);
+  const pluginGate = ownerGatePayload.eventOwnerRootGateRecord;
+  const pluginPayload =
+    pluginEventSystem.getPortalEventOwnerRootGateRecordPayload(pluginGate);
+
+  assert.equal(
+    pluginGate.kind,
+    pluginEventSystem.PORTAL_EVENT_OWNER_ROOT_GATE_RECORD_KIND
+  );
+  assert.equal(
+    pluginGate.status,
+    pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS
+  );
+  assert.equal(
+    pluginGate.blockedReason,
+    pluginEventSystem.PORTAL_EVENT_BUBBLING_BLOCKED_CODE
+  );
+  assert.equal(pluginGate.diagnosticOnly, true);
+  assert.equal(pluginGate.ownerRootMatchesTargetRoot, true);
+  assert.equal(pluginGate.dispatchPathRootOwnerMatchCount, 1);
+  assert.equal(pluginGate.dispatchPathRootOwnerMismatchCount, 0);
+  assert.equal(pluginGate.targetDispatchPathLength, 1);
+  assert.equal(
+    pluginGate.targetDispatchPathStatus,
+    "resolved-component-tree-dispatch-path"
+  );
+  assert.equal(pluginGate.portalContainerContainsTarget, true);
+  assert.equal(pluginGate.rootContainerContainsTarget, false);
+  assert.equal(pluginGate.portalContainerIsRootContainer, false);
+  assert.equal(pluginGate.publicPortalBubblingEnabled, false);
+  assert.equal(pluginGate.publicDispatchEnabled, false);
+  assert.equal(pluginGate.eventDispatch, false);
+  assert.equal(pluginGate.listenerInvocationCount, 0);
+  assert.equal(pluginGate.syntheticEventCount, 0);
+  assert.equal(pluginGate.browserDomEventCompatibilityClaimed, false);
+  assert.equal(pluginGate.compatibilityClaimed, false);
+  assert.equal(ownerGate.publicPortalBubbling, false);
+  assert.equal(ownerGate.eventDispatch, false);
+  assert.equal(ownerGate.listenerInvocationCount, 0);
+  assert.equal(ownerGate.syntheticEventCount, 0);
+  assert.deepEqual(
+    ownerGate.ownerRootAttachment,
+    {
+      eventTargetRootOwnerMatchesPortalOwner: true,
+      hostComponentRootOwnerMatchesPortalOwner: true,
+      hostTextRootOwnerMatchesPortalOwner: true
+    }
+  );
+  assert.equal(pluginPayload.ownerRoot, create.owner);
+  assert.equal(pluginPayload.portalContainer, portalContainer);
+  assert.equal(pluginPayload.rootContainer, rootContainer);
+  assert.equal(pluginPayload.targetNode, ownerGatePayload.hostComponentNode);
+  assert.equal(
+    pluginPayload.targetDispatchPathRecord.entries[0].rootOwner,
+    create.owner
+  );
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(ownerGatePayload.hostComponentNode.__registrations.length, 0);
+  assert.equal(rootContainer.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+
+  assert.throws(
+    () =>
+      pluginEventSystem.createPortalEventOwnerRootGateRecord(
+        ownerGatePayload.targetDispatchPathRecord,
+        {
+          ownerRoot: { kind: "DifferentRootOwner" },
+          portalContainer,
+          rootContainer
+        }
+      ),
+    {
+      code: pluginEventSystem.INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE
+    }
+  );
+
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
   const root = createEventTarget("plugin-root");
   assert.equal(

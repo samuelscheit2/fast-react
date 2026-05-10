@@ -9,6 +9,8 @@ const {
   assertMountedHostInstanceToken,
   attachHostInstanceNode,
   commitLatestPropsFromMutationHandoff,
+  createEventTargetDispatchPathRecord,
+  createEventTargetNormalizationRecord,
   createHostInstanceToken,
   detachHostInstanceSubtree,
   getLatestPropsFromHostInstanceToken,
@@ -57,6 +59,14 @@ const {
   registerRootListenersForPrivateRoot,
   revertRootListenersForPrivateRoot
 } = require('../events/root-listeners.js');
+const {
+  createPortalEventOwnerRootGateRecord:
+    createPluginPortalEventOwnerRootGateRecord,
+  getPortalEventOwnerRootGateRecordPayload:
+    getPluginPortalEventOwnerRootGateRecordPayload,
+  isPortalEventOwnerRootGateRecord:
+    isPluginPortalEventOwnerRootGateRecord
+} = require('../events/plugin-event-system.js');
 const {
   appendChild,
   appendChildToContainer,
@@ -123,6 +133,8 @@ const privateRootPortalFakeDomMountRecordType =
   'fast.react_dom.private_root_portal_fake_dom_mount_record';
 const privateRootPortalChildReconciliationDiagnosticRecordType =
   'fast.react_dom.private_root_portal_child_reconciliation_diagnostic_record';
+const privateRootPortalEventOwnerRootGateRecordType =
+  'fast.react_dom.private_root_portal_event_owner_root_gate_record';
 const privateRootHostOutputUpdateHandoffRecordType =
   'fast.react_dom.private_root_host_output_update_handoff_record';
 const privateRootCommitHostComponentUpdateHandoffRecordType =
@@ -196,6 +208,10 @@ const ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED =
   'blocked-public-root-portal-mounting';
 const ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED =
   'admitted-private-root-portal-child-reconciliation-diagnostic';
+const ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_RECORDED =
+  'recorded-private-root-portal-event-owner-root-gate';
+const ROOT_BRIDGE_PORTAL_EVENT_BUBBLING_BLOCKED =
+  'blocked-private-root-portal-event-bubbling';
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-host-output-update';
 const ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED =
@@ -781,6 +797,80 @@ const ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_BLOCKED_CAPABILITIES =
       reason: 'React DOM portal compatibility remains unclaimed.'
     })
   ]);
+const ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'portal-mounted-child-owner-root',
+      accepted: true,
+      reason:
+        'The mounted private portal HostComponent and HostText tokens belong to the owner root.'
+    }),
+    freezeRecord({
+      id: 'portal-event-target-dispatch-path',
+      accepted: true,
+      reason:
+        'The event layer recorded a component-tree dispatch path for the portal child without dispatching an event.'
+    }),
+    freezeRecord({
+      id: 'portal-event-owner-root-diagnostic',
+      accepted: true,
+      reason:
+        'The gate linked the portal event target path to the owner root for diagnostics only.'
+    })
+  ]);
+const ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-portal-event-bubbling',
+      blocked: true,
+      reason: 'Public React DOM portal event bubbling remains blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-event-dispatch',
+      blocked: true,
+      reason:
+        'Synthetic event extraction, dispatch, and listener invocation remain blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-listener-installation',
+      blocked: true,
+      reason:
+        'The owner-root gate does not install or invoke portal container listeners.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-compatibility',
+      blocked: true,
+      reason:
+        'The diagnostic uses fake-DOM component-tree metadata and makes no browser DOM bubbling claim.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler portal traversal, scheduling, or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'dom-mutation',
+      blocked: true,
+      reason: 'The owner-root gate records existing metadata only.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM portal event compatibility remains unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'fake-dom-property-update',
@@ -1039,6 +1129,7 @@ const rootUnmountHostOutputCleanupPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupRecords = new WeakMap();
 const rootPortalFakeDomMountPayloads = new WeakMap();
 const rootPortalChildReconciliationDiagnosticPayloads = new WeakMap();
+const rootPortalEventOwnerRootGatePayloads = new WeakMap();
 const rootHostOutputUpdateHandoffPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffRecords = new WeakMap();
 const rootCommitHostComponentUpdateHandoffPayloads = new WeakMap();
@@ -1178,6 +1269,13 @@ function createPrivateRootBridgeShell(options) {
         bridgeState,
         mountRecord,
         boundaryRecord,
+        options
+      );
+    },
+    createPortalEventOwnerRootGate(mountRecord, options) {
+      return createPortalEventOwnerRootGateRecordWithBridge(
+        bridgeState,
+        mountRecord,
         options
       );
     },
@@ -1919,6 +2017,14 @@ function createPortalChildReconciliationDiagnosticRecord(
     null,
     mountRecord,
     boundaryRecord,
+    options
+  );
+}
+
+function createPortalEventOwnerRootGateRecord(mountRecord, options) {
+  return createPortalEventOwnerRootGateRecordWithBridge(
+    null,
+    mountRecord,
     options
   );
 }
@@ -3051,6 +3157,14 @@ function getPrivateRootPortalChildReconciliationDiagnosticPayload(record) {
 
 function isPrivateRootPortalChildReconciliationDiagnosticRecord(value) {
   return rootPortalChildReconciliationDiagnosticPayloads.has(value);
+}
+
+function getPrivateRootPortalEventOwnerRootGatePayload(record) {
+  return rootPortalEventOwnerRootGatePayloads.get(record) || null;
+}
+
+function isPrivateRootPortalEventOwnerRootGateRecord(value) {
+  return rootPortalEventOwnerRootGatePayloads.has(value);
 }
 
 function getPrivateRootHostOutputUpdateHandoffPayload(record) {
@@ -4736,6 +4850,188 @@ function createPortalChildReconciliationDiagnosticRecordWithBridge(
   return diagnosticRecord;
 }
 
+function createPortalEventOwnerRootGateRecordWithBridge(
+  bridgeState,
+  mountRecord,
+  options
+) {
+  const validation = validatePortalEventOwnerRootGateMountRecord(mountRecord);
+  if (
+    bridgeState !== null &&
+    validation.rootHandleState.bridgeState !== bridgeState
+  ) {
+    const error = new Error(
+      'Cannot use a private root bridge portal event owner-root gate with a ' +
+        'different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence = rootBridgeState.nextPortalEventOwnerRootSequence++;
+  const gateId = `${rootBridgeState.portalEventOwnerRootIdPrefix}:${sequence}`;
+  const mountPayload = validation.mountPayload;
+  const portalContainer = mountPayload.portalContainer;
+  const hostComponentNode = assertMountedHostInstanceToken(
+    mountPayload.hostInstanceToken
+  );
+  const hostTextNode = assertMountedHostInstanceToken(
+    mountPayload.hostTextToken
+  );
+  const targetNormalizationRecord =
+    createEventTargetNormalizationRecord(hostComponentNode);
+  const targetDispatchPathRecord = createEventTargetDispatchPathRecord(
+    targetNormalizationRecord
+  );
+  const eventOwnerRootGateRecord =
+    createPluginPortalEventOwnerRootGateRecord(targetDispatchPathRecord, {
+      domEventName:
+        options && typeof options.domEventName === 'string'
+          ? options.domEventName
+          : 'click',
+      hostFiberPath: [
+        'HostRoot',
+        'HostPortal',
+        'HostComponent'
+      ],
+      ownerRoot: mountPayload.rootHandle.owner,
+      portalContainer,
+      portalKey: mountRecord.portalKey,
+      rootContainer: mountPayload.rootContainer,
+      sourceGateId: gateId
+    });
+  const eventOwnerRootGatePayload =
+    getPluginPortalEventOwnerRootGateRecordPayload(
+      eventOwnerRootGateRecord
+    );
+  const eventOwnerRootSummary =
+    summarizePortalEventOwnerRootGateRecord(eventOwnerRootGateRecord);
+  const listenerSideEffects = describePortalCommitListenerSideEffects(
+    portalContainer,
+    mountRecord.listenerSideEffects.portalListenerGuard
+  );
+  const hostComponentRootOwnerMatchesPortalOwner =
+    getRootOwnerFromHostInstanceToken(mountPayload.hostInstanceToken) ===
+    mountPayload.rootHandle.owner;
+  const hostTextRootOwnerMatchesPortalOwner =
+    getRootOwnerFromHostInstanceToken(mountPayload.hostTextToken) ===
+    mountPayload.rootHandle.owner;
+
+  const gateRecord = freezeRecord({
+    $$typeof: privateRootPortalEventOwnerRootGateRecordType,
+    kind: 'FastReactDomPrivateRootPortalEventOwnerRootGateRecord',
+    operation: 'portal-event-owner-root-gate',
+    gateId,
+    gateSequence: sequence,
+    gateStatus: ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_RECORDED,
+    eventBubblingStatus: ROOT_BRIDGE_PORTAL_EVENT_BUBBLING_BLOCKED,
+    sourceMountDiagnosticId: mountRecord.mountDiagnosticId,
+    sourceMountDiagnosticSequence: mountRecord.mountDiagnosticSequence,
+    sourceMountStatus: mountRecord.mountStatus,
+    sourceCommitHandoffId: mountRecord.sourceCommitHandoffId,
+    sourceCommitHandoffSequence: mountRecord.sourceCommitHandoffSequence,
+    sourceBoundaryId: mountRecord.sourceBoundaryId,
+    sourceBoundarySequence: mountRecord.sourceBoundarySequence,
+    sourceRequestId: mountRecord.sourceRequestId,
+    sourceRequestSequence: mountRecord.sourceRequestSequence,
+    sourceRequestType: mountRecord.sourceRequestType,
+    sourceUpdateId: mountRecord.sourceUpdateId,
+    rootId: mountRecord.rootId,
+    rootKind: mountRecord.rootKind,
+    rootTag: mountRecord.rootTag,
+    portalKey: mountRecord.portalKey,
+    hostFiberPath: freezeArray([
+      'HostRoot',
+      'HostPortal',
+      'HostComponent'
+    ]),
+    hostComponentType: mountRecord.hostComponentType,
+    hostComponentInfo: mountRecord.hostComponentInfo,
+    hostTextInfo: mountRecord.hostTextInfo,
+    portalContainerInfo: mountRecord.portalContainerInfo,
+    portalContainerOwnership: describePortalContainerOwnership(
+      mountPayload.rootHandle,
+      validation.rootHandleState,
+      portalContainer
+    ),
+    listenerSideEffects,
+    eventOwnerRootGate: eventOwnerRootSummary,
+    targetDispatchPathStatus:
+      eventOwnerRootGateRecord.targetDispatchPathStatus,
+    targetDispatchPathLength:
+      eventOwnerRootGateRecord.targetDispatchPathLength,
+    targetInstStatus: eventOwnerRootGateRecord.targetInstStatus,
+    targetHostInstanceStatus:
+      eventOwnerRootGateRecord.targetHostInstanceStatus,
+    dispatchPathRootOwnerMatchCount:
+      eventOwnerRootGateRecord.dispatchPathRootOwnerMatchCount,
+    dispatchPathRootOwnerMismatchCount:
+      eventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
+    portalContainerContainsEventTarget:
+      eventOwnerRootGateRecord.portalContainerContainsTarget,
+    rootContainerContainsEventTarget:
+      eventOwnerRootGateRecord.rootContainerContainsTarget,
+    portalContainerIsRootContainer:
+      eventOwnerRootGateRecord.portalContainerIsRootContainer,
+    ownerRootAttachment: freezeRecord({
+      eventTargetRootOwnerMatchesPortalOwner:
+        eventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+      hostComponentRootOwnerMatchesPortalOwner,
+      hostTextRootOwnerMatchesPortalOwner
+    }),
+    acceptedCapabilities:
+      ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_BLOCKED_CAPABILITIES,
+    fakeDomPortalMountDiagnostic: true,
+    explicitPortalHostChildMounted: true,
+    componentTreeMetadataAttached: true,
+    portalOwnerRootAttached: true,
+    portalEventPathDiagnostic: true,
+    portalEventBubbling: false,
+    publicPortalBubbling: false,
+    publicPortalMounting: false,
+    preparePortalMount: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    publicDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    resourceSideEffects: false,
+    hydration: false,
+    eventDispatch: false,
+    listenerInvocationCount: 0,
+    syntheticEventCount: 0,
+    browserDomEventCompatibilityClaimed: false,
+    fakeDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+
+  rootPortalEventOwnerRootGatePayloads.set(
+    gateRecord,
+    freezeRecord({
+      eventOwnerRootGatePayload,
+      eventOwnerRootGateRecord,
+      hostComponentNode,
+      hostInstanceToken: mountPayload.hostInstanceToken,
+      hostTextNode,
+      hostTextToken: mountPayload.hostTextToken,
+      mountPayload,
+      mountRecord,
+      portal: mountPayload.portal,
+      portalContainer,
+      rootContainer: mountPayload.rootContainer,
+      rootHandle: mountPayload.rootHandle,
+      targetDispatchPathRecord,
+      targetNormalizationRecord
+    })
+  );
+
+  return gateRecord;
+}
+
 function normalizeInitialHostOutputElement(element) {
   if (element === null || typeof element !== 'object') {
     throwInvalidInitialHostOutputHandoff(
@@ -5376,6 +5672,10 @@ function createBridgeState(options) {
       options && options.portalChildReconciliationIdPrefix,
       'portal-child-reconciliation'
     ),
+    portalEventOwnerRootIdPrefix: getIdPrefix(
+      options && options.portalEventOwnerRootIdPrefix,
+      'portal-event-owner-root'
+    ),
     publicFacadePreflightIdPrefix: getIdPrefix(
       options && options.publicFacadePreflightIdPrefix,
       'public-facade-preflight'
@@ -5407,6 +5707,7 @@ function createBridgeState(options) {
     nextPortalCommitSequence: 1,
     nextPortalMountSequence: 1,
     nextPortalChildReconciliationSequence: 1,
+    nextPortalEventOwnerRootSequence: 1,
     nextPublicFacadePreflightSequence: 1,
     nextRootCommitRefMetadataSequence: 1,
     nextRootSequence: 1,
@@ -7096,6 +7397,71 @@ function validatePortalChildReconciliationDiagnosticRecords(
     rootHandleState
   };
 }
+
+function validatePortalEventOwnerRootGateMountRecord(mountRecord) {
+  const mountPayload = rootPortalFakeDomMountPayloads.get(mountRecord);
+  if (mountPayload === undefined) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Expected a private React DOM portal fake-DOM mount diagnostic record.'
+    );
+  }
+
+  assertPrivatePortalMountDiagnosticStillIntactForEventOwnerRoot(
+    mountRecord,
+    mountPayload
+  );
+
+  const rootHandleState = getPrivateRootHandleState(mountPayload.rootHandle);
+  assertAcceptedReactDomPortalObject(mountPayload.portal, rootHandleState);
+  assertFakeDomPortalMountTarget(mountPayload.portalContainer);
+
+  const hostNode = assertMountedHostInstanceToken(
+    mountPayload.hostInstanceToken
+  );
+  const textNode = assertMountedHostInstanceToken(mountPayload.hostTextToken);
+  if (hostNode !== mountPayload.hostComponentNode) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Portal HostComponent token no longer matches the mounted fake-DOM node.'
+    );
+  }
+  if (textNode !== mountPayload.hostTextNode) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Portal HostText token no longer matches the mounted fake-DOM node.'
+    );
+  }
+  if (
+    getRootOwnerFromHostInstanceToken(mountPayload.hostInstanceToken) !==
+    mountPayload.rootHandle.owner
+  ) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Portal HostComponent must be owned by the private root.'
+    );
+  }
+  if (
+    getRootOwnerFromHostInstanceToken(mountPayload.hostTextToken) !==
+    mountPayload.rootHandle.owner
+  ) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Portal HostText must be owned by the private root.'
+    );
+  }
+  if (!isCurrentChild(mountPayload.portalContainer, hostNode)) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Portal HostComponent must still be mounted in the portal container.'
+    );
+  }
+  if (!isCurrentChild(hostNode, textNode)) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Portal HostText must still be mounted under the portal HostComponent.'
+    );
+  }
+
+  return {
+    mountPayload,
+    rootHandleState
+  };
+}
+
 function validateRefCallbackHostOutputOrderingDiagnosticRequests(
   bridgeState,
   rootRequestRecords
@@ -7340,6 +7706,49 @@ function assertPrivatePortalMountDiagnosticStillIntact(record, payload) {
     payload.hostTextToken === undefined
   ) {
     throwInvalidPortalChildReconciliationRecord(
+      'Portal fake-DOM mount diagnostics must include mounted host tokens.'
+    );
+  }
+}
+
+function assertPrivatePortalMountDiagnosticStillIntactForEventOwnerRoot(
+  record,
+  payload
+) {
+  if (
+    record.$$typeof !== privateRootPortalFakeDomMountRecordType ||
+    record.kind !== 'FastReactDomPrivateRootPortalFakeDomMountDiagnosticRecord' ||
+    record.operation !== 'portal-fake-dom-mount-diagnostic' ||
+    record.mountStatus !== ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED ||
+    record.publicMountStatus !== ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED ||
+    record.fakeDomCommitApplied !== true ||
+    record.fakeDomPortalMountDiagnostic !== true ||
+    record.explicitPortalHostChildMounted !== true ||
+    record.portalContainerChildrenReplaced !== false ||
+    record.portalChildReconciliation !== false ||
+    record.portalMounting !== false ||
+    record.publicPortalMounting !== false ||
+    record.preparePortalMount !== false ||
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.domMutation !== true ||
+    record.publicDomMutation !== false ||
+    record.listenerInstallation !== false ||
+    record.resourceSideEffects !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Expected an intact private React DOM portal fake-DOM mount diagnostic record.'
+    );
+  }
+
+  if (
+    payload.hostComponentNode === undefined ||
+    payload.hostTextNode === undefined ||
+    payload.hostInstanceToken === undefined ||
+    payload.hostTextToken === undefined
+  ) {
+    throwInvalidPortalEventOwnerRootGateRecord(
       'Portal fake-DOM mount diagnostics must include mounted host tokens.'
     );
   }
@@ -7637,6 +8046,36 @@ function summarizePortalPrepareMountListenerIntentRecord(record) {
   });
 }
 
+function summarizePortalEventOwnerRootGateRecord(record) {
+  if (!isPluginPortalEventOwnerRootGateRecord(record)) {
+    throwInvalidPortalEventOwnerRootGateRecord(
+      'Expected a private event plugin portal owner-root gate record.'
+    );
+  }
+
+  return freezeRecord({
+    blockedReason: record.blockedReason,
+    browserDomEventCompatibilityClaimed:
+      record.browserDomEventCompatibilityClaimed,
+    dispatchPathRootOwnerMatchCount:
+      record.dispatchPathRootOwnerMatchCount,
+    dispatchPathRootOwnerMismatchCount:
+      record.dispatchPathRootOwnerMismatchCount,
+    eventDispatch: record.eventDispatch,
+    eventRecordKind: record.kind,
+    eventRecordStatus: record.status,
+    listenerInvocationCount: record.listenerInvocationCount,
+    ownerRootMatchesTargetRoot: record.ownerRootMatchesTargetRoot,
+    portalContainerContainsTarget: record.portalContainerContainsTarget,
+    publicPortalBubblingEnabled: record.publicPortalBubblingEnabled,
+    rootContainerContainsTarget: record.rootContainerContainsTarget,
+    syntheticEventCount: record.syntheticEventCount,
+    targetDispatchPathLength: record.targetDispatchPathLength,
+    targetDispatchPathStatus: record.targetDispatchPathStatus,
+    targetInstStatus: record.targetInstStatus
+  });
+}
+
 function inspectPublicFacadeMarkerListenerPreflightState(container) {
   const ownerDocument = getOwnerDocument(container);
   return freezeRecord({
@@ -7870,6 +8309,13 @@ function throwInvalidPortalChildReconciliationRecord(message) {
   throw error;
 }
 
+function throwInvalidPortalEventOwnerRootGateRecord(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_RECORD';
+  throw error;
+}
+
 function throwInvalidHostOutputUpdateHandoff(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF';
@@ -8096,6 +8542,10 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED,
   ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED,
   ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED,
+  ROOT_BRIDGE_PORTAL_EVENT_BUBBLING_BLOCKED,
+  ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_RECORDED,
+  ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_LISTENER_INSTALLATION_BLOCKED,
   ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_BLOCKED_CAPABILITIES,
@@ -8149,6 +8599,7 @@ module.exports = {
   createNativeRootBridgeHandoffRecord,
   createPortalChildReconciliationDiagnosticRecord,
   createPortalCommitHandoffRecord,
+  createPortalEventOwnerRootGateRecord,
   createPortalFakeDomMountDiagnosticRecord,
   createPortalPrepareMountListenerIntentRecord,
   createPortalRootBoundaryRecord,
@@ -8174,6 +8625,7 @@ module.exports = {
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalChildReconciliationDiagnosticPayload,
   getPrivateRootPortalCommitHandoffPayload,
+  getPrivateRootPortalEventOwnerRootGatePayload,
   getPrivateRootPortalFakeDomMountPayload,
   getPrivateRootPortalPrepareMountListenerIntentPayload,
   getPrivateRootPublicFacadeMarkerListenerPreflightPayload,
@@ -8195,6 +8647,7 @@ module.exports = {
   isPrivateRootInitialHostOutputHandoffRecord,
   isPrivateRootPortalChildReconciliationDiagnosticRecord,
   isPrivateRootPortalCommitHandoffRecord,
+  isPrivateRootPortalEventOwnerRootGateRecord,
   isPrivateRootPortalFakeDomMountRecord,
   isPrivateRootPortalPrepareMountListenerIntentRecord,
   isPrivateRootPortalBoundaryRecord,
@@ -8223,6 +8676,7 @@ module.exports = {
   privateRootPortalBoundaryRecordType,
   privateRootPortalChildReconciliationDiagnosticRecordType,
   privateRootPortalCommitHandoffRecordType,
+  privateRootPortalEventOwnerRootGateRecordType,
   privateRootPortalPrepareMountListenerIntentRecordType,
   privateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateRootPublicFacadeAdapterSymbol,
