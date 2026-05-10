@@ -383,6 +383,8 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
         queueKind: reactGate.internalTestQueueKind,
         pendingCount: 2,
         drainsAcceptedInternalTestQueues: true,
+        executesBrandedInternalTestCallbacks: true,
+        recordsBrandedInternalTestContinuations: true,
         drainsPublicSchedulerTaskQueue: false,
         drainsPublicReactActQueue: false,
         publicSchedulerTimingCompatibilityClaimed: false,
@@ -397,7 +399,10 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
     assert.equal(report.status, "drained-accepted-internal-test-queue");
     assert.equal(report.pendingBefore, 2);
     assert.equal(report.drainedCount, 2);
+    assert.equal(report.executedCallbackCount, 0);
+    assert.equal(report.recordedContinuationCount, 0);
     assert.equal(report.remainingCount, 0);
+    assert.deepEqual(report.recordedContinuations, []);
     assert.deepEqual(
       report.drainedRecords.map((record) => [
         record.index,
@@ -405,6 +410,9 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
         record.recordKind,
         record.taskKind,
         record.continuationStatus,
+        record.callbackStatus,
+        record.callback,
+        record.returnedContinuation,
         record.executesQueuedWork,
         record.executesEffects
       ]),
@@ -415,6 +423,9 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
           "SchedulerActQueueRequest",
           "RootSchedule",
           "NoContinuation",
+          "no-callback",
+          null,
+          null,
           false,
           false
         ],
@@ -424,6 +435,9 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
           "SchedulerActQueueRequest",
           "SchedulerCallback",
           "PendingContinuation",
+          "no-callback",
+          null,
+          null,
           false,
           false
         ]
@@ -437,6 +451,16 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
     assert.equal(report.drainsPublicSchedulerTaskQueue, false, nodeEnv);
     assert.equal(report.drainsPublicReactActQueue, false, nodeEnv);
     assert.equal(
+      report.executesBrandedInternalTestCallbacks,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      report.recordsBrandedInternalTestContinuations,
+      true,
+      nodeEnv
+    );
+    assert.equal(
       report.publicSchedulerTimingCompatibilityClaimed,
       false,
       nodeEnv
@@ -448,13 +472,185 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
     assert.deepEqual(scheduledEvents, [], nodeEnv);
     assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
 
+    const privateCallbackEvents = [];
+    const privateContinuation = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        privateCallbackEvents.push([
+          "continuation-should-not-run",
+          didTimeout
+        ]);
+      },
+      {
+        label: "private-continuation"
+      }
+    );
+    const privateCallback = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        privateCallbackEvents.push([
+          "private-callback",
+          didTimeout,
+          Scheduler.unstable_now()
+        ]);
+        return privateContinuation;
+      },
+      {
+        label: "private-callback"
+      }
+    );
+    const callbackQueue = reactGate.createInternalActQueueTestQueue([
+      reactGate.createInternalActQueueTestTask({
+        label: "executable-scheduler-callback",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "PendingContinuation",
+        callback: privateCallback
+      })
+    ]);
+    assert.equal(
+      reactGate.isAcceptedInternalActQueueTestQueue(callbackQueue),
+      true,
+      nodeEnv
+    );
+
+    const callbackReport =
+      diagnostics.drainAcceptedInternalActQueue(callbackQueue);
+    assert.equal(callbackReport.status, "drained-accepted-internal-test-queue");
+    assert.equal(callbackReport.pendingBefore, 1, nodeEnv);
+    assert.equal(callbackReport.drainedCount, 1, nodeEnv);
+    assert.equal(callbackReport.executedCallbackCount, 1, nodeEnv);
+    assert.equal(callbackReport.recordedContinuationCount, 1, nodeEnv);
+    assert.equal(callbackReport.remainingCount, 0, nodeEnv);
+    assert.deepEqual(
+      privateCallbackEvents,
+      [["private-callback", false, 0]],
+      nodeEnv
+    );
+    assert.deepEqual(
+      callbackReport.drainedRecords[0],
+      {
+        index: 0,
+        label: "executable-scheduler-callback",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "PendingContinuation",
+        callbackStatus: "executed-branded-internal-test-callback",
+        callback: {
+          kind: reactGate.internalTestCallbackKind,
+          label: "private-callback",
+          executesQueuedWork: false,
+          executesEffects: false
+        },
+        returnedContinuation: {
+          sourceIndex: 0,
+          sourceLabel: "executable-scheduler-callback",
+          status: "recorded-branded-internal-test-continuation",
+          continuation: {
+            kind: reactGate.internalTestCallbackKind,
+            label: "private-continuation",
+            executesQueuedWork: false,
+            executesEffects: false
+          },
+          executesQueuedWork: false,
+          executesEffects: false
+        },
+        executesQueuedWork: false,
+        executesEffects: false
+      },
+      nodeEnv
+    );
+    assert.deepEqual(
+      callbackReport.recordedContinuations,
+      [callbackReport.drainedRecords[0].returnedContinuation],
+      nodeEnv
+    );
+    assert.equal(callbackReport.mockSchedulerPendingWorkBefore, true, nodeEnv);
+    assert.equal(callbackReport.mockSchedulerPendingWorkAfter, true, nodeEnv);
+    assert.equal(callbackReport.mockSchedulerNowBefore, 0, nodeEnv);
+    assert.equal(callbackReport.mockSchedulerNowAfter, 0, nodeEnv);
+    assert.equal(callbackReport.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(callbackReport.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(callbackReport.executesQueuedWork, false, nodeEnv);
+    assert.equal(callbackReport.executesEffects, false, nodeEnv);
+    assert.equal(callbackQueue.records.length, 0, nodeEnv);
+    assert.deepEqual(scheduledEvents, [], nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    let unbrandedContinuationInvoked = false;
+    const unbrandedContinuationQueue =
+      reactGate.createInternalActQueueTestQueue([
+        reactGate.createInternalActQueueTestTask({
+          label: "returns-unbranded-continuation",
+          continuationStatus: "PendingContinuation",
+          callback: reactGate.createInternalActQueueTestCallback(
+            () =>
+              function unbrandedContinuation() {
+                unbrandedContinuationInvoked = true;
+              },
+            {
+              label: "returns-unbranded-continuation"
+            }
+          )
+        })
+      ]);
+    assert.throws(
+      () =>
+        diagnostics.drainAcceptedInternalActQueue(
+          unbrandedContinuationQueue
+        ),
+      (error) => {
+        assert.equal(
+          error.name,
+          "FastReactSchedulerPrivateActQueueFlushError"
+        );
+        assert.equal(
+          error.code,
+          "FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_REJECTED"
+        );
+        assert.match(
+          error.message,
+          /record-0-continuation-missing-internal-brand/u
+        );
+        return true;
+      },
+      nodeEnv
+    );
+    assert.equal(unbrandedContinuationInvoked, false, nodeEnv);
+
     assert.equal(Scheduler.unstable_flushAllWithoutAsserting(), true, nodeEnv);
     assert.deepEqual(scheduledEvents, ["mock-scheduler-callback"], nodeEnv);
     assert.equal(Scheduler.unstable_hasPendingWork(), false, nodeEnv);
 
+    const unbrandedCallbackTask = {
+      kind: reactGate.internalTestTaskKind,
+      version: reactGate.internalTestQueueVersion,
+      compatibilityTarget: "react@19.2.6",
+      schedulerCompatibilityTarget: "scheduler@0.27.0",
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "SchedulerCallback",
+      continuationStatus: "NoContinuation",
+      label: "unbranded-callback",
+      callback() {},
+      publicCompatibilityClaimed: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      executesQueuedWork: false,
+      executesEffects: false
+    };
+    Object.defineProperty(
+      unbrandedCallbackTask,
+      Symbol.for(reactGate.internalTestTaskKind),
+      {
+        value: true
+      }
+    );
+    const unbrandedCallbackQueue =
+      reactGate.createInternalActQueueTestQueue([]);
+    unbrandedCallbackQueue.records.push(unbrandedCallbackTask);
+
     for (const rejectedQueue of [
       [],
       reactGate.createActQueueMetadata(),
+      unbrandedCallbackQueue,
       {
         id: 1,
         callback() {},
@@ -870,6 +1066,11 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     "fast-react.react.private-act-queue-test-task",
     label
   );
+  assert.equal(
+    diagnostics.callbackKind,
+    "fast-react.react.private-act-queue-test-callback",
+    label
+  );
   assert.equal(diagnostics.queueVersion, 1, label);
   assert.equal(diagnostics.compatibilityTarget, "scheduler@0.27.0", label);
   assert.equal(diagnostics.reactCompatibilityTarget, "react@19.2.6", label);
@@ -887,6 +1088,16 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     "PendingContinuation"
   ]);
   assert.equal(diagnostics.drainsAcceptedInternalTestQueues, true, label);
+  assert.equal(
+    diagnostics.executesBrandedInternalTestCallbacks,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsBrandedInternalTestContinuations,
+    true,
+    label
+  );
   assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false, label);
   assert.equal(diagnostics.drainsPublicReactActQueue, false, label);
   assert.equal(
