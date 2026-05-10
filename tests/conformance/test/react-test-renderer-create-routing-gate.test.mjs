@@ -87,6 +87,15 @@ const privateRootCreatePreflightSymbolDescription =
 const privateRootCreatePreflightSymbol = Symbol.for(
   privateRootCreatePreflightSymbolDescription
 );
+const privateToJSONUpdateHostOutputRowId =
+  "react-test-renderer-tojson-update-host-output-private-diagnostic";
+const privateToJSONUnmountHostOutputRowId =
+  "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
+const privateToJSONUpdateUnmountDependencyIds = [
+  "react-test-renderer-update-route-private-diagnostic",
+  "react-test-renderer-unmount-route-private-diagnostic",
+  "react-test-renderer-serialization-private-json-diagnostic"
+];
 const missingPrerequisites = [
   "public-react-test-renderer-root-lifecycle-routing",
   "react-test-renderer-host-output-serialization"
@@ -2428,6 +2437,8 @@ function normalizeExpectedRustLifecycle(value) {
 }
 
 function assertRustCanaryMetadata(metadata, label) {
+  const toJSONUpdateUnmountRowsAvailable =
+    metadata.privateJson.acceptedHostOutputUpdateKinds.includes("Unmount");
   assert.equal(Object.isFrozen(metadata), true, label);
   assert.equal(
     metadata.id,
@@ -2638,10 +2649,44 @@ function assertRustCanaryMetadata(metadata, label) {
     "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
     label
   );
-  assert.deepEqual(metadata.privateJson.acceptedHostOutputUpdateKinds, [
-    "Create",
-    "Update"
-  ]);
+  if (toJSONUpdateUnmountRowsAvailable) {
+    assert.equal(
+      metadata.privateJson.updateHostOutputRowApi,
+      "TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary",
+      label
+    );
+    assert.equal(
+      metadata.privateJson.unmountHostOutputRowApi,
+      "TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary",
+      label
+    );
+    assert.equal(
+      metadata.privateJson.updateHostOutputRowId,
+      privateToJSONUpdateHostOutputRowId,
+      label
+    );
+    assert.equal(
+      metadata.privateJson.unmountHostOutputRowId,
+      privateToJSONUnmountHostOutputRowId,
+      label
+    );
+    assert.deepEqual(
+      metadata.privateJson.updateUnmountDependencyMetadata
+        .acceptedPrivateDiagnosticDependencyIds,
+      privateToJSONUpdateUnmountDependencyIds
+    );
+    assert.equal(
+      metadata.privateJson.mismatchedUpdateUnmountRecordRejection,
+      true,
+      label
+    );
+  }
+  assert.deepEqual(
+    metadata.privateJson.acceptedHostOutputUpdateKinds,
+    toJSONUpdateUnmountRowsAvailable
+      ? ["Create", "Update", "Unmount"]
+      : ["Create", "Update"]
+  );
   assert.equal(metadata.privateJson.hostOutputSnapshotFreshnessRequired, true);
   assert.equal(metadata.privateJson.staleSnapshotRejection, true);
   assert.equal(metadata.privateJson.publicSerializationAvailable, false);

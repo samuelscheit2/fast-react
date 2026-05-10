@@ -68,6 +68,17 @@ const privateToJSONSerializationStatus =
   "private-host-output-diagnostics-serializable-public-tojson-blocked";
 const privateToJSONFacadeResultStatus =
   "private-tojson-facade-result-backed-by-rust-host-output-public-blocked";
+const privateToJSONUpdateHostOutputRowId =
+  "react-test-renderer-tojson-update-host-output-private-diagnostic";
+const privateToJSONUnmountHostOutputRowId =
+  "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
+const privateToJSONUpdateUnmountRowStatus =
+  "private-tojson-update-unmount-host-output-rows-public-tojson-blocked";
+const privateToJSONUpdateUnmountDependencyIds = [
+  "react-test-renderer-update-route-private-diagnostic",
+  "react-test-renderer-unmount-route-private-diagnostic",
+  "react-test-renderer-serialization-private-json-diagnostic"
+];
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
   "fast.react_test_renderer.private_totree_host_output_metadata"
 );
@@ -137,6 +148,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics: true,
     privateToJSONSerializationFacadeCoversBroaderHostShapes: true,
     privateToJSONSerializationFacadeExposesDiagnosticResult: true,
+    privateToJSONUpdateUnmountRowsPresent: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateToTreeHostOutputMetadataGatePresent: true,
     privateToTreePrivateFacadeGatePresent: true,
@@ -186,6 +198,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-tojson-serializes-accepted-host-output-diagnostics",
       "js-tojson-broader-host-shape-diagnostics",
       "js-tojson-exposes-private-diagnostic-result",
+      "js-tojson-update-unmount-host-output-rows",
       "js-tojson-public-serialization-blocked"
     ]
   );
@@ -307,9 +320,52 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       facadeGate.acceptedRustDiagnosticResultName,
       "fast-react-test-renderer.tojson.private-facade-result"
     );
+    const expectedRustApis = expectedToJSONFacadeRustApis.slice();
+    const expectedRustTests = expectedToJSONFacadeRustTests.slice();
+    const expectedHostOutputUpdateKinds = ["Create", "Update"];
+    if (entry.entrypoint.endsWith(".development")) {
+      expectedRustApis.splice(
+        expectedRustApis.indexOf(
+          "TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics"
+        ),
+        0,
+        "TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary",
+        "TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary"
+      );
+      expectedRustApis.splice(
+        expectedRustApis.indexOf("TestRendererPrivateJsonPublicSurfaceBlockers"),
+        0,
+        "TestRendererPrivateToJsonHostOutputRow",
+        "TestRendererPrivateToJsonHostOutputDependencyDiagnostics"
+      );
+      expectedRustTests.push(
+        "root_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers",
+        "root_private_to_json_unmount_host_output_row_rejects_stale_snapshot",
+        "root_private_to_json_update_host_output_row_rejects_mismatched_row_kind"
+      );
+      expectedHostOutputUpdateKinds.push("Unmount");
+      assert.equal(
+        facadeGate.privateUpdateHostOutputRowId,
+        privateToJSONUpdateHostOutputRowId
+      );
+      assert.equal(
+        facadeGate.privateUnmountHostOutputRowId,
+        privateToJSONUnmountHostOutputRowId
+      );
+      assert.equal(facadeGate.mismatchedUpdateUnmountRecordRejection, true);
+      assert.deepEqual(
+        facadeGate.privateUpdateUnmountDependencyMetadata
+          .acceptedPrivateDiagnosticDependencyIds,
+        privateToJSONUpdateUnmountDependencyIds
+      );
+      assert.deepEqual(
+        facadeGate.privateUpdateUnmountHostOutputRows.map((row) => row.id),
+        [privateToJSONUpdateHostOutputRowId, privateToJSONUnmountHostOutputRowId]
+      );
+    }
     assert.deepEqual(
       facadeGate.acceptedRustApis,
-      expectedToJSONFacadeRustApis
+      expectedRustApis
     );
     assert.deepEqual(
       facadeGate.acceptedRustNodeKinds,
@@ -322,15 +378,14 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       "TextSibling"
     ]);
     assert.deepEqual(facadeGate.acceptedHostOutputUpdateKinds, [
-      "Create",
-      "Update"
+      ...expectedHostOutputUpdateKinds
     ]);
     assert.equal(facadeGate.propElisionFromSerializedProps, true);
     assert.equal(facadeGate.hostOutputSnapshotFreshnessRequired, true);
     assert.equal(facadeGate.staleSnapshotRejection, true);
     assert.deepEqual(
       facadeGate.acceptedRustTests,
-      expectedToJSONFacadeRustTests
+      expectedRustTests
     );
     assert.equal(
       facadeGate.acceptedFacadeResultWorker,
@@ -375,6 +430,18 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(privateFacade.rootRequest, error.rootRequest);
     assert.equal(privateFacade.privateHostOutputDiagnosticsSerializable, true);
     assert.equal(privateFacade.privateDiagnosticResultAvailable, true);
+    if (entry.entrypoint.endsWith(".development")) {
+      assert.equal(privateFacade.mismatchedUpdateUnmountRecordRejection, true);
+      assert.deepEqual(
+        privateFacade.privateUpdateUnmountDependencyMetadata
+          .acceptedPrivateDiagnosticDependencyIds,
+        privateToJSONUpdateUnmountDependencyIds
+      );
+      assert.deepEqual(
+        privateFacade.privateUpdateUnmountHostOutputRows.map((row) => row.id),
+        [privateToJSONUpdateHostOutputRowId, privateToJSONUnmountHostOutputRowId]
+      );
+    }
     assert.equal(privateFacade.publicSerializationAvailable, false);
     assert.equal(privateFacade.publicRouteAvailable, false);
     assert.equal(privateFacade.nativeBridgeAvailable, false);
@@ -549,6 +616,59 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       );
     assert.equal(emptyPrivateDiagnosticResult.sourceNodeCount, 0);
     assert.equal(emptyPrivateDiagnosticResult.result, null);
+    if (entry.entrypoint.endsWith(".development")) {
+      const unmountPrivateJson =
+        privateFacade.serializeAcceptedHostOutputDiagnostic(
+          createAcceptedEmptyRootHostOutputDiagnostic({
+            hostOutputUpdateKind: "Unmount"
+          })
+        );
+      assert.equal(unmountPrivateJson, null);
+      const unmountPrivateDiagnosticResult =
+        privateFacade.createAcceptedHostOutputDiagnosticResult(
+          createAcceptedEmptyRootHostOutputDiagnostic({
+            hostOutputUpdateKind: "Unmount"
+          })
+        );
+      assert.equal(
+        unmountPrivateDiagnosticResult.hostOutputRowId,
+        privateToJSONUnmountHostOutputRowId
+      );
+      assert.equal(
+        unmountPrivateDiagnosticResult.hostOutputRow.hostOutputUpdateKind,
+        "Unmount"
+      );
+      assert.deepEqual(
+        unmountPrivateDiagnosticResult.hostOutputRow.dependencyMetadata
+          .acceptedPrivateDiagnosticDependencyIds,
+        privateToJSONUpdateUnmountDependencyIds
+      );
+      assert.equal(unmountPrivateDiagnosticResult.sourceNodeCount, 0);
+      assert.equal(unmountPrivateDiagnosticResult.result, null);
+
+      const mismatchedUpdateRow = createAcceptedMinimalHostOutputDiagnostic({
+        hostOutputUpdateKind: "Update",
+        text: "goodbye"
+      });
+      mismatchedUpdateRow.hostOutputRow = {
+        ...mismatchedUpdateRow.hostOutputRow,
+        id: privateToJSONUnmountHostOutputRowId,
+        hostOutputUpdateKind: "Unmount"
+      };
+      assert.equal(
+        privateFacade.canSerializeAcceptedHostOutputDiagnostic(
+          mismatchedUpdateRow
+        ),
+        false
+      );
+      const mismatchedUpdateError = captureThrown(() =>
+        privateFacade.serializeAcceptedHostOutputDiagnostic(mismatchedUpdateRow)
+      );
+      assert.match(
+        mismatchedUpdateError.message,
+        /Expected private JSON Update row id/u
+      );
+    }
     assert.equal(
       privateFacade.canCreateAcceptedHostOutputDiagnosticResult(
         createAcceptedMinimalHostOutputDiagnostic()
@@ -1415,7 +1535,7 @@ function createAcceptedMinimalHostOutputDiagnostic({
   hostOutputUpdateKind = "Create",
   text = "hello"
 } = {}) {
-  return {
+  const diagnostic = {
     diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
     hostOutputUpdateKind,
     hostOutputSnapshotCurrent,
@@ -1487,13 +1607,18 @@ function createAcceptedMinimalHostOutputDiagnostic({
       compatibilityClaimBlocked: true
     }
   };
+  attachToJSONUpdateUnmountRow(diagnostic, {
+    previousRootChildCount: 1,
+    currentRootChildCount: 1
+  });
+  return diagnostic;
 }
 
 function createAcceptedBroaderHostOutputDiagnostic({
   hostOutputSnapshotCurrent = true,
   hostOutputUpdateKind = "Create"
 } = {}) {
-  return {
+  const diagnostic = {
     diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
     hostOutputUpdateKind,
     hostOutputSnapshotCurrent,
@@ -1580,13 +1705,18 @@ function createAcceptedBroaderHostOutputDiagnostic({
     ],
     publicBlockers: createAcceptedPrivateJsonPublicBlockers()
   };
+  attachToJSONUpdateUnmountRow(diagnostic, {
+    previousRootChildCount: 3,
+    currentRootChildCount: 3
+  });
+  return diagnostic;
 }
 
 function createAcceptedEmptyRootHostOutputDiagnostic({
   hostOutputSnapshotCurrent = true,
   hostOutputUpdateKind = "Create"
 } = {}) {
-  return {
+  const diagnostic = {
     diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
     hostOutputUpdateKind,
     hostOutputSnapshotCurrent,
@@ -1594,6 +1724,61 @@ function createAcceptedEmptyRootHostOutputDiagnostic({
     rootNodeKind: "EmptyRoot",
     nodes: [],
     publicBlockers: createAcceptedPrivateJsonPublicBlockers()
+  };
+  attachToJSONUpdateUnmountRow(diagnostic, {
+    previousRootChildCount: hostOutputUpdateKind === "Unmount" ? 1 : 0,
+    currentRootChildCount: 0
+  });
+  return diagnostic;
+}
+
+function attachToJSONUpdateUnmountRow(
+  diagnostic,
+  { previousRootChildCount, currentRootChildCount }
+) {
+  if (diagnostic.hostOutputUpdateKind === "Create") {
+    return;
+  }
+  diagnostic.hostOutputRow = createAcceptedToJSONUpdateUnmountRow({
+    hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
+    previousRootChildCount,
+    currentRootChildCount
+  });
+}
+
+function createAcceptedToJSONUpdateUnmountRow({
+  hostOutputUpdateKind,
+  previousRootChildCount,
+  currentRootChildCount
+}) {
+  const rowId =
+    hostOutputUpdateKind === "Unmount"
+      ? privateToJSONUnmountHostOutputRowId
+      : privateToJSONUpdateHostOutputRowId;
+  return {
+    id: rowId,
+    status: privateToJSONUpdateUnmountRowStatus,
+    hostOutputUpdateKind,
+    previousRootChildCount,
+    currentRootChildCount,
+    dependencyMetadata: {
+      acceptedPrivateDiagnosticDependencyIds:
+        privateToJSONUpdateUnmountDependencyIds,
+      updateRouteDiagnosticsAvailable: true,
+      unmountRouteDiagnosticsAvailable: true,
+      serializationDiagnosticsAvailable: true,
+      hostOutputSnapshotFreshnessRequired: true,
+      staleSnapshotRejection: true,
+      mismatchedUpdateUnmountRecordRejection: true,
+      publicToJSONAvailable: false,
+      publicTestInstanceAvailable: false,
+      nativeExecutionAvailable: false,
+      compatibilityClaimed: false
+    },
+    publicToJSONAvailable: false,
+    publicTestInstanceAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
   };
 }
 
