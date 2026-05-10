@@ -368,11 +368,39 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS =
         "Private fake-DOM property/text mutation helpers can update host output and publish latest props only after mutation handoff validation."
     },
     {
+      scenarioId: "replace-host-tree",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private fake-DOM removal and placement helpers can replace the root host child while detaching the old latest-props mapping."
+    },
+    {
+      scenarioId: "render-null-clears-container",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private fake-DOM clearContainer and component-tree detach helpers can clear mounted host output while the private root marker/listener gate remains active."
+    },
+    {
       scenarioId: "root-unmount",
       admission: "private-host-output-diagnostic",
       gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
       reason:
         "Private unmount diagnostics can clear fake host output and revert explicit createRoot marker/listener side effects without admitting public root unmount behavior."
+    },
+    {
+      scenarioId: "double-unmount",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private fake-DOM unmount diagnostics can prove the first unmount clears host output and the second private unmount records no additional host mutation."
+    },
+    {
+      scenarioId: "render-after-unmount",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private fake-DOM unmount diagnostics can prove the stale render guard throws after host output is cleared without mutating the container again."
     },
     ...REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.filter(
       (scenarioId) =>
@@ -380,14 +408,20 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS =
           "create-root-no-render",
           "initial-host-render",
           "update-host-render",
-          "root-unmount"
+          "replace-host-tree",
+          "render-null-clears-container",
+          "root-unmount",
+          "double-unmount",
+          "render-after-unmount"
         ].includes(scenarioId)
     ).map((scenarioId) => ({
       scenarioId,
       admission: "unsupported",
       gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS,
       reason:
-        "This root E2E scenario still needs fuller private host-output evidence before it can be admitted as a diagnostic row."
+        scenarioId === "flush-sync-cross-root-render"
+          ? "This root E2E scenario still needs private cross-root flush/scheduling evidence before it can be admitted as a host-output diagnostic row."
+          : "This root E2E scenario still needs private warning-boundary evidence before it can be admitted as a host-output diagnostic row."
     }))
   ]);
 
@@ -3078,6 +3112,32 @@ function runPrivateHostOutputDiagnosticScenario({ mode, modules, scenarioId }) {
       );
       recordPrivateHostOutputRootRequest(harness, updateRender);
       hostOutputEvidence = updatePrivateHostOutput(harness, mounted);
+    } else if (scenarioId === "replace-host-tree") {
+      const initialRender = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("replace-before")
+      );
+      recordPrivateHostOutputRootRequest(harness, initialRender);
+      const mounted = mountPrivateReplacementInitialHostOutput(harness);
+      const replaceRender = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("replace-after")
+      );
+      recordPrivateHostOutputRootRequest(harness, replaceRender);
+      hostOutputEvidence = replacePrivateHostOutput(harness, mounted);
+    } else if (scenarioId === "render-null-clears-container") {
+      const render = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("initial")
+      );
+      recordPrivateHostOutputRootRequest(harness, render);
+      const mounted = mountPrivateInitialHostOutput(harness);
+      const renderNull = harness.bridge.renderContainer(
+        harness.create.handle,
+        null
+      );
+      recordPrivateHostOutputRootRequest(harness, renderNull);
+      hostOutputEvidence = renderNullPrivateHostOutput(harness, mounted);
     } else if (scenarioId === "root-unmount") {
       const render = harness.bridge.renderContainer(
         harness.create.handle,
@@ -3088,6 +3148,40 @@ function runPrivateHostOutputDiagnosticScenario({ mode, modules, scenarioId }) {
       const unmount = harness.bridge.unmountContainer(harness.create.handle);
       recordPrivateHostOutputRootRequest(harness, unmount);
       hostOutputEvidence = unmountPrivateHostOutput(harness, mounted);
+    } else if (scenarioId === "double-unmount") {
+      const render = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("initial")
+      );
+      recordPrivateHostOutputRootRequest(harness, render);
+      const mounted = mountPrivateInitialHostOutput(harness);
+      const firstUnmount = harness.bridge.unmountContainer(
+        harness.create.handle
+      );
+      recordPrivateHostOutputRootRequest(harness, firstUnmount);
+      hostOutputEvidence = unmountPrivateHostOutput(harness, mounted);
+      const secondUnmount = harness.bridge.unmountContainer(
+        harness.create.handle
+      );
+      recordPrivateHostOutputRootRequest(harness, secondUnmount);
+      hostOutputEvidence = recordPrivateDoubleUnmountNoop(
+        harness,
+        hostOutputEvidence
+      );
+    } else if (scenarioId === "render-after-unmount") {
+      const render = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("initial")
+      );
+      recordPrivateHostOutputRootRequest(harness, render);
+      const mounted = mountPrivateInitialHostOutput(harness);
+      const unmount = harness.bridge.unmountContainer(harness.create.handle);
+      recordPrivateHostOutputRootRequest(harness, unmount);
+      hostOutputEvidence = unmountPrivateHostOutput(harness, mounted);
+      hostOutputEvidence = recordPrivateRenderAfterUnmountGuard(
+        harness,
+        hostOutputEvidence
+      );
     } else {
       throw new Error(
         `No private host-output diagnostic plan for scenario: ${scenarioId}`
@@ -3151,6 +3245,7 @@ function createPrivateHostOutputHarness({ mode, modules, scenarioId }) {
     nativeHandoffRecords: [],
     requestAdmissionRecords: [],
     requestRecords: [],
+    thrownOperations: [],
     rootOwner: modules.rootBridge.getRootOwnerFromHandle(create.handle)
   };
   recordPrivateHostOutputRootRequest(harness, create);
@@ -3293,6 +3388,195 @@ function updatePrivateHostOutput(harness, mounted) {
   };
 }
 
+function mountPrivateReplacementInitialHostOutput(harness) {
+  const previousProps = {};
+  const nextProps = createPrivateHostOutputProps("replace-before");
+  const host = harness.document.createElement("span");
+  const token = harness.modules.componentTree.createHostInstanceToken(
+    {
+      kind: "PrivateHostOutputDiagnosticHost",
+      phase: "replace-before"
+    },
+    harness.rootOwner
+  );
+  harness.modules.componentTree.attachHostInstanceNode(
+    host,
+    token,
+    previousProps
+  );
+  const handoff = harness.modules.domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    "span",
+    previousProps,
+    nextProps
+  );
+  const handoffPayload =
+    harness.modules.domHost.getDomPropertyUpdateLatestPropsHandoffPayload(
+      handoff
+    );
+  harness.modules.componentTree.commitLatestPropsFromMutationHandoff(handoff);
+  const latestPropsAfterCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const text = harness.modules.domHost.createDomHostTextInstance(
+    "before",
+    harness.container
+  );
+
+  harness.modules.domHost.appendInitialChild(host, text);
+  harness.modules.domHost.appendChildToContainer(harness.container, host);
+
+  return {
+    initialAttributes: summarizeAttributeEntries(host),
+    initialChildNodeNames: summarizeChildNodeNames(harness.container),
+    initialContainerTextContent: harness.container.textContent,
+    initialHandoff: summarizePrivateHostOutputHandoff(
+      handoff,
+      handoffPayload
+    ),
+    initialLatestPropsPublished: latestPropsAfterCommit === nextProps
+  };
+}
+
+function replacePrivateHostOutput(harness, mounted) {
+  const previousHost = harness.container.childNodes[0];
+  const replaceMutationStart = harness.container.mutationLog.length;
+  harness.modules.domHost.removeChildFromContainer(
+    harness.container,
+    previousHost
+  );
+  harness.modules.componentTree.detachHostInstanceNode(previousHost);
+
+  const replacementHost = harness.document.createElement("section");
+  const replacementPreviousProps = {};
+  const replacementNextProps = createPrivateHostOutputProps("replace-after");
+  const replacementToken =
+    harness.modules.componentTree.createHostInstanceToken(
+      {
+        kind: "PrivateHostOutputDiagnosticHost",
+        phase: "replace-after"
+      },
+      harness.rootOwner
+    );
+  harness.modules.componentTree.attachHostInstanceNode(
+    replacementHost,
+    replacementToken,
+    replacementPreviousProps
+  );
+  const replacementHandoff =
+    harness.modules.domHost.commitDomPropertyUpdateForLatestProps(
+      replacementHost,
+      "section",
+      replacementPreviousProps,
+      replacementNextProps
+    );
+  const replacementHandoffPayload =
+    harness.modules.domHost.getDomPropertyUpdateLatestPropsHandoffPayload(
+      replacementHandoff
+    );
+  harness.modules.componentTree.commitLatestPropsFromMutationHandoff(
+    replacementHandoff
+  );
+  const replacementLatestPropsAfterCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(replacementHost);
+
+  const bold = harness.document.createElement("b");
+  const boldPreviousProps = {};
+  const boldNextProps = createPrivateHostOutputProps("replace-bold");
+  const boldToken = harness.modules.componentTree.createHostInstanceToken(
+    {
+      kind: "PrivateHostOutputDiagnosticHost",
+      phase: "replace-bold"
+    },
+    harness.rootOwner
+  );
+  harness.modules.componentTree.attachHostInstanceNode(
+    bold,
+    boldToken,
+    boldPreviousProps
+  );
+  const boldHandoff =
+    harness.modules.domHost.commitDomPropertyUpdateForLatestProps(
+      bold,
+      "b",
+      boldPreviousProps,
+      boldNextProps
+    );
+  const boldHandoffPayload =
+    harness.modules.domHost.getDomPropertyUpdateLatestPropsHandoffPayload(
+      boldHandoff
+    );
+  harness.modules.componentTree.commitLatestPropsFromMutationHandoff(
+    boldHandoff
+  );
+  const boldLatestPropsAfterCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(bold);
+  const text = harness.modules.domHost.createDomHostTextInstance(
+    "after",
+    harness.container
+  );
+
+  harness.modules.domHost.appendInitialChild(bold, text);
+  harness.modules.domHost.appendInitialChild(replacementHost, bold);
+  harness.modules.domHost.appendChildToContainer(
+    harness.container,
+    replacementHost
+  );
+
+  return {
+    ...mounted,
+    nestedChildNodeNames: summarizeChildNodeNames(replacementHost),
+    nestedHandoff: summarizePrivateHostOutputHandoff(
+      boldHandoff,
+      boldHandoffPayload
+    ),
+    nestedLatestPropsPublished: boldLatestPropsAfterCommit === boldNextProps,
+    removedHostDetachedFromLatestPropsMap:
+      harness.modules.componentTree.getLatestPropsFromNode(previousHost) ===
+      null,
+    replaceAttributes: summarizeAttributeEntries(replacementHost),
+    replaceChildNodeNames: summarizeChildNodeNames(harness.container),
+    replaceContainerChildCount: harness.container.childNodes.length,
+    replaceContainerTextContent: harness.container.textContent,
+    replacementHandoff: summarizePrivateHostOutputHandoff(
+      replacementHandoff,
+      replacementHandoffPayload
+    ),
+    replacementLatestPropsPublished:
+      replacementLatestPropsAfterCommit === replacementNextProps,
+    replaceMutationLog: harness.container.mutationLog.slice(
+      replaceMutationStart
+    ),
+    textNodeValue: text.nodeValue,
+    textWriteLog: text.writeLog.slice()
+  };
+}
+
+function renderNullPrivateHostOutput(harness, mounted) {
+  const host = harness.container.childNodes[0] ?? null;
+  const renderNullMutationStart = harness.container.mutationLog.length;
+  if (host !== null) {
+    harness.modules.domHost.clearContainer(harness.container);
+    harness.modules.componentTree.detachHostInstanceNode(host);
+  }
+
+  return {
+    ...mounted,
+    childNodeNamesAfterRenderNull: summarizeChildNodeNames(harness.container),
+    containerChildCountAfterRenderNull: harness.container.childNodes.length,
+    containerTextContentAfterRenderNull: harness.container.textContent,
+    hostDetachedFromLatestPropsMap:
+      host === null
+        ? false
+        : harness.modules.componentTree.getLatestPropsFromNode(host) === null,
+    renderNullMutationLog: harness.container.mutationLog.slice(
+      renderNullMutationStart
+    ),
+    renderNullMutationObserved: true,
+    rootSideEffectStateAfterRenderNull:
+      summarizePrivateRootMarkerListenerState(harness)
+  };
+}
+
 function unmountPrivateHostOutput(harness, mounted) {
   const host = harness.container.childNodes[0] ?? null;
   if (host !== null) {
@@ -3314,6 +3598,61 @@ function unmountPrivateHostOutput(harness, mounted) {
   };
 }
 
+function recordPrivateDoubleUnmountNoop(harness, unmounted) {
+  const secondUnmountMutationStart = harness.container.mutationLog.length;
+  const secondUnmountRecord =
+    harness.requestRecords[harness.requestRecords.length - 1];
+
+  return {
+    ...unmounted,
+    childNodeNamesAfterSecondUnmount: summarizeChildNodeNames(
+      harness.container
+    ),
+    containerChildCountAfterSecondUnmount: harness.container.childNodes.length,
+    containerTextContentAfterSecondUnmount: harness.container.textContent,
+    secondUnmountBridgeNoOp: secondUnmountRecord?.noOp === true,
+    secondUnmountHostMutationObserved: false,
+    secondUnmountMutationLog: harness.container.mutationLog.slice(
+      secondUnmountMutationStart
+    )
+  };
+}
+
+function recordPrivateRenderAfterUnmountGuard(harness, unmounted) {
+  const renderAfterUnmountMutationStart = harness.container.mutationLog.length;
+  let thrownError = null;
+  try {
+    harness.bridge.renderContainer(
+      harness.create.handle,
+      createPrivateHostOutputElementValue("stale")
+    );
+  } catch (error) {
+    thrownError = describePrivateBridgeError(error);
+    harness.thrownOperations.push({
+      operation: "root.render",
+      error: thrownError
+    });
+  }
+
+  if (thrownError === null) {
+    throw new Error("Private host-output render-after-unmount did not throw.");
+  }
+
+  return {
+    ...unmounted,
+    childNodeNamesAfterRenderAttempt: summarizeChildNodeNames(
+      harness.container
+    ),
+    containerChildCountAfterRenderAttempt: harness.container.childNodes.length,
+    containerTextContentAfterRenderAttempt: harness.container.textContent,
+    renderAfterUnmountError: thrownError,
+    renderAfterUnmountHostMutationObserved: false,
+    renderAfterUnmountMutationLog: harness.container.mutationLog.slice(
+      renderAfterUnmountMutationStart
+    )
+  };
+}
+
 function summarizePrivateHostOutputRootBridgeEvidence(harness) {
   return {
     admissions: harness.requestAdmissionRecords.map((record) => ({
@@ -3324,9 +3663,11 @@ function summarizePrivateHostOutputRootBridgeEvidence(harness) {
       requestType: record.requestType
     })),
     nativeHandoffs: harness.nativeHandoffRecords,
+    requestNoOps: harness.requestRecords.map((record) => record.noOp ?? false),
     requestOperations: harness.requestRecords.map((record) => record.operation),
     requestRecordCount: harness.requestRecords.length,
-    requestTypes: harness.requestRecords.map((record) => record.requestType)
+    requestTypes: harness.requestRecords.map((record) => record.requestType),
+    thrownOperations: harness.thrownOperations
   };
 }
 
@@ -3570,6 +3911,33 @@ function createPrivateHostOutputProps(phase) {
       title: "updated title",
       "data-phase": "updated",
       children: "goodbye"
+    };
+  }
+  if (phase === "replace-before") {
+    return {
+      id: "replace-before",
+      title: "before",
+      children: "before"
+    };
+  }
+  if (phase === "replace-after") {
+    return {
+      id: "replace-after",
+      title: "after",
+      children: {
+        props: createPrivateHostOutputProps("replace-bold"),
+        type: "b"
+      }
+    };
+  }
+  if (phase === "replace-bold") {
+    return {
+      children: "after"
+    };
+  }
+  if (phase === "stale") {
+    return {
+      children: "stale"
     };
   }
 
@@ -4873,6 +5241,7 @@ function validatePrivateHostOutputDiagnosticObservation({
     diagnosticKind: "private-fake-dom-root-host-output",
     publicRootCompatibilitySurface: false,
     requestOperations: expectedPrivateHostOutputRequestOperations(scenarioId),
+    thrownOperations: expectedPrivateHostOutputThrownOperations(scenarioId),
     rootSideEffects: {
       afterApply: {
         containerListenerRegistrationCount: 138,
@@ -4908,6 +5277,7 @@ function validatePrivateHostOutputDiagnosticObservation({
     diagnosticKind: evidence.diagnosticKind,
     publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
     requestOperations: evidence.rootBridgeEvidence.requestOperations,
+    thrownOperations: evidence.rootBridgeEvidence.thrownOperations,
     rootSideEffects: {
       afterApply: evidence.rootSideEffectEvidence.afterApply,
       afterCleanup: evidence.rootSideEffectEvidence.cleanup.afterCleanup,
@@ -4976,11 +5346,35 @@ function expectedPrivateHostOutputRequestOperations(scenarioId) {
       return ["create", "render"];
     case "update-host-render":
       return ["create", "render", "render"];
+    case "replace-host-tree":
+      return ["create", "render", "render"];
+    case "render-null-clears-container":
+      return ["create", "render", "render"];
     case "root-unmount":
+      return ["create", "render", "unmount"];
+    case "double-unmount":
+      return ["create", "render", "unmount", "unmount"];
+    case "render-after-unmount":
       return ["create", "render", "unmount"];
     default:
       return [];
   }
+}
+
+function expectedPrivateHostOutputThrownOperations(scenarioId) {
+  if (scenarioId !== "render-after-unmount") {
+    return [];
+  }
+
+  return [
+    {
+      operation: "root.render",
+      error: {
+        code: "FAST_REACT_DOM_UNMOUNTED_ROOT",
+        message: "Cannot update an unmounted root."
+      }
+    }
+  ];
 }
 
 function expectedPrivateHostOutputScenarioEvidence(scenarioId) {
@@ -5045,6 +5439,70 @@ function expectedPrivateHostOutputScenarioEvidence(scenarioId) {
         textWriteLog: [["nodeValue", "goodbye"]],
         updateMutationObserved: true
       };
+    case "replace-host-tree":
+      return {
+        initialChildNodeNames: ["SPAN"],
+        initialContainerTextContent: "before",
+        initialHandoff: {
+          kind: "domPropertyUpdateLatestPropsHandoff",
+          latestPropsCommitRecordKind: "latestPropsCommit",
+          latestPropsCommitRecordStatus: "safe-for-latest-props",
+          mutationRecordCount: 3,
+          payloadCount: 3,
+          status: "mutated"
+        },
+        initialLatestPropsPublished: true,
+        nestedChildNodeNames: ["B"],
+        nestedHandoff: {
+          kind: "domPropertyUpdateLatestPropsHandoff",
+          latestPropsCommitRecordKind: "latestPropsCommit",
+          latestPropsCommitRecordStatus: "safe-for-latest-props",
+          mutationRecordCount: 1,
+          payloadCount: 1,
+          status: "mutated"
+        },
+        nestedLatestPropsPublished: true,
+        removedHostDetachedFromLatestPropsMap: true,
+        replaceAttributes: [
+          ["id", "replace-after"],
+          ["title", "after"]
+        ],
+        replaceChildNodeNames: ["SECTION"],
+        replaceContainerChildCount: 1,
+        replaceContainerTextContent: "after",
+        replacementHandoff: {
+          kind: "domPropertyUpdateLatestPropsHandoff",
+          latestPropsCommitRecordKind: "latestPropsCommit",
+          latestPropsCommitRecordStatus: "safe-for-latest-props",
+          mutationRecordCount: 3,
+          payloadCount: 3,
+          status: "mutated"
+        },
+        replacementLatestPropsPublished: true,
+        replaceMutationLog: [
+          ["removeChild", "SPAN"],
+          ["appendChild", "SECTION"]
+        ],
+        textNodeValue: "after",
+        textWriteLog: []
+      };
+    case "render-null-clears-container":
+      return {
+        childNodeNamesAfterRenderNull: [],
+        containerChildCountAfterRenderNull: 0,
+        containerTextContentAfterRenderNull: "",
+        hostDetachedFromLatestPropsMap: true,
+        renderNullMutationLog: [["removeChild", "DIV"]],
+        renderNullMutationObserved: true,
+        rootSideEffectStateAfterRenderNull: {
+          containerListenerRegistrationCount: 138,
+          containerListeningMarkerPropertyCount: 1,
+          containerMarkerPropertyCount: 1,
+          containerMarkerTruthyCount: 1,
+          ownerDocumentListenerRegistrationCount: 1,
+          ownerDocumentListeningMarkerPropertyCount: 1
+        }
+      };
     case "root-unmount":
       return {
         childNodeNamesAfterUnmount: [],
@@ -5053,12 +5511,122 @@ function expectedPrivateHostOutputScenarioEvidence(scenarioId) {
         hostDetachedFromLatestPropsMap: true,
         unmountMutationObserved: true
       };
+    case "double-unmount":
+      return {
+        childNodeNamesAfterSecondUnmount: [],
+        childNodeNamesAfterUnmount: [],
+        containerChildCountAfterSecondUnmount: 0,
+        containerChildCountAfterUnmount: 0,
+        containerTextContentAfterSecondUnmount: "",
+        containerTextContentAfterUnmount: "",
+        hostDetachedFromLatestPropsMap: true,
+        secondUnmountBridgeNoOp: true,
+        secondUnmountHostMutationObserved: false,
+        secondUnmountMutationLog: [],
+        unmountMutationObserved: true
+      };
+    case "render-after-unmount":
+      return {
+        childNodeNamesAfterRenderAttempt: [],
+        childNodeNamesAfterUnmount: [],
+        containerChildCountAfterRenderAttempt: 0,
+        containerChildCountAfterUnmount: 0,
+        containerTextContentAfterRenderAttempt: "",
+        containerTextContentAfterUnmount: "",
+        hostDetachedFromLatestPropsMap: true,
+        renderAfterUnmountError: {
+          code: "FAST_REACT_DOM_UNMOUNTED_ROOT",
+          message: "Cannot update an unmounted root."
+        },
+        renderAfterUnmountHostMutationObserved: false,
+        renderAfterUnmountMutationLog: [],
+        unmountMutationObserved: true
+      };
     default:
       return null;
   }
 }
 
 function comparablePrivateHostOutputScenarioEvidence(evidence) {
+  if (evidence.replaceMutationLog !== undefined) {
+    return {
+      initialChildNodeNames: evidence.initialChildNodeNames,
+      initialContainerTextContent: evidence.initialContainerTextContent,
+      initialHandoff: evidence.initialHandoff,
+      initialLatestPropsPublished: evidence.initialLatestPropsPublished,
+      nestedChildNodeNames: evidence.nestedChildNodeNames,
+      nestedHandoff: evidence.nestedHandoff,
+      nestedLatestPropsPublished: evidence.nestedLatestPropsPublished,
+      removedHostDetachedFromLatestPropsMap:
+        evidence.removedHostDetachedFromLatestPropsMap,
+      replaceAttributes: evidence.replaceAttributes,
+      replaceChildNodeNames: evidence.replaceChildNodeNames,
+      replaceContainerChildCount: evidence.replaceContainerChildCount,
+      replaceContainerTextContent: evidence.replaceContainerTextContent,
+      replacementHandoff: evidence.replacementHandoff,
+      replacementLatestPropsPublished:
+        evidence.replacementLatestPropsPublished,
+      replaceMutationLog: evidence.replaceMutationLog,
+      textNodeValue: evidence.textNodeValue,
+      textWriteLog: evidence.textWriteLog
+    };
+  }
+
+  if (evidence.containerChildCountAfterRenderNull !== undefined) {
+    return {
+      childNodeNamesAfterRenderNull: evidence.childNodeNamesAfterRenderNull,
+      containerChildCountAfterRenderNull:
+        evidence.containerChildCountAfterRenderNull,
+      containerTextContentAfterRenderNull:
+        evidence.containerTextContentAfterRenderNull,
+      hostDetachedFromLatestPropsMap: evidence.hostDetachedFromLatestPropsMap,
+      renderNullMutationLog: evidence.renderNullMutationLog,
+      renderNullMutationObserved: evidence.renderNullMutationObserved,
+      rootSideEffectStateAfterRenderNull:
+        evidence.rootSideEffectStateAfterRenderNull
+    };
+  }
+
+  if (evidence.secondUnmountMutationLog !== undefined) {
+    return {
+      childNodeNamesAfterSecondUnmount:
+        evidence.childNodeNamesAfterSecondUnmount,
+      childNodeNamesAfterUnmount: evidence.childNodeNamesAfterUnmount,
+      containerChildCountAfterSecondUnmount:
+        evidence.containerChildCountAfterSecondUnmount,
+      containerChildCountAfterUnmount: evidence.containerChildCountAfterUnmount,
+      containerTextContentAfterSecondUnmount:
+        evidence.containerTextContentAfterSecondUnmount,
+      containerTextContentAfterUnmount: evidence.containerTextContentAfterUnmount,
+      hostDetachedFromLatestPropsMap: evidence.hostDetachedFromLatestPropsMap,
+      secondUnmountBridgeNoOp: evidence.secondUnmountBridgeNoOp,
+      secondUnmountHostMutationObserved:
+        evidence.secondUnmountHostMutationObserved,
+      secondUnmountMutationLog: evidence.secondUnmountMutationLog,
+      unmountMutationObserved: evidence.unmountMutationObserved
+    };
+  }
+
+  if (evidence.renderAfterUnmountError !== undefined) {
+    return {
+      childNodeNamesAfterRenderAttempt:
+        evidence.childNodeNamesAfterRenderAttempt,
+      childNodeNamesAfterUnmount: evidence.childNodeNamesAfterUnmount,
+      containerChildCountAfterRenderAttempt:
+        evidence.containerChildCountAfterRenderAttempt,
+      containerChildCountAfterUnmount: evidence.containerChildCountAfterUnmount,
+      containerTextContentAfterRenderAttempt:
+        evidence.containerTextContentAfterRenderAttempt,
+      containerTextContentAfterUnmount: evidence.containerTextContentAfterUnmount,
+      hostDetachedFromLatestPropsMap: evidence.hostDetachedFromLatestPropsMap,
+      renderAfterUnmountError: evidence.renderAfterUnmountError,
+      renderAfterUnmountHostMutationObserved:
+        evidence.renderAfterUnmountHostMutationObserved,
+      renderAfterUnmountMutationLog: evidence.renderAfterUnmountMutationLog,
+      unmountMutationObserved: evidence.unmountMutationObserved
+    };
+  }
+
   if (evidence.containerChildCountAfterUnmount !== undefined) {
     return {
       childNodeNamesAfterUnmount: evidence.childNodeNamesAfterUnmount,
