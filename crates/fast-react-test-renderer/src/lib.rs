@@ -4,8 +4,9 @@
 //! traits can be implemented without DOM, native, hydration, persistence, or
 //! legacy `HostConfig` behavior. Its root canary delegates create/update/
 //! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
-//! HostRoot render/commit handoff, but it still stops before host output,
-//! serialization, act, or public `react-test-renderer` compatibility.
+//! HostRoot render/commit handoff, including callback snapshot diagnostics,
+//! but it still stops before host output, serialization, act, or public
+//! `react-test-renderer` compatibility.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -23,8 +24,8 @@ use fast_react_host_config::{
 use fast_react_reconciler::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCommitError, RootElementHandle, RootOptions,
-    RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateError, RootWorkLoopError,
-    ScheduledRootUpdateResult, UpdateContainerResult, commit_finished_host_root,
+    RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateCallbackHandle, RootUpdateError,
+    RootWorkLoopError, ScheduledRootUpdateResult, UpdateContainerResult, commit_finished_host_root,
     ensure_root_is_scheduled, process_root_schedule_in_microtask, render_host_root_for_lanes,
     scheduled_roots, update_container, update_container_sync,
 };
@@ -862,6 +863,22 @@ impl TestRendererRoot {
         element: RootElementHandle,
         options: TestRendererOptions,
     ) -> Result<Self, TestRendererRootError> {
+        Self::create_with_root_update_callback(element, options, None)
+    }
+
+    pub fn create_with_root_update_callback_for_canary(
+        element: RootElementHandle,
+        options: TestRendererOptions,
+        callback: RootUpdateCallbackHandle,
+    ) -> Result<Self, TestRendererRootError> {
+        Self::create_with_root_update_callback(element, options, Some(callback))
+    }
+
+    fn create_with_root_update_callback(
+        element: RootElementHandle,
+        options: TestRendererOptions,
+        callback: Option<RootUpdateCallbackHandle>,
+    ) -> Result<Self, TestRendererRootError> {
         let mut renderer = TestRenderer::new();
         let container = renderer.create_container();
         let mut store = FiberRootStore::<TestRenderer>::new();
@@ -876,7 +893,8 @@ impl TestRendererRoot {
             scheduled_updates: Vec::new(),
         };
 
-        let record = root.schedule_root_update(TestRendererRootUpdateKind::Create, element)?;
+        let record =
+            root.schedule_root_update(TestRendererRootUpdateKind::Create, element, callback)?;
         root.scheduled_updates.push(record);
         Ok(root)
     }
@@ -885,22 +903,56 @@ impl TestRendererRoot {
         &mut self,
         element: RootElementHandle,
     ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        self.update_with_root_update_callback(element, None)
+    }
+
+    pub fn update_with_root_update_callback_for_canary(
+        &mut self,
+        element: RootElementHandle,
+        callback: RootUpdateCallbackHandle,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        self.update_with_root_update_callback(element, Some(callback))
+    }
+
+    fn update_with_root_update_callback(
+        &mut self,
+        element: RootElementHandle,
+        callback: Option<RootUpdateCallbackHandle>,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
         if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
             return Ok(TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
         }
 
-        let record = self.schedule_root_update(TestRendererRootUpdateKind::Update, element)?;
+        let record =
+            self.schedule_root_update(TestRendererRootUpdateKind::Update, element, callback)?;
         self.scheduled_updates.push(record.clone());
         Ok(TestRendererRootUpdateOutcome::Scheduled(record))
     }
 
     pub fn unmount(&mut self) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        self.unmount_with_root_update_callback(None)
+    }
+
+    pub fn unmount_with_root_update_callback_for_canary(
+        &mut self,
+        callback: RootUpdateCallbackHandle,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        self.unmount_with_root_update_callback(Some(callback))
+    }
+
+    fn unmount_with_root_update_callback(
+        &mut self,
+        callback: Option<RootUpdateCallbackHandle>,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
         if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
             return Ok(TestRendererRootUpdateOutcome::AlreadyUnmountScheduled);
         }
 
-        let record = self
-            .schedule_root_update(TestRendererRootUpdateKind::Unmount, RootElementHandle::NONE)?;
+        let record = self.schedule_root_update(
+            TestRendererRootUpdateKind::Unmount,
+            RootElementHandle::NONE,
+            callback,
+        )?;
         self.scheduled_updates.push(record.clone());
         self.lifecycle = TestRendererRootLifecycle::UnmountScheduled;
         Ok(TestRendererRootUpdateOutcome::Scheduled(record))
@@ -987,13 +1039,14 @@ impl TestRendererRoot {
         &mut self,
         kind: TestRendererRootUpdateKind,
         element: RootElementHandle,
+        callback: Option<RootUpdateCallbackHandle>,
     ) -> Result<TestRendererRootScheduledUpdate, TestRendererRootError> {
         let container_update = match kind {
             TestRendererRootUpdateKind::Create | TestRendererRootUpdateKind::Update => {
-                update_container(&mut self.store, self.root_id, element, None)?
+                update_container(&mut self.store, self.root_id, element, callback)?
             }
             TestRendererRootUpdateKind::Unmount => {
-                update_container_sync(&mut self.store, self.root_id, element, None)?
+                update_container_sync(&mut self.store, self.root_id, element, callback)?
             }
         };
         let root_schedule = ensure_root_is_scheduled(&mut self.store, container_update.schedule())?;
@@ -1410,7 +1463,9 @@ mod tests {
     use std::sync::atomic::AtomicUsize;
 
     use fast_react_host_config::{HostOperationErrorKind, HostTreeUpdateMode, MutationRenderer};
-    use fast_react_reconciler::RootTaskScheduleOutcome;
+    use fast_react_reconciler::{
+        RootTaskScheduleOutcome, RootUpdateCallbackRecord, RootUpdateCallbackVisibility,
+    };
 
     static TEST_HOST_FIBER_TOKEN: TestHostFiberToken = 1;
 
@@ -1550,6 +1605,50 @@ mod tests {
             .unwrap();
         let commit = root.commit_host_root_render_for_canary(render).unwrap();
         (render, commit)
+    }
+
+    fn assert_empty_root_update_callback_snapshot(
+        commit: &HostRootCommitRecord,
+        render: &HostRootRenderPhaseRecord,
+    ) {
+        let callbacks = commit.root_update_callbacks();
+
+        assert_eq!(callbacks.queue(), render.work_in_progress_update_queue());
+        assert!(callbacks.is_empty());
+        assert!(callbacks.visible().is_empty());
+        assert!(callbacks.hidden().is_empty());
+        assert!(callbacks.deferred_hidden().is_empty());
+    }
+
+    fn assert_visible_root_update_callback_snapshot(
+        commit: &HostRootCommitRecord,
+        render: &HostRootRenderPhaseRecord,
+        scheduled_update: &TestRendererRootScheduledUpdate,
+        callback: RootUpdateCallbackHandle,
+    ) {
+        let callbacks = commit.root_update_callbacks();
+
+        assert_eq!(callbacks.queue(), render.work_in_progress_update_queue());
+        assert_eq!(callback_handles(callbacks.visible()), vec![callback]);
+        assert_eq!(
+            callbacks.visible()[0].queue(),
+            render.work_in_progress_update_queue()
+        );
+        assert_eq!(
+            callbacks.visible()[0].update(),
+            scheduled_update.container_update().update()
+        );
+        assert_eq!(callbacks.visible()[0].sequence(), 0);
+        assert_eq!(
+            callbacks.visible()[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert!(callbacks.hidden().is_empty());
+        assert!(callbacks.deferred_hidden().is_empty());
+    }
+
+    fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {
+        records.iter().map(|record| record.callback()).collect()
     }
 
     #[test]
@@ -1716,6 +1815,7 @@ mod tests {
         assert_eq!(commit.finished_lanes(), render.render_lanes());
         assert!(commit.remaining_lanes().is_empty());
         assert!(commit.pending_lanes().is_empty());
+        assert_empty_root_update_callback_snapshot(&commit, &render);
         assert_eq!(new_current, render.finished_work());
         assert_ne!(new_current, previous_current);
         assert_eq!(current_host_root_element(&root), element);
@@ -1767,6 +1867,7 @@ mod tests {
         assert_eq!(commit.previous_current(), previous_current);
         assert_eq!(commit.current(), render.finished_work());
         assert!(commit.pending_lanes().is_empty());
+        assert_empty_root_update_callback_snapshot(&commit, &render);
         assert_eq!(new_current, render.finished_work());
         assert_ne!(new_current, previous_current);
         assert_eq!(current_host_root_element(&root), root_element(2));
@@ -1805,9 +1906,89 @@ mod tests {
         assert_eq!(commit.previous_current(), previous_current);
         assert_eq!(commit.current(), render.finished_work());
         assert!(commit.pending_lanes().is_empty());
+        assert_empty_root_update_callback_snapshot(&commit, &render);
         assert_eq!(new_current, render.finished_work());
         assert_ne!(new_current, previous_current);
         assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot_after_create
+        );
+        assert_eq!(host_storage_counts(&root), storage_after_create);
+    }
+
+    #[test]
+    fn root_create_commit_handoff_exposes_visible_callback_snapshot() {
+        let callback = RootUpdateCallbackHandle::from_raw(77);
+        let mut root = TestRendererRoot::create_with_root_update_callback_for_canary(
+            root_element(10),
+            TestRendererOptions::new(),
+            callback,
+        )
+        .unwrap();
+        let scheduled_update = root.last_scheduled_update().unwrap().clone();
+        let snapshot_before = root.diagnostic_container_snapshot().unwrap();
+        let storage_before = host_storage_counts(&root);
+
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+
+        assert_eq!(scheduled_update.kind(), TestRendererRootUpdateKind::Create);
+        assert_visible_root_update_callback_snapshot(&commit, &render, &scheduled_update, callback);
+        assert_eq!(current_host_root_element(&root), root_element(10));
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot_before
+        );
+        assert_eq!(host_storage_counts(&root), storage_before);
+    }
+
+    #[test]
+    fn root_update_commit_handoff_exposes_visible_callback_snapshot() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        render_and_commit_latest_host_root(&mut root);
+        let callback = RootUpdateCallbackHandle::from_raw(88);
+
+        let outcome = root
+            .update_with_root_update_callback_for_canary(root_element(2), callback)
+            .unwrap();
+        let scheduled_update = outcome.scheduled().unwrap().clone();
+        let snapshot_after_create = root.diagnostic_container_snapshot().unwrap();
+        let storage_after_create = host_storage_counts(&root);
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+
+        assert_eq!(scheduled_update.kind(), TestRendererRootUpdateKind::Update);
+        assert_visible_root_update_callback_snapshot(&commit, &render, &scheduled_update, callback);
+        assert_eq!(current_host_root_element(&root), root_element(2));
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot_after_create
+        );
+        assert_eq!(host_storage_counts(&root), storage_after_create);
+    }
+
+    #[test]
+    fn root_unmount_commit_handoff_exposes_visible_callback_snapshot() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        render_and_commit_latest_host_root(&mut root);
+        let callback = RootUpdateCallbackHandle::from_raw(99);
+
+        let outcome = root
+            .unmount_with_root_update_callback_for_canary(callback)
+            .unwrap();
+        let scheduled_update = outcome.scheduled().unwrap().clone();
+        let snapshot_after_create = root.diagnostic_container_snapshot().unwrap();
+        let storage_after_create = host_storage_counts(&root);
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+
+        assert_eq!(scheduled_update.kind(), TestRendererRootUpdateKind::Unmount);
+        assert_visible_root_update_callback_snapshot(&commit, &render, &scheduled_update, callback);
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert_eq!(
+            root.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
         assert_eq!(
             root.diagnostic_container_snapshot().unwrap(),
             snapshot_after_create
