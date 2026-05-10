@@ -3298,6 +3298,386 @@ test('private controlled checkbox and radio fake-DOM latest-props restore record
   }
 });
 
+test('private controlled restore queue write preflight records deterministic write intents only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'write-preflight'
+    });
+  const rows = [
+    {
+      domEventName: 'input',
+      expectedRestoreKind: 'input-text-value',
+      expectedWrapperOperation: 'input-value-sync',
+      latestProps: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'text-write-preflight'
+    },
+    {
+      domEventName: 'click',
+      expectedRestoreKind: 'input-checkbox-checked',
+      expectedWrapperOperation: 'input-checked-sync',
+      latestProps: {
+        type: 'checkbox',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'checkbox-write-preflight'
+    },
+    {
+      domEventName: 'click',
+      expectedRestoreKind: 'input-radio-checked',
+      expectedWrapperOperation: 'input-checked-sync',
+      latestProps: {
+        type: 'radio',
+        name: 'choice',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'radio-write-preflight'
+    },
+    {
+      domEventName: 'change',
+      expectedRestoreKind: 'select-single-value',
+      expectedWrapperOperation: 'select-single-options-sync',
+      latestProps: {
+        value: 'b',
+        onChange() {}
+      },
+      nodeName: 'SELECT',
+      queueId: 'select-single-write-preflight'
+    },
+    {
+      domEventName: 'change',
+      expectedRestoreKind: 'select-multiple-value',
+      expectedWrapperOperation: 'select-multiple-options-sync',
+      latestProps: {
+        multiple: true,
+        value: ['a', 'c'],
+        onChange() {}
+      },
+      nodeName: 'SELECT',
+      queueId: 'select-multiple-write-preflight'
+    },
+    {
+      domEventName: 'input',
+      expectedRestoreKind: 'textarea-value',
+      expectedWrapperOperation: 'textarea-value-sync',
+      latestProps: {
+        value: 'body',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'TEXTAREA',
+      queueId: 'textarea-write-preflight'
+    }
+  ];
+  const admission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+    queueId: 'controlled-write-preflight-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+  };
+  const records = rows.map((row) => {
+    const dispatch = createControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      value: 'browser-mutated'
+    });
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+    return {dispatch, intent, row};
+  });
+  const preflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    admission
+  );
+
+  assert.equal(Object.isFrozen(preflight), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueWritePreflightRecord(
+      preflight
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueWritePreflightRecordPayload(
+      preflight
+    ),
+    preflight
+  );
+  assert.equal(
+    preflight.$$typeof,
+    controlledRestoreQueue.privateControlledInputPostEventRestoreQueueWritePreflightRecordType
+  );
+  assert.equal(
+    preflight.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWritePreflightStatus
+  );
+  assert.equal(preflight.requestId, 'write-preflight:7');
+  assert.equal(preflight.acceptedRecordCount, 6);
+  assert.deepEqual(
+    preflight.acceptedRestoreKinds,
+    rows.map((row) => row.expectedRestoreKind)
+  );
+  assert.deepEqual(preflight.sourceRequestIds, [
+    'write-preflight:1',
+    'write-preflight:2',
+    'write-preflight:3',
+    'write-preflight:4',
+    'write-preflight:5',
+    'write-preflight:6'
+  ]);
+  assert.deepEqual(
+    preflight.writeIntentRows.map((row) => ({
+      rowId: row.rowId,
+      rowSequence: row.rowSequence,
+      sourceRequestId: row.sourceRequestId,
+      sourceQueueId: row.sourceQueueId,
+      queueSlot: row.queueSlot,
+      queueSlotIndex: row.queueSlotIndex,
+      restoreTargetWouldBeSet: row.restoreTargetWouldBeSet,
+      restoreQueueWouldBeAppended: row.restoreQueueWouldBeAppended,
+      restoreQueueLengthBeforeWrite: row.restoreQueueLengthBeforeWrite,
+      restoreQueueLengthAfterWrite: row.restoreQueueLengthAfterWrite,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      hostWrapperOperation: row.hostWrapperOperation,
+      radioGroupLookupRequired: row.radioGroupLookupRequired,
+      radioGroupLookupPerformed: row.radioGroupLookupPerformed,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        rowId: 'write-preflight:7:row:1',
+        rowSequence: 1,
+        sourceRequestId: 'write-preflight:1',
+        sourceQueueId: 'text-write-preflight',
+        queueSlot: 'restore-target',
+        queueSlotIndex: 0,
+        restoreTargetWouldBeSet: true,
+        restoreQueueWouldBeAppended: false,
+        restoreQueueLengthBeforeWrite: 0,
+        restoreQueueLengthAfterWrite: 0,
+        acceptedRestoreKind: 'input-text-value',
+        hostWrapperOperation: 'input-value-sync',
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-preflight:7:row:2',
+        rowSequence: 2,
+        sourceRequestId: 'write-preflight:2',
+        sourceQueueId: 'checkbox-write-preflight',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 0,
+        restoreTargetWouldBeSet: false,
+        restoreQueueWouldBeAppended: true,
+        restoreQueueLengthBeforeWrite: 0,
+        restoreQueueLengthAfterWrite: 1,
+        acceptedRestoreKind: 'input-checkbox-checked',
+        hostWrapperOperation: 'input-checked-sync',
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-preflight:7:row:3',
+        rowSequence: 3,
+        sourceRequestId: 'write-preflight:3',
+        sourceQueueId: 'radio-write-preflight',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 1,
+        restoreTargetWouldBeSet: false,
+        restoreQueueWouldBeAppended: true,
+        restoreQueueLengthBeforeWrite: 1,
+        restoreQueueLengthAfterWrite: 2,
+        acceptedRestoreKind: 'input-radio-checked',
+        hostWrapperOperation: 'input-checked-sync',
+        radioGroupLookupRequired: true,
+        radioGroupLookupPerformed: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-preflight:7:row:4',
+        rowSequence: 4,
+        sourceRequestId: 'write-preflight:4',
+        sourceQueueId: 'select-single-write-preflight',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 2,
+        restoreTargetWouldBeSet: false,
+        restoreQueueWouldBeAppended: true,
+        restoreQueueLengthBeforeWrite: 2,
+        restoreQueueLengthAfterWrite: 3,
+        acceptedRestoreKind: 'select-single-value',
+        hostWrapperOperation: 'select-single-options-sync',
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-preflight:7:row:5',
+        rowSequence: 5,
+        sourceRequestId: 'write-preflight:5',
+        sourceQueueId: 'select-multiple-write-preflight',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 3,
+        restoreTargetWouldBeSet: false,
+        restoreQueueWouldBeAppended: true,
+        restoreQueueLengthBeforeWrite: 3,
+        restoreQueueLengthAfterWrite: 4,
+        acceptedRestoreKind: 'select-multiple-value',
+        hostWrapperOperation: 'select-multiple-options-sync',
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'write-preflight:7:row:6',
+        rowSequence: 6,
+        sourceRequestId: 'write-preflight:6',
+        sourceQueueId: 'textarea-write-preflight',
+        queueSlot: 'restore-queue',
+        queueSlotIndex: 4,
+        restoreTargetWouldBeSet: false,
+        restoreQueueWouldBeAppended: true,
+        restoreQueueLengthBeforeWrite: 4,
+        restoreQueueLengthAfterWrite: 5,
+        acceptedRestoreKind: 'textarea-value',
+        hostWrapperOperation: 'textarea-value-sync',
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(preflight.writePlan.writeSequence, [
+    'validate-queueable-restore-records',
+    'record-restore-target-write-intent',
+    'record-additional-restore-queue-write-intents',
+    'keep-post-event-controlled-restore-flush-blocked'
+  ]);
+  assert.equal(preflight.writePlan.flushWouldBeRequiredAfterWrite, true);
+  assert.equal(preflight.writePlan.restoreQueueWritten, false);
+  assert.equal(preflight.writePlan.restoreQueueFlushed, false);
+  assert.equal(preflight.writePlan.hostWrapperInvoked, false);
+  assert.equal(preflight.writePlan.radioGroupLookupPerformed, false);
+  assert.equal(preflight.postEventRestoreBoundary.restoreQueueWritten, false);
+  assert.equal(preflight.postEventRestoreBoundary.restoreQueueFlushed, false);
+  assert.equal(preflight.postEventRestoreBoundary.hostWrapperInvoked, false);
+  assert.equal(preflight.sideEffects.restoreQueueWritePreflightRecorded, true);
+  assert.equal(preflight.sideEffects.restoreQueueWriteIntentRowCount, 6);
+  assert.equal(preflight.sideEffects.restoreQueueWritten, false);
+  assert.equal(preflight.sideEffects.restoreQueueFlushed, false);
+  assert.equal(preflight.sideEffects.hostWrapperInvoked, false);
+  assert.equal(preflight.sideEffects.radioGroupLookupRequired, true);
+  assert.equal(preflight.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(preflight.sideEffects.radioGroupMembersEnumerated, false);
+  assert.equal(preflight.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(preflight.sideEffects.browserInputMutated, false);
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(summary.recordsRestoreQueueWritePreflight, true);
+  assert.equal(
+    summary.restoreQueueWritePreflight.recordsWriteIntentRows,
+    true
+  );
+  assert.equal(
+    summary.restoreQueueWritePreflight.actualQueueWrites,
+    false
+  );
+  assert.equal(
+    summary.restoreQueueWritePreflight.actualQueueFlushes,
+    false
+  );
+  assert.equal(
+    summary.restoreQueueWritePreflight.hostWrapperInvocations,
+    false
+  );
+  assert.equal(summary.restoreQueueWritePreflight.radioGroupQueries, false);
+  assert.equal(summary.restoreQueueWritePreflight.liveDomMutations, false);
+
+  const skippedDispatch = createControlledInputEventDispatch({
+    domEventName: 'click',
+    latestProps: {
+      type: 'text',
+      value: 'alpha',
+      onClick() {}
+    },
+    nodeName: 'INPUT',
+    value: 'browser-mutated'
+  });
+  const skipped = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    skippedDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-event-latest-props-post-event-restore-queue',
+      queueId: 'skipped-write-preflight',
+      eventName: 'click',
+      targetKind: 'controlled-input-post-event-restore-queue'
+    }
+  );
+  assert.throws(
+    () => gate.preflightRestoreQueueWrites([skipped], admission),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWritePreflightCode,
+      compatibilityTarget,
+      reason: 'restore-intent-not-recorded',
+      sourceRequestId: 'write-preflight:8'
+    }
+  );
+
+  for (const {dispatch} of records) {
+    assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+  assert.equal(Object.hasOwn(skippedDispatch.targetNode, '_valueTracker'), false);
+  componentTree.detachHostInstanceToken(skippedDispatch.token);
+});
+
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
   const gate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'fake-tracker-error'
