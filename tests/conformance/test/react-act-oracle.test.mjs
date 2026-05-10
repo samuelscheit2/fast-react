@@ -281,6 +281,15 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(gate.continuationFlushingReady, false);
   assert.equal(gate.privateTestQueueFlushDiagnosticsReady, true);
   assert.equal(gate.drainsAcceptedInternalTestQueues, true);
+  assert.equal(gate.privateSyncFlushActExecutionDiagnosticsReady, true);
+  assert.equal(
+    gate.privateSyncFlushActExecutionDiagnosticKind,
+    "fast-react.react.private-sync-flush-act-execution-diagnostic"
+  );
+  assert.equal(gate.privateSyncFlushActExecutionDiagnosticVersion, 1);
+  assert.equal(gate.committedHostOutputCanaryRequired, true);
+  assert.equal(gate.drainsAcceptedInternalActContinuationRecords, true);
+  assert.equal(gate.drainsPublicReactActQueue, false);
   assert.equal(gate.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(gate.publicReactActCompatibilityClaimed, false);
   assert.equal(gate.executesQueuedWork, false);
@@ -296,6 +305,13 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   ]);
   assert.deepEqual(gate.requiredContinuationStatuses, [
     "NoContinuation",
+    "PendingContinuation"
+  ]);
+  assert.deepEqual(gate.acceptedPrivateActContinuationDrainRecords, [
+    "SyncFlushActContinuationDrainRecord",
+    "SyncFlushActPrivateExecutionDiagnosticsForCanary"
+  ]);
+  assert.deepEqual(gate.acceptedPrivateActContinuationDrainStatuses, [
     "PendingContinuation"
   ]);
   assert.equal(
@@ -329,6 +345,10 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(queuedTaskInvoked, false);
   assert.equal(metadata.privateTestQueueFlushDiagnosticsReady, true);
   assert.equal(metadata.drainsAcceptedInternalTestQueues, true);
+  assert.equal(metadata.privateSyncFlushActExecutionDiagnosticsReady, true);
+  assert.equal(metadata.committedHostOutputCanaryRequired, true);
+  assert.equal(metadata.drainsAcceptedInternalActContinuationRecords, true);
+  assert.equal(metadata.drainsPublicReactActQueue, false);
   assert.equal(metadata.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(metadata.publicReactActCompatibilityClaimed, false);
 
@@ -449,6 +469,15 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     }),
     gate.createActQueueMetadata({
       privateTestQueueFlushDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      privateSyncFlushActExecutionDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      drainsAcceptedInternalActContinuationRecords: false
+    }),
+    gate.createActQueueMetadata({
+      drainsPublicReactActQueue: true
     }),
     gate.createActQueueMetadata({
       publicSchedulerTimingCompatibilityClaimed: true

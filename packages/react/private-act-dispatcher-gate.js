@@ -30,6 +30,16 @@ const acceptedActQueueContinuationStatuses = Object.freeze([
   'NoContinuation',
   'PendingContinuation'
 ]);
+const privateSyncFlushActExecutionDiagnosticKind =
+  'fast-react.react.private-sync-flush-act-execution-diagnostic';
+const privateSyncFlushActExecutionDiagnosticVersion = 1;
+const acceptedPrivateActContinuationDrainRecords = Object.freeze([
+  'SyncFlushActContinuationDrainRecord',
+  'SyncFlushActPrivateExecutionDiagnosticsForCanary'
+]);
+const acceptedPrivateActContinuationDrainStatuses = Object.freeze([
+  'PendingContinuation'
+]);
 const schedulerCompatibilityTarget = 'scheduler@0.27.0';
 const privateActQueueTestQueueKind =
   'fast-react.react.private-act-queue-test-queue';
@@ -80,6 +90,14 @@ function isAcceptedActQueueMetadata(metadata) {
     metadata.continuationFlushingReady === false &&
     metadata.privateTestQueueFlushDiagnosticsReady === true &&
     metadata.drainsAcceptedInternalTestQueues === true &&
+    metadata.privateSyncFlushActExecutionDiagnosticsReady === true &&
+    metadata.privateSyncFlushActExecutionDiagnosticKind ===
+      privateSyncFlushActExecutionDiagnosticKind &&
+    metadata.privateSyncFlushActExecutionDiagnosticVersion ===
+      privateSyncFlushActExecutionDiagnosticVersion &&
+    metadata.committedHostOutputCanaryRequired === true &&
+    metadata.drainsAcceptedInternalActContinuationRecords === true &&
+    metadata.drainsPublicReactActQueue === false &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
     metadata.executesQueuedWork === false &&
@@ -89,6 +107,14 @@ function isAcceptedActQueueMetadata(metadata) {
     hasExactStringSet(
       metadata.acceptedContinuationStatuses,
       acceptedActQueueContinuationStatuses
+    ) &&
+    hasExactStringSet(
+      metadata.acceptedPrivateActContinuationDrainRecords,
+      acceptedPrivateActContinuationDrainRecords
+    ) &&
+    hasExactStringSet(
+      metadata.acceptedPrivateActContinuationDrainStatuses,
+      acceptedPrivateActContinuationDrainStatuses
     )
   );
 }
@@ -108,6 +134,14 @@ function createActQueueMetadata(overrides = {}) {
     continuationFlushingReady: false,
     privateTestQueueFlushDiagnosticsReady: true,
     drainsAcceptedInternalTestQueues: true,
+    privateSyncFlushActExecutionDiagnosticsReady: true,
+    privateSyncFlushActExecutionDiagnosticKind,
+    privateSyncFlushActExecutionDiagnosticVersion,
+    committedHostOutputCanaryRequired: true,
+    drainsAcceptedInternalActContinuationRecords: true,
+    drainsPublicReactActQueue: false,
+    acceptedPrivateActContinuationDrainRecords,
+    acceptedPrivateActContinuationDrainStatuses,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
     executesQueuedWork: false,
@@ -282,6 +316,14 @@ module.exports = Object.freeze({
   continuationFlushingReady: false,
   privateTestQueueFlushDiagnosticsReady: true,
   drainsAcceptedInternalTestQueues: true,
+  privateSyncFlushActExecutionDiagnosticsReady: true,
+  privateSyncFlushActExecutionDiagnosticKind,
+  privateSyncFlushActExecutionDiagnosticVersion,
+  committedHostOutputCanaryRequired: true,
+  drainsAcceptedInternalActContinuationRecords: true,
+  drainsPublicReactActQueue: false,
+  acceptedPrivateActContinuationDrainRecords,
+  acceptedPrivateActContinuationDrainStatuses,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
   executesQueuedWork: false,
