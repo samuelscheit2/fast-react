@@ -1825,6 +1825,11 @@ mod tests {
             result.entanglement().unwrap().entangled_lanes(),
             Lanes::from(Lane::TRANSITION_1)
         );
+        assert_eq!(
+            result.source_priority(),
+            RootUpdateLaneSourcePriority::TransitionLane
+        );
+        assert!(!result.public_batching_compatibility_claimed());
         assert!(
             store
                 .root(root_id)

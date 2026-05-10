@@ -12613,6 +12613,219 @@ mod tests {
     }
 
     #[test]
+    fn root_work_loop_use_reducer_transition_lane_rebase_then_commit() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let child_element = source.insert_text("transition reducer commit");
+        let root_current = store.root(root_id).unwrap().current();
+        let (function_current, function_work_in_progress, component) =
+            attach_function_component_current_child_with_work_pair(&mut store, root_id);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = FunctionComponentReducerHandle::from_raw(1_203);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(function_current, reducer_id, StateHandle::from_raw(1_300))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = TestHostTreeFunctionOutputResolver::new(&source);
+        let transition_lanes = Lanes::from(Lane::TRANSITION_1);
+        let transition_lane = HookUpdateLane::from_lane(Lane::TRANSITION_1).unwrap();
+        let dispatch_request = FunctionComponentReducerDispatchRequest::new(
+            current_reducer.dispatch(),
+            action(23),
+            transition_lane,
+        );
+
+        let rescheduled = hook_store
+            .dispatch_reducer_update_and_reschedule_root(&mut store, dispatch_request)
+            .unwrap();
+
+        assert_eq!(rescheduled.root(), root_id);
+        assert_eq!(rescheduled.dispatch().fiber(), function_current);
+        assert_eq!(rescheduled.dispatch().queue(), current_reducer.queue());
+        assert_eq!(rescheduled.dispatch().reducer(), reducer_id);
+        assert_eq!(rescheduled.dispatch().lane(), transition_lane);
+        assert_eq!(rescheduled.reschedule().lane(), Lane::TRANSITION_1);
+        assert_eq!(rescheduled.scheduled().root(), root_id);
+        assert!(rescheduled.scheduled().inserted());
+        assert!(rescheduled.scheduled().microtask().is_some());
+        assert!(
+            store
+                .fiber_arena()
+                .get(function_current)
+                .unwrap()
+                .lanes()
+                .contains_lane(Lane::TRANSITION_1)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::TRANSITION_1)
+        );
+
+        let skipped_render = render_function_component_with_use_reducer(
+            store.fiber_arena_mut(),
+            &mut hook_store,
+            function_work_in_progress,
+            Lanes::SYNC,
+            FunctionComponentUseReducerRenderRequest::new(
+                reducer_id,
+                StateHandle::from_raw(9_999),
+                FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC),
+            ),
+            &mut registry,
+            |_, _| panic!("transition reducer update should skip during sync render"),
+        )
+        .unwrap();
+        let skipped_update = skipped_render.reducer_hook().update_record().unwrap();
+
+        assert_eq!(skipped_render.render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            skipped_update.memoized_state(),
+            StateHandle::from_raw(1_300)
+        );
+        assert_eq!(skipped_update.base_state(), StateHandle::from_raw(1_300));
+        assert_eq!(skipped_update.remaining_lanes(), transition_lanes);
+        assert_eq!(skipped_update.applied_update_count(), 0);
+        assert_eq!(skipped_update.skipped_update_count(), 1);
+        let skipped_base_tail = skipped_update.base_queue().unwrap();
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(Some(skipped_base_tail))
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        let rebased_update = hook_store.state_queues().update(rebased[0]).unwrap();
+        assert_eq!(rebased_update.lane(), transition_lane);
+        assert_eq!(*rebased_update.action(), action(23));
+        hook_store.bind_current_list_unchecked(
+            function_current,
+            skipped_render.hook_state().work_in_progress_list(),
+        );
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        assert_eq!(processed.records().len(), 1);
+        assert_eq!(processed.records()[0].root(), root_id);
+        assert_eq!(processed.records()[0].next_lanes(), transition_lanes);
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::Scheduled
+        );
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+        let callback_render = render_host_root_via_scheduler_callback(
+            &mut store,
+            root_id,
+            callback.node(),
+            transition_lanes,
+        )
+        .unwrap();
+        assert_eq!(
+            callback_render.status(),
+            SchedulerCallbackRenderStatus::Rendered
+        );
+        let render = callback_render.render_phase().unwrap();
+        assert_eq!(render.root(), root_id);
+        assert_eq!(render.current(), root_current);
+        assert_eq!(render.render_lanes(), transition_lanes);
+        store
+            .fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[function_work_in_progress])
+            .unwrap();
+
+        let mut reducer_calls = 0;
+        let record =
+            handoff_completed_function_component_use_reducer_single_child_to_test_complete_work_and_commit(
+                &mut store,
+                &mut host,
+                render,
+                &source,
+                &mut hook_store,
+                FunctionComponentUseReducerRenderRequest::new(
+                    reducer_id,
+                    StateHandle::from_raw(9_999),
+                    FunctionComponentStateUpdateRenderLanes::new(
+                        transition_lanes,
+                        transition_lanes,
+                    ),
+                ),
+                &mut registry,
+                &resolver,
+                |state, action| {
+                    reducer_calls += 1;
+                    StateHandle::from_raw(state.raw() + action.raw())
+                },
+            )
+            .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(record.function_component(), function_work_in_progress);
+        assert_eq!(
+            record.use_reducer_render().current(),
+            Some(function_current)
+        );
+        assert_eq!(record.use_reducer_render().render_lanes(), transition_lanes);
+        assert_eq!(record.use_reducer_render().output(), output);
+        let accepted_update = record
+            .use_reducer_render()
+            .reducer_hook()
+            .update_record()
+            .unwrap();
+        assert_eq!(
+            accepted_update.previous_base_queue(),
+            Some(skipped_base_tail)
+        );
+        assert_eq!(
+            accepted_update.memoized_state(),
+            StateHandle::from_raw(1_323)
+        );
+        assert_eq!(accepted_update.base_state(), StateHandle::from_raw(1_323));
+        assert_eq!(accepted_update.base_queue(), None);
+        assert_eq!(accepted_update.remaining_lanes(), Lanes::NO);
+        assert_eq!(accepted_update.applied_update_count(), 1);
+        assert_eq!(accepted_update.skipped_update_count(), 0);
+        assert_eq!(reducer_calls, 1);
+        assert_eq!(record.single_child().child_tag(), FiberTag::HostText);
+        assert_eq!(record.single_child().child_element(), child_element);
+        assert_eq!(
+            record.finished_work_handoff().pending().finished_lanes(),
+            transition_lanes
+        );
+        assert!(
+            record
+                .finished_work_handoff()
+                .execution_request()
+                .compatibility_claim_blocked()
+        );
+        assert!(
+            record
+                .finished_work_handoff()
+                .public_root_rendering_blocked()
+        );
+        assert!(record.public_render_blocked());
+        assert_eq!(record.commit().root(), root_id);
+        assert_eq!(record.commit().previous_current(), root_current);
+        assert_eq!(record.commit().current(), render.work_in_progress());
+        assert_eq!(record.commit().finished_lanes(), transition_lanes);
+        assert_eq!(record.commit().pending_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.work_in_progress()
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(registry.calls().len(), 2);
+    }
+
+    #[test]
     fn root_work_loop_use_reducer_render_commits_single_host_update_handoff() {
         let mut source = TestHostTree::new();
         let updated_text = source.insert_text("reducer text update");
