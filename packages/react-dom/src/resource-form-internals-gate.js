@@ -662,6 +662,8 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   stylesheetResourceMapCommitRowsRecorded: false,
   preloadResourceMapCommitRowsRecorded: false,
   scriptResourceMapCommitRowsRecorded: false,
+  moduleResourceMapOrderRowsRecorded: false,
+  moduleResourceMapDedupeKeysRecorded: false,
   realResourceMapsCreated: false,
   realResourceMapsMutated: false,
   fakeResourceMapsCreated: false,
@@ -688,6 +690,8 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   stylesheetResourceMapCommitRowsRecorded: true,
   preloadResourceMapCommitRowsRecorded: true,
   scriptResourceMapCommitRowsRecorded: true,
+  moduleResourceMapOrderRowsRecorded: true,
+  moduleResourceMapDedupeKeysRecorded: true,
   realResourceMapsCreated: false,
   realResourceMapsMutated: false,
   fakeResourceMapsCreated: false,
@@ -2967,6 +2971,10 @@ function describePrivateResourceHintResourceMapCommitGate() {
     recordsScriptRows: true,
     recordsModulePreloadRows: true,
     recordsModuleScriptRows: true,
+    recordsModuleResourceMapOrderRows: true,
+    recordsModuleResourceMapDedupeKeys: true,
+    rejectsMalformedModuleRows: true,
+    rejectsConflictingDuplicateRecords: true,
     mutatesRealResourceMaps: false,
     mutatesFakeResourceMaps: false,
     mutatesFakeHead: false,
@@ -4268,6 +4276,8 @@ function recordResourceHintResourceMapCommitWithGate(
     stylesheetResourceMapRecords: commitPlan.stylesheetResourceMapRecords,
     preloadResourceMapRecords: commitPlan.preloadResourceMapRecords,
     scriptResourceMapRecords: commitPlan.scriptResourceMapRecords,
+    moduleResourceMapOrder: commitPlan.moduleResourceMapOrder,
+    resourceMapConflictBoundary: commitPlan.resourceMapConflictBoundary,
     stylesheetPrecedenceBoundary:
       commitPlan.stylesheetPrecedenceBoundary,
     resourceLifecycleBoundary:
@@ -7719,7 +7729,10 @@ function createScriptModulePreinitRows(dedupeRows) {
 }
 
 function getScriptModulePreinitRowScriptKind(row) {
-  if (row.contractId === 'preload-module') {
+  if (
+    row.contractId === 'preload-module' &&
+    row.resourceKind === 'script'
+  ) {
     return 'module';
   }
   if (row.contractId === 'preinit-module-script') {
@@ -7811,7 +7824,10 @@ function isScriptModuleHeadOrderPlannedRow(row) {
 }
 
 function getScriptModuleHeadOrderScriptKind(row) {
-  if (row.contractId === 'preload-module') {
+  if (
+    row.contractId === 'preload-module' &&
+    row.resourceKind === 'script'
+  ) {
     return 'module';
   }
   if (row.contractId === 'preinit-module-script') {
@@ -9178,6 +9194,10 @@ function createResourceHintResourceMapCommitPlan(
       )
       .filter((row) => row !== null)
   );
+  const resourceMapConflictBoundary =
+    createResourceMapCommitConflictBoundary(privateResourceMapRecords);
+  const moduleResourceMapOrder =
+    createResourceMapCommitModuleResourceOrder(privateResourceMapRecords);
   const stylesheetResourceMapRecords = freezeArray(
     privateResourceMapRecords.filter((row) => row.recordKind === 'stylesheet')
   );
@@ -9193,11 +9213,17 @@ function createResourceHintResourceMapCommitPlan(
       uniqueStrings(privateResourceMapRecords.map((row) => row.contractId))
     ),
     resourceMapCommitPlan:
-      createResourceMapCommitPlanSummary(privateResourceMapRecords),
+      createResourceMapCommitPlanSummary(
+        privateResourceMapRecords,
+        moduleResourceMapOrder,
+        resourceMapConflictBoundary
+      ),
     privateResourceMapRecords,
     stylesheetResourceMapRecords,
     preloadResourceMapRecords,
     scriptResourceMapRecords,
+    moduleResourceMapOrder,
+    resourceMapConflictBoundary,
     stylesheetPrecedenceBoundary:
       createResourceMapCommitStylesheetPrecedenceBoundary(
         stylesheetPrecedence
@@ -9226,6 +9252,7 @@ function createPrivateResourceMapCommitRecord(
   return freezeRecord({
     rowId: `resource-map-commit-${index}`,
     rowType: 'resource-map-commit',
+    resourceMapOrderIndex: index,
     recordKind,
     mapKind: getResourceMapCommitMapKind(recordKind),
     sourceDedupeRowId: row.rowId,
@@ -9245,6 +9272,9 @@ function createPrivateResourceMapCommitRecord(
     moduleScript: row.contractId === 'preinit-module-script',
     classicScriptPreinit: row.contractId === 'preinit-script',
     resourceKey: row.resourceKey,
+    dedupeKey: row.resourceKey,
+    resourceMapDedupeKey:
+      `${getResourceMapCommitMapKind(recordKind)}:${row.resourceKey}`,
     opaqueResourceKey: row.opaqueResourceKey,
     precedenceKey: row.precedenceKey,
     relationship: row.relationship,
@@ -9319,7 +9349,269 @@ function getResourceMapCommitMapKind(recordKind) {
   return 'preload-props';
 }
 
-function createResourceMapCommitPlanSummary(privateResourceMapRecords) {
+function createResourceMapCommitConflictBoundary(privateResourceMapRecords) {
+  assertWellFormedResourceMapCommitModuleRows(privateResourceMapRecords);
+
+  const stateByMapDedupeKey = new Map();
+  for (const row of privateResourceMapRecords) {
+    if (!isResourceMapCommitScriptOrderRecord(row)) {
+      continue;
+    }
+
+    const signature = getResourceMapCommitConflictSignature(row);
+    const existingState = stateByMapDedupeKey.get(row.resourceMapDedupeKey);
+    if (
+      existingState !== undefined &&
+      existingState.signature !== signature
+    ) {
+      throwInvalidResourceHintResourceMapCommitAdmission(
+        `duplicate conflicting resource-map records for ${row.resourceMapDedupeKey}`
+      );
+    }
+
+    if (existingState === undefined) {
+      stateByMapDedupeKey.set(row.resourceMapDedupeKey, {
+        signature,
+        rowCount: 1
+      });
+    } else {
+      existingState.rowCount++;
+    }
+  }
+
+  return freezeRecord({
+    status: 'validated-private-resource-map-commit-record-conflicts',
+    checkedRecordCount: privateResourceMapRecords.length,
+    checkedScriptModuleRecordCount:
+      Array.from(stateByMapDedupeKey.values()).reduce(
+        (count, state) => count + state.rowCount,
+        0
+      ),
+    checkedDedupeKeyCount: stateByMapDedupeKey.size,
+    malformedModuleRowCount: 0,
+    conflictingDuplicateRecordCount: 0,
+    validationMutatedRecords: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertWellFormedResourceMapCommitModuleRows(
+  privateResourceMapRecords
+) {
+  for (const row of privateResourceMapRecords) {
+    if (row.contractId === 'preload-module') {
+      if (
+        row.recordKind !== 'preload' ||
+        row.mapKind !== 'preload-props' ||
+        row.resourceKind !== 'script' ||
+        row.scriptKind !== 'module' ||
+        row.relationship !== 'modulepreload' ||
+        row.modulePreload !== true
+      ) {
+        throwInvalidResourceHintResourceMapCommitAdmission(
+          'modulepreload resource-map commit rows must describe script module preload records'
+        );
+      }
+    } else if (row.contractId === 'preinit-module-script') {
+      if (
+        row.recordKind !== 'script' ||
+        row.mapKind !== 'hoistable-scripts' ||
+        row.resourceKind !== 'script' ||
+        row.scriptKind !== 'module' ||
+        row.relationship !== 'module-script' ||
+        row.moduleScript !== true
+      ) {
+        throwInvalidResourceHintResourceMapCommitAdmission(
+          'preinitModule resource-map commit rows must describe script module records'
+        );
+      }
+    }
+  }
+}
+
+function isResourceMapCommitScriptOrderRecord(row) {
+  return (
+    row.resourceKind === 'script' &&
+    (row.recordKind === 'preload' || row.recordKind === 'script')
+  );
+}
+
+function getResourceMapCommitConflictSignature(row) {
+  if (row.recordKind === 'preload') {
+    return `${row.recordKind}:${row.relationship}:${row.scriptKind || 'none'}`;
+  }
+  if (row.recordKind === 'script') {
+    return `${row.recordKind}:${row.scriptKind || 'none'}`;
+  }
+  return `${row.recordKind}:${row.resourceKind}`;
+}
+
+function createResourceMapCommitModuleResourceOrder(
+  privateResourceMapRecords
+) {
+  const rows = freezeArray(
+    privateResourceMapRecords
+      .filter(isResourceMapCommitScriptOrderRecord)
+      .map((row, moduleOrderIndex) =>
+        createResourceMapCommitModuleOrderRow(row, moduleOrderIndex)
+      )
+  );
+  const dedupeKeys = createResourceMapCommitModuleDedupeKeyRows(rows);
+
+  return freezeRecord({
+    orderKind:
+      'react-19.2.6-modulepreload-preinit-module-resource-map-order-diagnostic',
+    targetKind: 'document-head',
+    hostTag: 'head',
+    rowCount: rows.length,
+    dedupeKeyCount: dedupeKeys.length,
+    rows,
+    dedupeKeys,
+    malformedModuleRowCount: 0,
+    conflictingDuplicateRecordCount: 0,
+    headInsertionApplied: false,
+    realHeadMutated: false,
+    fakeHeadMutated: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsMutated: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceMapCommitModuleOrderRow(row, moduleOrderIndex) {
+  return freezeRecord({
+    rowId: `module-resource-map-order-${moduleOrderIndex}`,
+    rowType: 'module-resource-map-order',
+    moduleOrderIndex,
+    sourceResourceMapCommitRowId: row.rowId,
+    resourceMapOrderIndex: row.resourceMapOrderIndex,
+    inputIndex: row.inputIndex,
+    sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+    sourceRequestId: row.sourceRequestId,
+    contractId: row.contractId,
+    privateDispatcherKey: row.privateDispatcherKey,
+    publicName: row.publicName,
+    recordKind: row.recordKind,
+    mapKind: row.mapKind,
+    resourceStage: row.resourceStage,
+    resourceKind: row.resourceKind,
+    scriptKind: row.scriptKind,
+    relationship: row.relationship,
+    dedupeKey: row.dedupeKey,
+    resourceMapDedupeKey: row.resourceMapDedupeKey,
+    modulePreload: row.modulePreload,
+    moduleScript: row.moduleScript,
+    classicScriptPreinit: row.classicScriptPreinit,
+    dedupeAction: row.dedupeAction,
+    dedupeMatched: row.dedupeMatched,
+    wouldInsertIntoHead: row.wouldInsertIntoHead,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    headInsertionApplied: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceMapCommitModuleDedupeKeyRows(orderRows) {
+  const stateByDedupeKey = new Map();
+  for (const row of orderRows) {
+    let state = stateByDedupeKey.get(row.dedupeKey);
+    if (state === undefined) {
+      state = {
+        dedupeKey: row.dedupeKey,
+        sourceRowIds: [],
+        resourceMapDedupeKeys: [],
+        contractIds: [],
+        recordKinds: [],
+        mapKinds: [],
+        scriptKinds: [],
+        relationships: [],
+        firstModuleOrderIndex: row.moduleOrderIndex,
+        lastModuleOrderIndex: row.moduleOrderIndex,
+        hasClassicScriptPreload: false,
+        hasModulePreload: false,
+        hasClassicScriptPreinit: false,
+        hasModuleScriptPreinit: false
+      };
+      stateByDedupeKey.set(row.dedupeKey, state);
+    }
+
+    state.sourceRowIds.push(row.sourceResourceMapCommitRowId);
+    state.resourceMapDedupeKeys.push(row.resourceMapDedupeKey);
+    state.contractIds.push(row.contractId);
+    state.recordKinds.push(row.recordKind);
+    state.mapKinds.push(row.mapKind);
+    state.scriptKinds.push(row.scriptKind);
+    state.relationships.push(row.relationship);
+    state.lastModuleOrderIndex = row.moduleOrderIndex;
+    if (row.contractId === 'preload' && row.scriptKind === 'classic') {
+      state.hasClassicScriptPreload = true;
+    }
+    if (row.contractId === 'preload-module') {
+      state.hasModulePreload = true;
+    }
+    if (row.contractId === 'preinit-script') {
+      state.hasClassicScriptPreinit = true;
+    }
+    if (row.contractId === 'preinit-module-script') {
+      state.hasModuleScriptPreinit = true;
+    }
+  }
+
+  return freezeArray(
+    Array.from(stateByDedupeKey.values()).map((state, dedupeKeyIndex) =>
+      freezeRecord({
+        rowId: `module-resource-map-dedupe-key-${dedupeKeyIndex}`,
+        rowType: 'module-resource-map-dedupe-key',
+        dedupeKeyIndex,
+        dedupeKey: state.dedupeKey,
+        rowCount: state.sourceRowIds.length,
+        sourceResourceMapCommitRowIds: freezeArray(state.sourceRowIds),
+        resourceMapDedupeKeys: freezeArray(
+          uniqueStrings(state.resourceMapDedupeKeys)
+        ),
+        contractIdsInOrder: freezeArray(state.contractIds),
+        recordKindsInOrder: freezeArray(state.recordKinds),
+        mapKindsInOrder: freezeArray(state.mapKinds),
+        scriptKindsInOrder: freezeArray(state.scriptKinds),
+        relationshipsInOrder: freezeArray(state.relationships),
+        firstModuleOrderIndex: state.firstModuleOrderIndex,
+        lastModuleOrderIndex: state.lastModuleOrderIndex,
+        hasClassicScriptPreload: state.hasClassicScriptPreload,
+        hasModulePreload: state.hasModulePreload,
+        hasClassicScriptPreinit: state.hasClassicScriptPreinit,
+        hasModuleScriptPreinit: state.hasModuleScriptPreinit,
+        conflictStatus: 'validated-no-conflicting-duplicates',
+        rawValuesRetained: false,
+        compatibilityClaimed: false
+      })
+    )
+  );
+}
+
+function createResourceMapCommitPlanSummary(
+  privateResourceMapRecords,
+  moduleResourceMapOrder,
+  resourceMapConflictBoundary
+) {
   const uniquePrivateRecordKeys = new Set(
     privateResourceMapRecords.map(
       (row) => `${row.recordKind}:${row.resourceKey}`
@@ -9353,6 +9645,12 @@ function createResourceMapCommitPlanSummary(privateResourceMapRecords) {
     scriptRecordCount,
     modulePreloadRecordCount,
     moduleScriptRecordCount,
+    moduleResourceMapOrderRowCount: moduleResourceMapOrder.rowCount,
+    moduleResourceMapDedupeKeyCount: moduleResourceMapOrder.dedupeKeyCount,
+    malformedModuleRowCount:
+      resourceMapConflictBoundary.malformedModuleRowCount,
+    conflictingDuplicateRecordCount:
+      resourceMapConflictBoundary.conflictingDuplicateRecordCount,
     dedupedRecordCount: privateResourceMapRecords.filter(
       (row) => row.wouldInsertIntoHead === false
     ).length,
