@@ -66,6 +66,113 @@ const unmountPrivateRoute = Object.freeze({
     'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics'
   ])
 });
+const privateTestInstanceWrapperRecordSymbol = Symbol.for(
+  'fast.react_test_renderer.private_test_instance_wrapper_record'
+);
+const privateTestInstanceEmptyProps = Object.freeze({});
+const privateTestInstanceTextChildRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-host-text-child',
+  kind: 'ReactTestInstancePrivateTextChildRecord',
+  fiberTag: 'HostText',
+  source: 'TestRendererCommittedFiberTreeInspection::host_text',
+  text: 'hello',
+  publicObject: false
+});
+const privateTestInstanceChildren = Object.freeze([
+  privateTestInstanceTextChildRecord
+]);
+const privateTestInstanceFiberInspectionMetadata = Object.freeze({
+  acceptedWorker: 'worker-235-test-renderer-private-fiber-inspection',
+  acceptedRustCrate: 'fast-react-reconciler',
+  acceptedRustModule: 'private_fiber_inspection',
+  acceptedRustApis: Object.freeze([
+    'inspect_test_renderer_committed_fiber_tree',
+    'TestRendererCommittedFiberTreeInspection::host_component',
+    'TestRendererCommittedFiberTreeInspection::host_text',
+    'TestRendererCommittedFiberNodeInspection::element_type',
+    'TestRendererCommittedFiberNodeInspection::memoized_props'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'committed_fiber_inspection_describes_host_root_component_and_text',
+    'committed_fiber_inspection_rejects_empty_current_host_root'
+  ]),
+  committedShape: Object.freeze(['HostRoot', 'HostComponent', 'HostText']),
+  exposesHostNodes: false,
+  mutatesFibers: false
+});
+const privateTestInstanceTypeQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-type-query',
+  query: 'type',
+  source: 'TestRendererCommittedFiberNodeInspection::element_type',
+  fiberTag: 'HostComponent',
+  value: 'span',
+  deterministic: true,
+  publicQueryMethodAvailable: false
+});
+const privateTestInstancePropsQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-props-query',
+  query: 'props',
+  source: 'TestRendererCommittedFiberNodeInspection::memoized_props',
+  fiberTag: 'HostComponent',
+  value: privateTestInstanceEmptyProps,
+  deterministic: true,
+  publicQueryMethodAvailable: false
+});
+const privateTestInstanceChildrenQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-children-query',
+  query: 'children',
+  source: 'TestRendererCommittedFiberTreeInspection::host_text',
+  fiberTag: 'HostComponent',
+  value: privateTestInstanceChildren,
+  deterministic: true,
+  publicQueryMethodAvailable: false
+});
+const privateTestInstanceRootRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-root-record',
+  kind: 'ReactTestInstancePrivateRecord',
+  source: 'TestRendererCommittedFiberTreeInspection::host_component',
+  fiberTag: 'HostComponent',
+  publicObject: false,
+  type: privateTestInstanceTypeQueryRecord.value,
+  props: privateTestInstancePropsQueryRecord.value,
+  children: privateTestInstanceChildrenQueryRecord.value,
+  queryRecords: Object.freeze({
+    type: privateTestInstanceTypeQueryRecord,
+    props: privateTestInstancePropsQueryRecord,
+    children: privateTestInstanceChildrenQueryRecord
+  })
+});
+const privateTestInstanceRootQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-root-query',
+  query: 'root',
+  status: 'private-record-ready-public-root-blocked',
+  publicSurface: 'create().root',
+  source: 'TestRendererCommittedFiberTreeInspection::host_component',
+  deterministic: true,
+  publicAccessAvailable: false,
+  result: privateTestInstanceRootRecord
+});
+const privateTestInstanceWrapperSkeleton = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-wrapper-skeleton',
+  status: 'private-record-ready-public-test-instance-blocked',
+  entrypoint,
+  deterministic: true,
+  symbol: privateTestInstanceWrapperRecordSymbol.description,
+  publicRootAvailable: false,
+  publicQueryMethodsAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false,
+  fiberInspection: privateTestInstanceFiberInspectionMetadata,
+  rootQueryRecord: privateTestInstanceRootQueryRecord,
+  queryRecords: Object.freeze({
+    root: privateTestInstanceRootQueryRecord,
+    type: privateTestInstanceTypeQueryRecord,
+    props: privateTestInstancePropsQueryRecord,
+    children: privateTestInstanceChildrenQueryRecord
+  })
+});
 const privateRoutes = Object.freeze([
   updatePrivateRoute,
   unmountPrivateRoute
@@ -88,7 +195,8 @@ const createRoutingGate = Object.freeze({
   prerequisites: createRoutingPrerequisites,
   privateRoutes,
   updatePrivateRoute,
-  unmountPrivateRoute
+  unmountPrivateRoute,
+  privateTestInstanceWrapperSkeleton
 });
 const schedulerMockKeys = [
   'log',
@@ -329,6 +437,12 @@ function createPlaceholderRenderer(routingGate) {
         routingGate
       );
     }
+  });
+  Object.defineProperty(renderer, privateTestInstanceWrapperRecordSymbol, {
+    configurable: false,
+    enumerable: false,
+    value: routingGate.privateTestInstanceWrapperSkeleton,
+    writable: false
   });
 
   return renderer;
