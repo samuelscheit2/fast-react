@@ -40,6 +40,15 @@ sequencing belong in `MASTER_PLAN.md`.
   resource/form, controlled-input, and event-delegation conformance checks;
   `npm run check --workspace @fast-react/react-dom`; conflict-marker scanning;
   and `git diff --check`.
+- Workers 631, 641, and 642 were accepted from the active queue. The batch
+  added private Suspense retry render handoff evidence, symbol-private React DOM
+  facade `root.render` fake-DOM execution, and private facade root-render update
+  conformance evidence while keeping public Suspense and React DOM root
+  compatibility blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, focused
+  reconciler Suspense and root-scheduler tests, focused React DOM private root
+  bridge and root-render conformance checks, `npm run check --workspace
+  @fast-react/react-dom`, conflict-marker scanning, and `git diff --check`.
 
 ### Queue 595-624
 

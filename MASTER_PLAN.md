@@ -56,8 +56,8 @@ Top-level cap: 30 workers. Queue 625-654 is active in isolated
 - 641-652: React DOM private facade, controlled input, event, hydration,
   resource, and form execution gates.
 - 653-654: Scheduler mock and postTask private execution routes.
-- Accepted so far: 644 and 647.
-- Remaining active: 625-643, 645-646, and 648-654.
+- Accepted so far: 631, 641-642, 644, and 647.
+- Remaining active: 625-630, 632-640, 643, 645-646, and 648-654.
 
 ## Near-Term Sequencing
 
