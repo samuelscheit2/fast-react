@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   findFastReactSchedulerNativeEntryComparison,
@@ -24,6 +27,14 @@ import {
 } from "../src/scheduler-native-entry-targets.mjs";
 
 const oracle = readCheckedSchedulerNativeEntryOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const schedulerPackageRoot = path.join(repoRoot, "packages", "scheduler");
 
 const DEFAULT_EXPORT_KEYS = [
   "unstable_now",
@@ -61,6 +72,74 @@ const NATIVE_EXPORT_KEYS = [
   "unstable_scheduleCallback",
   "unstable_shouldYield",
   "unstable_wrapCallback"
+];
+
+const MOCK_EXPORT_KEYS = [
+  "log",
+  "reset",
+  "unstable_IdlePriority",
+  "unstable_ImmediatePriority",
+  "unstable_LowPriority",
+  "unstable_NormalPriority",
+  "unstable_Profiling",
+  "unstable_UserBlockingPriority",
+  "unstable_advanceTime",
+  "unstable_cancelCallback",
+  "unstable_clearLog",
+  "unstable_flushAll",
+  "unstable_flushAllWithoutAsserting",
+  "unstable_flushExpired",
+  "unstable_flushNumberOfYields",
+  "unstable_flushUntilNextPaint",
+  "unstable_forceFrameRate",
+  "unstable_getCurrentPriorityLevel",
+  "unstable_hasPendingWork",
+  "unstable_next",
+  "unstable_now",
+  "unstable_requestPaint",
+  "unstable_runWithPriority",
+  "unstable_scheduleCallback",
+  "unstable_setDisableYieldValue",
+  "unstable_shouldYield",
+  "unstable_wrapCallback"
+];
+
+const POST_TASK_EXPORT_KEYS = [
+  "unstable_IdlePriority",
+  "unstable_ImmediatePriority",
+  "unstable_LowPriority",
+  "unstable_NormalPriority",
+  "unstable_Profiling",
+  "unstable_UserBlockingPriority",
+  "unstable_cancelCallback",
+  "unstable_forceFrameRate",
+  "unstable_getCurrentPriorityLevel",
+  "unstable_next",
+  "unstable_now",
+  "unstable_requestPaint",
+  "unstable_runWithPriority",
+  "unstable_scheduleCallback",
+  "unstable_shouldYield",
+  "unstable_wrapCallback"
+];
+
+const PRIVATE_MOCK_DIAGNOSTICS_KEY =
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+const PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL_DESCRIPTION =
+  "fast-react.scheduler.unstable_post_task.priority-diagnostics";
+const PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL = Symbol.for(
+  PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL_DESCRIPTION
+);
+const PRIVATE_RUNTIME_STRING_PATTERN =
+  /(?:^__FAST_REACT_PRIVATE|private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu;
+const MOCK_OR_POST_TASK_FILE_PATTERN =
+  /(?:scheduler-unstable_mock|scheduler-unstable_post_task|unstable_mock\.js|unstable_post_task\.js)/u;
+const MOCK_PRIVATE_DIAGNOSTIC_FUNCTIONS = [
+  "unstable_flushAll",
+  "unstable_flushAllWithoutAsserting",
+  "unstable_flushExpired",
+  "unstable_flushNumberOfYields",
+  "unstable_flushUntilNextPaint"
 ];
 
 const EXPECTED_TARBALL_FILES = [
@@ -267,6 +346,7 @@ test("native wrapper selects NODE_ENV-specific CJS file and export constants", (
     assert.equal(loading.selectedNativeCjsFile, mode.selectedNativeCjsFile);
     assert.ok(loading.afterFiles.includes("node_modules/scheduler/index.native.js"));
     assert.ok(loading.afterFiles.includes(mode.selectedNativeCjsFile));
+    assertNoLoadedMockOrPostTaskFiles(loading.afterFiles, mode.id);
     assert.deepEqual(loading.module.exportKeys, NATIVE_EXPORT_KEYS);
     assert.deepEqual(loading.priorityConstants, fallbackPriorityConstants());
   }
@@ -442,6 +522,226 @@ test("native and default scheduler entrypoints expose the same names with differ
       }
     );
     assertNativeThrowers(relationship.nativePriorityHelpers);
+    assertNoLoadedMockOrPostTaskFiles(relationship.loadedFiles, mode.id);
+  }
+});
+
+test("local scheduler native and root entries do not expose mock or post-task private diagnostics", () => {
+  for (const entrypoint of [
+    {
+      file: "index.js",
+      label: "scheduler/index.js",
+      keys: DEFAULT_EXPORT_KEYS
+    },
+    {
+      file: "cjs/scheduler.development.js",
+      label: "scheduler/cjs/scheduler.development.js",
+      keys: DEFAULT_EXPORT_KEYS
+    },
+    {
+      file: "cjs/scheduler.production.js",
+      label: "scheduler/cjs/scheduler.production.js",
+      keys: DEFAULT_EXPORT_KEYS
+    },
+    {
+      file: "index.native.js",
+      label: "scheduler/index.native.js",
+      keys: NATIVE_EXPORT_KEYS
+    },
+    {
+      file: "cjs/scheduler.native.development.js",
+      label: "scheduler/cjs/scheduler.native.development.js",
+      keys: NATIVE_EXPORT_KEYS
+    },
+    {
+      file: "cjs/scheduler.native.production.js",
+      label: "scheduler/cjs/scheduler.native.production.js",
+      keys: NATIVE_EXPORT_KEYS
+    }
+  ]) {
+    const moduleExports = requireFreshSchedulerFile(entrypoint.file);
+
+    assert.deepEqual(
+      Object.keys(moduleExports),
+      entrypoint.keys,
+      entrypoint.label
+    );
+    assertNoPrivateSchedulerDiagnostics(moduleExports, entrypoint.label);
+  }
+});
+
+test("local scheduler mock diagnostics stay hidden on mock flush helpers only", () => {
+  const SchedulerMock = requireFreshSchedulerFile("unstable_mock.js");
+
+  assert.deepEqual(Object.keys(SchedulerMock), MOCK_EXPORT_KEYS);
+  assertNoPrivateRuntimeKeys(
+    SchedulerMock,
+    "scheduler/unstable_mock module"
+  );
+
+  for (const key of MOCK_EXPORT_KEYS) {
+    if (typeof SchedulerMock[key] !== "function") {
+      continue;
+    }
+
+    const expectedKeys = MOCK_PRIVATE_DIAGNOSTIC_FUNCTIONS.includes(key)
+      ? [PRIVATE_MOCK_DIAGNOSTICS_KEY]
+      : [];
+    assert.deepEqual(
+      privateStringKeys(SchedulerMock[key]),
+      expectedKeys,
+      `scheduler/unstable_mock ${key} private diagnostic keys`
+    );
+    assert.deepEqual(
+      privateSymbolDescriptions(SchedulerMock[key]),
+      [],
+      `scheduler/unstable_mock ${key} private diagnostic symbols`
+    );
+
+    if (expectedKeys.length > 0) {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        SchedulerMock[key],
+        PRIVATE_MOCK_DIAGNOSTICS_KEY
+      );
+      assert.equal(descriptor.enumerable, false, key);
+      assert.equal(descriptor.configurable, false, key);
+      assert.equal(descriptor.writable, false, key);
+      assert.equal(Object.isFrozen(descriptor.value), true, key);
+      assert.equal(
+        descriptor.value.exportName,
+        PRIVATE_MOCK_DIAGNOSTICS_KEY,
+        key
+      );
+      assert.equal(
+        descriptor.value.compatibilityTarget,
+        "scheduler@0.27.0",
+        key
+      );
+      assert.equal(
+        descriptor.value.publicSchedulerTimingCompatibilityClaimed,
+        false,
+        key
+      );
+      assert.equal(
+        descriptor.value.publicReactActCompatibilityClaimed,
+        false,
+        key
+      );
+    }
+  }
+
+  for (const entrypoint of [
+    "index.js",
+    "index.native.js",
+    "cjs/scheduler.native.development.js",
+    "cjs/scheduler.native.production.js"
+  ]) {
+    const moduleExports = requireFreshSchedulerFile(entrypoint);
+    assert.equal(
+      Reflect.ownKeys(moduleExports).includes(PRIVATE_MOCK_DIAGNOSTICS_KEY),
+      false,
+      `${entrypoint} must not expose mock diagnostics on the module`
+    );
+    for (const key of Object.keys(moduleExports)) {
+      if (typeof moduleExports[key] === "function") {
+        assert.equal(
+          Reflect.ownKeys(moduleExports[key]).includes(
+            PRIVATE_MOCK_DIAGNOSTICS_KEY
+          ),
+          false,
+          `${entrypoint} ${key} must not expose mock diagnostics`
+        );
+      }
+    }
+  }
+});
+
+test("local scheduler post-task diagnostics are opt-in and scoped to returned browser task nodes", () => {
+  withPostTaskGlobals({ enableDiagnostics: false }, () => {
+    const PostTaskScheduler = requireFreshSchedulerFile("unstable_post_task.js");
+    assert.deepEqual(Object.keys(PostTaskScheduler), POST_TASK_EXPORT_KEYS);
+    assertNoPrivateSchedulerDiagnostics(
+      PostTaskScheduler,
+      "scheduler/unstable_post_task module without diagnostics"
+    );
+
+    const task = PostTaskScheduler.unstable_scheduleCallback(
+      PostTaskScheduler.unstable_NormalPriority,
+      () => {}
+    );
+    assert.deepEqual(Object.keys(task), ["_controller"]);
+    assert.deepEqual(
+      Reflect.ownKeys(task),
+      ["_controller"],
+      "post-task returned node without diagnostics"
+    );
+  });
+
+  withPostTaskGlobals({ enableDiagnostics: true }, () => {
+    const PostTaskScheduler = requireFreshSchedulerFile("unstable_post_task.js");
+    assert.deepEqual(Object.keys(PostTaskScheduler), POST_TASK_EXPORT_KEYS);
+    assertNoPrivateSchedulerDiagnostics(
+      PostTaskScheduler,
+      "scheduler/unstable_post_task module with diagnostics"
+    );
+
+    const task = PostTaskScheduler.unstable_scheduleCallback(
+      PostTaskScheduler.unstable_UserBlockingPriority,
+      () => {}
+    );
+    assert.deepEqual(Object.keys(task), ["_controller"]);
+    assert.deepEqual(
+      privateSymbolDescriptions(task),
+      [PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL_DESCRIPTION]
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(
+      task,
+      PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL
+    );
+    assert.equal(descriptor.enumerable, false);
+    assert.equal(descriptor.configurable, false);
+    assert.equal(descriptor.writable, false);
+    assert.equal(typeof descriptor.value, "function");
+
+    const diagnostics = descriptor.value();
+    assert.equal(
+      diagnostics.exportName,
+      "__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__"
+    );
+    assert.equal(diagnostics.entrypoint, "scheduler/unstable_post_task");
+    assert.equal(diagnostics.compatibilityTarget, "scheduler@0.27.0");
+    assert.equal(diagnostics.browserPostTaskCompatibilityClaimed, false);
+    assert.equal(diagnostics.publicSchedulerTimingCompatibilityClaimed, false);
+    assert.equal(diagnostics.compatibilityClaimed, false);
+  });
+
+  for (const entrypoint of [
+    "index.js",
+    "index.native.js",
+    "unstable_mock.js",
+    "cjs/scheduler.native.development.js",
+    "cjs/scheduler.native.production.js"
+  ]) {
+    const moduleExports = requireFreshSchedulerFile(entrypoint);
+    assert.equal(
+      Reflect.ownKeys(moduleExports).includes(
+        PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL
+      ),
+      false,
+      `${entrypoint} must not expose post-task diagnostics on the module`
+    );
+    for (const key of Object.keys(moduleExports)) {
+      if (typeof moduleExports[key] === "function") {
+        assert.equal(
+          Reflect.ownKeys(moduleExports[key]).includes(
+            PRIVATE_POST_TASK_DIAGNOSTICS_SYMBOL
+          ),
+          false,
+          `${entrypoint} ${key} must not expose post-task diagnostics`
+        );
+      }
+    }
   }
 });
 
@@ -523,6 +823,148 @@ test("print-scheduler-native-entry-oracle CLI emits the checked-in oracle", () =
 
 function observation(modeId, scenarioId) {
   return findSchedulerNativeEntryObservation(oracle, modeId, scenarioId);
+}
+
+function requireFreshSchedulerFile(file, nodeEnv = "development") {
+  clearSchedulerPackageCache();
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = nodeEnv;
+  try {
+    return require(path.join(schedulerPackageRoot, file));
+  } finally {
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
+}
+
+function clearSchedulerPackageCache() {
+  const schedulerRootWithSeparator = `${schedulerPackageRoot}${path.sep}`;
+  for (const cachePath of Object.keys(require.cache)) {
+    if (cachePath.startsWith(schedulerRootWithSeparator)) {
+      delete require.cache[cachePath];
+    }
+  }
+}
+
+function assertNoLoadedMockOrPostTaskFiles(files, label) {
+  assert.equal(
+    files.some((file) => MOCK_OR_POST_TASK_FILE_PATTERN.test(file)),
+    false,
+    `${label} must not load mock or post-task variant files`
+  );
+}
+
+function assertNoPrivateSchedulerDiagnostics(moduleExports, label) {
+  assertNoPrivateRuntimeKeys(moduleExports, label);
+
+  for (const key of Object.keys(moduleExports)) {
+    if (typeof moduleExports[key] === "function") {
+      assertNoPrivateRuntimeKeys(moduleExports[key], `${label}.${key}`);
+    }
+  }
+}
+
+function assertNoPrivateRuntimeKeys(target, label) {
+  assert.deepEqual(
+    privateStringKeys(target),
+    [],
+    `${label} private diagnostic string properties`
+  );
+  assert.deepEqual(
+    privateSymbolDescriptions(target),
+    [],
+    `${label} private diagnostic symbols`
+  );
+}
+
+function privateStringKeys(target) {
+  return Reflect.ownKeys(target)
+    .filter(
+      (key) =>
+        typeof key === "string" && PRIVATE_RUNTIME_STRING_PATTERN.test(key)
+    )
+    .sort();
+}
+
+function privateSymbolDescriptions(target) {
+  return Reflect.ownKeys(target)
+    .filter((key) => typeof key === "symbol")
+    .map((symbol) => symbol.description)
+    .sort();
+}
+
+function withPostTaskGlobals(options, callback) {
+  const previousGlobals = {
+    TaskController: captureGlobalProperty("TaskController"),
+    diagnosticsFlag: captureGlobalProperty(
+      "__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__"
+    ),
+    scheduler: captureGlobalProperty("scheduler"),
+    window: captureGlobalProperty("window")
+  };
+
+  let signalId = 0;
+  class TaskController {
+    constructor(taskOptions = {}) {
+      this.signal = {
+        id: ++signalId,
+        priority: taskOptions.priority ?? null,
+        aborted: false
+      };
+    }
+
+    abort() {
+      this.signal.aborted = true;
+    }
+  }
+
+  globalThis.window = {
+    performance: {
+      now: () => 100
+    },
+    setTimeout: () => 0
+  };
+  globalThis.scheduler = {
+    postTask() {
+      return Promise.resolve();
+    }
+  };
+  globalThis.TaskController = TaskController;
+  if (options.enableDiagnostics) {
+    globalThis.__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__ = true;
+  } else {
+    delete globalThis.__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__;
+  }
+
+  try {
+    callback();
+  } finally {
+    clearSchedulerPackageCache();
+    restoreGlobalProperty("TaskController", previousGlobals.TaskController);
+    restoreGlobalProperty(
+      "__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__",
+      previousGlobals.diagnosticsFlag
+    );
+    restoreGlobalProperty("scheduler", previousGlobals.scheduler);
+    restoreGlobalProperty("window", previousGlobals.window);
+  }
+}
+
+function captureGlobalProperty(name) {
+  return Object.hasOwn(globalThis, name)
+    ? { exists: true, value: globalThis[name] }
+    : { exists: false, value: undefined };
+}
+
+function restoreGlobalProperty(name, previous) {
+  if (previous.exists) {
+    globalThis[name] = previous.value;
+  } else {
+    delete globalThis[name];
+  }
 }
 
 function descriptorFor(descriptors, key) {
