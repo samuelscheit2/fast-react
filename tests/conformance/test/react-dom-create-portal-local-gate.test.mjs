@@ -345,6 +345,7 @@ test("private portal fake-DOM mount diagnostic admits one explicit HostComponent
   assert.equal(mount.fakeDomCommitApplied, true);
   assert.equal(mount.fakeDomPortalMountDiagnostic, true);
   assert.equal(mount.explicitPortalHostChildMounted, true);
+  assert.equal(mount.componentTreeMetadataAttached, true);
   assert.equal(mount.portalContainerChildrenReplaced, false);
   assert.equal(mount.portalChildReconciliation, false);
   assert.equal(mount.portalMounting, false);
@@ -361,7 +362,8 @@ test("private portal fake-DOM mount diagnostic admits one explicit HostComponent
     mount.acceptedCapabilities.map((capability) => capability.id),
     [
       "portal-explicit-host-component-mount",
-      "portal-explicit-host-text-mount"
+      "portal-explicit-host-text-mount",
+      "portal-component-tree-host-instance-map"
     ]
   );
   assert.deepEqual(
@@ -439,6 +441,167 @@ test("private portal fake-DOM mount diagnostic admits one explicit HostComponent
       }),
     {
       code: resourceFormGate.rootBoundaryInvalidPortalCommitHandoffCode
+    }
+  );
+
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootContainer.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+});
+
+test("private portal child reconciliation admits one fake-DOM HostComponent update while public mounting stays blocked", () => {
+  const document = createPortalGateDocument("portal-child-reconciliation");
+  const rootContainer = createPortalGateElement("DIV", document);
+  const portalContainer = createPortalGateElement("SECTION", document);
+  const portalChild = {
+    props: {
+      children: "portal child"
+    },
+    type: "span"
+  };
+  const updatedPortalChild = {
+    props: {
+      children: "updated portal child",
+      "data-phase": "updated",
+      title: "updated title"
+    },
+    type: "span"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: "portal-boundary",
+    portalChildReconciliationIdPrefix: "portal-child",
+    portalCommitIdPrefix: "portal-commit",
+    portalMountIdPrefix: "portal-mount"
+  });
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const hiddenMount =
+    rootBridge.getPrivateRootPortalFakeDomMountPayload(mount);
+  const updatedPortal = reactDom.createPortal(
+    updatedPortalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const updateRender = bridge.renderContainer(create.handle, updatedPortal);
+  const updateBoundary = bridge.createPortalRootBoundary(updateRender);
+
+  hiddenMount.hostComponentNode.attributeLog = [];
+  hiddenMount.hostTextNode.__mutationLog = [];
+  const diagnostic = bridge.createPortalChildReconciliationDiagnostic(
+    mount,
+    updateBoundary,
+    {
+      explicitChild: updatedPortalChild
+    }
+  );
+  const hiddenDiagnostic =
+    rootBridge.getPrivateRootPortalChildReconciliationDiagnosticPayload(
+      diagnostic
+    );
+
+  assert.equal(
+    diagnostic.kind,
+    "FastReactDomPrivateRootPortalChildReconciliationDiagnosticRecord"
+  );
+  assert.equal(
+    diagnostic.reconciliationStatus,
+    "admitted-private-root-portal-child-reconciliation-diagnostic"
+  );
+  assert.equal(
+    diagnostic.publicMountStatus,
+    "blocked-public-root-portal-mounting"
+  );
+  assert.equal(diagnostic.sourceMountDiagnosticId, "portal-mount:1");
+  assert.equal(diagnostic.sourceBoundaryId, "portal-boundary:2");
+  assert.equal(diagnostic.sourceUpdateId, updateRender.updateId);
+  assert.equal(diagnostic.hostComponentType, "span");
+  assert.equal(diagnostic.previousHostText, "portal child");
+  assert.equal(diagnostic.nextHostText, "updated portal child");
+  assert.equal(diagnostic.latestPropsPublished, true);
+  assert.equal(diagnostic.portalChildReconciliation, true);
+  assert.equal(diagnostic.singleHostComponentUpdate, true);
+  assert.equal(diagnostic.portalHostComponentUpdated, true);
+  assert.equal(diagnostic.portalHostTextUpdated, true);
+  assert.equal(diagnostic.portalContainerChildrenReplaced, false);
+  assert.equal(diagnostic.portalMounting, false);
+  assert.equal(diagnostic.publicPortalMounting, false);
+  assert.equal(diagnostic.preparePortalMount, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.domMutation, true);
+  assert.equal(diagnostic.publicDomMutation, false);
+  assert.equal(diagnostic.listenerInstallation, false);
+  assert.equal(diagnostic.resourceSideEffects, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "portal-accepted-boundary",
+      "portal-fake-dom-host-component-update",
+      "portal-fake-dom-host-text-update",
+      "portal-latest-props-after-mutation"
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities.map((capability) => capability.id),
+    [
+      "portal-public-container-mounting",
+      "portal-generic-child-reconciliation",
+      "portal-container-replacement",
+      "portal-prepare-mount-listeners",
+      "portal-resource-side-effects",
+      "native-execution",
+      "reconciler-execution",
+      "hydration",
+      "events",
+      "compatibility-claims"
+    ]
+  );
+  assert.equal(hiddenDiagnostic.mountRecord, mount);
+  assert.equal(hiddenDiagnostic.boundaryRecord, updateBoundary);
+  assert.equal(hiddenDiagnostic.previousProps, portalChild.props);
+  assert.equal(hiddenDiagnostic.nextProps, updatedPortalChild.props);
+  assert.deepEqual(attributeEntries(hiddenMount.hostComponentNode), [
+    ["data-phase", "updated"],
+    ["title", "updated title"]
+  ]);
+  assert.deepEqual(hiddenMount.hostTextNode.__mutationLog, [
+    {
+      type: "nodeValue",
+      value: "updated portal child"
+    }
+  ]);
+  assert.equal(portalContainer.textContent, "updated portal child");
+  assert.equal(portalContainer.childNodes.length, 1);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
+
+  assert.throws(
+    () =>
+      bridge.createPortalChildReconciliationDiagnostic(mount, updateBoundary, {
+        explicitChild: {
+          props: {
+            children: "not the portal child"
+          },
+          type: "span"
+        }
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_PORTAL_CHILD_RECONCILIATION_RECORD"
     }
   );
 
@@ -596,6 +759,8 @@ function createPortalGateElement(nodeName, ownerDocument) {
 function createPortalGateEventTarget(fields) {
   const target = {
     ...fields,
+    attributeLog: [],
+    attributes: new Map(),
     childNodes: [],
     __mutationLog: [],
     __registrations: [],
@@ -645,6 +810,31 @@ function createPortalGateEventTarget(fields) {
       }
       this.__mutationLog.push({ child, type: "removeChild" });
       return child;
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributes.set(attributeName, stringValue);
+      this.attributeLog.push(["setAttribute", attributeName, stringValue]);
+    },
+    removeAttribute(name) {
+      const attributeName = String(name);
+      const hadAttribute = this.attributes.has(attributeName);
+      this.attributes.delete(attributeName);
+      this.attributeLog.push([
+        "removeAttribute",
+        attributeName,
+        hadAttribute
+      ]);
+    },
+    hasAttribute(name) {
+      return this.attributes.has(String(name));
+    },
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
     }
   };
   Object.defineProperties(target, {
@@ -743,4 +933,10 @@ function detachPortalGateNode(child) {
     }
   }
   child.parentNode = null;
+}
+
+function attributeEntries(node) {
+  return [...node.attributes.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }

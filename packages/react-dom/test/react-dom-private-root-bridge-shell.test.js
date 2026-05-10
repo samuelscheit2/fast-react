@@ -1563,7 +1563,8 @@ test('private portal fake-DOM mount diagnostic appends one explicit HostComponen
     mount.acceptedCapabilities.map((capability) => capability.id),
     [
       'portal-explicit-host-component-mount',
-      'portal-explicit-host-text-mount'
+      'portal-explicit-host-text-mount',
+      'portal-component-tree-host-instance-map'
     ]
   );
   assert.deepEqual(
@@ -1601,6 +1602,7 @@ test('private portal fake-DOM mount diagnostic appends one explicit HostComponen
   assert.equal(mount.fakeDomCommitApplied, true);
   assert.equal(mount.fakeDomPortalMountDiagnostic, true);
   assert.equal(mount.explicitPortalHostChildMounted, true);
+  assert.equal(mount.componentTreeMetadataAttached, true);
   assert.equal(mount.portalContainerChildrenReplaced, false);
   assert.equal(mount.portalChildReconciliation, false);
   assert.equal(mount.portalMounting, false);
@@ -1629,6 +1631,24 @@ test('private portal fake-DOM mount diagnostic appends one explicit HostComponen
   assert.equal(hiddenMount.hostTextNode, hiddenMount.hostComponentNode.firstChild);
   assert.equal(hiddenMount.hostComponentNode.parentNode, portalContainer);
   assert.equal(hiddenMount.hostTextNode.parentNode, hiddenMount.hostComponentNode);
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(
+      hiddenMount.hostInstanceToken
+    ),
+    create.owner
+  );
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(hiddenMount.hostTextToken),
+    create.owner
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(hiddenMount.hostComponentNode),
+    portalChild.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(hiddenMount.hostTextNode),
+    null
+  );
   assert.equal(hiddenMount.hostComponentNode.textContent, 'portal child');
   assert.equal(hiddenMount.hostTextNode.nodeValue, 'portal child');
   assert.equal(hiddenMount.portalContainer, portalContainer);
@@ -1737,6 +1757,290 @@ test('private portal fake-DOM mount diagnostic appends one explicit HostComponen
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
   assert.equal(rootContainer.__registrations.length, 0);
   assert.equal(document.__registrations.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+});
+
+test('private portal child reconciliation diagnostic updates one mounted fake-DOM HostComponent', () => {
+  const document = createDocument('private-portal-child-reconciliation');
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  const portalChild = {
+    props: {
+      children: 'portal child'
+    },
+    type: 'span'
+  };
+  const updatedPortalChild = {
+    props: {
+      children: 'updated portal child',
+      'data-phase': 'updated',
+      title: 'updated title'
+    },
+    type: 'span'
+  };
+  const replacementPortalChild = {
+    props: {
+      children: 'replacement portal child'
+    },
+    type: 'strong'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: 'portal-boundary',
+    portalChildReconciliationIdPrefix: 'portal-child',
+    portalCommitIdPrefix: 'portal-commit',
+    portalMountIdPrefix: 'portal-mount'
+  });
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    'portal-key'
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const hiddenMount =
+    rootBridge.getPrivateRootPortalFakeDomMountPayload(mount);
+
+  assert.throws(
+    () =>
+      bridge.createPortalChildReconciliationDiagnostic(mount, boundary, {
+        explicitChild: portalChild
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_PORTAL_CHILD_RECONCILIATION_RECORD'
+    }
+  );
+  assert.throws(
+    () =>
+      bridge.createPortalChildReconciliationDiagnostic(mount, boundary),
+    {
+      code: 'FAST_REACT_DOM_INVALID_PORTAL_CHILD_RECONCILIATION_RECORD'
+    }
+  );
+  const replacementPortal = reactDom.createPortal(
+    replacementPortalChild,
+    portalContainer,
+    'portal-key'
+  );
+  const replacementRender = bridge.renderContainer(
+    create.handle,
+    replacementPortal
+  );
+  const replacementBoundary =
+    bridge.createPortalRootBoundary(replacementRender);
+  assert.throws(
+    () =>
+      bridge.createPortalChildReconciliationDiagnostic(
+        mount,
+        replacementBoundary,
+        {
+          explicitChild: replacementPortalChild
+        }
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_PORTAL_CHILD_RECONCILIATION_RECORD'
+    }
+  );
+
+  const updatedPortal = reactDom.createPortal(
+    updatedPortalChild,
+    portalContainer,
+    'portal-key'
+  );
+  const updateRender = bridge.renderContainer(create.handle, updatedPortal);
+  const updateBoundary = bridge.createPortalRootBoundary(updateRender);
+  assert.throws(
+    () =>
+      otherBridge.createPortalChildReconciliationDiagnostic(
+        mount,
+        updateBoundary,
+        {
+          explicitChild: updatedPortalChild
+        }
+      ),
+    {
+      code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+    }
+  );
+  hiddenMount.hostComponentNode.attributeLog = [];
+  hiddenMount.hostTextNode.writeLog = [];
+
+  const diagnostic = bridge.createPortalChildReconciliationDiagnostic(
+    mount,
+    updateBoundary,
+    {
+      explicitChild: updatedPortalChild
+    }
+  );
+  const hiddenDiagnostic =
+    rootBridge.getPrivateRootPortalChildReconciliationDiagnosticPayload(
+      diagnostic
+    );
+
+  assert.equal(
+    diagnostic.$$typeof,
+    rootBridge.privateRootPortalChildReconciliationDiagnosticRecordType
+  );
+  assert.equal(
+    diagnostic.kind,
+    'FastReactDomPrivateRootPortalChildReconciliationDiagnosticRecord'
+  );
+  assert.equal(diagnostic.operation, 'portal-child-reconciliation-diagnostic');
+  assert.equal(diagnostic.diagnosticId, 'portal-child:1');
+  assert.equal(
+    diagnostic.reconciliationStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED
+  );
+  assert.equal(
+    diagnostic.publicMountStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED
+  );
+  assert.equal(diagnostic.sourceMountDiagnosticId, mount.mountDiagnosticId);
+  assert.equal(diagnostic.sourceBoundaryId, updateBoundary.boundaryId);
+  assert.equal(diagnostic.sourceUpdateId, updateRender.updateId);
+  assert.deepEqual(diagnostic.hostFiberPath, [
+    'HostRoot',
+    'HostPortal',
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(diagnostic.hostComponentType, 'span');
+  assert.equal(diagnostic.previousHostText, 'portal child');
+  assert.equal(diagnostic.nextHostText, 'updated portal child');
+  assert.deepEqual(diagnostic.propertyMutation, {
+    handoffKind: domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+    latestPropsCommitRecordKind: domHost.LATEST_PROPS_COMMIT_RECORD,
+    latestPropsCommitRecordStatus: 'safe-for-latest-props',
+    mutationRecordCount: 3,
+    payloadCount: 3,
+    status: 'mutated'
+  });
+  assert.deepEqual(diagnostic.textMutation, {
+    newTextLength: 20,
+    oldTextLength: 12,
+    status: 'mutated'
+  });
+  assert.equal(diagnostic.latestPropsPublished, true);
+  assert.equal(
+    diagnostic.latestPropsPublishOrder,
+    'after-portal-property-and-text-mutation'
+  );
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'portal-accepted-boundary',
+      'portal-fake-dom-host-component-update',
+      'portal-fake-dom-host-text-update',
+      'portal-latest-props-after-mutation'
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities.map((capability) => capability.id),
+    [
+      'portal-public-container-mounting',
+      'portal-generic-child-reconciliation',
+      'portal-container-replacement',
+      'portal-prepare-mount-listeners',
+      'portal-resource-side-effects',
+      'native-execution',
+      'reconciler-execution',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(diagnostic.fakeDomCommitApplied, true);
+  assert.equal(diagnostic.fakeDomPortalMountDiagnostic, true);
+  assert.equal(diagnostic.portalChildReconciliation, true);
+  assert.equal(diagnostic.singleHostComponentUpdate, true);
+  assert.equal(diagnostic.portalHostComponentUpdated, true);
+  assert.equal(diagnostic.portalHostTextUpdated, true);
+  assert.equal(diagnostic.portalContainerChildrenReplaced, false);
+  assert.equal(diagnostic.portalMounting, false);
+  assert.equal(diagnostic.publicPortalMounting, false);
+  assert.equal(diagnostic.preparePortalMount, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.domMutation, true);
+  assert.equal(diagnostic.publicDomMutation, false);
+  assert.equal(diagnostic.listenerInstallation, false);
+  assert.equal(diagnostic.resourceSideEffects, false);
+  assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(diagnostic.listenerSideEffects.preparePortalMount, false);
+  assert.equal(diagnostic.listenerSideEffects.listenerInstallation, false);
+  assert.equal(diagnostic.listenerSideEffects.hasPortalListeningMarker, false);
+
+  assert.equal(
+    rootBridge.isPrivateRootPortalChildReconciliationDiagnosticRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPortalChildReconciliationDiagnosticRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPortalChildReconciliationDiagnosticPayload({}),
+    null
+  );
+  assert.equal(hiddenDiagnostic.mountRecord, mount);
+  assert.equal(hiddenDiagnostic.boundaryRecord, updateBoundary);
+  assert.equal(hiddenDiagnostic.previousChild, portalChild);
+  assert.equal(hiddenDiagnostic.nextChild, updatedPortalChild);
+  assert.equal(hiddenDiagnostic.previousProps, portalChild.props);
+  assert.equal(hiddenDiagnostic.nextProps, updatedPortalChild.props);
+  assert.equal(hiddenDiagnostic.hostComponentNode, hiddenMount.hostComponentNode);
+  assert.equal(hiddenDiagnostic.hostTextNode, hiddenMount.hostTextNode);
+  assert.equal(hiddenDiagnostic.latestPropsBeforeCommit, portalChild.props);
+  assert.equal(
+    hiddenDiagnostic.latestPropsAfterCommit,
+    updatedPortalChild.props
+  );
+  assert.deepEqual(hiddenDiagnostic.textUpdate, {
+    newText: 'updated portal child',
+    oldText: 'portal child'
+  });
+
+  assert.deepEqual(attributeEntries(hiddenMount.hostComponentNode), [
+    ['data-phase', 'updated'],
+    ['title', 'updated title']
+  ]);
+  assert.deepEqual(hiddenMount.hostComponentNode.attributeLog, [
+    ['setAttribute', 'data-phase', 'updated'],
+    ['setAttribute', 'title', 'updated title']
+  ]);
+  assert.deepEqual(hiddenMount.hostTextNode.writeLog, [
+    ['nodeValue', 'updated portal child']
+  ]);
+  assert.equal(portalContainer.childNodes.length, 1);
+  assert.equal(portalContainer.firstChild, hiddenMount.hostComponentNode);
+  assert.equal(portalContainer.textContent, 'updated portal child');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(hiddenMount.hostComponentNode),
+    updatedPortalChild.props
+  );
+  assert.equal(rootContainer.__mutationLog.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
+
+  const serialized = JSON.stringify(diagnostic);
+  assert.equal(serialized.includes('updated title'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(rootContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(rootContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
   assert.equal(portalContainer.__registrations.length, 0);
 });
 
