@@ -5856,6 +5856,170 @@ test('private react-dom/client facade host-output diagnostic renders through bri
   });
 });
 
+test('private react-dom/client facade root.render accepts unkeyed Fragment array host children through fake DOM', () => {
+  const document = createDocument('private-client-facade-fragment-array');
+  const container = createElement('DIV', document);
+  const firstElement = {
+    props: {
+      children: 'fragment first',
+      id: 'fragment-first'
+    },
+    type: 'header'
+  };
+  const secondElement = {
+    props: {
+      children: 'fragment second',
+      title: 'Fragment second'
+    },
+    type: 'main'
+  };
+  const element = {
+    props: {
+      children: [firstElement, secondElement]
+    },
+    type: Symbol.for('react.fragment')
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: 'facade-fragment-admission',
+    initialHostOutputIdPrefix: 'facade-fragment-initial',
+    publicFacadeHostOutputRenderIdPrefix: 'facade-fragment-render',
+    requestIdPrefix: 'facade-fragment-request',
+    rootIdPrefix: 'facade-fragment-root',
+    sideEffectIdPrefix: 'facade-fragment-side-effect',
+    updateIdPrefix: 'facade-fragment-update'
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+
+  const diagnostic = root.render(element);
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(diagnostic);
+  const handoff = hidden.hostOutputHandoff;
+  const handoffPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const [firstNode, secondNode] = handoffPayload.hostNodes;
+  const [firstText, secondText] = handoffPayload.textNodes;
+  const rootWorkLoopRecord = diagnostic.rootWorkLoopFinishedWorkRecord;
+
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(diagnostic.hostType, 'Fragment');
+  assert.equal(diagnostic.hostOutputShape, 'fragment');
+  assert.equal(diagnostic.hostComponentCount, 2);
+  assert.equal(diagnostic.hostTextCount, 2);
+  assert.equal(diagnostic.containerChildCount, 2);
+  assert.equal(diagnostic.hostChildCount, 2);
+  assert.equal(diagnostic.textContent, 'fragment firstfragment second');
+  assert.deepEqual(diagnostic.childTags, [
+    'Fragment',
+    'HostComponent',
+    'HostText',
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'public-facade-create-root-record',
+      'public-facade-root-render-record',
+      'root-marker-setup-cleanup',
+      'root-listener-setup-cleanup',
+      'create-render-admission',
+      'fake-dom-host-output-mutation',
+      'component-tree-host-instance-map',
+      'latest-props-publication',
+      'fake-dom-fragment-array-host-children',
+      'root-work-loop-finished-work-handoff'
+    ]
+  );
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+
+  assert.equal(handoff.hostOutputShape, 'fragment');
+  assert.equal(handoff.hostComponentCount, 2);
+  assert.equal(handoff.hostTextCount, 2);
+  assert.equal(handoffPayload.hostChildren.length, 2);
+  assert.equal(handoffPayload.hostNodes.length, 2);
+  assert.equal(handoffPayload.textNodes.length, 2);
+  assert.equal(handoffPayload.hostNode, firstNode);
+  assert.equal(handoffPayload.textNode, firstText);
+  assert.equal(rootWorkLoopRecord.rootChildTag, 'Fragment');
+  assert.equal(rootWorkLoopRecord.completedChildTag, 'HostComponent');
+  assert.equal(rootWorkLoopRecord.hostTextChildTag, 'HostText');
+  assert.deepEqual(rootWorkLoopRecord.childTags, diagnostic.childTags);
+  assert.equal(rootWorkLoopRecord.hostOutputShape, 'fragment');
+  assert.equal(rootWorkLoopRecord.hostComponentCount, 2);
+  assert.equal(rootWorkLoopRecord.hostTextCount, 2);
+  assert.equal(rootWorkLoopRecord.placementTag, 'Fragment');
+  assert.equal(
+    rootWorkLoopRecord.placementApplyKind,
+    'append-fragment-children-to-container'
+  );
+  assert.equal(rootWorkLoopRecord.publicRootRenderingBlocked, true);
+  assert.equal(rootWorkLoopRecord.publicRootExecution, false);
+  assert.equal(rootWorkLoopRecord.compatibilityClaimed, false);
+
+  assert.deepEqual(adapter.getRootRequestRecords(root), [
+    create,
+    hidden.renderRecord
+  ]);
+  assert.equal(container.childNodes.length, 2);
+  assert.equal(container.childNodes[0], firstNode);
+  assert.equal(container.childNodes[1], secondNode);
+  assert.equal(container.textContent, 'fragment firstfragment second');
+  assert.equal(firstNode.nodeName, 'HEADER');
+  assert.equal(firstNode.firstChild, firstText);
+  assert.equal(secondNode.nodeName, 'MAIN');
+  assert.equal(secondNode.firstChild, secondText);
+  assert.deepEqual(attributeEntries(firstNode), [['id', 'fragment-first']]);
+  assert.deepEqual(attributeEntries(secondNode), [
+    ['title', 'Fragment second']
+  ]);
+  assert.equal(componentTree.getRootOwnerFromNode(firstNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(secondNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(firstText), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(secondText), create.owner);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(firstNode),
+    firstElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(secondNode),
+    secondElement.props
+  );
+
+  const cleanup = hidden.bridge.cleanupInitialRenderHostOutput(handoff);
+  assert.equal(
+    cleanup.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(cleanup.removedRootChildCount, 2);
+  assert.equal(cleanup.detachedHostInstanceCount, 4);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(componentTree.getRootOwnerFromNode(firstNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(secondNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(firstText), null);
+  assert.equal(componentTree.getRootOwnerFromNode(secondText), null);
+
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-client-facade-fragment-array-public')
+  );
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+});
+
 test('private react-dom/client facade render native handoff consumes facade, work-loop, and fake-DOM metadata', () => {
   const document = createDocument('private-client-facade-render-native-handoff');
   const container = createElement('DIV', document);

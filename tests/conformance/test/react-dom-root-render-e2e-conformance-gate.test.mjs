@@ -119,6 +119,120 @@ test("root render E2E gate accepts private facade root.render fake-DOM execution
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
 
+test("root render E2E gate accepts private facade root.render unkeyed fragment array fake-DOM execution below public compatibility", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputRenderIdPrefix: "conformance-fragment-render"
+  });
+  const root = adapter.createRoot(container);
+  const firstElement = {
+    props: {
+      children: "conformance fragment first",
+      id: "conformance-fragment-first"
+    },
+    type: "header"
+  };
+  const secondElement = {
+    props: {
+      children: "conformance fragment second",
+      title: "Conformance fragment second"
+    },
+    type: "main"
+  };
+  const element = {
+    props: {
+      children: [firstElement, secondElement]
+    },
+    type: Symbol.for("react.fragment")
+  };
+  const diagnostic = root.render(element);
+  const payload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(diagnostic);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      payload.hostOutputHandoff
+    );
+
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(diagnostic.hostOutputShape, "fragment");
+  assert.equal(diagnostic.hostType, "Fragment");
+  assert.equal(diagnostic.hostComponentCount, 2);
+  assert.equal(diagnostic.hostTextCount, 2);
+  assert.equal(diagnostic.containerChildCount, 2);
+  assert.deepEqual(diagnostic.childTags, [
+    "Fragment",
+    "HostComponent",
+    "HostText",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(diagnostic.rootWorkLoopFinishedWorkRootChildTag, "Fragment");
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkHostTextChildTag,
+    "HostText"
+  );
+  assert.equal(diagnostic.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.fakeDomMutation, true);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-root-render-record",
+      "root-marker-setup-cleanup",
+      "root-listener-setup-cleanup",
+      "create-render-admission",
+      "fake-dom-host-output-mutation",
+      "component-tree-host-instance-map",
+      "latest-props-publication",
+      "fake-dom-fragment-array-host-children",
+      "root-work-loop-finished-work-handoff"
+    ]
+  );
+  assert.equal(container.childNodes.length, 2);
+  assert.equal(container.childNodes[0].nodeName, "HEADER");
+  assert.equal(container.childNodes[1].nodeName, "MAIN");
+  assert.equal(
+    container.textContent,
+    "conformance fragment firstconformance fragment second"
+  );
+  assert.deepEqual(attributeEntries(container.childNodes[0]), [
+    ["id", "conformance-fragment-first"]
+  ]);
+  assert.deepEqual(attributeEntries(container.childNodes[1]), [
+    ["title", "Conformance fragment second"]
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(hostOutputPayload.hostNodes[0]),
+    firstElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(hostOutputPayload.hostNodes[1]),
+    secondElement.props
+  );
+  assert.deepEqual(
+    adapter.getRootRequestRecords(root).map((record) => record.requestType),
+    ["createRoot", "root.render"]
+  );
+  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
+    code: "FAST_REACT_UNIMPLEMENTED"
+  });
+
+  payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
+});
+
 test("private facade root.render update mutates one fake DOM property and text path below public compatibility", () => {
   const document = createDocument();
   const container = document.createElement("div");
