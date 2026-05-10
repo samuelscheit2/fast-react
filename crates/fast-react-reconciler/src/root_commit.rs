@@ -88,6 +88,27 @@ pub enum RootCommitError {
         expected: UpdateQueueHandle,
         actual: UpdateQueueHandle,
     },
+    DomRefCallbackGateActionMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: &'static str,
+        actual: &'static str,
+    },
+    DomRefCallbackGateTokenScopeMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        action: &'static str,
+        expected_phase: HostFiberTokenPhase,
+        actual_phase: HostFiberTokenPhase,
+        expected_target: HostFiberTokenTarget,
+        actual_target: HostFiberTokenTarget,
+    },
+    DomRefCallbackGateDetachReasonMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        action: &'static str,
+        detach_reason: Option<&'static str>,
+    },
     RemainingLanesMismatch {
         root: FiberRootId,
         expected: Lanes,
@@ -227,6 +248,51 @@ impl Display for RootCommitError {
                 actual.raw(),
                 expected.raw()
             ),
+            Self::DomRefCallbackGateActionMismatch {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} DOM ref callback gate expected {} ref metadata for fiber slot {}, found {}",
+                root.raw(),
+                expected,
+                fiber.slot().get(),
+                actual
+            ),
+            Self::DomRefCallbackGateTokenScopeMismatch {
+                root,
+                fiber,
+                action,
+                expected_phase,
+                actual_phase,
+                expected_target,
+                actual_target,
+            } => write!(
+                formatter,
+                "root {} DOM ref callback gate {} metadata for fiber slot {} requires {} {} token scope, found {} {}",
+                root.raw(),
+                action,
+                fiber.slot().get(),
+                expected_phase,
+                expected_target,
+                actual_phase,
+                actual_target
+            ),
+            Self::DomRefCallbackGateDetachReasonMismatch {
+                root,
+                fiber,
+                action,
+                detach_reason,
+            } => write!(
+                formatter,
+                "root {} DOM ref callback gate {} metadata for fiber slot {} has invalid detach reason {:?}",
+                root.raw(),
+                action,
+                fiber.slot().get(),
+                detach_reason
+            ),
             Self::RemainingLanesMismatch {
                 root,
                 expected,
@@ -263,6 +329,9 @@ impl Error for RootCommitError {
             | Self::RenderPhaseNotCompleted { .. }
             | Self::MemoizedStateMismatch { .. }
             | Self::UpdateQueueMismatch { .. }
+            | Self::DomRefCallbackGateActionMismatch { .. }
+            | Self::DomRefCallbackGateTokenScopeMismatch { .. }
+            | Self::DomRefCallbackGateDetachReasonMismatch { .. }
             | Self::RemainingLanesMismatch { .. } => None,
         }
     }
@@ -435,6 +504,161 @@ impl HostRootRefCommitSnapshot {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootDomRefCallbackCommitGateSnapshot {
+    records: Vec<HostRootDomRefCallbackCommitGateRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private DOM ref callback gate records are reserved for future DOM commit workers"
+)]
+impl HostRootDomRefCallbackCommitGateSnapshot {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootDomRefCallbackCommitGateRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_refs_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn object_refs_mutated(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn layout_effects_run(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_instances_exposed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_ref_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct HostRootDomRefCallbackCommitGateRecord {
+    sequence: usize,
+    root: FiberRootId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    token: HostFiberTokenId,
+    token_phase: HostFiberTokenPhase,
+    token_target: HostFiberTokenTarget,
+    action: HostRootRefCommitAction,
+    detach_reason: Option<HostRootRefDetachReason>,
+    status: HostRootDomRefCallbackCommitGateStatus,
+    blockers: [HostRootDomRefCallbackCommitGateBlocker; 5],
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private DOM ref callback gate records are reserved for future DOM commit workers"
+)]
+impl HostRootDomRefCallbackCommitGateRecord {
+    #[must_use]
+    pub(crate) const fn sequence(&self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(&self) -> RefHandle {
+        self.ref_handle
+    }
+
+    #[must_use]
+    pub(crate) const fn token(&self) -> HostFiberTokenId {
+        self.token
+    }
+
+    #[must_use]
+    pub(crate) const fn token_phase(&self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn token_target(&self) -> HostFiberTokenTarget {
+        self.token_target
+    }
+
+    #[must_use]
+    pub(crate) const fn action(&self) -> HostRootRefCommitAction {
+        self.action
+    }
+
+    #[must_use]
+    pub(crate) const fn detach_reason(&self) -> Option<HostRootRefDetachReason> {
+        self.detach_reason
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> HostRootDomRefCallbackCommitGateStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(&self) -> &[HostRootDomRefCallbackCommitGateBlocker; 5] {
+        &self.blockers
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootDomRefCallbackCommitGateStatus {
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootDomRefCallbackCommitGateBlocker {
+    CallbackRefInvocation,
+    ObjectRefMutation,
+    LayoutEffectExecution,
+    PublicInstanceExposure,
+    ReactDomRefCompatibilityClaim,
+}
+
+const DOM_REF_CALLBACK_GATE_BLOCKERS: [HostRootDomRefCallbackCommitGateBlocker; 5] = [
+    HostRootDomRefCallbackCommitGateBlocker::CallbackRefInvocation,
+    HostRootDomRefCallbackCommitGateBlocker::ObjectRefMutation,
+    HostRootDomRefCallbackCommitGateBlocker::LayoutEffectExecution,
+    HostRootDomRefCallbackCommitGateBlocker::PublicInstanceExposure,
+    HostRootDomRefCallbackCommitGateBlocker::ReactDomRefCompatibilityClaim,
+];
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct PendingRefCommitSnapshot {
     detach: Vec<PendingRefCommitRecord>,
     attach: Vec<PendingRefCommitRecord>,
@@ -528,6 +752,7 @@ pub struct HostRootCommitRecord {
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
     deletion_lists: Vec<HostRootDeletionListRecord>,
     ref_commit_metadata: HostRootRefCommitSnapshot,
+    dom_ref_callback_commit_gate: HostRootDomRefCallbackCommitGateSnapshot,
 }
 
 impl HostRootCommitRecord {
@@ -583,6 +808,15 @@ impl HostRootCommitRecord {
     )]
     pub(crate) fn ref_commit_metadata(&self) -> &HostRootRefCommitSnapshot {
         &self.ref_commit_metadata
+    }
+
+    #[must_use]
+    #[allow(
+        dead_code,
+        reason = "crate-private DOM ref callback gate records are reserved for future DOM commit workers"
+    )]
+    pub(crate) fn dom_ref_callback_commit_gate(&self) -> &HostRootDomRefCallbackCommitGateSnapshot {
+        &self.dom_ref_callback_commit_gate
     }
 
     #[allow(
@@ -650,6 +884,9 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let root_update_callbacks = store
         .update_queues_mut()
         .take_root_update_callback_records(work_in_progress_update_queue)?;
+    let ref_commit_metadata = materialize_ref_commit_metadata(store, pending_ref_commit_metadata)?;
+    let dom_ref_callback_commit_gate =
+        materialize_dom_ref_callback_commit_gate(store, &ref_commit_metadata)?;
 
     Ok(HostRootCommitRecord {
         root: root_id,
@@ -662,7 +899,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         root_update_callbacks,
         pending_passive_handoff,
         deletion_lists,
-        ref_commit_metadata: materialize_ref_commit_metadata(store, pending_ref_commit_metadata)?,
+        ref_commit_metadata,
+        dom_ref_callback_commit_gate,
     })
 }
 
@@ -840,6 +1078,122 @@ fn issue_ref_commit_record<H: HostTypes>(
         action: pending.action,
         detach_reason: pending.detach_reason,
     })
+}
+
+fn materialize_dom_ref_callback_commit_gate<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    metadata: &HostRootRefCommitSnapshot,
+) -> Result<HostRootDomRefCallbackCommitGateSnapshot, RootCommitError> {
+    let mut gate = HostRootDomRefCallbackCommitGateSnapshot::default();
+    let mut sequence = 0;
+
+    for record in metadata.detach() {
+        gate.records.push(dom_ref_callback_commit_gate_record(
+            store,
+            sequence,
+            record,
+            HostRootRefCommitAction::Detach,
+        )?);
+        sequence += 1;
+    }
+    for record in metadata.attach() {
+        gate.records.push(dom_ref_callback_commit_gate_record(
+            store,
+            sequence,
+            record,
+            HostRootRefCommitAction::Attach,
+        )?);
+        sequence += 1;
+    }
+
+    Ok(gate)
+}
+
+fn dom_ref_callback_commit_gate_record<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    sequence: usize,
+    record: &HostRootRefCommitRecord,
+    expected_action: HostRootRefCommitAction,
+) -> Result<HostRootDomRefCallbackCommitGateRecord, RootCommitError> {
+    if record.action() != expected_action {
+        return Err(RootCommitError::DomRefCallbackGateActionMismatch {
+            root: record.root(),
+            fiber: record.fiber(),
+            expected: ref_commit_action_label(expected_action),
+            actual: ref_commit_action_label(record.action()),
+        });
+    }
+
+    let expected_phase = dom_ref_callback_gate_token_phase(record.action());
+    let expected_target = HostFiberTokenTarget::Instance;
+    if record.token_phase() != expected_phase || record.token_target() != expected_target {
+        return Err(RootCommitError::DomRefCallbackGateTokenScopeMismatch {
+            root: record.root(),
+            fiber: record.fiber(),
+            action: ref_commit_action_label(record.action()),
+            expected_phase,
+            actual_phase: record.token_phase(),
+            expected_target,
+            actual_target: record.token_target(),
+        });
+    }
+
+    let detach_reason_is_valid = match record.action() {
+        HostRootRefCommitAction::Detach => record.detach_reason().is_some(),
+        HostRootRefCommitAction::Attach => record.detach_reason().is_none(),
+    };
+    if !detach_reason_is_valid {
+        return Err(RootCommitError::DomRefCallbackGateDetachReasonMismatch {
+            root: record.root(),
+            fiber: record.fiber(),
+            action: ref_commit_action_label(record.action()),
+            detach_reason: record.detach_reason().map(ref_detach_reason_label),
+        });
+    }
+
+    store.host_tokens().validate(
+        record.token(),
+        record.root(),
+        record.fiber(),
+        expected_phase,
+        expected_target,
+    )?;
+
+    Ok(HostRootDomRefCallbackCommitGateRecord {
+        sequence,
+        root: record.root(),
+        fiber: record.fiber(),
+        state_node: record.state_node(),
+        ref_handle: record.ref_handle(),
+        token: record.token(),
+        token_phase: record.token_phase(),
+        token_target: record.token_target(),
+        action: record.action(),
+        detach_reason: record.detach_reason(),
+        status: HostRootDomRefCallbackCommitGateStatus::Blocked,
+        blockers: DOM_REF_CALLBACK_GATE_BLOCKERS,
+    })
+}
+
+const fn dom_ref_callback_gate_token_phase(action: HostRootRefCommitAction) -> HostFiberTokenPhase {
+    match action {
+        HostRootRefCommitAction::Detach => HostFiberTokenPhase::Deletion,
+        HostRootRefCommitAction::Attach => HostFiberTokenPhase::Commit,
+    }
+}
+
+const fn ref_commit_action_label(action: HostRootRefCommitAction) -> &'static str {
+    match action {
+        HostRootRefCommitAction::Detach => "detach",
+        HostRootRefCommitAction::Attach => "attach",
+    }
+}
+
+const fn ref_detach_reason_label(reason: HostRootRefDetachReason) -> &'static str {
+    match reason {
+        HostRootRefDetachReason::RefChanged => "ref-changed",
+        HostRootRefDetachReason::Deleted => "deleted",
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1304,6 +1658,7 @@ mod tests {
         DeletionListId, FiberFlags, FiberMode, FiberTag, Lane, Lanes, PropsHandle, RefHandle,
         StateNodeHandle,
     };
+    use fast_react_host_config::HostFiberTokenViolation;
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -1460,6 +1815,8 @@ mod tests {
         assert!(commit.mutation_log().is_empty());
         assert!(commit.deletion_lists().is_empty());
         assert!(commit.ref_commit_metadata().is_empty());
+        assert!(commit.dom_ref_callback_commit_gate().is_empty());
+        assert_dom_ref_callback_gate_is_inert(commit.dom_ref_callback_commit_gate());
         assert!(!commit.has_remaining_work());
         assert_eq!(new_current, render.work_in_progress());
         assert_eq!(host_root_element(&store, new_current), element);
@@ -1742,6 +2099,7 @@ mod tests {
         assert!(pending_passive.passive_mounts().is_empty());
         assert!(commit.root_update_callbacks().is_empty());
         assert!(commit.ref_commit_metadata().is_empty());
+        assert!(commit.dom_ref_callback_commit_gate().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -1767,6 +2125,7 @@ mod tests {
 
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let refs = commit.ref_commit_metadata();
+        let gate = commit.dom_ref_callback_commit_gate();
 
         assert!(refs.detach().is_empty());
         assert_eq!(refs.attach().len(), 1);
@@ -1781,6 +2140,19 @@ mod tests {
         assert_eq!(attach.token_phase(), HostFiberTokenPhase::Commit);
         assert_eq!(attach.token_target(), HostFiberTokenTarget::Instance);
         assert_active_ref_token(&store, &attach);
+        assert_dom_ref_callback_gate_is_inert(gate);
+        assert_eq!(gate.len(), 1);
+        let gate_record = gate.records()[0];
+        assert_eq!(gate_record.sequence(), 0);
+        assert_eq!(gate_record.root(), root_id);
+        assert_eq!(gate_record.fiber(), child);
+        assert_eq!(gate_record.state_node(), state_node);
+        assert_eq!(gate_record.ref_handle(), ref_handle);
+        assert_eq!(gate_record.token(), attach.token());
+        assert_eq!(gate_record.token_phase(), HostFiberTokenPhase::Commit);
+        assert_eq!(gate_record.token_target(), HostFiberTokenTarget::Instance);
+        assert_eq!(gate_record.action(), HostRootRefCommitAction::Attach);
+        assert_eq!(gate_record.detach_reason(), None);
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.work_in_progress()
@@ -1820,6 +2192,7 @@ mod tests {
 
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let refs = commit.ref_commit_metadata();
+        let gate = commit.dom_ref_callback_commit_gate();
 
         assert_eq!(refs.detach().len(), 1);
         assert_eq!(refs.attach().len(), 1);
@@ -1843,6 +2216,21 @@ mod tests {
         assert_eq!(attach.action(), HostRootRefCommitAction::Attach);
         assert_eq!(attach.token_phase(), HostFiberTokenPhase::Commit);
         assert_active_ref_token(&store, &attach);
+        assert_dom_ref_callback_gate_is_inert(gate);
+        assert_eq!(gate.len(), 2);
+        assert_eq!(gate.records()[0].sequence(), 0);
+        assert_eq!(gate.records()[0].fiber(), current_child);
+        assert_eq!(gate.records()[0].token(), detach.token());
+        assert_eq!(gate.records()[0].action(), HostRootRefCommitAction::Detach);
+        assert_eq!(
+            gate.records()[0].detach_reason(),
+            Some(HostRootRefDetachReason::RefChanged)
+        );
+        assert_eq!(gate.records()[1].sequence(), 1);
+        assert_eq!(gate.records()[1].fiber(), finished_child);
+        assert_eq!(gate.records()[1].token(), attach.token());
+        assert_eq!(gate.records()[1].action(), HostRootRefCommitAction::Attach);
+        assert_eq!(gate.records()[1].detach_reason(), None);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -1874,6 +2262,7 @@ mod tests {
 
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let refs = commit.ref_commit_metadata();
+        let gate = commit.dom_ref_callback_commit_gate();
 
         assert_eq!(refs.attach().len(), 0);
         assert_eq!(refs.detach().len(), 2);
@@ -1898,6 +2287,24 @@ mod tests {
             assert_eq!(record.token_target(), HostFiberTokenTarget::Instance);
             assert_active_ref_token(&store, record);
         }
+        assert_dom_ref_callback_gate_is_inert(gate);
+        assert_eq!(gate.len(), 2);
+        assert_eq!(gate.records()[0].sequence(), 0);
+        assert_eq!(gate.records()[0].fiber(), deleted_parent);
+        assert_eq!(gate.records()[0].token(), refs.detach()[0].token());
+        assert_eq!(gate.records()[0].action(), HostRootRefCommitAction::Detach);
+        assert_eq!(
+            gate.records()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_eq!(gate.records()[1].sequence(), 1);
+        assert_eq!(gate.records()[1].fiber(), deleted_child);
+        assert_eq!(gate.records()[1].token(), refs.detach()[1].token());
+        assert_eq!(gate.records()[1].action(), HostRootRefCommitAction::Detach);
+        assert_eq!(
+            gate.records()[1].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -1939,6 +2346,87 @@ mod tests {
         ));
         assert_eq!(store.root(root_id).unwrap().current(), previous_current);
         assert!(store.host_tokens().is_empty());
+    }
+
+    #[test]
+    fn dom_ref_callback_gate_revalidates_source_tokens_by_phase_and_target() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let ref_handle = RefHandle::from_raw(141);
+        let state_node = StateNodeHandle::from_raw(241);
+        append_host_ref_child(
+            &mut store,
+            render.work_in_progress(),
+            ref_handle,
+            state_node,
+            FiberFlags::REF,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(render.work_in_progress())
+            .unwrap()
+            .set_subtree_flags(FiberFlags::REF);
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let metadata = commit.ref_commit_metadata().clone();
+        let attach = metadata.attach()[0];
+        store
+            .host_tokens_mut()
+            .invalidate(attach.token(), attach.token_phase(), attach.token_target())
+            .unwrap();
+
+        let error = materialize_dom_ref_callback_commit_gate(&store, &metadata).unwrap_err();
+
+        assert!(matches!(
+            error,
+            RootCommitError::HostFiberToken(error)
+                if error.violation() == HostFiberTokenViolation::Stale
+                    && error.phase() == HostFiberTokenPhase::Commit
+                    && error.target() == HostFiberTokenTarget::Instance
+        ));
+    }
+
+    #[test]
+    fn dom_ref_callback_gate_rejects_invalid_source_metadata_shape() {
+        let (mut store, root_id, _host) = root_store();
+        let fiber = create_host_ref_fiber(
+            &mut store,
+            RefHandle::from_raw(151),
+            StateNodeHandle::from_raw(251),
+            FiberFlags::NO,
+        );
+        let token = store.host_tokens_mut().issue(
+            root_id,
+            fiber,
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::Instance,
+        );
+        let metadata = HostRootRefCommitSnapshot {
+            detach: Vec::new(),
+            attach: vec![HostRootRefCommitRecord {
+                root: root_id,
+                fiber,
+                state_node: StateNodeHandle::from_raw(251),
+                ref_handle: RefHandle::from_raw(151),
+                token,
+                token_phase: HostFiberTokenPhase::Commit,
+                token_target: HostFiberTokenTarget::Instance,
+                action: HostRootRefCommitAction::Attach,
+                detach_reason: Some(HostRootRefDetachReason::RefChanged),
+            }],
+        };
+
+        let error = materialize_dom_ref_callback_commit_gate(&store, &metadata).unwrap_err();
+
+        assert!(matches!(
+            error,
+            RootCommitError::DomRefCallbackGateDetachReasonMismatch {
+                root,
+                fiber: error_fiber,
+                action: "attach",
+                detach_reason: Some("ref-changed")
+            } if root == root_id && error_fiber == fiber
+        ));
     }
 
     #[test]
@@ -2241,5 +2729,20 @@ mod tests {
         assert_eq!(metadata.phase(), record.token_phase());
         assert_eq!(metadata.target(), record.token_target());
         assert!(metadata.is_active());
+    }
+
+    fn assert_dom_ref_callback_gate_is_inert(gate: &HostRootDomRefCallbackCommitGateSnapshot) {
+        assert!(!gate.callback_refs_invoked());
+        assert!(!gate.object_refs_mutated());
+        assert!(!gate.layout_effects_run());
+        assert!(!gate.public_instances_exposed());
+        assert!(!gate.react_dom_ref_compatibility_claimed());
+        for record in gate.records() {
+            assert_eq!(
+                record.status(),
+                HostRootDomRefCallbackCommitGateStatus::Blocked
+            );
+            assert_eq!(record.blockers(), &DOM_REF_CALLBACK_GATE_BLOCKERS);
+        }
     }
 }
