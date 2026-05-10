@@ -214,6 +214,89 @@ impl RootErrorCallbackHandles {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum RootErrorOptionCallbackPhase {
+    Render,
+    Commit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct RootErrorOptionCallbackRecord {
+    root: FiberRootId,
+    phase: RootErrorOptionCallbackPhase,
+    on_uncaught_error: RootErrorCallbackHandle,
+    on_caught_error: RootErrorCallbackHandle,
+    on_recoverable_error: RootRecoverableErrorCallbackHandle,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root error option metadata for future error routing workers"
+)]
+impl RootErrorOptionCallbackRecord {
+    #[must_use]
+    pub(crate) const fn new(
+        root: FiberRootId,
+        phase: RootErrorOptionCallbackPhase,
+        callbacks: RootErrorCallbackHandles,
+    ) -> Self {
+        Self {
+            root,
+            phase,
+            on_uncaught_error: callbacks.on_uncaught_error(),
+            on_caught_error: callbacks.on_caught_error(),
+            on_recoverable_error: callbacks.on_recoverable_error(),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn phase(self) -> RootErrorOptionCallbackPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub(crate) const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
+        self.on_uncaught_error
+    }
+
+    #[must_use]
+    pub(crate) const fn on_caught_error(self) -> RootErrorCallbackHandle {
+        self.on_caught_error
+    }
+
+    #[must_use]
+    pub(crate) const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
+        self.on_recoverable_error
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(self) -> bool {
+        self.on_uncaught_error.is_some()
+            || self.on_caught_error.is_some()
+            || self.on_recoverable_error.is_some()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_error_boundaries_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn recoverable_error_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
 /// Typed, bridge-facing result of root option parsing.
 ///
 /// This record mirrors React root options after a facade has handled public
@@ -305,6 +388,15 @@ impl RootOptionsRecord {
     #[must_use]
     pub const fn on_recoverable_error(&self) -> RootRecoverableErrorCallbackHandle {
         self.error_callbacks.on_recoverable_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn error_option_callback_record(
+        &self,
+        root: FiberRootId,
+        phase: RootErrorOptionCallbackPhase,
+    ) -> RootErrorOptionCallbackRecord {
+        RootErrorOptionCallbackRecord::new(root, phase, self.error_callbacks)
     }
 
     #[must_use]
@@ -427,6 +519,15 @@ impl RootOptions {
     #[must_use]
     pub const fn on_recoverable_error(&self) -> RootRecoverableErrorCallbackHandle {
         self.record.on_recoverable_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn error_option_callback_record(
+        &self,
+        root: FiberRootId,
+        phase: RootErrorOptionCallbackPhase,
+    ) -> RootErrorOptionCallbackRecord {
+        self.record.error_option_callback_record(root, phase)
     }
 
     #[must_use]
@@ -825,6 +926,35 @@ mod tests {
         assert_eq!(options.on_uncaught_error().raw(), scheduler_handle.raw());
         assert_eq!(options.on_caught_error().raw(), 2);
         assert_eq!(options.on_recoverable_error().raw(), 3);
+    }
+
+    #[test]
+    fn root_config_error_option_callback_record_preserves_handles_as_metadata() {
+        let root = root_id();
+        let record = RootOptions::new()
+            .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(41))
+            .with_on_caught_error(RootErrorCallbackHandle::from_raw(42))
+            .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(43))
+            .error_option_callback_record(root, RootErrorOptionCallbackPhase::Render);
+
+        assert_eq!(record.root(), root);
+        assert_eq!(record.phase(), RootErrorOptionCallbackPhase::Render);
+        assert_eq!(
+            record.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(41)
+        );
+        assert_eq!(
+            record.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(42)
+        );
+        assert_eq!(
+            record.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(43)
+        );
+        assert!(record.has_configured_error_callback());
+        assert!(!record.root_error_callbacks_invoked());
+        assert!(!record.public_error_boundaries_enabled());
+        assert!(!record.recoverable_error_compatibility_claimed());
     }
 
     #[test]

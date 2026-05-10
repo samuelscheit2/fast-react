@@ -27,13 +27,15 @@ use crate::root_callbacks::{
 };
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveUnmountOrigin,
+    RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord,
 };
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId,
     HostFiberTokenValidationError, HostRootRenderPhaseRecord, HostRootStateStoreError,
-    RootRenderExitStatus, RootSchedulingState, RootUpdateCallbackSnapshot,
-    TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryPreparedFibers,
-    TestRendererHostOutputCanaryUpdatedFibers, UpdateQueueError,
+    RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle, RootRenderExitStatus,
+    RootSchedulingState, RootUpdateCallbackSnapshot, TestRendererHostOutputCanaryError,
+    TestRendererHostOutputCanaryPreparedFibers, TestRendererHostOutputCanaryUpdatedFibers,
+    UpdateQueueError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -492,6 +494,104 @@ impl From<UpdateQueueError> for RootCommitError {
     fn from(error: UpdateQueueError) -> Self {
         Self::UpdateQueue(error)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootCommitErrorOptionCallbackRecord {
+    root: FiberRootId,
+    finished_work: Option<FiberId>,
+    finished_lanes: Lanes,
+    error: RootCommitError,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private commit error option metadata for future root error routing"
+)]
+impl RootCommitErrorOptionCallbackRecord {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> Option<FiberId> {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn error(&self) -> &RootCommitError {
+        &self.error
+    }
+
+    #[must_use]
+    pub(crate) const fn error_option_callbacks(&self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
+    pub(crate) const fn on_uncaught_error(&self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks.on_uncaught_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn on_caught_error(&self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks.on_caught_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn on_recoverable_error(&self) -> RootRecoverableErrorCallbackHandle {
+        self.error_option_callbacks.on_recoverable_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(&self) -> bool {
+        self.error_option_callbacks.has_configured_error_callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_error_boundaries_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn recoverable_error_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private commit error option metadata for future root error routing"
+)]
+pub(crate) fn record_root_commit_error_option_callbacks<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    finished_work: Option<FiberId>,
+    finished_lanes: Lanes,
+    error: RootCommitError,
+) -> Result<RootCommitErrorOptionCallbackRecord, RootCommitError> {
+    let root = store.root(root_id)?;
+    Ok(RootCommitErrorOptionCallbackRecord {
+        root: root_id,
+        finished_work,
+        finished_lanes,
+        error,
+        error_option_callbacks: root
+            .options()
+            .error_option_callback_record(root_id, RootErrorOptionCallbackPhase::Commit),
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -8580,6 +8680,70 @@ mod tests {
         assert_eq!(pending_passive.finished_work(), None);
         assert_eq!(pending_passive.lanes(), Lanes::DEFAULT);
         assert!(!pending_passive.has_commit_handoff());
+    }
+
+    #[test]
+    fn root_commit_error_option_callback_record_preserves_handles_without_callbacks() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(
+                FakeContainer::new(1),
+                RootOptions::new()
+                    .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(61))
+                    .with_on_caught_error(RootErrorCallbackHandle::from_raw(62))
+                    .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(63)),
+            )
+            .unwrap();
+        let wrong_root = FiberRootId::new(root_id.raw() + 1).unwrap();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(7), None).unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(wrong_root, Lanes::DEFAULT);
+
+        let error = commit_finished_host_root(&mut store, render).unwrap_err();
+        let record = record_root_commit_error_option_callbacks(
+            &store,
+            root_id,
+            Some(render.finished_work()),
+            render.render_lanes(),
+            error,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.finished_work(), Some(render.finished_work()));
+        assert_eq!(record.finished_lanes(), Lanes::DEFAULT);
+        assert!(matches!(
+            record.error(),
+            RootCommitError::PendingPassiveRootMismatch { root, pending_root }
+                if *root == root_id && *pending_root == wrong_root
+        ));
+        assert_eq!(
+            record.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(61)
+        );
+        assert_eq!(
+            record.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(62)
+        );
+        assert_eq!(
+            record.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(63)
+        );
+        let callbacks = record.error_option_callbacks();
+        assert_eq!(callbacks.root(), root_id);
+        assert_eq!(callbacks.phase(), RootErrorOptionCallbackPhase::Commit);
+        assert!(record.has_configured_error_callback());
+        assert!(!record.root_error_callbacks_invoked());
+        assert!(!record.public_error_boundaries_enabled());
+        assert!(!record.recoverable_error_compatibility_claimed());
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert!(host.operations().is_empty());
     }
 
     #[test]
