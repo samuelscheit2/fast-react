@@ -39,6 +39,7 @@ use crate::{
         render_function_component_with_required_use_context,
         render_function_component_with_use_context, render_function_component_with_use_state,
     },
+    unsupported_features::{OFFSCREEN_UNSUPPORTED_FEATURE, SUSPENSE_UNSUPPORTED_FEATURE},
 };
 
 pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
@@ -133,6 +134,202 @@ impl UnsupportedPortalBeginWorkRecord {
     #[must_use]
     pub(crate) const fn render_lanes(&self) -> Lanes {
         self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn feature(&self) -> &'static str {
+        self.feature
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnsupportedSuspenseChildShapeKind {
+    Empty,
+    PrimaryOffscreen,
+    PrimaryOffscreenWithFallback,
+    Dehydrated,
+    UnsupportedPrimary,
+}
+
+impl UnsupportedSuspenseChildShapeKind {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::PrimaryOffscreen => "primary-offscreen",
+            Self::PrimaryOffscreenWithFallback => "primary-offscreen-with-fallback",
+            Self::Dehydrated => "dehydrated",
+            Self::UnsupportedPrimary => "unsupported-primary",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UnsupportedSuspenseChildShapeRecord {
+    fiber: FiberId,
+    key: Option<ReactKey>,
+    pending_props: PropsHandle,
+    memoized_state: StateHandle,
+    child: Option<FiberId>,
+    child_tag: Option<FiberTag>,
+    fallback_child: Option<FiberId>,
+    fallback_child_tag: Option<FiberTag>,
+    render_lanes: Lanes,
+    shape: UnsupportedSuspenseChildShapeKind,
+    feature: &'static str,
+}
+
+impl UnsupportedSuspenseChildShapeRecord {
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) fn key(&self) -> Option<&ReactKey> {
+        self.key.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_props(&self) -> PropsHandle {
+        self.pending_props
+    }
+
+    #[must_use]
+    pub(crate) const fn memoized_state(&self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub(crate) const fn child(&self) -> Option<FiberId> {
+        self.child
+    }
+
+    #[must_use]
+    pub(crate) const fn child_tag(&self) -> Option<FiberTag> {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_child(&self) -> Option<FiberId> {
+        self.fallback_child
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_child_tag(&self) -> Option<FiberTag> {
+        self.fallback_child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn shape(&self) -> UnsupportedSuspenseChildShapeKind {
+        self.shape
+    }
+
+    #[must_use]
+    pub(crate) const fn feature(&self) -> &'static str {
+        self.feature
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnsupportedOffscreenChildShapeKind {
+    Empty,
+    SingleChild,
+    MultipleChildren,
+}
+
+impl UnsupportedOffscreenChildShapeKind {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::SingleChild => "single-child",
+            Self::MultipleChildren => "multiple-children",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UnsupportedOffscreenChildShapeRecord {
+    fiber: FiberId,
+    key: Option<ReactKey>,
+    pending_props: PropsHandle,
+    memoized_props: PropsHandle,
+    memoized_state: StateHandle,
+    state_node: StateNodeHandle,
+    child: Option<FiberId>,
+    child_tag: Option<FiberTag>,
+    child_sibling: Option<FiberId>,
+    child_sibling_tag: Option<FiberTag>,
+    render_lanes: Lanes,
+    shape: UnsupportedOffscreenChildShapeKind,
+    feature: &'static str,
+}
+
+impl UnsupportedOffscreenChildShapeRecord {
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) fn key(&self) -> Option<&ReactKey> {
+        self.key.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_props(&self) -> PropsHandle {
+        self.pending_props
+    }
+
+    #[must_use]
+    pub(crate) const fn memoized_props(&self) -> PropsHandle {
+        self.memoized_props
+    }
+
+    #[must_use]
+    pub(crate) const fn memoized_state(&self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn child(&self) -> Option<FiberId> {
+        self.child
+    }
+
+    #[must_use]
+    pub(crate) const fn child_tag(&self) -> Option<FiberTag> {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn child_sibling(&self) -> Option<FiberId> {
+        self.child_sibling
+    }
+
+    #[must_use]
+    pub(crate) const fn child_sibling_tag(&self) -> Option<FiberTag> {
+        self.child_sibling_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn shape(&self) -> UnsupportedOffscreenChildShapeKind {
+        self.shape
     }
 
     #[must_use]
@@ -1779,6 +1976,8 @@ pub(crate) enum BeginWorkError {
     FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
     FragmentSingleHostChild(FragmentSingleHostChildBeginWorkError),
     UnsupportedPortal(UnsupportedPortalBeginWorkRecord),
+    UnsupportedSuspenseChildShape(UnsupportedSuspenseChildShapeRecord),
+    UnsupportedOffscreenChildShape(UnsupportedOffscreenChildShapeRecord),
     UnsupportedFiberTag { fiber: FiberId, tag: FiberTag },
 }
 
@@ -1799,6 +1998,38 @@ impl Display for BeginWorkError {
                 record.state_node(),
                 feature = record.feature()
             ),
+            Self::UnsupportedSuspenseChildShape(record) => write!(
+                formatter,
+                "Suspense fiber {} reached begin-work with unsupported {} child shape {}; key {:?}, primary child {:?} ({:?}), fallback child {:?} ({:?}), pending props {:?}, memoized state {:?}, lanes {:?}",
+                record.fiber().slot().get(),
+                record.feature(),
+                record.shape().as_str(),
+                record.key().map(ReactKey::as_str),
+                record.child().map(|fiber| fiber.slot().get()),
+                record.child_tag(),
+                record.fallback_child().map(|fiber| fiber.slot().get()),
+                record.fallback_child_tag(),
+                record.pending_props(),
+                record.memoized_state(),
+                record.render_lanes()
+            ),
+            Self::UnsupportedOffscreenChildShape(record) => write!(
+                formatter,
+                "Offscreen fiber {} reached begin-work with unsupported {} child shape {}; key {:?}, first child {:?} ({:?}), first child sibling {:?} ({:?}), pending props {:?}, memoized props {:?}, memoized state {:?}, state node {:?}, lanes {:?}",
+                record.fiber().slot().get(),
+                record.feature(),
+                record.shape().as_str(),
+                record.key().map(ReactKey::as_str),
+                record.child().map(|fiber| fiber.slot().get()),
+                record.child_tag(),
+                record.child_sibling().map(|fiber| fiber.slot().get()),
+                record.child_sibling_tag(),
+                record.pending_props(),
+                record.memoized_props(),
+                record.memoized_state(),
+                record.state_node(),
+                record.render_lanes()
+            ),
             Self::UnsupportedFiberTag { fiber, tag } => write!(
                 formatter,
                 "fiber {} has unsupported begin-work tag {:?}; only FunctionComponent and an exact single-host-child Fragment are delegated by this private handoff",
@@ -1816,7 +2047,10 @@ impl Error for BeginWorkError {
             Self::FunctionComponent(error) => Some(error),
             Self::FunctionComponentSingleChild(error) => Some(error),
             Self::FragmentSingleHostChild(error) => Some(error),
-            Self::UnsupportedPortal(_) | Self::UnsupportedFiberTag { .. } => None,
+            Self::UnsupportedPortal(_)
+            | Self::UnsupportedSuspenseChildShape(_)
+            | Self::UnsupportedOffscreenChildShape(_)
+            | Self::UnsupportedFiberTag { .. } => None,
         }
     }
 }
@@ -2093,6 +2327,125 @@ pub(crate) fn unsupported_portal_begin_work_record(
     })
 }
 
+pub(crate) fn unsupported_suspense_begin_work_record(
+    arena: &FiberArena,
+    request: BeginWorkRequest,
+) -> Result<UnsupportedSuspenseChildShapeRecord, BeginWorkError> {
+    let fiber = request.work_in_progress();
+    let node = arena.get(fiber)?;
+    let tag = node.tag();
+
+    if tag != FiberTag::Suspense {
+        return Err(BeginWorkError::UnsupportedFiberTag { fiber, tag });
+    }
+
+    let child = node.child();
+    let (child_tag, fallback_child, fallback_child_tag) = match child {
+        Some(child) => {
+            let child_node = arena.get(child)?;
+            let fallback_child = child_node.sibling();
+            let fallback_child_tag = match fallback_child {
+                Some(fallback_child) => Some(arena.get(fallback_child)?.tag()),
+                None => None,
+            };
+            (Some(child_node.tag()), fallback_child, fallback_child_tag)
+        }
+        None => (None, None, None),
+    };
+    let shape = match child_tag {
+        None => UnsupportedSuspenseChildShapeKind::Empty,
+        Some(FiberTag::Offscreen) if fallback_child.is_some() => {
+            UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
+        }
+        Some(FiberTag::Offscreen) => UnsupportedSuspenseChildShapeKind::PrimaryOffscreen,
+        Some(FiberTag::DehydratedFragment) => UnsupportedSuspenseChildShapeKind::Dehydrated,
+        Some(_) => UnsupportedSuspenseChildShapeKind::UnsupportedPrimary,
+    };
+
+    Ok(UnsupportedSuspenseChildShapeRecord {
+        fiber,
+        key: node.key().cloned(),
+        pending_props: node.pending_props(),
+        memoized_state: node.memoized_state(),
+        child,
+        child_tag,
+        fallback_child,
+        fallback_child_tag,
+        render_lanes: request.render_lanes(),
+        shape,
+        feature: SUSPENSE_UNSUPPORTED_FEATURE,
+    })
+}
+
+pub(crate) fn unsupported_offscreen_begin_work_record(
+    arena: &FiberArena,
+    request: BeginWorkRequest,
+) -> Result<UnsupportedOffscreenChildShapeRecord, BeginWorkError> {
+    let fiber = request.work_in_progress();
+    let node = arena.get(fiber)?;
+    let tag = node.tag();
+
+    if tag != FiberTag::Offscreen {
+        return Err(BeginWorkError::UnsupportedFiberTag { fiber, tag });
+    }
+
+    let child = node.child();
+    let (child_tag, child_sibling, child_sibling_tag) = match child {
+        Some(child) => {
+            let child_node = arena.get(child)?;
+            let child_sibling = child_node.sibling();
+            let child_sibling_tag = match child_sibling {
+                Some(child_sibling) => Some(arena.get(child_sibling)?.tag()),
+                None => None,
+            };
+            (Some(child_node.tag()), child_sibling, child_sibling_tag)
+        }
+        None => (None, None, None),
+    };
+    let shape = match (child, child_sibling) {
+        (None, _) => UnsupportedOffscreenChildShapeKind::Empty,
+        (Some(_), None) => UnsupportedOffscreenChildShapeKind::SingleChild,
+        (Some(_), Some(_)) => UnsupportedOffscreenChildShapeKind::MultipleChildren,
+    };
+
+    Ok(UnsupportedOffscreenChildShapeRecord {
+        fiber,
+        key: node.key().cloned(),
+        pending_props: node.pending_props(),
+        memoized_props: node.memoized_props(),
+        memoized_state: node.memoized_state(),
+        state_node: node.state_node(),
+        child,
+        child_tag,
+        child_sibling,
+        child_sibling_tag,
+        render_lanes: request.render_lanes(),
+        shape,
+        feature: OFFSCREEN_UNSUPPORTED_FEATURE,
+    })
+}
+
+fn unsupported_begin_work_error(
+    arena: &FiberArena,
+    request: BeginWorkRequest,
+) -> Result<BeginWorkError, BeginWorkError> {
+    let fiber = request.work_in_progress();
+    let tag = arena.get(fiber)?.tag();
+
+    match tag {
+        FiberTag::Portal => Ok(BeginWorkError::UnsupportedPortal(
+            unsupported_portal_begin_work_record(arena, request)?,
+        )),
+        FiberTag::Suspense => Ok(BeginWorkError::UnsupportedSuspenseChildShape(
+            unsupported_suspense_begin_work_record(arena, request)?,
+        )),
+        FiberTag::Offscreen => Ok(BeginWorkError::UnsupportedOffscreenChildShape(
+            unsupported_offscreen_begin_work_record(arena, request)?,
+        )),
+        _ => Ok(BeginWorkError::UnsupportedFiberTag { fiber, tag }),
+    }
+}
+
 pub(crate) fn begin_work(
     arena: &mut FiberArena,
     request: BeginWorkRequest,
@@ -2117,13 +2470,7 @@ pub(crate) fn begin_work(
         FiberTag::Fragment => Ok(BeginWorkResult::Fragment(
             begin_work_fragment_single_host_child(arena, request)?,
         )),
-        FiberTag::Portal => Err(BeginWorkError::UnsupportedPortal(
-            unsupported_portal_begin_work_record(arena, request)?,
-        )),
-        _ => Err(BeginWorkError::UnsupportedFiberTag {
-            fiber: work_in_progress,
-            tag,
-        }),
+        _ => Err(unsupported_begin_work_error(arena, request)?),
     }
 }
 
@@ -2151,13 +2498,7 @@ pub(crate) fn begin_work_with_use_state(
             )?;
             Ok(function_component_use_state_begin_work_record(state_render))
         }
-        FiberTag::Portal => Err(BeginWorkError::UnsupportedPortal(
-            unsupported_portal_begin_work_record(arena, request)?,
-        )),
-        _ => Err(BeginWorkError::UnsupportedFiberTag {
-            fiber: work_in_progress,
-            tag,
-        }),
+        _ => Err(unsupported_begin_work_error(arena, request)?),
     }
 }
 
@@ -2346,16 +2687,7 @@ pub(crate) fn begin_work_with_context_reads(
     let tag = arena.get(work_in_progress)?.tag();
 
     if tag != FiberTag::FunctionComponent {
-        if tag == FiberTag::Portal {
-            return Err(BeginWorkError::UnsupportedPortal(
-                unsupported_portal_begin_work_record(arena, request)?,
-            ));
-        }
-
-        return Err(BeginWorkError::UnsupportedFiberTag {
-            fiber: work_in_progress,
-            tag,
-        });
+        return Err(unsupported_begin_work_error(arena, request)?);
     }
 
     let render = render_function_component_with_context_reads(
@@ -2408,16 +2740,7 @@ fn begin_work_function_component_use_context_impl(
     let tag = arena.get(work_in_progress)?.tag();
 
     if tag != FiberTag::FunctionComponent {
-        if tag == FiberTag::Portal {
-            return Err(BeginWorkError::UnsupportedPortal(
-                unsupported_portal_begin_work_record(arena, request)?,
-            ));
-        }
-
-        return Err(BeginWorkError::UnsupportedFiberTag {
-            fiber: work_in_progress,
-            tag,
-        });
+        return Err(unsupported_begin_work_error(arena, request)?);
     }
 
     let render = match expected_context {
@@ -5706,6 +6029,179 @@ mod tests {
     }
 
     #[test]
+    fn begin_work_fails_closed_with_suspense_and_offscreen_child_shape_diagnostics() {
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let mut suspense_arena = FiberArena::new();
+        let suspense = suspense_arena.create_fiber(
+            FiberTag::Suspense,
+            Some(ReactKey::from_normalized("boundary")),
+            PropsHandle::from_raw(840),
+            FiberMode::NO,
+        );
+        suspense_arena
+            .get_mut(suspense)
+            .unwrap()
+            .set_memoized_state(StateHandle::from_raw(841));
+        let primary = suspense_arena.create_fiber(
+            FiberTag::Offscreen,
+            None,
+            PropsHandle::from_raw(842),
+            FiberMode::NO,
+        );
+        let primary_child = suspense_arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(843),
+            FiberMode::NO,
+        );
+        suspense_arena
+            .set_children(primary, &[primary_child])
+            .unwrap();
+        let fallback = suspense_arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(844),
+            FiberMode::NO,
+        );
+        let fallback_child = suspense_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(845),
+            FiberMode::NO,
+        );
+        suspense_arena
+            .set_children(fallback, &[fallback_child])
+            .unwrap();
+        suspense_arena
+            .set_children(suspense, &[primary, fallback])
+            .unwrap();
+
+        let suspense_error = begin_work(
+            &mut suspense_arena,
+            BeginWorkRequest::new(suspense, Lanes::from(Lane::RETRY_1)),
+            &mut registry,
+        )
+        .unwrap_err();
+
+        let suspense_record = match suspense_error {
+            BeginWorkError::UnsupportedSuspenseChildShape(record) => record,
+            other => panic!("expected Suspense child-shape diagnostic, got {other:?}"),
+        };
+        assert_eq!(suspense_record.fiber(), suspense);
+        assert_eq!(
+            suspense_record.key().map(ReactKey::as_str),
+            Some("boundary")
+        );
+        assert_eq!(suspense_record.pending_props(), PropsHandle::from_raw(840));
+        assert_eq!(suspense_record.memoized_state(), StateHandle::from_raw(841));
+        assert_eq!(suspense_record.child(), Some(primary));
+        assert_eq!(suspense_record.child_tag(), Some(FiberTag::Offscreen));
+        assert_eq!(suspense_record.fallback_child(), Some(fallback));
+        assert_eq!(
+            suspense_record.fallback_child_tag(),
+            Some(FiberTag::Fragment)
+        );
+        assert_eq!(
+            suspense_record.shape(),
+            UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
+        );
+        assert_eq!(suspense_record.render_lanes(), Lanes::from(Lane::RETRY_1));
+        assert_eq!(suspense_record.feature(), SUSPENSE_UNSUPPORTED_FEATURE);
+        assert_eq!(
+            suspense_arena.get(suspense).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+        assert_eq!(
+            suspense_arena.get(primary).unwrap().return_fiber(),
+            Some(suspense)
+        );
+        assert_eq!(
+            suspense_arena.get(fallback).unwrap().return_fiber(),
+            Some(suspense)
+        );
+
+        let mut offscreen_arena = FiberArena::new();
+        let offscreen = offscreen_arena.create_fiber(
+            FiberTag::Offscreen,
+            Some(ReactKey::from_normalized("hidden")),
+            PropsHandle::from_raw(850),
+            FiberMode::NO,
+        );
+        {
+            let node = offscreen_arena.get_mut(offscreen).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(851));
+            node.set_memoized_state(StateHandle::from_raw(852));
+            node.set_state_node(StateNodeHandle::from_raw(853));
+        }
+        let first_child = offscreen_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(854),
+            FiberMode::NO,
+        );
+        let second_child = offscreen_arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(855),
+            FiberMode::NO,
+        );
+        offscreen_arena
+            .set_children(offscreen, &[first_child, second_child])
+            .unwrap();
+
+        let offscreen_error = begin_work(
+            &mut offscreen_arena,
+            BeginWorkRequest::new(offscreen, Lanes::OFFSCREEN),
+            &mut registry,
+        )
+        .unwrap_err();
+
+        let offscreen_record = match offscreen_error {
+            BeginWorkError::UnsupportedOffscreenChildShape(record) => record,
+            other => panic!("expected Offscreen child-shape diagnostic, got {other:?}"),
+        };
+        assert_eq!(offscreen_record.fiber(), offscreen);
+        assert_eq!(offscreen_record.key().map(ReactKey::as_str), Some("hidden"));
+        assert_eq!(offscreen_record.pending_props(), PropsHandle::from_raw(850));
+        assert_eq!(
+            offscreen_record.memoized_props(),
+            PropsHandle::from_raw(851)
+        );
+        assert_eq!(
+            offscreen_record.memoized_state(),
+            StateHandle::from_raw(852)
+        );
+        assert_eq!(
+            offscreen_record.state_node(),
+            StateNodeHandle::from_raw(853)
+        );
+        assert_eq!(offscreen_record.child(), Some(first_child));
+        assert_eq!(offscreen_record.child_tag(), Some(FiberTag::HostText));
+        assert_eq!(offscreen_record.child_sibling(), Some(second_child));
+        assert_eq!(
+            offscreen_record.child_sibling_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(
+            offscreen_record.shape(),
+            UnsupportedOffscreenChildShapeKind::MultipleChildren
+        );
+        assert_eq!(offscreen_record.render_lanes(), Lanes::OFFSCREEN);
+        assert_eq!(offscreen_record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
+        assert_eq!(
+            offscreen_arena.get(first_child).unwrap().return_fiber(),
+            Some(offscreen)
+        );
+        assert_eq!(
+            offscreen_arena.get(second_child).unwrap().return_fiber(),
+            Some(offscreen)
+        );
+
+        assert!(registry.calls().is_empty());
+    }
+
+    #[test]
     fn begin_work_single_child_reconciliation_fails_closed_for_unknown_output() {
         let (mut arena, _current, work_in_progress, component) = function_component_pair();
         let output = FunctionComponentOutputHandle::from_raw(93);
@@ -5758,13 +6254,33 @@ mod tests {
             )
             .unwrap_err();
 
-            assert_eq!(
-                error,
-                BeginWorkError::UnsupportedFiberTag {
-                    fiber: work_in_progress,
-                    tag,
-                }
-            );
+            match tag {
+                FiberTag::Suspense => match error {
+                    BeginWorkError::UnsupportedSuspenseChildShape(record) => {
+                        assert_eq!(record.fiber(), work_in_progress);
+                        assert_eq!(record.shape(), UnsupportedSuspenseChildShapeKind::Empty);
+                        assert_eq!(record.child(), None);
+                        assert_eq!(record.feature(), SUSPENSE_UNSUPPORTED_FEATURE);
+                    }
+                    other => panic!("expected Suspense shape diagnostic, got {other:?}"),
+                },
+                FiberTag::Offscreen => match error {
+                    BeginWorkError::UnsupportedOffscreenChildShape(record) => {
+                        assert_eq!(record.fiber(), work_in_progress);
+                        assert_eq!(record.shape(), UnsupportedOffscreenChildShapeKind::Empty);
+                        assert_eq!(record.child(), None);
+                        assert_eq!(record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
+                    }
+                    other => panic!("expected Offscreen shape diagnostic, got {other:?}"),
+                },
+                _ => assert_eq!(
+                    error,
+                    BeginWorkError::UnsupportedFiberTag {
+                        fiber: work_in_progress,
+                        tag,
+                    }
+                ),
+            }
             assert!(registry.calls().is_empty());
         }
     }

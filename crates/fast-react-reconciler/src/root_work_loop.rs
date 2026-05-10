@@ -34,9 +34,12 @@ use crate::{
     begin_work::{
         BeginWorkError, BeginWorkRequest, BeginWorkResult, NestedContextProviderBeginWorkError,
         NestedContextProviderBeginWorkRecord, NestedContextProviderBeginWorkRequest,
-        NestedContextProviderUseContextBeginWorkRecord, UnsupportedPortalBeginWorkRecord,
-        begin_work, begin_work_nested_context_provider_child,
-        begin_work_nested_context_provider_use_context_child, unsupported_portal_begin_work_record,
+        NestedContextProviderUseContextBeginWorkRecord, UnsupportedOffscreenChildShapeRecord,
+        UnsupportedPortalBeginWorkRecord, UnsupportedSuspenseChildShapeRecord, begin_work,
+        begin_work_nested_context_provider_child,
+        begin_work_nested_context_provider_use_context_child,
+        unsupported_offscreen_begin_work_record, unsupported_portal_begin_work_record,
+        unsupported_suspense_begin_work_record,
     },
     create_host_root_work_in_progress,
     function_component::{
@@ -57,6 +60,7 @@ use crate::{
         HostRootOneLevelChildSetBeginWorkError, HostRootOneLevelChildSetBeginWorkRecord,
         HostRootOneLevelChildSetEntry, HostRootOneLevelChildSetKind,
         NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
+        UnsupportedOffscreenChildShapeKind, UnsupportedSuspenseChildShapeKind,
         begin_work_context_provider_child, begin_work_context_provider_use_context_child,
         begin_work_context_provider_use_context_single_child,
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
@@ -230,6 +234,16 @@ enum HostRootChildBeginWorkPreflightError {
         host_root_work_in_progress: FiberId,
         portal: Box<UnsupportedPortalBeginWorkRecord>,
     },
+    UnsupportedSuspenseChildShape {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        suspense: Box<UnsupportedSuspenseChildShapeRecord>,
+    },
+    UnsupportedOffscreenChildShape {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        offscreen: Box<UnsupportedOffscreenChildShapeRecord>,
+    },
 }
 
 impl Display for HostRootChildBeginWorkPreflightError {
@@ -281,6 +295,32 @@ impl Display for HostRootChildBeginWorkPreflightError {
                 portal.fiber().slot().get(),
                 portal.feature()
             ),
+            Self::UnsupportedSuspenseChildShape {
+                root,
+                host_root_work_in_progress,
+                suspense,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} cannot admit Suspense child {} shape {} into root work: {}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                suspense.fiber().slot().get(),
+                suspense.shape().as_str(),
+                suspense.feature()
+            ),
+            Self::UnsupportedOffscreenChildShape {
+                root,
+                host_root_work_in_progress,
+                offscreen,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} cannot admit Offscreen child {} shape {} into root work: {}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                offscreen.fiber().slot().get(),
+                offscreen.shape().as_str(),
+                offscreen.feature()
+            ),
         }
     }
 }
@@ -294,7 +334,9 @@ impl Error for HostRootChildBeginWorkPreflightError {
             Self::ExpectedHostRootWorkInProgress { .. }
             | Self::WorkInProgressNotLinkedToRootCurrent { .. }
             | Self::UnsupportedReconcilerFiberFeature { .. }
-            | Self::UnsupportedPortal { .. } => None,
+            | Self::UnsupportedPortal { .. }
+            | Self::UnsupportedSuspenseChildShape { .. }
+            | Self::UnsupportedOffscreenChildShape { .. } => None,
         }
     }
 }
@@ -375,6 +417,32 @@ fn validate_host_root_child_preflight<H: HostTypes>(
             host_root_work_in_progress,
             portal: Box::new(portal),
         });
+    }
+    if child_tag == FiberTag::Suspense {
+        let suspense = unsupported_suspense_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(child, render_lanes),
+        )?;
+        return Err(
+            HostRootChildBeginWorkPreflightError::UnsupportedSuspenseChildShape {
+                root: root_id,
+                host_root_work_in_progress,
+                suspense: Box::new(suspense),
+            },
+        );
+    }
+    if child_tag == FiberTag::Offscreen {
+        let offscreen = unsupported_offscreen_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(child, render_lanes),
+        )?;
+        return Err(
+            HostRootChildBeginWorkPreflightError::UnsupportedOffscreenChildShape {
+                root: root_id,
+                host_root_work_in_progress,
+                offscreen: Box::new(offscreen),
+            },
+        );
     }
 
     if let Some(feature) = unsupported_reconciler_feature_for_fiber_tag(child_tag) {
@@ -4164,6 +4232,105 @@ mod tests {
         (portal, portal_child)
     }
 
+    fn attach_suspense_wip_child_with_primary_and_fallback(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberId, FiberId, FiberId) {
+        let suspense = store.fiber_arena_mut().create_fiber(
+            FiberTag::Suspense,
+            Some(ReactKey::from_normalized("boundary")),
+            PropsHandle::from_raw(741),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(suspense)
+            .unwrap()
+            .set_memoized_state(StateHandle::from_raw(742));
+        let primary = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            None,
+            PropsHandle::from_raw(743),
+            FiberMode::NO,
+        );
+        let primary_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(744),
+            FiberMode::NO,
+        );
+        let fallback = store.fiber_arena_mut().create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(745),
+            FiberMode::NO,
+        );
+        let fallback_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(746),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(primary, &[primary_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(fallback, &[fallback_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(suspense, &[primary, fallback])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[suspense])
+            .unwrap();
+
+        (suspense, primary, primary_child, fallback, fallback_child)
+    }
+
+    fn attach_offscreen_wip_child_with_descendants(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberId) {
+        let offscreen = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            Some(ReactKey::from_normalized("hidden")),
+            PropsHandle::from_raw(751),
+            FiberMode::NO,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(offscreen).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(752));
+            node.set_memoized_state(StateHandle::from_raw(753));
+            node.set_state_node(StateNodeHandle::from_raw(754));
+        }
+        let first_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(755),
+            FiberMode::NO,
+        );
+        let second_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(756),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(offscreen, &[first_child, second_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[offscreen])
+            .unwrap();
+
+        (offscreen, first_child, second_child)
+    }
+
     fn attach_fragment_wip_child_with_descendant(
         store: &mut FiberRootStore<RecordingHost>,
         host_root_work_in_progress: FiberId,
@@ -4393,6 +4560,59 @@ mod tests {
         assert_eq!(work_node.child_lanes(), Lanes::NO);
         assert_eq!(work_node.subtree_flags(), FiberFlags::NO);
         assert_eq!(work_node.flags(), FiberFlags::NO);
+    }
+
+    fn assert_root_child_preflight_blocks_unsupported_tag(
+        error: HostRootChildBeginWorkPreflightError,
+        root_id: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+        feature: &'static str,
+        render_lanes: Lanes,
+    ) {
+        match tag {
+            FiberTag::Suspense => match error {
+                HostRootChildBeginWorkPreflightError::UnsupportedSuspenseChildShape {
+                    root,
+                    host_root_work_in_progress: actual_work_in_progress,
+                    suspense,
+                } => {
+                    assert_eq!(root, root_id);
+                    assert_eq!(actual_work_in_progress, host_root_work_in_progress);
+                    assert_eq!(suspense.fiber(), child);
+                    assert_eq!(suspense.shape(), UnsupportedSuspenseChildShapeKind::Empty);
+                    assert_eq!(suspense.child(), None);
+                    assert_eq!(suspense.render_lanes(), render_lanes);
+                    assert_eq!(suspense.feature(), feature);
+                }
+                other => panic!("expected Suspense child-shape preflight, got {other:?}"),
+            },
+            FiberTag::Offscreen => match error {
+                HostRootChildBeginWorkPreflightError::UnsupportedOffscreenChildShape {
+                    root,
+                    host_root_work_in_progress: actual_work_in_progress,
+                    offscreen,
+                } => {
+                    assert_eq!(root, root_id);
+                    assert_eq!(actual_work_in_progress, host_root_work_in_progress);
+                    assert_eq!(offscreen.fiber(), child);
+                    assert_eq!(offscreen.shape(), UnsupportedOffscreenChildShapeKind::Empty);
+                    assert_eq!(offscreen.child(), None);
+                    assert_eq!(offscreen.render_lanes(), render_lanes);
+                    assert_eq!(offscreen.feature(), feature);
+                }
+                other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
+            },
+            _ => assert_eq!(
+                error,
+                HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                    fiber: child,
+                    tag,
+                    feature,
+                }
+            ),
+        }
     }
 
     #[test]
@@ -6151,13 +6371,14 @@ mod tests {
             )
             .unwrap_err();
 
-            assert_eq!(
+            assert_root_child_preflight_blocks_unsupported_tag(
                 error,
-                HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                    fiber: child,
-                    tag,
-                    feature,
-                }
+                root_id,
+                render.work_in_progress(),
+                child,
+                tag,
+                feature,
+                render_lanes,
             );
             assert!(registry.calls().is_empty());
             assert_client_root_fail_closed_without_side_effects(
@@ -6204,13 +6425,14 @@ mod tests {
             assert_eq!(render.applied_update_count(), 0);
             assert_eq!(render.skipped_update_count(), 1);
             assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
-            assert_eq!(
+            assert_root_child_preflight_blocks_unsupported_tag(
                 error,
-                HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                    fiber: child,
-                    tag,
-                    feature,
-                }
+                root_id,
+                render.work_in_progress(),
+                child,
+                tag,
+                feature,
+                render.render_lanes(),
             );
             assert!(registry.calls().is_empty());
             assert_eq!(
@@ -6228,6 +6450,239 @@ mod tests {
             assert_eq!(child_node.flags(), FiberFlags::NO);
             assert_eq!(child_node.child(), None);
         }
+    }
+
+    #[test]
+    fn root_work_loop_preflight_and_complete_handoff_report_suspense_offscreen_child_shapes() {
+        let (mut suspense_store, suspense_root, mut suspense_host) = root_store();
+        let mut suspense_source = TestHostTree::new();
+        let suspense_element = suspense_source.insert_host_element_with_text("section", "blocked");
+        let suspense_current = suspense_store.root(suspense_root).unwrap().current();
+        update_container(&mut suspense_store, suspense_root, suspense_element, None).unwrap();
+        let suspense_render =
+            render_host_root_for_lanes(&mut suspense_store, suspense_root, Lanes::DEFAULT).unwrap();
+        let (suspense, primary, primary_child, fallback, fallback_child) =
+            attach_suspense_wip_child_with_primary_and_fallback(
+                &mut suspense_store,
+                suspense_render.work_in_progress(),
+            );
+        let mut suspense_registry = TestFunctionComponentRegistry::default();
+
+        let suspense_preflight = preflight_host_root_child_begin_work(
+            &mut suspense_store,
+            suspense_root,
+            suspense_render.work_in_progress(),
+            Lanes::from(Lane::RETRY_1),
+            &mut suspense_registry,
+        )
+        .unwrap_err();
+
+        match suspense_preflight {
+            HostRootChildBeginWorkPreflightError::UnsupportedSuspenseChildShape {
+                root,
+                host_root_work_in_progress,
+                suspense: record,
+            } => {
+                assert_eq!(root, suspense_root);
+                assert_eq!(
+                    host_root_work_in_progress,
+                    suspense_render.work_in_progress()
+                );
+                assert_eq!(record.fiber(), suspense);
+                assert_eq!(record.key().map(ReactKey::as_str), Some("boundary"));
+                assert_eq!(record.pending_props(), PropsHandle::from_raw(741));
+                assert_eq!(record.memoized_state(), StateHandle::from_raw(742));
+                assert_eq!(record.child(), Some(primary));
+                assert_eq!(record.child_tag(), Some(FiberTag::Offscreen));
+                assert_eq!(record.fallback_child(), Some(fallback));
+                assert_eq!(record.fallback_child_tag(), Some(FiberTag::Fragment));
+                assert_eq!(
+                    record.shape(),
+                    UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
+                );
+                assert_eq!(record.render_lanes(), Lanes::from(Lane::RETRY_1));
+                assert_eq!(record.feature(), SUSPENSE_UNSUPPORTED_FEATURE);
+            }
+            other => panic!("expected Suspense child-shape preflight, got {other:?}"),
+        }
+
+        let suspense_complete_error = handoff_completed_host_root_render_to_test_complete_work(
+            &mut suspense_store,
+            &mut suspense_host,
+            suspense_render,
+            &suspense_source,
+        )
+        .unwrap_err();
+
+        match suspense_complete_error {
+            HostRootCompleteWorkHandoffError::ChildPreflight(error) => match *error {
+                HostRootChildBeginWorkPreflightError::UnsupportedSuspenseChildShape {
+                    root,
+                    host_root_work_in_progress,
+                    suspense: record,
+                } => {
+                    assert_eq!(root, suspense_root);
+                    assert_eq!(
+                        host_root_work_in_progress,
+                        suspense_render.work_in_progress()
+                    );
+                    assert_eq!(record.fiber(), suspense);
+                    assert_eq!(
+                        record.shape(),
+                        UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
+                    );
+                    assert_eq!(record.child(), Some(primary));
+                    assert_eq!(record.fallback_child(), Some(fallback));
+                    assert_eq!(record.render_lanes(), suspense_render.render_lanes());
+                }
+                other => panic!("expected Suspense child-shape preflight, got {other:?}"),
+            },
+            other => panic!("expected complete-work child preflight, got {other:?}"),
+        }
+        assert!(suspense_registry.calls().is_empty());
+        assert_client_root_fail_closed_without_side_effects(
+            &suspense_store,
+            &suspense_host,
+            suspense_root,
+            suspense_current,
+            suspense_render,
+            suspense,
+        );
+        assert_eq!(
+            suspense_store
+                .fiber_arena()
+                .get(primary_child)
+                .unwrap()
+                .return_fiber(),
+            Some(primary)
+        );
+        assert_eq!(
+            suspense_store
+                .fiber_arena()
+                .get(fallback_child)
+                .unwrap()
+                .return_fiber(),
+            Some(fallback)
+        );
+
+        let (mut offscreen_store, offscreen_root, mut offscreen_host) = root_store();
+        let mut offscreen_source = TestHostTree::new();
+        let offscreen_element = offscreen_source.insert_host_element_with_text("aside", "blocked");
+        let offscreen_current = offscreen_store.root(offscreen_root).unwrap().current();
+        update_container(
+            &mut offscreen_store,
+            offscreen_root,
+            offscreen_element,
+            None,
+        )
+        .unwrap();
+        let offscreen_render =
+            render_host_root_for_lanes(&mut offscreen_store, offscreen_root, Lanes::DEFAULT)
+                .unwrap();
+        let (offscreen, first_child, second_child) = attach_offscreen_wip_child_with_descendants(
+            &mut offscreen_store,
+            offscreen_render.work_in_progress(),
+        );
+        let mut offscreen_registry = TestFunctionComponentRegistry::default();
+
+        let offscreen_preflight = preflight_host_root_child_begin_work(
+            &mut offscreen_store,
+            offscreen_root,
+            offscreen_render.work_in_progress(),
+            Lanes::OFFSCREEN,
+            &mut offscreen_registry,
+        )
+        .unwrap_err();
+
+        match offscreen_preflight {
+            HostRootChildBeginWorkPreflightError::UnsupportedOffscreenChildShape {
+                root,
+                host_root_work_in_progress,
+                offscreen: record,
+            } => {
+                assert_eq!(root, offscreen_root);
+                assert_eq!(
+                    host_root_work_in_progress,
+                    offscreen_render.work_in_progress()
+                );
+                assert_eq!(record.fiber(), offscreen);
+                assert_eq!(record.key().map(ReactKey::as_str), Some("hidden"));
+                assert_eq!(record.pending_props(), PropsHandle::from_raw(751));
+                assert_eq!(record.memoized_props(), PropsHandle::from_raw(752));
+                assert_eq!(record.memoized_state(), StateHandle::from_raw(753));
+                assert_eq!(record.state_node(), StateNodeHandle::from_raw(754));
+                assert_eq!(record.child(), Some(first_child));
+                assert_eq!(record.child_tag(), Some(FiberTag::HostText));
+                assert_eq!(record.child_sibling(), Some(second_child));
+                assert_eq!(record.child_sibling_tag(), Some(FiberTag::HostComponent));
+                assert_eq!(
+                    record.shape(),
+                    UnsupportedOffscreenChildShapeKind::MultipleChildren
+                );
+                assert_eq!(record.render_lanes(), Lanes::OFFSCREEN);
+                assert_eq!(record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
+            }
+            other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
+        }
+
+        let offscreen_complete_error = handoff_completed_host_root_render_to_test_complete_work(
+            &mut offscreen_store,
+            &mut offscreen_host,
+            offscreen_render,
+            &offscreen_source,
+        )
+        .unwrap_err();
+
+        match offscreen_complete_error {
+            HostRootCompleteWorkHandoffError::ChildPreflight(error) => match *error {
+                HostRootChildBeginWorkPreflightError::UnsupportedOffscreenChildShape {
+                    root,
+                    host_root_work_in_progress,
+                    offscreen: record,
+                } => {
+                    assert_eq!(root, offscreen_root);
+                    assert_eq!(
+                        host_root_work_in_progress,
+                        offscreen_render.work_in_progress()
+                    );
+                    assert_eq!(record.fiber(), offscreen);
+                    assert_eq!(
+                        record.shape(),
+                        UnsupportedOffscreenChildShapeKind::MultipleChildren
+                    );
+                    assert_eq!(record.child(), Some(first_child));
+                    assert_eq!(record.child_sibling(), Some(second_child));
+                    assert_eq!(record.render_lanes(), offscreen_render.render_lanes());
+                }
+                other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
+            },
+            other => panic!("expected complete-work child preflight, got {other:?}"),
+        }
+        assert!(offscreen_registry.calls().is_empty());
+        assert_client_root_fail_closed_without_side_effects(
+            &offscreen_store,
+            &offscreen_host,
+            offscreen_root,
+            offscreen_current,
+            offscreen_render,
+            offscreen,
+        );
+        assert_eq!(
+            offscreen_store
+                .fiber_arena()
+                .get(first_child)
+                .unwrap()
+                .return_fiber(),
+            Some(offscreen)
+        );
+        assert_eq!(
+            offscreen_store
+                .fiber_arena()
+                .get(second_child)
+                .unwrap()
+                .return_fiber(),
+            Some(offscreen)
+        );
     }
 
     #[test]
@@ -6553,16 +7008,20 @@ mod tests {
             )
             .unwrap_err();
 
-            assert_eq!(
-                error,
-                HostRootCompleteWorkHandoffError::ChildPreflight(Box::new(
-                    HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                        fiber: child,
+            match error {
+                HostRootCompleteWorkHandoffError::ChildPreflight(error) => {
+                    assert_root_child_preflight_blocks_unsupported_tag(
+                        *error,
+                        root_id,
+                        render.work_in_progress(),
+                        child,
                         tag,
                         feature,
-                    },
-                ))
-            );
+                        render.render_lanes(),
+                    );
+                }
+                other => panic!("expected child preflight error, got {other:?}"),
+            }
             assert_client_root_fail_closed_without_side_effects(
                 &store, &host, root_id, current, render, child,
             );
@@ -7584,16 +8043,20 @@ mod tests {
                     },
                     other => panic!("expected child preflight blocker, got {other:?}"),
                 },
-                FiberTag::Suspense => assert_eq!(
-                    error,
-                    HostRootCompleteWorkHandoffError::ChildPreflight(Box::new(
-                        HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                            fiber: blocked_child,
-                            tag: FiberTag::Suspense,
-                            feature: SUSPENSE_UNSUPPORTED_FEATURE,
-                        },
-                    )),
-                ),
+                FiberTag::Suspense => match error {
+                    HostRootCompleteWorkHandoffError::ChildPreflight(error) => {
+                        assert_root_child_preflight_blocks_unsupported_tag(
+                            *error,
+                            root_id,
+                            render.work_in_progress(),
+                            blocked_child,
+                            FiberTag::Suspense,
+                            SUSPENSE_UNSUPPORTED_FEATURE,
+                            render.render_lanes(),
+                        );
+                    }
+                    other => panic!("expected child preflight blocker, got {other:?}"),
+                },
                 _ => unreachable!("test only covers explicit blocker tags"),
             }
 
@@ -7971,18 +8434,22 @@ mod tests {
             )
             .unwrap_err();
 
-            assert_eq!(
-                error,
+            match error {
                 HostRootFunctionComponentSingleChildCompleteWorkHandoffError::ChildPreflight(
-                    Box::new(
-                        HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                            fiber: child,
-                            tag,
-                            feature,
-                        },
-                    ),
-                )
-            );
+                    error,
+                ) => {
+                    assert_root_child_preflight_blocks_unsupported_tag(
+                        *error,
+                        root_id,
+                        render.work_in_progress(),
+                        child,
+                        tag,
+                        feature,
+                        render.render_lanes(),
+                    );
+                }
+                other => panic!("expected child preflight error, got {other:?}"),
+            }
             assert!(registry.calls().is_empty());
             assert_client_root_fail_closed_without_side_effects(
                 &store, &host, root_id, current, render, child,
@@ -8190,13 +8657,14 @@ mod tests {
                         render_lanes,
                     )
                     .unwrap_err();
-                    assert_eq!(
+                    assert_root_child_preflight_blocks_unsupported_tag(
                         error,
-                        HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                            fiber: child,
-                            tag,
-                            feature: feature.unwrap(),
-                        }
+                        root_id,
+                        render.work_in_progress(),
+                        child,
+                        tag,
+                        feature.unwrap(),
+                        render_lanes,
                     );
                 }
             }
