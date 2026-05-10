@@ -463,6 +463,140 @@ test('private hydration replay event queue diagnostics record blocked event targ
   assert.deepEqual(document.__registrations, []);
 });
 
+test('private hydration target resolution records dehydrated ownership without draining replay queues', () => {
+  const document = createDocument('target-resolution');
+  const container = createElement('DIV', document);
+  const buttonTarget = createElement('BUTTON', document);
+  const startMarker = createComment('$');
+  const endMarker = createComment('/$');
+  buttonTarget.parentNode = container;
+  container.childNodes = [startMarker, buttonTarget, endMarker];
+
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    recordIdPrefix: 'hydration-target'
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    {
+      props: {
+        children: 'button'
+      },
+      type: 'App'
+    },
+    {
+      identifierPrefix: 'target-resolution-'
+    }
+  );
+  const wrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      'click',
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapper,
+      createNativeEvent('click', buttonTarget)
+    );
+  const targetResolutionDiagnostics =
+    pluginEventSystem.createHydrationDehydratedTargetResolutionDiagnostic(
+      dispatchRecord,
+      {
+        dehydratedTargetResolution: record.targetResolutionDiagnostics,
+        source: 'hydration-boundary-test-target-resolution'
+      }
+    );
+  const replayDiagnostics =
+    pluginEventSystem.createHydrationReplayEventQueueDiagnostic(
+      dispatchRecord,
+      {
+        dehydratedTargetResolution: record.targetResolutionDiagnostics,
+        markerReplayTargetCandidates:
+          record.replayQueueDiagnostics.markerReplayTargetCandidates,
+        source: 'hydration-boundary-test-target-resolution'
+      }
+    );
+
+  assertHydrationDehydratedTargetResolutionDiagnostics(
+    record.targetResolutionDiagnostics,
+    {
+      boundaryOwnerCount: 1,
+      lookupCount: 0,
+      rootRecordId: 'hydration-target:1',
+      status: 'blocked-no-hydratable-event-targets-recorded'
+    }
+  );
+  assert.equal(
+    record.eventReplayBlockers.targetResolutionDiagnostics,
+    record.targetResolutionDiagnostics
+  );
+  assert.equal(
+    record.eventReplayQueueDiagnostics.dehydratedTargetResolutionDiagnostics,
+    record.targetResolutionDiagnostics
+  );
+  assertHydrationDehydratedTargetResolutionDiagnostics(
+    targetResolutionDiagnostics,
+    {
+      boundaryOwnerCount: 1,
+      lookupCount: 1,
+      rootRecordId: 'hydration-target:1',
+      status: 'blocked-hydratable-event-targets-recorded'
+    }
+  );
+  const lookup =
+    targetResolutionDiagnostics.hydratableEventTargetLookups[0];
+  assert.deepEqual(
+    {
+      blockedOnKind: lookup.blockedOnKind,
+      blockedOnStatus: lookup.blockedOnStatus,
+      dehydratedBoundaryOwnerId: lookup.dehydratedBoundaryOwnerId,
+      domEventName: lookup.domEventName,
+      queueName: lookup.queueName,
+      rootOwnershipStatus: lookup.rootOwnershipStatus,
+      status: lookup.status,
+      targetContainerMatchesRoot: lookup.targetContainerMatchesRoot,
+      targetPath: lookup.targetPath,
+      targetPathStatus: lookup.targetPathStatus,
+      targetResolutionStatus: lookup.targetResolutionStatus,
+      willDrainReplayQueues: lookup.willDrainReplayQueues,
+      willHydrate: lookup.willHydrate,
+      willReplay: lookup.willReplay
+    },
+    {
+      blockedOnKind: 'suspense-boundary',
+      blockedOnStatus: 'blocked-on-dehydrated-boundary',
+      dehydratedBoundaryOwnerId: 'hydration-target:1:boundary:0',
+      domEventName: 'click',
+      queueName: 'discrete-hydration-replay-attempt',
+      rootOwnershipStatus: 'owned-by-dehydrated-root',
+      status: 'blocked-on-dehydrated-boundary',
+      targetContainerMatchesRoot: true,
+      targetPath: 'container.childNodes[1]',
+      targetPathStatus: 'found-in-container-child-list',
+      targetResolutionStatus: 'blocked',
+      willDrainReplayQueues: false,
+      willHydrate: false,
+      willReplay: false
+    }
+  );
+  assert.equal(
+    lookup.dehydratedBoundaryOwner.contractId,
+    'suspense-completed-start'
+  );
+  assert.equal(replayDiagnostics.targetResolutionDiagnosticsAccepted, true);
+  assert.equal(replayDiagnostics.hydratableEventTargetLookupCount, 1);
+  assert.equal(
+    replayDiagnostics.dehydratedTargetResolutionDiagnostics
+      .hydratableEventTargetLookups[0].targetPath,
+    'container.childNodes[1]'
+  );
+  assert.equal(replayDiagnostics.queuedEventReplayTargetCount, 0);
+  assert.equal(replayDiagnostics.replayedEventCount, 0);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+});
+
 test('public hydrateRoot remains an unsupported placeholder with no guard side effects', () => {
   const document = createDocument('public');
   const container = createElement('DIV', document);
@@ -639,6 +773,104 @@ function assertHydrationReplayEventQueueDiagnostics(diagnostics, expected) {
     diagnostics.priorityQueueOrder.length,
     expected.blockedEventReplayTargetCount
   );
+}
+
+function assertHydrationDehydratedTargetResolutionDiagnostics(
+  diagnostics,
+  expected
+) {
+  assert.equal(Object.isFrozen(diagnostics), true);
+  assert.equal(
+    diagnostics.kind,
+    pluginEventSystem.HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND
+  );
+  assert.equal(diagnostics.status, expected.status);
+  assert.equal(diagnostics.diagnosticOnly, true);
+  assert.equal(diagnostics.readOnly, true);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.browserDomEventCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicRootBehaviorChanged, false);
+  assert.equal(diagnostics.eventTargetResolutionSupported, false);
+  assert.equal(diagnostics.hydrationReplaySupported, false);
+  assert.equal(diagnostics.eventReplaySupported, false);
+  assert.equal(diagnostics.queueMutationAllowed, false);
+  assert.equal(diagnostics.replayQueuesDrained, false);
+  assert.equal(diagnostics.willDrainReplayQueues, false);
+  assert.equal(diagnostics.eventsReplayed, false);
+  assert.equal(diagnostics.willDispatchEvents, false);
+  assert.equal(diagnostics.willHydrateHostInstances, false);
+  assert.equal(
+    diagnostics.blockedReason,
+    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.hydrationReplayBlockedReason,
+    pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.eventDispatchBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(diagnostics.rootRecordId, expected.rootRecordId);
+  assert.equal(diagnostics.rootKind, hydrationGate.UNSUPPORTED_HYDRATION_ROOT_KIND);
+  assert.equal(diagnostics.rootTag, hydrationGate.CONCURRENT_ROOT_TAG);
+  assert.equal(
+    diagnostics.dehydratedRootOwner.kind,
+    pluginEventSystem.HYDRATION_DEHYDRATED_ROOT_OWNER_RECORD_KIND
+  );
+  assert.equal(
+    diagnostics.dehydratedRootOwner.status,
+    'recorded-unsupported-dehydrated-root-owner'
+  );
+  assert.equal(diagnostics.dehydratedRootOwner.dehydrated, true);
+  assert.equal(diagnostics.dehydratedRootOwner.unsupported, true);
+  assert.equal(diagnostics.dehydratedRootOwner.canHydrate, false);
+  assert.equal(diagnostics.dehydratedRootOwner.targetResolutionSupported, false);
+  assert.equal(
+    diagnostics.dehydratedRootOwnerStatus,
+    'recorded-unsupported-dehydrated-root-owner'
+  );
+  assert.equal(
+    diagnostics.markerReplayTargetCandidateCount,
+    expected.boundaryOwnerCount
+  );
+  assert.equal(
+    diagnostics.dehydratedBoundaryOwnerCount,
+    expected.boundaryOwnerCount
+  );
+  assert.equal(
+    diagnostics.dehydratedBoundaryOwners.length,
+    expected.boundaryOwnerCount
+  );
+  for (const owner of diagnostics.dehydratedBoundaryOwners) {
+    assert.equal(
+      owner.kind,
+      pluginEventSystem.HYDRATION_DEHYDRATED_BOUNDARY_OWNER_RECORD_KIND
+    );
+    assert.equal(
+      owner.status,
+      'recorded-marker-derived-dehydrated-boundary-owner'
+    );
+    assert.equal(owner.dehydrated, true);
+    assert.equal(owner.rootOwned, true);
+    assert.equal(owner.canHydrate, false);
+    assert.equal(owner.queued, false);
+    assert.equal(owner.queueEligible, false);
+  }
+  assert.equal(
+    diagnostics.eventDispatchRecordCount,
+    expected.lookupCount
+  );
+  assert.equal(
+    diagnostics.hydratableEventTargetLookupCount,
+    expected.lookupCount
+  );
+  assert.equal(
+    diagnostics.hydratableEventTargetLookups.length,
+    expected.lookupCount
+  );
+  assert.equal(diagnostics.queuedEventReplayTargetCount, 0);
+  assert.equal(diagnostics.replayedEventCount, 0);
 }
 
 function assertHydrationMarkerReplayQueueDiagnostics(record, expected) {
