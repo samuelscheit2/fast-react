@@ -48,6 +48,14 @@ const privateActDispatcherGateModule =
   "packages/react/private-act-dispatcher-gate.js";
 const reactDomTestUtilsActPrivateRoutingGateModule =
   "packages/react-dom/src/test-utils-act-gate.js";
+const privateActQueueFlushDiagnosticsExport =
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+const schedulerMockWorkspaceEntrypoint = "packages/scheduler/unstable_mock.js";
+const schedulerMockWorkspaceEntrypoints = [
+  schedulerMockWorkspaceEntrypoint,
+  "packages/scheduler/cjs/scheduler-unstable_mock.development.js",
+  "packages/scheduler/cjs/scheduler-unstable_mock.production.js"
+];
 
 test("checked React.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -271,6 +279,10 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(gate.rendererRootsReady, false);
   assert.equal(gate.passiveEffectsReady, false);
   assert.equal(gate.continuationFlushingReady, false);
+  assert.equal(gate.privateTestQueueFlushDiagnosticsReady, true);
+  assert.equal(gate.drainsAcceptedInternalTestQueues, true);
+  assert.equal(gate.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(gate.publicReactActCompatibilityClaimed, false);
   assert.equal(gate.executesQueuedWork, false);
   assert.equal(gate.executesEffects, false);
   assert.deepEqual(gate.requiredRecords, [
@@ -286,6 +298,15 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     "NoContinuation",
     "PendingContinuation"
   ]);
+  assert.equal(
+    gate.internalTestQueueKind,
+    "fast-react.react.private-act-queue-test-queue"
+  );
+  assert.equal(
+    gate.internalTestTaskKind,
+    "fast-react.react.private-act-queue-test-task"
+  );
+  assert.equal(gate.internalTestQueueVersion, 1);
 
   let queuedTaskInvoked = false;
   const metadata = gate.createActQueueMetadata({
@@ -306,6 +327,118 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(gate.isPrivateActDispatcher(dispatcher), true);
   assert.equal(gate.getPrivateActQueueMetadata(dispatcher), metadata);
   assert.equal(queuedTaskInvoked, false);
+  assert.equal(metadata.privateTestQueueFlushDiagnosticsReady, true);
+  assert.equal(metadata.drainsAcceptedInternalTestQueues, true);
+  assert.equal(metadata.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(metadata.publicReactActCompatibilityClaimed, false);
+
+  const testTask = gate.createInternalActQueueTestTask({
+    label: "react-private-act-test-task",
+    recordKind: "SchedulerActQueueRequest",
+    taskKind: "SchedulerCallback",
+    continuationStatus: "PendingContinuation"
+  });
+  assert.equal(gate.isAcceptedInternalActQueueTestTask(testTask), true);
+  assert.deepEqual(
+    {
+      kind: testTask.kind,
+      version: testTask.version,
+      label: testTask.label,
+      recordKind: testTask.recordKind,
+      taskKind: testTask.taskKind,
+      continuationStatus: testTask.continuationStatus,
+      publicCompatibilityClaimed: testTask.publicCompatibilityClaimed,
+      publicSchedulerTimingCompatibilityClaimed:
+        testTask.publicSchedulerTimingCompatibilityClaimed,
+      publicReactActCompatibilityClaimed:
+        testTask.publicReactActCompatibilityClaimed,
+      executesQueuedWork: testTask.executesQueuedWork,
+      executesEffects: testTask.executesEffects
+    },
+    {
+      kind: gate.internalTestTaskKind,
+      version: 1,
+      label: "react-private-act-test-task",
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "SchedulerCallback",
+      continuationStatus: "PendingContinuation",
+      publicCompatibilityClaimed: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      executesQueuedWork: false,
+      executesEffects: false
+    }
+  );
+
+  const testQueue = gate.createInternalActQueueTestQueue([
+    testTask,
+    "string-normalized-task"
+  ]);
+  assert.equal(gate.isAcceptedInternalActQueueTestQueue(testQueue), true);
+  assert.equal(testQueue.kind, gate.internalTestQueueKind);
+  assert.equal(testQueue.version, gate.internalTestQueueVersion);
+  assert.equal(testQueue.queueFlushingReady, false);
+  assert.equal(testQueue.privateTestQueueFlushDiagnosticsReady, true);
+  assert.equal(testQueue.drainsAcceptedInternalTestQueues, true);
+  assert.equal(testQueue.publicCompatibilityClaimed, false);
+  assert.equal(testQueue.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(testQueue.publicReactActCompatibilityClaimed, false);
+  assert.equal(testQueue.executesQueuedWork, false);
+  assert.equal(testQueue.executesEffects, false);
+  assert.deepEqual(
+    testQueue.records.map((record) => record.label),
+    ["react-private-act-test-task", "string-normalized-task"]
+  );
+
+  const Scheduler = loadFreshSchedulerMock("development");
+  const diagnostics =
+    Scheduler.unstable_flushAllWithoutAsserting[
+      privateActQueueFlushDiagnosticsExport
+    ];
+  const drainReport = diagnostics.drainAcceptedInternalActQueue(testQueue);
+  assert.equal(drainReport.status, "drained-accepted-internal-test-queue");
+  assert.equal(drainReport.drainedCount, 2);
+  assert.equal(drainReport.remainingCount, 0);
+  assert.equal(drainReport.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(drainReport.publicReactActCompatibilityClaimed, false);
+  assert.equal(drainReport.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(drainReport.drainsPublicReactActQueue, false);
+  assert.equal(drainReport.executesQueuedWork, false);
+  assert.equal(drainReport.executesEffects, false);
+  assert.equal(testQueue.records.length, 0);
+
+  const rejectedQueue = gate.createInternalActQueueTestQueue([
+    gate.createInternalActQueueTestTask("accepted-before-tamper")
+  ]);
+  rejectedQueue.records.push({
+    kind: gate.internalTestTaskKind,
+    version: gate.internalTestQueueVersion,
+    label: "unbranded-task",
+    recordKind: "SchedulerActQueueRequest",
+    taskKind: "SchedulerCallback",
+    continuationStatus: "NoContinuation",
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+  assert.equal(gate.isAcceptedInternalActQueueTestQueue(rejectedQueue), false);
+  assert.throws(
+    () => diagnostics.drainAcceptedInternalActQueue(rejectedQueue),
+    (error) => {
+      assert.equal(error.name, "FastReactSchedulerPrivateActQueueFlushError");
+      assert.equal(
+        error.code,
+        "FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_REJECTED"
+      );
+      assert.equal(error.entrypoint, "scheduler/unstable_mock");
+      assert.equal(error.compatibilityTarget, "scheduler@0.27.0");
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      return true;
+    }
+  );
 
   for (const rejectedMetadata of [
     gate.createActQueueMetadata({
@@ -313,6 +446,12 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     }),
     gate.createActQueueMetadata({
       queueFlushingReady: true
+    }),
+    gate.createActQueueMetadata({
+      privateTestQueueFlushDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      publicSchedulerTimingCompatibilityClaimed: true
     }),
     gate.createActQueueMetadata({
       passiveEffectsReady: true
@@ -806,6 +945,26 @@ function loadFreshWorkspaceModule(relativeModulePath) {
   const resolved = require.resolve(modulePath);
   delete require.cache[resolved];
   return require(resolved);
+}
+
+function loadFreshSchedulerMock(nodeEnv) {
+  const previousNodeEnv = process.env.NODE_ENV;
+
+  for (const relativeModulePath of schedulerMockWorkspaceEntrypoints) {
+    const resolved = require.resolve(path.join(repoRoot, relativeModulePath));
+    delete require.cache[resolved];
+  }
+
+  process.env.NODE_ENV = nodeEnv;
+  try {
+    return require(path.join(repoRoot, schedulerMockWorkspaceEntrypoint));
+  } finally {
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
 }
 
 function captureThrown(fn) {
