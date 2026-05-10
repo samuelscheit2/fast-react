@@ -63,6 +63,7 @@ const latestPropsSafePayloadKinds = new Set([
   ENTRY_REMOVE_PROPERTY,
   ENTRY_SET_STYLE,
   ENTRY_REMOVE_STYLE,
+  ENTRY_SET_INNER_HTML,
   ENTRY_NON_PAYLOAD
 ]);
 function createDomHostMutationError(code, message) {
@@ -833,6 +834,14 @@ function normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
     return validateStylePayloadEntry(instance, entry, entry.kind);
   }
 
+  if (
+    entry &&
+    typeof entry === 'object' &&
+    entry.kind === ENTRY_SET_INNER_HTML
+  ) {
+    return validateInnerHtmlPayloadEntry(instance, entry);
+  }
+
   if (isNonPayloadPropertyPayloadEntry(entry)) {
     return normalizeNonPayloadPropertyPayloadEntry(entry, index);
   }
@@ -848,6 +857,11 @@ function applyLatestPropsSafeDomPropertyPayloadEntry(instance, entry) {
 
   if (isStylePropertyPayloadEntry(entry)) {
     applyStylePayloadEntry(instance, entry);
+    return;
+  }
+
+  if (entry.kind === ENTRY_SET_INNER_HTML) {
+    applyStyleDangerousHtmlPayloadEntry(instance, entry);
   }
 }
 
@@ -945,6 +959,15 @@ function createLatestPropsPayloadRecord(entry) {
       mutation: entry.mutation,
       propName: entry.propName,
       styleName: entry.styleName,
+      value: entry.value
+    });
+  }
+
+  if (entry.kind === ENTRY_SET_INNER_HTML) {
+    return Object.freeze({
+      kind: entry.kind,
+      propertyName: entry.propertyName,
+      propName: entry.propName,
       value: entry.value
     });
   }
@@ -1184,6 +1207,10 @@ function createLatestPropsSafeDomPropertyPayloadRollbackRecord(
 
   if (entry.kind === ENTRY_SET_STYLE || entry.kind === ENTRY_REMOVE_STYLE) {
     return createStylePayloadRollbackRecord(instance, entry);
+  }
+
+  if (entry.kind === ENTRY_SET_INNER_HTML) {
+    return createInnerHtmlPayloadRollbackRecord(instance);
   }
 
   return null;
@@ -1555,6 +1582,10 @@ function cloneSafeLatestPropsPayloadRecord(payloadRecord, index) {
     assertStringPayloadField(payloadRecord, 'propName', index);
     assertStringPayloadField(payloadRecord, 'styleName', index);
     assertStringPayloadField(payloadRecord, 'mutation', index);
+    assertStringPayloadField(payloadRecord, 'value', index);
+  } else if (kind === 'setInnerHTML') {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'propertyName', index);
     assertStringPayloadField(payloadRecord, 'value', index);
   } else {
     assertStringPayloadField(payloadRecord, 'propName', index);

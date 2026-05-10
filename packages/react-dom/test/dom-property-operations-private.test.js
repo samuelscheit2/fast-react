@@ -31,6 +31,8 @@ const {
   ENTRY_SET_INNER_HTML,
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
+  PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND,
+  PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_KIND,
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
@@ -414,6 +416,264 @@ test('private root host-output style commit rejects stale and unsupported style 
   cleanupPrivateStyleCommitFixture(unsupportedFixture);
 });
 
+test('private root host-output update applies style and dangerous HTML fake-DOM rows', () => {
+  const fixture = createPrivateStyleDangerousHtmlUpdateFixture();
+  const nextProps = {
+    style: orderedStyle([
+      ['color', 'blue'],
+      ['width', 12]
+    ]),
+    dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+  };
+  const update = fixture.bridge.renderContainer(fixture.create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+
+  fixture.host.styleLog = [];
+  fixture.host.innerHTMLLog = [];
+
+  const handoff = fixture.bridge.applyHostOutputUpdate(update, {
+    hostInstanceToken: fixture.token,
+    nextProps,
+    tag: 'div'
+  });
+  const payload =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(handoff);
+  const styleCommit = payload.styleObjectDiffCommit;
+  const dangerousHtmlCommit = payload.dangerousHtmlUpdateCommit;
+
+  assert.equal(handoff.latestPropsPublished, true);
+  assert.equal(handoff.latestPropsPublishOrder, 'after-property-mutation');
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.publicRootObjectExposed, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.deepEqual(handoff.propertyMutation.propertyPayloadEvidence, {
+    propertyPayloadBacked: true,
+    rowCount: 5,
+    mutatingRowCount: 5,
+    updateRowCount: 3,
+    removalRowCount: 2,
+    setAttributeCount: 0,
+    removeAttributeCount: 0,
+    setPropertyCount: 0,
+    removePropertyCount: 0,
+    setStyleCount: 2,
+    removeStyleCount: 2,
+    nonPayloadRowCount: 0,
+    attributeRowCount: 0,
+    propertyRowCount: 0,
+    styleRowCount: 4,
+    rowKinds: [ENTRY_REMOVE_STYLE, ENTRY_SET_STYLE, ENTRY_SET_INNER_HTML],
+    setInnerHTMLCount: 1,
+    dangerousHtmlRowCount: 1
+  });
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'fake-dom-property-update',
+      'property-payload-evidence',
+      'latest-props-after-mutation',
+      'style-payload-rows',
+      'dangerous-html-payload-rows'
+    ]
+  );
+  assert.equal(
+    styleCommit.publicMetadata.kind,
+    PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND
+  );
+  assert.equal(
+    styleCommit.publicMetadata.status,
+    PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS
+  );
+  assert.deepEqual(styleCommit.payloadRows, [
+    removeStyle('marginTop', 'propertyAssignment'),
+    removeStyle('--gap', 'setProperty'),
+    setStyle('color', 'propertyAssignment', 'blue'),
+    setStyle('width', 'propertyAssignment', '12px')
+  ]);
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.kind,
+    PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND
+  );
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.status,
+    PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS
+  );
+  assert.deepEqual(dangerousHtmlCommit.publicMetadata, {
+    kind: PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND,
+    status: PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS,
+    sourceRequestId: update.requestId,
+    sourceUpdateId: update.updateId,
+    propName: 'dangerouslySetInnerHTML',
+    propertyName: 'innerHTML',
+    payloadRowCount: 1,
+    commitMutationRecordCount: 1,
+    setInnerHTMLCount: 1,
+    propertyPayloadBacked: true,
+    payloadRowsAccepted: true,
+    fakeDomCommitHandoff: true,
+    fakeDomMutation: true,
+    fakeDomInnerHTMLWritten: true,
+    realDomInnerHTMLWritten: false,
+    browserDomMutation: false,
+    publicRootCompatibility: false,
+    publicDangerousHtmlCompatibility: false,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(dangerousHtmlCommit.payloadRows, [
+    setInnerHTML('<em>After</em>')
+  ]);
+  assert.deepEqual(dangerousHtmlCommit.mutationRecords, [
+    setInnerHTML('<em>After</em>')
+  ]);
+  assert.deepEqual(fixture.host.styleLog, [
+    ['stylePropertyAssignment', 'marginTop', ''],
+    ['styleSetProperty', '--gap', ''],
+    ['stylePropertyAssignment', 'color', 'blue'],
+    ['stylePropertyAssignment', 'width', '12px']
+  ]);
+  assert.deepEqual(fixture.host.innerHTMLLog, [
+    ['setInnerHTML', '<em>After</em>']
+  ]);
+  assert.deepEqual(activeStyleProperties(fixture.host), [
+    ['color', 'blue'],
+    ['width', '12px']
+  ]);
+  assert.equal(fixture.host.innerHTML, '<em>After</em>');
+  assert.equal(
+    componentTree.getLatestPropsFromHostInstanceToken(fixture.token),
+    nextProps
+  );
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('<span>Before</span>'), false);
+  assert.equal(serialized.includes('<em>After</em>'), false);
+  cleanupPrivateStyleDangerousHtmlUpdateFixture(fixture);
+});
+
+test('private root host-output dangerous HTML update rolls back prior style rows', () => {
+  const fixture = createPrivateStyleDangerousHtmlUpdateFixture(
+    'dangerous-html-rollback'
+  );
+  const nextProps = {
+    style: orderedStyle([
+      ['color', 'blue'],
+      ['width', 12]
+    ]),
+    dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+  };
+  const update = fixture.bridge.renderContainer(fixture.create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const thrownError = new Error('fake innerHTML update failed');
+  fixture.host.innerHTMLFailure = thrownError;
+  fixture.host.styleLog = [];
+  fixture.host.innerHTMLLog = [];
+
+  let caughtError = null;
+  assert.throws(
+    () =>
+      fixture.bridge.applyHostOutputUpdate(update, {
+        hostInstanceToken: fixture.token,
+        nextProps,
+        tag: 'div'
+      }),
+    (error) => {
+      caughtError = error;
+      return error === thrownError;
+    }
+  );
+  assert.deepEqual(caughtError.domPropertyRollbackEvidence, {
+    kind: 'FastReactDomLatestPropsPropertyRollbackEvidence',
+    mutation: 'propertyUpdate',
+    latestPropsPublished: false,
+    normalizedEntryCount: 5,
+    mutationAttempted: true,
+    appliedMutationCount: 5,
+    rollbackSupported: true,
+    rollbackAttempted: true,
+    rollbackApplied: true,
+    rollbackRecordCount: 5,
+    unsupportedPropertyPayloadRejected: false,
+    rollbackError: null
+  });
+  assert.deepEqual(caughtError.privateRootUpdateRollbackEvidence, {
+    kind: 'FastReactDomPrivateRootUpdateRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: false,
+    latestPropsRestoredToPrevious: true,
+    propertyMutationAttempted: true,
+    propertyRollbackAttempted: true,
+    propertyRollbackApplied: true,
+    propertyRollbackRecordCount: 5,
+    textMutationRequested: false,
+    textMutationApplied: false,
+    textRollbackAttempted: false,
+    textRollbackApplied: false,
+    unsupportedPropertyPayloadRejected: false,
+    propertyRollbackError: null,
+    textRollbackError: null
+  });
+  assert.deepEqual(fixture.host.innerHTMLLog, [
+    ['setInnerHTML', '<em>After</em>', 'throw']
+  ]);
+  assert.deepEqual(activeStyleProperties(fixture.host), [
+    ['--gap', '4px'],
+    ['color', 'red'],
+    ['marginTop', '4px']
+  ]);
+  assert.equal(fixture.host.innerHTML, '<span>Before</span>');
+  assert.equal(
+    componentTree.getLatestPropsFromHostInstanceToken(fixture.token),
+    fixture.initialProps
+  );
+  cleanupPrivateStyleDangerousHtmlUpdateFixture(fixture);
+});
+
+test('private root host-output dangerous HTML update fails closed for unsupported rows', () => {
+  const fixture = createPrivateStyleDangerousHtmlUpdateFixture(
+    'dangerous-html-unsupported'
+  );
+  const nextProps = {
+    style: orderedStyle([['color', 'blue']]),
+    dangerouslySetInnerHTML: '<em>After</em>'
+  };
+  const update = fixture.bridge.renderContainer(fixture.create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  fixture.host.styleLog = [];
+  fixture.host.innerHTMLLog = [];
+
+  assert.throws(
+    () =>
+      fixture.bridge.applyHostOutputUpdate(update, {
+        hostInstanceToken: fixture.token,
+        nextProps,
+        tag: 'div'
+      }),
+    {
+      code: 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+    }
+  );
+  assert.deepEqual(fixture.host.styleLog, []);
+  assert.deepEqual(fixture.host.innerHTMLLog, []);
+  assert.deepEqual(activeStyleProperties(fixture.host), [
+    ['--gap', '4px'],
+    ['color', 'red'],
+    ['marginTop', '4px']
+  ]);
+  assert.equal(fixture.host.innerHTML, '<span>Before</span>');
+  assert.equal(
+    componentTree.getLatestPropsFromHostInstanceToken(fixture.token),
+    fixture.initialProps
+  );
+  cleanupPrivateStyleDangerousHtmlUpdateFixture(fixture);
+});
+
 test('private DOM style object diff diagnostics fail closed for unsupported rows', () => {
   const diagnostic = recordPrivateDomStyleObjectDiffDiagnostics(
     null,
@@ -525,6 +785,15 @@ function removeStyle(styleName, mutation) {
     styleName,
     mutation,
     value: ''
+  };
+}
+
+function setInnerHTML(value) {
+  return {
+    kind: ENTRY_SET_INNER_HTML,
+    propName: 'dangerouslySetInnerHTML',
+    propertyName: 'innerHTML',
+    value
   };
 }
 
@@ -1282,10 +1551,174 @@ function cleanupPrivateStyleCommitFixture(fixture) {
   fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
 }
 
+function createPrivateStyleDangerousHtmlUpdateFixture(
+  label = 'style-dangerous-html-update'
+) {
+  const document = new PrivateStyleDangerousHtmlUpdateDocument(label);
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hostOutputUpdateIdPrefix: `${label}-host-update`,
+    sideEffectIdPrefix: `${label}-side-effect`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = {
+    style: orderedStyle([
+      ['color', 'red'],
+      ['marginTop', 4],
+      ['--gap', '4px']
+    ]),
+    dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+  };
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement('div');
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'PrivateStyleDangerousHtmlUpdateHost'},
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, {});
+  const propsHandoff = domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    'div',
+    {},
+    initialProps
+  );
+  componentTree.commitLatestPropsFromMutationHandoff(propsHandoff);
+
+  return {
+    bridge,
+    create,
+    host,
+    initialProps,
+    sideEffects,
+    token
+  };
+}
+
+function cleanupPrivateStyleDangerousHtmlUpdateFixture(fixture) {
+  componentTree.detachHostInstanceToken(fixture.token);
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
 function activeStyleProperties(element) {
   return Array.from(element.style.properties.entries())
     .filter(([, value]) => value !== '')
     .sort(([left], [right]) => left.localeCompare(right));
+}
+
+class PrivateStyleDangerousHtmlUpdateEventTarget {
+  constructor(fields) {
+    Object.assign(this, fields);
+    this.__registrations = [];
+  }
+
+  addEventListener(type, listener, options) {
+    this.__registrations.push({listener, options, type});
+  }
+
+  removeEventListener(type, listener, options) {
+    const index = this.__registrations.findIndex(
+      (entry) =>
+        entry.type === type &&
+        entry.listener === listener &&
+        entry.options === options
+    );
+    if (index !== -1) {
+      this.__registrations.splice(index, 1);
+    }
+  }
+}
+
+class PrivateStyleDangerousHtmlUpdateDocument
+  extends PrivateStyleDangerousHtmlUpdateEventTarget {
+  constructor(label) {
+    super({
+      label,
+      nodeName: '#document',
+      nodeType: 9
+    });
+    this.ownerDocument = this;
+    this.defaultView = new PrivateStyleDangerousHtmlUpdateEventTarget({
+      label: `${label}-window`
+    });
+  }
+
+  createElement(nodeName) {
+    return new PrivateStyleDangerousHtmlUpdateElement(
+      String(nodeName),
+      this
+    );
+  }
+}
+
+class PrivateStyleDangerousHtmlUpdateElement
+  extends PrivateStyleDangerousHtmlUpdateEventTarget {
+  constructor(nodeName, ownerDocument) {
+    super({
+      nodeName,
+      nodeType: 1,
+      ownerDocument
+    });
+    this.childNodes = [];
+    this.innerHTMLFailure = null;
+    this.innerHTMLLog = [];
+    this._innerHTML = '';
+    this.styleLog = [];
+    this.style = new PrivateStyleDangerousHtmlUpdateStyle(this);
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set innerHTML(value) {
+    const stringValue = String(value);
+    if (this.innerHTMLFailure !== null) {
+      this.innerHTMLLog.push(['setInnerHTML', stringValue, 'throw']);
+      throw this.innerHTMLFailure;
+    }
+    this.childNodes = [];
+    this._innerHTML = stringValue;
+    this.innerHTMLLog.push(['setInnerHTML', stringValue]);
+  }
+}
+
+class PrivateStyleDangerousHtmlUpdateStyle {
+  constructor(ownerElement) {
+    this.ownerElement = ownerElement;
+    this.properties = new Map();
+
+    return new Proxy(this, {
+      set(target, property, value, receiver) {
+        if (typeof property === 'string' && property !== 'ownerElement') {
+          const stringValue = String(value);
+          target.properties.set(property, stringValue);
+          target.ownerElement.styleLog.push([
+            'stylePropertyAssignment',
+            property,
+            stringValue
+          ]);
+        }
+        return Reflect.set(target, property, value, receiver);
+      }
+    });
+  }
+
+  setProperty(name, value) {
+    const propertyName = String(name);
+    const stringValue = String(value);
+    this.properties.set(propertyName, stringValue);
+    this.ownerElement.styleLog.push([
+      'styleSetProperty',
+      propertyName,
+      stringValue
+    ]);
+  }
 }
 
 class PrivateStyleCommitEventTarget {

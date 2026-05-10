@@ -118,6 +118,8 @@ const {
   ENTRY_SET_PROPERTY,
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
+  PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND,
+  PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
@@ -5804,6 +5806,7 @@ function applyPrivateRootHostOutputUpdateWithBridge(
   let propertyHandoffPayload = null;
   let propertyMutationEvidence = null;
   let styleObjectDiffCommit = null;
+  let dangerousHtmlUpdateCommit = null;
   let publishedLatestProps = null;
   let textMutationApplied = false;
   let latestPropsHandoffStale = false;
@@ -5826,6 +5829,12 @@ function applyPrivateRootHostOutputUpdateWithBridge(
       propertyMutationEvidence,
       record
     );
+    dangerousHtmlUpdateCommit =
+      createHostOutputDangerousHtmlUpdateCommitMetadata(
+        propertyHandoffPayload,
+        propertyMutationEvidence,
+        record
+      );
     if (
       normalized.textUpdate === null &&
       propertyMutationEvidence.mutatingRowCount === 0
@@ -5983,6 +5992,7 @@ function applyPrivateRootHostOutputUpdateWithBridge(
     propertyMutationEvidence,
     rootHandle: payload.rootHandle,
     sourceRecord: record,
+    dangerousHtmlUpdateCommit,
     styleObjectDiffCommit,
     textInstance:
       normalized.textUpdate === null
@@ -11976,6 +11986,7 @@ function createHostOutputPropertyMutationEvidence(propertyHandoffPayload) {
     removeStyleCount: 0,
     nonPayloadRowCount: 0
   };
+  let setInnerHTMLCount = 0;
 
   for (const record of mutationRecords) {
     const kind = record.kind;
@@ -12014,13 +12025,18 @@ function createHostOutputPropertyMutationEvidence(propertyHandoffPayload) {
         evidence.removalRowCount += 1;
         evidence.mutatingRowCount += 1;
         break;
+      case ENTRY_SET_INNER_HTML:
+        setInnerHTMLCount += 1;
+        evidence.updateRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
       case ENTRY_NON_PAYLOAD:
         evidence.nonPayloadRowCount += 1;
         break;
     }
   }
 
-  return freezeRecord({
+  const result = {
     ...evidence,
     attributeRowCount:
       evidence.setAttributeCount + evidence.removeAttributeCount,
@@ -12028,7 +12044,12 @@ function createHostOutputPropertyMutationEvidence(propertyHandoffPayload) {
       evidence.setPropertyCount + evidence.removePropertyCount,
     styleRowCount: evidence.setStyleCount + evidence.removeStyleCount,
     rowKinds: freezeArray(rowKinds)
-  });
+  };
+  if (setInnerHTMLCount > 0) {
+    result.setInnerHTMLCount = setInnerHTMLCount;
+    result.dangerousHtmlRowCount = setInnerHTMLCount;
+  }
+  return freezeRecord(result);
 }
 
 function createHostOutputStyleObjectDiffCommitMetadata(
@@ -12120,6 +12141,65 @@ function isHostOutputStyleMutationRecord(record) {
   );
 }
 
+function createHostOutputDangerousHtmlUpdateCommitMetadata(
+  propertyHandoffPayload,
+  propertyMutationEvidence,
+  sourceRecord
+) {
+  const dangerousHtmlRowCount =
+    propertyMutationEvidence.dangerousHtmlRowCount || 0;
+  if (dangerousHtmlRowCount === 0) {
+    return null;
+  }
+
+  const mutationRecords =
+    propertyHandoffPayload === null
+      ? []
+      : propertyHandoffPayload.mutationRecords.filter(
+          isHostOutputDangerousHtmlMutationRecord
+        );
+  if (mutationRecords.length !== dangerousHtmlRowCount) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output dangerousHTML payload rows must match committed fake-DOM mutation records.'
+    );
+  }
+
+  const payloadRows = freezeArray(
+    mutationRecords.map((row) => freezeRecord({...row}))
+  );
+  const publicMetadata = freezeRecord({
+    kind: PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND,
+    status: PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS,
+    sourceRequestId: sourceRecord.requestId,
+    sourceUpdateId: sourceRecord.updateId,
+    propName: 'dangerouslySetInnerHTML',
+    propertyName: 'innerHTML',
+    payloadRowCount: payloadRows.length,
+    commitMutationRecordCount: mutationRecords.length,
+    setInnerHTMLCount: mutationRecords.length,
+    propertyPayloadBacked: true,
+    payloadRowsAccepted: true,
+    fakeDomCommitHandoff: true,
+    fakeDomMutation: true,
+    fakeDomInnerHTMLWritten: true,
+    realDomInnerHTMLWritten: false,
+    browserDomMutation: false,
+    publicRootCompatibility: false,
+    publicDangerousHtmlCompatibility: false,
+    compatibilityClaimed: false
+  });
+
+  return freezeRecord({
+    mutationRecords: payloadRows,
+    payloadRows,
+    publicMetadata
+  });
+}
+
+function isHostOutputDangerousHtmlMutationRecord(record) {
+  return isObjectOrFunction(record) && record.kind === ENTRY_SET_INNER_HTML;
+}
+
 function assertStyleObjectDiffPayloadRowsMatchCommitRecords(
   payloadRows,
   mutationRecords
@@ -12189,6 +12269,21 @@ function attachHostOutputUpdateRollbackEvidence(error, options) {
 
   const propertyRollbackError = options.propertyRollbackError;
   const textRollbackError = options.textRollbackError;
+  const domPropertyRollbackEvidence = error.domPropertyRollbackEvidence;
+  const internalPropertyMutationAttempted =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    domPropertyRollbackEvidence.mutationAttempted === true;
+  const internalPropertyRollbackAttempted =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    domPropertyRollbackEvidence.rollbackAttempted === true;
+  const internalPropertyRollbackApplied =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    domPropertyRollbackEvidence.rollbackApplied === true;
+  const internalPropertyRollbackRecordCount =
+    isObjectOrFunction(domPropertyRollbackEvidence) &&
+    typeof domPropertyRollbackEvidence.rollbackRecordCount === 'number'
+      ? domPropertyRollbackEvidence.rollbackRecordCount
+      : 0;
   error.privateRootUpdateRollbackEvidence = freezeRecord({
     kind: 'FastReactDomPrivateRootUpdateRollbackEvidence',
     latestPropsPublished: false,
@@ -12197,10 +12292,15 @@ function attachHostOutputUpdateRollbackEvidence(error, options) {
       getLatestPropsFromHostInstanceToken(
         options.normalized.hostInstanceToken
       ) === options.previousProps,
-    propertyMutationAttempted: options.propertyHandoff !== null,
-    propertyRollbackAttempted: options.propertyHandoff !== null,
-    propertyRollbackApplied: options.propertyRollbackApplied,
-    propertyRollbackRecordCount: options.propertyRollbackRecordCount,
+    propertyMutationAttempted:
+      options.propertyHandoff !== null || internalPropertyMutationAttempted,
+    propertyRollbackAttempted:
+      options.propertyHandoff !== null || internalPropertyRollbackAttempted,
+    propertyRollbackApplied:
+      options.propertyRollbackApplied || internalPropertyRollbackApplied,
+    propertyRollbackRecordCount:
+      options.propertyRollbackRecordCount ||
+      internalPropertyRollbackRecordCount,
     textMutationRequested: options.normalized.textUpdate !== null,
     textMutationApplied: options.textMutationApplied,
     textRollbackAttempted: options.textMutationApplied,
@@ -12256,6 +12356,16 @@ function createHostOutputUpdateAcceptedCapabilities(
         accepted: true,
         reason:
           'Style update and removal rows were admitted from property-payload evidence.'
+      })
+    );
+  }
+  if ((propertyMutationEvidence.dangerousHtmlRowCount || 0) > 0) {
+    capabilities.push(
+      freezeRecord({
+        id: 'dangerous-html-payload-rows',
+        accepted: true,
+        reason:
+          'DangerouslySetInnerHTML update rows were admitted from property-payload evidence for fake-DOM innerHTML mutation.'
       })
     );
   }
