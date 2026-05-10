@@ -9,6 +9,10 @@ const hydrationGate = require(path.join(
   packageRoot,
   'src/client/hydration-boundary-gate.js'
 ));
+const resourceFormGate = require(path.join(
+  packageRoot,
+  'src/resource-form-gates.js'
+));
 const rootBridge = require(path.join(
   packageRoot,
   'src/client/root-bridge.js'
@@ -58,6 +62,26 @@ test('unsupported hydrateRoot records bridge hydration parser evidence with root
     'suspense-completed-start',
     'suspense-end'
   ]);
+  assertAcceptedPrivateMetadataDiagnostics(
+    first.record.acceptedPrivateMetadataDiagnostics,
+    {
+      ownershipRowCount: 0,
+      ownershipStatus: 'blocked-no-replay-ownership-targets-recorded',
+      rootRecordId: 'hydration-root-bridge:1'
+    }
+  );
+  assert.equal(
+    Object.isFrozen(first.record.acceptedPrivateMetadataDiagnostics),
+    true
+  );
+  assert.deepEqual(
+    first.record.acceptedPrivateMetadataIds,
+    expectedAcceptedPrivateMetadataIds()
+  );
+  assert.deepEqual(
+    first.record.acceptedPrivateMetadataGateIds,
+    expectedAcceptedPrivateMetadataGateIds()
+  );
   assert.equal(first.record.markerDiagnostics.acceptedMarkerCount, 2);
   assert.equal(first.record.markerDiagnostics.diagnosticOnly, true);
   assert.equal(first.record.markerDiagnostics.canHydrate, false);
@@ -208,6 +232,18 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
       first.record.hydrationBoundaryRecord
     ),
     true
+  );
+  assertAcceptedPrivateMetadataDiagnostics(
+    first.record.hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+    {
+      ownershipRowCount: 0,
+      ownershipStatus: 'blocked-no-replay-ownership-targets-recorded',
+      rootRecordId: 'hydration-boundary:1'
+    }
+  );
+  assert.deepEqual(
+    first.record.hydrationBoundaryRecord.acceptedPrivateMetadataIds,
+    expectedAcceptedPrivateMetadataIds()
   );
   assert.equal(
     first.record.markerDiagnostics,
@@ -1339,6 +1375,211 @@ function markerContractId(marker) {
   return marker.contractId;
 }
 
+function expectedAcceptedPrivateMetadataIds() {
+  return [
+    'hydration-replay-ownership',
+    'resource-map-commit',
+    'stylesheet-load-error-state',
+    'form-action-event-extraction',
+    'form-reset-queue-commit'
+  ];
+}
+
+function expectedAcceptedPrivateMetadataGateIds() {
+  return [
+    hydrationGate.privateHydrationReplayOwnershipGateId,
+    resourceFormGate.privateResourceHintResourceMapCommitGateId,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
+    resourceFormGate.privateFormActionEventExtractionGateId,
+    resourceFormGate.privateFormActionResetQueueCommitGateId
+  ];
+}
+
+function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
+  assert.equal(Object.isFrozen(diagnostics), true);
+  assert.equal(
+    diagnostics.kind,
+    hydrationGate.HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    diagnostics.gateId,
+    hydrationGate.privateHydrationBoundaryAcceptedMetadataGateId
+  );
+  assert.equal(
+    diagnostics.status,
+    hydrationGate.privateHydrationBoundaryAcceptedMetadataStatus
+  );
+  assert.equal(diagnostics.rootRecordId, expected.rootRecordId);
+  assert.equal(diagnostics.diagnosticOnly, true);
+  assert.equal(diagnostics.readOnly, true);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.comparedToReactDomOracle, false);
+  assert.equal(diagnostics.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostics.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicHydrationCompatibilityClaimed, false);
+  assert.equal(
+    diagnostics.publicHydrationReplayCompatibilityClaimed,
+    false
+  );
+  assert.equal(diagnostics.publicEventCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicResourceCompatibilityClaimed, false);
+  assert.equal(
+    diagnostics.publicResourceDomInsertionCompatibilityClaimed,
+    false
+  );
+  assert.equal(diagnostics.publicStylesheetCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicFormCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicFormActionCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicFormResetCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicControlledInputCompatibilityClaimed, false);
+  assert.equal(diagnostics.hydrationReplaySupported, false);
+  assert.equal(diagnostics.eventsReplayed, false);
+  assert.equal(diagnostics.rootScheduled, false);
+  assert.equal(diagnostics.resourceDomInsertion, false);
+  assert.equal(diagnostics.resourceMapsCreated, false);
+  assert.equal(diagnostics.resourceMapCommitted, false);
+  assert.equal(diagnostics.stylesheetLoadListenersInstalled, false);
+  assert.equal(diagnostics.stylesheetErrorListenersInstalled, false);
+  assert.equal(diagnostics.stylesheetFetchStarted, false);
+  assert.equal(diagnostics.stylesheetCommitSuspended, false);
+  assert.equal(diagnostics.formActionEventPluginInvoked, false);
+  assert.equal(diagnostics.formActionExtracted, false);
+  assert.equal(diagnostics.formDataConstructed, false);
+  assert.equal(diagnostics.actionInvoked, false);
+  assert.equal(diagnostics.hostTransitionStarted, false);
+  assert.equal(diagnostics.resetStateQueued, false);
+  assert.equal(diagnostics.resetUpdateEnqueued, false);
+  assert.equal(diagnostics.resetQueueCommitted, false);
+  assert.equal(diagnostics.formResetCommitted, false);
+  assert.equal(diagnostics.realFormReset, false);
+  assert.equal(diagnostics.metadataIdCount, 5);
+  assert.deepEqual(
+    diagnostics.metadataIds,
+    expectedAcceptedPrivateMetadataIds()
+  );
+  assert.deepEqual(
+    diagnostics.gateIds,
+    expectedAcceptedPrivateMetadataGateIds()
+  );
+  assert.deepEqual(diagnostics.acceptedRecordTypes, [
+    hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    resourceFormGate.privateResourceHintResourceMapCommitRecordType,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateRecordType,
+    resourceFormGate.privateFormActionEventExtractionRecordType,
+    resourceFormGate.privateFormActionResetQueueCommitRecordType
+  ]);
+  assert.deepEqual(diagnostics.acceptedStatuses, [
+    'blocked-replay-ownership-retained-through-drain-order',
+    resourceFormGate.privateResourceHintResourceMapCommitStatus,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateStatus,
+    resourceFormGate.privateFormActionEventExtractionRecordedStatus,
+    resourceFormGate.privateFormActionResetQueueCommitRecordedStatus
+  ]);
+  assert.deepEqual(
+    diagnostics.metadataRows.map((row) => ({
+      metadataId: row.metadataId,
+      category: row.category,
+      gateId: row.gateId,
+      recordType: row.recordType,
+      acceptedStatus: row.acceptedStatus,
+      compatibilityClaimed: row.compatibilityClaimed,
+      promotesHydration: row.promotesHydration,
+      promotesRootRender: row.promotesRootRender
+    })),
+    [
+      {
+        metadataId: 'hydration-replay-ownership',
+        category: 'hydration',
+        gateId: hydrationGate.privateHydrationReplayOwnershipGateId,
+        recordType:
+          hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+        acceptedStatus:
+          'blocked-replay-ownership-retained-through-drain-order',
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      },
+      {
+        metadataId: 'resource-map-commit',
+        category: 'resource',
+        gateId: resourceFormGate.privateResourceHintResourceMapCommitGateId,
+        recordType:
+          resourceFormGate.privateResourceHintResourceMapCommitRecordType,
+        acceptedStatus:
+          resourceFormGate.privateResourceHintResourceMapCommitStatus,
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      },
+      {
+        metadataId: 'stylesheet-load-error-state',
+        category: 'stylesheet',
+        gateId:
+          resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
+        recordType:
+          resourceFormGate
+            .privateResourceHintStylesheetLoadErrorStateRecordType,
+        acceptedStatus:
+          resourceFormGate.privateResourceHintStylesheetLoadErrorStateStatus,
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      },
+      {
+        metadataId: 'form-action-event-extraction',
+        category: 'form',
+        gateId: resourceFormGate.privateFormActionEventExtractionGateId,
+        recordType: resourceFormGate.privateFormActionEventExtractionRecordType,
+        acceptedStatus:
+          resourceFormGate.privateFormActionEventExtractionRecordedStatus,
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      },
+      {
+        metadataId: 'form-reset-queue-commit',
+        category: 'form',
+        gateId: resourceFormGate.privateFormActionResetQueueCommitGateId,
+        recordType:
+          resourceFormGate.privateFormActionResetQueueCommitRecordType,
+        acceptedStatus:
+          resourceFormGate.privateFormActionResetQueueCommitRecordedStatus,
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostics.blockedCapabilities.map((capability) => [
+      capability.id,
+      capability.blocked
+    ]),
+    [
+      ['public-hydration-replay', true],
+      ['public-root-render', true],
+      ['resource-dom-insertion', true],
+      ['stylesheet-runtime-state', true],
+      ['form-action-execution', true],
+      ['form-reset-commit', true]
+    ]
+  );
+  assert.deepEqual(diagnostics.hydrationOwnership, {
+    metadataId: 'hydration-replay-ownership',
+    gateId: hydrationGate.privateHydrationReplayOwnershipGateId,
+    diagnosticKind:
+      hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    diagnosticStatus: expected.ownershipStatus,
+    diagnosticSource: 'unsupported-hydrate-root-boundary-record',
+    ownershipRowCount: expected.ownershipRowCount,
+    ownershipRetainedCount: 0,
+    ownershipRetainedThroughDrainOrder: false,
+    hydrationReplaySupported: false,
+    eventsReplayed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function assertHydrationEventReplayBlockers(blockers, expected) {
   assert.equal(Object.isFrozen(blockers), true);
   assert.equal(blockers.kind, 'FastReactDomHydrationEventReplayBlockers');
@@ -1538,6 +1779,11 @@ function assertHydrationReplayOwnershipGateDiagnostics(
     diagnostics.kind,
     hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND
   );
+  assert.equal(
+    diagnostics.gateId,
+    hydrationGate.privateHydrationReplayOwnershipGateId
+  );
+  assert.equal(diagnostics.metadataId, 'hydration-replay-ownership');
   assert.equal(diagnostics.status, expected.status);
   assert.equal(diagnostics.diagnosticOnly, true);
   assert.equal(diagnostics.readOnly, true);
@@ -1611,6 +1857,11 @@ function assertHydrationReplayOwnershipGateDiagnostics(
       row.kind,
       hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND
     );
+    assert.equal(
+      row.gateId,
+      hydrationGate.privateHydrationReplayOwnershipGateId
+    );
+    assert.equal(row.metadataId, 'hydration-replay-ownership');
     assert.equal(row.diagnosticOnly, true);
     assert.equal(row.readOnly, true);
     assert.equal(row.compatibilityClaimed, false);

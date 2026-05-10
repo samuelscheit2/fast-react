@@ -27,6 +27,7 @@ const {
   createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic
 } = require('../events/plugin-event-system.js');
+const resourceFormInternalsGate = require('../resource-form-internals-gate.js');
 
 const HYDRATION_MARKER_ORACLE_KIND =
   'react-19.2.6-react-dom-hydration-marker-oracle';
@@ -41,12 +42,20 @@ const HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayOwnershipGateDiagnostic';
 const HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND =
   'FastReactDomHydrationReplayOwnershipGateEntryRecord';
+const HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationBoundaryAcceptedMetadataDiagnostics';
 const HYDRATION_TEXT_MISMATCH_BLOCKED_REASON =
   'FAST_REACT_DOM_HYDRATION_TEXT_MISMATCH_BLOCKED';
 const HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON =
   'FAST_REACT_DOM_HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED';
 const INVALID_HYDRATION_BOUNDARY_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_BOUNDARY_RECORD';
+const privateHydrationReplayOwnershipGateId =
+  'hydration-replay-ownership-private-gate-1';
+const privateHydrationBoundaryAcceptedMetadataGateId =
+  'hydration-boundary-accepted-resource-form-metadata-private-gate-1';
+const privateHydrationBoundaryAcceptedMetadataStatus =
+  'accepted-private-hydration-boundary-resource-form-metadata-ids';
 
 const privateHydrationBoundaryRecordType =
   'fast.react_dom.unsupported_hydration_boundary_record';
@@ -336,6 +345,96 @@ const hydrationMarkerReplayQueueContracts = freezeArray([
   )
 ]);
 
+const acceptedHydrationBoundaryMetadataContracts = freezeArray([
+  acceptedMetadataContract(
+    'hydration-replay-ownership',
+    'hydration',
+    privateHydrationReplayOwnershipGateId,
+    HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    'blocked-replay-ownership-retained-through-drain-order',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Retained dehydrated root and boundary ownership rows remain metadata-only.'
+  ),
+  acceptedMetadataContract(
+    'resource-map-commit',
+    'resource',
+    resourceFormInternalsGate.privateResourceHintResourceMapCommitGateId,
+    resourceFormInternalsGate.privateResourceHintResourceMapCommitRecordType,
+    resourceFormInternalsGate.privateResourceHintResourceMapCommitStatus,
+    resourceFormInternalsGate
+      .privateResourceHintResourceMapCommitCompatibilityBlockedStatus,
+    'Resource map commit rows remain private metadata and do not insert DOM resources.'
+  ),
+  acceptedMetadataContract(
+    'stylesheet-load-error-state',
+    'stylesheet',
+    resourceFormInternalsGate
+      .privateResourceHintStylesheetLoadErrorStateGateId,
+    resourceFormInternalsGate
+      .privateResourceHintStylesheetLoadErrorStateRecordType,
+    resourceFormInternalsGate
+      .privateResourceHintStylesheetLoadErrorStateStatus,
+    resourceFormInternalsGate
+      .privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus,
+    'Stylesheet resource state rows remain private metadata without listeners, fetches, or commit suspension.'
+  ),
+  acceptedMetadataContract(
+    'form-action-event-extraction',
+    'form',
+    resourceFormInternalsGate.privateFormActionEventExtractionGateId,
+    resourceFormInternalsGate.privateFormActionEventExtractionRecordType,
+    resourceFormInternalsGate
+      .privateFormActionEventExtractionRecordedStatus,
+    resourceFormInternalsGate.privateFormActionEventExtractionGateErrorCode,
+    'Form action extraction rows remain private metadata without event objects, serialized payloads, actions, or transitions.'
+  ),
+  acceptedMetadataContract(
+    'form-reset-queue-commit',
+    'form',
+    resourceFormInternalsGate.privateFormActionResetQueueCommitGateId,
+    resourceFormInternalsGate.privateFormActionResetQueueCommitRecordType,
+    resourceFormInternalsGate
+      .privateFormActionResetQueueCommitRecordedStatus,
+    resourceFormInternalsGate.privateFormActionResetQueueCommitGateErrorCode,
+    'Form reset queue and commit rows remain private metadata without update queue writes or real form reset.'
+  )
+]);
+
+const hydrationBoundaryAcceptedMetadataBlockers = freezeArray([
+  metadataBlocker(
+    'public-hydration-replay',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Hydration replay queues remain blocked and are not drained.'
+  ),
+  metadataBlocker(
+    'public-root-render',
+    'FAST_REACT_DOM_PUBLIC_ROOT_RENDER_BLOCKED',
+    'Accepted private metadata cannot promote public root render compatibility.'
+  ),
+  metadataBlocker(
+    'resource-dom-insertion',
+    resourceFormInternalsGate
+      .privateResourceHintResourceMapCommitCompatibilityBlockedStatus,
+    'Resource maps and DOM insertion remain blocked outside private diagnostics.'
+  ),
+  metadataBlocker(
+    'stylesheet-runtime-state',
+    resourceFormInternalsGate
+      .privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus,
+    'Stylesheet load/error listeners, promises, fetches, and suspended commits remain blocked.'
+  ),
+  metadataBlocker(
+    'form-action-execution',
+    resourceFormInternalsGate.privateFormActionEventExtractionGateErrorCode,
+    'Form action event extraction does not inspect real forms or invoke actions.'
+  ),
+  metadataBlocker(
+    'form-reset-commit',
+    resourceFormInternalsGate.privateFormActionResetQueueCommitGateErrorCode,
+    'Form reset queue writes, commit traversal, and real form reset remain blocked.'
+  )
+]);
+
 const hydrationBoundaryRecordPayloads = new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
@@ -544,6 +643,11 @@ function createUnsupportedHydrateRootRecordWithGate(
     replayQueueDiagnostics,
     targetResolutionDiagnostics
   });
+  const acceptedPrivateMetadataDiagnostics =
+    createHydrationBoundaryAcceptedMetadataDiagnostics({
+      eventReplayOwnershipDiagnostics,
+      recordId
+    });
   const record = freezeRecord({
     $$typeof: privateHydrationBoundaryRecordType,
     kind: 'FastReactDomUnsupportedHydrationBoundaryRecord',
@@ -570,6 +674,11 @@ function createUnsupportedHydrateRootRecordWithGate(
     eventReplayQueueDiagnostics,
     eventReplayOwnershipDiagnostics,
     eventReplayBlockers,
+    acceptedPrivateMetadataDiagnostics,
+    acceptedPrivateMetadataIds:
+      acceptedPrivateMetadataDiagnostics.metadataIds,
+    acceptedPrivateMetadataGateIds:
+      acceptedPrivateMetadataDiagnostics.gateIds,
     canHydrate: false,
     publicRootCreated: false,
     containerMarked: false,
@@ -1273,6 +1382,115 @@ function createHydrationEventReplayBlockers({
   });
 }
 
+function createHydrationBoundaryAcceptedMetadataDiagnostics({
+  eventReplayOwnershipDiagnostics,
+  recordId
+}) {
+  const metadataRows = freezeArray(
+    acceptedHydrationBoundaryMetadataContracts.map((contract) =>
+      createHydrationBoundaryAcceptedMetadataRow(contract)
+    )
+  );
+  const metadataIds = freezeArray(
+    metadataRows.map((row) => row.metadataId)
+  );
+  const gateIds = freezeArray(metadataRows.map((row) => row.gateId));
+
+  return freezeRecord({
+    kind: HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
+    gateId: privateHydrationBoundaryAcceptedMetadataGateId,
+    status: privateHydrationBoundaryAcceptedMetadataStatus,
+    source: 'unsupported-hydrate-root-boundary-record',
+    rootRecordId: recordId,
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    comparedToReactDomOracle: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicEventCompatibilityClaimed: false,
+    publicResourceCompatibilityClaimed: false,
+    publicResourceDomInsertionCompatibilityClaimed: false,
+    publicStylesheetCompatibilityClaimed: false,
+    publicFormCompatibilityClaimed: false,
+    publicFormActionCompatibilityClaimed: false,
+    publicFormResetCompatibilityClaimed: false,
+    publicControlledInputCompatibilityClaimed: false,
+    hydrationReplaySupported: false,
+    eventReplayInstalled: false,
+    eventsReplayed: false,
+    rootScheduled: false,
+    resourceDomInsertion: false,
+    resourceMapsCreated: false,
+    resourceMapCommitted: false,
+    stylesheetLoadListenersInstalled: false,
+    stylesheetErrorListenersInstalled: false,
+    stylesheetFetchStarted: false,
+    stylesheetCommitSuspended: false,
+    formActionEventPluginInvoked: false,
+    formActionExtracted: false,
+    formDataConstructed: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    resetQueueCommitted: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    metadataIdCount: metadataRows.length,
+    metadataIds,
+    gateIds,
+    acceptedRecordTypes: freezeArray(
+      metadataRows.map((row) => row.recordType)
+    ),
+    acceptedStatuses: freezeArray(
+      metadataRows.map((row) => row.acceptedStatus)
+    ),
+    hydrationOwnership: freezeRecord({
+      metadataId: 'hydration-replay-ownership',
+      gateId: privateHydrationReplayOwnershipGateId,
+      diagnosticKind: eventReplayOwnershipDiagnostics.kind,
+      diagnosticStatus: eventReplayOwnershipDiagnostics.status,
+      diagnosticSource: eventReplayOwnershipDiagnostics.source,
+      ownershipRowCount: eventReplayOwnershipDiagnostics.ownershipRowCount,
+      ownershipRetainedCount:
+        eventReplayOwnershipDiagnostics.ownershipRetainedCount,
+      ownershipRetainedThroughDrainOrder:
+        eventReplayOwnershipDiagnostics.ownershipRetainedThroughDrainOrder,
+      hydrationReplaySupported: false,
+      eventsReplayed: false,
+      compatibilityClaimed: false
+    }),
+    metadataRows,
+    blockedCapabilities: hydrationBoundaryAcceptedMetadataBlockers
+  });
+}
+
+function createHydrationBoundaryAcceptedMetadataRow(contract) {
+  return freezeRecord({
+    metadataId: contract.metadataId,
+    category: contract.category,
+    gateId: contract.gateId,
+    recordType: contract.recordType,
+    acceptedStatus: contract.acceptedStatus,
+    blockedReason: contract.blockedReason,
+    reason: contract.reason,
+    metadataRecognized: true,
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    publicCompatibilityClaimed: false,
+    publicRootRenderCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicResourceCompatibilityClaimed: false,
+    publicFormCompatibilityClaimed: false,
+    promotesHydration: false,
+    promotesRootRender: false
+  });
+}
+
 function createHydrationReplayOwnershipGateDiagnosticFromQueue({
   eventReplayQueueDiagnostics,
   recordId,
@@ -1316,6 +1534,8 @@ function createHydrationReplayOwnershipGateDiagnosticFromQueue({
 
   return freezeRecord({
     kind: HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    gateId: privateHydrationReplayOwnershipGateId,
+    metadataId: 'hydration-replay-ownership',
     status:
       ownershipRows.length === 0
         ? 'blocked-no-replay-ownership-targets-recorded'
@@ -1423,6 +1643,8 @@ function createHydrationReplayOwnershipGateEntryRecord(
 
   return freezeRecord({
     kind: HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
+    gateId: privateHydrationReplayOwnershipGateId,
+    metadataId: 'hydration-replay-ownership',
     status: ownershipRetainedThroughDrainOrder
       ? dehydratedBoundaryOwnershipRequired
         ? 'retained-root-and-boundary-ownership-through-drain-order'
@@ -1596,6 +1818,35 @@ function replayQueueContract(id, queueName, owner, blockedReason, reason) {
   });
 }
 
+function acceptedMetadataContract(
+  metadataId,
+  category,
+  gateId,
+  recordType,
+  acceptedStatus,
+  blockedReason,
+  reason
+) {
+  return freezeRecord({
+    metadataId,
+    category,
+    gateId,
+    recordType,
+    acceptedStatus,
+    blockedReason,
+    reason
+  });
+}
+
+function metadataBlocker(id, blockedReason, reason) {
+  return freezeRecord({
+    blocked: true,
+    blockedReason,
+    id,
+    reason
+  });
+}
+
 function normalizeMarkerContracts(markerContracts) {
   assertOracleField(
     Array.isArray(markerContracts),
@@ -1705,6 +1956,7 @@ module.exports = {
   HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
   HYDRATION_MARKER_ORACLE_KIND,
   HYDRATION_MARKER_ORACLE_SCHEMA_VERSION,
+  HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
   HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
@@ -1712,16 +1964,21 @@ module.exports = {
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   INVALID_HYDRATION_BOUNDARY_RECORD_CODE,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
+  acceptedHydrationBoundaryMetadataContracts,
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
   createHydrationReplayOwnershipGateDiagnostic,
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
+  hydrationBoundaryAcceptedMetadataBlockers,
   hydrationEventReplayBlockerContracts,
   hydrationMarkerReplayQueueContracts,
   inspectHydrationContainerMarkers,
   isPrivateHydrationBoundaryRecord,
+  privateHydrationBoundaryAcceptedMetadataGateId,
+  privateHydrationBoundaryAcceptedMetadataStatus,
   privateHydrationBoundaryRecordType,
+  privateHydrationReplayOwnershipGateId,
   unsupportedHydrationPrerequisites
 };

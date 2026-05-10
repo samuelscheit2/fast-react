@@ -1320,6 +1320,111 @@ test("React DOM public root facade gate rejects private React DOM metadata promo
   );
 });
 
+test("React DOM public root facade remains blocked with hydration resource/form metadata ids", () => {
+  const hydrationGate = require(
+    path.join(
+      repoRoot,
+      "packages/react-dom/src/client/hydration-boundary-gate.js"
+    )
+  );
+  const resourceFormGate = require(
+    path.join(repoRoot, "packages/react-dom/src/resource-form-gates.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-hydration-metadata",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  container.childNodes = [
+    { data: "$", nodeType: domContainer.COMMENT_NODE },
+    { data: "/$", nodeType: domContainer.COMMENT_NODE }
+  ];
+
+  const record = hydrationGate
+    .createHydrationBoundaryGate({
+      recordIdPrefix: "public-facade-hydration-metadata"
+    })
+    .recordUnsupportedHydrateRoot(
+      container,
+      { props: { children: "metadata ids" }, type: "App" },
+      { identifierPrefix: "public-facade-hydration-metadata-" }
+    );
+  const metadata = record.acceptedPrivateMetadataDiagnostics;
+
+  assert.equal(
+    metadata.kind,
+    hydrationGate.HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    metadata.gateId,
+    hydrationGate.privateHydrationBoundaryAcceptedMetadataGateId
+  );
+  assert.deepEqual(metadata.metadataIds, [
+    "hydration-replay-ownership",
+    "resource-map-commit",
+    "stylesheet-load-error-state",
+    "form-action-event-extraction",
+    "form-reset-queue-commit"
+  ]);
+  assert.deepEqual(metadata.gateIds, [
+    hydrationGate.privateHydrationReplayOwnershipGateId,
+    resourceFormGate.privateResourceHintResourceMapCommitGateId,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
+    resourceFormGate.privateFormActionEventExtractionGateId,
+    resourceFormGate.privateFormActionResetQueueCommitGateId
+  ]);
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(metadata.publicHydrationCompatibilityClaimed, false);
+  assert.equal(metadata.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(metadata.publicResourceCompatibilityClaimed, false);
+  assert.equal(metadata.publicResourceDomInsertionCompatibilityClaimed, false);
+  assert.equal(metadata.publicStylesheetCompatibilityClaimed, false);
+  assert.equal(metadata.publicFormCompatibilityClaimed, false);
+  assert.equal(metadata.publicFormActionCompatibilityClaimed, false);
+  assert.equal(metadata.publicFormResetCompatibilityClaimed, false);
+  assert.equal(metadata.hydrationReplaySupported, false);
+  assert.equal(metadata.eventsReplayed, false);
+  assert.equal(metadata.resourceDomInsertion, false);
+  assert.equal(metadata.resourceMapsCreated, false);
+  assert.equal(metadata.stylesheetLoadListenersInstalled, false);
+  assert.equal(metadata.stylesheetCommitSuspended, false);
+  assert.equal(metadata.formActionEventPluginInvoked, false);
+  assert.equal(metadata.actionInvoked, false);
+  assert.equal(metadata.resetUpdateEnqueued, false);
+  assert.equal(metadata.formResetCommitted, false);
+  assert.equal(record.canHydrate, false);
+  assert.equal(record.publicRootCreated, false);
+  assert.equal(record.eventsReplayed, false);
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle
+  });
+
+  assert.equal(gate.ok, true);
+  assert.equal(gate.summary.compatibilityClaimed, false);
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicResourceCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicFormCompatibilityClaimed,
+    false
+  );
+});
+
 test("React DOM public root facade gate rejects portal root-render compatibility leaks", () => {
   const rootRenderGate = clone(
     evaluateReactDomRootRenderE2EConformanceGate({
