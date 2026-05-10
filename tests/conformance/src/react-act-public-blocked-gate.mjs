@@ -226,7 +226,9 @@ export function inspectReactActPublicBlockedLocalTarget({
   const passiveEffectMetadataOnly =
     /does not traverse hook rings, invoke create\/destroy callbacks/u.test(
       passiveEffectsSource
-    );
+    ) ||
+    /default flush path remains metadata-only/u.test(passiveEffectsSource) ||
+    /detached from public effect execution/u.test(passiveEffectsSource);
   const effectCallbackExecutionPresent =
     /\b(?:invoke|execute)_(?:layout|passive|hook)_effects?\b|\b(?:invoke|execute)Effect(?:Create|Destroy)\b/u.test(
       passiveEffectsSource
