@@ -119,14 +119,29 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
   const rootContinuationExecutionRoute = executionRouteValidation.route;
   const acceptedActRootWorkHandoff =
     executionRouteValidation.actRootWorkHandoff;
+  const priorityTimeout = readPriorityTimeout(
+    record,
+    continuation,
+    rootContinuationExecutionRoute,
+    acceptedActRootWorkHandoff
+  );
+  const sourceCallbackDidTimeout = readSourceCallbackDidTimeout(
+    continuation,
+    rootContinuationExecutionRoute,
+    acceptedActRootWorkHandoff
+  );
   const continuationFallback = createRootContinuationFallbackMetadata(
-    continuation
+    continuation,
+    priorityTimeout,
+    sourceCallbackDidTimeout
   );
   const acceptedRootContinuation = createAcceptedRootContinuationRecord({
     continuationId: continuationValidation.continuationId,
     continuation,
     signalValidation,
     abortOrdering,
+    priorityTimeout,
+    sourceCallbackDidTimeout,
     continuationFallback,
     rootContinuationExecutionRoute,
     acceptedActRootWorkHandoff
@@ -149,6 +164,8 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     schedulerPriorityName: record.priorityMapping.schedulerPriorityName,
     postTaskPriority: record.priorityMapping.postTaskPriority,
     taskControllerPriority: record.priorityMapping.taskControllerPriority,
+    priorityTimeout: cloneDiagnosticValue(priorityTimeout),
+    sourceCallbackDidTimeout,
     delay: cloneDiagnosticValue(
       delayAbortOrdering && delayAbortOrdering.scheduledDelay
         ? delayAbortOrdering.scheduledDelay
@@ -188,6 +205,8 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
         : 0,
       delayAbortOrderingDiagnostics:
         record.delayAbortOrderingDiagnostics === true,
+      priorityTimeoutDiagnostics:
+        record.priorityTimeoutDiagnostics === true,
       continuationFallbackMetadataDiagnostics:
         record.continuationFallbackMetadataDiagnostics === true,
       taskControllerAbortOrderingDiagnostics:
@@ -359,6 +378,69 @@ function readContinuationSignal(continuation) {
     typeof continuation.signalAtSchedule === 'object'
   ) {
     return continuation.signalAtSchedule;
+  }
+  return null;
+}
+
+function readPriorityTimeout(
+  record,
+  continuation,
+  rootContinuationExecutionRoute,
+  acceptedActRootWorkHandoff
+) {
+  if (
+    acceptedActRootWorkHandoff &&
+    acceptedActRootWorkHandoff.priorityTimeout &&
+    typeof acceptedActRootWorkHandoff.priorityTimeout === 'object'
+  ) {
+    return acceptedActRootWorkHandoff.priorityTimeout;
+  }
+  if (
+    rootContinuationExecutionRoute &&
+    rootContinuationExecutionRoute.priorityTimeout &&
+    typeof rootContinuationExecutionRoute.priorityTimeout === 'object'
+  ) {
+    return rootContinuationExecutionRoute.priorityTimeout;
+  }
+  if (
+    continuation &&
+    continuation.priorityTimeout &&
+    typeof continuation.priorityTimeout === 'object'
+  ) {
+    return continuation.priorityTimeout;
+  }
+  if (
+    record &&
+    record.priorityTimeout &&
+    typeof record.priorityTimeout === 'object'
+  ) {
+    return record.priorityTimeout;
+  }
+  return null;
+}
+
+function readSourceCallbackDidTimeout(
+  continuation,
+  rootContinuationExecutionRoute,
+  acceptedActRootWorkHandoff
+) {
+  if (
+    acceptedActRootWorkHandoff &&
+    typeof acceptedActRootWorkHandoff.sourceCallbackDidTimeout === 'boolean'
+  ) {
+    return acceptedActRootWorkHandoff.sourceCallbackDidTimeout;
+  }
+  if (
+    rootContinuationExecutionRoute &&
+    typeof rootContinuationExecutionRoute.sourceCallbackDidTimeout === 'boolean'
+  ) {
+    return rootContinuationExecutionRoute.sourceCallbackDidTimeout;
+  }
+  if (
+    continuation &&
+    typeof continuation.sourceCallbackDidTimeout === 'boolean'
+  ) {
+    return continuation.sourceCallbackDidTimeout;
   }
   return null;
 }
@@ -688,7 +770,11 @@ function readContinuationAbortOrdering(
   });
 }
 
-function createRootContinuationFallbackMetadata(continuation) {
+function createRootContinuationFallbackMetadata(
+  continuation,
+  priorityTimeout,
+  sourceCallbackDidTimeout
+) {
   return freezeRecord({
     status: ROOT_CONTINUATION_FALLBACK_STATUS,
     continuationStatus: continuation.continuationStatus,
@@ -702,6 +788,8 @@ function createRootContinuationFallbackMetadata(continuation) {
     sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
     callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
     reusesOriginalSignal: continuation.reusesOriginalSignal === true,
+    priorityTimeout: cloneDiagnosticValue(priorityTimeout),
+    sourceCallbackDidTimeout,
     continuationMetadata: cloneDiagnosticValue(
       continuation.continuationMetadata || null
     ),
@@ -720,6 +808,8 @@ function createAcceptedRootContinuationRecord({
   continuation,
   signalValidation,
   abortOrdering,
+  priorityTimeout,
+  sourceCallbackDidTimeout,
   continuationFallback,
   rootContinuationExecutionRoute,
   acceptedActRootWorkHandoff
@@ -732,6 +822,8 @@ function createAcceptedRootContinuationRecord({
     sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
     signalValidation: cloneDiagnosticValue(signalValidation),
     abortOrdering: cloneDiagnosticValue(abortOrdering),
+    priorityTimeout: cloneDiagnosticValue(priorityTimeout),
+    sourceCallbackDidTimeout,
     continuationFallback: cloneDiagnosticValue(continuationFallback),
     rootContinuationExecutionRoute: cloneDiagnosticValue(
       rootContinuationExecutionRoute

@@ -695,6 +695,65 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       "unknown-priority-defaults-to-user-visible"
     ]
   ];
+  const expectedPriorityTimeouts = [
+    [
+      "immediate",
+      expectedPriorityTimeout({
+        priorityLevel: 1,
+        schedulerPriorityName: "unstable_ImmediatePriority",
+        timeoutMs: -1,
+        timeoutReason: "immediate-priority-timeout",
+        timeoutClassification: "expired-priority-timeout"
+      })
+    ],
+    [
+      "user-blocking",
+      expectedPriorityTimeout({
+        priorityLevel: 2,
+        schedulerPriorityName: "unstable_UserBlockingPriority",
+        timeoutMs: 250,
+        timeoutReason: "user-blocking-priority-timeout"
+      })
+    ],
+    [
+      "normal",
+      expectedPriorityTimeout({
+        priorityLevel: 3,
+        schedulerPriorityName: "unstable_NormalPriority",
+        timeoutMs: 5000,
+        timeoutReason: "normal-priority-timeout"
+      })
+    ],
+    [
+      "low-delay",
+      expectedPriorityTimeout({
+        priorityLevel: 4,
+        schedulerPriorityName: "unstable_LowPriority",
+        timeoutMs: 10000,
+        timeoutReason: "low-priority-timeout"
+      })
+    ],
+    [
+      "idle-zero-delay",
+      expectedPriorityTimeout({
+        priorityLevel: 5,
+        schedulerPriorityName: "unstable_IdlePriority",
+        timeoutMs: 1073741823,
+        timeoutReason: "idle-priority-never-times-out",
+        timeoutClassification: "idle-priority-timeout"
+      })
+    ],
+    [
+      "invalid-delay",
+      expectedPriorityTimeout({
+        priorityLevel: 99,
+        schedulerPriorityName: "unknown",
+        recognizedPriority: false,
+        timeoutMs: 5000,
+        timeoutReason: "unknown-priority-defaults-to-normal-timeout"
+      })
+    ]
+  ];
   const expectedEnvironmentCapabilities = {
     status: "controlled-task-scheduling-api-capability-snapshot",
     hasWindow: true,
@@ -753,6 +812,13 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       ]),
       expectedPriorityMappings
     );
+    assert.deepEqual(
+      report.scheduling.map((entry) => [
+        entry.label,
+        entry.diagnosticsBeforeFlush.priorityTimeout
+      ]),
+      expectedPriorityTimeouts
+    );
 
     for (const entry of report.scheduling) {
       assert.deepEqual(entry.publicNodeKeys, ["_controller"], entry.label);
@@ -772,6 +838,7 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
         true
       );
       assert.equal(entry.diagnosticsBeforeFlush.priorityMappingDiagnostics, true);
+      assert.equal(entry.diagnosticsBeforeFlush.priorityTimeoutDiagnostics, true);
       assert.deepEqual(
         entry.diagnosticsBeforeFlush.environmentCapabilities,
         expectedEnvironmentCapabilities
@@ -783,6 +850,10 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       assert.deepEqual(
         entry.diagnosticsBeforeFlush.schedule.priorityMapping,
         entry.diagnosticsBeforeFlush.priorityMapping
+      );
+      assert.deepEqual(
+        entry.diagnosticsBeforeFlush.schedule.priorityTimeout,
+        entry.diagnosticsBeforeFlush.priorityTimeout
       );
       assert.equal(
         entry.diagnosticsBeforeFlush.priorityMapping.browserPostTaskCompatibilityClaimed,
@@ -834,6 +905,14 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
         entry.diagnosticsBeforeFlush.schedule.postTaskPriority
       );
       assert.equal(entry.diagnosticsAfterFlush.callbackRuns[0].didTimeout, false);
+      assert.equal(
+        entry.diagnosticsAfterFlush.callbackRuns[0].didTimeoutSource,
+        "scheduler-post-task-deprecated-didTimeout-is-always-false"
+      );
+      assert.deepEqual(
+        entry.diagnosticsAfterFlush.callbackRuns[0].priorityTimeout,
+        entry.diagnosticsBeforeFlush.priorityTimeout
+      );
       assert.equal(
         entry.diagnosticsAfterFlush.callbackRuns[0].shouldYieldAtStart,
         false
@@ -1010,6 +1089,12 @@ test("scheduler post-task private priority diagnostics capture continuation fall
       const expectedFallback = withYield
         ? "scheduler.yield"
         : "scheduler.postTask";
+      const expectedContinuationPriorityTimeout = expectedPriorityTimeout({
+        priorityLevel: 3,
+        schedulerPriorityName: "unstable_NormalPriority",
+        timeoutMs: 5000,
+        timeoutReason: "normal-priority-timeout"
+      });
 
       assert.deepEqual(report.continuation.publicNodeKeys, ["_controller"]);
       assert.equal(report.continuation.privateDiagnosticSymbolPresent, true);
@@ -1056,6 +1141,11 @@ test("scheduler post-task private priority diagnostics capture continuation fall
       assert.deepEqual(
         diagnostics.priorityMapping,
         diagnostics.schedule.priorityMapping
+      );
+      assert.deepEqual(diagnostics.priorityTimeout, expectedContinuationPriorityTimeout);
+      assert.deepEqual(
+        diagnostics.schedule.priorityTimeout,
+        expectedContinuationPriorityTimeout
       );
       assert.equal(diagnostics.continuationFallbackDiagnostics, true);
       assert.equal(diagnostics.continuationFallbackMetadataDiagnostics, true);
@@ -1149,6 +1239,10 @@ test("scheduler post-task private priority diagnostics capture continuation fall
             signalValidationRejectionReason: null,
             abortOrderingStatus:
               "continuation-abort-ordering-pending-abort-call",
+            priorityTimeoutStatus:
+              "scheduler-post-task-private-priority-timeout-diagnostics",
+            timeoutMs: 5000,
+            sourceCallbackDidTimeout: false,
             fallbackEnvironmentClassification:
               expectedFallbackEnvironmentClassification(withYield)
                 .classification,
@@ -1169,6 +1263,8 @@ test("scheduler post-task private priority diagnostics capture continuation fall
             signalId: 8,
             signalPriority: "user-visible"
           }),
+          priorityTimeout: expectedContinuationPriorityTimeout,
+          sourceCallbackDidTimeout: false,
           reusesOriginalSignal: true,
           signalAtSchedule: {
             id: 8,
@@ -1228,6 +1324,12 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     ]);
 
     const afterFallback = flow.diagnosticsAfterFallback;
+    const expectedNormalPriorityTimeout = expectedPriorityTimeout({
+      priorityLevel: 3,
+      schedulerPriorityName: "unstable_NormalPriority",
+      timeoutMs: 5000,
+      timeoutReason: "normal-priority-timeout"
+    });
     assert.equal(afterFallback.diagnosticEventCount, 3);
     assert.equal(afterFallback.continuationFallbackMetadataDiagnostics, true);
     assert.equal(afterFallback.continuationSignalValidationDiagnostics, true);
@@ -1295,6 +1397,14 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
       2
     );
     assert.deepEqual(
+      afterFallback.rootContinuationExecutionRoute.priorityTimeout,
+      expectedNormalPriorityTimeout
+    );
+    assert.equal(
+      afterFallback.rootContinuationExecutionRoute.sourceCallbackDidTimeout,
+      false
+    );
+    assert.deepEqual(
       afterFallback.rootContinuationExecutionRoute.delay,
       expectedPostTaskDelayDiagnostic("number", 0, "zero-delay-task")
     );
@@ -1311,7 +1421,8 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
         callbackRunCountAtAbortRequest: null,
         callbackRunCountAtAbortCompletion: null,
         continuationFallbackCountAtAbortRequest: null,
-        continuationFallbackCountAtAbortCompletion: null
+        continuationFallbackCountAtAbortCompletion: null,
+        priorityTimeout: expectedNormalPriorityTimeout
       })
     );
 
@@ -1436,7 +1547,8 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
         callbackRunCountAtAbortRequest: 1,
         callbackRunCountAtAbortCompletion: 1,
         continuationFallbackCountAtAbortRequest: 1,
-        continuationFallbackCountAtAbortCompletion: 1
+        continuationFallbackCountAtAbortCompletion: 1,
+        priorityTimeout: expectedNormalPriorityTimeout
       })
     );
     assert.deepEqual(flow.cancellationEvents, [
@@ -1470,6 +1582,12 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
       withYield: false
     });
     const flow = report.delayedContinuationActRootHandoff;
+    const expectedLowPriorityTimeout = expectedPriorityTimeout({
+      priorityLevel: 4,
+      schedulerPriorityName: "unstable_LowPriority",
+      timeoutMs: 10000,
+      timeoutReason: "low-priority-timeout"
+    });
 
     assert.deepEqual(flow.publicNodeKeys, ["_controller"]);
     assert.equal(flow.privateDiagnosticSymbolPresent, true);
@@ -1543,6 +1661,14 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
       continuation.continuationMetadata.delayedCallbackPathAccepted,
       true
     );
+    assert.equal(
+      continuation.continuationMetadata.priorityTimeoutStatus,
+      "scheduler-post-task-private-priority-timeout-diagnostics"
+    );
+    assert.equal(continuation.continuationMetadata.timeoutMs, 10000);
+    assert.equal(continuation.continuationMetadata.sourceCallbackDidTimeout, false);
+    assert.deepEqual(continuation.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(continuation.sourceCallbackDidTimeout, false);
 
     const route = diagnostics.rootContinuationExecutionRoute;
     assert.equal(route.hasActRootWorkHandoff, true);
@@ -1550,6 +1676,8 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
     assert.equal(route.publicReactActCompatibilityClaimed, false);
     assert.equal(route.publicRootSchedulerCompatibilityClaimed, false);
     assert.equal(route.publicRendererCompatibilityClaimed, false);
+    assert.deepEqual(route.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(route.sourceCallbackDidTimeout, false);
     assert.deepEqual(
       route.privateRootContinuationExecution,
       expectedPrivateRootContinuationExecution({
@@ -1559,7 +1687,8 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
         callbackRunCountAtAbortRequest: null,
         callbackRunCountAtAbortCompletion: null,
         continuationFallbackCountAtAbortRequest: null,
-        continuationFallbackCountAtAbortCompletion: null
+        continuationFallbackCountAtAbortCompletion: null,
+        priorityTimeout: expectedLowPriorityTimeout
       })
     );
 
@@ -1587,6 +1716,8 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
     assert.equal(handoff.continuationDiagnosticEventIndex, 2);
     assert.equal(handoff.sourceCallbackRunIndex, 0);
     assert.equal(handoff.callbackRunCountAtSchedule, 1);
+    assert.deepEqual(handoff.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(handoff.sourceCallbackDidTimeout, false);
     assert.deepEqual(
       handoff.delay,
       expectedPostTaskDelayDiagnostic("number", 17, "delayed-task")
@@ -1614,6 +1745,8 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
       accepted: true,
       schedulerPriorityName: "unstable_LowPriority",
       priorityLevel: 4,
+      priorityTimeout: expectedLowPriorityTimeout,
+      sourceCallbackDidTimeout: false,
       postTaskPriority: "user-visible",
       actQueueHandoffOnly: true,
       rootWorkMetadataOnly: true,
@@ -1635,6 +1768,8 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
     );
     for (const rootWorkRecord of handoff.rootWorkRecords) {
       assert.equal(rootWorkRecord.accepted, true);
+      assert.deepEqual(rootWorkRecord.priorityTimeout, expectedLowPriorityTimeout);
+      assert.equal(rootWorkRecord.sourceCallbackDidTimeout, false);
       assert.equal(rootWorkRecord.rootWorkMetadataOnly, true);
       assert.equal(rootWorkRecord.rendererWorkExecutionBlocked, true);
       assert.equal(rootWorkRecord.publicSchedulerTimingCompatibilityClaimed, false);
@@ -1702,6 +1837,34 @@ function expectedPostTaskDelayDiagnostic(type, value, delayClassification) {
     normalizedDelayValue: value,
     delayClassification,
     browserPostTaskCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedPriorityTimeout({
+  priorityLevel,
+  schedulerPriorityName,
+  recognizedPriority = true,
+  timeoutMs,
+  timeoutReason,
+  timeoutClassification = "finite-priority-timeout"
+}) {
+  return {
+    status: "scheduler-post-task-private-priority-timeout-diagnostics",
+    priorityLevel,
+    schedulerPriorityName,
+    recognizedPriority,
+    timeoutMs,
+    timeoutReason,
+    timeoutClassification,
+    didTimeoutArgument: false,
+    didTimeoutSource:
+      "scheduler-post-task-deprecated-didTimeout-is-always-false",
+    expiresAt: null,
+    rawTimingCaptured: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
@@ -1831,7 +1994,8 @@ function expectedPrivateRootContinuationExecution({
   callbackRunCountAtAbortRequest,
   callbackRunCountAtAbortCompletion,
   continuationFallbackCountAtAbortRequest,
-  continuationFallbackCountAtAbortCompletion
+  continuationFallbackCountAtAbortCompletion,
+  priorityTimeout
 }) {
   return {
     status,
@@ -1839,6 +2003,8 @@ function expectedPrivateRootContinuationExecution({
     routeSelected: true,
     continuationIndex: 0,
     sourceCallbackRunIndex: 0,
+    sourceCallbackDidTimeout: false,
+    priorityTimeout,
     callbackRunCountAtSchedule: 1,
     callbackRunCountAtAbortRequest,
     callbackRunCountAtAbortCompletion,

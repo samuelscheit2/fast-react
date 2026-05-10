@@ -55,6 +55,16 @@ test('private postTask root continuation metadata links delay and abort diagnost
   assert.equal(row.priorityLevel, 3);
   assert.equal(row.schedulerPriorityName, 'unstable_NormalPriority');
   assert.equal(row.postTaskPriority, 'user-visible');
+  assert.deepEqual(
+    row.priorityTimeout,
+    expectedPriorityTimeout({
+      priorityLevel: 3,
+      schedulerPriorityName: 'unstable_NormalPriority',
+      timeoutMs: 5000,
+      timeoutReason: 'normal-priority-timeout'
+    })
+  );
+  assert.equal(row.sourceCallbackDidTimeout, false);
   assert.equal(row.delay.value, 0);
   assert.equal(row.delay.delayClassification, 'zero-delay-task');
   assert.deepEqual(row.signalAtSchedule, {
@@ -82,6 +92,7 @@ test('private postTask root continuation metadata links delay and abort diagnost
     true
   );
   assert.equal(row.sourceDiagnostics.taskControllerAbortOrderingDiagnostics, true);
+  assert.equal(row.sourceDiagnostics.priorityTimeoutDiagnostics, true);
   assert.equal(row.sourceDiagnostics.continuationSignalValidationDiagnostics, true);
   assert.equal(row.sourceDiagnostics.continuationAbortOrderingDiagnostics, true);
   assert.equal(
@@ -139,6 +150,14 @@ test('private postTask root continuation metadata links delay and abort diagnost
     row.privateRootContinuationExecution.continuationCallbackExecuted,
     false
   );
+  assert.deepEqual(
+    row.privateRootContinuationExecution.priorityTimeout,
+    row.priorityTimeout
+  );
+  assert.equal(
+    row.privateRootContinuationExecution.sourceCallbackDidTimeout,
+    false
+  );
   assert.equal(row.privateRootContinuationExecution.rendererWorkExecuted, false);
   assert.equal(row.privateRootContinuationExecution.reconcilerWorkExecuted, false);
   assert.equal(
@@ -154,6 +173,8 @@ test('private postTask root continuation metadata links delay and abort diagnost
   );
   assert.equal(row.continuationFallback.status, ROOT_CONTINUATION_FALLBACK_STATUS);
   assert.equal(row.continuationFallback.selectedFallback, 'scheduler.postTask');
+  assert.deepEqual(row.continuationFallback.priorityTimeout, row.priorityTimeout);
+  assert.equal(row.continuationFallback.sourceCallbackDidTimeout, false);
   assert.equal(row.acceptedRootContinuation.status, ACCEPTED_ROOT_CONTINUATION_STATUS);
   assert.equal(row.acceptedRootContinuation.accepted, true);
   assert.equal(Object.isFrozen(row.acceptedRootContinuation), true);
@@ -169,6 +190,11 @@ test('private postTask root continuation metadata links delay and abort diagnost
     row.acceptedRootContinuation.privateRootContinuationExecution.status,
     ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS
   );
+  assert.deepEqual(
+    row.acceptedRootContinuation.priorityTimeout,
+    row.priorityTimeout
+  );
+  assert.equal(row.acceptedRootContinuation.sourceCallbackDidTimeout, false);
   assert.equal(
     row.blockedRootExecution.status,
     ROOT_CONTINUATION_BLOCKED_STATUS
@@ -225,6 +251,16 @@ test('private postTask delayed continuation metadata accepts act/root handoff wi
   assert.equal(row.priorityLabel, 'low');
   assert.equal(row.priorityLevel, 4);
   assert.equal(row.schedulerPriorityName, 'unstable_LowPriority');
+  assert.deepEqual(
+    row.priorityTimeout,
+    expectedPriorityTimeout({
+      priorityLevel: 4,
+      schedulerPriorityName: 'unstable_LowPriority',
+      timeoutMs: 10000,
+      timeoutReason: 'low-priority-timeout'
+    })
+  );
+  assert.equal(row.sourceCallbackDidTimeout, false);
   assert.equal(row.delay.value, 17);
   assert.equal(row.delay.delayClassification, 'delayed-task');
   assert.equal(row.abortSignalState, 'not-aborted');
@@ -240,6 +276,11 @@ test('private postTask delayed continuation metadata accepts act/root handoff wi
     row.acceptedRootContinuation.privateRootContinuationExecution.status,
     ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
   );
+  assert.deepEqual(
+    row.acceptedRootContinuation.priorityTimeout,
+    row.priorityTimeout
+  );
+  assert.equal(row.acceptedRootContinuation.sourceCallbackDidTimeout, false);
   assert.equal(
     row.acceptedActRootWorkHandoff.status,
     ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS
@@ -247,6 +288,11 @@ test('private postTask delayed continuation metadata accepts act/root handoff wi
   assert.equal(row.acceptedActRootWorkHandoff.accepted, true);
   assert.equal(row.acceptedActRootWorkHandoff.delayedCallbackPathAccepted, true);
   assert.equal(row.acceptedActRootWorkHandoff.delay.value, 17);
+  assert.deepEqual(
+    row.acceptedActRootWorkHandoff.priorityTimeout,
+    row.priorityTimeout
+  );
+  assert.equal(row.acceptedActRootWorkHandoff.sourceCallbackDidTimeout, false);
   assert.equal(
     row.acceptedActRootWorkHandoff.routeStatus,
     ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
@@ -263,6 +309,10 @@ test('private postTask delayed continuation metadata accepts act/root handoff wi
     ),
     ['RootLaneSchedulingSnapshot', 'RootTaskScheduleRecord']
   );
+  for (const rootWorkRecord of row.acceptedActRootWorkHandoff.rootWorkRecords) {
+    assert.deepEqual(rootWorkRecord.priorityTimeout, row.priorityTimeout);
+    assert.equal(rootWorkRecord.sourceCallbackDidTimeout, false);
+  }
   assert.equal(
     row.acceptedRootContinuation.acceptedActRootWorkHandoff.status,
     ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS
@@ -482,4 +532,30 @@ function loadPostTaskOracleModule() {
     );
   }
   return postTaskOracleModulePromise;
+}
+
+function expectedPriorityTimeout({
+  priorityLevel,
+  schedulerPriorityName,
+  timeoutMs,
+  timeoutReason
+}) {
+  return {
+    status: 'scheduler-post-task-private-priority-timeout-diagnostics',
+    priorityLevel,
+    schedulerPriorityName,
+    recognizedPriority: true,
+    timeoutMs,
+    timeoutReason,
+    timeoutClassification: 'finite-priority-timeout',
+    didTimeoutArgument: false,
+    didTimeoutSource:
+      'scheduler-post-task-deprecated-didTimeout-is-always-false',
+    expiresAt: null,
+    rawTimingCaptured: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
 }
