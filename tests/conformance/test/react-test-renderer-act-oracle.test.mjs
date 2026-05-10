@@ -44,6 +44,9 @@ const privateActQueueFlushDiagnosticsExport =
 const privateFlushSyncActRoutingDiagnosticsSymbol = Symbol.for(
   "fast.react_test_renderer.private_flushsync_act_routing_diagnostics"
 );
+const rootRequestBridgeSymbol = Symbol.for(
+  "fast.react_test_renderer.root_request_bridge"
+);
 const privateFlushSyncActRoutingDiagnosticsStatus =
   "private-flushsync-act-routing-diagnostics-public-flushsync-blocked";
 const privateActPassiveEffectDrainDiagnosticsExport =
@@ -178,6 +181,10 @@ const ACT_NESTED_SCOPE_BLOCKER_IDS = [
 ];
 const ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID =
   "react-test-renderer-act-private-root-passive-prerequisite-sequence";
+const ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID =
+  "react-test-renderer-act-native-update-passive-drain-private-diagnostic";
+const ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID =
+  "private-native-update-execution-passive-effect-drain-metadata";
 const ACT_PRIVATE_ROOT_PASSIVE_REQUIRED_PREREQUISITE_IDS = [
   "test-renderer-private-root-request-records",
   "scheduler-mock-flush-helper-metadata",
@@ -253,6 +260,7 @@ const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID,
   "test-renderer-mock-scheduler-expired-work-act-route",
   "test-renderer-mock-scheduler-expired-act-root-work-route",
+  ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID,
   "react-private-act-internal-test-queue-factories"
 ];
 const CJS_DEVELOPMENT_ENTRYPOINT =
@@ -363,7 +371,9 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS = [
   ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(0, 4),
   ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID,
   ACT_NESTED_SCOPE_BLOCKER_PREREQUISITE_ID,
-  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4),
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4, 9),
+  ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID,
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(9),
   ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
 ];
 
@@ -748,10 +758,16 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
   assert.equal(localGate.privatePassiveCallbackExecutionMetadataPresent, true);
   assert.equal(localGate.privatePassiveDestroyExecutionMetadataPresent, true);
   assert.equal(localGate.privatePassiveSchedulerFlushMetadataPresent, true);
+  assert.equal(localGate.privateNativeUpdateExecutionMetadataPresent, true);
   assert.equal(localGate.passiveActFlushMetadataAccepted, true);
   assert.equal(localGate.rootRequestRecordsAccepted, true);
   assert.equal(localGate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(localGate.privateFlushExecutionMetadataAccepted, true);
+  assert.equal(localGate.privateNativeUpdateExecutionMetadataAccepted, true);
+  assert.equal(
+    localGate.privateNativeUpdatePassiveEffectDrainMetadataConsumed,
+    true
+  );
   assert.equal(localGate.compatibilityClaimed, false);
 
   for (const requirement of actUnblockingRequirements) {
@@ -1036,6 +1052,9 @@ function inspectLocalReactTestRendererActBlockedGate() {
   const testRendererSource = readWorkspaceFile(
     "packages/react-test-renderer/index.js"
   );
+  const testRendererCjsDevelopmentSource = readWorkspaceFile(
+    "packages/react-test-renderer/cjs/react-test-renderer.development.js"
+  );
   const actQueueSource = [
     schedulerBridgeSource,
     rootSchedulerSource,
@@ -1106,6 +1125,16 @@ function inspectLocalReactTestRendererActBlockedGate() {
     ) &&
     /\bflush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary\b/u.test(
       passiveEffectsSource
+    );
+  const privateNativeUpdateExecutionMetadataPresent =
+    /worker-637-test-renderer-update-native-execution/u.test(
+      testRendererCjsDevelopmentSource
+    ) &&
+    /consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata/u.test(
+      testRendererCjsDevelopmentSource
+    ) &&
+    /FastReactTestRendererPrivateUpdateNativeBridgeAdmission/u.test(
+      testRendererCjsDevelopmentSource
     );
   const publicEffectCallbackExecutionPresent =
     /\bpublic_effect_execution_enabled\(&self\) -> bool \{\s*true\s*\}/u.test(
@@ -1216,6 +1245,7 @@ function inspectLocalReactTestRendererActBlockedGate() {
     privatePassiveCallbackExecutionMetadataPresent,
     privatePassiveDestroyExecutionMetadataPresent,
     privatePassiveSchedulerFlushMetadataPresent,
+    privateNativeUpdateExecutionMetadataPresent,
     actSchedulerPrivateGatePresent,
     reactActPrivateDispatcherGateAccepted,
     privateActQueueDiagnosticConsumptionPresent,
@@ -1233,9 +1263,14 @@ function inspectLocalReactTestRendererActBlockedGate() {
     privateFlushExecutionMetadataAccepted:
       privateSyncFlushExecutionMetadataPresent &&
       privatePassiveSchedulerFlushMetadataPresent &&
+      privateNativeUpdateExecutionMetadataPresent &&
       (privatePassiveCallbackExecutionMetadataPresent ||
         privatePassiveDestroyExecutionMetadataPresent) &&
       privateRootOutputDiagnosticsAccepted,
+    privateNativeUpdateExecutionMetadataAccepted:
+      privateNativeUpdateExecutionMetadataPresent,
+    privateNativeUpdatePassiveEffectDrainMetadataConsumed:
+      privateNativeUpdateExecutionMetadataPresent,
     actQueueFlushingReady,
     effectExecutionReady,
     rendererRootsReady,
@@ -2339,6 +2374,35 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
   assert.equal(diagnostics.executesPassiveEffects, false);
   assert.equal(diagnostics.invokesEffectCallbacks, false);
   assert.equal(diagnostics.invokesActCallback, false);
+  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    assert.equal(
+      diagnostics.nativeUpdateExecutionResultKind,
+      "FastReactTestRendererPrivateRootExecutionResult"
+    );
+    assert.equal(
+      diagnostics.nativeUpdatePassiveEffectDrainDiagnosticId,
+      ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID
+    );
+    assert.equal(diagnostics.consumesAcceptedNativeUpdateExecution, true);
+    assert.equal(diagnostics.consumesPrivateUpdateNativeBridgeAdmission, true);
+    assert.equal(diagnostics.consumesAcceptedNativeUpdateHostOutput, true);
+    assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
+    assert.equal(diagnostics.publicUpdateCompatibilityClaimed, false);
+    assert.equal(
+      typeof diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
+      "function"
+    );
+  } else {
+    assert.equal(diagnostics.consumesAcceptedNativeUpdateExecution, undefined);
+    assert.equal(
+      diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
+      undefined
+    );
+  }
 
   for (const row of inspection.helperDiagnostics) {
     assert.equal(row.diagnostics, diagnostics, `${entry.entrypoint}:${row.key}`);
@@ -2463,6 +2527,14 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
   assert.equal(report.invokesEffectCallbacks, false);
   assert.equal(metadata.records.length, 0, entry.entrypoint);
 
+  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    assertPrivateActNativeUpdatePassiveDrainConsumer(
+      entry,
+      moduleExports,
+      diagnostics
+    );
+  }
+
   const rejected = diagnostics.describeAcceptedPendingPassiveFlushMetadata([]);
   assert.equal(rejected.accepted, false, entry.entrypoint);
   assert.throws(
@@ -2481,6 +2553,130 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
         error.exportName,
         `_Scheduler.${privateActPassiveEffectDrainDiagnosticsExport}`
       );
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.publicActCompatibilityClaimed, false);
+      assert.equal(error.executesPassiveEffects, false);
+      assert.equal(error.invokesEffectCallbacks, false);
+      return true;
+    },
+    entry.entrypoint
+  );
+}
+
+function assertPrivateActNativeUpdatePassiveDrainConsumer(
+  entry,
+  moduleExports,
+  diagnostics
+) {
+  const updateExecutionResult = createAcceptedNativeUpdateExecutionResult(
+    entry,
+    moduleExports
+  );
+  const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
+    diagnostics.createAcceptedPendingPassiveFlushRecord({
+      label: "native-update-passive-gate",
+      recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
+      root: updateExecutionResult.request.rootId,
+      finishedWork: "updated-fiber",
+      lanes: "Default",
+      pendingUnmountCount: 0,
+      pendingMountCount: 1,
+      schedulerRequestOrder: 2
+    })
+  ]);
+  const description =
+    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      updateExecutionResult,
+      metadata
+    );
+
+  assert.equal(description.id, ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID);
+  assert.equal(description.accepted, true);
+  assert.equal(description.rejectionReason, null);
+  assert.equal(description.updateExecutionAccepted, true);
+  assert.equal(description.passiveMetadataAccepted, true);
+  assert.equal(description.consumesAcceptedNativeUpdateExecution, true);
+  assert.equal(description.drainsAcceptedPendingPassiveFlushMetadata, true);
+  assert.equal(description.publicActCompatibilityClaimed, false);
+  assert.equal(description.publicUpdateCompatibilityClaimed, false);
+
+  const report =
+    diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      updateExecutionResult,
+      metadata
+    );
+  assert.equal(report.id, ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID);
+  assert.equal(
+    report.status,
+    "private-act-native-update-passive-effect-drain-public-act-blocked"
+  );
+  assert.equal(report.accepted, true);
+  assert.equal(report.updateRequestId, updateExecutionResult.requestId);
+  assert.equal(report.updateRequestSequence, updateExecutionResult.requestSequence);
+  assert.equal(report.privateUpdateNativeBridgeAdmissionId,
+    "react-test-renderer-update-native-bridge-admission-private-diagnostic"
+  );
+  assert.equal(report.nativeUpdateExecutionConsumed, true);
+  assert.equal(report.privateRootRequestExecutionConsumed, true);
+  assert.equal(report.rustRootExecutionBoundaryCalled, true);
+  assert.equal(report.rustExecution, true);
+  assert.equal(report.reconcilerExecution, true);
+  assert.equal(report.hostOutputProduced, true);
+  assert.equal(report.textUpdateApplyRecorded, true);
+  assert.equal(report.hostTextUpdateApplyCount, 1);
+  assert.equal(report.hostComponentUpdateApplyCount, 1);
+  assert.equal(report.pendingBefore, 1);
+  assert.equal(report.drainedCount, 1);
+  assert.equal(report.remainingCount, 0);
+  assert.equal(report.drainedRecords[0].recordKind,
+    "PassiveEffectSchedulerFlushExecutionRecord"
+  );
+  assert.equal(report.privatePassiveEffectDrainDiagnosticsConsumed, true);
+  assert.equal(report.consumesPendingPassiveFlushMetadata, true);
+  assert.equal(report.consumesAcceptedSchedulerFlushMetadata, true);
+  assert.equal(report.consumesAcceptedNativeUpdateExecution, true);
+  assert.equal(report.consumesPrivateUpdateNativeBridgeAdmission, true);
+  assert.equal(report.consumesAcceptedNativeUpdateHostOutput, true);
+  assert.equal(report.drainsAcceptedPendingPassiveFlushMetadata, true);
+  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(report.drainsPublicReactActQueue, false);
+  assert.equal(report.publicReactActCompatibilityClaimed, false);
+  assert.equal(report.publicActCompatibilityClaimed, false);
+  assert.equal(report.publicUpdateCompatibilityClaimed, false);
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.invokesActCallback, false);
+  assert.equal(report.executesQueuedWork, false);
+  assert.equal(report.executesScheduledCallbacks, false);
+  assert.equal(report.executesPassiveEffects, false);
+  assert.equal(report.invokesEffectCallbacks, false);
+  assert.equal(report.executesRendererRoots, false);
+  assert.equal(report.mutatesHostOutput, false);
+  assert.equal(metadata.records.length, 0, entry.entrypoint);
+
+  const rejected =
+    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      [],
+      diagnostics.createAcceptedPendingPassiveFlushMetadata([])
+  );
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
+  assert.throws(
+    () =>
+      diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+        updateExecutionResult,
+        []
+      ),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateActPassiveEffectDrainError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED"
+      );
+      assert.equal(error.reason, "metadata-missing-internal-brand");
+      assert.equal(error.entrypoint, entry.entrypoint);
       assert.equal(error.publicReactActCompatibilityClaimed, false);
       assert.equal(error.publicActCompatibilityClaimed, false);
       assert.equal(error.executesPassiveEffects, false);
@@ -2663,7 +2859,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-541-test-renderer-act-nested-scope-blockers",
       "worker-576-test-renderer-act-private-root-passive-sequence",
       "worker-622-scheduler-mock-act-root-work-execution",
-      "worker-640-test-renderer-act-scheduler-flush-execution"
+      "worker-640-test-renderer-act-scheduler-flush-execution",
+      "worker-670-test-renderer-act-passive-native-flush"
     );
   }
 
@@ -2711,6 +2908,19 @@ function assertActSchedulerGate(gate, entrypoint) {
       true
     );
     assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
+    assert.equal(gate.privateNativeUpdateExecutionMetadataAccepted, true);
+    assert.equal(
+      gate.privateNativeUpdatePassiveEffectDrainMetadataConsumed,
+      true
+    );
+    assert.equal(
+      gate.privateNativeUpdatePassiveEffectDrainDiagnosticId,
+      ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID
+    );
+    assert.equal(
+      gate.privateNativeUpdatePassiveEffectDrainPrerequisiteId,
+      ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID
+    );
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
   assert.equal(gate.rootActRecordsAccepted, true);
@@ -2829,6 +3039,16 @@ function assertActSchedulerGate(gate, entrypoint) {
         .rootPassivePrerequisiteSequenceDiagnostics,
       gate.recognizedPrivateRootPassivePrerequisiteSequence
     );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .privateNativeUpdateExecutionMetadataAccepted,
+      true
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .privateNativeUpdatePassiveEffectDrainMetadataConsumed,
+      true
+    );
   } else {
     assert.equal(gate.recognizedActWarningThenableBlockers, undefined);
     assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
@@ -2936,6 +3156,10 @@ function assertActSchedulerGate(gate, entrypoint) {
       publicSchedulerFlushBehaviorExecuted: false,
       drainsExpiredMockSchedulerWork: false,
       sequencesPrivateRootPassivePrerequisites: true,
+      consumesAcceptedNativeUpdateExecution: true,
+      consumesPrivateUpdateNativeBridgeAdmission: true,
+      consumesAcceptedNativeUpdateHostOutput: true,
+      drainsAcceptedPendingPassiveFlushMetadata: true,
       emitsActWarnings: false,
       emitsOverlappingActWarnings: false,
       awaitsActThenables: false,
@@ -3456,6 +3680,153 @@ function assertReactTestRendererUnimplementedError(
     error.message,
     /no React Test Renderer behavior implementation yet/
   );
+}
+
+function createAcceptedNativeUpdateExecutionResult(entry, moduleExports) {
+  const bridge = moduleExports.create[rootRequestBridgeSymbol];
+  assert.equal(bridge.bridgeKind, "FastReactTestRendererPrivateRootRequestBridge");
+
+  const renderer = moduleExports.create({
+    props: { "data-state": "old", children: "hello" },
+    type: "span"
+  });
+  const updateError = captureThrown(() =>
+    renderer.update({
+      props: { "data-state": "new", children: "goodbye" },
+      type: "span"
+    })
+  );
+  assertReactTestRendererUnimplementedError(
+    updateError,
+    entry.entrypoint,
+    "create().update"
+  );
+
+  const result = bridge.consumeRootExecutionResult(
+    updateError.rootRequest,
+    createRustUpdateNativeBridgeAdmissionEvidence(updateError.rootRequest)
+  );
+  assert.equal(Object.isFrozen(result), true, entry.entrypoint);
+  assert.equal(result.kind, "FastReactTestRendererPrivateRootExecutionResult");
+  assert.equal(result.operation, "update");
+  assert.equal(result.hostOutputProduced, true);
+  assert.equal(result.privateRootRequestExecution, true);
+  assert.equal(result.publicCreateUpdateUnmountBehaviorAvailable, false);
+  assert.equal(result.compatibilityClaimed, false);
+  return result;
+}
+
+function createRustUpdateNativeBridgeAdmissionEvidence(request) {
+  return {
+    rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+    updateRouteRootWorkLoopDiagnostic:
+      createRustUpdateRouteRootWorkLoopDiagnosticSource(request),
+    hostOutputProduced: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rustExecution: true,
+    reconcilerExecution: true
+  };
+}
+
+function createRustLifecycleDiagnosticSource(request) {
+  return {
+    operation: request.operation,
+    updateKind: request.updateKind,
+    updateOutcome: request.rustOutcome,
+    lifecycleStatusBefore: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusBefore
+    ),
+    lifecycleStatusAfter: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusAfter
+    ),
+    scheduledUpdate: request.scheduled
+      ? {
+          kind: request.updateKind,
+          element: request.rootElementHandle.isNone
+            ? {
+                kind: "RootElementHandle::NONE",
+                isNone: true
+              }
+            : {
+                kind: "RootElementHandle",
+                isNone: false
+              },
+          containerUpdate: {
+            api: request.containerUpdateApi
+          },
+          rootSchedule: {
+            api: "ensure_root_is_scheduled"
+          }
+        }
+      : null
+  };
+}
+
+function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
+  return {
+    diagnosticName: "fast-react-test-renderer.update-route.private-root-work-loop",
+    status:
+      "private-update-route-root-work-loop-metadata-ready-public-update-blocked",
+    rootRequestId: request.requestId,
+    rootRequestSequence: request.requestSequence,
+    rootOperation: "update",
+    updateKind: "Update",
+    updateOutcome: request.rustOutcome,
+    lifecycleStatusBefore: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusBefore
+    ),
+    lifecycleStatusAfter: normalizeExpectedRustLifecycle(
+      request.lifecycleStatusAfter
+    ),
+    hostOutputUpdateKind: "Update",
+    updateQueueMetadata: {
+      record: "UpdateContainerResult",
+      scheduleRecord: "RootScheduleUpdateRecord",
+      scheduledUpdateRecord: "TestRendererRootScheduledUpdate",
+      scheduledUpdateKind: "Update",
+      laneSource: "update_container",
+      queueMatchesRenderCurrentQueue: true,
+      selectedLanesMatchRenderLanes: true,
+      pendingLanesAfterEnqueueMatchRenderLanes: true
+    },
+    rootWorkLoopMetadata: {
+      renderPhaseRecord: "HostRootRenderPhaseRecord",
+      commitRecord: "HostRootCommitRecord",
+      appliedUpdateCount: 1,
+      skippedUpdateCount: 0,
+      remainingLanesEmpty: true,
+      commitCurrentMatchesRenderFinishedWork: true,
+      commitPreviousCurrentMatchesRenderCurrent: true,
+      commitLanesMatchRenderLanes: true,
+      rootCurrentMatchesCommitCurrent: true
+    },
+    hostTextUpdateMetadata: {
+      hostOutputUpdateRecord: "TestRendererUpdatedHostOutput",
+      hostTextUpdateApplyRequired: true,
+      textUpdateApplyRecorded: true,
+      hostTextUpdateApplyCount: 1,
+      hostComponentUpdateApplyCount: 1
+    },
+    publicRootUpdateAvailable: false,
+    publicSerializationAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  };
+}
+
+function normalizeExpectedRustLifecycle(status) {
+  if (status === "active") {
+    return "Active";
+  }
+  if (status === "unmount-scheduled") {
+    return "UnmountScheduled";
+  }
+  if (status === "unmounted") {
+    return "Unmounted";
+  }
+  return status;
 }
 
 function captureThrown(callback) {

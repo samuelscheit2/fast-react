@@ -53,6 +53,12 @@ const privateActPassiveEffectDrainMetadataKind =
 const privateActPassiveEffectDrainRecordKind =
   'fast-react.react-test-renderer.private-act-passive-effect-drain-record';
 const privateActPassiveEffectDrainVersion = 1;
+const privateActNativeUpdatePassiveEffectDrainDiagnosticId =
+  'react-test-renderer-act-native-update-passive-drain-private-diagnostic';
+const privateActNativeUpdatePassiveEffectDrainPrerequisiteId =
+  'private-native-update-execution-passive-effect-drain-metadata';
+const privateActNativeUpdatePassiveEffectDrainStatus =
+  'private-act-native-update-passive-effect-drain-public-act-blocked';
 const privateActQueueTestQueueBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-queue'
 );
@@ -1136,6 +1142,41 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     executesRendererRoots: false
   }),
   Object.freeze({
+    id: privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    passiveEffectDrainExport: privateActPassiveEffectDrainDiagnosticsExport,
+    status: privateActNativeUpdatePassiveEffectDrainStatus,
+    acceptedWorker:
+      'worker-670-test-renderer-act-passive-native-flush',
+    buildsOnWorkers: Object.freeze([
+      'worker-473-test-renderer-act-passive-effect-drain',
+      'worker-637-test-renderer-update-native-execution'
+    ]),
+    nativeUpdateExecutionResultKind:
+      'FastReactTestRendererPrivateRootExecutionResult',
+    privateUpdateNativeBridgeAdmissionDiagnosticId:
+      'react-test-renderer-update-native-bridge-admission-private-diagnostic',
+    privateUpdateNativeBridgeAdmissionStatus:
+      'private-update-native-bridge-admission-host-output-handoff-public-update-blocked',
+    consumesAcceptedNativeUpdateExecution: true,
+    consumesPrivateUpdateNativeBridgeAdmission: true,
+    consumesAcceptedNativeUpdateHostOutput: true,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    drainsAcceptedPendingPassiveFlushMetadata: true,
+    publicUpdateCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    executesRendererRoots: false
+  }),
+  Object.freeze({
     id: 'react-private-act-internal-test-queue-factories',
     jsExport: '__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__',
     acceptedWorker: 'worker-377-scheduler-act-queue-flush-helper-private',
@@ -1192,6 +1233,12 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   nestedScopeBlockerDiagnostics: actNestedScopeBlockerDiagnostics,
   rootPassivePrerequisiteSequenceDiagnostics:
     privateActRootPassivePrerequisiteSequenceDiagnostics,
+  privateNativeUpdatePassiveEffectDrainDiagnosticId:
+    privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+  privateNativeUpdatePassiveEffectDrainPrerequisiteId:
+    privateActNativeUpdatePassiveEffectDrainPrerequisiteId,
+  privateNativeUpdateExecutionMetadataAccepted: true,
+  privateNativeUpdatePassiveEffectDrainMetadataConsumed: true,
   publicActWarningEmissionAvailable: false,
   publicActScopeDepthTrackingAvailable: false,
   publicNestedActQueueReuseAvailable: false,
@@ -1244,6 +1291,21 @@ privateActPassiveEffectDrainDiagnostics = Object.freeze({
   consumesPendingPassiveFlushMetadata: true,
   consumesAcceptedSchedulerFlushMetadata: true,
   privatePassiveEffectDrainDiagnosticsConsumed: true,
+  nativeUpdateExecutionResultKind:
+    'FastReactTestRendererPrivateRootExecutionResult',
+  nativeUpdatePassiveEffectDrainDiagnosticId:
+    privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+  nativeUpdatePassiveEffectDrainStatus:
+    privateActNativeUpdatePassiveEffectDrainStatus,
+  privateUpdateNativeBridgeAdmissionDiagnosticId:
+    'react-test-renderer-update-native-bridge-admission-private-diagnostic',
+  privateUpdateNativeBridgeAdmissionStatus:
+    'private-update-native-bridge-admission-host-output-handoff-public-update-blocked',
+  consumesAcceptedNativeUpdateExecution: true,
+  consumesPrivateUpdateNativeBridgeAdmission: true,
+  consumesAcceptedNativeUpdateHostOutput: true,
+  drainsAcceptedPendingPassiveFlushMetadata: true,
+  publicUpdateCompatibilityClaimed: false,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
   publicSchedulerTimingCompatibilityClaimed: false,
@@ -1257,8 +1319,12 @@ privateActPassiveEffectDrainDiagnostics = Object.freeze({
   createAcceptedPendingPassiveFlushRecord,
   describeAcceptedPendingPassiveFlushMetadata,
   consumeAcceptedPendingPassiveFlushMetadata,
+  describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
+  consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
   drainAcceptedPendingPassiveFlushMetadata:
-    consumeAcceptedPendingPassiveFlushMetadata
+    consumeAcceptedPendingPassiveFlushMetadata,
+  drainAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata:
+    consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata
 });
 const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'react-act-private-dispatcher-gate',
@@ -1272,6 +1338,7 @@ const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'sync-flush-post-passive-private-execution-metadata',
   'passive-effect-flush-metadata',
   'passive-effect-scheduler-flush-metadata',
+  privateActNativeUpdatePassiveEffectDrainPrerequisiteId,
   'passive-effect-private-callback-execution-metadata',
   'test-renderer-private-root-output-diagnostics',
   'test-renderer-private-root-request-records',
@@ -1424,6 +1491,38 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     publicSchedulerPackageBehaviorChanged: false
   }),
   Object.freeze({
+    id: privateActNativeUpdatePassiveEffectDrainPrerequisiteId,
+    present: true,
+    recordOnly: false,
+    records: Object.freeze([
+      'FastReactTestRendererPrivateRootExecutionResult',
+      'FastReactTestRendererPrivateUpdateNativeBridgeAdmission',
+      'TestRendererUpdateNativeBridgeAdmission',
+      'TestRendererUpdatedHostOutput',
+      'PassiveEffectSchedulerFlushExecutionRecord'
+    ]),
+    diagnosticId: privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+    status: privateActNativeUpdatePassiveEffectDrainStatus,
+    consumesAcceptedNativeUpdateExecution: true,
+    consumesPrivateUpdateNativeBridgeAdmission: true,
+    consumesAcceptedNativeUpdateHostOutput: true,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    drainsAcceptedPendingPassiveFlushMetadata: true,
+    publicUpdateCompatibilityClaimed: false,
+    publicActCompatibility: false,
+    publicSchedulerPackageBehaviorChanged: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    executesRendererRoots: false
+  }),
+  Object.freeze({
     id: 'passive-effect-private-callback-execution-metadata',
     present: true,
     recordOnly: true,
@@ -1527,6 +1626,10 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   consumesPrivateSchedulerActQueueDiagnostics: true,
   consumesPrivatePassiveEffectDrainDiagnostics: true,
   consumesPendingPassiveFlushMetadata: true,
+  consumesAcceptedNativeUpdateExecution: true,
+  consumesPrivateUpdateNativeBridgeAdmission: true,
+  consumesAcceptedNativeUpdateHostOutput: true,
+  drainsAcceptedPendingPassiveFlushMetadata: true,
   sequencesPrivateRootPassivePrerequisites: true,
   emitsActWarnings: false,
   emitsOverlappingActWarnings: false,
@@ -1587,7 +1690,8 @@ const actSchedulerGate = Object.freeze({
     'worker-541-test-renderer-act-nested-scope-blockers',
     'worker-576-test-renderer-act-private-root-passive-sequence',
     'worker-622-scheduler-mock-act-root-work-execution',
-    'worker-640-test-renderer-act-scheduler-flush-execution'
+    'worker-640-test-renderer-act-scheduler-flush-execution',
+    'worker-670-test-renderer-act-passive-native-flush'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -1628,6 +1732,12 @@ const actSchedulerGate = Object.freeze({
   privatePassiveCallbackExecutionMetadataAccepted: true,
   privatePassiveSchedulerFlushMetadataAccepted: true,
   privatePassiveEffectDrainDiagnosticsConsumed: true,
+  privateNativeUpdateExecutionMetadataAccepted: true,
+  privateNativeUpdatePassiveEffectDrainMetadataConsumed: true,
+  privateNativeUpdatePassiveEffectDrainDiagnosticId:
+    privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+  privateNativeUpdatePassiveEffectDrainPrerequisiteId:
+    privateActNativeUpdatePassiveEffectDrainPrerequisiteId,
   warningThenableBlockerDiagnosticsAccepted: true,
   nestedScopeBlockerDiagnosticsAccepted: true,
   privateRootPassivePrerequisiteSequenceAccepted: true,
@@ -7386,7 +7496,7 @@ function createPrivateActPassiveEffectDrainDiagnosticError(reason) {
   const error = createUnsupportedError(
     `_Scheduler.${privateActPassiveEffectDrainDiagnosticsExport}`,
     'rejected private act passive-effect drain diagnostics',
-    `Only accepted branded pending-passive flush metadata can be consumed by this private gate. Rejection reason: ${reason}.`,
+    `Only accepted private native update execution results and branded pending-passive flush metadata can be consumed by this private gate. Rejection reason: ${reason}.`,
     undefined,
     undefined,
     actSchedulerGate
@@ -7501,6 +7611,245 @@ function consumeAcceptedPendingPassiveFlushMetadata(metadata) {
     publicSchedulerFlushExecutionAvailable: false,
     publicActBehaviorAvailable: false,
     rendererRootsCompatibilityClaimed: false
+  });
+}
+
+function getRejectedNativeUpdateExecutionResultReason(result) {
+  if (!isObjectLike(result)) {
+    return 'native-update-result-not-object';
+  }
+  if (!Object.isFrozen(result)) {
+    return 'native-update-result-not-frozen';
+  }
+  if (result.kind !== 'FastReactTestRendererPrivateRootExecutionResult') {
+    return 'native-update-result-kind';
+  }
+  if (result.status !== 'accepted-private-test-renderer-root-execution-result') {
+    return 'native-update-result-status';
+  }
+  if (
+    result.operation !== 'update' ||
+    result.updateKind !== 'Update' ||
+    result.rustOutcome !== 'Scheduled' ||
+    result.scheduled !== true
+  ) {
+    return 'native-update-result-operation';
+  }
+  if (
+    !isObjectLike(result.request) ||
+    typeof result.request.rootId !== 'string'
+  ) {
+    return 'native-update-result-request';
+  }
+  if (
+    result.privateRootRequestExecution !== true ||
+    result.rustRootExecutionBoundaryCalled !== true ||
+    result.rustExecution !== true ||
+    result.reconcilerExecution !== true ||
+    result.hostOutputProduced !== true
+  ) {
+    return 'native-update-result-execution-evidence';
+  }
+  if (
+    result.publicRouteAvailable !== false ||
+    result.publicCreateUpdateUnmountBehaviorAvailable !== false ||
+    result.compatibilityClaimed !== false
+  ) {
+    return 'native-update-result-public-claim';
+  }
+  if (
+    result.nativeAddonLoaded !== false ||
+    result.nativeBridgeAvailable !== false ||
+    result.nativeExecution !== false
+  ) {
+    return 'native-update-result-native-addon-claim';
+  }
+
+  const admission = result.privateUpdateNativeBridgeAdmission;
+  if (!isObjectLike(admission) || !Object.isFrozen(admission)) {
+    return 'native-update-admission-not-object';
+  }
+  if (
+    admission.id !==
+      'react-test-renderer-update-native-bridge-admission-private-diagnostic' ||
+    admission.kind !== 'FastReactTestRendererPrivateUpdateNativeBridgeAdmission' ||
+    admission.status !==
+      'private-update-native-bridge-admission-host-output-handoff-public-update-blocked'
+  ) {
+    return 'native-update-admission-identity';
+  }
+  if (
+    admission.operation !== 'update' ||
+    admission.request !== result.request ||
+    admission.requestId !== result.requestId ||
+    admission.requestSequence !== result.requestSequence ||
+    admission.updateKind !== 'Update' ||
+    admission.updateOutcome !== 'Scheduled' ||
+    admission.scheduled !== true
+  ) {
+    return 'native-update-admission-request';
+  }
+  if (
+    admission.updateRouteAdmissionAccepted !== true ||
+    admission.lifecycleEvidenceAccepted !== true ||
+    admission.rootWorkLoopHandoffAccepted !== true ||
+    admission.hostOutputHandoffAccepted !== true ||
+    admission.textUpdateApplyRecorded !== true ||
+    admission.hostTextUpdateApplyCount !== 1 ||
+    admission.hostComponentUpdateApplyCount !== 1 ||
+    admission.rustExecutionFromJs !== true ||
+    admission.reconcilerExecutionFromJs !== true ||
+    admission.hostOutputProduced !== true
+  ) {
+    return 'native-update-admission-execution-evidence';
+  }
+  if (
+    admission.publicUpdateCompatibilityClaimed !== false ||
+    admission.publicSerializationAvailable !== false ||
+    admission.actFlushingClaimed !== false ||
+    admission.nativeBridgeAvailable !== false ||
+    admission.nativeExecution !== false ||
+    admission.compatibilityClaimed !== false
+  ) {
+    return 'native-update-admission-public-claim';
+  }
+
+  return null;
+}
+
+function describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+  updateExecutionResult,
+  metadata
+) {
+  const updateRejectionReason =
+    getRejectedNativeUpdateExecutionResultReason(updateExecutionResult);
+  const passiveRejectionReason =
+    getRejectedPendingPassiveFlushMetadataReason(metadata);
+  const accepted =
+    updateRejectionReason === null && passiveRejectionReason === null;
+  const pendingCount =
+    isObjectLike(metadata) && Array.isArray(metadata.records)
+      ? metadata.records.length
+      : 0;
+
+  return freezeRecord({
+    id: privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+    status: accepted
+      ? 'accepted-native-update-execution-and-pending-passive-flush-metadata'
+      : 'rejected-native-update-execution-and-pending-passive-flush-metadata',
+    accepted,
+    rejectionReason: updateRejectionReason ?? passiveRejectionReason,
+    updateExecutionAccepted: updateRejectionReason === null,
+    passiveMetadataAccepted: passiveRejectionReason === null,
+    nativeUpdateExecutionResultKind: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.kind
+      : null,
+    updateExecutionStatus: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.status
+      : null,
+    updateRequestId: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.requestId
+      : null,
+    updateRequestSequence: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.requestSequence
+      : null,
+    pendingCount,
+    consumer:
+      'react-test-renderer-act-native-update-passive-drain-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    consumesAcceptedNativeUpdateExecution: accepted,
+    consumesPrivateUpdateNativeBridgeAdmission: accepted,
+    consumesAcceptedNativeUpdateHostOutput: accepted,
+    consumesPendingPassiveFlushMetadata: passiveRejectionReason === null,
+    consumesAcceptedSchedulerFlushMetadata: passiveRejectionReason === null,
+    drainsAcceptedPendingPassiveFlushMetadata: accepted,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    publicUpdateCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false
+  });
+}
+
+function consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+  updateExecutionResult,
+  metadata
+) {
+  const description =
+    describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      updateExecutionResult,
+      metadata
+    );
+  if (description.accepted !== true) {
+    throw createPrivateActPassiveEffectDrainDiagnosticError(
+      description.rejectionReason
+    );
+  }
+
+  const passiveDrainReport =
+    consumeAcceptedPendingPassiveFlushMetadata(metadata);
+  const admission = updateExecutionResult.privateUpdateNativeBridgeAdmission;
+
+  return freezeRecord({
+    id: privateActNativeUpdatePassiveEffectDrainDiagnosticId,
+    status: privateActNativeUpdatePassiveEffectDrainStatus,
+    accepted: true,
+    consumer:
+      'react-test-renderer-act-native-update-passive-drain-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    nativeUpdateExecutionResultKind: updateExecutionResult.kind,
+    updateExecutionStatus: updateExecutionResult.status,
+    updateRequestId: updateExecutionResult.requestId,
+    updateRequestSequence: updateExecutionResult.requestSequence,
+    updateKind: updateExecutionResult.updateKind,
+    updateOutcome: updateExecutionResult.rustOutcome,
+    rootId: updateExecutionResult.request.rootId,
+    privateUpdateNativeBridgeAdmission: admission,
+    privateUpdateNativeBridgeAdmissionId: admission.id,
+    privateUpdateNativeBridgeAdmissionStatus: admission.status,
+    nativeUpdateExecutionConsumed: true,
+    privateRootRequestExecutionConsumed: true,
+    rustRootExecutionBoundaryCalled: true,
+    rustExecution: true,
+    reconcilerExecution: true,
+    hostOutputProduced: true,
+    textUpdateApplyRecorded: admission.textUpdateApplyRecorded,
+    hostTextUpdateApplyCount: admission.hostTextUpdateApplyCount,
+    hostComponentUpdateApplyCount: admission.hostComponentUpdateApplyCount,
+    pendingPassiveFlushDrainReport: passiveDrainReport,
+    passiveEffectDrainStatus: passiveDrainReport.passiveEffectDrainStatus,
+    pendingBefore: passiveDrainReport.pendingBefore,
+    drainedCount: passiveDrainReport.drainedCount,
+    remainingCount: passiveDrainReport.remainingCount,
+    drainedRecords: passiveDrainReport.drainedRecords,
+    privatePassiveEffectDrainDiagnosticsConsumed: true,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    consumesAcceptedNativeUpdateExecution: true,
+    consumesPrivateUpdateNativeBridgeAdmission: true,
+    consumesAcceptedNativeUpdateHostOutput: true,
+    drainsAcceptedPendingPassiveFlushMetadata: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicActBehaviorAvailable: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicPassiveEffectFlushExecutionAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    executesRendererRoots: false,
+    mutatesHostOutput: false
   });
 }
 

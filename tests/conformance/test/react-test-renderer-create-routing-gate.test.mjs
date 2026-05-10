@@ -210,6 +210,10 @@ const actSchedulerNestedScopeMissingBeforeExecution = [
 ];
 const actPrivateRootPassiveSequenceRecordId =
   "react-test-renderer-act-private-root-passive-prerequisite-sequence";
+const actNativeUpdatePassiveDrainRecordId =
+  "react-test-renderer-act-native-update-passive-drain-private-diagnostic";
+const actNativeUpdatePassiveDrainPrerequisiteId =
+  "private-native-update-execution-passive-effect-drain-metadata";
 const actPrivateRootPassiveRequiredPrerequisiteIds = [
   "test-renderer-private-root-request-records",
   "scheduler-mock-flush-helper-metadata",
@@ -428,6 +432,7 @@ const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
   actPrivateRootPassiveSequenceRecordId,
   "test-renderer-mock-scheduler-expired-work-act-route",
   "test-renderer-mock-scheduler-expired-act-root-work-route",
+  actNativeUpdatePassiveDrainRecordId,
   "react-private-act-internal-test-queue-factories"
 ];
 const actSchedulerSyncFlushRecordIds = [
@@ -479,7 +484,9 @@ const acceptedPrivateActFlushCjsDevelopmentPrerequisiteIds = [
   ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(0, 4),
   "act-warning-thenable-public-compatibility-blockers",
   "act-nested-scope-public-compatibility-blockers",
-  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(4),
+  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(4, 9),
+  actNativeUpdatePassiveDrainPrerequisiteId,
+  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(9),
   actPrivateRootPassiveSequenceRecordId
 ];
 const blockedPrivateActFlushPrerequisiteIds = [
@@ -1216,6 +1223,118 @@ test("react-test-renderer private update native bridge admission consumes Rust h
     assert.equal(result.publicCreateUpdateUnmountBehaviorAvailable, false);
     assert.equal(updateError.rootRequest.rustExecution, false);
   }
+});
+
+test("react-test-renderer CJS development private act diagnostics consume update execution with passive drain metadata", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const diagnostics =
+    moduleExports._Scheduler.unstable_flushAllWithoutAsserting[
+      privateActQueueFlushDiagnosticsExport
+    ].privateActPassiveEffectDrainDiagnostics;
+  assert.equal(
+    diagnostics.nativeUpdatePassiveEffectDrainDiagnosticId,
+    actNativeUpdatePassiveDrainRecordId
+  );
+  assert.equal(diagnostics.consumesAcceptedNativeUpdateExecution, true);
+  assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
+
+  const renderer = moduleExports.create({
+    props: { "data-state": "old", children: "hello" },
+    type: "span"
+  });
+  const updateError = captureThrown(() =>
+    renderer.update({
+      props: { "data-state": "new", children: "goodbye" },
+      type: "span"
+    })
+  );
+  const updateExecutionResult = bridge.consumeRootExecutionResult(
+    updateError.rootRequest,
+    createRustUpdateNativeBridgeAdmissionEvidence(updateError.rootRequest)
+  );
+  assertPrivateUpdateNativeBridgeAdmission(
+    updateExecutionResult.privateUpdateNativeBridgeAdmission,
+    updateError.rootRequest
+  );
+
+  const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
+    diagnostics.createAcceptedPendingPassiveFlushRecord({
+      label: "private-update-passive-execution",
+      recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
+      root: updateError.rootRequest.rootId,
+      finishedWork: "updated-finished-work",
+      lanes: "Default",
+      pendingUnmountCount: 0,
+      pendingMountCount: 1,
+      schedulerRequestOrder: 3
+    })
+  ]);
+  const described =
+    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      updateExecutionResult,
+      metadata
+    );
+  assert.equal(described.id, actNativeUpdatePassiveDrainRecordId);
+  assert.equal(described.accepted, true);
+  assert.equal(described.rejectionReason, null);
+  assert.equal(described.updateExecutionAccepted, true);
+  assert.equal(described.passiveMetadataAccepted, true);
+  assert.equal(described.publicActCompatibilityClaimed, false);
+  assert.equal(described.publicUpdateCompatibilityClaimed, false);
+
+  const report =
+    diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      updateExecutionResult,
+      metadata
+    );
+  assert.equal(report.id, actNativeUpdatePassiveDrainRecordId);
+  assert.equal(
+    report.status,
+    "private-act-native-update-passive-effect-drain-public-act-blocked"
+  );
+  assert.equal(report.nativeUpdateExecutionConsumed, true);
+  assert.equal(report.privateRootRequestExecutionConsumed, true);
+  assert.equal(report.rustExecution, true);
+  assert.equal(report.reconcilerExecution, true);
+  assert.equal(report.hostOutputProduced, true);
+  assert.equal(report.pendingBefore, 1);
+  assert.equal(report.drainedCount, 1);
+  assert.equal(report.remainingCount, 0);
+  assert.equal(
+    report.drainedRecords[0].recordKind,
+    "PassiveEffectSchedulerFlushExecutionRecord"
+  );
+  assert.equal(report.consumesAcceptedNativeUpdateExecution, true);
+  assert.equal(report.consumesPrivateUpdateNativeBridgeAdmission, true);
+  assert.equal(report.consumesAcceptedNativeUpdateHostOutput, true);
+  assert.equal(report.drainsAcceptedPendingPassiveFlushMetadata, true);
+  assert.equal(report.publicActCompatibilityClaimed, false);
+  assert.equal(report.publicUpdateCompatibilityClaimed, false);
+  assert.equal(report.executesPassiveEffects, false);
+  assert.equal(report.invokesEffectCallbacks, false);
+  assert.equal(report.executesRendererRoots, false);
+  assert.equal(report.mutatesHostOutput, false);
+  assert.equal(metadata.records.length, 0);
+
+  const rejected =
+    diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+      {
+        ...updateExecutionResult,
+        hostOutputProduced: false
+      },
+      diagnostics.createAcceptedPendingPassiveFlushMetadata([])
+    );
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
 });
 
 test("react-test-renderer CJS development private unmount route records deletion commit handoff blockers", () => {
@@ -10078,7 +10197,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-541-test-renderer-act-nested-scope-blockers",
       "worker-576-test-renderer-act-private-root-passive-sequence",
       "worker-622-scheduler-mock-act-root-work-execution",
-      "worker-640-test-renderer-act-scheduler-flush-execution"
+      "worker-640-test-renderer-act-scheduler-flush-execution",
+      "worker-670-test-renderer-act-passive-native-flush"
     );
   }
 
@@ -10126,6 +10246,19 @@ function assertActSchedulerGate(gate, entrypoint) {
       true
     );
     assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
+    assert.equal(gate.privateNativeUpdateExecutionMetadataAccepted, true);
+    assert.equal(
+      gate.privateNativeUpdatePassiveEffectDrainMetadataConsumed,
+      true
+    );
+    assert.equal(
+      gate.privateNativeUpdatePassiveEffectDrainDiagnosticId,
+      actNativeUpdatePassiveDrainRecordId
+    );
+    assert.equal(
+      gate.privateNativeUpdatePassiveEffectDrainPrerequisiteId,
+      actNativeUpdatePassiveDrainPrerequisiteId
+    );
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
   assert.equal(gate.rootActRecordsAccepted, true);
@@ -10388,6 +10521,43 @@ function assertActSchedulerGate(gate, entrypoint) {
       false
     );
     assert.equal(expiredActRootWorkRecord.executesRendererWork, false);
+
+    const nativeUpdatePassiveRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === actNativeUpdatePassiveDrainRecordId
+      );
+    assert.notEqual(nativeUpdatePassiveRecord, undefined);
+    assert.equal(
+      nativeUpdatePassiveRecord.status,
+      "private-act-native-update-passive-effect-drain-public-act-blocked"
+    );
+    assert.deepEqual(nativeUpdatePassiveRecord.buildsOnWorkers, [
+      "worker-473-test-renderer-act-passive-effect-drain",
+      "worker-637-test-renderer-update-native-execution"
+    ]);
+    assert.equal(
+      nativeUpdatePassiveRecord.nativeUpdateExecutionResultKind,
+      "FastReactTestRendererPrivateRootExecutionResult"
+    );
+    assert.equal(
+      nativeUpdatePassiveRecord.consumesAcceptedNativeUpdateExecution,
+      true
+    );
+    assert.equal(
+      nativeUpdatePassiveRecord.consumesPrivateUpdateNativeBridgeAdmission,
+      true
+    );
+    assert.equal(
+      nativeUpdatePassiveRecord.drainsAcceptedPendingPassiveFlushMetadata,
+      true
+    );
+    assert.equal(nativeUpdatePassiveRecord.publicActCompatibilityClaimed, false);
+    assert.equal(
+      nativeUpdatePassiveRecord.publicUpdateCompatibilityClaimed,
+      false
+    );
+    assert.equal(nativeUpdatePassiveRecord.executesRendererRoots, false);
+    assert.equal(nativeUpdatePassiveRecord.executesPassiveEffects, false);
   } else {
     const nestedScopeRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
@@ -10414,6 +10584,12 @@ function assertActSchedulerGate(gate, entrypoint) {
         (record) =>
           record.id ===
           "test-renderer-mock-scheduler-expired-act-root-work-route"
+      ),
+      undefined
+    );
+    assert.equal(
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === actNativeUpdatePassiveDrainRecordId
       ),
       undefined
     );
