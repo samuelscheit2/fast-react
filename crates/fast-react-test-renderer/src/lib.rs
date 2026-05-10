@@ -1311,6 +1311,8 @@ pub struct TestRendererUnmountDeletionCommitHandoffDiagnostics {
     commit_previous_current: TestRendererFiberHandleDiagnostics,
     commit_current: TestRendererFiberHandleDiagnostics,
     render_finished_work: TestRendererFiberHandleDiagnostics,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
     deleted_root: TestRendererFiberHandleDiagnostics,
     deleted_component: TestRendererFiberHandleDiagnostics,
     deleted_text: TestRendererFiberHandleDiagnostics,
@@ -1383,6 +1385,16 @@ impl TestRendererUnmountDeletionCommitHandoffDiagnostics {
     #[must_use]
     pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
         self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
     }
 
     #[must_use]
@@ -1478,9 +1490,16 @@ pub struct TestRendererUnmountNativeBridgeAdmission {
     route_dependency_id: &'static str,
     deletion_commit_handoff_id: &'static str,
     cleanup_handoff_id: &'static str,
+    scheduled_update_sequence: usize,
     lifecycle: TestRendererRootLifecycle,
     scheduled_update_kind: TestRendererRootUpdateKind,
     scheduled_element_is_none: bool,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
     deletion_commit_handoff_accepted: bool,
     cleanup_handoff_accepted: bool,
     lifecycle_evidence_accepted: bool,
@@ -1536,6 +1555,11 @@ impl TestRendererUnmountNativeBridgeAdmission {
     }
 
     #[must_use]
+    pub const fn scheduled_update_sequence(self) -> usize {
+        self.scheduled_update_sequence
+    }
+
+    #[must_use]
     pub const fn lifecycle(self) -> TestRendererRootLifecycle {
         self.lifecycle
     }
@@ -1548,6 +1572,36 @@ impl TestRendererUnmountNativeBridgeAdmission {
     #[must_use]
     pub const fn scheduled_element_is_none(self) -> bool {
         self.scheduled_element_is_none
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
     }
 
     #[must_use]
@@ -12063,6 +12117,8 @@ impl TestRendererRoot {
             commit_previous_current: fiber_handle!(commit_previous_current),
             commit_current: fiber_handle!(commit_current),
             render_finished_work: fiber_handle!(render_finished_work),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
             deleted_root: fiber_handle!(deleted.host_root()),
             deleted_component: fiber_handle!(deleted.deleted_component()),
             deleted_text: fiber_handle!(deleted.deleted_text()),
@@ -12227,9 +12283,16 @@ impl TestRendererRoot {
                 TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID,
             cleanup_handoff_id:
                 TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID,
+            scheduled_update_sequence: self.scheduled_updates.len(),
             lifecycle: handoff.lifecycle(),
             scheduled_update_kind: scheduled_update.kind(),
             scheduled_element_is_none: scheduled_update.element() == RootElementHandle::NONE,
+            render_current: handoff.render_current(),
+            render_finished_work: handoff.render_finished_work(),
+            commit_previous_current: handoff.commit_previous_current(),
+            commit_current: handoff.commit_current(),
+            render_lanes_bits: handoff.render_lanes_bits(),
+            commit_finished_lanes_bits: handoff.commit_finished_lanes_bits(),
             deletion_commit_handoff_accepted: true,
             cleanup_handoff_accepted: true,
             lifecycle_evidence_accepted: true,
@@ -12413,6 +12476,16 @@ impl TestRendererRoot {
             return Err(
                 TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
                     reason: "commit-handoff-identity-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.render_lanes_bits() == 0
+            || handoff.render_lanes_bits() != handoff.commit_finished_lanes_bits()
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "lane-mismatch",
                 }
                 .into(),
             );
@@ -12717,9 +12790,34 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererUnmountedHostOutput,
         execution: TestRendererUnmountNativeBridgeAdmission,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
     ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
         self.validate_private_to_json_unmount_native_execution_record_for_canary(execution)?;
         let row = self.describe_private_to_json_host_output_unmount_row_for_canary(output)?;
+        let identity = self
+            .validate_private_serialization_finished_work_identity_for_native_execution(
+                "create().unmount -> create().toJSON",
+                TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+                row.host_output_update_kind(),
+                true,
+                false,
+                identity,
+            )
+            .map_err(|reason| {
+                TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                    operation: "unmount",
+                    reason,
+                }
+            })?;
+        self.validate_private_unmount_native_execution_matches_handoff_for_canary(
+            output, execution, identity, row,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason,
+            }
+        })?;
         let rendered_root = Self::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(
             output.snapshot(),
         );
@@ -12860,9 +12958,34 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererUnmountedHostOutput,
         execution: TestRendererUnmountNativeBridgeAdmission,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
     ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
         self.validate_private_to_tree_unmount_native_execution_record_for_canary(execution)?;
         let row = self.describe_private_to_json_host_output_unmount_row_for_canary(output)?;
+        let identity = self
+            .validate_private_serialization_finished_work_identity_for_native_execution(
+                "create().unmount -> create().toTree",
+                TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+                row.host_output_update_kind(),
+                false,
+                true,
+                identity,
+            )
+            .map_err(|reason| {
+                TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                    operation: "unmount",
+                    reason,
+                }
+            })?;
+        self.validate_private_unmount_native_execution_matches_handoff_for_canary(
+            output, execution, identity, row,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason,
+            }
+        })?;
         let rendered_root = Self::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics(
             output.snapshot(),
         );
@@ -12932,6 +13055,22 @@ impl TestRendererRoot {
         )
     }
 
+    pub fn describe_private_to_json_unmount_finished_work_identity_gate_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        handoff: Option<&TestRendererUnmountDeletionCommitHandoffDiagnostics>,
+    ) -> Result<TestRendererPrivateSerializationFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        self.describe_private_unmount_serialization_finished_work_identity_gate_for_canary(
+            "create().unmount -> create().toJSON",
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+            true,
+            false,
+            output,
+            handoff,
+        )
+    }
+
     pub fn describe_private_to_tree_finished_work_identity_gate_for_canary(
         &self,
         render: Option<HostRootRenderPhaseRecord>,
@@ -12959,6 +13098,22 @@ impl TestRendererRoot {
             false,
             true,
             report.gate(),
+        )
+    }
+
+    pub fn describe_private_to_tree_unmount_finished_work_identity_gate_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        handoff: Option<&TestRendererUnmountDeletionCommitHandoffDiagnostics>,
+    ) -> Result<TestRendererPrivateSerializationFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        self.describe_private_unmount_serialization_finished_work_identity_gate_for_canary(
+            "create().unmount -> create().toTree",
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            false,
+            true,
+            output,
+            handoff,
         )
     }
 
@@ -14030,6 +14185,102 @@ impl TestRendererRoot {
         Ok(())
     }
 
+    fn validate_private_unmount_native_execution_matches_handoff_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+        identity: TestRendererPrivateSerializationFinishedWorkIdentityGate,
+        row: TestRendererPrivateToJsonHostOutputRow,
+    ) -> Result<(), &'static str> {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if execution.scheduled_update_sequence() != self.scheduled_updates.len()
+            || identity.root_scheduled_update_sequence() != self.scheduled_updates.len()
+            || execution.root() != self.root_id
+            || commit.root() != self.root_id
+            || render.root() != self.root_id
+            || execution.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
+            || !execution.scheduled_element_is_none()
+        {
+            return Err("unmount-admission-handoff-mismatch");
+        }
+
+        if row.host_output_update_kind() != TestRendererRootUpdateKind::Unmount
+            || row.host_output_shape() != TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            || row.current_root_child_count() != 0
+            || row.current_host_component_count() != 0
+            || row.current_host_text_count() != 0
+            || !row.dependency_diagnostics().host_output_snapshot_current()
+            || !output.snapshot().children().is_empty()
+            || output.deleted_fibers().host_root() != commit.current()
+        {
+            return Err("unmount-admission-host-output-row-mismatch");
+        }
+
+        if execution.render_current() != fiber_handle!(render.current())
+            || execution.render_finished_work() != fiber_handle!(render.finished_work())
+            || execution.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || execution.commit_current() != fiber_handle!(commit.current())
+        {
+            return Err("unmount-admission-handoff-mismatch");
+        }
+
+        if execution.render_current() != identity.render_current()
+            || execution.render_finished_work() != identity.render_finished_work()
+            || execution.commit_previous_current() != identity.commit_previous_current()
+            || execution.commit_current() != identity.commit_current()
+        {
+            return Err("unmount-admission-finished-work-identity-mismatch");
+        }
+
+        if execution.render_lanes_bits() == 0
+            || execution.render_lanes_bits() != render.render_lanes().bits()
+            || execution.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+            || render.render_lanes().bits() != commit.finished_lanes().bits()
+        {
+            return Err("unmount-admission-lane-mismatch");
+        }
+
+        if execution.render_lanes_bits() != identity.render_lanes_bits()
+            || execution.commit_finished_lanes_bits() != identity.commit_finished_lanes_bits()
+        {
+            return Err("unmount-admission-finished-work-identity-lane-mismatch");
+        }
+
+        let passive_ref_cleanup_order =
+            Self::passive_ref_cleanup_order_evidence_for_canary(commit, output.host_node_cleanup());
+        if execution.host_node_cleanup_count() != output.host_node_cleanup().len()
+            || execution.ref_cleanup_return_count()
+                != passive_ref_cleanup_order.ref_cleanup_return_count()
+            || execution.passive_destroy_count()
+                != passive_ref_cleanup_order.passive_destroy_count()
+            || execution.cleanup_order_record_count()
+                != commit.deletion_cleanup_order_gate_for_canary().len()
+            || execution.cleanup_order_record_count()
+                != passive_ref_cleanup_order.cleanup_order_record_count()
+            || execution.native_cleanup_after_ref_and_passive_ordering()
+                != passive_ref_cleanup_order.native_cleanup_after_ref_and_passive_ordering()
+            || !execution.rust_unmount_cleanup_handoff_executed()
+            || !execution.host_output_produced()
+        {
+            return Err("unmount-admission-cleanup-handoff-mismatch");
+        }
+
+        Ok(())
+    }
+
     fn validate_private_to_json_create_native_execution_record_for_canary(
         &self,
         execution: TestRendererPrivateCreateRouteAdmissionDiagnostics,
@@ -14145,6 +14396,8 @@ impl TestRendererRoot {
                 != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
             || execution.deletion_commit_handoff_id()
                 != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+            || execution.cleanup_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID
             || execution.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
             || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
             || !execution.scheduled_element_is_none()
@@ -14153,8 +14406,13 @@ impl TestRendererRoot {
                 .private_to_json_native_execution_record_error("unmount", "route-metadata-stale");
         }
         if !execution.deletion_commit_handoff_accepted()
+            || !execution.cleanup_handoff_accepted()
             || !execution.lifecycle_evidence_accepted()
             || !execution.cleanup_blockers_accepted()
+            || !execution.passive_ref_cleanup_order_accepted()
+            || !execution.native_cleanup_after_ref_and_passive_ordering()
+            || !execution.rust_unmount_cleanup_handoff_executed()
+            || !execution.host_output_produced()
         {
             return self.private_to_json_native_execution_record_error(
                 "unmount",
@@ -14305,6 +14563,8 @@ impl TestRendererRoot {
                 != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
             || execution.deletion_commit_handoff_id()
                 != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+            || execution.cleanup_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID
             || execution.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
             || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
             || !execution.scheduled_element_is_none()
@@ -14313,8 +14573,13 @@ impl TestRendererRoot {
                 .private_to_tree_native_execution_record_error("unmount", "route-metadata-stale");
         }
         if !execution.deletion_commit_handoff_accepted()
+            || !execution.cleanup_handoff_accepted()
             || !execution.lifecycle_evidence_accepted()
             || !execution.cleanup_blockers_accepted()
+            || !execution.passive_ref_cleanup_order_accepted()
+            || !execution.native_cleanup_after_ref_and_passive_ordering()
+            || !execution.rust_unmount_cleanup_handoff_executed()
+            || !execution.host_output_produced()
         {
             return self.private_to_tree_native_execution_record_error(
                 "unmount",
@@ -16308,6 +16573,174 @@ impl TestRendererRoot {
 
     #[allow(
         clippy::too_many_arguments,
+        reason = "unmount serialization identity is backed by deletion handoff plus empty-root row evidence"
+    )]
+    fn describe_private_unmount_serialization_finished_work_identity_gate_for_canary(
+        &self,
+        public_surface: &'static str,
+        source_serialization_diagnostic_name: &'static str,
+        consumes_private_to_json_evidence: bool,
+        consumes_private_to_tree_evidence: bool,
+        output: &TestRendererUnmountedHostOutput,
+        handoff: Option<&TestRendererUnmountDeletionCommitHandoffDiagnostics>,
+    ) -> Result<TestRendererPrivateSerializationFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        let row = self.describe_private_to_json_host_output_unmount_row_for_canary(output)?;
+        let Some(handoff) = handoff.copied() else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::MissingFinishedWorkHandoff {
+                    public_surface,
+                }
+                .into(),
+            );
+        };
+        let Some(scheduled_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Unmount,
+                actual: TestRendererRootUpdateKind::Create,
+            });
+        };
+        self.validate_private_unmount_native_bridge_handoff_for_canary(scheduled_update, handoff)?;
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if render.root() != self.root_id {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                    reason: "render-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.root() != self.root_id {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                    reason: "commit-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if row.host_output_update_kind() != TestRendererRootUpdateKind::Unmount
+            || row.host_output_shape() != TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            || row.current_root_child_count() != 0
+            || !row.dependency_diagnostics().host_output_snapshot_current()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "unmount-empty-root-row-mismatch",
+                }
+                .into(),
+            );
+        }
+        if !row.public_blockers().all_blocked() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-blockers-not-all-closed",
+                }
+                .into(),
+            );
+        }
+
+        if handoff.render_current() != fiber_handle!(render.current())
+            || handoff.render_finished_work() != fiber_handle!(render.finished_work())
+            || handoff.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || handoff.commit_current() != fiber_handle!(commit.current())
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "unmount-handoff-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.current() != render.finished_work() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                    reason: "commit-current-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.previous_current() != render.current() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "commit-previous-current-render-current-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.finished_lanes() != render.render_lanes()
+            || handoff.render_lanes_bits() != render.render_lanes().bits()
+            || handoff.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::LaneMismatch {
+                    render_lanes_bits: render.render_lanes().bits(),
+                    commit_finished_lanes_bits: commit.finished_lanes().bits(),
+                }
+                .into(),
+            );
+        }
+        if commit.remaining_lanes().bits() != 0 || commit.pending_lanes().bits() != 0 {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "unmount-commit-lanes-not-drained",
+                }
+                .into(),
+            );
+        }
+
+        Ok(TestRendererPrivateSerializationFinishedWorkIdentityGate {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS,
+            root: self.root_id,
+            root_scheduled_update_sequence: self.scheduled_updates.len(),
+            public_surface,
+            source_serialization_diagnostic_name,
+            host_output_update_kind: TestRendererRootUpdateKind::Unmount,
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            report_finished_work: fiber_handle!(commit.current()),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            report_finished_lanes_bits: commit.finished_lanes().bits(),
+            commit_remaining_lanes_bits: commit.remaining_lanes().bits(),
+            commit_pending_lanes_bits: commit.pending_lanes().bits(),
+            commit_current_matches_render_finished_work: true,
+            commit_previous_current_matches_render_current: true,
+            commit_lanes_match_render_lanes: true,
+            report_finished_work_matches_commit_current: true,
+            report_lanes_match_commit_lanes: true,
+            committed_fiber_inspection_current_matches_commit: true,
+            host_output_snapshot_current: true,
+            consumes_committed_host_root_finished_work_identity: true,
+            consumes_committed_host_root_finished_work_lanes: true,
+            consumes_private_to_json_evidence,
+            consumes_private_to_tree_evidence,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
         reason = "private test-instance evidence builder mirrors the native query report shape"
     )]
     fn private_test_instance_native_query_execution_evidence_from_reports(
@@ -17393,6 +17826,61 @@ mod tests {
             public_serialization_available: false,
             compatibility_claimed: false,
         }
+    }
+
+    fn accepted_unmount_identity_for_root(
+        to_tree: bool,
+        include_ref_passive_cleanup: bool,
+    ) -> (
+        TestRendererRoot,
+        TestRendererUnmountedHostOutput,
+        TestRendererUnmountDeletionCommitHandoffDiagnostics,
+        TestRendererUnmountNativeBridgeAdmission,
+        TestRendererPrivateSerializationFinishedWorkIdentityGate,
+    ) {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let unmount_outcome = root.unmount().unwrap();
+        let unmounted = if include_ref_passive_cleanup {
+            root.render_and_commit_host_output_unmount_with_ref_passive_cleanup_for_canary()
+                .unwrap()
+                .unwrap()
+        } else {
+            root.render_and_commit_host_output_unmount_for_canary()
+                .unwrap()
+                .unwrap()
+        };
+        let handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        let admission = root
+            .describe_private_unmount_native_bridge_admission_for_canary(
+                &unmount_outcome,
+                Some(&handoff),
+            )
+            .unwrap();
+        let identity = if to_tree {
+            root.describe_private_to_tree_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&handoff),
+            )
+            .unwrap()
+        } else {
+            root.describe_private_to_json_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&handoff),
+            )
+            .unwrap()
+        };
+
+        (root, unmounted, handoff, admission, identity)
     }
 
     #[test]
@@ -19098,11 +19586,18 @@ mod tests {
                 Some(&unmount_handoff),
             )
             .unwrap();
+        let unmount_identity = root
+            .describe_private_to_json_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&unmount_handoff),
+            )
+            .unwrap();
 
         let unmount_evidence = root
             .describe_private_to_json_after_unmount_native_execution_for_canary(
                 &unmounted,
                 unmount_admission,
+                Some(unmount_identity),
             )
             .unwrap();
 
@@ -20164,11 +20659,18 @@ mod tests {
                 Some(&unmount_handoff),
             )
             .unwrap();
+        let unmount_identity = root
+            .describe_private_to_tree_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&unmount_handoff),
+            )
+            .unwrap();
 
         let unmount_evidence = root
             .describe_private_to_tree_after_unmount_native_execution_for_canary(
                 &unmounted,
                 unmount_admission,
+                Some(unmount_identity),
             )
             .unwrap();
 
@@ -21090,6 +21592,405 @@ mod tests {
         assert!(matches!(
             error.as_ref(),
             TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
+    fn root_private_to_json_unmount_finished_work_identity_gate_accepts_ref_passive_cleanup_handoff()
+     {
+        let (root, unmounted, mut handoff, admission, identity) =
+            accepted_unmount_identity_for_root(false, true);
+
+        assert_eq!(identity.root(), root.root_id());
+        assert_eq!(
+            identity.public_surface(),
+            "create().unmount -> create().toJSON"
+        );
+        assert_eq!(
+            identity.source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            identity.host_output_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(identity.render_finished_work(), identity.commit_current());
+        assert_eq!(
+            identity.render_current(),
+            identity.commit_previous_current()
+        );
+        assert_eq!(
+            identity.render_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(identity.commit_remaining_lanes_bits(), 0);
+        assert_eq!(identity.commit_pending_lanes_bits(), 0);
+        assert!(identity.host_output_snapshot_current());
+        assert!(identity.consumes_private_to_json_evidence());
+        assert!(!identity.consumes_private_to_tree_evidence());
+        assert!(!identity.public_to_json_available());
+        assert!(!identity.public_to_tree_available());
+        assert!(!identity.public_test_instance_available());
+        assert!(!identity.public_serialization_available());
+        assert!(!identity.compatibility_claimed());
+
+        assert_eq!(handoff.host_node_cleanup_count(), 2);
+        assert_eq!(
+            handoff
+                .passive_ref_cleanup_order()
+                .ref_cleanup_return_count(),
+            1
+        );
+        assert_eq!(
+            handoff.passive_ref_cleanup_order().passive_destroy_count(),
+            1
+        );
+        assert_eq!(handoff.cleanup_order_record_count(), 4);
+        assert_eq!(admission.ref_cleanup_return_count(), 1);
+        assert_eq!(admission.passive_destroy_count(), 1);
+        assert!(!admission.minimal_tree_cleanup_handoff());
+        assert!(admission.rust_unmount_cleanup_handoff_executed());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
+
+        let evidence = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+            )
+            .unwrap();
+        assert_eq!(evidence.operation(), "unmount");
+        assert!(evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(evidence.consumes_private_to_json_evidence());
+        assert!(evidence.minimal_tree_shape());
+        assert!(!evidence.public_to_json_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+
+        handoff.cleanup_order_record_count = handoff.host_node_cleanup_count();
+        handoff.passive_ref_cleanup_order.cleanup_order_record_count =
+            handoff.host_node_cleanup_count();
+        let error = root
+            .describe_private_to_json_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&handoff),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateUnmountNativeBridgeAdmission(error) = error else {
+            panic!("expected private unmount cleanup handoff validation error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                reason: "cleanup-order-count-mismatch"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate() {
+        let (root, unmounted, _handoff, admission, identity) =
+            accepted_unmount_identity_for_root(false, false);
+
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted, admission, None,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "finished-work-identity-missing"
+            }
+        ));
+
+        let mut stale_identity = identity;
+        stale_identity.root_scheduled_update_sequence += 1;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(stale_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution stale identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "finished-work-identity-stale"
+            }
+        ));
+
+        let mut mismatched_identity = identity;
+        mismatched_identity.render_current.slot += 1;
+        mismatched_identity.commit_previous_current = mismatched_identity.render_current;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(mismatched_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution identity handoff rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "unmount-admission-finished-work-identity-mismatch"
+            }
+        ));
+
+        let mut mismatched_admission = admission;
+        mismatched_admission.render_current.slot += 1;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                mismatched_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution admission handoff rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "unmount-admission-handoff-mismatch"
+            }
+        ));
+
+        let mut cleanup_handoff_admission = admission;
+        cleanup_handoff_admission.cleanup_handoff_id = "tampered-cleanup-handoff";
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                cleanup_handoff_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution cleanup handoff rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "route-metadata-stale"
+            }
+        ));
+
+        let mut lane_identity = identity;
+        lane_identity.render_lanes_bits += 1;
+        lane_identity.commit_finished_lanes_bits = lane_identity.render_lanes_bits;
+        lane_identity.report_finished_lanes_bits = lane_identity.render_lanes_bits;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(lane_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution identity lane rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "unmount-admission-finished-work-identity-lane-mismatch"
+            }
+        ));
+
+        let mut source_identity = identity;
+        source_identity.source_serialization_diagnostic_name =
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(source_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution source rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "finished-work-identity-source-report-mismatch"
+            }
+        ));
+
+        let mut surface_identity = identity;
+        surface_identity.public_surface = "create().unmount -> create().toTree";
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(surface_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution surface rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "finished-work-identity-public-surface-mismatch"
+            }
+        ));
+
+        let mut public_identity = identity;
+        public_identity.public_serialization_available = true;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(public_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution public claim rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "public-or-native-compatibility-claim"
+            }
+        ));
+
+        let mut native_admission = admission;
+        native_admission.native_bridge_available = true;
+        let error = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                native_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON unmount native execution native claim rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "public-or-native-compatibility-claim"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate() {
+        let (root, unmounted, _handoff, admission, identity) =
+            accepted_unmount_identity_for_root(true, false);
+
+        let evidence = root
+            .describe_private_to_tree_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+            )
+            .unwrap();
+        assert_eq!(evidence.operation(), "unmount");
+        assert!(evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(evidence.consumes_private_to_tree_evidence());
+        assert!(evidence.minimal_tree_shape());
+        assert!(!evidence.public_to_tree_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+
+        let error = root
+            .describe_private_to_tree_after_unmount_native_execution_for_canary(
+                &unmounted, admission, None,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree unmount native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "finished-work-identity-missing"
+            }
+        ));
+
+        let mut cleanup_handoff_admission = admission;
+        cleanup_handoff_admission.cleanup_handoff_id = "tampered-cleanup-handoff";
+        let error = root
+            .describe_private_to_tree_after_unmount_native_execution_for_canary(
+                &unmounted,
+                cleanup_handoff_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree unmount native execution cleanup handoff rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "route-metadata-stale"
+            }
+        ));
+
+        let mut source_identity = identity;
+        source_identity.source_serialization_diagnostic_name =
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME;
+        let error = root
+            .describe_private_to_tree_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(source_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree unmount native execution source rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "finished-work-identity-source-report-mismatch"
+            }
+        ));
+
+        let mut public_identity = identity;
+        public_identity.compatibility_claimed = true;
+        let error = root
+            .describe_private_to_tree_after_unmount_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(public_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree unmount native execution public claim rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "unmount",
+                reason: "public-or-native-compatibility-claim"
+            }
         ));
     }
 
