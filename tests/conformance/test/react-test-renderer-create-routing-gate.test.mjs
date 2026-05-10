@@ -2254,13 +2254,22 @@ function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
     "HostComponent",
     "HostText"
   ]);
+  assert.deepEqual(gate.acceptedCompositeFiberShape, [
+    "HostRoot",
+    "FunctionComponent",
+    "HostComponent",
+    "HostText"
+  ]);
   assert.equal(gate.acceptedReactSourceAlgorithm, "ReactTestRenderer.js toTree");
   assert.equal(gate.hostRootBehavior, "childrenToTree(node.child)", entrypoint);
+  assert.match(gate.functionComponentBehavior, /nodeType 'component'/u, entrypoint);
   assert.match(gate.hostComponentBehavior, /nodeType 'host'/u, entrypoint);
   assert.match(gate.hostTextBehavior, /text string/u, entrypoint);
   assert.equal(gate.acceptedRustPrivateJsonDiagnostics, true, entrypoint);
   assert.equal(gate.acceptedRustPrivateTreeMetadata, true, entrypoint);
+  assert.equal(gate.acceptedRustPrivateCompositeTreeMetadata, true, entrypoint);
   assert.equal(gate.acceptedCommittedFiberInspection, true, entrypoint);
+  assert.equal(gate.privateCompositeFunctionMetadataAvailable, true, entrypoint);
   assert.equal(gate.publicTreeAvailable, false, entrypoint);
   assert.equal(gate.publicRouteAvailable, false, entrypoint);
   assert.equal(gate.nativeBridgeAvailable, false, entrypoint);
@@ -2284,13 +2293,15 @@ function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
     "TestRendererRoot::describe_private_tree_metadata_for_canary",
     "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
     "TestRendererPrivateJsonSerializationReport",
-    "TestRendererPrivateTreeMetadataReport"
+    "TestRendererPrivateTreeMetadataReport",
+    "TestRendererPrivateTreeFunctionComponentDiagnostic"
   ]);
   assert.deepEqual(gate.acceptedRustTests, [
     "committed_fiber_inspection_describes_host_root_component_and_text",
     "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
     "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
-    "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit"
+    "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+    "root_private_tree_metadata_canary_describes_function_component_above_host_output"
   ]);
   assert.deepEqual(gate.blockedPublicSurfaces, [
     "create().toTree",
@@ -2375,6 +2386,7 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     entrypoint
   );
   assert.equal(gate.acceptedRustPrivateTreeMetadata, true, entrypoint);
+  assert.equal(gate.acceptedRustPrivateCompositeTreeMetadata, true, entrypoint);
   assert.equal(
     gate.acceptedRustDiagnosticName,
     "fast-react-test-renderer.serialization.private-tree-canary",
@@ -2385,6 +2397,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     "HostComponent",
     "HostText"
   ]);
+  assert.deepEqual(gate.acceptedCompositeFiberShape, [
+    "HostRoot",
+    "FunctionComponent",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(gate.privateCompositeFunctionMetadataSerializable, true, entrypoint);
   assert.deepEqual(gate.acceptedHostOutputUpdateKinds, [
     "Create",
     "Update"
@@ -2405,12 +2424,14 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     "TestRendererRoot::describe_private_tree_metadata_for_canary",
     "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
     "TestRendererPrivateTreeMetadataReport",
+    "TestRendererPrivateTreeFunctionComponentDiagnostic",
     "TestRendererPrivateTreeHostComponentDiagnostic",
     "TestRendererPrivateTreeHostTextDiagnostic"
   ]);
   assert.deepEqual(gate.acceptedRustTests, [
     "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
     "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+    "root_private_tree_metadata_canary_describes_function_component_above_host_output",
     "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
   ]);
   assert.deepEqual(gate.blockedPublicSurfaces, [
@@ -2835,7 +2856,7 @@ function assertPrivateTestInstanceRootBridgeMetadata(
     rootRequest.rustCanaryMetadata.testInstanceQuery,
     entrypoint
   );
-  assert.equal(metadata.recordOnlyPrivateBridge, true, entrypoint);
+  assert.equal(metadata.recordOnlyPrivateBridge, false, entrypoint);
   assert.equal(metadata.nativeBridgeAvailable, false, entrypoint);
   assert.equal(metadata.nativeExecution, false, entrypoint);
   assert.equal(metadata.rustExecution, false, entrypoint);

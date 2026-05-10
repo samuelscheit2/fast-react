@@ -6864,18 +6864,7 @@ mod tests {
         assert_eq!(host_node_activity_counts(&root), (2, 0));
         assert!(diagnostics.deletion_lists().is_empty());
         assert_eq!(diagnostics.mutation_records().len(), 2);
-        let mutation = diagnostics.mutation_records()[0];
-        assert_eq!(
-            mutation.kind(),
-            TestRendererHostOutputCanaryMutationKind::Update
-        );
-        assert_eq!(mutation.fiber(), fibers.component());
-        assert_eq!(mutation.host_root(), render.finished_work());
-        assert_eq!(mutation.state_node_raw(), 1);
-        assert_eq!(mutation.pending_props_raw(), 3);
-        assert_eq!(mutation.memoized_props_raw(), 3);
-        assert_eq!(mutation.alternate_memoized_props_raw(), Some(1));
-        let text_mutation = diagnostics.mutation_records()[1];
+        let text_mutation = diagnostics.mutation_records()[0];
         assert_eq!(
             text_mutation.kind(),
             TestRendererHostOutputCanaryMutationKind::Update
@@ -6886,6 +6875,21 @@ mod tests {
         assert_eq!(text_mutation.pending_props_raw(), 4);
         assert_eq!(text_mutation.memoized_props_raw(), 4);
         assert_eq!(text_mutation.alternate_memoized_props_raw(), Some(2));
+        let mutation = diagnostics.mutation_records()[1];
+        assert_eq!(
+            mutation.kind(),
+            TestRendererHostOutputCanaryMutationKind::Update
+        );
+        assert_eq!(mutation.fiber(), fibers.component());
+        assert_eq!(mutation.host_root(), render.finished_work());
+        assert_eq!(mutation.state_node_raw(), 1);
+        assert_eq!(mutation.pending_props_raw(), 3);
+        assert_eq!(mutation.memoized_props_raw(), 3);
+        assert_eq!(mutation.alternate_memoized_props_raw(), Some(1));
+        assert_eq!(
+            commit.test_only_host_component_update_apply_count_for_canary(),
+            1
+        );
         assert_eq!(
             commit.test_only_host_text_update_apply_count_for_canary(),
             1
