@@ -192,6 +192,59 @@ assert.equal(
   ),
   true
 );
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.responseSequenceGateStatus,
+  'diagnosed-native-root-bridge-json-batch-response-sequence'
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.batchId,
+  'native-root-bridge-json-batch-552'
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.rows.map((row) => row.requestOrder),
+  [0, 1, 2]
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.rows.map((row) => row.responseOrder),
+  [0, 1, 2]
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.rows.map((row) => row.teardownState),
+  ['root-active', 'root-active', 'root-retired']
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.errorRows.map((row) => row.errorRowStatus),
+  [
+    'deterministic-error-row',
+    'deterministic-error-row',
+    'deterministic-error-row',
+    'deterministic-error-row',
+    'deterministic-error-row'
+  ]
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate
+    .responseSequenceGate.errorRows.map((row) => row.responseOrder),
+  [0, 1, 2, 3, 4]
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.responseSequenceGate
+    .errorRows.every(
+      (row) =>
+        row.nativeAddonLoaded === false &&
+        row.nativeExecution === false &&
+        row.rendererExecution === false &&
+        row.reconcilerExecution === false &&
+        row.reactBehaviorError === false
+    ),
+  true
+);
 assert.deepEqual(
   nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.map(
     (row) => row.id

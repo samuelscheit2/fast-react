@@ -24,6 +24,10 @@ const nativeRootBridgeCrossEnvironmentTeardownGateStatus =
   'diagnosed-native-root-bridge-cross-environment-teardown-isolation';
 const nativeRootBridgeBatchedJsonTransportGateStatus =
   'validated-native-root-bridge-batched-json-transport-records';
+const nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus =
+  'diagnosed-native-root-bridge-json-batch-response-sequence';
+const nativeRootBridgeJsonTransportBatchResponseSequenceBatchId =
+  'native-root-bridge-json-batch-552';
 const nativeRootBridgeJsonTransportFormat = 'json';
 const nativeRootBridgeJsonTransportSchemaVersion = 1;
 const nativeRootBridgeRequestValidationModel =
@@ -158,6 +162,49 @@ const nativeRootBridgeJsonTransportBatchLifecycleRowFields = Object.freeze([
   'reconcilerExecution',
   'reactBehaviorError'
 ]);
+const nativeRootBridgeJsonTransportBatchResponseErrorRowStatusNotError =
+  'not-error-row';
+const nativeRootBridgeJsonTransportBatchResponseErrorRowStatusLifecycleError =
+  'lifecycle-error-row';
+const nativeRootBridgeJsonTransportBatchResponseErrorRowStatusDeterministic =
+  'deterministic-error-row';
+const nativeRootBridgeJsonTransportBatchResponseErrorRowStatuses =
+  Object.freeze([
+    nativeRootBridgeJsonTransportBatchResponseErrorRowStatusNotError,
+    nativeRootBridgeJsonTransportBatchResponseErrorRowStatusLifecycleError,
+    nativeRootBridgeJsonTransportBatchResponseErrorRowStatusDeterministic
+  ]);
+const nativeRootBridgeJsonTransportBatchResponseTeardownStateRootUninitialized =
+  'root-uninitialized';
+const nativeRootBridgeJsonTransportBatchResponseTeardownStateRootActive =
+  'root-active';
+const nativeRootBridgeJsonTransportBatchResponseTeardownStateRootRetired =
+  'root-retired';
+const nativeRootBridgeJsonTransportBatchResponseTeardownStates = Object.freeze([
+  nativeRootBridgeJsonTransportBatchResponseTeardownStateRootUninitialized,
+  nativeRootBridgeJsonTransportBatchResponseTeardownStateRootActive,
+  nativeRootBridgeJsonTransportBatchResponseTeardownStateRootRetired
+]);
+const nativeRootBridgeJsonTransportBatchResponseSequenceRowFields =
+  Object.freeze([
+    'id',
+    'batchId',
+    'requestOrder',
+    'responseOrder',
+    'requestId',
+    'kind',
+    'responseStatus',
+    'errorRowStatus',
+    'teardownState',
+    'code',
+    'sourceErrorCode',
+    'boundaryErrorCode',
+    'nativeAddonLoaded',
+    'nativeExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'reactBehaviorError'
+  ]);
 const nativeRootBridgeEnvironmentTeardownFields = Object.freeze([
   'requestedEnvironmentId',
   'tableEnvironmentId',
@@ -269,6 +316,22 @@ const nativeRootBridgeRustHandleTableAdmissionSmoke = Object.freeze({
   rendererExecution: false,
   reconcilerExecution: false
 });
+const nativeRootBridgeJsonTransportBatchResponseSequenceGate = Object.freeze({
+  responseSequenceGateStatus:
+    nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus,
+  batchId: nativeRootBridgeJsonTransportBatchResponseSequenceBatchId,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  jsonTransportBatchResponseSequenceRowFields:
+    nativeRootBridgeJsonTransportBatchResponseSequenceRowFields,
+  errorRowStatuses:
+    nativeRootBridgeJsonTransportBatchResponseErrorRowStatuses,
+  teardownStates: nativeRootBridgeJsonTransportBatchResponseTeardownStates,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  reactBehaviorError: false
+});
 const nativeRootBridgeBatchedJsonTransportGate = Object.freeze({
   batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
   validationModel: nativeRootBridgeRequestValidationModel,
@@ -278,6 +341,7 @@ const nativeRootBridgeBatchedJsonTransportGate = Object.freeze({
     nativeRootBridgeJsonTransportBatchLifecycleRowFields,
   jsonTransportBatchErrorCaseIds:
     nativeRootBridgeJsonTransportBatchErrorCaseIds,
+  responseSequenceGate: nativeRootBridgeJsonTransportBatchResponseSequenceGate,
   nativeAddonLoaded: false,
   nativeExecution: false,
   rendererExecution: false,
@@ -1376,6 +1440,7 @@ function createNativeRootBridgeBatchedJsonTransportGate(decodedRequestRecords) {
     createNativeRootBridgeBatchedJsonTransportLifecycleRows(
       decodedRequestRecords
     );
+  const errorRows = createNativeRootBridgeBatchedJsonTransportErrorRows();
 
   return Object.freeze({
     batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
@@ -1388,7 +1453,12 @@ function createNativeRootBridgeBatchedJsonTransportGate(decodedRequestRecords) {
     jsonTransportBatchErrorCaseIds:
       nativeRootBridgeJsonTransportBatchErrorCaseIds,
     lifecycleRows,
-    errorRows: createNativeRootBridgeBatchedJsonTransportErrorRows(),
+    errorRows,
+    responseSequenceGate:
+      createNativeRootBridgeJsonTransportBatchResponseSequenceGate(
+        lifecycleRows,
+        errorRows
+      ),
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -1458,6 +1528,104 @@ function createNativeRootBridgeBatchedJsonTransportErrorRows() {
       );
     })
   );
+}
+
+function createNativeRootBridgeJsonTransportBatchResponseSequenceGate(
+  lifecycleRows,
+  errorRows
+) {
+  const rows = Object.freeze(
+    lifecycleRows.map((row, responseOrder) =>
+      freezeNativeRootBridgeJsonTransportBatchResponseSequenceRow({
+        id:
+          row.status === nativeRootBridgeJsonTransportBatchLifecycleStatusError
+            ? `batch-response-${responseOrder}-error`
+            : `batch-response-${responseOrder}-${row.kind}`,
+        row,
+        responseOrder,
+        errorRowStatus:
+          row.status === nativeRootBridgeJsonTransportBatchLifecycleStatusError
+            ? nativeRootBridgeJsonTransportBatchResponseErrorRowStatusLifecycleError
+            : nativeRootBridgeJsonTransportBatchResponseErrorRowStatusNotError
+      })
+    )
+  );
+  const deterministicErrorRows = Object.freeze(
+    errorRows.map((row, responseOrder) =>
+      freezeNativeRootBridgeJsonTransportBatchResponseSequenceRow({
+        id: row.id,
+        row,
+        responseOrder,
+        errorRowStatus:
+          nativeRootBridgeJsonTransportBatchResponseErrorRowStatusDeterministic
+      })
+    )
+  );
+
+  return Object.freeze({
+    responseSequenceGateStatus:
+      nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus,
+    batchId: nativeRootBridgeJsonTransportBatchResponseSequenceBatchId,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    requestCount: lifecycleRows.length,
+    responseCount: rows.length,
+    errorRowCount: deterministicErrorRows.length,
+    jsonTransportBatchResponseSequenceRowFields:
+      nativeRootBridgeJsonTransportBatchResponseSequenceRowFields,
+    errorRowStatuses:
+      nativeRootBridgeJsonTransportBatchResponseErrorRowStatuses,
+    teardownStates: nativeRootBridgeJsonTransportBatchResponseTeardownStates,
+    rows,
+    errorRows: deterministicErrorRows,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  });
+}
+
+function freezeNativeRootBridgeJsonTransportBatchResponseSequenceRow({
+  id,
+  row,
+  responseOrder,
+  errorRowStatus
+}) {
+  return Object.freeze({
+    id,
+    batchId: nativeRootBridgeJsonTransportBatchResponseSequenceBatchId,
+    requestOrder: row.batchIndex,
+    responseOrder,
+    requestId: row.requestId,
+    kind: row.kind,
+    responseStatus: row.status,
+    errorRowStatus,
+    teardownState:
+      getNativeRootBridgeJsonTransportBatchResponseTeardownState(row),
+    code: row.code,
+    sourceErrorCode: row.sourceErrorCode,
+    boundaryErrorCode: row.boundaryErrorCode,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  });
+}
+
+function getNativeRootBridgeJsonTransportBatchResponseTeardownState(row) {
+  const lifecycle =
+    row.status === nativeRootBridgeJsonTransportBatchLifecycleStatusAccepted
+      ? row.lifecycleAfter
+      : row.lifecycleBefore;
+
+  if (lifecycle === nativeRootBridgeJsonTransportBatchLifecycleStateRetired) {
+    return nativeRootBridgeJsonTransportBatchResponseTeardownStateRootRetired;
+  }
+  if (lifecycle === nativeRootBridgeJsonTransportBatchLifecycleStateActive) {
+    return nativeRootBridgeJsonTransportBatchResponseTeardownStateRootActive;
+  }
+  return nativeRootBridgeJsonTransportBatchResponseTeardownStateRootUninitialized;
 }
 
 function createNativeRootBridgeBatchedJsonTransportLifecycleRows(records) {
