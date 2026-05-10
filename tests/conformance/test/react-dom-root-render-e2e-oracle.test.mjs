@@ -21,6 +21,7 @@ import {
 import {
   evaluateReactDomRootRenderE2EConformanceGate,
   inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics,
+  inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics,
   inspectReactDomRootRenderE2EPrivateBridgeRequests,
   REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
   REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
@@ -28,7 +29,9 @@ import {
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
-  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_BLOCKED_STATUS
 } from "../src/react-dom-root-render-e2e-conformance-gate.mjs";
 
 const oracle = readCheckedReactDomRootRenderE2EOracle();
@@ -348,11 +351,24 @@ test("root render e2e conformance gate records private bridge request rows separ
     16
   );
   assert.equal(result.summary.privateHostOutputBlockedScenarioModeRowCount, 4);
+  assert.equal(
+    result.summary.privateWarningBoundaryDiagnosticScenarioModeRowCount,
+    2
+  );
+  assert.equal(
+    result.summary.privateWarningBoundaryBlockedScenarioModeRowCount,
+    18
+  );
   assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
   assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
   assert.equal(result.summary.privateBridgeCompatibilityClaimed, false);
   assert.equal(result.summary.privateHostOutputCompatibilityClaimed, false);
+  assert.equal(result.summary.privateWarningBoundaryCompatibilityClaimed, false);
+  assert.equal(
+    result.summary.privateWarningBoundaryConsoleOutputUsedAsEvidence,
+    false
+  );
   assert.equal(result.summary.portalRootRenderCompatibilityClaimed, false);
   assert.equal(result.summary.compatibilityAdmitted, false);
   assert.deepEqual(result.privateBridgeGate.admittedPrivateRequestScenarioIds, [
@@ -382,6 +398,15 @@ test("root render e2e conformance gate records private bridge request rows separ
       "render-after-unmount"
     ]
   );
+  assert.deepEqual(
+    result.privateWarningBoundaryGate.admittedPrivateWarningBoundaryScenarioIds,
+    ["development-warning-boundaries"]
+  );
+  assert.equal(
+    result.privateWarningBoundaryGate.consoleOutputUsedAsEvidence,
+    false
+  );
+  assert.equal(result.privateWarningBoundaryGate.compatibilityClaimed, false);
 
   for (const row of result.blockedScenarioModeRows) {
     assert.equal(row.oracleRowAccepted, true);
@@ -467,6 +492,41 @@ test("root render e2e conformance gate records private bridge request rows separ
       )
     ),
     ["flush-sync-cross-root-render", "development-warning-boundaries"]
+  );
+
+  for (const row of result.privateWarningBoundaryDiagnosticScenarioModeRows) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS
+    );
+    assert.equal(row.scenarioId, "development-warning-boundaries");
+    assert.equal(row.oracleRowAccepted, true);
+    assert.equal(row.comparedToReactDomOracle, false);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.publicRootCompatibilitySurface, false);
+    assert.equal(row.consoleOutputUsedAsEvidence, false);
+    assert.equal(row.publicFacadeGateStatus, "blocked-unsupported-root-e2e");
+    assert.equal(row.diagnosticKind, "private-root-warning-boundary");
+    assert.equal(row.warningBoundaryEvidence.boundaries.length, 5);
+  }
+
+  assert.deepEqual(
+    new Set(
+      result.privateWarningBoundaryBlockedScenarioModeRows.map(
+        (row) => row.gateStatus
+      )
+    ),
+    new Set([REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_BLOCKED_STATUS])
+  );
+  assert.ok(
+    result.privateWarningBoundaryBlockedScenarioModeRows.every(
+      (row) =>
+        row.scenarioId !== "development-warning-boundaries" &&
+        row.publicRootCompatibilitySurface === false &&
+        row.comparedToReactDomOracle === false &&
+        row.compatibilityClaimed === false &&
+        row.consoleOutputUsedAsEvidence === false
+    )
   );
 
   assert.equal(result.portalRootRenderGate.ok, true);
@@ -695,6 +755,75 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
       .renderAfterUnmountMutationLog,
     []
   );
+});
+
+test("private warning-boundary diagnostics use root metadata rather than console output", () => {
+  const observations =
+    inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics();
+
+  assert.equal(observations.loadError, null);
+  assert.equal(observations.rows.length, 2);
+
+  for (const row of observations.rows) {
+    assert.equal(row.status, "ok");
+    assert.equal(row.scenarioId, "development-warning-boundaries");
+    assert.equal(row.evidence.comparedToReactDomOracle, false);
+    assert.equal(row.evidence.compatibilityClaimed, false);
+    assert.equal(row.evidence.publicRootCompatibilitySurface, false);
+    assert.equal(row.evidence.consoleOutputCaptured, false);
+    assert.equal(row.evidence.consoleOutputUsedAsEvidence, false);
+    assert.equal(row.evidence.diagnosticKind, "private-root-warning-boundary");
+    assert.equal(
+      row.evidence.warningBoundaryEvidence.consoleOutputUsedAsEvidence,
+      false
+    );
+    assert.deepEqual(
+      row.evidence.warningBoundaryEvidence.boundaries.map(
+        (boundary) => boundary.boundaryId
+      ),
+      [
+        "root-render-callback-second-argument",
+        "root-render-container-second-argument",
+        "root-render-generic-second-argument",
+        "root-unmount-callback-argument",
+        "duplicate-create-root"
+      ]
+    );
+  }
+
+  const development = observations.rows.find(
+    (row) => row.modeId === "default-node-development"
+  );
+  const production = observations.rows.find(
+    (row) => row.modeId === "default-node-production"
+  );
+  assert.equal(development.evidence.modeWarningEnabled, true);
+  assert.equal(production.evidence.modeWarningEnabled, false);
+
+  const developmentBoundaries =
+    development.evidence.warningBoundaryEvidence.boundaries;
+  const productionBoundaries =
+    production.evidence.warningBoundaryEvidence.boundaries;
+  assert.equal(
+    developmentBoundaries[0].callbackInfo.name,
+    "afterRender"
+  );
+  assert.equal(developmentBoundaries[1].argumentClassification.isValidContainer, true);
+  assert.deepEqual(developmentBoundaries[2].callbackInfo.keys, ["unexpected"]);
+  assert.equal(
+    developmentBoundaries[3].callbackInfo.name,
+    "afterUnmount"
+  );
+  assert.equal(
+    developmentBoundaries[4].duplicateWarningType,
+    "duplicate-create-root"
+  );
+  assert.equal(productionBoundaries[4].duplicateWarningType, null);
+
+  for (const boundary of [...developmentBoundaries, ...productionBoundaries]) {
+    assert.equal(boundary.consoleOutputUsedAsEvidence, false);
+    assert.equal(boundary.publicRootCompatibilitySurface, false);
+  }
 });
 
 test("React DOM root render e2e oracle artifact does not leak paths or randomized markers", () => {
