@@ -7,6 +7,7 @@ mod concurrent_updates;
 mod fiber_root;
 mod fiber_store;
 mod host_tokens;
+mod root_callbacks;
 mod root_config;
 mod root_scheduler;
 mod root_updates;
@@ -40,6 +41,9 @@ pub use fiber_store::{FiberRootId, FiberRootStore, FiberRootStoreError};
 pub use host_tokens::{
     HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
     HostFiberTokenValidationError,
+};
+pub use root_callbacks::{
+    RootUpdateCallbackRecord, RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility,
 };
 pub use root_config::{
     PendingChildrenHandle, PendingCommitCancelHandle, PendingCommitHandle, PendingPassiveState,
