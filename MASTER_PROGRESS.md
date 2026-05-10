@@ -29,6 +29,21 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Maintenance 715
+
+- Worker 715 restored the Rust 1.95.0 / clippy 0.1.95 workspace gate after the
+  post-cleanup `npm run check` baseline failed in existing Rust code. The
+  accepted maintenance pass boxed private diagnostic error payloads, added
+  narrow item-level clippy allows for intentional canary evidence shapes,
+  removed mechanical lint drift, preserved NAPI serialized status strings while
+  renaming private enum variants, and kept public behavior unchanged.
+- The worker was accepted after independent audit and verification with `cargo
+  fmt --all --check`, workspace clippy with `-D warnings`, `cargo test -p
+  fast-react-reconciler --all-features`, full `npm run check`, conflict-marker
+  scanning, and `git diff --check`.
+- Post-merge cleanup removed worker 715's subagent, isolated worktree, and
+  branch after the main checkout passed `npm run check`.
+
 ### Queue 685-714
 
 - Workers 687-689, 691, and 712 were accepted from the active queue. The batch
@@ -99,6 +114,10 @@ sequencing belong in `MASTER_PLAN.md`.
   test-renderer workspace checks, `npm run check:package-surface`, full
   conformance checks, focused React DOM root facade/root-render/test-utils act
   gates, conflict-marker scanning, and `git diff --check`.
+- Post-queue cleanup, before launching worker 715, confirmed only the root
+  orchestrator agent remained live, `git worktree list` contained only the main
+  checkout, no queue 685-714 worker branches were present, and no neighboring
+  queue worktree directories remained.
 
 ### Queue 655-684
 

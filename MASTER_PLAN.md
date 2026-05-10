@@ -47,25 +47,34 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted. Do not queue replacement workers; let the current cycle settle and
-continue with verification, cleanup, and coordination only.
+accepted and cleaned up. Worker 715 restored the Rust 1.95.0 clippy gate after
+the post-cleanup `npm run check` baseline failed and has been cleaned up.
 
-- No top-level worker queue is active.
+- Worker 716: private-admission and package-surface ledger for accepted queue
+  685-714.
 
 ## Near-Term Sequencing
 
-1. Clean the final accepted worker session/worktree/branch and confirm no
-   queue 685-714 worker state remains live.
+1. Accept worker 716 only if it adds queue 685-714 admission evidence without
+   product code changes and keeps `npm run check` green.
 2. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
-3. Continue coordination and planning without launching replacement workers.
 
 ## Next Queue Candidates
 
-- Minimal commit path after root work loop ownership is clear.
-- Sync flush integration once HostRoot render work can produce finished work.
-- Function component render and hook queue slices after the root queue model is
-  stable.
-- Test renderer root serialization and act/error surfaces once commit behavior
-  exists.
-- DOM mutation/text host behavior after host token boundaries remain stable.
+- Worker 716: private-admission and package-surface ledger for accepted queue
+  685-714; no product code.
+- Worker 717: private HostRoot render -> finished-work -> commit entrypoint
+  hardening, dependent on workers 685, 686, and 694.
+- Worker 718: sync-flush/root-scheduler finished-work handoff integration,
+  dependent on worker 717 if it adds shared helpers.
+- Worker 719: function-component effect destroy-handle persistence, dependent
+  on workers 688/689 and stable commit ownership from worker 717.
+- Worker 720: test-renderer serialization finished-work identity gate,
+  dependent on workers 695-702 and 717.
+- Worker 721: DOM text reset / dangerousHTML fake-DOM execution gate, dependent
+  on worker 704 and existing text-content gates.
+
+Premature until later gates are green: public React DOM root render/unmount,
+public `act`, public `flushSync`, public Scheduler timing, public hydration,
+resources, forms, and controlled inputs.
