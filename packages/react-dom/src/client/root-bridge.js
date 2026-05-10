@@ -133,6 +133,8 @@ const privateRootCreateRenderAdmissionRecordType =
   'fast.react_dom.private_root_create_render_admission_record';
 const privateRootNativeHandoffRecordType =
   'fast.react_dom.private_root_native_handoff_record';
+const privateRootRenderNativeHandoffRecordType =
+  'fast.react_dom.private_root_render_native_handoff_record';
 const privateRootNativeBridgeHandleType =
   'fast.react_dom.private_root_native_bridge_handle';
 const privateRootCreateSideEffectRecordType =
@@ -286,6 +288,8 @@ const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-nested-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED =
   'cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic';
+const ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED =
+  'accepted-private-root-render-native-handoff-metadata';
 const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE =
   'fast-react-reconciler.root-work-loop.finished-work-handoff';
 const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS =
@@ -1496,6 +1500,86 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES =
       reason: 'React DOM public root compatibility remains unclaimed.'
     })
   ]);
+const ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'private-public-facade-root-ownership',
+      accepted: true,
+      reason:
+        'The handoff consumed a symbol-private react-dom/client facade root owned by the requesting adapter.'
+    }),
+    freezeRecord({
+      id: 'public-facade-root-render-record',
+      accepted: true,
+      reason:
+        'The handoff consumed the public-shaped private root.render request record.'
+    }),
+    freezeRecord({
+      id: 'root-work-loop-finished-work-handoff',
+      accepted: true,
+      reason:
+        'Accepted root work-loop finished-work evidence was linked before the native render handoff metadata was recorded.'
+    }),
+    freezeRecord({
+      id: 'fake-dom-initial-host-output-admission',
+      accepted: true,
+      reason:
+        'The handoff consumed the active private fake-DOM initial host-output admission.'
+    }),
+    freezeRecord({
+      id: 'private-native-render-request-handoff',
+      accepted: true,
+      reason:
+        'The private render request was mirrored as an inert native root request handoff.'
+    })
+  ]);
+const ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The handoff does not enable public React DOM createRoot or root.render execution.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'The native request is mirrored as metadata only.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler scheduling, render, complete-work, or commit traversal is executed by this handoff.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-compatibility',
+      blocked: true,
+      reason:
+        'Only deterministic fake-DOM host output is admitted by this private handoff.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'hydrateRoot and hydration replay records are rejected by this render handoff.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction, dispatch, and listener invocation remain blocked.'
+    }),
+    freezeRecord({
+      id: 'refs',
+      blocked: true,
+      reason: 'Ref attach/detach effects are not admitted by this handoff.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM public root render compatibility remains unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES =
   freezeArray([
     freezeRecord({
@@ -1732,6 +1816,8 @@ const rootHandleState = new WeakMap();
 const rootRecordPayloads = new WeakMap();
 const rootNativeHandoffPayloads = new WeakMap();
 const rootNativeHandoffRecords = new WeakMap();
+const rootRenderNativeHandoffPayloads = new WeakMap();
+const rootRenderNativeHandoffRecords = new WeakMap();
 const rootCreateRenderAdmissionPayloads = new WeakMap();
 const rootCreateRenderAdmissionRecords = new WeakMap();
 const rootCreateSideEffectPayloads = new WeakMap();
@@ -2050,6 +2136,12 @@ function createPrivateRootPublicFacadeAdapter(options) {
           .hostOutputRenderRecords
       );
     },
+    getRootRenderNativeHandoffRecords(root) {
+      return freezeArray(
+        assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
+          .rootRenderNativeHandoffRecords
+      );
+    },
     getRootHostOutputUpdateDiagnostics(root) {
       return freezeArray(
         assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
@@ -2081,6 +2173,21 @@ function createPrivateRootPublicFacadeAdapter(options) {
         root,
         element,
         options
+      );
+    },
+    renderNativeHandoff(root, element, options) {
+      return renderPrivateRootPublicFacadeNativeHandoffWithAdapter(
+        adapterState,
+        root,
+        element,
+        options
+      );
+    },
+    createRenderNativeHandoff(root, hostOutputRenderRecord) {
+      return createPrivateRootRenderNativeHandoffRecordWithAdapter(
+        adapterState,
+        root,
+        hostOutputRenderRecord
       );
     },
     updateHostOutput(root, element, options) {
@@ -2211,6 +2318,7 @@ function createPrivateRootPublicFacadeRoot(
     hostOutputNestedUpdateRecords: [],
     hostOutputUnmountCleanupRecords: [],
     renderRecords: [],
+    rootRenderNativeHandoffRecords: [],
     markerListenerPreflightRecords: [],
     requestRecords: [createRecord],
     root: null,
@@ -2656,6 +2764,54 @@ function renderPrivateRootPublicFacadeHostOutputWithAdapter(
   );
 }
 
+function renderPrivateRootPublicFacadeNativeHandoff(root, element, options) {
+  const payload = rootPublicFacadeRootPayloads.get(root);
+  if (payload === undefined) {
+    throwInvalidRootPublicFacadeAdapter(
+      'Expected a private React DOM root public facade root.'
+    );
+  }
+  return renderPrivateRootPublicFacadeNativeHandoffFromPayload(
+    payload,
+    element,
+    options
+  );
+}
+
+function renderPrivateRootPublicFacadeNativeHandoffWithAdapter(
+  adapterState,
+  root,
+  element,
+  options
+) {
+  const payload = assertPrivateRootPublicFacadeRootForAdapter(
+    root,
+    adapterState
+  );
+  return renderPrivateRootPublicFacadeNativeHandoffFromPayload(
+    payload,
+    element,
+    options
+  );
+}
+
+function renderPrivateRootPublicFacadeNativeHandoffFromPayload(
+  payload,
+  element,
+  options
+) {
+  const hostOutputRenderRecord =
+    renderPrivateRootPublicFacadeHostOutputFromPayload(
+      payload,
+      element,
+      options
+    );
+  return createPrivateRootRenderNativeHandoffRecordFromPayload(
+    payload,
+    hostOutputRenderRecord
+  );
+}
+
 function renderPrivateRootPublicFacadeHostOutputFromPayload(
   payload,
   element,
@@ -2715,6 +2871,17 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       sideEffectOptions
     );
     renderRecord = payload.root.render(element, callback);
+    if (rootWorkLoopMetadataOption.found) {
+      normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
+        rootWorkLoopMetadataOption.value,
+        {
+          createRecord,
+          hostOutputHandoff: null,
+          normalizedInitial,
+          renderRecord
+        }
+      );
+    }
     admissionRecord = payload.bridge.admitCreateRenderPath(
       createRecord,
       sideEffectRecord,
@@ -2875,6 +3042,185 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
   });
   payload.hostOutputRenderRecords.push(diagnosticRecord);
   return diagnosticRecord;
+}
+
+function createPrivateRootRenderNativeHandoffRecord(hostOutputRenderRecord) {
+  return createPrivateRootRenderNativeHandoffRecordWithBridge(
+    null,
+    hostOutputRenderRecord
+  );
+}
+
+function createPrivateRootRenderNativeHandoffRecordWithAdapter(
+  adapterState,
+  root,
+  hostOutputRenderRecord
+) {
+  const payload = assertPrivateRootPublicFacadeRootForAdapter(
+    root,
+    adapterState
+  );
+  return createPrivateRootRenderNativeHandoffRecordFromPayload(
+    payload,
+    hostOutputRenderRecord
+  );
+}
+
+function createPrivateRootRenderNativeHandoffRecordWithBridge(
+  bridgeState,
+  hostOutputRenderRecord
+) {
+  const renderPayload =
+    rootPublicFacadeHostOutputRenderPayloads.get(hostOutputRenderRecord);
+  if (renderPayload === undefined) {
+    if (rootRecordPayloads.has(hostOutputRenderRecord)) {
+      const validation = validateRootBridgeRequestRecord(hostOutputRenderRecord);
+      if (validation.operation === 'hydrate') {
+        throwInvalidRootRenderNativeHandoff(
+          'Private hydrateRoot records cannot be used as root render native handoff metadata.'
+        );
+      }
+    }
+    throwInvalidRootRenderNativeHandoff(
+      'Expected a private public-facade host-output render diagnostic record.'
+    );
+  }
+  if (
+    bridgeState !== null &&
+    renderPayload.bridge !== undefined &&
+    renderPayload.bridge !== null
+  ) {
+    const createValidation = validateRootBridgeRequestRecord(
+      renderPayload.createRecord
+    );
+    if (createValidation.bridgeState !== bridgeState) {
+      throwForeignRootBridgeRequest();
+    }
+  }
+
+  const rootPayload = rootPublicFacadeRootPayloads.get(renderPayload.root);
+  if (rootPayload === undefined) {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff requires a private facade root.'
+    );
+  }
+  return createPrivateRootRenderNativeHandoffRecordFromPayload(
+    rootPayload,
+    hostOutputRenderRecord
+  );
+}
+
+function createPrivateRootRenderNativeHandoffRecordFromPayload(
+  rootPayload,
+  hostOutputRenderRecord
+) {
+  const existing = rootRenderNativeHandoffRecords.get(hostOutputRenderRecord);
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const validation = validatePrivateRootRenderNativeHandoff(
+    rootPayload,
+    hostOutputRenderRecord
+  );
+  const nativeHandoffRecord =
+    validation.bridge.createNativeRequestHandoff(validation.renderRecord);
+  const nativeHandoffPayload =
+    rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
+  const rootBridgeState = validation.bridgeState;
+  const sequence = rootBridgeState.nextRootRenderNativeHandoffSequence++;
+  const handoffId =
+    `${rootBridgeState.rootRenderNativeHandoffIdPrefix}:${sequence}`;
+  const handoff = freezeRecord({
+    $$typeof: privateRootRenderNativeHandoffRecordType,
+    kind: 'FastReactDomPrivateRootRenderNativeHandoffRecord',
+    operation: 'private-root-render-native-handoff',
+    entrypoint: 'react-dom/client',
+    handoffId,
+    handoffSequence: sequence,
+    handoffStatus: ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED,
+    adapterStatus: ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
+    sourceDiagnosticId: hostOutputRenderRecord.diagnosticId,
+    sourceDiagnosticSequence: hostOutputRenderRecord.diagnosticSequence,
+    sourceDiagnosticStatus: hostOutputRenderRecord.diagnosticStatus,
+    rootId: validation.createRecord.rootId,
+    rootKind: validation.createRecord.rootKind,
+    rootTag: validation.createRecord.rootTag,
+    createRequestId: validation.createRecord.requestId,
+    createRequestSequence: validation.createRecord.requestSequence,
+    createRequestType: validation.createRecord.requestType,
+    renderRequestId: validation.renderRecord.requestId,
+    renderRequestSequence: validation.renderRecord.requestSequence,
+    renderRequestType: validation.renderRecord.requestType,
+    renderUpdateId: validation.renderRecord.updateId,
+    renderLifecycleStatusBefore: validation.renderRecord.lifecycleStatusBefore,
+    renderLifecycleStatusAfter: validation.renderRecord.lifecycleStatusAfter,
+    hostOutputHandoffId: validation.hostOutputHandoff.handoffId,
+    hostOutputHandoffStatus: validation.hostOutputHandoff.handoffStatus,
+    rootWorkLoopFinishedWorkHandoffId:
+      validation.rootWorkLoopFinishedWorkRecord.handoffId,
+    rootWorkLoopFinishedWorkStatus:
+      validation.rootWorkLoopFinishedWorkRecord.handoffStatus,
+    rootWorkLoopFinishedWorkConsumed:
+      validation.rootWorkLoopFinishedWorkRecord.consumedFinishedWorkRecord,
+    rootWorkLoopPublicRootRenderingBlocked:
+      validation.rootWorkLoopFinishedWorkRecord.publicRootRenderingBlocked,
+    nativeHandoffId: nativeHandoffRecord.handoffId,
+    nativeHandoffStatus: nativeHandoffRecord.handoffStatus,
+    nativeRequestKind: nativeHandoffRecord.nativeRequestRecord.kind,
+    nativeRequestRecord: nativeHandoffRecord.nativeRequestRecord,
+    acceptedCapabilities:
+      ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_BLOCKED_CAPABILITIES,
+    privateFacadeRoot: true,
+    facadeOwnershipValidated: true,
+    rootWorkLoopEvidenceAccepted: true,
+    fakeDomAdmissionAccepted: true,
+    nativeRenderRequestMirrored: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootRenderNativeHandoffRecords.set(hostOutputRenderRecord, handoff);
+  rootRenderNativeHandoffPayloads.set(handoff, {
+    adapter: rootPayload.adapter,
+    admissionRecord: validation.admissionRecord,
+    bridge: validation.bridge,
+    container: validation.container,
+    createRecord: validation.createRecord,
+    hostOutputHandoff: validation.hostOutputHandoff,
+    hostOutputPayload: validation.hostOutputPayload,
+    hostOutputRenderRecord,
+    nativeHandoffPayload,
+    nativeHandoffRecord,
+    renderRecord: validation.renderRecord,
+    root: rootPayload.root,
+    rootHandle: rootPayload.rootHandle,
+    rootWorkLoopFinishedWorkPayload:
+      validation.rootWorkLoopFinishedWorkPayload,
+    rootWorkLoopFinishedWorkRecord:
+      validation.rootWorkLoopFinishedWorkRecord
+  });
+  rootPayload.rootRenderNativeHandoffRecords.push(handoff);
+  return handoff;
 }
 
 function updatePrivateRootPublicFacadeHostOutput(root, element, options) {
@@ -4972,6 +5318,14 @@ function getNativeRootBridgeHandoffPayload(record) {
 
 function isNativeRootBridgeHandoffRecord(value) {
   return rootNativeHandoffPayloads.has(value);
+}
+
+function getPrivateRootRenderNativeHandoffPayload(record) {
+  return rootRenderNativeHandoffPayloads.get(record) || null;
+}
+
+function isPrivateRootRenderNativeHandoffRecord(value) {
+  return rootRenderNativeHandoffPayloads.has(value);
 }
 
 function getPrivateRootCreateRenderAdmissionPayload(record) {
@@ -8031,6 +8385,10 @@ function createBridgeState(options) {
       options && options.publicFacadeHostOutputRenderIdPrefix,
       'public-facade-host-output-render'
     ),
+    rootRenderNativeHandoffIdPrefix: getIdPrefix(
+      options && options.rootRenderNativeHandoffIdPrefix,
+      'root-render-native-handoff'
+    ),
     publicFacadeHostOutputUpdateIdPrefix: getIdPrefix(
       options && options.publicFacadeHostOutputUpdateIdPrefix,
       'public-facade-host-output-update'
@@ -8078,6 +8436,7 @@ function createBridgeState(options) {
     nextPortalEventOwnerRootSequence: 1,
     nextPublicFacadePreflightSequence: 1,
     nextPublicFacadeHostOutputRenderSequence: 1,
+    nextRootRenderNativeHandoffSequence: 1,
     nextPublicFacadeHostOutputUpdateSequence: 1,
     nextPublicFacadeNestedHostOutputUpdateSequence: 1,
     nextPublicFacadeHostOutputUnmountCleanupSequence: 1,
@@ -12862,6 +13221,148 @@ function cleanupPublicFacadeHostOutputRenderAfterFailure({
   }
 }
 
+function validatePrivateRootRenderNativeHandoff(
+  rootPayload,
+  hostOutputRenderRecord
+) {
+  const renderPayload =
+    rootPublicFacadeHostOutputRenderPayloads.get(hostOutputRenderRecord);
+  if (renderPayload === undefined) {
+    throwInvalidRootRenderNativeHandoff(
+      'Expected a private public-facade host-output render diagnostic record.'
+    );
+  }
+  if (
+    renderPayload.root !== rootPayload.root ||
+    renderPayload.adapter !== rootPayload.adapter ||
+    renderPayload.bridge !== rootPayload.bridge
+  ) {
+    throwForeignRootBridgeRequest();
+  }
+  if (
+    hostOutputRenderRecord.$$typeof !==
+      privateRootPublicFacadeHostOutputRenderRecordType ||
+    hostOutputRenderRecord.kind !==
+      'FastReactDomPrivateRootPublicFacadeHostOutputRenderDiagnosticRecord' ||
+    hostOutputRenderRecord.operation !==
+      'public-facade-host-output-render-diagnostic' ||
+    hostOutputRenderRecord.diagnosticStatus !==
+      ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED ||
+    hostOutputRenderRecord.privateFacadeRoot !== true ||
+    hostOutputRenderRecord.publicRootExecution !== false ||
+    hostOutputRenderRecord.publicRootCompatibilitySurface !== false ||
+    hostOutputRenderRecord.nativeExecution !== false ||
+    hostOutputRenderRecord.reconcilerExecution !== false ||
+    hostOutputRenderRecord.hydration !== false ||
+    hostOutputRenderRecord.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRenderNativeHandoff(
+      'Expected an intact private public-facade host-output render diagnostic.'
+    );
+  }
+
+  const createRecord = renderPayload.createRecord;
+  const renderRecord = renderPayload.renderRecord;
+  const createValidation = validateRootBridgeRequestRecord(createRecord);
+  const renderValidation = validateRootBridgeRequestRecord(renderRecord);
+  if (createValidation.operation === 'hydrate') {
+    throwInvalidRootRenderNativeHandoff(
+      'Private hydrateRoot records cannot be used as root render native handoff metadata.'
+    );
+  }
+  if (createValidation.operation !== 'create') {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff requires a createRoot facade record.'
+    );
+  }
+  if (renderValidation.operation === 'hydrate') {
+    throwInvalidRootRenderNativeHandoff(
+      'Private hydrateRoot records cannot be used as root render native handoff metadata.'
+    );
+  }
+  if (renderValidation.operation !== 'render') {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff requires a root.render request record.'
+    );
+  }
+  if (
+    createValidation.bridgeState !== renderValidation.bridgeState ||
+    createValidation.bridgeState !==
+      getPrivateRootHandleState(rootPayload.rootHandle).bridgeState
+  ) {
+    throwForeignRootBridgeRequest();
+  }
+  if (
+    renderValidation.rootHandleState.lifecycleStatus !==
+      ROOT_LIFECYCLE_RENDERED ||
+    renderValidation.rootHandleState.renderCount !== renderRecord.renderCount ||
+    rootPayload.renderRecords[rootPayload.renderRecords.length - 1] !==
+      renderRecord
+  ) {
+    throwInvalidRootRenderNativeHandoff(
+      'Stale private root render records cannot be handed to the native render bridge.'
+    );
+  }
+
+  const hostOutputHandoff = renderPayload.hostOutputHandoff;
+  const hostOutputPayload =
+    rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
+  if (
+    hostOutputPayload === undefined ||
+    hostOutputPayload.active !== true ||
+    hostOutputPayload.renderRecord !== renderRecord ||
+    hostOutputPayload.createRecord !== createRecord ||
+    hostOutputHandoff.handoffStatus !==
+      ROOT_BRIDGE_INITIAL_HOST_OUTPUT_APPLIED
+  ) {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff requires an active fake-DOM initial host-output admission.'
+    );
+  }
+
+  const rootWorkLoopFinishedWorkRecord =
+    renderPayload.rootWorkLoopFinishedWorkRecord;
+  const rootWorkLoopFinishedWorkPayload =
+    rootPublicFacadeRootWorkLoopFinishedWorkPayloads.get(
+      rootWorkLoopFinishedWorkRecord
+    );
+  if (
+    rootWorkLoopFinishedWorkPayload === undefined ||
+    rootWorkLoopFinishedWorkRecord.$$typeof !==
+      privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType ||
+    rootWorkLoopFinishedWorkRecord.handoffStatus !==
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED ||
+    rootWorkLoopFinishedWorkRecord.renderUpdateId !==
+      renderRecord.updateId ||
+    rootWorkLoopFinishedWorkRecord.consumedFinishedWorkRecord !== true ||
+    rootWorkLoopFinishedWorkRecord.publicRootRenderingBlocked !== true ||
+    rootWorkLoopFinishedWorkRecord.publicRootExecution !== false ||
+    rootWorkLoopFinishedWorkRecord.reconcilerExecution !== false ||
+    rootWorkLoopFinishedWorkRecord.compatibilityClaimed !== false ||
+    rootWorkLoopFinishedWorkPayload.createRecord !== createRecord ||
+    rootWorkLoopFinishedWorkPayload.renderRecord !== renderRecord ||
+    rootWorkLoopFinishedWorkPayload.hostOutputHandoff !== hostOutputHandoff ||
+    rootWorkLoopFinishedWorkPayload.hostOutputPayload !== hostOutputPayload
+  ) {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff requires accepted root work-loop finished-work evidence for the active render.'
+    );
+  }
+
+  return {
+    admissionRecord: renderPayload.admissionRecord,
+    bridge: renderPayload.bridge,
+    bridgeState: createValidation.bridgeState,
+    container: renderPayload.container,
+    createRecord,
+    hostOutputHandoff,
+    hostOutputPayload,
+    renderRecord,
+    rootWorkLoopFinishedWorkPayload,
+    rootWorkLoopFinishedWorkRecord
+  };
+}
+
 function assertPrivateRootPublicFacadeRootForAdapter(root, adapterState) {
   const payload = rootPublicFacadeRootPayloads.get(root);
   if (payload === undefined) {
@@ -12910,6 +13411,9 @@ function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
     ),
     renderRecords: freezeArray(payload.renderRecords),
     requestRecords: freezeArray(payload.requestRecords),
+    rootRenderNativeHandoffRecords: freezeArray(
+      payload.rootRenderNativeHandoffRecords
+    ),
     root: payload.root,
     rootHandle: payload.rootHandle,
     rootOptions: payload.rootOptions,
@@ -13091,6 +13595,12 @@ function throwInvalidRootPublicFacadeHostOutputUnmount(message) {
   const error = new Error(message);
   error.code =
     'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT';
+  throw error;
+}
+
+function throwInvalidRootRenderNativeHandoff(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_RENDER_NATIVE_HANDOFF';
   throw error;
 }
 
@@ -13307,6 +13817,9 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED,
+  ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED,
+  ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_BLOCKED_CAPABILITIES,
   ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
   ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
   ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
@@ -13358,6 +13871,7 @@ module.exports = {
   createClientRootRecord,
   createHydrateRootRecord,
   createNativeRootBridgeHandoffRecord,
+  createPrivateRootRenderNativeHandoffRecord,
   createPortalChildReconciliationDiagnosticRecord,
   createPortalCommitHandoffRecord,
   createPortalEventOwnerRootGateRecord,
@@ -13381,6 +13895,7 @@ module.exports = {
   describeRootListenerGuard,
   describeUnmountMarkerGuard,
   getNativeRootBridgeHandoffPayload,
+  getPrivateRootRenderNativeHandoffPayload,
   getPrivateRootCreateRenderAdmissionPayload,
   getPrivateRootCommitHostComponentUpdateHandoffPayload,
   getPrivateRootDangerousHtmlTextResetCommitMetadataPayload,
@@ -13413,6 +13928,7 @@ module.exports = {
   getPrivateRootUnmountHostOutputCleanupPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
+  isPrivateRootRenderNativeHandoffRecord,
   isPrivateRootCommitHostComponentUpdateHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitMetadataRecord,
   isPrivateRootHostOutputUpdateHandoffRecord,
@@ -13456,6 +13972,7 @@ module.exports = {
   privateRootInitialHostOutputHandoffRecordType,
   privateRootNativeBridgeHandleType,
   privateRootNativeHandoffRecordType,
+  privateRootRenderNativeHandoffRecordType,
   privateRootPortalBoundaryRecordType,
   privateRootPortalChildReconciliationDiagnosticRecordType,
   privateRootPortalCommitHandoffRecordType,
@@ -13489,6 +14006,7 @@ module.exports = {
   privateRootUpdateRecordType,
   preflightPrivateRootPublicFacadeMarkerListenerSetup,
   renderPrivateRootPublicFacadeHostOutput,
+  renderPrivateRootPublicFacadeNativeHandoff,
   updatePrivateRootPublicFacadeHostOutput,
   updatePrivateRootPublicFacadeNestedHostOutput,
   unmountPrivateRootPublicFacadeHostOutput,

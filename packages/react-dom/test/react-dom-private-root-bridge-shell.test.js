@@ -5094,6 +5094,211 @@ test('private react-dom/client facade host-output diagnostic renders through bri
   });
 });
 
+test('private react-dom/client facade render native handoff consumes facade, work-loop, and fake-DOM metadata', () => {
+  const document = createDocument('private-client-facade-render-native-handoff');
+  const container = createElement('DIV', document);
+  const callback = function afterPrivateRenderNativeHandoff() {};
+  const element = {
+    props: {
+      children: 'native handoff output',
+      id: 'native-handoff-host',
+      title: 'Private render native handoff'
+    },
+    type: 'section'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: 'facade-native-admission',
+    initialHostOutputIdPrefix: 'facade-native-initial',
+    nativeEnvironmentId: 613,
+    nativeHandoffIdPrefix: 'facade-native-request',
+    publicFacadeHostOutputRenderIdPrefix: 'facade-native-render',
+    requestIdPrefix: 'facade-native-request',
+    rootIdPrefix: 'facade-native-root',
+    rootRenderNativeHandoffIdPrefix: 'facade-native-handoff',
+    sideEffectIdPrefix: 'facade-native-side-effect',
+    updateIdPrefix: 'facade-native-update'
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+
+  const handoff = adapter.renderNativeHandoff(root, element, {
+    callback
+  });
+  const hidden =
+    rootBridge.getPrivateRootRenderNativeHandoffPayload(handoff);
+  const diagnostic = hidden.hostOutputRenderRecord;
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      hidden.hostOutputHandoff
+    );
+  const rootWorkLoopPayload =
+    rootBridge.getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(
+      hidden.rootWorkLoopFinishedWorkRecord
+    );
+
+  assert.equal(Object.isFrozen(handoff), true);
+  assert.equal(
+    handoff.$$typeof,
+    rootBridge.privateRootRenderNativeHandoffRecordType
+  );
+  assert.equal(
+    handoff.kind,
+    'FastReactDomPrivateRootRenderNativeHandoffRecord'
+  );
+  assert.equal(handoff.operation, 'private-root-render-native-handoff');
+  assert.equal(
+    handoff.handoffStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED
+  );
+  assert.equal(handoff.handoffId, 'facade-native-handoff:1');
+  assert.equal(handoff.sourceDiagnosticId, 'facade-native-render:1');
+  assert.equal(
+    handoff.sourceDiagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(handoff.rootId, 'facade-native-root:1');
+  assert.equal(handoff.createRequestId, 'facade-native-request:1');
+  assert.equal(handoff.renderRequestId, 'facade-native-request:2');
+  assert.equal(handoff.renderUpdateId, 'facade-native-update:1');
+  assert.equal(handoff.hostOutputHandoffId, 'facade-native-initial:1');
+  assert.equal(
+    handoff.hostOutputHandoffStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_APPLIED
+  );
+  assert.equal(
+    handoff.rootWorkLoopFinishedWorkHandoffId,
+    'facade-native-update:1:root-work-loop-finished-work'
+  );
+  assert.equal(handoff.rootWorkLoopFinishedWorkConsumed, true);
+  assert.equal(handoff.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(handoff.nativeHandoffId, 'facade-native-request:2');
+  assert.equal(
+    handoff.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    handoff.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(handoff.nativeRequestRecord.environmentId, 613);
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'private-public-facade-root-ownership',
+      'public-facade-root-render-record',
+      'root-work-loop-finished-work-handoff',
+      'fake-dom-initial-host-output-admission',
+      'private-native-render-request-handoff'
+    ]
+  );
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(handoff.privateFacadeRoot, true);
+  assert.equal(handoff.facadeOwnershipValidated, true);
+  assert.equal(handoff.rootWorkLoopEvidenceAccepted, true);
+  assert.equal(handoff.fakeDomAdmissionAccepted, true);
+  assert.equal(handoff.nativeRenderRequestMirrored, true);
+  assert.equal(handoff.publicCreateRootEnabled, false);
+  assert.equal(handoff.publicHydrateRootEnabled, false);
+  assert.equal(handoff.publicRootCreated, false);
+  assert.equal(handoff.publicRootObjectExposed, false);
+  assert.equal(handoff.publicRootExecution, false);
+  assert.equal(handoff.publicRootCompatibilitySurface, false);
+  assert.equal(handoff.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.rootScheduled, false);
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.domMutation, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.markerWrites, false);
+  assert.equal(handoff.listenerInstallation, false);
+  assert.equal(handoff.hydration, false);
+  assert.equal(handoff.eventDispatch, false);
+  assert.equal(handoff.refEffects, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootRenderNativeHandoffRecord(handoff),
+    true
+  );
+  assert.equal(rootBridge.isPrivateRootRenderNativeHandoffRecord({}), false);
+  assert.equal(rootBridge.getPrivateRootRenderNativeHandoffPayload({}), null);
+
+  assert.equal(hidden.adapter, adapter);
+  assert.equal(hidden.root, root);
+  assert.equal(hidden.createRecord, create);
+  assert.equal(hidden.renderRecord.requestType, 'root.render');
+  assert.equal(hidden.hostOutputRenderRecord, diagnostic);
+  assert.equal(hidden.hostOutputPayload, hostOutputPayload);
+  assert.equal(
+    hidden.rootWorkLoopFinishedWorkPayload,
+    rootWorkLoopPayload
+  );
+  assert.equal(rootWorkLoopPayload.renderRecord, hidden.renderRecord);
+  assert.equal(rootWorkLoopPayload.hostOutputHandoff, hidden.hostOutputHandoff);
+  assert.equal(
+    rootBridge.getNativeRootBridgeHandoffPayload(
+      hidden.nativeHandoffRecord
+    ).sourceRecord,
+    hidden.renderRecord
+  );
+  assert.deepEqual(adapter.getRootRenderNativeHandoffRecords(root), [
+    handoff
+  ]);
+  assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [
+    diagnostic
+  ]);
+  assert.deepEqual(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .rootRenderNativeHandoffRecords,
+    [handoff]
+  );
+  assert.equal(
+    rootBridge.createPrivateRootRenderNativeHandoffRecord(diagnostic),
+    handoff
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, 'SECTION');
+  assert.equal(container.textContent, 'native handoff output');
+  assert.equal(componentTree.getLatestPropsFromNode(container.firstChild), element.props);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('afterPrivateRenderNativeHandoff'), false);
+
+  hidden.bridge.cleanupInitialRenderHostOutput(hidden.hostOutputHandoff);
+  assert.equal(container.childNodes.length, 0);
+
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-client-facade-render-native-handoff-public')
+  );
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+});
+
 test('private react-dom/client facade host-output update diagnostic routes root.render through fake DOM', () => {
   const document = createDocument('private-client-facade-host-output-update');
   const container = createElement('DIV', document);
@@ -6050,10 +6255,16 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
   assert.throws(() => otherAdapter.unmountHostOutput(root, element), {
     code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
   });
+  assert.throws(() => otherAdapter.renderNativeHandoff(root, element), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
   assert.throws(() => adapter.renderHostOutput({}, element), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
   });
   assert.throws(() => adapter.unmountHostOutput({}, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
+  });
+  assert.throws(() => adapter.renderNativeHandoff({}, element), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
   });
 
@@ -6083,10 +6294,23 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
       code: 'FAST_REACT_DOM_INVALID_INITIAL_HOST_OUTPUT_HANDOFF'
     }
   );
+  assert.throws(
+    () =>
+      adapter.renderNativeHandoff(unsupportedRoot, {
+        props: {
+          children: ['unsupported']
+        },
+        type: 'section'
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_INITIAL_HOST_OUTPUT_HANDOFF'
+    }
+  );
   assert.equal(
     adapter.getRootRequestRecords(unsupportedRoot).length,
     1
   );
+  assert.deepEqual(adapter.getRootRenderNativeHandoffRecords(unsupportedRoot), []);
   assertBridgeDidNotTouchContainer(unsupportedContainer, document);
 
   const occupiedDocument = createDocument('private-client-facade-host-output-occupied');
@@ -6100,6 +6324,9 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     code: 'FAST_REACT_DOM_ROOT_MARKER_OCCUPIED'
   });
   assert.throws(() => adapter.unmountHostOutput(occupiedRoot, element), {
+    code: 'FAST_REACT_DOM_ROOT_MARKER_OCCUPIED'
+  });
+  assert.throws(() => adapter.renderNativeHandoff(occupiedRoot, element), {
     code: 'FAST_REACT_DOM_ROOT_MARKER_OCCUPIED'
   });
   assert.equal(adapter.getRootRequestRecords(occupiedRoot).length, 1);
@@ -6116,7 +6343,7 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     adapter.getRootCreateRecord(staleMetadataRoot);
   assert.throws(
     () =>
-      adapter.renderHostOutput(staleMetadataRoot, element, {
+      adapter.renderNativeHandoff(staleMetadataRoot, element, {
         rootWorkLoopFinishedWorkMetadata:
           createRootWorkLoopFinishedWorkMetadata({
             hostType: 'section',
@@ -6138,6 +6365,10 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
   );
   assert.deepEqual(
     adapter.getRootHostOutputRenderDiagnostics(staleMetadataRoot),
+    []
+  );
+  assert.deepEqual(
+    adapter.getRootRenderNativeHandoffRecords(staleMetadataRoot),
     []
   );
 
@@ -6179,7 +6410,13 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
       activeDiagnostic
     );
+  assert.throws(() => otherAdapter.createRenderNativeHandoff(root, activeDiagnostic), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
   assert.throws(() => adapter.renderHostOutput(root, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER'
+  });
+  assert.throws(() => adapter.renderNativeHandoff(root, element), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER'
   });
   assert.throws(() => adapter.unmountHostOutput(root, element), {
@@ -6189,8 +6426,29 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     activeDiagnostic
   ]);
   assert.equal(adapter.getRootRequestRecords(root).length, 2);
+  activePayload.root.render(element);
+  assert.throws(
+    () => adapter.createRenderNativeHandoff(root, activeDiagnostic),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_RENDER_NATIVE_HANDOFF',
+      message: /Stale private root render records/
+    }
+  );
   activePayload.bridge.cleanupInitialRenderHostOutput(
     activePayload.hostOutputHandoff
+  );
+
+  const hydrateRecord = rootBridge.createHydrateRootRecord(
+    createElement('DIV', document),
+    'hydrated',
+    {}
+  );
+  assert.throws(
+    () => rootBridge.createPrivateRootRenderNativeHandoffRecord(hydrateRecord),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_RENDER_NATIVE_HANDOFF',
+      message: /hydrateRoot/
+    }
   );
 
   const unmountedDocument = createDocument(
@@ -6200,6 +6458,9 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
   const unmountedRoot = adapter.createRoot(unmountedContainer);
   unmountedRoot.unmount();
   assert.throws(() => adapter.renderHostOutput(unmountedRoot, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER'
+  });
+  assert.throws(() => adapter.renderNativeHandoff(unmountedRoot, element), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER'
   });
   assert.throws(() => adapter.unmountHostOutput(unmountedRoot, element), {
