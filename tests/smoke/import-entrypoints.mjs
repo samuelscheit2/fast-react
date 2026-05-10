@@ -511,6 +511,25 @@ const schedulerImplementedRootKeys = [
   'unstable_wrapCallback'
 ];
 
+const schedulerNativeKeys = [
+  'unstable_IdlePriority',
+  'unstable_ImmediatePriority',
+  'unstable_LowPriority',
+  'unstable_NormalPriority',
+  'unstable_Profiling',
+  'unstable_UserBlockingPriority',
+  'unstable_cancelCallback',
+  'unstable_forceFrameRate',
+  'unstable_getCurrentPriorityLevel',
+  'unstable_next',
+  'unstable_now',
+  'unstable_requestPaint',
+  'unstable_runWithPriority',
+  'unstable_scheduleCallback',
+  'unstable_shouldYield',
+  'unstable_wrapCallback'
+];
+
 const schedulerPlaceholderRootKeys = [
   'unstable_scheduleCallback',
   'unstable_cancelCallback',
@@ -580,7 +599,8 @@ const schedulerEntrypoints = [
     specifier: 'scheduler/unstable_post_task'
   },
   {
-    keys: schedulerPlaceholderRootKeys,
+    implementedNative: true,
+    keys: schedulerNativeKeys,
     resolvedFileName: 'index.native.js',
     specifier: 'scheduler/index.native.js',
     unsupportedExport: 'unstable_runWithPriority'
@@ -598,13 +618,15 @@ const schedulerEntrypoints = [
     specifier: 'scheduler/cjs/scheduler.production.js'
   },
   {
-    keys: schedulerPlaceholderRootKeys,
+    implementedNative: true,
+    keys: schedulerNativeKeys,
     resolvedFileName: path.join('cjs', 'scheduler.native.development.js'),
     specifier: 'scheduler/cjs/scheduler.native.development.js',
     unsupportedExport: 'unstable_next'
   },
   {
-    keys: schedulerPlaceholderRootKeys,
+    implementedNative: true,
+    keys: schedulerNativeKeys,
     resolvedFileName: path.join('cjs', 'scheduler.native.production.js'),
     specifier: 'scheduler/cjs/scheduler.native.production.js',
     unsupportedExport: 'unstable_wrapCallback'
@@ -817,6 +839,20 @@ function assertSchedulerImplementedMockKeys(moduleExports, expectedKeys, label) 
   );
 }
 
+function assertSchedulerImplementedNativeKeys(moduleExports, expectedKeys, label) {
+  assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assert.equal(
+    Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
+    false,
+    `${label} should not expose placeholder metadata`
+  );
+  assert.equal(
+    Object.hasOwn(moduleExports, 'compatibilityTarget'),
+    false,
+    `${label} should not expose placeholder compatibility metadata`
+  );
+}
+
 function assertSchedulerImplementedRootBehavior(moduleExports, label) {
   assert.equal(
     typeof moduleExports.unstable_now,
@@ -920,6 +956,91 @@ function assertSchedulerImplementedRootBehavior(moduleExports, label) {
     `${label} delayed sortIndex`
   );
   moduleExports.unstable_cancelCallback(delayedTask);
+}
+
+function assertSchedulerNativeThrower(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, 'Error', label);
+      assert.equal(error.message, 'Not implemented.', label);
+      assert.equal(Object.hasOwn(error, 'code'), false, label);
+      assert.equal(Object.hasOwn(error, 'compatibilityTarget'), false, label);
+      return true;
+    },
+    label
+  );
+}
+
+function assertSchedulerImplementedNativeBehavior(moduleExports, label) {
+  assert.equal(
+    typeof moduleExports.unstable_now,
+    'function',
+    `${label}.unstable_now`
+  );
+  assert.equal(
+    moduleExports.unstable_getCurrentPriorityLevel(),
+    moduleExports.unstable_NormalPriority,
+    `${label} default priority`
+  );
+  assert.equal(
+    moduleExports.unstable_requestPaint(),
+    undefined,
+    `${label}.unstable_requestPaint`
+  );
+  assert.equal(
+    moduleExports.unstable_shouldYield(),
+    true,
+    `${label}.unstable_shouldYield after requestPaint`
+  );
+
+  const beforeNow = moduleExports.unstable_now();
+  const task = moduleExports.unstable_scheduleCallback(
+    moduleExports.unstable_NormalPriority,
+    () => {}
+  );
+  assert.deepEqual(
+    Object.keys(task),
+    [
+      'id',
+      'callback',
+      'priorityLevel',
+      'startTime',
+      'expirationTime',
+      'sortIndex'
+    ],
+    `${label} task shape`
+  );
+  assert.equal(task.priorityLevel, moduleExports.unstable_NormalPriority);
+  assert.equal(typeof task.callback, 'function', `${label} task callback`);
+  assert.equal(task.sortIndex, task.expirationTime, `${label} ready sortIndex`);
+  assert.equal(task.startTime >= beforeNow, true, `${label} startTime`);
+  moduleExports.unstable_cancelCallback(task);
+  assert.equal(task.callback, null, `${label}.unstable_cancelCallback`);
+
+  const delayedTask = moduleExports.unstable_scheduleCallback(
+    moduleExports.unstable_NormalPriority,
+    () => {},
+    { delay: 40 }
+  );
+  assert.equal(
+    delayedTask.sortIndex,
+    delayedTask.startTime,
+    `${label} delayed sortIndex`
+  );
+  moduleExports.unstable_cancelCallback(delayedTask);
+
+  for (const unsupportedExport of [
+    'unstable_runWithPriority',
+    'unstable_next',
+    'unstable_wrapCallback',
+    'unstable_forceFrameRate'
+  ]) {
+    assertSchedulerNativeThrower(
+      () => moduleExports[unsupportedExport](),
+      `${label}.${unsupportedExport}`
+    );
+  }
 }
 
 function assertSchedulerImplementedMockBehavior(moduleExports, label) {
@@ -1925,6 +2046,12 @@ async function assertSchedulerFileEntrypoint(entrypoint, labelPrefix) {
       entrypoint.keys,
       `${labelPrefix} CJS`
     );
+  } else if (entrypoint.implementedNative) {
+    assertSchedulerImplementedNativeKeys(
+      cjsModule,
+      entrypoint.keys,
+      `${labelPrefix} CJS`
+    );
   } else {
     assertSchedulerInventoryKeys(cjsModule, entrypoint.keys, `${labelPrefix} CJS`);
   }
@@ -1938,6 +2065,8 @@ async function assertSchedulerFileEntrypoint(entrypoint, labelPrefix) {
     assertSchedulerImplementedRootBehavior(cjsModule, labelPrefix);
   } else if (entrypoint.implementedMock) {
     assertSchedulerImplementedMockBehavior(cjsModule, labelPrefix);
+  } else if (entrypoint.implementedNative) {
+    assertSchedulerImplementedNativeBehavior(cjsModule, labelPrefix);
   } else {
     assertSchedulerUnimplemented(
       () => cjsModule[entrypoint.unsupportedExport](),
@@ -2716,6 +2845,20 @@ async function runSchedulerPackageProbe(tempRoot) {
       );
     }
 
+    function assertImplementedNativeKeys(moduleExports, expectedKeys, label) {
+      assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assert.equal(
+        Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
+        false,
+        label
+      );
+      assert.equal(
+        Object.hasOwn(moduleExports, 'compatibilityTarget'),
+        false,
+        label
+      );
+    }
+
     function assertImplementedRootBehavior(moduleExports, label) {
       assert.equal(typeof moduleExports.unstable_now, 'function', label);
       assert.equal(
@@ -2807,6 +2950,75 @@ async function runSchedulerPackageProbe(tempRoot) {
       );
       assert.equal(delayedTask.sortIndex, delayedTask.startTime, label);
       moduleExports.unstable_cancelCallback(delayedTask);
+    }
+
+    function assertNativeThrower(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(error.name, 'Error', label);
+          assert.equal(error.message, 'Not implemented.', label);
+          assert.equal(Object.hasOwn(error, 'code'), false, label);
+          assert.equal(Object.hasOwn(error, 'compatibilityTarget'), false, label);
+          return true;
+        },
+        label
+      );
+    }
+
+    function assertImplementedNativeBehavior(moduleExports, label) {
+      assert.equal(typeof moduleExports.unstable_now, 'function', label);
+      assert.equal(
+        moduleExports.unstable_getCurrentPriorityLevel(),
+        moduleExports.unstable_NormalPriority,
+        label
+      );
+      assert.equal(moduleExports.unstable_requestPaint(), undefined, label);
+      assert.equal(moduleExports.unstable_shouldYield(), true, label);
+
+      const beforeNow = moduleExports.unstable_now();
+      const task = moduleExports.unstable_scheduleCallback(
+        moduleExports.unstable_NormalPriority,
+        () => {}
+      );
+      assert.deepEqual(
+        Object.keys(task),
+        [
+          'id',
+          'callback',
+          'priorityLevel',
+          'startTime',
+          'expirationTime',
+          'sortIndex'
+        ],
+        label
+      );
+      assert.equal(task.priorityLevel, moduleExports.unstable_NormalPriority);
+      assert.equal(typeof task.callback, 'function', label);
+      assert.equal(task.sortIndex, task.expirationTime, label);
+      assert.equal(task.startTime >= beforeNow, true, label);
+      moduleExports.unstable_cancelCallback(task);
+      assert.equal(task.callback, null, label);
+
+      const delayedTask = moduleExports.unstable_scheduleCallback(
+        moduleExports.unstable_NormalPriority,
+        () => {},
+        { delay: 40 }
+      );
+      assert.equal(delayedTask.sortIndex, delayedTask.startTime, label);
+      moduleExports.unstable_cancelCallback(delayedTask);
+
+      for (const unsupportedExport of [
+        'unstable_runWithPriority',
+        'unstable_next',
+        'unstable_wrapCallback',
+        'unstable_forceFrameRate'
+      ]) {
+        assertNativeThrower(
+          () => moduleExports[unsupportedExport](),
+          label + ' ' + unsupportedExport
+        );
+      }
     }
 
     function assertImplementedMockBehavior(moduleExports, label) {
@@ -2921,6 +3133,7 @@ async function runSchedulerPackageProbe(tempRoot) {
       );
 
       for (const {
+        implementedNative,
         implementedMock,
         implementedRoot,
         keys,
@@ -2960,6 +3173,8 @@ async function runSchedulerPackageProbe(tempRoot) {
           assertImplementedRootKeys(cjsModule, keys, specifier);
         } else if (implementedMock) {
           assertImplementedMockKeys(cjsModule, keys, specifier);
+        } else if (implementedNative) {
+          assertImplementedNativeKeys(cjsModule, keys, specifier);
         } else {
           assertInventoryKeys(cjsModule, keys, specifier);
         }
@@ -2973,6 +3188,8 @@ async function runSchedulerPackageProbe(tempRoot) {
           assertImplementedRootBehavior(cjsModule, specifier);
         } else if (implementedMock) {
           assertImplementedMockBehavior(cjsModule, specifier);
+        } else if (implementedNative) {
+          assertImplementedNativeBehavior(cjsModule, specifier);
         } else {
           assertUnimplemented(
             () => cjsModule[unsupportedExport](),
