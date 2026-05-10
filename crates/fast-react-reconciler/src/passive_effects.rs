@@ -5,7 +5,9 @@
 //! test-controlled mount-create and destroy executors plus a callback
 //! invocation gate can consume accepted callback handles. Those private gates
 //! remain detached from public effect execution, scheduler-driven passive
-//! execution, and `act` compatibility.
+//! execution, and `act` compatibility. A narrow lifecycle evidence gate can
+//! compose the accepted layout/passive metadata with those private execution
+//! snapshots for update and deleted-subtree unmount ordering canaries.
 
 #![allow(dead_code)]
 
@@ -20,7 +22,10 @@ use fast_react_host_config::HostTypes;
 use crate::function_component::FunctionComponentHookRenderPhase;
 use crate::root_commit::{
     FunctionComponentCommittedPassiveEffectsSnapshot,
-    FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
+    FunctionComponentDeletedSubtreePassiveEffectsSnapshot, FunctionComponentEffectListCommitPhase,
+    FunctionComponentEffectListCommitPhaseOrderKind,
+    FunctionComponentEffectListCommitPhaseOrderRecord,
+    FunctionComponentLayoutEffectCallbackInvocationGateSnapshot,
     FunctionComponentPendingPassiveCommitHandoff,
     FunctionComponentPendingPassiveEffectPhaseCommitRecord, PendingPassiveCommitHandoff,
 };
@@ -1925,6 +1930,855 @@ impl PassiveEffectCallbackInvocationGateSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EffectLifecycleExecutionPhase {
+    Mutation,
+    Layout,
+    Passive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EffectLifecycleExecutionKind {
+    LayoutDestroyMetadata,
+    LayoutCreateCallback,
+    PassiveDestroyCallback,
+    PassiveCreateCallback,
+    DeletedSubtreePassiveDestroyMetadata,
+    DeletedSubtreePassiveDestroyCallback,
+    DeletedSubtreeHostCleanupMetadata,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EffectLifecycleExecutionRecord {
+    sequence: usize,
+    phase: EffectLifecycleExecutionPhase,
+    kind: EffectLifecycleExecutionKind,
+    root: FiberRootId,
+    finished_work: FiberId,
+    fiber: FiberId,
+    effect: Option<HookEffectId>,
+    callback: Option<HookEffectCallbackHandle>,
+    metadata_sequence: Option<usize>,
+    invocation_order: Option<usize>,
+    pending_order: Option<PendingPassiveEffectOrder>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private effect lifecycle execution evidence for deterministic canaries"
+)]
+impl EffectLifecycleExecutionRecord {
+    #[must_use]
+    pub const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> EffectLifecycleExecutionPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn phase_name(self) -> &'static str {
+        effect_lifecycle_execution_phase_name(self.phase)
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> EffectLifecycleExecutionKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn kind_name(self) -> &'static str {
+        effect_lifecycle_execution_kind_name(self.kind)
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> Option<HookEffectId> {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> Option<HookEffectCallbackHandle> {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn metadata_sequence(self) -> Option<usize> {
+        self.metadata_sequence
+    }
+
+    #[must_use]
+    pub const fn invocation_order(self) -> Option<usize> {
+        self.invocation_order
+    }
+
+    #[must_use]
+    pub const fn pending_order(self) -> Option<PendingPassiveEffectOrder> {
+        self.pending_order
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct EffectLifecycleExecutionSnapshot {
+    root: Option<FiberRootId>,
+    finished_work: Option<FiberId>,
+    lanes: Lanes,
+    records: Vec<EffectLifecycleExecutionRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private effect lifecycle execution evidence for deterministic canaries"
+)]
+impl EffectLifecycleExecutionSnapshot {
+    #[must_use]
+    pub const fn root(&self) -> Option<FiberRootId> {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(&self) -> Option<FiberId> {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[EffectLifecycleExecutionRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn private_layout_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.kind() == EffectLifecycleExecutionKind::LayoutCreateCallback)
+            .count()
+    }
+
+    #[must_use]
+    pub fn private_passive_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.kind(),
+                    EffectLifecycleExecutionKind::PassiveDestroyCallback
+                        | EffectLifecycleExecutionKind::PassiveCreateCallback
+                        | EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyCallback
+                )
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub fn proves_update_destroy_before_create_order(&self) -> bool {
+        let (Some(root), Some(finished_work)) = (self.root, self.finished_work) else {
+            return false;
+        };
+
+        self.records
+            .iter()
+            .map(|record| record.kind())
+            .collect::<Vec<_>>()
+            == vec![
+                EffectLifecycleExecutionKind::LayoutDestroyMetadata,
+                EffectLifecycleExecutionKind::LayoutCreateCallback,
+                EffectLifecycleExecutionKind::PassiveDestroyCallback,
+                EffectLifecycleExecutionKind::PassiveCreateCallback,
+            ]
+            && self.records.iter().enumerate().all(|(sequence, record)| {
+                record.sequence() == sequence
+                    && record.root() == root
+                    && record.finished_work() == finished_work
+            })
+    }
+
+    #[must_use]
+    pub fn proves_deleted_subtree_unmount_destroy_order(&self) -> bool {
+        let mut saw_destroy_metadata = false;
+        let mut saw_destroy_callback = false;
+        let mut first_host_cleanup_metadata = None;
+
+        for record in &self.records {
+            match record.kind() {
+                EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyMetadata => {
+                    saw_destroy_metadata = true;
+                }
+                EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyCallback => {
+                    saw_destroy_callback = true;
+                }
+                EffectLifecycleExecutionKind::DeletedSubtreeHostCleanupMetadata => {
+                    first_host_cleanup_metadata =
+                        first_host_cleanup_metadata.or(record.metadata_sequence());
+                }
+                _ => {}
+            }
+        }
+
+        let destroy_metadata_sequence = self.records.iter().find_map(|record| {
+            (record.kind() == EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyMetadata)
+                .then_some(record.metadata_sequence())
+                .flatten()
+        });
+
+        saw_destroy_metadata
+            && saw_destroy_callback
+            && match (destroy_metadata_sequence, first_host_cleanup_metadata) {
+                (Some(destroy), Some(host_cleanup)) => destroy < host_cleanup,
+                _ => false,
+            }
+    }
+
+    #[must_use]
+    pub const fn public_effect_execution_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_effect_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum EffectLifecycleExecutionEvidenceError {
+    MissingAcceptedEffectList {
+        root: FiberRootId,
+    },
+    RootMismatch {
+        expected: FiberRootId,
+        actual: Option<FiberRootId>,
+    },
+    FinishedWorkMismatch {
+        root: FiberRootId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+    },
+    LanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    MissingPrivateLayoutExecution {
+        root: FiberRootId,
+    },
+    MissingPrivatePassiveExecution {
+        root: FiberRootId,
+    },
+    AcceptedMetadataMismatch {
+        root: FiberRootId,
+        message: &'static str,
+    },
+}
+
+impl Display for EffectLifecycleExecutionEvidenceError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingAcceptedEffectList { root } => write!(
+                formatter,
+                "root {} effect lifecycle evidence requires accepted effect-list metadata",
+                root.raw()
+            ),
+            Self::RootMismatch { expected, actual } => write!(
+                formatter,
+                "effect lifecycle evidence expected root {}, found {:?}",
+                expected.raw(),
+                actual.map(FiberRootId::raw)
+            ),
+            Self::FinishedWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} effect lifecycle evidence expected finished work fiber slot {}, found {:?}",
+                root.raw(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get())
+            ),
+            Self::LanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} effect lifecycle evidence lanes {:?} do not match accepted lanes {:?}",
+                root.raw(),
+                actual,
+                expected
+            ),
+            Self::MissingPrivateLayoutExecution { root } => write!(
+                formatter,
+                "root {} effect lifecycle evidence requires private layout callback execution",
+                root.raw()
+            ),
+            Self::MissingPrivatePassiveExecution { root } => write!(
+                formatter,
+                "root {} effect lifecycle evidence requires private passive callback execution",
+                root.raw()
+            ),
+            Self::AcceptedMetadataMismatch { root, message } => write!(
+                formatter,
+                "root {} effect lifecycle accepted metadata mismatch: {}",
+                root.raw(),
+                message
+            ),
+        }
+    }
+}
+
+impl Error for EffectLifecycleExecutionEvidenceError {}
+
+#[allow(
+    dead_code,
+    reason = "crate-private update effect lifecycle execution evidence for deterministic canaries"
+)]
+pub(crate) fn record_update_effect_lifecycle_execution_evidence_for_canary(
+    commit: &HostRootCommitRecord,
+    layout_execution: &FunctionComponentLayoutEffectCallbackInvocationGateSnapshot,
+    passive_execution: &PassiveEffectCallbackInvocationGateSnapshot,
+) -> Result<EffectLifecycleExecutionSnapshot, EffectLifecycleExecutionEvidenceError> {
+    validate_lifecycle_root_metadata(
+        commit.root(),
+        commit.finished_work(),
+        commit.finished_lanes(),
+        commit
+            .function_component_effect_list_commit_phase_order()
+            .root(),
+        commit
+            .function_component_effect_list_commit_phase_order()
+            .finished_work(),
+        commit
+            .function_component_effect_list_commit_phase_order()
+            .lanes(),
+    )?;
+    if commit
+        .function_component_effect_list_commit_phase_order()
+        .is_empty()
+    {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::MissingAcceptedEffectList {
+                root: commit.root(),
+            },
+        );
+    }
+    validate_lifecycle_root_metadata(
+        commit.root(),
+        commit.finished_work(),
+        commit.finished_lanes(),
+        layout_execution.root(),
+        layout_execution.finished_work(),
+        layout_execution.lanes(),
+    )?;
+    validate_lifecycle_root_metadata(
+        commit.root(),
+        commit.finished_work(),
+        commit.finished_lanes(),
+        Some(passive_execution.root()),
+        passive_execution.finished_work(),
+        passive_execution.lanes(),
+    )?;
+
+    if layout_execution.len() != 1
+        || layout_execution.has_errors()
+        || !layout_execution.did_invoke_test_layout_callback()
+    {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::MissingPrivateLayoutExecution {
+                root: commit.root(),
+            },
+        );
+    }
+    if passive_execution.len() != 2
+        || passive_execution.has_errors()
+        || passive_execution.skipped_flush_records_without_callbacks() != 0
+    {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::MissingPrivatePassiveExecution {
+                root: commit.root(),
+            },
+        );
+    }
+
+    let effect_list = commit.function_component_effect_list_commit_phase_order();
+    let layout_callback = layout_execution.records()[0];
+    let layout_request = layout_callback.request();
+    if !layout_request.after_matching_mutation_metadata()
+        || !layout_request.before_passive_metadata()
+    {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                root: commit.root(),
+                message: "layout callback is not ordered after mutation metadata and before passive metadata",
+            },
+        );
+    }
+    let layout_destroy_metadata = find_effect_list_record_by_sequence(
+        effect_list.records(),
+        layout_request.matched_mutation_sequence(),
+    )
+    .filter(|record| {
+        record.phase() == FunctionComponentEffectListCommitPhase::Mutation
+            && record.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy
+            && record.fiber() == layout_callback.fiber()
+            && record.destroy().is_some()
+    })
+    .ok_or(
+        EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+            root: commit.root(),
+            message: "layout callback did not match accepted mutation layout-destroy metadata",
+        },
+    )?;
+
+    let layout_create_metadata = find_effect_list_record_by_sequence(
+        effect_list.records(),
+        layout_request.effect_list_sequence(),
+    )
+    .filter(|record| {
+        record.phase() == FunctionComponentEffectListCommitPhase::Layout
+            && record.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate
+            && record.fiber() == layout_callback.fiber()
+            && record.create() == Some(layout_callback.callback())
+    })
+    .ok_or(
+        EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+            root: commit.root(),
+            message: "layout callback did not match accepted layout-create metadata",
+        },
+    )?;
+
+    let passive_records = passive_execution.records();
+    let passive_destroy = passive_records
+        .iter()
+        .find(|record| record.kind() == PassiveEffectCallbackInvocationKind::Destroy)
+        .ok_or(
+            EffectLifecycleExecutionEvidenceError::MissingPrivatePassiveExecution {
+                root: commit.root(),
+            },
+        )?;
+    let passive_create = passive_records
+        .iter()
+        .find(|record| record.kind() == PassiveEffectCallbackInvocationKind::Create)
+        .ok_or(
+            EffectLifecycleExecutionEvidenceError::MissingPrivatePassiveExecution {
+                root: commit.root(),
+            },
+        )?;
+    if passive_destroy.invocation_order() >= passive_create.invocation_order()
+        || passive_destroy.pending_order() >= passive_create.pending_order()
+        || passive_destroy.phase() != PendingPassiveEffectPhase::Unmount
+        || passive_create.phase() != PendingPassiveEffectPhase::Mount
+    {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                root: commit.root(),
+                message: "passive destroy callback is not ordered before passive create callback",
+            },
+        );
+    }
+
+    let passive_destroy_metadata = find_matching_passive_schedule_record(
+        effect_list.records(),
+        *passive_destroy,
+        FunctionComponentEffectListCommitPhaseOrderKind::PassiveUnmountScheduled,
+    )
+    .ok_or(
+        EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+            root: commit.root(),
+            message: "passive destroy callback did not match accepted passive-unmount metadata",
+        },
+    )?;
+    let passive_create_metadata = find_matching_passive_schedule_record(
+        effect_list.records(),
+        *passive_create,
+        FunctionComponentEffectListCommitPhaseOrderKind::PassiveMountScheduled,
+    )
+    .ok_or(
+        EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+            root: commit.root(),
+            message: "passive create callback did not match accepted passive-mount metadata",
+        },
+    )?;
+
+    let mut snapshot = EffectLifecycleExecutionSnapshot {
+        root: Some(commit.root()),
+        finished_work: Some(commit.finished_work()),
+        lanes: commit.finished_lanes(),
+        records: Vec::new(),
+    };
+    snapshot.push(
+        EffectLifecycleExecutionPhase::Mutation,
+        EffectLifecycleExecutionKind::LayoutDestroyMetadata,
+        commit.root(),
+        commit.finished_work(),
+        layout_destroy_metadata.fiber(),
+        layout_destroy_metadata.effect(),
+        layout_destroy_metadata.destroy(),
+        Some(layout_destroy_metadata.sequence()),
+        None,
+        None,
+    );
+    snapshot.push(
+        EffectLifecycleExecutionPhase::Layout,
+        EffectLifecycleExecutionKind::LayoutCreateCallback,
+        commit.root(),
+        commit.finished_work(),
+        layout_create_metadata.fiber(),
+        layout_create_metadata.effect(),
+        Some(layout_callback.callback()),
+        Some(layout_create_metadata.sequence()),
+        Some(layout_callback.invocation_order()),
+        None,
+    );
+    snapshot.push_passive_callback_record(
+        EffectLifecycleExecutionKind::PassiveDestroyCallback,
+        passive_destroy_metadata,
+        *passive_destroy,
+    );
+    snapshot.push_passive_callback_record(
+        EffectLifecycleExecutionKind::PassiveCreateCallback,
+        passive_create_metadata,
+        *passive_create,
+    );
+
+    Ok(snapshot)
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree unmount lifecycle execution evidence for deterministic canaries"
+)]
+pub(crate) fn record_deleted_subtree_unmount_effect_lifecycle_execution_evidence_for_canary(
+    commit: &HostRootCommitRecord,
+    passive_flush: &PassiveEffectsFlushResult,
+) -> Result<EffectLifecycleExecutionSnapshot, EffectLifecycleExecutionEvidenceError> {
+    validate_lifecycle_root_metadata(
+        commit.root(),
+        commit.finished_work(),
+        commit.finished_lanes(),
+        Some(passive_flush.root()),
+        passive_flush.finished_work(),
+        passive_flush.lanes(),
+    )?;
+
+    if passive_flush.destroy_callback_executions().is_empty()
+        || passive_flush.did_execute_mount_create_callbacks()
+        || passive_flush.did_record_destroy_callback_errors()
+    {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::MissingPrivatePassiveExecution {
+                root: commit.root(),
+            },
+        );
+    }
+
+    let deleted_snapshot = commit.function_component_deleted_subtree_passive_effects();
+    let cleanup_order = commit.deletion_cleanup_order_gate_for_canary();
+    let host_cleanup_records = cleanup_order
+        .records()
+        .iter()
+        .filter(|record| {
+            record.phase() == crate::root_commit::HostRootDeletionCleanupOrderPhase::HostNodeCleanup
+        })
+        .collect::<Vec<_>>();
+
+    let mut snapshot = EffectLifecycleExecutionSnapshot {
+        root: Some(commit.root()),
+        finished_work: Some(commit.finished_work()),
+        lanes: commit.finished_lanes(),
+        records: Vec::new(),
+    };
+
+    for execution in passive_flush.destroy_callback_executions() {
+        if execution.phase() != PendingPassiveEffectPhase::Unmount
+            || !matches!(
+                execution.unmount_origin(),
+                Some(PendingPassiveUnmountOrigin::DeletedSubtree { .. })
+            )
+        {
+            return Err(
+                EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                    root: commit.root(),
+                    message: "unmount lifecycle evidence only accepts deleted-subtree passive destroys",
+                },
+            );
+        }
+
+        let Some(execution_effect) = execution.effect() else {
+            return Err(
+                EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                    root: commit.root(),
+                    message: "deleted-subtree passive destroy execution is missing an effect id",
+                },
+            );
+        };
+
+        let deleted_record = deleted_snapshot
+            .records()
+            .iter()
+            .find(|record| {
+                record.fiber() == execution.fiber()
+                    && record.effect() == execution_effect
+                    && record.unmount_order() == execution.pending_order()
+                    && record.destroy() == Some(execution.destroy_callback())
+            })
+            .ok_or(EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                root: commit.root(),
+                message: "deleted-subtree passive destroy execution did not match accepted passive metadata",
+            })?;
+
+        let cleanup_record = cleanup_order
+            .records()
+            .iter()
+            .find(|record| {
+                record.phase()
+                    == crate::root_commit::HostRootDeletionCleanupOrderPhase::PassiveDestroy
+                    && record.fiber() == execution.fiber()
+                    && record.passive_unmount_order() == Some(execution.pending_order())
+                    && record.passive_destroy() == Some(execution.destroy_callback())
+            })
+            .ok_or(EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                root: commit.root(),
+                message: "deleted-subtree passive destroy execution did not match cleanup order metadata",
+            })?;
+
+        snapshot.push(
+            EffectLifecycleExecutionPhase::Passive,
+            EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyMetadata,
+            commit.root(),
+            commit.finished_work(),
+            deleted_record.fiber(),
+            Some(deleted_record.effect()),
+            deleted_record.destroy(),
+            Some(cleanup_record.sequence()),
+            None,
+            Some(deleted_record.unmount_order()),
+        );
+        snapshot.push(
+            EffectLifecycleExecutionPhase::Passive,
+            EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyCallback,
+            commit.root(),
+            commit.finished_work(),
+            execution.fiber(),
+            execution.effect(),
+            Some(execution.destroy_callback()),
+            Some(cleanup_record.sequence()),
+            Some(execution.execution_order()),
+            Some(execution.pending_order()),
+        );
+    }
+
+    for record in host_cleanup_records {
+        snapshot.push(
+            EffectLifecycleExecutionPhase::Mutation,
+            EffectLifecycleExecutionKind::DeletedSubtreeHostCleanupMetadata,
+            commit.root(),
+            commit.finished_work(),
+            record.fiber(),
+            None,
+            None,
+            Some(record.sequence()),
+            None,
+            None,
+        );
+    }
+
+    if !snapshot.proves_deleted_subtree_unmount_destroy_order() {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::AcceptedMetadataMismatch {
+                root: commit.root(),
+                message: "deleted-subtree passive destroy metadata does not precede host cleanup metadata",
+            },
+        );
+    }
+
+    Ok(snapshot)
+}
+
+impl EffectLifecycleExecutionSnapshot {
+    fn push(
+        &mut self,
+        phase: EffectLifecycleExecutionPhase,
+        kind: EffectLifecycleExecutionKind,
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+        effect: Option<HookEffectId>,
+        callback: Option<HookEffectCallbackHandle>,
+        metadata_sequence: Option<usize>,
+        invocation_order: Option<usize>,
+        pending_order: Option<PendingPassiveEffectOrder>,
+    ) {
+        self.records.push(EffectLifecycleExecutionRecord {
+            sequence: self.records.len(),
+            phase,
+            kind,
+            root,
+            finished_work,
+            fiber,
+            effect,
+            callback,
+            metadata_sequence,
+            invocation_order,
+            pending_order,
+        });
+    }
+
+    fn push_passive_callback_record(
+        &mut self,
+        kind: EffectLifecycleExecutionKind,
+        metadata: FunctionComponentEffectListCommitPhaseOrderRecord,
+        callback: PassiveEffectCallbackInvocationRecord,
+    ) {
+        self.push(
+            EffectLifecycleExecutionPhase::Passive,
+            kind,
+            callback.root(),
+            callback.finished_work(),
+            callback.fiber(),
+            Some(callback.effect()),
+            Some(callback.callback()),
+            Some(metadata.sequence()),
+            Some(callback.invocation_order()),
+            Some(callback.pending_order()),
+        );
+    }
+}
+
+fn validate_lifecycle_root_metadata(
+    expected_root: FiberRootId,
+    expected_finished_work: FiberId,
+    expected_lanes: Lanes,
+    actual_root: Option<FiberRootId>,
+    actual_finished_work: Option<FiberId>,
+    actual_lanes: Lanes,
+) -> Result<(), EffectLifecycleExecutionEvidenceError> {
+    if actual_root != Some(expected_root) {
+        return Err(EffectLifecycleExecutionEvidenceError::RootMismatch {
+            expected: expected_root,
+            actual: actual_root,
+        });
+    }
+    if actual_finished_work != Some(expected_finished_work) {
+        return Err(
+            EffectLifecycleExecutionEvidenceError::FinishedWorkMismatch {
+                root: expected_root,
+                expected: expected_finished_work,
+                actual: actual_finished_work,
+            },
+        );
+    }
+    if actual_lanes != expected_lanes {
+        return Err(EffectLifecycleExecutionEvidenceError::LanesMismatch {
+            root: expected_root,
+            expected: expected_lanes,
+            actual: actual_lanes,
+        });
+    }
+
+    Ok(())
+}
+
+fn find_effect_list_record_by_sequence(
+    records: &[FunctionComponentEffectListCommitPhaseOrderRecord],
+    sequence: usize,
+) -> Option<FunctionComponentEffectListCommitPhaseOrderRecord> {
+    records
+        .iter()
+        .find(|record| record.sequence() == sequence)
+        .copied()
+}
+
+fn find_matching_passive_schedule_record(
+    records: &[FunctionComponentEffectListCommitPhaseOrderRecord],
+    callback: PassiveEffectCallbackInvocationRecord,
+    kind: FunctionComponentEffectListCommitPhaseOrderKind,
+) -> Option<FunctionComponentEffectListCommitPhaseOrderRecord> {
+    records
+        .iter()
+        .find(|record| {
+            record.phase() == FunctionComponentEffectListCommitPhase::PassiveScheduling
+                && record.kind() == kind
+                && record.fiber() == callback.fiber()
+                && record.effect() == Some(callback.effect())
+                && record.create()
+                    == (callback.kind() == PassiveEffectCallbackInvocationKind::Create)
+                        .then_some(callback.callback())
+                && record.destroy()
+                    == (callback.kind() == PassiveEffectCallbackInvocationKind::Destroy)
+                        .then_some(callback.callback())
+        })
+        .copied()
+}
+
+const fn effect_lifecycle_execution_phase_name(
+    phase: EffectLifecycleExecutionPhase,
+) -> &'static str {
+    match phase {
+        EffectLifecycleExecutionPhase::Mutation => "mutation",
+        EffectLifecycleExecutionPhase::Layout => "layout",
+        EffectLifecycleExecutionPhase::Passive => "passive",
+    }
+}
+
+const fn effect_lifecycle_execution_kind_name(kind: EffectLifecycleExecutionKind) -> &'static str {
+    match kind {
+        EffectLifecycleExecutionKind::LayoutDestroyMetadata => "layout-destroy-metadata",
+        EffectLifecycleExecutionKind::LayoutCreateCallback => "layout-create-callback",
+        EffectLifecycleExecutionKind::PassiveDestroyCallback => "passive-destroy-callback",
+        EffectLifecycleExecutionKind::PassiveCreateCallback => "passive-create-callback",
+        EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyMetadata => {
+            "deleted-subtree-passive-destroy-metadata"
+        }
+        EffectLifecycleExecutionKind::DeletedSubtreePassiveDestroyCallback => {
+            "deleted-subtree-passive-destroy-callback"
+        }
+        EffectLifecycleExecutionKind::DeletedSubtreeHostCleanupMetadata => {
+            "deleted-subtree-host-cleanup-metadata"
+        }
+    }
+}
+
 pub(crate) fn invoke_passive_effect_callbacks_under_test_control(
     flush: PassiveEffectsFlushResult,
     control: &mut impl PassiveEffectCallbackInvocationTestControl,
@@ -3504,6 +4358,10 @@ mod tests {
         FunctionComponentHookRenderPhase, FunctionComponentHookRenderStore,
     };
     use crate::root_commit::{
+        FunctionComponentEffectListCommitPhaseOrderKind,
+        FunctionComponentLayoutEffectCallbackInvocationErrorHandle,
+        FunctionComponentLayoutEffectCallbackInvocationRequest,
+        FunctionComponentLayoutEffectCallbackInvocationTestControl,
         HostRootDeletionCleanupOrderPhase,
         queue_function_component_deleted_subtree_pending_passive_effects,
         queue_function_component_pending_passive_effects,
@@ -3736,6 +4594,29 @@ mod tests {
 
     fn callback_error(raw: u64) -> PassiveEffectCallbackInvocationErrorHandle {
         PassiveEffectCallbackInvocationErrorHandle::from_raw(raw)
+    }
+
+    #[derive(Default)]
+    struct TestLayoutEffectCallbackControl {
+        calls: Vec<FunctionComponentLayoutEffectCallbackInvocationRequest>,
+    }
+
+    impl TestLayoutEffectCallbackControl {
+        fn calls(&self) -> &[FunctionComponentLayoutEffectCallbackInvocationRequest] {
+            &self.calls
+        }
+    }
+
+    impl FunctionComponentLayoutEffectCallbackInvocationTestControl
+        for TestLayoutEffectCallbackControl
+    {
+        fn invoke_layout_effect_create(
+            &mut self,
+            request: FunctionComponentLayoutEffectCallbackInvocationRequest,
+        ) -> Result<(), FunctionComponentLayoutEffectCallbackInvocationErrorHandle> {
+            self.calls.push(request);
+            Ok(())
+        }
     }
 
     #[derive(Default)]
@@ -5163,6 +6044,225 @@ mod tests {
     }
 
     #[test]
+    fn passive_effects_update_lifecycle_execution_evidence_orders_layout_before_passive_callbacks()
+    {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(1_080);
+        let current_function = append_function_component_child(
+            &mut store,
+            previous_current,
+            PropsHandle::from_raw(1_081),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_layout = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Layout,
+                callback(1_082),
+                deps(1_083),
+                Some(callback(1_084)),
+            )
+            .unwrap();
+        let previous_passive = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(1_085),
+                deps(1_086),
+                Some(callback(1_087)),
+            )
+            .unwrap();
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_088),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(1_089),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let layout = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(1_090),
+                deps(1_091),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        let passive = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(1_092),
+                deps(1_093),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        bubble_test_fiber(&mut store, finished_function);
+        bubble_test_fiber(&mut store, finished_work);
+
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let layout_record = {
+            let effect_list = commit
+                .record_function_component_effect_list_commit_phase_order_for_canary(
+                    &store,
+                    &mut hook_store,
+                    std::slice::from_ref(&queued),
+                )
+                .unwrap()
+                .clone();
+            effect_list
+                .records()
+                .iter()
+                .find(|record| {
+                    record.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate
+                })
+                .copied()
+                .unwrap()
+        };
+        let mut layout_control = TestLayoutEffectCallbackControl::default();
+        let layout_execution = commit
+            .execute_function_component_layout_effect_record_under_test_control_for_canary(
+                &store,
+                &hook_store,
+                layout_record,
+                &mut layout_control,
+            )
+            .unwrap()
+            .clone();
+        let mut passive_control = TestPassiveEffectCallbackControl::default()
+            .with_destroy_result(callback(1_087), Ok(()))
+            .with_create_result(callback(1_092), Ok(Some(callback(1_094))));
+        let passive_execution =
+            execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary(
+                &mut store,
+                &commit,
+                &mut passive_control,
+            )
+            .unwrap();
+
+        let evidence = record_update_effect_lifecycle_execution_evidence_for_canary(
+            &commit,
+            &layout_execution,
+            &passive_execution,
+        )
+        .unwrap();
+
+        assert_eq!(evidence.root(), Some(root_id));
+        assert_eq!(evidence.finished_work(), Some(finished_work));
+        assert_eq!(evidence.lanes(), Lanes::DEFAULT);
+        assert_eq!(evidence.len(), 4);
+        assert_eq!(evidence.private_layout_callback_count(), 1);
+        assert_eq!(evidence.private_passive_callback_count(), 2);
+        assert!(evidence.proves_update_destroy_before_create_order());
+        assert!(!evidence.public_effect_execution_enabled());
+        assert!(!evidence.public_effect_compatibility_claimed());
+        assert!(!evidence.public_act_compatibility_claimed());
+        assert!(!evidence.scheduler_driven_passive_execution_enabled());
+        assert_eq!(
+            evidence
+                .records()
+                .iter()
+                .map(|record| record.kind_name())
+                .collect::<Vec<_>>(),
+            vec![
+                "layout-destroy-metadata",
+                "layout-create-callback",
+                "passive-destroy-callback",
+                "passive-create-callback",
+            ]
+        );
+        assert_eq!(
+            evidence
+                .records()
+                .iter()
+                .map(|record| record.phase_name())
+                .collect::<Vec<_>>(),
+            vec!["mutation", "layout", "passive", "passive"]
+        );
+        let records = evidence.records();
+        assert_eq!(records[0].fiber(), finished_function);
+        assert_eq!(records[0].effect(), Some(previous_layout.effect()));
+        assert_eq!(records[0].callback(), Some(callback(1_084)));
+        assert_eq!(records[1].fiber(), finished_function);
+        assert_eq!(records[1].effect(), Some(layout.effect()));
+        assert_eq!(records[1].callback(), Some(callback(1_090)));
+        assert_eq!(records[1].invocation_order(), Some(0));
+        assert_eq!(records[2].fiber(), finished_function);
+        assert_eq!(records[2].effect(), Some(passive.effect()));
+        assert_eq!(records[2].callback(), Some(callback(1_087)));
+        assert_eq!(records[2].invocation_order(), Some(0));
+        assert_eq!(
+            records[2].pending_order(),
+            Some(queued.records()[0].unmount_order().unwrap())
+        );
+        assert_eq!(records[3].fiber(), finished_function);
+        assert_eq!(records[3].effect(), Some(passive.effect()));
+        assert_eq!(records[3].callback(), Some(callback(1_092)));
+        assert_eq!(records[3].invocation_order(), Some(1));
+        assert_eq!(
+            records[3].pending_order(),
+            Some(queued.records()[0].mount_order())
+        );
+        assert!(records[1].metadata_sequence().unwrap() < records[2].metadata_sequence().unwrap());
+        assert!(records[2].pending_order().unwrap() < records[3].pending_order().unwrap());
+        assert_eq!(layout_control.calls().len(), 1);
+        assert_eq!(passive_control.calls().len(), 2);
+        assert_eq!(previous_passive.instance(), passive.instance());
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn passive_effects_committed_execution_gate_rejects_missing_handoff_before_callbacks() {
         let (mut store, root_id, host) = root_store();
         update_container(
@@ -6364,6 +7464,150 @@ mod tests {
         assert!(!order_gate.public_effects_flushed());
         assert!(!order_gate.public_ref_or_effect_compatibility_claimed());
 
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_deleted_subtree_unmount_lifecycle_execution_evidence_consumes_cleanup_order_metadata()
+     {
+        let (mut store, root_id, host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9_930),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let fixture = attach_deleted_host_subtree_ref_passive_fixture(
+            &mut store,
+            &mut hook_store,
+            finished_work,
+        );
+        let deleted_handoff = queue_function_component_deleted_subtree_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            finished_work,
+            fixture.deleted_host,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let queued_passive = deleted_handoff.records()[0];
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        commit
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[
+                deleted_handoff,
+            ])
+            .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+
+        let flush =
+            flush_passive_effects_after_commit_with_deleted_subtree_destroy_executor_for_canary(
+                &mut store,
+                &commit,
+                &mut destroy_executor,
+            )
+            .unwrap();
+        let evidence =
+            record_deleted_subtree_unmount_effect_lifecycle_execution_evidence_for_canary(
+                &commit, &flush,
+            )
+            .unwrap();
+
+        assert_eq!(evidence.root(), Some(root_id));
+        assert_eq!(evidence.finished_work(), Some(finished_work));
+        assert_eq!(evidence.lanes(), Lanes::DEFAULT);
+        assert_eq!(evidence.len(), 4);
+        assert_eq!(evidence.private_layout_callback_count(), 0);
+        assert_eq!(evidence.private_passive_callback_count(), 1);
+        assert!(evidence.proves_deleted_subtree_unmount_destroy_order());
+        assert!(!evidence.public_effect_execution_enabled());
+        assert!(!evidence.public_effect_compatibility_claimed());
+        assert!(!evidence.public_act_compatibility_claimed());
+        assert!(!evidence.scheduler_driven_passive_execution_enabled());
+        assert_eq!(
+            evidence
+                .records()
+                .iter()
+                .map(|record| record.kind_name())
+                .collect::<Vec<_>>(),
+            vec![
+                "deleted-subtree-passive-destroy-metadata",
+                "deleted-subtree-passive-destroy-callback",
+                "deleted-subtree-host-cleanup-metadata",
+                "deleted-subtree-host-cleanup-metadata",
+            ]
+        );
+        assert_eq!(
+            evidence
+                .records()
+                .iter()
+                .map(|record| record.phase_name())
+                .collect::<Vec<_>>(),
+            vec!["passive", "passive", "mutation", "mutation"]
+        );
+
+        let records = evidence.records();
+        assert_eq!(records[0].fiber(), fixture.deleted_function);
+        assert_eq!(records[0].effect(), Some(queued_passive.effect()));
+        assert_eq!(records[0].callback(), Some(fixture.passive_destroy));
+        assert_eq!(
+            records[0].pending_order(),
+            Some(queued_passive.unmount_order())
+        );
+        assert_eq!(records[1].fiber(), fixture.deleted_function);
+        assert_eq!(records[1].effect(), Some(queued_passive.effect()));
+        assert_eq!(records[1].callback(), Some(fixture.passive_destroy));
+        assert_eq!(records[1].invocation_order(), Some(0));
+        assert_eq!(
+            records[1].pending_order(),
+            Some(queued_passive.unmount_order())
+        );
+        assert_eq!(
+            records[0].metadata_sequence(),
+            records[1].metadata_sequence()
+        );
+        assert!(records[0].metadata_sequence().unwrap() < records[2].metadata_sequence().unwrap());
+        assert_eq!(records[2].fiber(), fixture.deleted_text);
+        assert_eq!(records[3].fiber(), fixture.deleted_host);
+
+        assert_eq!(flush.destroy_callback_executions().len(), 1);
+        assert_eq!(
+            flush.destroy_callback_executions()[0].destroy_callback(),
+            fixture.passive_destroy
+        );
+        assert_eq!(
+            flush.destroy_callback_executions()[0].unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+                nearest_mounted_ancestor: finished_work,
+            })
+        );
+        assert_eq!(
+            destroy_executor.calls(),
+            &[flush.destroy_callback_executions()[0].request()]
+        );
         assert!(
             store
                 .root(root_id)
