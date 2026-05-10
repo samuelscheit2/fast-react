@@ -185,6 +185,19 @@ const ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID =
   "react-test-renderer-act-native-update-passive-drain-private-diagnostic";
 const ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID =
   "private-native-update-execution-passive-effect-drain-metadata";
+const ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID =
+  "react-test-renderer-act-nested-scope-passive-flush-private-diagnostic";
+const ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID =
+  "private-nested-act-scope-passive-flush-order-metadata";
+const ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS =
+  "private-act-nested-scope-passive-flush-public-act-blocked";
+const ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER = [
+  "outer-act-scope-enter",
+  "inner-act-scope-enter",
+  "accepted-passive-work-flush",
+  "inner-act-scope-exit",
+  "outer-act-scope-exit"
+];
 const ACT_PRIVATE_ROOT_PASSIVE_REQUIRED_PREREQUISITE_IDS = [
   "test-renderer-private-root-request-records",
   "scheduler-mock-flush-helper-metadata",
@@ -261,6 +274,7 @@ const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   "test-renderer-mock-scheduler-expired-work-act-route",
   "test-renderer-mock-scheduler-expired-act-root-work-route",
   ACT_NATIVE_UPDATE_PASSIVE_DRAIN_RECORD_ID,
+  ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID,
   "react-private-act-internal-test-queue-factories"
 ];
 const CJS_DEVELOPMENT_ENTRYPOINT =
@@ -373,6 +387,7 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS = [
   ACT_NESTED_SCOPE_BLOCKER_PREREQUISITE_ID,
   ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4, 9),
   ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID,
+  ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID,
   ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(9),
   ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
 ];
@@ -768,6 +783,7 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
     localGate.privateNativeUpdatePassiveEffectDrainMetadataConsumed,
     true
   );
+  assert.equal(localGate.privateNestedScopePassiveFlushEvidencePresent, true);
   assert.equal(localGate.compatibilityClaimed, false);
 
   for (const requirement of actUnblockingRequirements) {
@@ -1136,6 +1152,16 @@ function inspectLocalReactTestRendererActBlockedGate() {
     /FastReactTestRendererPrivateUpdateNativeBridgeAdmission/u.test(
       testRendererCjsDevelopmentSource
     );
+  const privateNestedScopePassiveFlushEvidencePresent =
+    /worker-700-test-renderer-act-nested-scope-passive-flush/u.test(
+      testRendererCjsDevelopmentSource
+    ) &&
+    /flushAcceptedNestedActScopePassiveWork/u.test(
+      testRendererCjsDevelopmentSource
+    ) &&
+    /private-act-nested-scope-passive-flush-public-act-blocked/u.test(
+      testRendererCjsDevelopmentSource
+    );
   const publicEffectCallbackExecutionPresent =
     /\bpublic_effect_execution_enabled\(&self\) -> bool \{\s*true\s*\}/u.test(
       passiveEffectsSource
@@ -1271,6 +1297,7 @@ function inspectLocalReactTestRendererActBlockedGate() {
       privateNativeUpdateExecutionMetadataPresent,
     privateNativeUpdatePassiveEffectDrainMetadataConsumed:
       privateNativeUpdateExecutionMetadataPresent,
+    privateNestedScopePassiveFlushEvidencePresent,
     actQueueFlushingReady,
     effectExecutionReady,
     rendererRootsReady,
@@ -2387,6 +2414,23 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
     assert.equal(diagnostics.consumesPrivateUpdateNativeBridgeAdmission, true);
     assert.equal(diagnostics.consumesAcceptedNativeUpdateHostOutput, true);
     assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
+    assert.equal(
+      diagnostics.nestedScopePassiveFlushDiagnosticId,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+    );
+    assert.equal(
+      diagnostics.nestedScopePassiveFlushStatus,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS
+    );
+    assert.equal(
+      diagnostics.nestedScopePassiveFlushPrerequisiteId,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
+    );
+    assert.deepEqual(
+      diagnostics.nestedScopePassiveFlushOrder,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+    );
+    assert.equal(diagnostics.nestedScopePassiveFlushEvidenceAccepted, true);
     assert.equal(diagnostics.publicUpdateCompatibilityClaimed, false);
     assert.equal(
       typeof diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
@@ -2394,6 +2438,14 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
     );
     assert.equal(
       typeof diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.describeAcceptedNestedActScopePassiveFlush,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.flushAcceptedNestedActScopePassiveWork,
       "function"
     );
   } else {
@@ -2533,6 +2585,7 @@ function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
       moduleExports,
       diagnostics
     );
+    assertPrivateActNestedScopePassiveFlushConsumer(entry, diagnostics);
   }
 
   const rejected = diagnostics.describeAcceptedPendingPassiveFlushMetadata([]);
@@ -2676,6 +2729,182 @@ function assertPrivateActNativeUpdatePassiveDrainConsumer(
         "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED"
       );
       assert.equal(error.reason, "metadata-missing-internal-brand");
+      assert.equal(error.entrypoint, entry.entrypoint);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.publicActCompatibilityClaimed, false);
+      assert.equal(error.executesPassiveEffects, false);
+      assert.equal(error.invokesEffectCallbacks, false);
+      return true;
+    },
+    entry.entrypoint
+  );
+}
+
+function assertPrivateActNestedScopePassiveFlushConsumer(entry, diagnostics) {
+  const privateBrand = Symbol.for(
+    "fast.react_test_renderer.private_act_nested_scope_passive_flush_record"
+  );
+  const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
+    diagnostics.createAcceptedPendingPassiveFlushRecord({
+      label: "outer-scope-passive",
+      recordKind: "PendingPassiveCommitHandoff",
+      root: "root-nested-act",
+      finishedWork: "fiber-outer",
+      lanes: "Default",
+      pendingUnmountCount: 1,
+      pendingMountCount: 0
+    }),
+    diagnostics.createAcceptedPendingPassiveFlushRecord({
+      label: "inner-scope-passive",
+      recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
+      root: "root-nested-act",
+      finishedWork: "fiber-inner",
+      lanes: "Default",
+      pendingUnmountCount: 0,
+      pendingMountCount: 2,
+      schedulerRequestOrder: 1
+    })
+  ]);
+
+  const description =
+    diagnostics.describeAcceptedNestedActScopePassiveFlush(metadata);
+  assert.equal(description[privateBrand], true, entry.entrypoint);
+  assert.equal(description.id, ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID);
+  assert.equal(description.status, ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS);
+  assert.equal(description.accepted, true);
+  assert.equal(description.rejectionReason, null);
+  assert.deepEqual(
+    description.passiveFlushOrder,
+    ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+  );
+  assert.equal(description.outerScopeDepth, 1);
+  assert.equal(description.innerScopeDepth, 2);
+  assert.equal(description.passiveFlushOrderIndex, 2);
+  assert.equal(description.pendingBefore, 2);
+  assert.equal(description.pendingPassiveRecordCount, 3);
+  assert.equal(description.consumesNestedScopeBlockerDiagnostics, true);
+  assert.equal(description.consumesPendingPassiveFlushMetadata, true);
+  assert.equal(description.consumesAcceptedSchedulerFlushMetadata, true);
+  assert.equal(
+    description.drainsAcceptedPendingPassiveFlushMetadata,
+    true
+  );
+  assert.equal(description.deterministicFlushOrder, true);
+  assert.equal(description.privateNestedScopeDepthTracking, true);
+  assert.equal(description.privateNestedActQueueReuse, true);
+  assert.equal(description.publicActScopeDepthTrackingAvailable, false);
+  assert.equal(description.publicNestedActQueueReuseAvailable, false);
+  assert.equal(
+    description.publicOverlappingActWarningEmissionAvailable,
+    false
+  );
+  assert.equal(description.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(description.drainsPublicReactActQueue, false);
+  assert.equal(description.publicReactActCompatibilityClaimed, false);
+  assert.equal(description.publicActCompatibilityClaimed, false);
+  assert.equal(description.compatibilityClaimed, false);
+  assert.equal(description.invokesActCallback, false);
+  assert.equal(description.executesPassiveEffects, false);
+  assert.equal(description.invokesEffectCallbacks, false);
+
+  const report =
+    diagnostics.flushAcceptedNestedActScopePassiveWork(metadata);
+  assert.equal(report[privateBrand], true, entry.entrypoint);
+  assert.equal(report.id, ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID);
+  assert.equal(report.status, ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS);
+  assert.equal(report.accepted, true);
+  assert.deepEqual(
+    report.passiveFlushOrder,
+    ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+  );
+  assert.equal(report.outerScopeDepth, 1);
+  assert.equal(report.innerScopeDepth, 2);
+  assert.equal(report.passiveFlushOrderIndex, 2);
+  assert.equal(report.pendingBefore, 2);
+  assert.equal(report.drainedCount, 2);
+  assert.equal(report.remainingCount, 0);
+  assert.deepEqual(
+    report.drainedRecords.map((record) => [
+      record.index,
+      record.label,
+      record.recordKind,
+      record.pendingRecordCount,
+      record.schedulerRequestOrder,
+      record.executesPassiveEffects,
+      record.invokesEffectCallbacks
+    ]),
+    [
+      [
+        0,
+        "outer-scope-passive",
+        "PendingPassiveCommitHandoff",
+        1,
+        0,
+        false,
+        false
+      ],
+      [
+        1,
+        "inner-scope-passive",
+        "PassiveEffectSchedulerFlushExecutionRecord",
+        2,
+        1,
+        false,
+        false
+      ]
+    ],
+    entry.entrypoint
+  );
+  assert.equal(report.consumesNestedScopeBlockerDiagnostics, true);
+  assert.equal(report.privatePassiveEffectDrainDiagnosticsConsumed, true);
+  assert.equal(report.consumesPendingPassiveFlushMetadata, true);
+  assert.equal(report.consumesAcceptedSchedulerFlushMetadata, true);
+  assert.equal(
+    report.drainsAcceptedPendingPassiveFlushMetadata,
+    true
+  );
+  assert.equal(report.deterministicFlushOrder, true);
+  assert.equal(report.privateNestedScopeDepthTracking, true);
+  assert.equal(report.privateNestedActQueueReuse, true);
+  assert.equal(report.publicActScopeDepthTrackingAvailable, false);
+  assert.equal(report.publicNestedActQueueReuseAvailable, false);
+  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(report.drainsPublicReactActQueue, false);
+  assert.equal(report.publicReactActCompatibilityClaimed, false);
+  assert.equal(report.publicActCompatibilityClaimed, false);
+  assert.equal(report.publicActBehaviorAvailable, false);
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.invokesActCallback, false);
+  assert.equal(report.executesQueuedWork, false);
+  assert.equal(report.executesScheduledCallbacks, false);
+  assert.equal(report.executesPassiveEffects, false);
+  assert.equal(report.invokesEffectCallbacks, false);
+  assert.equal(report.executesRendererRoots, false);
+  assert.equal(report.mutatesHostOutput, false);
+  assert.equal(metadata.records.length, 0, entry.entrypoint);
+
+  const rejected =
+    diagnostics.describeAcceptedNestedActScopePassiveFlush(
+      diagnostics.createAcceptedPendingPassiveFlushMetadata([])
+    );
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.rejectionReason, "metadata-empty");
+  assert.throws(
+    () =>
+      diagnostics.flushAcceptedNestedActScopePassiveWork(
+        diagnostics.createAcceptedPendingPassiveFlushMetadata([]),
+        { innerScopeDepth: 3 }
+      ),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateActPassiveEffectDrainError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED"
+      );
+      assert.equal(error.reason, "metadata-empty");
       assert.equal(error.entrypoint, entry.entrypoint);
       assert.equal(error.publicReactActCompatibilityClaimed, false);
       assert.equal(error.publicActCompatibilityClaimed, false);
@@ -2860,7 +3089,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-576-test-renderer-act-private-root-passive-sequence",
       "worker-622-scheduler-mock-act-root-work-execution",
       "worker-640-test-renderer-act-scheduler-flush-execution",
-      "worker-670-test-renderer-act-passive-native-flush"
+      "worker-670-test-renderer-act-passive-native-flush",
+      "worker-700-test-renderer-act-nested-scope-passive-flush"
     );
   }
 
@@ -2920,6 +3150,15 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(
       gate.privateNativeUpdatePassiveEffectDrainPrerequisiteId,
       ACT_NATIVE_UPDATE_PASSIVE_DRAIN_PREREQUISITE_ID
+    );
+    assert.equal(gate.privateNestedScopePassiveFlushEvidenceAccepted, true);
+    assert.equal(
+      gate.privateNestedScopePassiveFlushDiagnosticId,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+    );
+    assert.equal(
+      gate.privateNestedScopePassiveFlushPrerequisiteId,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_PREREQUISITE_ID
     );
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
@@ -3049,6 +3288,56 @@ function assertActSchedulerGate(gate, entrypoint) {
         .privateNativeUpdatePassiveEffectDrainMetadataConsumed,
       true
     );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .privateNestedScopePassiveFlushEvidenceAccepted,
+      true
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .privateNestedScopePassiveFlushDiagnosticId,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+    );
+    assert.deepEqual(
+      gate.privateActQueueFlushDiagnostics.privateNestedScopePassiveFlushOrder,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+    );
+
+    const nestedScopePassiveFlushRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_NESTED_SCOPE_PASSIVE_FLUSH_RECORD_ID
+      );
+    assert.notEqual(nestedScopePassiveFlushRecord, undefined);
+    assert.equal(
+      gate.recognizedNestedScopePassiveFlushDiagnostics,
+      nestedScopePassiveFlushRecord
+    );
+    assert.equal(
+      nestedScopePassiveFlushRecord.status,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_STATUS
+    );
+    assert.deepEqual(
+      nestedScopePassiveFlushRecord.passiveFlushOrder,
+      ACT_NESTED_SCOPE_PASSIVE_FLUSH_ORDER
+    );
+    assert.equal(nestedScopePassiveFlushRecord.outerScopeDepth, 1);
+    assert.equal(nestedScopePassiveFlushRecord.innerScopeDepth, 2);
+    assert.equal(nestedScopePassiveFlushRecord.passiveFlushOrderIndex, 2);
+    assert.equal(
+      nestedScopePassiveFlushRecord.consumesNestedScopeBlockerDiagnostics,
+      true
+    );
+    assert.equal(
+      nestedScopePassiveFlushRecord.drainsAcceptedPendingPassiveFlushMetadata,
+      true
+    );
+    assert.equal(nestedScopePassiveFlushRecord.deterministicFlushOrder, true);
+    assert.equal(
+      nestedScopePassiveFlushRecord.publicActCompatibilityClaimed,
+      false
+    );
+    assert.equal(nestedScopePassiveFlushRecord.executesPassiveEffects, false);
+    assert.equal(nestedScopePassiveFlushRecord.invokesActCallback, false);
   } else {
     assert.equal(gate.recognizedActWarningThenableBlockers, undefined);
     assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
@@ -3067,6 +3356,10 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(
       gate.privateActQueueFlushDiagnostics
         .rootPassivePrerequisiteSequenceDiagnostics,
+      undefined
+    );
+    assert.equal(
+      gate.recognizedNestedScopePassiveFlushDiagnostics,
       undefined
     );
   }
@@ -3160,6 +3453,9 @@ function assertActSchedulerGate(gate, entrypoint) {
       consumesPrivateUpdateNativeBridgeAdmission: true,
       consumesAcceptedNativeUpdateHostOutput: true,
       drainsAcceptedPendingPassiveFlushMetadata: true,
+      consumesNestedScopeBlockerDiagnostics: true,
+      drainsAcceptedNestedScopePassiveFlushMetadata: true,
+      deterministicNestedScopePassiveFlushOrder: true,
       emitsActWarnings: false,
       emitsOverlappingActWarnings: false,
       awaitsActThenables: false,
