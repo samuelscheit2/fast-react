@@ -45,18 +45,50 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. No active queued workers remain after accepting
-queue 353-382; clean up accepted sessions/worktrees before refilling.
+Top-level cap: 30 workers. Queue 383-412 is assigned in isolated worktrees with
+overlap allowed where scopes converge on the same implementation path.
+
+| Worker | Focus |
+| --- | --- |
+| 383 | Root commit HostComponent update apply |
+| 384 | Root commit HostComponent deletion apply |
+| 385 | Root commit ref callback execution handoff |
+| 386 | Context provider begin-work runtime read |
+| 387 | Root work-loop context provider handoff |
+| 388 | Function-component effect update queue private path |
+| 389 | Passive effects error propagation private path |
+| 390 | Sync flush act private execution |
+| 391 | Test renderer public `toJSON` private facade |
+| 392 | Test renderer public `toTree` private facade |
+| 393 | Test renderer update/unmount JS private routing |
+| 394 | Test renderer act private scheduler consumption |
+| 395 | React DOM private root public-facade adapter |
+| 396 | React DOM host-output attribute update gate |
+| 397 | React DOM event invocation from private root output |
+| 398 | React DOM ref ordering from root commit metadata |
+| 399 | Controlled input private restore queue gate |
+| 400 | Resource hint head singleton private gate |
+| 401 | Hydration marker replay event queue private path |
+| 402 | Portal private child reconciliation gate |
+| 403 | Native root bridge JSON transport smoke |
+| 404 | Scheduler mock private callback execution |
+| 405 | React act private continuation gate |
+| 406 | React DOM test-utils act private root output |
+| 407 | Benchmark private root-output timing canaries |
+| 408 | Package surface private root-output audit |
+| 409 | Context object local gate after provider progress |
+| 410 | Root render E2E private `flushSync` admission |
+| 411 | Root render E2E private warning boundary |
+| 412 | Private root-output gate docs and smoke refresh |
 
 ## Near-Term Sequencing
 
-1. Clean accepted worker sessions, worktrees, and branches for queue 353-382.
-2. Refill up to the 30 top-level worker cap with non-overlapping slices that
-   turn the accepted private root, commit, host-output, function-component,
-   DOM, and package gates into the next narrow implementation or conformance
-   checkpoints.
-3. Accept code workers opportunistically, resolving merge conflicts after the
+1. Monitor queue 383-412 for completion and merge completed workers before
+   queuing more.
+2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
+3. After the queue drains, refill up to the 30 top-level worker cap with the
+   next narrow implementation or conformance checkpoints.
 
 ## Next Queue Candidates
 
