@@ -64,11 +64,13 @@ const exactPrivatePublicFileGuards = {
     'cjs/react.development.js',
     'cjs/react.production.js',
     'hook-dispatcher.js',
-    'private-act-dispatcher-gate.js'
+    'private-act-dispatcher-gate.js',
+    'transition.js'
   ],
   'react-dom': [
     'placeholder-utils.js',
     'src/client/component-tree.js',
+    'src/client/controlled-restore-queue.js',
     'src/client/dom-container.js',
     'src/client/dom-host-context.js',
     'src/client/dom-namespaces.js',

@@ -212,6 +212,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/hook-dispatcher-private-metadata',
   '@fast-react/react/hook-dispatcher-private-metadata.js',
   '@fast-react/react/ref-object.js',
+  '@fast-react/react/transition.js',
   '@fast-react/react/wrapper-object.js',
   '@fast-react/react/placeholder-utils.js'
 ];
@@ -511,6 +512,7 @@ const expectedReactDomPackageExports = {
 const reactDomPrivateDirectFiles = [
   'placeholder-utils.js',
   'src/client/component-tree.js',
+  'src/client/controlled-restore-queue.js',
   'src/client/dom-container.js',
   'src/client/dom-host-context.js',
   'src/client/dom-namespaces.js',
