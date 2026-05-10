@@ -16,6 +16,9 @@ import {
   readCheckedDomControlledInputOracle,
   readCheckedDomControlledInputOracleText
 } from "../src/dom-controlled-input-oracle.mjs";
+import {
+  assertFastReactControlledFormUnsupportedGate
+} from "../src/dom-controlled-input-unsupported-gates.mjs";
 
 const oracle = readCheckedDomControlledInputOracle();
 
@@ -72,6 +75,10 @@ test("DOM controlled input oracle keeps Fast React compatibility claims false", 
     ),
     true
   );
+});
+
+test("Fast React controlled form behavior stays unsupported until DOM adapters exist", () => {
+  assertFastReactControlledFormUnsupportedGate(oracle);
 });
 
 test("DOM controlled input oracle covers every scenario in every probe mode", () => {
