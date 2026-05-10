@@ -8,6 +8,10 @@ const test = require('node:test');
 const packageRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(packageRoot, '..', '..');
 const sourceRoot = path.join(packageRoot, 'src');
+const resourceFormGate = require(path.join(
+  sourceRoot,
+  'resource-form-internals-gate.js'
+));
 
 const resourceOracle = require(path.join(
   repoRoot,
@@ -37,6 +41,7 @@ const unsupportedCode = 'FAST_REACT_UNIMPLEMENTED';
 const compatibilityTarget = 'react-dom@19.2.6';
 const placeholderVersion = '0.0.0-fast-react-dom-placeholder';
 const implementedVersion = '19.2.6';
+const metadataOnlySourceFiles = new Set(['src/resource-form-internals-gate.js']);
 
 const resourceShape = oracleValue(
   resourceOracle,
@@ -99,6 +104,199 @@ test('accepted resource, form, and controlled-control oracles remain non-compati
   assert.equal(
     controlledInputOracle.evidenceClaims.deterministicFakeDomSubstrateUsed,
     true
+  );
+});
+
+test('private resource/form internals gate records deterministic unsupported metadata only', () => {
+  const first = createPrivateGateScenario();
+  const second = createPrivateGateScenario();
+
+  assert.deepEqual(first.records, second.records);
+  assert.deepEqual(first.summary, second.summary);
+
+  for (const record of first.records) {
+    assert.equal(Object.isFrozen(record), true, record.requestType);
+    assert.equal(
+      resourceFormGate.isPrivateResourceFormActionGateRecord(record),
+      true,
+      record.requestType
+    );
+    assert.equal(
+      resourceFormGate.getPrivateResourceFormActionGateRecordPayload(record),
+      record,
+      record.requestType
+    );
+    assert.equal(record.status, resourceFormGate.unsupportedStatus);
+    assert.equal(record.unsupportedCode, unsupportedCode);
+    assert.equal(record.compatibilityTarget, compatibilityTarget);
+    assert.deepEqual(record.sideEffects, resourceFormGate.noSideEffects);
+    assert.equal(record.sideEffects.resourcesDispatched, false);
+    assert.equal(record.sideEffects.singletonsResolved, false);
+    assert.equal(record.sideEffects.formsSubmitted, false);
+    assert.equal(record.sideEffects.formsReset, false);
+    assert.equal(record.sideEffects.controlsTracked, false);
+    assert.equal(record.sideEffects.publicRootTouched, false);
+    assert.equal(record.sideEffects.compatibilityClaimed, false);
+  }
+
+  assert.deepEqual(
+    first.records.map((record) => ({
+      argumentInfo: record.argumentInfo,
+      behaviorArea: record.behaviorArea,
+      contractId: record.contractId,
+      hostTag: record.hostTag,
+      oracleKind: record.oracleKind,
+      privateDispatcherKey: record.privateDispatcherKey,
+      publicName: record.publicName,
+      requestId: record.requestId,
+      requestName: record.requestName,
+      requestSequence: record.requestSequence,
+      requestType: record.requestType
+    })),
+    [
+      {
+        argumentInfo: {
+          count: 2,
+          values: [
+            {type: 'string', empty: false},
+            {type: 'object'}
+          ]
+        },
+        behaviorArea: 'resource-hint',
+        contractId: 'preload',
+        hostTag: null,
+        oracleKind: 'react-19.2.6-react-dom-resource-hints-oracle',
+        privateDispatcherKey: 'L',
+        publicName: 'preload',
+        requestId: 'gate:1',
+        requestName: 'preload',
+        requestSequence: 1,
+        requestType: 'resource-hint.preload'
+      },
+      {
+        argumentInfo: {
+          count: 1,
+          values: [{type: 'object'}]
+        },
+        behaviorArea: 'host-singleton',
+        contractId: 'head-singleton',
+        hostTag: 'head',
+        oracleKind: 'react-19.2.6-react-dom-resource-hints-oracle',
+        privateDispatcherKey: null,
+        publicName: null,
+        requestId: 'gate:2',
+        requestName: 'head',
+        requestSequence: 2,
+        requestType: 'host-singleton.head'
+      },
+      {
+        argumentInfo: {
+          count: 1,
+          values: [{type: 'object'}]
+        },
+        behaviorArea: 'form-action',
+        contractId: 'request-form-reset',
+        hostTag: null,
+        oracleKind: 'react-19.2.6-react-dom-form-actions-oracle',
+        privateDispatcherKey: 'r',
+        publicName: 'requestFormReset',
+        requestId: 'gate:3',
+        requestName: 'requestFormReset',
+        requestSequence: 3,
+        requestType: 'form-action.requestFormReset'
+      },
+      {
+        argumentInfo: {
+          count: 1,
+          values: [{type: 'object'}]
+        },
+        behaviorArea: 'controlled-form',
+        contractId: 'input-controlled-value',
+        hostTag: 'input',
+        oracleKind: 'react-19.2.6-dom-controlled-input-oracle',
+        privateDispatcherKey: null,
+        publicName: null,
+        requestId: 'gate:4',
+        requestName: 'input',
+        requestSequence: 4,
+        requestType: 'controlled-form.input'
+      }
+    ]
+  );
+
+  assert.equal(first.summary.compatibilityTarget, compatibilityTarget);
+  assert.equal(first.summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(first.summary.unsupportedCode, unsupportedCode);
+  assert.deepEqual(first.summary.sideEffects, resourceFormGate.noSideEffects);
+  assert.deepEqual(
+    first.summary.oracleEvidence.map((evidence) => ({
+      compatibilityClaimed: evidence.compatibilityClaimed,
+      fastReactComparedToReactDom: evidence.fastReactComparedToReactDom,
+      oracleKind: evidence.oracleKind
+    })),
+    [
+      {
+        compatibilityClaimed: false,
+        fastReactComparedToReactDom: false,
+        oracleKind: 'react-19.2.6-react-dom-resource-hints-oracle'
+      },
+      {
+        compatibilityClaimed: false,
+        fastReactComparedToReactDom: false,
+        oracleKind: 'react-19.2.6-react-dom-form-actions-oracle'
+      },
+      {
+        compatibilityClaimed: false,
+        fastReactComparedToReactDom: false,
+        oracleKind: 'react-19.2.6-dom-controlled-input-oracle'
+      }
+    ]
+  );
+});
+
+test('private resource/form internals gate errors are deterministic and fail closed', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'error-gate'
+  });
+  const record = gate.recordFormActionRequest('useFormStatus', []);
+  const error =
+    resourceFormGate.createUnsupportedResourceFormActionInternalsError(record);
+
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(error.code, resourceFormGate.privateResourceFormActionGateErrorCode);
+  assert.equal(error.entrypoint, 'react-dom/private-internals');
+  assert.equal(error.exportName, 'form-action.useFormStatus');
+  assert.equal(error.compatibilityTarget, compatibilityTarget);
+  assert.equal(error.requestId, 'error-gate:1');
+  assert.equal(error.requestSequence, 1);
+  assert.equal(error.requestType, 'form-action.useFormStatus');
+  assert.equal(error.behaviorArea, 'form-action');
+  assert.equal(error.requestName, 'useFormStatus');
+  assert.equal(error.status, resourceFormGate.unsupportedStatus);
+  assert.deepEqual(error.sideEffects, resourceFormGate.noSideEffects);
+  assert.match(
+    error.message,
+    /private resource\/form action internals gate records metadata only/u
+  );
+
+  assert.throws(
+    () => gate.recordResourceHintRequest('unknown-resource', []),
+    {
+      code: resourceFormGate.privateResourceFormActionGateUnknownRequestCode,
+      compatibilityTarget,
+      behaviorArea: 'resource-hint',
+      requestName: 'unknown-resource'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceFormActionInternalsError({
+        requestId: 'not-a-private-record'
+      }),
+    {
+      code: 'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE_INVALID_RECORD',
+      compatibilityTarget
+    }
   );
 });
 
@@ -341,6 +539,30 @@ function replaceDispatcherWithSpies(moduleExports) {
   return dispatchCalls;
 }
 
+function createPrivateGateScenario() {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'gate'
+  });
+  const records = [
+    gate.recordResourceHintRequest('preload', [
+      'https://fast-react.invalid/app.js',
+      throwingProxy('resource options')
+    ]),
+    gate.recordSingletonRequest('head', [throwingProxy('singleton props')]),
+    gate.recordFormActionRequest('requestFormReset', [
+      throwingProxy('form element')
+    ]),
+    gate.recordControlledFormRequest('input', [
+      throwingProxy('controlled props')
+    ])
+  ];
+
+  return {
+    records,
+    summary: resourceFormGate.describeResourceFormActionInternalsGate()
+  };
+}
+
 function throwingProxy(label) {
   return new Proxy(Object.create(null), {
     get(_target, property) {
@@ -379,6 +601,14 @@ function requireFresh(fileName) {
 function findDisallowedSourceMatches() {
   const matches = [];
   for (const filePath of listJavaScriptFiles(sourceRoot)) {
+    const packageRelativeFile = path
+      .relative(packageRoot, filePath)
+      .split(path.sep)
+      .join('/');
+    if (metadataOnlySourceFiles.has(packageRelativeFile)) {
+      continue;
+    }
+
     const contents = readFileSync(filePath, 'utf8');
     for (const { id, pattern } of disallowedSourcePatterns) {
       const match = pattern.exec(contents);

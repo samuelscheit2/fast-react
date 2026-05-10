@@ -5,7 +5,7 @@ import {
   readFileSync,
   statSync
 } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -25,6 +25,9 @@ export const FAST_REACT_DOM_PLACEHOLDER_VERSION =
 export const FAST_REACT_DOM_IMPLEMENTED_VERSION = "19.2.6";
 export const FAST_REACT_DOM_INTERNALS_EXPORT =
   "__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE";
+
+export const FAST_REACT_RESOURCE_FORM_ACTION_INTERNALS_GATE_SOURCE_FILES =
+  new Set(["packages/react-dom/src/resource-form-internals-gate.js"]);
 
 export const FAST_REACT_RESOURCE_HINT_PLACEHOLDER_ENTRYPOINTS = [
   {
@@ -327,12 +330,21 @@ export function assertOpaqueReactServerInternalsPlaceholder(
 export function findDisallowedReactDomSourceMatches(patterns) {
   const matches = [];
   for (const filePath of listSourceFiles(reactDomSourceRoot)) {
+    const relativeFile = relative(repoRoot, filePath).split(sep).join("/");
+    if (
+      FAST_REACT_RESOURCE_FORM_ACTION_INTERNALS_GATE_SOURCE_FILES.has(
+        relativeFile
+      )
+    ) {
+      continue;
+    }
+
     const contents = readFileSync(filePath, "utf8");
     for (const { id, pattern, reason } of patterns) {
       const match = pattern.exec(contents);
       if (match !== null) {
         matches.push({
-          file: relative(repoRoot, filePath),
+          file: relativeFile,
           id,
           match: match[0],
           reason
