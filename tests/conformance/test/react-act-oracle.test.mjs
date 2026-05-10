@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   REACT_ACT_FAST_REACT_TARGET,
@@ -25,6 +28,22 @@ import {
 } from "../src/react-act-public-blocked-gate.mjs";
 
 const oracle = readCheckedReactActOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const privateActDispatcherGateExport =
+  "__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__";
+const privateActDispatcherGateStatus =
+  "blocked-until-renderer-roots-passive-effects-and-act-continuations";
+const reactPrivateActGateEntrypoints = [
+  "packages/react/index.js",
+  "packages/react/cjs/react.development.js",
+  "packages/react/cjs/react.production.js"
+];
 
 test("checked React.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -212,6 +231,117 @@ test("public React.act gate rejects premature compatibility claims and scenario 
   assert.deepEqual(admissionGate.violations[0].scenarioIds, [
     "react-act-export-shape"
   ]);
+});
+
+test("package-private React act dispatcher gate recognizes accepted metadata without flushing", () => {
+  for (const relativeModulePath of reactPrivateActGateEntrypoints) {
+    const React = loadFreshWorkspaceModule(relativeModulePath);
+    const descriptor = Object.getOwnPropertyDescriptor(
+      React,
+      privateActDispatcherGateExport
+    );
+
+    assert.equal(
+      Object.keys(React).includes(privateActDispatcherGateExport),
+      false,
+      relativeModulePath
+    );
+    assert.equal(descriptor?.enumerable, false, relativeModulePath);
+    assert.equal(descriptor?.configurable, false, relativeModulePath);
+    assert.equal(descriptor?.writable, false, relativeModulePath);
+
+    const gate = descriptor.value;
+    assert.equal(gate.status, privateActDispatcherGateStatus);
+    assert.equal(gate.publicCompatibilityClaimed, false);
+    assert.equal(gate.queueFlushingReady, false);
+    assert.equal(gate.rendererRootsReady, false);
+    assert.equal(gate.passiveEffectsReady, false);
+    assert.equal(gate.continuationFlushingReady, false);
+    assert.equal(gate.executesQueuedWork, false);
+    assert.equal(gate.executesEffects, false);
+    assert.deepEqual(gate.requiredRecords, [
+      "SchedulerActQueueRequest",
+      "SchedulerActScopeBoundaryRecord",
+      "SyncFlushActContinuationRecord"
+    ]);
+    assert.deepEqual(gate.requiredTaskKinds, [
+      "RootSchedule",
+      "SchedulerCallback"
+    ]);
+    assert.deepEqual(gate.requiredContinuationStatuses, [
+      "NoContinuation",
+      "PendingContinuation"
+    ]);
+
+    let queuedTaskInvoked = false;
+    const metadata = gate.createActQueueMetadata({
+      queuedTasks: [
+        function queuedActTaskMustNotRun() {
+          queuedTaskInvoked = true;
+        }
+      ]
+    });
+    const dispatcher = {
+      [gate.metadataSymbol]: metadata
+    };
+
+    assert.equal(gate.isAcceptedActQueueMetadata(metadata), true);
+    assert.equal(gate.isPrivateActDispatcher(dispatcher), false);
+    assert.equal(gate.getPrivateActQueueMetadata(dispatcher), null);
+    assert.equal(gate.markPrivateActDispatcher(dispatcher), dispatcher);
+    assert.equal(gate.isPrivateActDispatcher(dispatcher), true);
+    assert.equal(gate.getPrivateActQueueMetadata(dispatcher), metadata);
+    assert.equal(queuedTaskInvoked, false);
+
+    for (const rejectedMetadata of [
+      gate.createActQueueMetadata({
+        publicCompatibilityClaimed: true
+      }),
+      gate.createActQueueMetadata({
+        queueFlushingReady: true
+      }),
+      gate.createActQueueMetadata({
+        passiveEffectsReady: true
+      }),
+      gate.createActQueueMetadata({
+        continuationFlushingReady: true
+      }),
+      gate.createActQueueMetadata({
+        acceptedRecords: ["SchedulerActQueueRequest"]
+      })
+    ]) {
+      const rejectedDispatcher = {
+        [gate.metadataSymbol]: rejectedMetadata
+      };
+      assert.equal(gate.isAcceptedActQueueMetadata(rejectedMetadata), false);
+      assert.throws(
+        () => gate.markPrivateActDispatcher(rejectedDispatcher),
+        (error) => {
+          assert.equal(error.name, "FastReactUnimplementedError");
+          assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+          assert.equal(error.entrypoint, "react");
+          assert.equal(
+            error.exportName,
+            `${privateActDispatcherGateExport}.markPrivateActDispatcher`
+          );
+          assert.equal(error.compatibilityTarget, "react@19.2.6");
+          return true;
+        }
+      );
+      assert.equal(gate.isPrivateActDispatcher(rejectedDispatcher), false);
+    }
+
+    let publicActCallbackInvoked = false;
+    const publicActError = captureThrown(() =>
+      React.act(() => {
+        publicActCallbackInvoked = true;
+      })
+    );
+    assertReactActPlaceholderError(publicActError);
+    assert.equal(publicActCallbackInvoked, false, relativeModulePath);
+
+    assertReactHookDispatcherGuardUnchanged(React, relativeModulePath);
+  }
 });
 
 test("React.act oracle covers every scenario in every probe mode", () => {
@@ -581,5 +711,57 @@ function countFastReactComparisonStatuses(comparisons) {
       "matched-but-compatibility-not-claimed": 0,
       "unsupported-placeholder": 0
     }
+  );
+}
+
+function loadFreshWorkspaceModule(relativeModulePath) {
+  const modulePath = path.join(repoRoot, relativeModulePath);
+  const resolved = require.resolve(modulePath);
+  delete require.cache[resolved];
+  return require(resolved);
+}
+
+function captureThrown(fn) {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+
+  assert.fail("Expected operation to throw");
+}
+
+function assertReactActPlaceholderError(error) {
+  assert.equal(error.name, "FastReactUnimplementedError");
+  assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+  assert.equal(error.entrypoint, "react");
+  assert.equal(error.exportName, "act");
+  assert.equal(error.compatibilityTarget, "react@19.2.6");
+}
+
+function assertReactHookDispatcherGuardUnchanged(React, label) {
+  const useRefError = captureThrown(() => React.useRef(null));
+  assert.equal(useRefError.name, "Error", `${label}.useRef error name`);
+  assert.equal(
+    useRefError.code,
+    "FAST_REACT_INVALID_HOOK_CALL",
+    `${label}.useRef code`
+  );
+
+  const useStateError = captureThrown(() => React.useState(null));
+  assert.equal(
+    useStateError.name,
+    "FastReactUnimplementedError",
+    `${label}.useState error name`
+  );
+  assert.equal(
+    useStateError.code,
+    "FAST_REACT_UNIMPLEMENTED",
+    `${label}.useState code`
+  );
+  assert.equal(
+    useStateError.exportName,
+    "useState",
+    `${label}.useState export`
   );
 }
