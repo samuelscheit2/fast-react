@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 import {
@@ -25,6 +26,10 @@ import {
 } from "../src/react-dom-resource-hints-unsupported-gates.mjs";
 
 const oracle = readCheckedReactDomResourceHintsOracle();
+const require = createRequire(import.meta.url);
+const resourceFormGate = require(
+  "../../../packages/react-dom/src/resource-form-gates.js"
+);
 
 test("checked React DOM resource hint oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -341,6 +346,67 @@ test("private dispatcher absence failure shape is captured as internal-only evid
   assert.match(absence.nullDispatcher.error.message, /Cannot read/u);
 });
 
+test("private fake-DOM insertion diagnostics stay separate from public resource hint behavior", () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: "resource-conformance-dispatcher"
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: "resource-conformance-adapter"
+  });
+  const insertionGate = resourceFormGate.createResourceHintFakeDomInsertionGate({
+    requestIdPrefix: "resource-conformance-insertion"
+  });
+  const fakeDom = createDeterministicResourceHintDom();
+  const dispatcherRecord = dispatcherGate.recordResourceHintDispatcherRequest(
+    "C",
+    ["https://connect.example.test", ""]
+  );
+  const adapterAdmission = adapterGate.admitDispatcherRecord(
+    dispatcherRecord,
+    {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "document-head"
+    }
+  );
+  const insertion = insertionGate.insertAdapterAdmissionRecord(
+    adapterAdmission,
+    {
+      explicitInsertion: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+
+  assert.equal(insertion.contractId, "preconnect");
+  assert.equal(
+    insertion.insertionStatus,
+    resourceFormGate.privateResourceHintFakeDomInsertionStatus
+  );
+  assert.equal(insertion.sideEffects.fakeResourceElementInserted, true);
+  assert.equal(insertion.sideEffects.resourceFetchStarted, false);
+  assert.equal(insertion.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(insertion.sideEffects.compatibilityClaimed, false);
+  assert.equal(
+    insertion.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(insertion.publicResourceBoundary.realDocumentMutated, false);
+  assert.deepEqual(fakeDom.head.childNodes[0].attributes, {
+    rel: "preconnect",
+    href: "[fast-react-redacted-resource-hint:href]",
+    crossOrigin: ""
+  });
+  assert.equal(JSON.stringify(insertion).includes("connect.example"), false);
+  assert.equal(
+    oracle.intentionalGaps.some(
+      (gap) => gap.id === "no-dom-or-server-rendering-resource-effects"
+    ),
+    true
+  );
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
 test("React DOM resource hint oracle artifact does not leak temporary generation paths", () => {
   const oracleText = readCheckedReactDomResourceHintsOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
@@ -427,4 +493,32 @@ function describedObjectProperty(objectDescription, key) {
   );
   assert.ok(entry, `missing object property ${key}`);
   return entry.descriptor.value;
+}
+
+function createDeterministicResourceHintDom() {
+  const document = {
+    __fastReactFakeResourceDocument: true,
+    createElement(tagName) {
+      return {
+        __fastReactFakeResourceElement: true,
+        nodeName: tagName.toUpperCase(),
+        ownerDocument: document,
+        attributes: {},
+        setAttribute(name, value) {
+          this.attributes[name] = String(value);
+        }
+      };
+    }
+  };
+  const head = {
+    __fastReactFakeResourceHead: true,
+    ownerDocument: document,
+    childNodes: [],
+    appendChild(child) {
+      this.childNodes.push(child);
+      child.parentNode = this;
+      return child;
+    }
+  };
+  return { document, head };
 }

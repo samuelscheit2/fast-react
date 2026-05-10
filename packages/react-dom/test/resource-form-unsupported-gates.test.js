@@ -1190,6 +1190,292 @@ test('private resource hint fake-DOM adapter gate admits normalized dispatcher r
   assert.equal(JSON.stringify(admissions).includes('nonce-script'), false);
 });
 
+test('private resource hint fake-DOM insertion gate admits one deterministic preload record only', () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'resource-dispatcher-insertion-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'fake-dom-insertion-adapter'
+  });
+  const insertionGate = resourceFormGate.createResourceHintFakeDomInsertionGate({
+    requestIdPrefix: 'fake-dom-insertion'
+  });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const dispatcherRecord = dispatcherGate.recordResourceHintDispatcherRequest(
+    'L',
+    [
+      '/font.woff2',
+      'font',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-font',
+        nonce: undefined,
+        type: 'font/woff2',
+        fetchPriority: 'high',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: 'print'
+      }
+    ]
+  );
+  const adapterAdmission = adapterGate.admitDispatcherRecord(
+    dispatcherRecord,
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      adapterId: 'resource-hint-insertion-adapter',
+      targetKind: 'document-head'
+    }
+  );
+  const insertion = insertionGate.insertAdapterAdmissionRecord(
+    adapterAdmission,
+    {
+      explicitInsertion: true,
+      insertionKind: 'deterministic-fake-dom-head-append',
+      insertionId: 'preload-font-private-diagnostic',
+      targetKind: 'document-head',
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceHintFakeDomInsertionGate();
+
+  assert.equal(Object.isFrozen(insertion), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintFakeDomInsertionRecord(insertion),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintFakeDomInsertionRecordPayload(
+      insertion
+    ),
+    insertion
+  );
+  assert.deepEqual(summarizeFakeDomInsertion(insertion), {
+    insertionId: 'fake-dom-insertion:1',
+    sourceAdapterAdmissionId: 'fake-dom-insertion-adapter:1',
+    sourceRequestId: 'resource-dispatcher-insertion-source:1',
+    requestType: 'resource-hint-fake-dom-insertion.preload',
+    contractId: 'preload',
+    privateDispatcherKey: 'L',
+    insertionStatus:
+      resourceFormGate.privateResourceHintFakeDomInsertionStatus,
+    executionStatus:
+      resourceFormGate.privateResourceHintFakeDomInsertionExecutionStatus,
+    elementPlan: {
+      elementTag: 'link',
+      relationship: 'preload',
+      insertionMethod: 'appendChild',
+      attributeNames: [
+        'rel',
+        'href',
+        'as',
+        'crossOrigin',
+        'integrity',
+        'type',
+        'fetchPriority',
+        'media'
+      ]
+    }
+  });
+  assert.equal(insertion.status, resourceFormGate.unsupportedStatus);
+  assert.equal(insertion.unsupportedCode, unsupportedCode);
+  assert.equal(insertion.compatibilityTarget, compatibilityTarget);
+  assert.equal(
+    insertion.compatibilityStatus,
+    resourceFormGate.privateResourceHintFakeDomInsertionCompatibilityBlockedStatus
+  );
+  assert.deepEqual(
+    insertion.sideEffects,
+    resourceFormGate.resourceHintFakeDomInsertionSideEffects
+  );
+  assert.equal(insertion.sideEffects.fakeDomInsertionGateInvoked, true);
+  assert.equal(insertion.sideEffects.fakeHeadMutated, true);
+  assert.equal(insertion.sideEffects.fakeResourceElementCreated, true);
+  assert.equal(insertion.sideEffects.fakeResourceElementInserted, true);
+  assert.equal(
+    insertion.sideEffects.fakeResourceElementAttributesApplied,
+    true
+  );
+  assert.equal(insertion.sideEffects.resourceFetchStarted, false);
+  assert.equal(insertion.sideEffects.realDocumentMutated, false);
+  assert.equal(insertion.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(insertion.sideEffects.publicRootTouched, false);
+  assert.equal(insertion.sideEffects.compatibilityClaimed, false);
+  assert.equal(insertion.insertionAdmission.explicitInsertion, true);
+  assert.equal(
+    insertion.insertionAdmission.deterministicFakeDomOnly,
+    true
+  );
+  assert.equal(insertion.insertionAdmission.rawDocumentCaptured, false);
+  assert.equal(insertion.insertionAdmission.rawHeadCaptured, false);
+  assert.equal(insertion.insertionAdmission.rawElementCaptured, false);
+  assert.equal(insertion.resourceElementPlan.rawValuesRetained, false);
+  assert.equal(insertion.resourceElementPlan.elementCreated, true);
+  assert.equal(insertion.resourceElementPlan.elementInserted, true);
+  assert.equal(insertion.resourceElementPlan.resourceFetchStarted, false);
+  assert.equal(
+    insertion.resourceElementPlan.publicResourceHintDomInsertion,
+    false
+  );
+  assert.equal(
+    insertion.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(insertion.publicResourceBoundary.publicDispatcherInvoked, false);
+  assert.equal(insertion.publicResourceBoundary.realDocumentMutated, false);
+  assert.equal(insertion.publicResourceBoundary.realHeadMutated, false);
+  assert.equal(insertion.publicResourceBoundary.compatibilityClaimed, false);
+  assert.equal(fakeDom.head.childNodes.length, 1);
+  assert.equal(fakeDom.head.childNodes[0].nodeName, 'LINK');
+  assert.deepEqual(fakeDom.head.childNodes[0].attributes, {
+    rel: 'preload',
+    href: '[fast-react-redacted-resource-hint:href]',
+    as: '[fast-react-redacted-resource-hint:as]',
+    crossOrigin: '',
+    integrity: '[fast-react-redacted-resource-hint:integrity]',
+    type: '[fast-react-redacted-resource-hint:type]',
+    fetchPriority: '[fast-react-redacted-resource-hint:fetchPriority]',
+    media: '[fast-react-redacted-resource-hint:media]'
+  });
+  assert.deepEqual(fakeDom.log.map((entry) => entry.type), [
+    'document.createElement',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'head.appendChild'
+  ]);
+  assert.equal(JSON.stringify(insertion).includes('/font.woff2'), false);
+  assert.equal(JSON.stringify(insertion).includes('sha256-font'), false);
+  assert.equal(JSON.stringify(insertion).includes('font/woff2'), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintFakeDomInsertionGateId
+  );
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(
+    summary.admissionStatus,
+    resourceFormGate.privateResourceHintFakeDomInsertionAdmissionRequiredStatus
+  );
+  assert.deepEqual(summary.acceptsContractIds, ['preconnect', 'preload']);
+  assert.equal(summary.maxInsertionsPerGate, 1);
+  assert.equal(summary.publicResourceHintDomInsertion, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintFakeDomInsertionBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintFakeDomInsertionError(
+      insertion
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintFakeDomInsertionGateErrorCode
+  );
+  assert.equal(error.exportName, 'resource-hint-fake-dom-insertion.preload');
+  assert.equal(error.insertionId, 'fake-dom-insertion:1');
+  assert.equal(error.sourceAdapterAdmissionId, 'fake-dom-insertion-adapter:1');
+  assert.equal(error.contractId, 'preload');
+  assert.equal(
+    error.executionStatus,
+    resourceFormGate.privateResourceHintFakeDomInsertionExecutionStatus
+  );
+  assert.deepEqual(
+    error.sideEffects,
+    resourceFormGate.resourceHintFakeDomInsertionSideEffects
+  );
+
+  assert.throws(
+    () =>
+      insertionGate.insertAdapterAdmissionRecord(adapterAdmission, {
+        explicitInsertion: true,
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head
+      }),
+    {
+      code:
+        resourceFormGate.privateResourceHintFakeDomInsertionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'fake DOM insertion gate admits exactly one record'
+    }
+  );
+
+  const preinitAdapterAdmission = adapterGate.admitDispatcherRecord(
+    dispatcherGate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'low'
+      }
+    ]),
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintFakeDomInsertionGate()
+        .insertAdapterAdmissionRecord(preinitAdapterAdmission, {
+          explicitInsertion: true,
+          fakeDocument: fakeDom.document,
+          fakeHead: fakeDom.head
+        }),
+    {
+      code:
+        resourceFormGate.privateResourceHintFakeDomInsertionInvalidRecordCode,
+      compatibilityTarget,
+      contractId: 'preinit-style'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintFakeDomInsertionGate()
+        .insertAdapterAdmissionRecord(adapterAdmission, {
+          explicitInsertion: true,
+          fakeDocument: {
+            createElement() {
+              return {};
+            }
+          },
+          fakeHead: {
+            appendChild() {}
+          }
+        }),
+    {
+      code:
+        resourceFormGate.privateResourceHintFakeDomInsertionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'fakeDocument must be an explicit deterministic fake resource document'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintFakeDomInsertionError({}),
+    {
+      code:
+        resourceFormGate.privateResourceHintFakeDomInsertionInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -1538,6 +1824,13 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.equal(summary.sideEffects.fakeHeadRead, false);
   assert.equal(summary.sideEffects.fakeResourceElementCreated, false);
   assert.equal(summary.sideEffects.fakeResourceElementInserted, false);
+  assert.equal(summary.sideEffects.fakeDomInsertionGateInvoked, false);
+  assert.equal(
+    summary.sideEffects.fakeResourceElementAttributesApplied,
+    false
+  );
+  assert.equal(summary.sideEffects.realDocumentMutated, false);
+  assert.equal(summary.sideEffects.publicResourceHintDomInsertion, false);
   assert.deepEqual(
     summary.privateResourceDispatcherBoundary,
     resourceFormGate.describePrivateResourceDispatcherBoundary(null)
@@ -1607,10 +1900,15 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       fakeHeadMutated: false,
       resourceElementCreated: false,
       resourceElementInserted: false,
+      fakeDomInsertionGateInvoked: false,
+      fakeResourceElementAttributesApplied: false,
       resourceFetchStarted: false,
+      realDocumentMutated: false,
       publicResourceHintDomInsertion: false,
       compatibilityClaimed: false,
-      adapterGate: resourceFormGate.describePrivateResourceHintFakeDomAdapterGate()
+      adapterGate: resourceFormGate.describePrivateResourceHintFakeDomAdapterGate(),
+      insertionGate:
+        resourceFormGate.describePrivateResourceHintFakeDomInsertionGate()
     },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
@@ -1766,6 +2064,16 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
     assert.equal(blockedRecord.sideEffects.fakeHeadMutated, false);
     assert.equal(blockedRecord.sideEffects.fakeResourceElementCreated, false);
     assert.equal(blockedRecord.sideEffects.fakeResourceElementInserted, false);
+    assert.equal(blockedRecord.sideEffects.fakeDomInsertionGateInvoked, false);
+    assert.equal(
+      blockedRecord.sideEffects.fakeResourceElementAttributesApplied,
+      false
+    );
+    assert.equal(blockedRecord.sideEffects.realDocumentMutated, false);
+    assert.equal(
+      blockedRecord.sideEffects.publicResourceHintDomInsertion,
+      false
+    );
     assert.equal(blockedRecord.sourceAdapterBoundary.adaptersInvoked, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.rawTargetCaptured, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.publicRootTouched, false);
@@ -1786,11 +2094,21 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.equal(adapterBoundary.fakeHeadMutated, false);
       assert.equal(adapterBoundary.resourceElementCreated, false);
       assert.equal(adapterBoundary.resourceElementInserted, false);
+      assert.equal(adapterBoundary.fakeDomInsertionGateInvoked, false);
+      assert.equal(
+        adapterBoundary.fakeResourceElementAttributesApplied,
+        false
+      );
       assert.equal(adapterBoundary.resourceFetchStarted, false);
+      assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
       assert.deepEqual(
         adapterBoundary.adapterGate,
         resourceFormGate.describePrivateResourceHintFakeDomAdapterGate()
+      );
+      assert.deepEqual(
+        adapterBoundary.insertionGate,
+        resourceFormGate.describePrivateResourceHintFakeDomInsertionGate()
       );
     } else {
       assert.equal(
@@ -2335,6 +2653,55 @@ function createThrowingFakeResourceHead(log) {
   };
 }
 
+function createDeterministicFakeResourceDom() {
+  const log = [];
+  const document = {
+    __fastReactFakeResourceDocument: true,
+    nodeName: '#document',
+    nodeType: 9,
+    createElement(tagName) {
+      log.push({tagName, type: 'document.createElement'});
+      return createDeterministicFakeResourceElement(tagName, document, log);
+    }
+  };
+  const head = {
+    __fastReactFakeResourceHead: true,
+    nodeName: 'HEAD',
+    nodeType: 1,
+    ownerDocument: document,
+    childNodes: [],
+    appendChild(child) {
+      this.childNodes.push(child);
+      child.parentNode = this;
+      log.push({child: child.nodeName, type: 'head.appendChild'});
+      return child;
+    }
+  };
+  document.head = head;
+
+  return {
+    document,
+    head,
+    log
+  };
+}
+
+function createDeterministicFakeResourceElement(tagName, ownerDocument, log) {
+  const nodeName = tagName.toUpperCase();
+  return {
+    __fastReactFakeResourceElement: true,
+    nodeName,
+    tagName: nodeName,
+    ownerDocument,
+    parentNode: null,
+    attributes: {},
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+      log.push({name, type: 'element.setAttribute', value: String(value)});
+    }
+  };
+}
+
 function throwingProxy(label) {
   return new Proxy(Object.create(null), {
     get(_target, property) {
@@ -2410,6 +2777,25 @@ function summarizeFakeDomAdapterAdmission(admission) {
       elementTag: admission.resourceElementPlan.elementTag,
       relationship: admission.resourceElementPlan.relationship,
       attributeNames: admission.resourceElementPlan.attributeNames
+    }
+  };
+}
+
+function summarizeFakeDomInsertion(insertion) {
+  return {
+    insertionId: insertion.insertionId,
+    sourceAdapterAdmissionId: insertion.sourceAdapterAdmissionId,
+    sourceRequestId: insertion.sourceRequestId,
+    requestType: insertion.requestType,
+    contractId: insertion.contractId,
+    privateDispatcherKey: insertion.privateDispatcherKey,
+    insertionStatus: insertion.insertionStatus,
+    executionStatus: insertion.executionStatus,
+    elementPlan: {
+      elementTag: insertion.resourceElementPlan.elementTag,
+      relationship: insertion.resourceElementPlan.relationship,
+      insertionMethod: insertion.resourceElementPlan.insertionMethod,
+      attributeNames: insertion.resourceElementPlan.attributeNames
     }
   };
 }
