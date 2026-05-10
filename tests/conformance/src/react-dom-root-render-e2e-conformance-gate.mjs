@@ -573,6 +573,15 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       privateReactDomMetadataEvidence: "separate"
     }),
     Object.freeze({
+      id: "public-root-work-loop-commit-handoff-compatibility",
+      publicApi:
+        "private root work-loop and finished-work commit handoff through public createRoot/render/update/unmount/hydrateRoot",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateRootWorkLoopCommitHandoffEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
       admission: "blocked",
@@ -687,6 +696,35 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS =
 
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_BLOCKED_STATUS =
   "blocked-private-root-act-passive-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_GATE_ID =
+  "root-render-private-root-work-loop-commit-handoff-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS =
+  "accepted-private-root-work-loop-commit-handoff-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_CLAIM_KEYS =
+  Object.freeze([
+    "publicRootCompatibilitySurface",
+    "publicCreateRootCompatibilityClaimed",
+    "publicRootRenderCompatibilityClaimed",
+    "publicRootUpdateCompatibilityClaimed",
+    "publicRootUnmountCompatibilityClaimed",
+    "publicHydrateRootCompatibilityClaimed",
+    "publicHydrationCompatibilityClaimed",
+    "publicDomMutationCompatibilityClaimed",
+    "publicTestRendererCompatibilityClaimed"
+  ]);
+
+function privateRootWorkLoopCommitHandoffClaims() {
+  return Object.freeze(
+    Object.fromEntries(
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_CLAIM_KEYS.map(
+        (key) => [key, false]
+      )
+    )
+  );
+}
 
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_GATE_ID =
   "root-render-private-react-dom-metadata-diagnostic-gate-1";
@@ -1221,6 +1259,34 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ADMISSIONS =
     )
   );
 
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS =
+  Object.freeze([
+    Object.freeze({
+      metadataId: "worker-534-root-work-loop-finished-work-commit-handoff",
+      workerId: "534",
+      category: "root-work-loop",
+      scenarioId: "initial-host-render",
+      admission: "private-root-work-loop-commit-handoff-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS,
+      evidenceKind: "root-work-loop-finished-work-commit-handoff",
+      reason:
+        "Worker 534 accepted a private root-work-loop handoff from completed HostRoot render through complete-work into a finished-work commit diagnostic without public root execution."
+    }),
+    Object.freeze({
+      metadataId: "worker-534-root-commit-finished-work-record-consumption",
+      workerId: "534",
+      category: "root-commit",
+      scenarioId: "initial-host-render",
+      admission: "private-root-work-loop-commit-handoff-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS,
+      evidenceKind: "root-commit-finished-work-record-consumption",
+      reason:
+        "Worker 534 accepted a private root-commit finished-work record with root token, lane, order, consumption, and fail-closed rejection diagnostics while host mutation and public root compatibility stay blocked."
+    })
+  ]);
+
 export async function runReactDomRootRenderE2EConformanceGate({
   checkedOracle = readCheckedReactDomRootRenderE2EOracle(),
   currentOracle,
@@ -1245,6 +1311,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
       }),
     privateActPassiveDiagnostics:
       inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics({
+        workspaceRoot
+      }),
+    privateRootWorkLoopCommitHandoffDiagnostics:
+      inspectReactDomRootRenderE2EPrivateRootWorkLoopCommitHandoffDiagnostics({
         workspaceRoot
       }),
     privateReactDomMetadataDiagnostics:
@@ -1292,6 +1362,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics(),
   privateActPassiveDiagnostics =
     inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics(),
+  privateRootWorkLoopCommitHandoffDiagnostics =
+    inspectReactDomRootRenderE2EPrivateRootWorkLoopCommitHandoffDiagnostics(),
   privateReactDomMetadataDiagnostics =
     inspectReactDomRootRenderE2EPrivateReactDomMetadataDiagnostics(),
   portalRootRenderObservations =
@@ -1310,6 +1382,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   const privateCrossRootSchedulingBlockedRows = [];
   const privateActPassiveDiagnosticRows = [];
   const privateActPassiveBlockedRows = [];
+  const privateRootWorkLoopCommitHandoffDiagnosticRows = [];
   const privateReactDomMetadataDiagnosticRows = [];
   const behaviorByScenario = new Map(
     REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR.map((behavior) => [
@@ -1372,6 +1445,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       row
     ])
   );
+  const privateRootWorkLoopCommitHandoffAdmissionById = new Map(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.map(
+      (admission) => [admission.metadataId, admission]
+    )
+  );
+  const privateRootWorkLoopCommitHandoffObservationByRow = new Map(
+    (privateRootWorkLoopCommitHandoffDiagnostics.rows ?? []).map((row) => [
+      formatMetadataModeKey(row),
+      row
+    ])
+  );
   const privateReactDomMetadataAdmissionById = new Map(
     REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.map(
       (admission) => [admission.metadataId, admission]
@@ -1413,6 +1497,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateActPassiveAdmissionByScenario,
     failures
   });
+  validatePrivateRootWorkLoopCommitHandoffAdmissionMetadata({
+    privateRootWorkLoopCommitHandoffAdmissionById,
+    failures
+  });
   validatePrivateReactDomMetadataAdmissionMetadata({
     privateReactDomMetadataAdmissionById,
     failures
@@ -1446,6 +1534,12 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     failures.push({
       gateStatus: "private-root-act-passive-diagnostic-load-failed",
       error: privateActPassiveDiagnostics.loadError
+    });
+  }
+  if (privateRootWorkLoopCommitHandoffDiagnostics.loadError) {
+    failures.push({
+      gateStatus: "private-root-work-loop-commit-handoff-diagnostic-load-failed",
+      error: privateRootWorkLoopCommitHandoffDiagnostics.loadError
     });
   }
   if (privateReactDomMetadataDiagnostics.loadError) {
@@ -1941,6 +2035,75 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   }
 
   for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+    for (const privateAdmission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS) {
+      const context = {
+        category: privateAdmission.category,
+        metadataId: privateAdmission.metadataId,
+        modeId: mode.id,
+        scenarioId: privateAdmission.scenarioId,
+        workerId: privateAdmission.workerId
+      };
+
+      if (
+        privateAdmission.admission !==
+        "private-root-work-loop-commit-handoff-diagnostic"
+      ) {
+        failures.push({
+          ...context,
+          gateStatus:
+            "unknown-private-root-work-loop-commit-handoff-admission",
+          admission: privateAdmission.admission
+        });
+        continue;
+      }
+
+      const privateObservation =
+        privateRootWorkLoopCommitHandoffObservationByRow.get(
+          formatMetadataModeKey(context)
+        );
+
+      if (!privateObservation) {
+        failures.push({
+          ...context,
+          gateStatus:
+            "missing-private-root-work-loop-commit-handoff-diagnostic"
+        });
+        continue;
+      }
+
+      const validationFailure =
+        validatePrivateRootWorkLoopCommitHandoffDiagnosticObservation({
+          admission: privateAdmission,
+          observation: privateObservation
+        });
+
+      if (validationFailure === null) {
+        const publicCompatibilityClaims =
+          privateRootWorkLoopCommitHandoffClaims();
+        privateRootWorkLoopCommitHandoffDiagnosticRows.push({
+          ...context,
+          gateStatus: privateAdmission.gateStatus,
+          oracleRowAccepted: true,
+          publicFacadeGateStatus:
+            REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS,
+          privateEvidenceOnly: true,
+          publicRootCompatibilitySurface: false,
+          comparedToReactDomOracle: false,
+          comparedToReactTestRendererOracle: false,
+          compatibilityClaimed: false,
+          ...publicCompatibilityClaims,
+          publicCompatibilityClaims,
+          evidenceKind: privateObservation.evidence.evidenceKind,
+          sourceEvidence: privateObservation.evidence.sourceEvidence
+        });
+      } else {
+        failures.push({
+          ...context,
+          ...validationFailure
+        });
+      }
+    }
+
     for (const privateAdmission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS) {
       const context = {
         category: privateAdmission.category,
@@ -2111,6 +2274,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       publicPassiveEffectCompatibilityClaimed: false,
       compatibilityClaimed: false
     },
+    privateRootWorkLoopCommitHandoffGate: {
+      id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_GATE_ID,
+      localEntrypoint:
+        "crates/fast-react-reconciler/src/root_work_loop.rs + crates/fast-react-reconciler/src/root_commit.rs private finished-work handoff diagnostics",
+      admittedPrivateRootWorkLoopCommitHandoffIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.map(
+          (admission) => admission.metadataId
+        ),
+      compatibilityClaimed: false,
+      ...privateRootWorkLoopCommitHandoffClaims()
+    },
     privateReactDomMetadataGate: {
       id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_GATE_ID,
       localEntrypoint:
@@ -2158,6 +2332,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateActPassiveDiagnosticScenarioModeRows:
       privateActPassiveDiagnosticRows,
     privateActPassiveBlockedScenarioModeRows: privateActPassiveBlockedRows,
+    privateRootWorkLoopCommitHandoffDiagnosticRows:
+      privateRootWorkLoopCommitHandoffDiagnosticRows,
     privateReactDomMetadataDiagnosticRows:
       privateReactDomMetadataDiagnosticRows,
     privatePromotionRejectionRows503533:
@@ -2189,6 +2365,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateActPassiveDiagnosticRows.length,
       privateActPassiveBlockedScenarioModeRowCount:
         privateActPassiveBlockedRows.length,
+      privateRootWorkLoopCommitHandoffDiagnosticRowCount:
+        privateRootWorkLoopCommitHandoffDiagnosticRows.length,
       privateReactDomMetadataDiagnosticRowCount:
         privateReactDomMetadataDiagnosticRows.length,
       privatePromotion503533RejectedRowCount:
@@ -2216,6 +2394,24 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed: false,
       privateActPassivePublicRootRenderCompatibilityClaimed: false,
       privateActPassivePublicPassiveEffectCompatibilityClaimed: false,
+      privateRootWorkLoopCommitHandoffCompatibilityClaimed: false,
+      privateRootWorkLoopCommitHandoffPublicRootCompatibilitySurface: false,
+      privateRootWorkLoopCommitHandoffPublicCreateRootCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicRootRenderCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicRootUpdateCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicRootUnmountCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicHydrateRootCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicHydrationCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicDomMutationCompatibilityClaimed:
+        false,
+      privateRootWorkLoopCommitHandoffPublicTestRendererCompatibilityClaimed:
+        false,
       privatePortalMetadataPromotesPublicRootRender:
         portalRootRenderGate.summary.privatePortalMetadataPromotesPublicRootRender,
       privateReactDomMetadataCompatibilityClaimed: false,
@@ -2425,6 +2621,7 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Private cross-root scheduling diagnostic rows blocked: ${result.summary.privateCrossRootSchedulingBlockedScenarioModeRowCount}`,
     `Private act/passive diagnostic rows admitted: ${result.summary.privateActPassiveDiagnosticScenarioModeRowCount}`,
     `Private act/passive diagnostic rows blocked: ${result.summary.privateActPassiveBlockedScenarioModeRowCount}`,
+    `Private root work-loop commit handoff rows admitted: ${result.summary.privateRootWorkLoopCommitHandoffDiagnosticRowCount}`,
     `Private React DOM metadata diagnostic rows admitted: ${result.summary.privateReactDomMetadataDiagnosticRowCount}`,
     `Private 503-533 promotion rows rejected: ${result.summary.privatePromotion503533RejectedRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
@@ -2460,6 +2657,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateActPassiveDiagnosticScenarioModeRows.length > 0) {
     lines.push(
       "Private act/passive diagnostics use accepted metadata and source evidence only; public React act, React DOM test-utils act, passive effects, and public root compatibility remain blocked."
+    );
+  }
+  if (result.privateRootWorkLoopCommitHandoffDiagnosticRows.length > 0) {
+    lines.push(
+      "Private root work-loop and finished-work commit handoff diagnostics use source evidence only; public createRoot, render, update, unmount, hydrateRoot, DOM mutation, and test-renderer compatibility remain blocked."
     );
   }
   if (result.privateReactDomMetadataDiagnosticRows.length > 0) {
@@ -2535,6 +2737,10 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateActPassiveBlockedScenarioModeRowCount ?? 0
     }`,
+    `Root-render private root work-loop commit handoff rows admitted: ${
+      result.rootRenderGate?.summary
+        .privateRootWorkLoopCommitHandoffDiagnosticRowCount ?? 0
+    }`,
     `Root-render private React DOM metadata diagnostic rows admitted: ${
       result.rootRenderGate?.summary
         .privateReactDomMetadataDiagnosticRowCount ?? 0
@@ -2588,6 +2794,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private act/passive diagnostics remain metadata evidence only and do not unblock public act, passive effect, or public root compatibility."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary
+      .privateRootWorkLoopCommitHandoffDiagnosticRowCount ?? 0) > 0
+  ) {
+    lines.push(
+      "Private root work-loop and finished-work commit handoff diagnostics remain source evidence only and do not unblock public createRoot, render, update, unmount, hydrateRoot, DOM mutation, or test-renderer compatibility."
     );
   }
   if (
@@ -2882,6 +3096,45 @@ export function inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics({
   } catch (error) {
     return {
       loadError: describePrivateBridgeError(error),
+      rows: []
+    };
+  }
+}
+
+export function inspectReactDomRootRenderE2EPrivateRootWorkLoopCommitHandoffDiagnostics({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const sourceDiagnostics =
+      inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot });
+    const rows = [];
+
+    if (sourceDiagnostics.loadError) {
+      return {
+        loadError: sourceDiagnostics.loadError,
+        rows
+      };
+    }
+
+    for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+      for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS) {
+        rows.push(
+          runPrivateRootWorkLoopCommitHandoffDiagnostic({
+            admission,
+            mode,
+            sourceDiagnostics
+          })
+        );
+      }
+    }
+
+    return {
+      loadError: null,
+      rows
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error),
       rows: []
     };
   }
@@ -3435,6 +3688,10 @@ function validateRootRenderGatePrerequisites({
     failures
   });
   validateRootRenderPrivateActPassiveBlockers({
+    rootRenderGateResult,
+    failures
+  });
+  validateRootRenderPrivateRootWorkLoopCommitHandoffBlockers({
     rootRenderGateResult,
     failures
   });
@@ -4048,6 +4305,157 @@ function validateRootRenderPrivateActPassiveBlockers({
   }
 }
 
+function validateRootRenderPrivateRootWorkLoopCommitHandoffBlockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const admittedMetadataIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.map(
+      (admission) => admission.metadataId
+    );
+  const expectedRows =
+    admittedMetadataIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffDiagnosticRowCount !== expectedRows
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-root-work-loop-commit-handoff-row-count-mismatch",
+      actual:
+        rootRenderGateResult.summary
+          .privateRootWorkLoopCommitHandoffDiagnosticRowCount ?? null,
+      expected: expectedRows
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateRootWorkLoopCommitHandoffGate
+      ?.compatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicRootCompatibilitySurface !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicCreateRootCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicRootRenderCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicRootUpdateCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicRootUnmountCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicHydrateRootCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicHydrationCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicDomMutationCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateRootWorkLoopCommitHandoffPublicTestRendererCompatibilityClaimed !==
+      false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-root-work-loop-commit-handoff-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary
+          .privateRootWorkLoopCommitHandoffCompatibilityClaimed ?? null,
+      gateClaim:
+        rootRenderGateResult.privateRootWorkLoopCommitHandoffGate
+          ?.compatibilityClaimed ?? null,
+      summaryPublicRootClaim:
+        rootRenderGateResult.summary
+          .privateRootWorkLoopCommitHandoffPublicRootCompatibilitySurface ??
+        null,
+      summaryPublicHydrateRootClaim:
+        rootRenderGateResult.summary
+          .privateRootWorkLoopCommitHandoffPublicHydrateRootCompatibilityClaimed ??
+        null,
+      summaryPublicTestRendererClaim:
+        rootRenderGateResult.summary
+          .privateRootWorkLoopCommitHandoffPublicTestRendererCompatibilityClaimed ??
+        null
+    });
+  }
+
+  for (const claimKey of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_CLAIM_KEYS) {
+    if (
+      rootRenderGateResult.privateRootWorkLoopCommitHandoffGate?.[claimKey] !==
+      false
+    ) {
+      failures.push({
+        gateStatus:
+          "root-render-private-root-work-loop-commit-handoff-gate-public-claim-leaked",
+        claimKey,
+        actual:
+          rootRenderGateResult.privateRootWorkLoopCommitHandoffGate?.[claimKey]
+      });
+    }
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privateRootWorkLoopCommitHandoffGate
+        ?.admittedPrivateRootWorkLoopCommitHandoffIds ?? [],
+      admittedMetadataIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-root-work-loop-commit-handoff-admission-set-mismatch",
+      admitted:
+        rootRenderGateResult.privateRootWorkLoopCommitHandoffGate
+          ?.admittedPrivateRootWorkLoopCommitHandoffIds ?? null
+    });
+  }
+
+  for (const row of rootRenderGateResult.privateRootWorkLoopCommitHandoffDiagnosticRows ??
+    []) {
+    const publicClaimLeak =
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_CLAIM_KEYS.some(
+        (claimKey) =>
+          row[claimKey] !== false ||
+          row.publicCompatibilityClaims?.[claimKey] !== false
+      );
+
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.privateEvidenceOnly !== true ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.comparedToReactTestRendererOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      publicClaimLeak ||
+      !admittedMetadataIds.includes(row.metadataId)
+    ) {
+      failures.push({
+        metadataId: row.metadataId,
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus:
+          "root-render-private-root-work-loop-commit-handoff-row-not-private",
+        row
+      });
+    }
+  }
+}
+
 function validateRootRenderPrivateReactDomMetadataBlockers({
   rootRenderGateResult,
   failures
@@ -4631,6 +5039,15 @@ function validatePublicFacadeBoundary({
       "Private React DOM metadata rows remain separate from public root, hydration, event, resource, form, and controlled-input compatibility while public roots are placeholders.",
     compatibilityClaimed: false,
     privateReactDomMetadataEvidence: "separate"
+  });
+
+  blockedPublicFacadeRows.push({
+    id: "public-root-work-loop-commit-handoff-compatibility",
+    gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    reason:
+      "Private root work-loop and finished-work commit handoff diagnostics remain separate from public createRoot, render, update, unmount, hydrateRoot, DOM mutation, and test-renderer compatibility while public roots are placeholders.",
+    compatibilityClaimed: false,
+    privateRootWorkLoopCommitHandoffEvidence: "separate"
   });
 
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
@@ -6066,6 +6483,52 @@ function runPrivateActPassiveDiagnosticScenario({ mode, modules, scenarioId }) {
     return {
       modeId: mode.id,
       scenarioId,
+      status: "throws",
+      error: describePrivateBridgeError(error)
+    };
+  }
+}
+
+function runPrivateRootWorkLoopCommitHandoffDiagnostic({
+  admission,
+  mode,
+  sourceDiagnostics
+}) {
+  try {
+    const sourceEvidence = sourceDiagnostics[admission.metadataId];
+    if (!sourceEvidence) {
+      throw new Error(
+        `Missing private root work-loop commit handoff source evidence: ${admission.metadataId}`
+      );
+    }
+    const publicCompatibilityClaims =
+      privateRootWorkLoopCommitHandoffClaims();
+
+    return {
+      metadataId: admission.metadataId,
+      modeId: mode.id,
+      scenarioId: admission.scenarioId,
+      status: "ok",
+      evidence: {
+        diagnosticKind:
+          "private-root-work-loop-commit-handoff-source-diagnostic",
+        evidenceKind: admission.evidenceKind,
+        metadataId: admission.metadataId,
+        privateEvidenceOnly: true,
+        workerId: admission.workerId,
+        comparedToReactDomOracle: false,
+        comparedToReactTestRendererOracle: false,
+        compatibilityClaimed: false,
+        ...publicCompatibilityClaims,
+        publicCompatibilityClaims,
+        sourceEvidence
+      }
+    };
+  } catch (error) {
+    return {
+      metadataId: admission.metadataId,
+      modeId: mode.id,
+      scenarioId: admission.scenarioId,
       status: "throws",
       error: describePrivateBridgeError(error)
     };
@@ -10233,6 +10696,125 @@ function inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot }) {
   }
 }
 
+function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
+  try {
+    const rootWorkLoopSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_work_loop.rs"
+    );
+    const rootCommitSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/root_commit.rs"
+    );
+
+    return {
+      loadError: null,
+      "worker-534-root-work-loop-finished-work-commit-handoff": {
+        completeWorkCommitHandoffRecordPresent:
+          /HostRootCompleteWorkCommitHandoffRecord/u.test(rootWorkLoopSource),
+        completeWorkCommitHandoffFunctionPresent:
+          /handoff_completed_host_root_render_to_test_complete_work_and_commit/u.test(
+            rootWorkLoopSource
+          ),
+        finishedWorkPendingCommitRecorded:
+          /record_host_root_finished_work_pending_commit_for_canary/u.test(
+            rootWorkLoopSource
+          ),
+        finishedWorkCommitHandoffConsumed:
+          /commit_finished_host_root_with_finished_work_handoff_for_canary/u.test(
+            rootWorkLoopSource
+          ),
+        hostComponentCommitDiagnosticTestPresent:
+          /root_work_loop_complete_work_handoff_commits_host_component_tree_with_diagnostics/u.test(
+            rootWorkLoopSource
+          ),
+        hostTextCommitDiagnosticTestPresent:
+          /root_work_loop_complete_work_commit_handoff_records_root_text_diagnostic/u.test(
+            rootWorkLoopSource
+          ),
+        hostOperationsUnchangedByCommitCheckPresent:
+          /host_operations_unchanged_by_commit/u.test(rootWorkLoopSource),
+        placementApplyDiagnosticsCaptured:
+          /host_root_placement_apply_diagnostics_for_canary/u.test(
+            rootWorkLoopSource
+          ),
+        publicRenderBlockedMethodPresent:
+          /const fn public_render_blocked\(&self\) -> bool\s*\{\s*true\s*\}/u.test(
+            rootWorkLoopSource
+          ),
+        mutationExecutionBlockedAssertionPresent:
+          /mutation_execution_blocked\(\)/u.test(rootWorkLoopSource),
+        publicRootRenderingBlockedAssertionPresent:
+          /public_root_rendering_blocked\(\)/u.test(rootWorkLoopSource),
+        effectsRefsHydrationBlockedAssertionPresent:
+          /effects_refs_and_hydration_blocked\(\)/u.test(rootWorkLoopSource),
+        publicRootCompatibilityClaimed: false
+      },
+      "worker-534-root-commit-finished-work-record-consumption": {
+        pendingRecordStructPresent:
+          /HostRootFinishedWorkPendingCommitRecordForCanary/u.test(
+            rootCommitSource
+          ),
+        commitHandoffRecordStructPresent:
+          /HostRootFinishedWorkCommitHandoffRecordForCanary/u.test(
+            rootCommitSource
+          ),
+        recordFunctionPresent:
+          /record_host_root_finished_work_pending_commit_for_canary/u.test(
+            rootCommitSource
+          ),
+        commitFunctionPresent:
+          /commit_finished_host_root_with_finished_work_handoff_for_canary/u.test(
+            rootCommitSource
+          ),
+        validationFunctionPresent:
+          /validate_host_root_finished_work_pending_commit_for_canary/u.test(
+            rootCommitSource
+          ),
+        recordsFinishedWorkMethodPresent:
+          /records_finished_work/u.test(rootCommitSource),
+        commitOrderAfterPendingRecordMethodPresent:
+          /commit_order_after_pending_record/u.test(rootCommitSource),
+        consumedFinishedWorkRecordMethodPresent:
+          /consumed_finished_work_record/u.test(rootCommitSource),
+        mutationExecutionBlockedMethodPresent:
+          /mutation_execution_blocked/u.test(rootCommitSource),
+        publicRootRenderingBlockedMethodPresent:
+          /public_root_rendering_blocked/u.test(rootCommitSource),
+        effectsRefsHydrationBlockedMethodPresent:
+          /effects_refs_and_hydration_blocked/u.test(rootCommitSource),
+        identityLanesRootTokenOrderTestPresent:
+          /root_commit_finished_work_handoff_records_identity_lanes_root_token_and_order/u.test(
+            rootCommitSource
+          ),
+        missingRecordRejectionTestPresent:
+          /root_commit_finished_work_handoff_rejects_missing_record_before_switching_current/u.test(
+            rootCommitSource
+          ),
+        foreignRecordRejectionTestPresent:
+          /root_commit_finished_work_handoff_rejects_foreign_record_before_switching_current/u.test(
+            rootCommitSource
+          ),
+        staleRecordRejectionTestPresent:
+          /root_commit_finished_work_handoff_rejects_stale_record_after_current_switch/u.test(
+            rootCommitSource
+          ),
+        lanesMismatchErrorVariantPresent:
+          /FinishedWorkRecordLanesMismatch/u.test(rootCommitSource),
+        commitDelegatesToFinishedHostRoot:
+          /let commit = commit_finished_host_root\(store, render\)\?/u.test(
+            rootCommitSource
+          ),
+        publicRootCompatibilityClaimed: false
+      }
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error)
+    };
+  }
+}
+
 function inspectActPassiveSourceDiagnostics({ workspaceRoot }) {
   try {
     const reactActGateSource = readWorkspaceFile(
@@ -11565,6 +12147,93 @@ function expectedPrivateWarningUpdateBoundaryRecord(operation, requestType) {
   };
 }
 
+function validatePrivateRootWorkLoopCommitHandoffDiagnosticObservation({
+  admission,
+  observation
+}) {
+  if (observation.status !== "ok") {
+    return {
+      gateStatus: "private-root-work-loop-commit-handoff-diagnostic-failed",
+      status: observation.status,
+      error: observation.error ?? null
+    };
+  }
+
+  const evidence = observation.evidence;
+  const publicClaimExpectation = privateRootWorkLoopCommitHandoffClaims();
+  const commonExpectation = {
+    compatibilityClaimed: false,
+    comparedToReactDomOracle: false,
+    comparedToReactTestRendererOracle: false,
+    diagnosticKind:
+      "private-root-work-loop-commit-handoff-source-diagnostic",
+    evidenceKind: admission.evidenceKind,
+    metadataId: admission.metadataId,
+    privateEvidenceOnly: true,
+    workerId: admission.workerId,
+    ...publicClaimExpectation,
+    publicCompatibilityClaims: publicClaimExpectation
+  };
+  const commonActual = {
+    compatibilityClaimed: evidence.compatibilityClaimed,
+    comparedToReactDomOracle: evidence.comparedToReactDomOracle,
+    comparedToReactTestRendererOracle:
+      evidence.comparedToReactTestRendererOracle,
+    diagnosticKind: evidence.diagnosticKind,
+    evidenceKind: evidence.evidenceKind,
+    metadataId: evidence.metadataId,
+    privateEvidenceOnly: evidence.privateEvidenceOnly,
+    workerId: evidence.workerId,
+    publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+    publicCreateRootCompatibilityClaimed:
+      evidence.publicCreateRootCompatibilityClaimed,
+    publicRootRenderCompatibilityClaimed:
+      evidence.publicRootRenderCompatibilityClaimed,
+    publicRootUpdateCompatibilityClaimed:
+      evidence.publicRootUpdateCompatibilityClaimed,
+    publicRootUnmountCompatibilityClaimed:
+      evidence.publicRootUnmountCompatibilityClaimed,
+    publicHydrateRootCompatibilityClaimed:
+      evidence.publicHydrateRootCompatibilityClaimed,
+    publicHydrationCompatibilityClaimed:
+      evidence.publicHydrationCompatibilityClaimed,
+    publicDomMutationCompatibilityClaimed:
+      evidence.publicDomMutationCompatibilityClaimed,
+    publicTestRendererCompatibilityClaimed:
+      evidence.publicTestRendererCompatibilityClaimed,
+    publicCompatibilityClaims: evidence.publicCompatibilityClaims
+  };
+  const commonDifference = findFirstDifferencePath(
+    commonExpectation,
+    commonActual
+  );
+  if (commonDifference !== null) {
+    return {
+      gateStatus:
+        "private-root-work-loop-commit-handoff-common-evidence-mismatch",
+      firstDifferencePath: commonDifference
+    };
+  }
+
+  const expected = expectedPrivateRootWorkLoopCommitHandoffEvidence(
+    admission.metadataId
+  );
+  const actual = comparablePrivateRootWorkLoopCommitHandoffEvidence(
+    admission.metadataId,
+    evidence.sourceEvidence
+  );
+  const sourceDifference = findFirstDifferencePath(expected, actual);
+  if (sourceDifference !== null) {
+    return {
+      gateStatus:
+        "private-root-work-loop-commit-handoff-source-evidence-mismatch",
+      firstDifferencePath: sourceDifference
+    };
+  }
+
+  return null;
+}
+
 function validatePrivateReactDomMetadataDiagnosticObservation({
   admission,
   observation
@@ -11640,6 +12309,124 @@ function validatePrivateReactDomMetadataDiagnosticObservation({
   }
 
   return null;
+}
+
+function expectedPrivateRootWorkLoopCommitHandoffEvidence(metadataId) {
+  switch (metadataId) {
+    case "worker-534-root-work-loop-finished-work-commit-handoff":
+      return {
+        completeWorkCommitHandoffRecordPresent: true,
+        completeWorkCommitHandoffFunctionPresent: true,
+        finishedWorkPendingCommitRecorded: true,
+        finishedWorkCommitHandoffConsumed: true,
+        hostComponentCommitDiagnosticTestPresent: true,
+        hostTextCommitDiagnosticTestPresent: true,
+        hostOperationsUnchangedByCommitCheckPresent: true,
+        placementApplyDiagnosticsCaptured: true,
+        publicRenderBlockedMethodPresent: true,
+        mutationExecutionBlockedAssertionPresent: true,
+        publicRootRenderingBlockedAssertionPresent: true,
+        effectsRefsHydrationBlockedAssertionPresent: true,
+        publicRootCompatibilityClaimed: false
+      };
+    case "worker-534-root-commit-finished-work-record-consumption":
+      return {
+        pendingRecordStructPresent: true,
+        commitHandoffRecordStructPresent: true,
+        recordFunctionPresent: true,
+        commitFunctionPresent: true,
+        validationFunctionPresent: true,
+        recordsFinishedWorkMethodPresent: true,
+        commitOrderAfterPendingRecordMethodPresent: true,
+        consumedFinishedWorkRecordMethodPresent: true,
+        mutationExecutionBlockedMethodPresent: true,
+        publicRootRenderingBlockedMethodPresent: true,
+        effectsRefsHydrationBlockedMethodPresent: true,
+        identityLanesRootTokenOrderTestPresent: true,
+        missingRecordRejectionTestPresent: true,
+        foreignRecordRejectionTestPresent: true,
+        staleRecordRejectionTestPresent: true,
+        lanesMismatchErrorVariantPresent: true,
+        commitDelegatesToFinishedHostRoot: true,
+        publicRootCompatibilityClaimed: false
+      };
+    default:
+      return null;
+  }
+}
+
+function comparablePrivateRootWorkLoopCommitHandoffEvidence(
+  metadataId,
+  evidence
+) {
+  switch (metadataId) {
+    case "worker-534-root-work-loop-finished-work-commit-handoff":
+      return {
+        completeWorkCommitHandoffRecordPresent:
+          evidence.completeWorkCommitHandoffRecordPresent,
+        completeWorkCommitHandoffFunctionPresent:
+          evidence.completeWorkCommitHandoffFunctionPresent,
+        finishedWorkPendingCommitRecorded:
+          evidence.finishedWorkPendingCommitRecorded,
+        finishedWorkCommitHandoffConsumed:
+          evidence.finishedWorkCommitHandoffConsumed,
+        hostComponentCommitDiagnosticTestPresent:
+          evidence.hostComponentCommitDiagnosticTestPresent,
+        hostTextCommitDiagnosticTestPresent:
+          evidence.hostTextCommitDiagnosticTestPresent,
+        hostOperationsUnchangedByCommitCheckPresent:
+          evidence.hostOperationsUnchangedByCommitCheckPresent,
+        placementApplyDiagnosticsCaptured:
+          evidence.placementApplyDiagnosticsCaptured,
+        publicRenderBlockedMethodPresent:
+          evidence.publicRenderBlockedMethodPresent,
+        mutationExecutionBlockedAssertionPresent:
+          evidence.mutationExecutionBlockedAssertionPresent,
+        publicRootRenderingBlockedAssertionPresent:
+          evidence.publicRootRenderingBlockedAssertionPresent,
+        effectsRefsHydrationBlockedAssertionPresent:
+          evidence.effectsRefsHydrationBlockedAssertionPresent,
+        publicRootCompatibilityClaimed:
+          evidence.publicRootCompatibilityClaimed
+      };
+    case "worker-534-root-commit-finished-work-record-consumption":
+      return {
+        pendingRecordStructPresent: evidence.pendingRecordStructPresent,
+        commitHandoffRecordStructPresent:
+          evidence.commitHandoffRecordStructPresent,
+        recordFunctionPresent: evidence.recordFunctionPresent,
+        commitFunctionPresent: evidence.commitFunctionPresent,
+        validationFunctionPresent: evidence.validationFunctionPresent,
+        recordsFinishedWorkMethodPresent:
+          evidence.recordsFinishedWorkMethodPresent,
+        commitOrderAfterPendingRecordMethodPresent:
+          evidence.commitOrderAfterPendingRecordMethodPresent,
+        consumedFinishedWorkRecordMethodPresent:
+          evidence.consumedFinishedWorkRecordMethodPresent,
+        mutationExecutionBlockedMethodPresent:
+          evidence.mutationExecutionBlockedMethodPresent,
+        publicRootRenderingBlockedMethodPresent:
+          evidence.publicRootRenderingBlockedMethodPresent,
+        effectsRefsHydrationBlockedMethodPresent:
+          evidence.effectsRefsHydrationBlockedMethodPresent,
+        identityLanesRootTokenOrderTestPresent:
+          evidence.identityLanesRootTokenOrderTestPresent,
+        missingRecordRejectionTestPresent:
+          evidence.missingRecordRejectionTestPresent,
+        foreignRecordRejectionTestPresent:
+          evidence.foreignRecordRejectionTestPresent,
+        staleRecordRejectionTestPresent:
+          evidence.staleRecordRejectionTestPresent,
+        lanesMismatchErrorVariantPresent:
+          evidence.lanesMismatchErrorVariantPresent,
+        commitDelegatesToFinishedHostRoot:
+          evidence.commitDelegatesToFinishedHostRoot,
+        publicRootCompatibilityClaimed:
+          evidence.publicRootCompatibilityClaimed
+      };
+    default:
+      return null;
+  }
 }
 
 function expectedPrivateReactDomMetadataEvidence(metadataId) {
@@ -13451,6 +14238,56 @@ function validatePrivateActPassiveAdmissionMetadata({
       gateStatus: "invalid-private-root-act-passive-admission-metadata",
       admission
     });
+  }
+}
+
+function validatePrivateRootWorkLoopCommitHandoffAdmissionMetadata({
+  privateRootWorkLoopCommitHandoffAdmissionById,
+  failures
+}) {
+  for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS) {
+    if (
+      !privateRootWorkLoopCommitHandoffAdmissionById.has(admission.metadataId)
+    ) {
+      failures.push({
+        metadataId: admission.metadataId,
+        gateStatus:
+          "missing-private-root-work-loop-commit-handoff-admission"
+      });
+    }
+  }
+
+  for (const [
+    metadataId,
+    admission
+  ] of privateRootWorkLoopCommitHandoffAdmissionById) {
+    if (
+      !REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.some(
+        (candidate) => candidate.metadataId === metadataId
+      )
+    ) {
+      failures.push({
+        metadataId,
+        gateStatus:
+          "unknown-private-root-work-loop-commit-handoff-admission-id"
+      });
+    }
+
+    if (
+      admission.admission !==
+        "private-root-work-loop-commit-handoff-diagnostic" ||
+      admission.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS ||
+      typeof admission.evidenceKind !== "string" ||
+      !REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.includes(admission.scenarioId)
+    ) {
+      failures.push({
+        metadataId,
+        gateStatus:
+          "invalid-private-root-work-loop-commit-handoff-admission",
+        admission
+      });
+    }
   }
 }
 

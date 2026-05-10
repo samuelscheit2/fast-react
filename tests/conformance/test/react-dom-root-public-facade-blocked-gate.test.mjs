@@ -33,6 +33,8 @@ import {
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
   evaluateReactDomRootRenderE2EConformanceGate,
   evaluateReactDomRootPublicFacadeBlockedGate,
@@ -176,6 +178,61 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
   assert.equal(
     gate.rootRenderGate.summary
       .privateActPassivePublicPassiveEffectCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateRootWorkLoopCommitHandoffDiagnosticRowCount,
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.length *
+      REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicRootCompatibilitySurface,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicCreateRootCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicRootUpdateCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicRootUnmountCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicHydrateRootCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicDomMutationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateRootWorkLoopCommitHandoffPublicTestRendererCompatibilityClaimed,
     false
   );
   assert.equal(
@@ -324,6 +381,10 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     assert.notEqual(
       row.gateStatus,
       REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS
+    );
+    assert.notEqual(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS
     );
     assert.notEqual(row.gateStatus, "blocked-portal-root-render");
     if ("compatibilityClaimed" in row) {
@@ -1565,6 +1626,91 @@ test("React DOM public root facade gate rejects private act/passive promotion to
     gate.failures.some(
       (failure) =>
         failure.gateStatus === "root-render-private-act-passive-row-not-private"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects private root work-loop commit handoff promotion", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privateRootWorkLoopCommitHandoffCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicRootCompatibilitySurface = true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicCreateRootCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicRootRenderCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicRootUpdateCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicRootUnmountCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicHydrateRootCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicHydrationCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicDomMutationCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateRootWorkLoopCommitHandoffPublicTestRendererCompatibilityClaimed =
+    true;
+  rootRenderGate.privateRootWorkLoopCommitHandoffGate.compatibilityClaimed =
+    true;
+  rootRenderGate.privateRootWorkLoopCommitHandoffGate
+    .publicHydrateRootCompatibilityClaimed = true;
+  rootRenderGate.privateRootWorkLoopCommitHandoffDiagnosticRows[0] = {
+    ...rootRenderGate.privateRootWorkLoopCommitHandoffDiagnosticRows[0],
+    compatibilityClaimed: true,
+    comparedToReactDomOracle: true,
+    privateEvidenceOnly: false,
+    publicCompatibilityClaims: {
+      ...rootRenderGate.privateRootWorkLoopCommitHandoffDiagnosticRows[0]
+        .publicCompatibilityClaims,
+      publicRootCompatibilitySurface: true,
+      publicHydrateRootCompatibilityClaimed: true
+    },
+    publicRootCompatibilitySurface: true,
+    publicHydrateRootCompatibilityClaimed: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-root-work-loop-commit-handoff-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-root-work-loop-commit-handoff-gate-public-claim-leaked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-root-work-loop-commit-handoff-row-not-private"
     )
   );
 });

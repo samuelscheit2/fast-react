@@ -14,7 +14,11 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS,
-  evaluateReactDomRootRenderE2EConformanceGate
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_CLAIM_KEYS,
+  evaluateReactDomRootRenderE2EConformanceGate,
+  inspectReactDomRootRenderE2EPrivateRootWorkLoopCommitHandoffDiagnostics
 } from "../src/react-dom-root-render-e2e-conformance-gate.mjs";
 
 const oracle = readCheckedReactDomRootRenderE2EOracle();
@@ -287,3 +291,160 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
     ["restore-target", "restore-queue"]
   );
 });
+
+test("root render E2E gate admits private root work-loop and commit handoff rows only as source evidence", () => {
+  const result = evaluateReactDomRootRenderE2EConformanceGate({
+    checkedOracle: oracle,
+    currentOracle: oracle
+  });
+  const expectedRowCount =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.length *
+    REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    result.summary.privateRootWorkLoopCommitHandoffDiagnosticRowCount,
+    expectedRowCount
+  );
+  assert.deepEqual(
+    result.privateRootWorkLoopCommitHandoffGate
+      .admittedPrivateRootWorkLoopCommitHandoffIds,
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ADMISSIONS.map(
+      (admission) => admission.metadataId
+    )
+  );
+  assert.equal(
+    result.summary.privateRootWorkLoopCommitHandoffCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicRootCompatibilitySurface,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicCreateRootCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicRootUpdateCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicRootUnmountCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicHydrateRootCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicDomMutationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateRootWorkLoopCommitHandoffPublicTestRendererCompatibilityClaimed,
+    false
+  );
+
+  for (const row of result.privateRootWorkLoopCommitHandoffDiagnosticRows) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_ACCEPTED_STATUS
+    );
+    assert.equal(row.publicFacadeGateStatus, "blocked-unsupported-root-e2e");
+    assert.equal(row.privateEvidenceOnly, true);
+    assert.equal(row.comparedToReactDomOracle, false);
+    assert.equal(row.comparedToReactTestRendererOracle, false);
+    assert.equal(row.compatibilityClaimed, false);
+    for (const claimKey of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ROOT_WORK_LOOP_COMMIT_HANDOFF_CLAIM_KEYS) {
+      assert.equal(row[claimKey], false, `${row.metadataId} ${claimKey}`);
+      assert.equal(
+        row.publicCompatibilityClaims[claimKey],
+        false,
+        `${row.metadataId} publicCompatibilityClaims.${claimKey}`
+      );
+    }
+  }
+
+  const developmentRows = Object.fromEntries(
+    result.privateRootWorkLoopCommitHandoffDiagnosticRows
+      .filter((row) => row.modeId === "default-node-development")
+      .map((row) => [row.metadataId, row])
+  );
+  assert.equal(
+    developmentRows["worker-534-root-work-loop-finished-work-commit-handoff"]
+      .sourceEvidence.hostComponentCommitDiagnosticTestPresent,
+    true
+  );
+  assert.equal(
+    developmentRows["worker-534-root-work-loop-finished-work-commit-handoff"]
+      .sourceEvidence.publicRootRenderingBlockedAssertionPresent,
+    true
+  );
+  assert.equal(
+    developmentRows[
+      "worker-534-root-commit-finished-work-record-consumption"
+    ].sourceEvidence.identityLanesRootTokenOrderTestPresent,
+    true
+  );
+  assert.equal(
+    developmentRows[
+      "worker-534-root-commit-finished-work-record-consumption"
+    ].sourceEvidence.missingRecordRejectionTestPresent,
+    true
+  );
+});
+
+test("root render E2E gate rejects real handoff source metadata promotion", () => {
+  const diagnostics = clone(
+    inspectReactDomRootRenderE2EPrivateRootWorkLoopCommitHandoffDiagnostics()
+  );
+  diagnostics.rows[0].evidence.compatibilityClaimed = true;
+  diagnostics.rows[0].evidence.publicRootCompatibilitySurface = true;
+  diagnostics.rows[0].evidence.publicCreateRootCompatibilityClaimed = true;
+  diagnostics.rows[0].evidence.publicRootRenderCompatibilityClaimed = true;
+  diagnostics.rows[0].evidence.publicRootUpdateCompatibilityClaimed = true;
+  diagnostics.rows[0].evidence.publicRootUnmountCompatibilityClaimed = true;
+  diagnostics.rows[0].evidence.publicHydrateRootCompatibilityClaimed = true;
+  diagnostics.rows[0].evidence.publicCompatibilityClaims = {
+    ...diagnostics.rows[0].evidence.publicCompatibilityClaims,
+    publicRootCompatibilitySurface: true,
+    publicCreateRootCompatibilityClaimed: true
+  };
+
+  const result = evaluateReactDomRootRenderE2EConformanceGate({
+    checkedOracle: oracle,
+    currentOracle: oracle,
+    privateRootWorkLoopCommitHandoffDiagnostics: diagnostics
+  });
+
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "private-root-work-loop-commit-handoff-common-evidence-mismatch"
+    )
+  );
+});
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
