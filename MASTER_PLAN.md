@@ -52,12 +52,19 @@ the post-cleanup `npm run check` baseline failed and has been cleaned up.
 
 - Worker 716: private-admission and package-surface ledger for accepted queue
   685-714.
+- Worker 717: private HostRoot render -> finished-work -> commit entrypoint
+  hardening.
+- Worker 721: DOM text reset / dangerousHTML fake-DOM execution gate.
 
 ## Near-Term Sequencing
 
 1. Accept worker 716 only if it adds queue 685-714 admission evidence without
    product code changes and keeps `npm run check` green.
-2. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+2. Accept worker 717 only if it keeps public render/host mutation blocked while
+   hardening private finished-work commit handoff.
+3. Accept worker 721 only if it remains fake-DOM/private and keeps public React
+   DOM text/dangerousHTML compatibility blocked.
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
