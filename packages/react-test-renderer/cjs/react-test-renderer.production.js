@@ -19,6 +19,10 @@ const privateCreateRouteAdmissionMetadataId =
   'fast-react-test-renderer-create-route-admission-metadata';
 const privateCreateRouteAdmissionMetadataStatus =
   'accepted-create-route-rust-root-create-work-loop-admission-metadata';
+const privateCreateNativeBridgeHostOutputHandoffDiagnosticId =
+  'react-test-renderer-create-native-bridge-host-output-handoff-private-diagnostic';
+const privateCreateNativeBridgeHostOutputHandoffStatus =
+  'private-create-native-bridge-host-output-handoff-public-create-blocked';
 const actSchedulerMissingBeforeExecution = Object.freeze([
   'public-react-test-renderer-act-queue-drain',
   'public-react-test-renderer-scheduler-flush-execution',
@@ -1155,24 +1159,36 @@ const privateCreateRouteAdmissionGate = Object.freeze({
     'TestRendererRootScheduledUpdate',
     'TestRendererRootCreatePreflightDiagnostics',
     'TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics',
-    'TestRendererPrivateCreateRouteAdmissionDiagnostics'
+    'TestRendererPrivateCreateRouteAdmissionDiagnostics',
+    'TestRendererPrivateCreateNativeBridgeHostOutputHandoff'
   ]),
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::create',
     'TestRendererRoot::describe_private_root_create_preflight_for_canary',
     'TestRendererRoot::describe_private_create_route_admission_for_canary',
-    'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff'
+    'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff',
+    'TestRendererRoot::render_and_commit_host_output_for_canary',
+    'TestRendererRoot::describe_private_create_native_bridge_host_output_handoff_for_canary'
   ]),
   acceptedRustTests: Object.freeze([
     'root_private_create_route_admission_consumes_create_and_work_loop_evidence',
+    'root_private_create_native_bridge_handoff_consumes_actual_host_output',
+    'root_private_create_native_bridge_handoff_rejects_stale_admission',
     'root_private_create_route_admission_rejects_missing_rust_admission_record',
     'root_private_create_route_admission_rejects_stale_rust_admission_record',
     'root_private_create_route_admission_rejects_missing_root_create_preflight'
   ]),
+  hostOutputHandoffDiagnosticId:
+    privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+  hostOutputHandoffStatus:
+    privateCreateNativeBridgeHostOutputHandoffStatus,
   consumesJsFacadeCreateMetadata: true,
   consumesAcceptedRustRootCreateExecutionEvidence: true,
   consumesAcceptedRustRootCreatePreflightDiagnostics: true,
   consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+  consumesAcceptedRustCreateHostOutputHandoff: true,
+  acceptedHostOutputShape: 'SingleHostText',
+  hostOutputProducedByRust: true,
   missingRustAdmissionRecordRejection: true,
   staleRustAdmissionRecordRejection: true,
   publicRouteAvailable: false,
@@ -1212,6 +1228,9 @@ const createPrivateRoute = Object.freeze({
   consumesAcceptedRustRootCreateExecutionEvidence: true,
   consumesAcceptedRustRootCreatePreflightDiagnostics: true,
   consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+  consumesAcceptedRustCreateHostOutputHandoff: true,
+  acceptedHostOutputShape: 'SingleHostText',
+  hostOutputProducedByRust: true,
   publicCreateBehaviorAvailable: false,
   publicSerializationAvailable: false,
   compatibilityClaimed: false,
@@ -2532,13 +2551,15 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
     acceptedWorkers: freezeArray([
       'worker-153-test-renderer-root-canary',
       'worker-195-test-renderer-root-callback-snapshot',
-      'worker-208-test-renderer-host-output-canary'
+      'worker-208-test-renderer-host-output-canary',
+      'worker-636-test-renderer-create-native-execution'
     ]),
     acceptedRustTests: freezeArray([
       'root_create_enqueues_host_root_update_without_host_mutation',
       'root_options_store_strict_mode_and_create_node_mock_without_invocation',
       'root_create_commit_handoff_exposes_visible_callback_snapshot',
-      'root_host_output_canary_commits_minimal_host_component_with_text'
+      'root_host_output_canary_commits_minimal_host_component_with_text',
+      'root_private_create_native_bridge_handoff_consumes_actual_host_output'
     ])
   }),
   update: freezeRecord({
@@ -2635,6 +2656,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-265-test-renderer-private-json-ready-diagnostics',
     'worker-575-test-renderer-unmount-deletion-commit-link',
     'worker-610-test-renderer-create-native-bridge-admission',
+    'worker-636-test-renderer-create-native-execution',
     'worker-612-test-renderer-unmount-native-bridge-admission'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
@@ -2644,6 +2666,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-423-test-renderer-native-root-execution-bridge',
     'worker-426-test-renderer-testinstance-bridge-query',
     'worker-610-test-renderer-create-native-bridge-admission',
+    'worker-636-test-renderer-create-native-execution',
     'worker-612-test-renderer-unmount-native-bridge-admission'
   ]),
   root: freezeRecord({
@@ -2737,11 +2760,20 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     lifecycleRecord: 'TestRendererRootScheduledUpdate',
     executionResultRecord:
       'TestRendererPrivateCreateRouteAdmissionDiagnostics',
+    hostOutputHandoffRecord:
+      'TestRendererPrivateCreateNativeBridgeHostOutputHandoff',
+    hostOutputHandoffDiagnosticId:
+      privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+    hostOutputHandoffStatus:
+      privateCreateNativeBridgeHostOutputHandoffStatus,
     acceptedInputShape: 'HostComponentWithTextChild',
     consumesJsFacadeCreateMetadata: true,
     consumesAcceptedRustRootCreateExecutionEvidence: true,
     consumesAcceptedRustRootCreatePreflightDiagnostics: true,
     consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
+    consumesAcceptedRustCreateHostOutputHandoff: true,
+    acceptedHostOutputShape: 'SingleHostText',
+    hostOutputProducedByRust: true,
     missingRustAdmissionRecordRejection: true,
     staleRustAdmissionRecordRejection: true,
     publicRendererRootCreated: false,
@@ -4737,6 +4769,10 @@ function createRootRequestRecord({
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       operation
     ),
+    privateCreateNativeBridgeHostOutputHandoffGate:
+      operation === 'create' ? privateCreateRouteAdmissionGate : null,
+    privateCreateNativeBridgeHostOutputHandoffAvailable:
+      operation === 'create',
     privateUpdateRouteRootWorkLoopGate:
       operation === 'update' ? privateUpdateRouteRootWorkLoopGate : null,
     privateUpdateRouteRootWorkLoopAdmissionAvailable:
@@ -6020,6 +6056,10 @@ function createRootExecutionHandoff(record) {
       record.privateUnmountDeletionCommitHandoff,
     privateUnmountDeletionCommitHandoffAvailable:
       record.privateUnmountDeletionCommitHandoffAvailable,
+    privateCreateNativeBridgeHostOutputHandoffGate:
+      record.privateCreateNativeBridgeHostOutputHandoffGate,
+    privateCreateNativeBridgeHostOutputHandoffAvailable:
+      record.privateCreateNativeBridgeHostOutputHandoffAvailable,
     privateUnmountNativeBridgeAdmissionGate:
       record.privateUnmountNativeBridgeAdmissionGate,
     privateUnmountNativeBridgeAdmissionAvailable:

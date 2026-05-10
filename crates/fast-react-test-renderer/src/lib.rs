@@ -2678,6 +2678,10 @@ pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_ID: &str =
     "fast-react-test-renderer-create-route-admission-metadata";
 pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_STATUS: &str =
     "accepted-create-route-rust-root-create-work-loop-admission-metadata";
+pub const TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID: &str =
+    "react-test-renderer-create-native-bridge-host-output-handoff-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS: &str =
+    "private-create-native-bridge-host-output-handoff-public-create-blocked";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
@@ -3623,6 +3627,180 @@ impl TestRendererPrivateCreateRouteAdmissionDiagnostics {
     #[must_use]
     pub const fn reconciler_execution_from_js(self) -> bool {
         self.reconciler_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn host_output_produced_from_js(self) -> bool {
+        self.host_output_produced_from_js
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
+    diagnostic_id: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    public_surface: &'static str,
+    create_route_admission_record_id: &'static str,
+    create_route_admission_status: &'static str,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element: RootElementHandle,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    host_output: TestRendererHostOutputDiagnostics,
+    serialization_gate_status: TestRendererSerializationGateStatus,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    create_route_admission_accepted: bool,
+    host_output_handoff_accepted: bool,
+    actual_rust_create_host_output_handoff: bool,
+    host_output_produced_by_rust: bool,
+    public_create_behavior_available: bool,
+    public_serialization_available: bool,
+    public_test_instance_available: bool,
+    native_addon_loaded: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+    rust_execution_from_js: bool,
+    host_output_produced_from_js: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
+    #[must_use]
+    pub const fn diagnostic_id(self) -> &'static str {
+        self.diagnostic_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn create_route_admission_record_id(self) -> &'static str {
+        self.create_route_admission_record_id
+    }
+
+    #[must_use]
+    pub const fn create_route_admission_status(self) -> &'static str {
+        self.create_route_admission_status
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element(self) -> RootElementHandle {
+        self.scheduled_element
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
+    pub const fn host_output(self) -> TestRendererHostOutputDiagnostics {
+        self.host_output
+    }
+
+    #[must_use]
+    pub const fn serialization_gate_status(self) -> TestRendererSerializationGateStatus {
+        self.serialization_gate_status
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn create_route_admission_accepted(self) -> bool {
+        self.create_route_admission_accepted
+    }
+
+    #[must_use]
+    pub const fn host_output_handoff_accepted(self) -> bool {
+        self.host_output_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn actual_rust_create_host_output_handoff(self) -> bool {
+        self.actual_rust_create_host_output_handoff
+    }
+
+    #[must_use]
+    pub const fn host_output_produced_by_rust(self) -> bool {
+        self.host_output_produced_by_rust
+    }
+
+    #[must_use]
+    pub const fn public_create_behavior_available(self) -> bool {
+        self.public_create_behavior_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn native_addon_loaded(self) -> bool {
+        self.native_addon_loaded
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(self) -> bool {
+        self.native_execution
+    }
+
+    #[must_use]
+    pub const fn rust_execution_from_js(self) -> bool {
+        self.rust_execution_from_js
     }
 
     #[must_use]
@@ -6994,6 +7172,13 @@ pub enum TestRendererPrivateCreateRouteAdmissionError {
         expected_render_phase_api: &'static str,
         actual_render_phase_api: &'static str,
     },
+    StaleCreateHostOutputHandoff {
+        reason: &'static str,
+    },
+    UnexpectedCreateHostOutputShape {
+        expected: TestRendererPrivateToJsonHostOutputShape,
+        actual: TestRendererPrivateToJsonHostOutputShape,
+    },
 }
 
 impl Display for TestRendererPrivateCreateRouteAdmissionError {
@@ -7031,6 +7216,16 @@ impl Display for TestRendererPrivateCreateRouteAdmissionError {
             } => write!(
                 formatter,
                 "private create-route admission work-loop finished-work preflight is stale: expected {expected_metadata_id}/{expected_render_phase_api}, found {actual_metadata_id}/{actual_render_phase_api}",
+            ),
+            Self::StaleCreateHostOutputHandoff { reason } => write!(
+                formatter,
+                "private create-route admission host-output handoff is stale: {reason}",
+            ),
+            Self::UnexpectedCreateHostOutputShape { expected, actual } => write!(
+                formatter,
+                "private create-route admission expected host-output shape {}, found {}",
+                expected.as_str(),
+                actual.as_str()
             ),
         }
     }
@@ -7691,6 +7886,181 @@ impl TestRendererRoot {
             host_output_produced_from_js: false,
             compatibility_claimed: false,
         })
+    }
+
+    pub fn describe_private_create_native_bridge_host_output_handoff_for_canary(
+        &self,
+        admission: &TestRendererPrivateCreateRouteAdmissionDiagnostics,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateCreateNativeBridgeHostOutputHandoff, TestRendererRootError> {
+        self.validate_private_create_native_bridge_host_output_handoff_for_canary(
+            admission, output,
+        )?;
+
+        let gate = self.require_serialization_gate_ready_for_canary(output.commit())?;
+        let shape =
+            Self::private_to_json_host_output_shape_from_snapshot(output.snapshot()).shape();
+        if shape != TestRendererPrivateToJsonHostOutputShape::SingleHostText {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::UnexpectedCreateHostOutputShape {
+                    expected: TestRendererPrivateToJsonHostOutputShape::SingleHostText,
+                    actual: shape,
+                }
+                .into(),
+            );
+        }
+        Self::validate_private_json_canary_current_fibers(
+            output.fiber_inspection(),
+            output.completed_fibers().current(),
+        )?;
+
+        let host_output = gate.host_output();
+        if host_output.container_child_count() != 1
+            || host_output.instance_count() != 1
+            || host_output.text_count() != 1
+            || !host_output.real_host_output_available()
+        {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "host-output-counts-not-minimal-single-host-text",
+                }
+                .into(),
+            );
+        }
+
+        let render_finished_work = output.render().finished_work();
+        let commit_current = output.commit().current();
+
+        Ok(TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
+            diagnostic_id:
+                TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID,
+            status: TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS,
+            root: self.root_id,
+            operation: "create",
+            public_surface: "create()",
+            create_route_admission_record_id: admission.record_id(),
+            create_route_admission_status: admission.status(),
+            scheduled_update_kind: admission.scheduled_update_kind(),
+            scheduled_element: admission.scheduled_element(),
+            host_output_update_kind: TestRendererRootUpdateKind::Create,
+            host_output_shape: shape,
+            host_output,
+            serialization_gate_status: gate.status(),
+            render_finished_work: TestRendererFiberHandleDiagnostics {
+                arena_id: render_finished_work.arena_id().get(),
+                slot: render_finished_work.slot().get(),
+                generation: render_finished_work.generation().get(),
+            },
+            commit_current: TestRendererFiberHandleDiagnostics {
+                arena_id: commit_current.arena_id().get(),
+                slot: commit_current.slot().get(),
+                generation: commit_current.generation().get(),
+            },
+            create_route_admission_accepted: true,
+            host_output_handoff_accepted: true,
+            actual_rust_create_host_output_handoff: true,
+            host_output_produced_by_rust: true,
+            public_create_behavior_available: false,
+            public_serialization_available: false,
+            public_test_instance_available: false,
+            native_addon_loaded: false,
+            native_bridge_available: false,
+            native_execution: false,
+            rust_execution_from_js: false,
+            host_output_produced_from_js: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    fn validate_private_create_native_bridge_host_output_handoff_for_canary(
+        &self,
+        admission: &TestRendererPrivateCreateRouteAdmissionDiagnostics,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<(), TestRendererRootError> {
+        if admission.record_id() != TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID
+            || admission.diagnostic_name()
+                != TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_DIAGNOSTIC_NAME
+            || admission.status() != TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS
+            || admission.operation() != "create"
+            || admission.public_surface() != "create()"
+        {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "create-route-admission-identity-mismatch",
+                }
+                .into(),
+            );
+        }
+        if admission.root() != self.root_id {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "create-route-admission-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if admission.scheduled_update_kind() != TestRendererRootUpdateKind::Create {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "create-route-admission-update-kind-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let Some(scheduled_update) = self.scheduled_updates.last() else {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "missing-scheduled-create-update",
+                }
+                .into(),
+            );
+        };
+        if scheduled_update.kind() != TestRendererRootUpdateKind::Create {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "scheduled-update-kind-mismatch",
+                }
+                .into(),
+            );
+        }
+        if scheduled_update.element() != admission.scheduled_element() {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "scheduled-element-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if render.root() != self.root_id || commit.root() != self.root_id {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "host-output-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if render.resulting_element() != admission.scheduled_element() {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "host-output-resulting-element-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.current() != render.finished_work() {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "commit-current-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
     }
 
     pub fn describe_private_error_boundary_diagnostics_for_canary(
@@ -11909,6 +12279,154 @@ mod tests {
         assert!(!admission.reconciler_execution_from_js());
         assert!(!admission.host_output_produced_from_js());
         assert!(!admission.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_create_native_bridge_handoff_consumes_actual_host_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            output.render().resulting_element(),
+            "span",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+
+        let handoff = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap();
+        let host_output = handoff.host_output();
+
+        assert_eq!(
+            handoff.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            handoff.status(),
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS
+        );
+        assert_eq!(handoff.root(), root.root_id());
+        assert_eq!(handoff.operation(), "create");
+        assert_eq!(handoff.public_surface(), "create()");
+        assert_eq!(
+            handoff.create_route_admission_record_id(),
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            handoff.create_route_admission_status(),
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            handoff.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(
+            handoff.scheduled_element(),
+            output.render().resulting_element()
+        );
+        assert_eq!(
+            handoff.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(
+            handoff.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
+        assert_eq!(
+            handoff.serialization_gate_status(),
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        );
+        assert_eq!(host_output.container_child_count(), 1);
+        assert_eq!(host_output.instance_count(), 1);
+        assert_eq!(host_output.text_count(), 1);
+        assert!(host_output.real_host_output_available());
+        assert_eq!(
+            handoff.render_finished_work().slot(),
+            output.render().finished_work().slot().get()
+        );
+        assert_eq!(
+            handoff.commit_current().slot(),
+            output.commit().current().slot().get()
+        );
+        assert!(handoff.create_route_admission_accepted());
+        assert!(handoff.host_output_handoff_accepted());
+        assert!(handoff.actual_rust_create_host_output_handoff());
+        assert!(handoff.host_output_produced_by_rust());
+        assert!(!handoff.public_create_behavior_available());
+        assert!(!handoff.public_serialization_available());
+        assert!(!handoff.public_test_instance_available());
+        assert!(!handoff.native_addon_loaded());
+        assert!(!handoff.native_bridge_available());
+        assert!(!handoff.native_execution());
+        assert!(!handoff.rust_execution_from_js());
+        assert!(!handoff.host_output_produced_from_js());
+        assert!(!handoff.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_create_native_bridge_handoff_rejects_stale_admission() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let stale_input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(2),
+            "span",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            stale_input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+
+        let error = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateCreateRouteAdmission(error) = error else {
+            panic!("expected create-route admission error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                reason: "scheduled-element-mismatch"
+            }
+        ));
     }
 
     #[test]
