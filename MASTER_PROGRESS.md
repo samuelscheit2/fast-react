@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 480 was accepted from queue 473-502. It added private fail-closed
+  Suspense and Offscreen child-shape diagnostics for begin-work and
+  root-work-loop preflight/complete handoff paths, preserving the public
+  blocker for Suspense/Offscreen rendering. It was verified after merge with
+  focused unsupported-feature, Suspense/Offscreen begin-work, and
+  root-work-loop gates, Rust fmt, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 479 was accepted from queue 473-502. It added exact private
   nested-provider two-consumer context diagnostics in begin work and a
   root-work-loop canary that marks each consumer dependency path in stable
