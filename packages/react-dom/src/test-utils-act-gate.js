@@ -8,7 +8,7 @@ const {
 const entrypoint = 'react-dom/test-utils';
 
 const privateRoutingGateId =
-  'react-dom-test-utils-act-private-routing-gate-2';
+  'react-dom-test-utils-act-private-routing-gate-3';
 const privateRoutingGateStatus =
   'blocked-public-test-utils-act-private-routing';
 const publicActStatus = 'unsupported-public-test-utils-act-placeholder';
@@ -21,13 +21,15 @@ const schedulerActQueueRecordOnlyStatus =
 const syncFlushRecordOnlyStatus =
   'private-sync-flush-act-continuation-records-without-execution';
 const syncFlushPostPassiveExecutionGateStatus =
-  'private-sync-flush-post-passive-continuation-execution-gate-record-only';
+  'private-sync-flush-post-passive-continuation-executes-follow-up-sync-flush';
 const schedulerMockFlushHelperStatus =
-  'accepted-scheduler-mock-flush-helper-metadata';
+  'accepted-scheduler-mock-flush-helper-and-continuation-evidence';
 const passiveEffectsFlushMetadataStatus =
   'metadata-only-passive-flush-without-callback-execution';
 const passiveEffectCallbackHandleStatus =
-  'data-only-passive-effect-callback-handles-without-invocation';
+  'private-passive-effect-callback-invocation-test-control-only';
+const privateRootHostOutputDiagnosticStatus =
+  'accepted-private-root-host-output-diagnostic-without-public-root-execution';
 
 const reactActPrivateRecords = freezeArray([
   'SchedulerActQueueRequest',
@@ -49,12 +51,38 @@ const schedulerMockFlushHelpers = freezeArray([
   'unstable_flushNumberOfYields',
   'unstable_flushUntilNextPaint'
 ]);
+const schedulerMockFlushEvidenceScenarios = freezeArray([
+  'scheduler-mock-export-shape',
+  'scheduler-mock-flush-helpers',
+  'scheduler-mock-continuations-and-paint'
+]);
 const rootBridgeRequestRecords = freezeArray([
   'FastReactDomPrivateRootCreateRecord',
   'FastReactDomPrivateRootUpdateRecord',
   'FastReactDomPrivateRootAdmissionRecord',
   'FastReactDomPrivateRootNativeRequestHandoffRecord'
 ]);
+const privateRootHostOutputDiagnosticScenarios = freezeArray([
+  'create-root-no-render',
+  'initial-host-render',
+  'update-host-render',
+  'root-unmount'
+]);
+const privateRootHostOutputDiagnosticEvidence = freezeArray([
+  'root-render-private-host-output-diagnostic-gate-1',
+  'accepted-private-root-host-output-diagnostic',
+  'private-fake-dom-root-host-output',
+  'explicit-create-root-marker-listener-apply-revert',
+  'fake-dom-host-component-host-text-output',
+  'latest-props-mutation-handoff-publication',
+  'private-unmount-host-output-cleanup'
+]);
+const privateRootHostOutputDiagnosticSummary = freezeRecord({
+  admittedScenarioModeRowCount: 8,
+  blockedScenarioModeRowCount: 12,
+  compatibilityClaimed: false,
+  source: 'tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs'
+});
 const syncFlushContinuationRecords = freezeArray([
   'SchedulerActContinuationRecord',
   'SyncFlushActPostPassiveContinuationGateRecord',
@@ -63,15 +91,22 @@ const syncFlushContinuationRecords = freezeArray([
 ]);
 const syncFlushPostPassiveContinuationExecutionRecords = freezeArray([
   'SyncFlushPostPassiveContinuationExecutionGateRecord',
+  'SyncFlushPostPassiveContinuationExecutionRecord',
   'SyncFlushPostPassiveContinuationRootRecord',
   'sync_flush_post_passive_continuation_execution_gate',
-  'observe_sync_flush_post_passive_continuation_execution_gate_after_commit',
-  'SyncFlushRootRecord.post_passive_continuation_execution_gate'
+  'SyncFlushPostPassiveContinuationExecutionGateRecord.should_execute_follow_up_sync_flush',
+  'flush_sync_post_passive_continuation_after_passive_effects',
+  'flush_passive_effects_after_commit_and_sync_flush_continuation',
+  'PassiveEffectsFlushWithSyncFlushContinuationResult',
+  'SyncFlushPostPassiveContinuationExecutionRecord.did_execute_follow_up_sync_flush',
+  'SyncFlushPostPassiveContinuationExecutionRecord.did_flush_follow_up_sync_work',
+  'SyncFlushRootRecord::post_passive_continuation_execution_gate'
 ]);
 const passiveEffectsFlushRecords = freezeArray([
   'PendingPassiveCommitHandoff',
   'PassiveEffectsFlushResult',
   'PassiveEffectFlushRecord',
+  'PassiveEffectsFlushWithSyncFlushContinuationResult',
   'FunctionComponentPendingPassiveCommitHandoff',
   'FunctionComponentPendingPassiveEffectPhaseCommitRecord'
 ]);
@@ -87,10 +122,30 @@ const passiveEffectCallbackHandleRecords = freezeArray([
   'PassiveEffectFlushRecord.create_callback_invoked',
   'PassiveEffectFlushRecord.destroy_callback_invoked'
 ]);
+const passiveEffectCallbackInvocationRecords = freezeArray([
+  'PassiveEffectCallbackInvocationGateSnapshot',
+  'PassiveEffectCallbackInvocationRecord',
+  'PassiveEffectCallbackInvocationRequest',
+  'PassiveEffectCallbackInvocationKind',
+  'PassiveEffectCallbackInvocationStatus',
+  'PassiveEffectCallbackInvocationTestControl',
+  'PassiveEffectCallbackInvocationGateBlocker',
+  'invoke_passive_effect_callbacks_under_test_control',
+  'PassiveEffectDestroyCallbackExecutionRecord',
+  'PassiveEffectDestroyCallbackErrorRecord',
+  'flush_passive_effects_after_commit_with_destroy_executor'
+]);
 const passiveEffectCallbackPhaseRules = freezeArray([
   'unmount-phase-carries-destroy-handle-without-create-handle',
   'mount-phase-carries-create-handle-without-destroy-handle',
-  'callback-invoked-accessors-return-false'
+  'default-flush-callback-invoked-accessors-return-false',
+  'test-controlled-invocation-runs-destroy-before-create',
+  'scheduler-driven-passive-execution-remains-disabled'
+]);
+const passiveEffectCallbackInvocationBlockers = freezeArray([
+  'PublicEffectExecution',
+  'PublicActCompatibility',
+  'SchedulerDrivenPassiveExecution'
 ]);
 
 const acceptedPrivatePrerequisites = freezeRecords([
@@ -128,8 +183,13 @@ const acceptedPrivatePrerequisites = freezeRecords([
     status: schedulerMockFlushHelperStatus,
     source: 'packages/scheduler/unstable_mock.js',
     recordOnly: true,
+    deterministicMockFlushEvidence: true,
+    mockContinuationEvidence: true,
+    executesActQueueTasks: false,
+    executesRendererWork: false,
     executesScheduledCallbacks: false,
-    helpers: schedulerMockFlushHelpers
+    helpers: schedulerMockFlushHelpers,
+    evidenceScenarios: schedulerMockFlushEvidenceScenarios
   },
   {
     id: 'sync-flush-act-continuation-records',
@@ -145,13 +205,14 @@ const acceptedPrivatePrerequisites = freezeRecords([
     present: true,
     status: syncFlushPostPassiveExecutionGateStatus,
     source: 'crates/fast-react-reconciler/src/root_scheduler.rs',
-    recordOnly: true,
+    recordOnly: false,
+    privateExecution: true,
     observesPendingPassiveHandoff: true,
     collectsContinuationRoots: true,
-    consumesPendingPassive: false,
-    rendersContinuationRoots: false,
-    commitsContinuationRoots: false,
-    executesSyncFlush: false,
+    consumesPendingPassive: true,
+    rendersContinuationRoots: true,
+    commitsContinuationRoots: true,
+    executesSyncFlush: true,
     executesPassiveEffects: false,
     invokesCallbacks: false,
     records: syncFlushPostPassiveContinuationExecutionRecords
@@ -163,6 +224,7 @@ const acceptedPrivatePrerequisites = freezeRecords([
     source: 'crates/fast-react-reconciler/src/passive_effects.rs',
     recordOnly: true,
     consumesPendingPassiveMetadata: true,
+    hasSyncFlushContinuationWrapper: true,
     discoversCommittedFiberEffects: false,
     executesPassiveEffects: false,
     invokesCreateCallbacks: false,
@@ -174,13 +236,23 @@ const acceptedPrivatePrerequisites = freezeRecords([
     present: true,
     status: passiveEffectCallbackHandleStatus,
     source: 'crates/fast-react-reconciler/src/passive_effects.rs',
-    recordOnly: true,
+    recordOnly: false,
+    testControlledInvocationOnly: true,
     carriesCreateCallbackHandles: true,
     carriesDestroyCallbackHandles: true,
+    invokesCreateCallbacksUnderTestControl: true,
+    invokesDestroyCallbacksUnderTestControl: true,
+    recordsReturnedDestroyHandles: true,
+    recordsCallbackErrors: true,
     invokesCreateCallbacks: false,
     invokesDestroyCallbacks: false,
+    publicEffectExecutionEnabled: false,
+    schedulerDrivenPassiveExecutionEnabled: false,
+    publicActCompatibilityClaimed: false,
     effectCallbackExecutionReady: false,
     records: passiveEffectCallbackHandleRecords,
+    invocationRecords: passiveEffectCallbackInvocationRecords,
+    invocationBlockers: passiveEffectCallbackInvocationBlockers,
     phaseRules: passiveEffectCallbackPhaseRules
   },
   {
@@ -190,6 +262,15 @@ const acceptedPrivatePrerequisites = freezeRecords([
     source: 'packages/react-dom/src/client/root-bridge.js',
     recordOnly: true,
     executesRendererRoots: false,
+    privateHostOutputDiagnostics: true,
+    privateHostOutputDiagnosticStatus: privateRootHostOutputDiagnosticStatus,
+    privateHostOutputDiagnosticScenarios:
+      privateRootHostOutputDiagnosticScenarios,
+    privateHostOutputDiagnosticSummary:
+      privateRootHostOutputDiagnosticSummary,
+    fakeDomHostOutputOnly: true,
+    publicRootExecution: false,
+    publicDomMutation: false,
     records: rootBridgeRequestRecords
   },
   {
@@ -216,21 +297,21 @@ const blockedPublicPrerequisites = freezeRecords([
     present: false,
     requiredBeforePublicAct: true,
     reason:
-      'Accepted act queue records do not drain queued work or scheduler continuations.'
+      'Accepted act queue records still do not drain queued work or act scheduler continuations, even though private scheduler and sync-flush evidence exists.'
   },
   {
     id: 'passive-effect-callback-execution',
     present: false,
     requiredBeforePublicAct: true,
     reason:
-      'Passive effect flush records now carry create and destroy callback handles, but callback invocation remains explicitly false.'
+      'Passive create and destroy callbacks can run only through explicit private test controls; scheduler-driven passive execution and public act integration remain disabled.'
   },
   {
     id: 'public-react-dom-root-execution',
     present: false,
     requiredBeforePublicAct: true,
     reason:
-      'Public React DOM roots still throw placeholders instead of routing create, render, or unmount work.'
+      'Private fake-DOM host-output diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, or unmount work.'
   },
   {
     id: 'public-react-dom-flush-sync-execution',
@@ -246,6 +327,8 @@ const sideEffectPolicy = Object.freeze({
   executesQueuedWork: false,
   executesPassiveEffects: false,
   executesRendererRoots: false,
+  executesPublicRendererRoots: false,
+  executesPublicDomMutation: false,
   executesSyncFlush: false,
   emitsDeprecationWarning: false,
   delegatesToReactAct: false
@@ -302,6 +385,11 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     schedulerMockFlushHelpers: freezeRecord({
       status: schedulerMockFlushHelperStatus,
       helpers: schedulerMockFlushHelpers,
+      evidenceScenarios: schedulerMockFlushEvidenceScenarios,
+      deterministicMockFlushEvidence: true,
+      mockContinuationEvidence: true,
+      executesActQueueTasks: false,
+      executesRendererWork: false,
       executesScheduledCallbacks: false
     }),
     syncFlushActContinuation: freezeRecord({
@@ -315,10 +403,11 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       records: syncFlushPostPassiveContinuationExecutionRecords,
       observesPendingPassiveHandoff: true,
       collectsContinuationRoots: true,
-      consumesPendingPassive: false,
-      rendersContinuationRoots: false,
-      commitsContinuationRoots: false,
-      executesSyncFlush: false,
+      consumesPendingPassive: true,
+      privateExecution: true,
+      rendersContinuationRoots: true,
+      commitsContinuationRoots: true,
+      executesSyncFlush: true,
       executesPassiveEffects: false,
       invokesCallbacks: false
     }),
@@ -326,6 +415,7 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       status: passiveEffectsFlushMetadataStatus,
       records: passiveEffectsFlushRecords,
       consumesPendingPassiveMetadata: true,
+      hasSyncFlushContinuationWrapper: true,
       discoversCommittedFiberEffects: false,
       executesPassiveEffects: false,
       invokesCreateCallbacks: false,
@@ -334,16 +424,36 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     passiveEffectCallbackHandles: freezeRecord({
       status: passiveEffectCallbackHandleStatus,
       records: passiveEffectCallbackHandleRecords,
+      invocationRecords: passiveEffectCallbackInvocationRecords,
+      invocationBlockers: passiveEffectCallbackInvocationBlockers,
       phaseRules: passiveEffectCallbackPhaseRules,
       carriesCreateCallbackHandles: true,
       carriesDestroyCallbackHandles: true,
+      testControlledInvocationOnly: true,
+      invokesCreateCallbacksUnderTestControl: true,
+      invokesDestroyCallbacksUnderTestControl: true,
+      recordsReturnedDestroyHandles: true,
+      recordsCallbackErrors: true,
       invokesCreateCallbacks: false,
       invokesDestroyCallbacks: false,
+      publicEffectExecutionEnabled: false,
+      schedulerDrivenPassiveExecutionEnabled: false,
+      publicActCompatibilityClaimed: false,
       effectCallbackExecutionReady: false
     }),
     reactDomRootBridge: freezeRecord({
       status: rootBridgeRecordOnlyStatus,
       records: rootBridgeRequestRecords,
+      privateHostOutputDiagnostics: freezeRecord({
+        status: privateRootHostOutputDiagnosticStatus,
+        scenarios: privateRootHostOutputDiagnosticScenarios,
+        evidence: privateRootHostOutputDiagnosticEvidence,
+        summary: privateRootHostOutputDiagnosticSummary,
+        fakeDomHostOutputOnly: true,
+        publicRootExecution: false,
+        publicDomMutation: false,
+        compatibilityClaimed: false
+      }),
       nativeExecution: false,
       reconcilerExecution: false,
       domMutation: false,
