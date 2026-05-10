@@ -680,6 +680,19 @@ function isOrdinaryPropertyPayloadEntry(entry) {
   );
 }
 
+function isStyleDangerousHtmlPayloadEntry(entry) {
+  return (
+    isObjectLike(entry) &&
+    (entry.kind === ENTRY_SET_STYLE ||
+      entry.kind === ENTRY_REMOVE_STYLE ||
+      entry.kind === ENTRY_SET_INNER_HTML)
+  );
+}
+
+function isNonPayloadPropertyPayloadEntry(entry) {
+  return isObjectLike(entry) && entry.kind === ENTRY_NON_PAYLOAD;
+}
+
 function isNullishStyleValue(value) {
   return value == null;
 }
@@ -722,5 +735,7 @@ module.exports = {
   diffDomPropertyPayload,
   isAttributeNameSafe,
   isEventLikeProp,
-  isOrdinaryPropertyPayloadEntry
+  isNonPayloadPropertyPayloadEntry,
+  isOrdinaryPropertyPayloadEntry,
+  isStyleDangerousHtmlPayloadEntry
 };

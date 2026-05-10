@@ -175,6 +175,120 @@ function runSmokeChecks() {
   }
 
   {
+    const element = createElement('button');
+    element.setAttribute('title', 'old-title');
+    element.setAttribute('hidden', '');
+    element.attributeLog = [];
+
+    assert.deepEqual(
+      domHost.commitDomPropertyUpdate(
+        element,
+        'button',
+        orderedProps([
+          ['title', 'old-title'],
+          ['hidden', true],
+          ['children', 'Old label']
+        ]),
+        orderedProps([
+          ['id', 'next-id'],
+          ['title', 'new-title'],
+          ['children', 'New label'],
+          ['data-state', 'ready']
+        ])
+      ),
+      [
+        appliedRemoveAttribute('hidden'),
+        appliedSetAttribute('id', 'next-id'),
+        appliedSetAttribute('title', 'new-title'),
+        skippedNonPayload(
+          'children',
+          'children',
+          'children are handled by text-content reconciliation'
+        ),
+        appliedSetAttribute('data-state', 'ready')
+      ]
+    );
+    assert.deepEqual(attributeEntries(element), [
+      ['data-state', 'ready'],
+      ['id', 'next-id'],
+      ['title', 'new-title']
+    ]);
+    assert.deepEqual(element.attributeLog, [
+      ['removeAttribute', 'hidden', true],
+      ['setAttribute', 'id', 'next-id'],
+      ['setAttribute', 'title', 'new-title'],
+      ['setAttribute', 'data-state', 'ready']
+    ]);
+  }
+
+  {
+    const element = createElement('fast-widget');
+    const value = {answer: 42};
+
+    assert.deepEqual(
+      domHost.applyAdmittedDomPropertyPayload(element, [
+        {
+          kind: propertyPayload.ENTRY_SET_PROPERTY,
+          propertyName: 'objectProp',
+          value
+        },
+        {
+          kind: propertyPayload.ENTRY_NON_PAYLOAD,
+          propName: 'onClick',
+          category: 'event',
+          reason: 'event props are stored by the future event/latest-props path'
+        },
+        {
+          kind: propertyPayload.ENTRY_REMOVE_PROPERTY,
+          propertyName: 'objectProp'
+        }
+      ]),
+      [
+        appliedSetProperty('objectProp', value),
+        skippedNonPayload(
+          'onClick',
+          'event',
+          'event props are stored by the future event/latest-props path'
+        ),
+        appliedRemoveProperty('objectProp')
+      ]
+    );
+    assert.equal(element.objectProp, null);
+    assert.deepEqual(element.propertyLog, [
+      ['setProperty', 'objectProp', value],
+      ['setProperty', 'objectProp', null]
+    ]);
+  }
+
+  {
+    const element = createElement('div');
+
+    assert.deepEqual(
+      domHost.commitDomPropertyUpdate(
+        element,
+        'div',
+        {},
+        orderedProps([
+          ['id', 'mixed'],
+          ['style', {color: 'red'}],
+          ['dangerouslySetInnerHTML', {__html: '<span>raw</span>'}]
+        ])
+      ),
+      [
+        appliedSetAttribute('id', 'mixed'),
+        styleSet('color', 'propertyAssignment', 'red'),
+        innerHtmlSet('<span>raw</span>')
+      ]
+    );
+    assert.deepEqual(element.attributeLog, [['setAttribute', 'id', 'mixed']]);
+    assert.deepEqual(element.styleLog, [
+      ['stylePropertyAssignment', 'color', 'red'],
+      ['setInnerHTML', '<span>raw</span>']
+    ]);
+    assert.equal(element.assignedInnerHTML, '<span>raw</span>');
+  }
+
+  {
     const element = createElement('div');
     const blockedPayloads = [
       propertyPayload.diffDomPropertyPayload(
@@ -229,6 +343,50 @@ function runSmokeChecks() {
     assert.equal(element.getAttribute('id'), null);
     assert.deepEqual(element.attributeLog, []);
     assert.deepEqual(element.propertyLog, []);
+  }
+
+  {
+    const element = createElement('input');
+
+    assert.throws(
+      () =>
+        domHost.commitDomPropertyUpdate(
+          element,
+          'input',
+          {},
+          orderedProps([
+            ['id', 'must-not-apply'],
+            ['value', 'Ada']
+          ])
+        ),
+      {
+        code: 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+      }
+    );
+    assert.deepEqual(element.attributeLog, []);
+    assert.deepEqual(element.propertyLog, []);
+  }
+
+  {
+    const element = createElement('div');
+
+    assert.throws(
+      () =>
+        domHost.commitDomPropertyUpdate(
+          element,
+          'div',
+          {},
+          orderedProps([
+            ['id', 'must-not-apply'],
+            ['style', {width: Number.NaN}]
+          ])
+        ),
+      {
+        code: 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+      }
+    );
+    assert.deepEqual(element.attributeLog, []);
+    assert.deepEqual(element.styleLog, []);
   }
 
   {
@@ -517,6 +675,35 @@ function appliedRemoveProperty(propertyName) {
     kind: propertyPayload.ENTRY_REMOVE_PROPERTY,
     propertyName,
     value: null
+  };
+}
+
+function skippedNonPayload(propName, category, reason) {
+  return {
+    kind: propertyPayload.ENTRY_NON_PAYLOAD,
+    propName,
+    category,
+    reason,
+    status: 'skipped'
+  };
+}
+
+function styleSet(styleName, mutation, value) {
+  return {
+    kind: propertyPayload.ENTRY_SET_STYLE,
+    propName: 'style',
+    styleName,
+    mutation,
+    value
+  };
+}
+
+function innerHtmlSet(value) {
+  return {
+    kind: propertyPayload.ENTRY_SET_INNER_HTML,
+    propName: 'dangerouslySetInnerHTML',
+    propertyName: 'innerHTML',
+    value
   };
 }
 
