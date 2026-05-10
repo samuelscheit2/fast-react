@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "private-root-update-text-event-passive-timing-canaries",
+  "description": "Diagnostic-only timing canary manifest for private root update, text reset, event dispatch, and passive flush gates; public comparable timing remains blocked until public compatibility gates are green.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "private-root-update-gate-timing-canary",
+    "private-dom-reset-text-content-timing-canary",
+    "private-root-event-dispatch-timing-canary",
+    "private-passive-flush-gate-timing-canary"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-dom-root-private-update-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-update-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Private root update request and host-output update records are admitted as fake-DOM diagnostics only; public root update compatibility and comparable timing remain blocked."
+      }
+    },
+    {
+      "id": "dom-text-content-private-reset-text-content-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-text-content-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "dom-text-content-private-reset-text-content-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run dom-text-content:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "The private DOM HostText gate admits resetTextContent before managed-child append as a fake-DOM mutation row; public roots, browser DOM, hydration, and compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-private-event-dispatch-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-event-delegation-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-private-fake-dom-event-dispatch-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Private fake-DOM click dispatch canaries record target/currentTarget, capture-before-bubble order, and blocked SyntheticEvent/public dispatch surfaces without claiming browser DOM event compatibility."
+      }
+    },
+    {
+      "id": "react-dom-test-utils-private-passive-flush-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-test-utils-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-test-utils-private-passive-flush-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Private passive flush metadata and test-controlled callback-handle records are admitted for diagnostics while scheduler-driven passive execution, public act, and effect compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-render-e2e-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-dual-run-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public root render E2E gate still admits 0 public scenario-mode rows, so private root update timing canaries cannot become public comparable timing evidence."
+      }
+    },
+    {
+      "id": "react-dom-root-public-facade-blocked-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-public-facade-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public facade gate keeps createRoot, render, update, unmount, listener setup, browser DOM mutation, events, and compatibility claims blocked despite private diagnostics."
+      }
+    },
+    {
+      "id": "dom-text-content-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-text-content-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "dom-text-content-public-compatibility-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run dom-text-content:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The text-content gate admits only private helper rows; public React DOM roots, browser DOM mutation, hydration, and compatibility remain blocked."
+      }
+    },
+    {
+      "id": "dom-event-delegation-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-event-delegation-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "dom-event-delegation-public-compatibility-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/dom-event-delegation-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The event delegation artifact is an oracle-only public target; Fast React browser DOM event dispatch and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-test-utils-act-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-test-utils-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-test-utils-act-public-compatibility-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public react-dom/test-utils.act surface remains a placeholder; public act delegation, passive effect execution, and comparable timing remain blocked."
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "private-root-update-text-event-passive-timing-canaries-diagnostic-admission",
+      "description": "Private root update, text reset, event dispatch, and passive flush timing canaries may collect diagnostic timing for admitted private gates only.",
+      "scenarioIds": [
+        "private-root-update-gate-timing-canary",
+        "private-dom-reset-text-content-timing-canary",
+        "private-root-event-dispatch-timing-canary",
+        "private-passive-flush-gate-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-update-gate",
+        "dom-text-content-private-reset-text-content-gate",
+        "react-dom-private-event-dispatch-gate",
+        "react-dom-test-utils-private-passive-flush-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "These timing canaries are admitted only for diagnostic private gates; public React DOM root update, text reset, event dispatch, passive flush, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-update-text-event-passive-public-timing-promotion-blocked",
+      "description": "Public comparable timing promotion remains blocked until public root, text, event, and act/passive gates become green.",
+      "scenarioIds": [
+        "private-root-update-gate-timing-canary",
+        "private-dom-reset-text-content-timing-canary",
+        "private-root-event-dispatch-timing-canary",
+        "private-passive-flush-gate-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e-public-compatibility",
+        "react-dom-root-public-facade-blocked-gate",
+        "dom-text-content-public-compatibility",
+        "dom-event-delegation-public-compatibility",
+        "react-dom-test-utils-act-public-compatibility"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Comparable public timing remains blocked until public root render/update, DOM text reset, event delegation, act/passive flush, and facade gates are green-admitted and claim compatibility."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "private-root-update-gate-timing-canary",
+      "area": "react-dom private root update timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js",
+        "crates/fast-react-reconciler/src/root_callbacks.rs"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-update-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The root update timing canary covers only private root update request, fake-DOM update handoff, and callback metadata diagnostics; public root update compatibility and comparable timing remain blocked."
+    },
+    {
+      "id": "private-dom-reset-text-content-timing-canary",
+      "area": "DOM private resetTextContent timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/dom-host/mutation.js",
+        "tests/conformance/src/dom-text-content-conformance-gate.mjs"
+      ],
+      "conformanceGateIds": [
+        "dom-text-content-private-reset-text-content-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The resetTextContent timing canary covers only the private fake-DOM reset write before managed child append; public React DOM roots, browser DOM mutation, hydration, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-event-dispatch-timing-canary",
+      "area": "react-dom private event dispatch timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/events/root-listeners.js",
+        "packages/react-dom/src/events/plugin-event-system.js",
+        "packages/react-dom/src/events/react-dom-event-listener.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-private-event-dispatch-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The event dispatch timing canary covers only private fake-DOM click dispatch records with target/currentTarget diagnostics; public browser DOM dispatch, SyntheticEvent compatibility, root event compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-passive-flush-gate-timing-canary",
+      "area": "React private passive flush timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/test-utils-act-gate.js",
+        "crates/fast-react-reconciler/src/passive_effects.rs",
+        "crates/fast-react-reconciler/src/sync_flush.rs"
+      ],
+      "conformanceGateIds": [
+        "react-dom-test-utils-private-passive-flush-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The passive flush timing canary covers only private passive metadata and test-controlled callback-handle diagnostics; scheduler-driven passive execution, public act compatibility, effect compatibility, and comparable timing remain blocked."
+    }
+  ]
+}
