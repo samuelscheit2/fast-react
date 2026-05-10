@@ -1945,6 +1945,7 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
   assert.equal(domGate.reactActPrivateDispatcher.executesEffects, false);
   assert.deepEqual(domGate.acceptedPrivatePrerequisiteIds, [
     "react-act-private-dispatcher-gate",
+    "scheduler-mock-expired-act-root-work-diagnostics",
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
