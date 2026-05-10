@@ -3826,6 +3826,10 @@ mod tests {
         BeginWorkError, FragmentSingleHostChildBeginWorkError,
         PORTAL_RECONCILER_UNSUPPORTED_FEATURE,
     };
+    use crate::context::{
+        ContextProviderUpdateDependencyPath, ContextProviderUpdateTwoConsumerLaneRequest,
+        record_context_provider_update_two_consumer_lane_gate,
+    };
     use crate::function_component::{
         FunctionComponentContextReadRecord, FunctionComponentContextRenderReader,
         FunctionComponentContextRenderStore, FunctionComponentInvocationError,
@@ -5662,6 +5666,132 @@ mod tests {
             None
         );
         store.fiber_arena().validate_topology().unwrap();
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn root_work_loop_context_changed_bailout_gate_skips_unchanged_provider_propagation() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(138), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            outer_provider,
+            inner_provider,
+            first_function_component,
+            first_component,
+            second_function_component,
+            second_component,
+        ) = attach_nested_context_provider_two_consumer_wip_children(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_124);
+        let outer_value = context_value(1_125);
+        let previous_inner_value = context_value(1_126);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(second_component, UseContextBehavior::ReadOnce { context });
+        let begin_work = begin_work_nested_context_provider_two_consumer_use_context_children(
+            store.fiber_arena_mut(),
+            NestedContextProviderBeginWorkRequest::new(
+                outer_provider,
+                Lanes::DEFAULT,
+                context,
+                outer_value,
+                context,
+                previous_inner_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+        let propagation_lanes = Lanes::SYNC
+            .merge_lane(Lane::TRANSITION_2)
+            .merge_lane(Lane::RETRY_2);
+
+        let record = record_context_provider_update_two_consumer_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work,
+            ContextProviderUpdateTwoConsumerLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                begin_work.outer_provider_token(),
+                begin_work.inner_provider_token(),
+                context,
+                previous_inner_value,
+                previous_inner_value,
+                propagation_lanes,
+                ContextProviderUpdateDependencyPath::from_begin_work(begin_work),
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert!(record.unchanged_provider_bailout());
+        assert_eq!(record.marked_dependency_count(), 0);
+        assert!(record.public_context_compatibility_blocked());
+
+        let consumers = record.dependent_consumers();
+        for (consumer, dependency) in [
+            (consumers[0], begin_work.first_child_context_dependency()),
+            (consumers[1], begin_work.second_child_context_dependency()),
+        ] {
+            assert_eq!(consumer.dependency(), dependency);
+            assert_eq!(consumer.context(), context);
+            assert_eq!(consumer.memoized_value(), previous_inner_value);
+            assert_eq!(consumer.previous_value(), previous_inner_value);
+            assert_eq!(consumer.next_value(), previous_inner_value);
+            assert_eq!(consumer.propagation_lanes(), propagation_lanes);
+            assert_eq!(consumer.previous_dependency_lanes(), Lanes::NO);
+            assert_eq!(consumer.dependency_lanes(), Lanes::NO);
+            assert_eq!(consumer.marked_dependency_count(), 0);
+            assert!(consumer.unchanged_provider_bailout());
+            assert_eq!(consumer.scanned_dependency_count(), 1);
+            assert_eq!(
+                context_store
+                    .context_dependency(dependency)
+                    .unwrap()
+                    .dependency_lanes(),
+                Lanes::NO
+            );
+        }
+
+        for consumer in [first_function_component, second_function_component] {
+            let node = store.fiber_arena().get(consumer).unwrap();
+            assert_eq!(node.lanes(), Lanes::NO);
+            assert_eq!(node.dependencies(), DependenciesHandle::NONE);
+            assert!(!node.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
+        }
+        for fiber in [inner_provider, outer_provider, host_root_work_in_progress] {
+            assert_eq!(
+                store.fiber_arena().get(fiber).unwrap().child_lanes(),
+                Lanes::NO
+            );
+        }
+        assert!(
+            !store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_any(propagation_lanes)
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
