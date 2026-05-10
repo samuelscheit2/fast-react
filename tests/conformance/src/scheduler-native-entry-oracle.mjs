@@ -35,8 +35,11 @@ export function formatSchedulerNativeEntryOracleAsMarkdown(oracle) {
     const directCjsLoaded = directCjs.filter(
       (probe) => probe.require.status === "ok"
     ).length;
+    const fastReactStatuses = countStatuses(
+      Object.values(oracle.fastReactComparisons?.[mode.id] ?? {})
+    );
 
-    return `- ${mode.id}: selected ${loadedFile}; direct native CJS ${directCjsLoaded}/${directCjs.length} loaded`;
+    return `- ${mode.id}: selected ${loadedFile}; direct native CJS ${directCjsLoaded}/${directCjs.length} loaded; Fast React comparisons ${JSON.stringify(fastReactStatuses)}`;
   });
 
   const claimLines = Object.entries(oracle.conformanceClaims).map(
@@ -48,7 +51,7 @@ export function formatSchedulerNativeEntryOracleAsMarkdown(oracle) {
   return [
     "# Scheduler Native Entry Oracle",
     "",
-    "Generated from the exact scheduler@0.27.0 npm artifact. This oracle records the published native entrypoint behavior and does not claim Fast React scheduler compatibility.",
+    "Generated from the exact scheduler@0.27.0 npm artifact and the current local scheduler implementation. This oracle records native entrypoint behavior and keeps broad Fast React scheduler compatibility claims false.",
     "",
     "## Scenarios",
     "",
@@ -116,6 +119,44 @@ export function findSchedulerNativeEntryDirectCjsProbe(
     );
   }
   return probe;
+}
+
+export function findFastReactSchedulerNativeEntryObservation(
+  oracle,
+  modeId,
+  scenarioId
+) {
+  const key = scenarioObservationKey(scenarioId);
+  const observation = oracle.fastReactObservations?.[modeId]?.[key];
+  if (!observation) {
+    throw new Error(
+      `Missing Fast React scheduler native entry observation: ${modeId}:${scenarioId}`
+    );
+  }
+  return observation;
+}
+
+export function findFastReactSchedulerNativeEntryComparison(
+  oracle,
+  modeId,
+  scenarioId
+) {
+  const key = scenarioObservationKey(scenarioId);
+  const comparison = oracle.fastReactComparisons?.[modeId]?.[key];
+  if (!comparison) {
+    throw new Error(
+      `Missing Fast React scheduler native entry comparison: ${modeId}:${scenarioId}`
+    );
+  }
+  return comparison;
+}
+
+function countStatuses(comparisons) {
+  const counts = {};
+  for (const comparison of comparisons) {
+    counts[comparison.status] = (counts[comparison.status] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function scenarioObservationKey(scenarioId) {

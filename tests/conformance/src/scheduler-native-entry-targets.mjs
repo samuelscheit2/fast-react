@@ -11,6 +11,14 @@ export const SCHEDULER_NATIVE_ENTRY_TARGET = {
   expectedDistShasum: "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
 };
 
+export const SCHEDULER_NATIVE_ENTRY_FAST_REACT_TARGET = {
+  packageName: "scheduler",
+  sourcePackageName: "scheduler",
+  version: "0.27.0",
+  role: "fast-react-local-scheduler-native-entry-implementation",
+  targetStatus: "local-implementation-under-comparison"
+};
+
 export const SCHEDULER_NATIVE_ENTRY_PROBE_MODES = [
   {
     id: "node-development",

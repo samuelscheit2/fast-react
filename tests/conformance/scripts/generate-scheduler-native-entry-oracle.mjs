@@ -13,8 +13,9 @@ if (args.has("--help") || args.has("-h")) {
   process.stdout.write(`Usage: node scripts/generate-scheduler-native-entry-oracle.mjs [--write]
 
 Generate the pinned scheduler@0.27.0 native entrypoint behavior oracle from
-exact npm package artifacts. Generation uses temporary directories, does not
-run lifecycle scripts, and does not claim Fast React scheduler compatibility.
+exact npm package artifacts and the local Fast React scheduler implementation.
+Generation uses temporary directories, does not run lifecycle scripts, and does
+not claim broad Fast React scheduler compatibility.
 
 Without --write, the generated JSON is printed to stdout.
 With --write, ${SCHEDULER_NATIVE_ENTRY_ORACLE_ARTIFACT_PATH} is refreshed.
