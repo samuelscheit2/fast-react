@@ -18,7 +18,8 @@ use fast_react_host_config::{
 };
 
 use crate::host_nodes::{
-    HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError, HostNodeViolation,
+    HostNodeMetadata, HostNodePropertyUpdate, HostNodeScope, HostNodeStore,
+    HostNodeValidationError, HostNodeViolation,
 };
 use crate::root_commit::{
     HostRootDeletionCleanupRecord, HostRootMutationApplyRecord, HostRootMutationApplyRecordKind,
@@ -70,6 +71,12 @@ pub(crate) enum HostWorkError {
         root: FiberRootId,
         expected: FiberId,
         actual: FiberId,
+    },
+    InvalidHostComponentPropertyUpdatePayload {
+        root: FiberRootId,
+        fiber: FiberId,
+        prop_name: &'static str,
+        violation: TestHostComponentPropertyPayloadViolation,
     },
 }
 
@@ -154,6 +161,17 @@ impl Display for HostWorkError {
                 expected.slot().get(),
                 actual.slot().get()
             ),
+            Self::InvalidHostComponentPropertyUpdatePayload {
+                root,
+                fiber,
+                prop_name,
+                violation,
+            } => write!(
+                formatter,
+                "root {} HostComponent fiber {} cannot apply private property payload row {prop_name}: {violation}",
+                root.raw(),
+                fiber.slot().get()
+            ),
         }
     }
 }
@@ -174,7 +192,8 @@ impl Error for HostWorkError {
             | Self::ExpectedMultipleRootChildren { .. }
             | Self::InvalidDetachedInstance { .. }
             | Self::InvalidDetachedText { .. }
-            | Self::CommitCurrentMismatch { .. } => None,
+            | Self::CommitCurrentMismatch { .. }
+            | Self::InvalidHostComponentPropertyUpdatePayload { .. } => None,
         }
     }
 }
@@ -256,6 +275,14 @@ impl DetachedHostRecords {
     ) -> Result<HostNodeMetadata, HostWorkError> {
         let scope = self.scope(handle, HostFiberTokenTarget::Instance)?;
         Ok(self.nodes.instance_metadata(handle, scope)?)
+    }
+
+    fn instance_property_updates(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<&[crate::host_nodes::HostNodeAppliedPropertyUpdate], HostWorkError> {
+        let scope = self.scope(handle, HostFiberTokenTarget::Instance)?;
+        Ok(self.nodes.instance_property_updates(handle, scope)?)
     }
 
     fn text_metadata(&self, handle: StateNodeHandle) -> Result<HostNodeMetadata, HostWorkError> {
@@ -530,17 +557,209 @@ impl HostWorkResult {
     }
 }
 
+const TEST_HOST_SAFE_PROPERTY_PROP_NAME: &str = "testHostProperty";
+const TEST_HOST_SAFE_PROPERTY_NAME: &str = "testHostProperty";
+const TEST_HOST_STYLE_PROP_NAME: &str = "style";
+const TEST_HOST_DANGEROUS_HTML_PROP_NAME: &str = "dangerouslySetInnerHTML";
+const TEST_HOST_DANGEROUS_HTML_PROPERTY_NAME: &str = "innerHTML";
+const TEST_HOST_TEXT_CONTENT_PROP_NAME: &str = "children";
+const TEST_HOST_TEXT_CONTENT_PROPERTY_NAME: &str = "textContent";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestHostComponentPropertyPayloadKind {
+    SafeTestProperty,
+    Style,
+    DangerousHtml,
+    TextContent,
+}
+
+impl TestHostComponentPropertyPayloadKind {
+    #[must_use]
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::SafeTestProperty => "safe-test-property",
+            Self::Style => "style",
+            Self::DangerousHtml => "dangerous-html",
+            Self::TextContent => "text-content",
+        }
+    }
+
+    #[must_use]
+    const fn is_supported_for_private_execution(self) -> bool {
+        matches!(self, Self::SafeTestProperty)
+    }
+
+    #[must_use]
+    const fn affects_text_content(self) -> bool {
+        matches!(self, Self::TextContent)
+    }
+}
+
+impl Display for TestHostComponentPropertyPayloadKind {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TestHostComponentPropertyPayloadRow {
+    kind: TestHostComponentPropertyPayloadKind,
+    prop_name: &'static str,
+    property_name: &'static str,
+    old_props: PropsHandle,
+    new_props: PropsHandle,
+}
+
+impl TestHostComponentPropertyPayloadRow {
+    #[must_use]
+    const fn safe_test_property(old_props: PropsHandle, new_props: PropsHandle) -> Self {
+        Self {
+            kind: TestHostComponentPropertyPayloadKind::SafeTestProperty,
+            prop_name: TEST_HOST_SAFE_PROPERTY_PROP_NAME,
+            property_name: TEST_HOST_SAFE_PROPERTY_NAME,
+            old_props,
+            new_props,
+        }
+    }
+
+    #[must_use]
+    const fn unsupported_style(old_props: PropsHandle, new_props: PropsHandle) -> Self {
+        Self {
+            kind: TestHostComponentPropertyPayloadKind::Style,
+            prop_name: TEST_HOST_STYLE_PROP_NAME,
+            property_name: TEST_HOST_STYLE_PROP_NAME,
+            old_props,
+            new_props,
+        }
+    }
+
+    #[must_use]
+    const fn unsupported_dangerous_html(old_props: PropsHandle, new_props: PropsHandle) -> Self {
+        Self {
+            kind: TestHostComponentPropertyPayloadKind::DangerousHtml,
+            prop_name: TEST_HOST_DANGEROUS_HTML_PROP_NAME,
+            property_name: TEST_HOST_DANGEROUS_HTML_PROPERTY_NAME,
+            old_props,
+            new_props,
+        }
+    }
+
+    #[must_use]
+    const fn conflicting_text_content(old_props: PropsHandle, new_props: PropsHandle) -> Self {
+        Self {
+            kind: TestHostComponentPropertyPayloadKind::TextContent,
+            prop_name: TEST_HOST_TEXT_CONTENT_PROP_NAME,
+            property_name: TEST_HOST_TEXT_CONTENT_PROPERTY_NAME,
+            old_props,
+            new_props,
+        }
+    }
+
+    #[must_use]
+    const fn kind(self) -> TestHostComponentPropertyPayloadKind {
+        self.kind
+    }
+
+    #[must_use]
+    const fn prop_name(self) -> &'static str {
+        self.prop_name
+    }
+
+    #[must_use]
+    const fn property_name(self) -> &'static str {
+        self.property_name
+    }
+
+    #[must_use]
+    const fn old_props(self) -> PropsHandle {
+        self.old_props
+    }
+
+    #[must_use]
+    const fn new_props(self) -> PropsHandle {
+        self.new_props
+    }
+
+    #[must_use]
+    const fn public_dom_property_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TestHostComponentPropertyPayloadViolation {
+    WrongRoot,
+    WrongFiber,
+    WrongAlternateFiber,
+    WrongStateNode,
+    WrongPendingProps,
+    WrongMemoizedProps,
+    WrongAlternateMemoizedProps,
+    WrongPayloadRowProps,
+    UnsupportedStyleRow,
+    UnsupportedDangerousHtmlRow,
+    UnsupportedTextContentRow,
+    ConflictingTextUpdate,
+}
+
+impl TestHostComponentPropertyPayloadViolation {
+    #[must_use]
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::WrongRoot => "payload root does not match the mutation root",
+            Self::WrongFiber => "payload fiber does not match the mutation fiber",
+            Self::WrongAlternateFiber => {
+                "payload current fiber does not match the mutation alternate"
+            }
+            Self::WrongStateNode => "payload state node does not match the mutation state node",
+            Self::WrongPendingProps => "payload new props do not match mutation pending props",
+            Self::WrongMemoizedProps => "payload new props do not match mutation memoized props",
+            Self::WrongAlternateMemoizedProps => {
+                "payload old props do not match mutation alternate memoized props"
+            }
+            Self::WrongPayloadRowProps => {
+                "property payload row props do not match component payload metadata"
+            }
+            Self::UnsupportedStyleRow => {
+                "style rows remain blocked outside the private style diagnostics"
+            }
+            Self::UnsupportedDangerousHtmlRow => {
+                "dangerous HTML rows remain blocked outside the private dangerousHTML diagnostics"
+            }
+            Self::UnsupportedTextContentRow => {
+                "text-content property rows are not a supported HostComponent property payload"
+            }
+            Self::ConflictingTextUpdate => {
+                "text-content property row conflicts with a HostText update payload"
+            }
+        }
+    }
+}
+
+impl Display for TestHostComponentPropertyPayloadViolation {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HostComponentUpdatePayload {
+    root: FiberRootId,
     current: FiberId,
     work_in_progress: FiberId,
     state_node: StateNodeHandle,
     old_props: PropsHandle,
     new_props: PropsHandle,
     ty: &'static str,
+    property_row: TestHostComponentPropertyPayloadRow,
 }
 
 impl HostComponentUpdatePayload {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
     #[must_use]
     const fn current(&self) -> FiberId {
         self.current
@@ -569,6 +788,11 @@ impl HostComponentUpdatePayload {
     #[must_use]
     const fn ty(&self) -> &'static str {
         self.ty
+    }
+
+    #[must_use]
+    const fn property_row(&self) -> TestHostComponentPropertyPayloadRow {
+        self.property_row
     }
 }
 
@@ -827,6 +1051,8 @@ fn apply_test_host_root_commit_mutations(
     let mut container = *root.container_info();
     let mut records = Vec::new();
 
+    preflight_test_host_root_component_property_updates(store, commit, detached_hosts)?;
+
     for &mutation in commit.mutation_apply_log().records() {
         let status = apply_test_host_root_mutation_record(
             store,
@@ -843,6 +1069,27 @@ fn apply_test_host_root_commit_mutations(
         finished_work: commit.finished_work(),
         records,
     })
+}
+
+fn preflight_test_host_root_component_property_updates(
+    store: &FiberRootStore<RecordingHost>,
+    commit: &HostRootCommitRecord,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<(), HostWorkError> {
+    for &mutation in commit.mutation_apply_log().records() {
+        if mutation.kind() != HostRootMutationApplyRecordKind::CommitHostComponentUpdate {
+            continue;
+        }
+        if let Some(payload) = detached_hosts.component_update_payload(mutation) {
+            validate_test_host_component_property_update_payload(
+                store,
+                mutation,
+                &payload,
+                detached_hosts,
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn apply_test_host_root_deletion_cleanup(
@@ -1050,6 +1297,157 @@ fn apply_test_root_placement_insertion_record(
     ))
 }
 
+fn validate_test_host_component_property_update_payload(
+    store: &FiberRootStore<RecordingHost>,
+    mutation: HostRootMutationApplyRecord,
+    payload: &HostComponentUpdatePayload,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<HostNodeScope, HostWorkError> {
+    let row = payload.property_row();
+    if payload.root() != mutation.root() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongRoot,
+        ));
+    }
+    if payload.work_in_progress() != mutation.fiber() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongFiber,
+        ));
+    }
+    if Some(payload.current()) != mutation.alternate_fiber() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongAlternateFiber,
+        ));
+    }
+    if payload.state_node() != mutation.state_node() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongStateNode,
+        ));
+    }
+    if payload.new_props() != mutation.pending_props() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongPendingProps,
+        ));
+    }
+    if payload.new_props() != mutation.memoized_props() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongMemoizedProps,
+        ));
+    }
+    if Some(payload.old_props()) != mutation.alternate_memoized_props() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongAlternateMemoizedProps,
+        ));
+    }
+    if row.old_props() != payload.old_props() || row.new_props() != payload.new_props() {
+        return Err(invalid_component_property_payload(
+            mutation,
+            row,
+            TestHostComponentPropertyPayloadViolation::WrongPayloadRowProps,
+        ));
+    }
+
+    match row.kind() {
+        TestHostComponentPropertyPayloadKind::SafeTestProperty => {}
+        TestHostComponentPropertyPayloadKind::Style => {
+            return Err(invalid_component_property_payload(
+                mutation,
+                row,
+                TestHostComponentPropertyPayloadViolation::UnsupportedStyleRow,
+            ));
+        }
+        TestHostComponentPropertyPayloadKind::DangerousHtml => {
+            return Err(invalid_component_property_payload(
+                mutation,
+                row,
+                TestHostComponentPropertyPayloadViolation::UnsupportedDangerousHtmlRow,
+            ));
+        }
+        TestHostComponentPropertyPayloadKind::TextContent => {
+            let violation = if host_component_payload_conflicts_with_text_update(
+                store,
+                payload,
+                detached_hosts,
+            )? {
+                TestHostComponentPropertyPayloadViolation::ConflictingTextUpdate
+            } else {
+                TestHostComponentPropertyPayloadViolation::UnsupportedTextContentRow
+            };
+            return Err(invalid_component_property_payload(mutation, row, violation));
+        }
+    }
+
+    debug_assert!(row.kind().is_supported_for_private_execution());
+    let scope = detached_hosts.validated_scope(
+        store.host_tokens(),
+        mutation.state_node(),
+        mutation.root(),
+        payload.current(),
+        HostFiberTokenTarget::Instance,
+    )?;
+    detached_hosts
+        .nodes
+        .instance(mutation.state_node(), scope)?;
+    Ok(scope)
+}
+
+fn host_component_payload_conflicts_with_text_update(
+    store: &FiberRootStore<RecordingHost>,
+    payload: &HostComponentUpdatePayload,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<bool, HostWorkError> {
+    if !payload.property_row().kind().affects_text_content() {
+        return Ok(false);
+    }
+
+    let mut stack = store.fiber_arena().child_ids(payload.work_in_progress())?;
+    while let Some(fiber) = stack.pop() {
+        let node = store.fiber_arena().get(fiber)?;
+        if node.tag() == FiberTag::HostText
+            && node.flags().contains_all(FiberFlags::UPDATE)
+            && detached_hosts.text_updates.iter().any(|text_payload| {
+                text_payload.work_in_progress() == fiber
+                    && text_payload.state_node() == node.state_node()
+                    && Some(text_payload.current()) == node.alternate()
+            })
+        {
+            return Ok(true);
+        }
+
+        let children = store.fiber_arena().child_ids(fiber)?;
+        stack.extend(children.iter().rev().copied());
+    }
+
+    Ok(false)
+}
+
+fn invalid_component_property_payload(
+    mutation: HostRootMutationApplyRecord,
+    row: TestHostComponentPropertyPayloadRow,
+    violation: TestHostComponentPropertyPayloadViolation,
+) -> HostWorkError {
+    HostWorkError::InvalidHostComponentPropertyUpdatePayload {
+        root: mutation.root(),
+        fiber: mutation.fiber(),
+        prop_name: row.prop_name(),
+        violation,
+    }
+}
+
 fn apply_test_host_component_update_record(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -1059,12 +1457,11 @@ fn apply_test_host_component_update_record(
     let Some(payload) = detached_hosts.component_update_payload(mutation) else {
         return Ok(TestHostRootMutationApplyStatus::RecordedOnly);
     };
-    let scope = detached_hosts.validated_scope(
-        store.host_tokens(),
-        mutation.state_node(),
-        mutation.root(),
-        payload.current(),
-        HostFiberTokenTarget::Instance,
+    let scope = validate_test_host_component_property_update_payload(
+        store,
+        mutation,
+        &payload,
+        detached_hosts,
     )?;
     let token = issue_commit_host_token(
         store,
@@ -1087,6 +1484,16 @@ fn apply_test_host_component_update_record(
         &payload.ty(),
         &(),
         &(),
+    )?;
+    detached_hosts.nodes.apply_instance_property_update(
+        mutation.state_node(),
+        scope,
+        HostNodePropertyUpdate::new(
+            payload.property_row().prop_name(),
+            payload.property_row().property_name(),
+            payload.old_props(),
+            payload.new_props(),
+        ),
     )?;
     Ok(TestHostRootMutationApplyStatus::Applied(
         TestHostRootMutationHostCall::CommitUpdate,
@@ -1840,12 +2247,17 @@ fn complete_host_component_update(
     )?;
 
     let payload = HostComponentUpdatePayload {
+        root: root_id,
         current,
         work_in_progress,
         state_node,
         old_props,
         new_props: element.props(),
         ty: element.ty(),
+        property_row: TestHostComponentPropertyPayloadRow::safe_test_property(
+            old_props,
+            element.props(),
+        ),
     };
     if old_props != element.props() {
         detached_hosts.record_component_update(payload.clone());
@@ -2243,6 +2655,122 @@ mod tests {
             .unwrap();
         complete_host_root(store, host_root).unwrap();
         payload
+    }
+
+    fn assert_single_test_property_update(
+        detached_hosts: &DetachedHostRecords,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        current_component: FiberId,
+        old_props: PropsHandle,
+        new_props: PropsHandle,
+    ) {
+        let metadata = detached_hosts.instance_metadata(handle).unwrap();
+        let updates = detached_hosts.instance_property_updates(handle).unwrap();
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].sequence(), 0);
+        assert_eq!(updates[0].handle(), handle);
+        assert_eq!(updates[0].root_id(), root_id);
+        assert_eq!(updates[0].fiber_id(), current_component);
+        assert_eq!(updates[0].token_id(), metadata.token_id());
+        assert_eq!(updates[0].prop_name(), TEST_HOST_SAFE_PROPERTY_PROP_NAME);
+        assert_eq!(updates[0].property_name(), TEST_HOST_SAFE_PROPERTY_NAME);
+        assert_eq!(updates[0].old_props(), old_props);
+        assert_eq!(updates[0].new_props(), new_props);
+    }
+
+    struct RootComponentUpdateApplyFixture {
+        store: FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        host: RecordingHost,
+        detached_hosts: DetachedHostRecords,
+        commit: HostRootCommitRecord,
+        payload: HostComponentUpdatePayload,
+        state_node: StateNodeHandle,
+        operations_before_apply: Vec<&'static str>,
+        token_count_before_apply: usize,
+    }
+
+    fn root_component_update_apply_fixture() -> RootComponentUpdateApplyFixture {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let payload = update_root_component_for_commit(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        RootComponentUpdateApplyFixture {
+            store,
+            root_id,
+            host,
+            detached_hosts,
+            commit,
+            payload,
+            state_node,
+            operations_before_apply,
+            token_count_before_apply,
+        }
+    }
+
+    fn assert_component_property_payload_error(
+        error: HostWorkError,
+        root_id: FiberRootId,
+        fiber: FiberId,
+        prop_name: &'static str,
+        violation: TestHostComponentPropertyPayloadViolation,
+    ) {
+        match error {
+            HostWorkError::InvalidHostComponentPropertyUpdatePayload {
+                root,
+                fiber: actual_fiber,
+                prop_name: actual_prop_name,
+                violation: actual_violation,
+            } => {
+                assert_eq!(root, root_id);
+                assert_eq!(actual_fiber, fiber);
+                assert_eq!(actual_prop_name, prop_name);
+                assert_eq!(actual_violation, violation);
+            }
+            other => panic!("expected invalid component property payload, got {other:?}"),
+        }
     }
 
     fn update_root_text_for_commit_with_payload(
@@ -4004,7 +4532,7 @@ mod tests {
     }
 
     #[test]
-    fn host_work_applies_root_component_update_payload_to_fake_host_config() {
+    fn host_work_applies_root_host_component_update_payload_to_fake_host_config() {
         let (mut store, root_id) = root_store();
         let mut host = RecordingHost::default();
         let mut detached_hosts = DetachedHostRecords::default();
@@ -4058,11 +4586,25 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(payload.root(), root_id);
         assert_eq!(payload.current(), current_component);
         assert_eq!(payload.state_node(), state_node);
         assert_eq!(payload.old_props(), initial_props);
         assert_eq!(payload.new_props(), next.props());
         assert_eq!(payload.ty(), "section");
+        assert_eq!(
+            payload.property_row().kind(),
+            TestHostComponentPropertyPayloadKind::SafeTestProperty
+        );
+        assert_eq!(
+            payload.property_row().prop_name(),
+            TEST_HOST_SAFE_PROPERTY_PROP_NAME
+        );
+        assert!(
+            !payload
+                .property_row()
+                .public_dom_property_compatibility_claimed()
+        );
         assert_eq!(apply.records().len(), 1);
         assert_eq!(
             apply.records()[0].mutation().fiber(),
@@ -4083,9 +4625,150 @@ mod tests {
         assert_eq!(apply.applied_host_call_count(), 1);
         assert_eq!(store.host_tokens().len(), token_count_before_apply + 1);
         assert_eq!(detached_hosts.instance(state_node).unwrap().ty(), "section");
+        assert_single_test_property_update(
+            &detached_hosts,
+            state_node,
+            root_id,
+            current_component,
+            initial_props,
+            next.props(),
+        );
         let mut expected_operations = operations_before_apply;
         expected_operations.push("commit_update");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_host_component_rejects_unsupported_style_and_dangerous_html_property_rows() {
+        for (row, violation) in [
+            (
+                TestHostComponentPropertyPayloadRow::unsupported_style(
+                    PropsHandle::from_raw(1),
+                    PropsHandle::from_raw(2),
+                ),
+                TestHostComponentPropertyPayloadViolation::UnsupportedStyleRow,
+            ),
+            (
+                TestHostComponentPropertyPayloadRow::unsupported_dangerous_html(
+                    PropsHandle::from_raw(1),
+                    PropsHandle::from_raw(2),
+                ),
+                TestHostComponentPropertyPayloadViolation::UnsupportedDangerousHtmlRow,
+            ),
+        ] {
+            let mut fixture = root_component_update_apply_fixture();
+            let row = match row.kind() {
+                TestHostComponentPropertyPayloadKind::Style => {
+                    TestHostComponentPropertyPayloadRow::unsupported_style(
+                        fixture.payload.old_props(),
+                        fixture.payload.new_props(),
+                    )
+                }
+                TestHostComponentPropertyPayloadKind::DangerousHtml => {
+                    TestHostComponentPropertyPayloadRow::unsupported_dangerous_html(
+                        fixture.payload.old_props(),
+                        fixture.payload.new_props(),
+                    )
+                }
+                _ => unreachable!("test only covers unsupported style/dangerousHTML rows"),
+            };
+            fixture.detached_hosts.component_updates[0].property_row = row;
+
+            let error = apply_test_host_root_commit_mutations(
+                &mut fixture.store,
+                &mut fixture.host,
+                &fixture.commit,
+                &mut fixture.detached_hosts,
+            )
+            .unwrap_err();
+
+            assert_component_property_payload_error(
+                error,
+                fixture.root_id,
+                fixture.payload.work_in_progress(),
+                row.prop_name(),
+                violation,
+            );
+            assert_eq!(fixture.host.operations(), fixture.operations_before_apply);
+            assert_eq!(
+                fixture.store.host_tokens().len(),
+                fixture.token_count_before_apply
+            );
+            assert!(
+                fixture
+                    .detached_hosts
+                    .instance_property_updates(fixture.state_node)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn host_work_host_component_rejects_property_payload_metadata_mismatch_before_commit() {
+        let mut fixture = root_component_update_apply_fixture();
+        fixture.detached_hosts.component_updates[0].new_props = PropsHandle::from_raw(98_608);
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.commit,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap_err();
+
+        assert_component_property_payload_error(
+            error,
+            fixture.root_id,
+            fixture.payload.work_in_progress(),
+            TEST_HOST_SAFE_PROPERTY_PROP_NAME,
+            TestHostComponentPropertyPayloadViolation::WrongPendingProps,
+        );
+        assert_eq!(fixture.host.operations(), fixture.operations_before_apply);
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_property_updates(fixture.state_node)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn host_work_host_component_rejects_stale_property_update_handles_before_commit_token_issue() {
+        let mut fixture = root_component_update_apply_fixture();
+        let scope = fixture
+            .detached_hosts
+            .scope(fixture.state_node, HostFiberTokenTarget::Instance)
+            .unwrap();
+        fixture
+            .detached_hosts
+            .nodes
+            .invalidate_instance(fixture.state_node, scope)
+            .unwrap();
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.commit,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::HostNode(ref error)
+                if error.violation() == HostNodeViolation::Stale
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_apply);
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply
+        );
     }
 
     #[test]
@@ -4248,8 +4931,7 @@ mod tests {
     }
 
     #[test]
-    fn host_work_applies_host_parent_component_property_and_text_update_payloads_to_fake_host_config()
-     {
+    fn host_work_applies_host_component_property_and_text_update_payloads_to_fake_host_config() {
         let (mut store, root_id) = root_store();
         let mut host = RecordingHost::default();
         let mut detached_hosts = DetachedHostRecords::default();
@@ -4307,11 +4989,21 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(payload.root(), root_id);
         assert_eq!(payload.current(), current_inner);
         assert_eq!(payload.state_node(), component_state_node);
         assert_eq!(payload.old_props(), old_component_props);
         assert_eq!(payload.new_props(), next_component.props());
         assert_eq!(payload.ty(), "label");
+        assert_eq!(
+            payload.property_row().kind(),
+            TestHostComponentPropertyPayloadKind::SafeTestProperty
+        );
+        assert!(
+            !payload
+                .property_row()
+                .public_dom_property_compatibility_claimed()
+        );
         assert_eq!(diff.current(), current_text);
         assert_eq!(diff.state_node(), text_state_node);
         assert_eq!(diff.old_text(), "before");
@@ -4362,6 +5054,14 @@ mod tests {
             detached_hosts.instance(component_state_node).unwrap().ty(),
             "label"
         );
+        assert_single_test_property_update(
+            &detached_hosts,
+            component_state_node,
+            root_id,
+            current_inner,
+            old_component_props,
+            next_component.props(),
+        );
         assert_eq!(
             detached_hosts.text(text_state_node).unwrap().text(),
             "before"
@@ -4370,6 +5070,84 @@ mod tests {
         expected_operations.push("commit_text_update");
         expected_operations.push("commit_update");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_host_component_rejects_text_content_property_row_when_host_text_update_is_pending()
+    {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(81));
+        let (current_outer, current_inner, current_text) =
+            attach_detached_nested_root_element_with_text_for_commit(
+                &mut store,
+                &mut host,
+                &mut detached_hosts,
+                root_id,
+                create_render.finished_work(),
+                "before",
+            );
+        let component_state_node = store.fiber_arena().get(current_inner).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let mut source = TestHostTree::new();
+        let next_element = source.insert_host_element_with_text("label", "after");
+        let next_component = element_from_root(&source, next_element);
+        let next_text = first_text_child(next_component);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let (_work_outer, payload, diff) =
+            update_host_parent_component_and_text_for_commit_with_payload(
+                &mut store,
+                root_id,
+                update_render.finished_work(),
+                current_outer,
+                current_inner,
+                current_text,
+                next_component,
+                next_text,
+                &mut detached_hosts,
+            );
+        detached_hosts.component_updates[0].property_row =
+            TestHostComponentPropertyPayloadRow::conflicting_text_content(
+                payload.old_props(),
+                payload.new_props(),
+            );
+        let update_commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        let error = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert_eq!(diff.current(), current_text);
+        assert_component_property_payload_error(
+            error,
+            root_id,
+            payload.work_in_progress(),
+            TEST_HOST_TEXT_CONTENT_PROP_NAME,
+            TestHostComponentPropertyPayloadViolation::ConflictingTextUpdate,
+        );
+        assert_eq!(host.operations(), operations_before_apply);
+        assert_eq!(store.host_tokens().len(), token_count_before_apply);
+        assert!(
+            detached_hosts
+                .instance_property_updates(component_state_node)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
