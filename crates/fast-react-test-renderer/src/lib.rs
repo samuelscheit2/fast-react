@@ -6,9 +6,9 @@
 //! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
 //! HostRoot render/commit handoff, including callback snapshot diagnostics,
 //! plus a private committed host-output canary for one HostComponent with one
-//! HostText child and private host-node deletion cleanup diagnostics. It still
-//! stops before public serialization, act, or public `react-test-renderer`
-//! compatibility.
+//! HostText child, private JSON diagnostics for create/update canaries, and
+//! private host-node deletion cleanup diagnostics. It still stops before public
+//! serialization, act, or public `react-test-renderer` compatibility.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -1178,6 +1178,7 @@ pub struct TestRendererUpdatedHostOutput {
     render: HostRootRenderPhaseRecord,
     updated_fibers: TestRendererHostOutputCanaryUpdatedFibers,
     commit: HostRootCommitRecord,
+    fiber_inspection: TestRendererCommittedFiberTreeInspection,
     commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
     previous_snapshot: TestContainerSnapshot,
     snapshot: TestContainerSnapshot,
@@ -1197,6 +1198,11 @@ impl TestRendererUpdatedHostOutput {
     #[must_use]
     pub const fn commit(&self) -> &HostRootCommitRecord {
         &self.commit
+    }
+
+    #[must_use]
+    pub const fn fiber_inspection(&self) -> &TestRendererCommittedFiberTreeInspection {
+        &self.fiber_inspection
     }
 
     #[must_use]
@@ -2146,6 +2152,8 @@ impl TestRendererPrivateJsonHostComponentDiagnostic {
 pub struct TestRendererPrivateJsonSerializationReport {
     diagnostic_name: &'static str,
     gate: TestRendererSerializationGateReport,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
     root_child_count: usize,
     root_node_kind: TestRendererPrivateJsonNodeKind,
     nodes: Vec<TestRendererPrivateJsonNodeDiagnostic>,
@@ -2162,6 +2170,16 @@ impl TestRendererPrivateJsonSerializationReport {
     #[must_use]
     pub const fn gate(&self) -> &TestRendererSerializationGateReport {
         &self.gate
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
     }
 
     #[must_use]
@@ -2886,30 +2904,64 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererCommittedHostOutput,
     ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
-        let gate = self.require_serialization_gate_ready_for_canary(output.commit())?;
+        self.describe_private_json_serialization_from_current_fibers_for_canary(
+            output.commit(),
+            Some(output.fiber_inspection()),
+            output.completed_fibers().current(),
+            output.snapshot(),
+            TestRendererRootUpdateKind::Create,
+        )
+    }
+
+    pub fn describe_private_json_serialization_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
+        self.describe_private_json_serialization_from_current_fibers_for_canary(
+            output.commit(),
+            Some(output.fiber_inspection()),
+            output.updated_fibers().current(),
+            output.snapshot(),
+            TestRendererRootUpdateKind::Update,
+        )
+    }
+
+    fn describe_private_json_serialization_from_current_fibers_for_canary(
+        &self,
+        commit: &HostRootCommitRecord,
+        expected_fiber_inspection: Option<&TestRendererCommittedFiberTreeInspection>,
+        current_fibers: TestRendererHostOutputCanaryCurrentFibers,
+        snapshot: &TestContainerSnapshot,
+        host_output_update_kind: TestRendererRootUpdateKind,
+    ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
+        let gate = self.require_serialization_gate_ready_for_canary(commit)?;
         let fiber_inspection = gate
             .fiber_inspection()
             .cloned()
             .ok_or(TestRendererPrivateJsonSerializationError::CommittedFiberInspectionMissing)?;
-        if &fiber_inspection != output.fiber_inspection() {
-            return Err(
-                TestRendererPrivateJsonSerializationError::CommittedFiberInspectionStale.into(),
-            );
+        if let Some(expected_fiber_inspection) = expected_fiber_inspection {
+            if &fiber_inspection != expected_fiber_inspection {
+                return Err(
+                    TestRendererPrivateJsonSerializationError::CommittedFiberInspectionStale.into(),
+                );
+            }
         }
         let current_snapshot = self.diagnostic_container_snapshot()?;
-        if current_snapshot != *output.snapshot() {
+        if current_snapshot != *snapshot {
             return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
         }
 
-        Self::validate_private_json_canary_fibers(&fiber_inspection, output.completed_fibers())?;
-        let component = Self::private_json_component_from_snapshot(output.snapshot())?;
+        Self::validate_private_json_canary_current_fibers(&fiber_inspection, current_fibers)?;
+        let component = Self::private_json_component_from_snapshot(snapshot)?;
         let nodes =
             Self::private_json_nodes_from_component_and_fibers(&component, &fiber_inspection);
 
         Ok(TestRendererPrivateJsonSerializationReport {
             diagnostic_name: TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
             gate,
-            root_child_count: output.snapshot().children().len(),
+            host_output_update_kind,
+            host_output_snapshot_current: true,
+            root_child_count: snapshot.children().len(),
             root_node_kind: component.node_kind(),
             nodes,
             component,
@@ -3001,6 +3053,7 @@ impl TestRendererRoot {
             Self::text_state_node_raw(current.text),
         )?;
         let commit = self.commit_host_root_render_for_canary(render)?;
+        let fiber_inspection = self.describe_committed_fiber_tree_for_canary(&commit)?;
         let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
         let text_update_requested =
             updated.text_props_changed() || current.fixture.text != next_fixture.text;
@@ -3058,6 +3111,7 @@ impl TestRendererRoot {
             render,
             updated_fibers: updated,
             commit,
+            fiber_inspection,
             commit_diagnostics,
             previous_snapshot,
             snapshot,
@@ -3546,11 +3600,11 @@ impl TestRendererRoot {
         Ok((instance, text))
     }
 
-    fn validate_private_json_canary_fibers(
+    fn validate_private_json_canary_current_fibers(
         fiber_inspection: &TestRendererCommittedFiberTreeInspection,
-        completed: TestRendererHostOutputCanaryCompletedFibers,
+        current: TestRendererHostOutputCanaryCurrentFibers,
     ) -> Result<(), TestRendererPrivateJsonSerializationError> {
-        if fiber_inspection.host_component().fiber() != completed.component() {
+        if fiber_inspection.host_component().fiber() != current.component() {
             return Err(
                 TestRendererPrivateJsonSerializationError::CommittedFiberMismatch {
                     node_kind: TestRendererPrivateJsonNodeKind::HostComponent,
@@ -3558,7 +3612,7 @@ impl TestRendererRoot {
             );
         }
 
-        if fiber_inspection.host_text().fiber() != completed.text() {
+        if fiber_inspection.host_text().fiber() != current.text() {
             return Err(
                 TestRendererPrivateJsonSerializationError::CommittedFiberMismatch {
                     node_kind: TestRendererPrivateJsonNodeKind::Text,
@@ -3566,7 +3620,7 @@ impl TestRendererRoot {
             );
         }
 
-        let fixture = completed.prepared().fixture();
+        let fixture = current.fixture();
         let component = fiber_inspection.host_component();
         let text = fiber_inspection.host_text();
         Self::validate_private_json_raw_handle(
@@ -4689,6 +4743,11 @@ mod tests {
             TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
         );
         assert_eq!(
+            report.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(report.host_output_snapshot_current());
+        assert_eq!(
             gate.status(),
             TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
         );
@@ -4777,6 +4836,93 @@ mod tests {
     }
 
     #[test]
+    fn root_private_json_serialization_canary_describes_updated_host_component_text_after_commit() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_json_serialization_after_update_for_canary(&updated)
+            .unwrap();
+        let gate = report.gate();
+        let fiber_inspection = gate.fiber_inspection().unwrap();
+        let component = report.component();
+        let text = component.text_child();
+        let nodes = report.nodes();
+
+        assert_eq!(updated.render().current(), created.commit().current());
+        assert_eq!(updated.commit().current(), updated.render().finished_work());
+        assert_eq!(
+            report.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(report.host_output_snapshot_current());
+        assert_eq!(
+            gate.status(),
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        );
+        assert_eq!(fiber_inspection, updated.fiber_inspection());
+        assert_eq!(fiber_inspection.current(), updated.commit().current());
+        assert_eq!(
+            fiber_inspection.host_component().fiber(),
+            updated.updated_fibers().component()
+        );
+        assert_eq!(
+            fiber_inspection.host_text().fiber(),
+            updated.updated_fibers().text()
+        );
+        assert_eq!(report.root_child_count(), 1);
+        assert_eq!(
+            report.root_node_kind(),
+            TestRendererPrivateJsonNodeKind::HostComponent
+        );
+        assert_eq!(report.node_count(), 2);
+        assert_eq!(nodes[0].ordinal(), 0);
+        assert_eq!(
+            nodes[0].node_kind(),
+            TestRendererPrivateJsonNodeKind::HostComponent
+        );
+        assert_eq!(nodes[0].element_type().unwrap().as_str(), "span");
+        assert_eq!(nodes[0].props(), Some(&TestProps::new()));
+        assert_eq!(nodes[0].child_ordinals(), &[1]);
+        assert_eq!(nodes[1].ordinal(), 1);
+        assert_eq!(nodes[1].node_kind(), TestRendererPrivateJsonNodeKind::Text);
+        assert_eq!(nodes[1].parent_ordinal(), Some(0));
+        assert_eq!(nodes[1].text(), Some("goodbye"));
+        assert_eq!(component.element_type().as_str(), "span");
+        assert_eq!(component.props(), &TestProps::new());
+        assert_eq!(component.child_count(), 1);
+        assert_eq!(text.text(), "goodbye");
+        assert!(report.public_blockers().all_blocked());
+
+        let TestNodeSnapshot::Element(previous) = &updated.previous_snapshot().children()[0] else {
+            panic!("expected previous host component");
+        };
+        assert_eq!(child_texts(previous), vec!["hello"]);
+        let TestNodeSnapshot::Element(current) = &updated.snapshot().children()[0] else {
+            panic!("expected updated host component");
+        };
+        assert_eq!(child_texts(current), vec!["goodbye"]);
+    }
+
+    #[test]
     fn root_private_json_serialization_canary_rejects_stale_host_output_snapshot() {
         let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
             "span",
@@ -4792,6 +4938,38 @@ mod tests {
 
         let error = root
             .describe_private_json_serialization_for_canary(&output)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
+    fn root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let mut updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        updated.snapshot = TestContainerSnapshot { children: vec![] };
+
+        let error = root
+            .describe_private_json_serialization_after_update_for_canary(&updated)
             .unwrap_err();
 
         let TestRendererRootError::PrivateJsonSerialization(error) = error else {

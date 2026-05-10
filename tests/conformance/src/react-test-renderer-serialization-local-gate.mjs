@@ -579,11 +579,19 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_json_serialization_after_update_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
       /\bTestRendererPrivateJsonSerializationReport\b/u
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\broot_private_json_serialization_canary_describes_minimal_host_component_with_text\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\broot_private_json_serialization_canary_describes_updated_host_component_text_after_commit\b/u
     );
   const privateToJSONSerializationFacadeSerializesHostOutputDiagnostics =
     privateToJSONSerializationFacadeGatePresent &&
@@ -606,6 +614,18 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bserializePrivateToJSONHostOutputDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bhostOutputSnapshotFreshnessRequired\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bstaleSnapshotRejection\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bhostOutputSnapshotCurrent\b/u
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
