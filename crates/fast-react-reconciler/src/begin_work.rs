@@ -428,6 +428,25 @@ pub(crate) struct ContextProviderUseContextSingleChildBeginWorkRecord {
     single_child: FunctionComponentSingleChildReconciliationRecord,
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUseContextOpenScopeBeginWorkRecord {
+    provider: FiberId,
+    child: FiberId,
+    context: ContextHandle,
+    value: ContextValueHandle,
+    provider_snapshot: ContextStackSnapshot,
+    pushed_stack_depth: usize,
+    child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
+    begin_work: ContextProviderUseContextOpenScopeBeginWorkRecord,
+    single_child: FunctionComponentSingleChildReconciliationRecord,
+}
+
 impl ContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn provider(self) -> FiberId {
@@ -621,6 +640,142 @@ impl ContextProviderUseContextSingleChildBeginWorkRecord {
     #[must_use]
     pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
         self.begin_work.child_context_dependency()
+    }
+
+    #[must_use]
+    pub const fn child_context_read_count(self) -> usize {
+        self.begin_work.child_context_read_count()
+    }
+
+    #[must_use]
+    pub const fn child_element(self) -> RootElementHandle {
+        self.single_child.child_element()
+    }
+
+    #[must_use]
+    pub const fn child_tag(self) -> FiberTag {
+        self.single_child.child_tag()
+    }
+}
+
+#[cfg(test)]
+impl ContextProviderUseContextOpenScopeBeginWorkRecord {
+    #[must_use]
+    pub const fn provider(self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    pub const fn child(self) -> FiberId {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn value(self) -> ContextValueHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(self) -> ContextStackSnapshot {
+        self.provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn pushed_stack_depth(self) -> usize {
+        self.pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.child_begin_work
+    }
+
+    #[must_use]
+    pub const fn child_render(self) -> FunctionComponentRenderRecord {
+        self.child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn child_output(self) -> FunctionComponentOutputHandle {
+        self.child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_read_count(self) -> usize {
+        self.child_begin_work.context_read_count()
+    }
+}
+
+#[cfg(test)]
+impl ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
+    #[must_use]
+    pub const fn begin_work(self) -> ContextProviderUseContextOpenScopeBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    pub const fn single_child(self) -> FunctionComponentSingleChildReconciliationRecord {
+        self.single_child
+    }
+
+    #[must_use]
+    pub const fn provider(self) -> FiberId {
+        self.begin_work.provider()
+    }
+
+    #[must_use]
+    pub const fn child(self) -> FiberId {
+        self.begin_work.child()
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.begin_work.context()
+    }
+
+    #[must_use]
+    pub const fn value(self) -> ContextValueHandle {
+        self.begin_work.value()
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(self) -> ContextStackSnapshot {
+        self.begin_work.provider_snapshot()
+    }
+
+    #[must_use]
+    pub const fn pushed_stack_depth(self) -> usize {
+        self.begin_work.pushed_stack_depth()
+    }
+
+    #[must_use]
+    pub const fn child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.begin_work.child_begin_work()
+    }
+
+    #[must_use]
+    pub const fn child_render(self) -> FunctionComponentRenderRecord {
+        self.begin_work.child_render()
+    }
+
+    #[must_use]
+    pub const fn child_output(self) -> FunctionComponentOutputHandle {
+        self.begin_work.child_output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.begin_work.child_context_read()
     }
 
     #[must_use]
@@ -1895,6 +2050,109 @@ pub(crate) fn begin_work_context_provider_use_context_single_child(
     })
 }
 
+#[cfg(test)]
+pub(crate) fn begin_work_context_provider_use_context_child_for_complete_traversal(
+    arena: &mut FiberArena,
+    request: ContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<ContextProviderUseContextOpenScopeBeginWorkRecord, ContextProviderBeginWorkError> {
+    let child = validate_context_provider_handoff_shape(arena, request.provider())?;
+    let provider_snapshot = context_store
+        .push_provider(request.context(), request.value())
+        .map_err(|error| ContextProviderBeginWorkError::ContextStack {
+            provider: request.provider(),
+            context: request.context(),
+            error: Box::new(error),
+        })?;
+    let pushed_stack_depth = context_store.stack_depth();
+
+    let child_result = begin_work_function_component_required_use_context(
+        arena,
+        BeginWorkRequest::new(child, request.render_lanes()),
+        context_store,
+        request.context(),
+        invoker,
+    );
+
+    match child_result {
+        Ok(child_begin_work) => Ok(ContextProviderUseContextOpenScopeBeginWorkRecord {
+            provider: request.provider(),
+            child,
+            context: request.context(),
+            value: request.value(),
+            provider_snapshot,
+            pushed_stack_depth,
+            child_begin_work,
+        }),
+        Err(error) => match context_store.restore_snapshot(provider_snapshot) {
+            Ok(()) => Err(ContextProviderBeginWorkError::ChildBeginWork {
+                provider: request.provider(),
+                child,
+                error: Box::new(error),
+            }),
+            Err(restore_error) => Err(
+                ContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                    provider: request.provider(),
+                    child,
+                    context: request.context(),
+                    child_error: Box::new(error),
+                    restore_error: Box::new(restore_error),
+                },
+            ),
+        },
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn begin_work_context_provider_use_context_single_child_for_complete_traversal(
+    arena: &mut FiberArena,
+    request: ContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+) -> Result<
+    ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+    ContextProviderBeginWorkError,
+> {
+    let begin_work = begin_work_context_provider_use_context_child_for_complete_traversal(
+        arena,
+        request,
+        context_store,
+        invoker,
+    )?;
+    let single_child = reconcile_function_component_single_child_output(
+        arena,
+        begin_work.child_render(),
+        resolver,
+    );
+
+    match single_child {
+        Ok(single_child) => Ok(
+            ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
+                begin_work,
+                single_child,
+            },
+        ),
+        Err(error) => match context_store.restore_snapshot(begin_work.provider_snapshot()) {
+            Ok(()) => Err(ContextProviderBeginWorkError::ChildBeginWork {
+                provider: begin_work.provider(),
+                child: begin_work.child(),
+                error: Box::new(BeginWorkError::FunctionComponentSingleChild(error)),
+            }),
+            Err(restore_error) => Err(
+                ContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                    provider: begin_work.provider(),
+                    child: begin_work.child(),
+                    context: begin_work.context(),
+                    child_error: Box::new(BeginWorkError::FunctionComponentSingleChild(error)),
+                    restore_error: Box::new(restore_error),
+                },
+            ),
+        },
+    }
+}
+
 pub(crate) fn begin_work_nested_context_provider_child(
     arena: &mut FiberArena,
     request: NestedContextProviderBeginWorkRequest,
@@ -2677,6 +2935,71 @@ mod tests {
             arena.get(child_work_in_progress).unwrap().memoized_props(),
             PropsHandle::from_raw(2)
         );
+    }
+
+    #[test]
+    fn context_provider_use_context_complete_traversal_begin_leaves_provider_stack_open() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(185);
+        let provided_value = context_value(186);
+        let context = context_store.create_context(default_value);
+        let (mut arena, _current, child_work_in_progress, component) = function_component_pair();
+        let provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(187),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(provider, &[child_work_in_progress])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        let output = FunctionComponentOutputHandle::from_raw(provided_value.raw());
+        let child_element = RootElementHandle::from_raw(provided_value.raw());
+        let resolver =
+            StaticSingleChildResolver::new(Some(FunctionComponentSingleChildOutput::host_text(
+                output,
+                child_element,
+                PropsHandle::from_raw(188),
+            )));
+
+        let record = begin_work_context_provider_use_context_single_child_for_complete_traversal(
+            &mut arena,
+            ContextProviderBeginWorkRequest::new(provider, Lanes::DEFAULT, context, provided_value),
+            &mut context_store,
+            &mut registry,
+            &resolver,
+        )
+        .unwrap();
+
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.child(), child_work_in_progress);
+        assert_eq!(record.context(), context);
+        assert_eq!(record.value(), provided_value);
+        assert!(record.provider_snapshot().is_root());
+        assert_eq!(record.pushed_stack_depth(), 1);
+        assert_eq!(record.child_element(), child_element);
+        assert_eq!(record.child_tag(), FiberTag::HostText);
+        assert_eq!(record.child_context_read_count(), 1);
+        let read = record.child_context_read();
+        assert_eq!(read.value(), provided_value);
+        assert_eq!(read.active_provider_count(), 1);
+        assert_eq!(
+            context_store.current_value(context).unwrap(),
+            provided_value
+        );
+        assert_eq!(context_store.stack_depth(), 1);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 1);
+
+        context_store
+            .restore_snapshot(record.provider_snapshot())
+            .unwrap();
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
     }
 
     #[test]
