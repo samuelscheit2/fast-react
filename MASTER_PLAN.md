@@ -99,6 +99,8 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-191-root-scheduler-lane-selection-integration`.
 - Worker 192: core hook list foundation in
   `/Users/user/Developer/Developer/fast-react-worker-192-core-hook-list-foundation`.
+- Worker 193: root commit callback handoff in
+  `/Users/user/Developer/Developer/fast-react-worker-193-root-commit-callback-handoff`.
 
 ## Near-Term Sequencing
 
