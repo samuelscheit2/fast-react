@@ -10,7 +10,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, HookEffectId, HookEffectInstanceId, Lanes};
+use fast_react_core::{
+    FiberId, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes,
+};
 use fast_react_host_config::HostTypes;
 
 use crate::root_commit::{
@@ -34,6 +36,8 @@ pub(crate) struct PassiveEffectFlushEffectRecord {
     effect_index: usize,
     effect: HookEffectId,
     instance: HookEffectInstanceId,
+    create: Option<HookEffectCallbackHandle>,
+    destroy: Option<HookEffectCallbackHandle>,
 }
 
 impl PassiveEffectFlushEffectRecord {
@@ -50,6 +54,26 @@ impl PassiveEffectFlushEffectRecord {
     #[must_use]
     pub const fn instance(self) -> HookEffectInstanceId {
         self.instance
+    }
+
+    #[must_use]
+    pub const fn create_callback(self) -> Option<HookEffectCallbackHandle> {
+        self.create
+    }
+
+    #[must_use]
+    pub const fn destroy_callback(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub const fn create_callback_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn destroy_callback_invoked(self) -> bool {
+        false
     }
 }
 
@@ -140,6 +164,32 @@ impl PassiveEffectFlushRecord {
             Some(effect) => Some(effect.instance()),
             None => None,
         }
+    }
+
+    #[must_use]
+    pub const fn create_callback(&self) -> Option<HookEffectCallbackHandle> {
+        match self.effect {
+            Some(effect) => effect.create_callback(),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn destroy_callback(&self) -> Option<HookEffectCallbackHandle> {
+        match self.effect {
+            Some(effect) => effect.destroy_callback(),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn create_callback_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn destroy_callback_invoked(&self) -> bool {
+        false
     }
 }
 
@@ -603,6 +653,8 @@ fn build_passive_flush_records(
                     effect_index: record.effect_index(),
                     effect: record.effect(),
                     instance: record.instance(),
+                    create: record.create(),
+                    destroy: record.destroy(),
                 });
             PassiveEffectFlushRecord {
                 flush_index,
@@ -845,10 +897,21 @@ mod tests {
         assert_eq!(record.effect_index(), Some(0));
         assert_eq!(record.effect(), Some(registration.effect()));
         assert_eq!(record.effect_instance(), Some(registration.instance()));
+        assert_eq!(record.create_callback(), Some(callback(822)));
+        assert_eq!(record.destroy_callback(), None);
+        assert!(!record.create_callback_invoked());
+        assert!(!record.destroy_callback_invoked());
         assert_eq!(
             record.effect_record().unwrap().effect(),
             registration.effect()
         );
+        assert_eq!(
+            record.effect_record().unwrap().create_callback(),
+            Some(callback(822))
+        );
+        assert_eq!(record.effect_record().unwrap().destroy_callback(), None);
+        assert!(!record.effect_record().unwrap().create_callback_invoked());
+        assert!(!record.effect_record().unwrap().destroy_callback_invoked());
         assert_eq!(
             hook_store
                 .hook_effects()
@@ -1025,6 +1088,10 @@ mod tests {
         assert_eq!(unmount.effect(), Some(registration.effect()));
         assert_eq!(unmount.effect_instance(), Some(previous.instance()));
         assert_eq!(unmount.effect_instance(), Some(registration.instance()));
+        assert_eq!(unmount.create_callback(), None);
+        assert_eq!(unmount.destroy_callback(), Some(callback(834)));
+        assert!(!unmount.create_callback_invoked());
+        assert!(!unmount.destroy_callback_invoked());
         assert_eq!(
             unmount.unmount_origin(),
             Some(PendingPassiveUnmountOrigin::UpdatedFiber)
@@ -1039,6 +1106,10 @@ mod tests {
         assert_eq!(mount.effect_index(), Some(0));
         assert_eq!(mount.effect(), Some(registration.effect()));
         assert_eq!(mount.effect_instance(), Some(registration.instance()));
+        assert_eq!(mount.create_callback(), Some(callback(837)));
+        assert_eq!(mount.destroy_callback(), None);
+        assert!(!mount.create_callback_invoked());
+        assert!(!mount.destroy_callback_invoked());
         assert_eq!(mount.unmount_origin(), None);
         assert!(unmount.pending_order() < mount.pending_order());
         assert!(

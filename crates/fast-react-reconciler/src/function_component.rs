@@ -730,6 +730,13 @@ impl FunctionComponentHookRenderStore {
             let effect = effect.map_err(|error| {
                 FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
             })?;
+            let destroy = self
+                .hook_effects
+                .get_instance(effect.instance())
+                .map_err(|error| {
+                    FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                })?
+                .destroy();
             records.push(FunctionComponentPassiveEffectMetadata {
                 fiber: state.render_fiber(),
                 hook_list: list,
@@ -738,6 +745,7 @@ impl FunctionComponentHookRenderStore {
                 instance: effect.instance(),
                 tag: effect.tag(),
                 create: effect.create(),
+                destroy,
                 dependencies: effect.dependencies(),
                 lanes,
             });
@@ -1550,6 +1558,7 @@ pub(crate) struct FunctionComponentPassiveEffectMetadata {
     instance: HookEffectInstanceId,
     tag: HookEffectFlags,
     create: HookEffectCallbackHandle,
+    destroy: Option<HookEffectCallbackHandle>,
     dependencies: HookEffectDependencies,
     lanes: Lanes,
 }
@@ -1588,6 +1597,11 @@ impl FunctionComponentPassiveEffectMetadata {
     #[must_use]
     pub const fn create(self) -> HookEffectCallbackHandle {
         self.create
+    }
+
+    #[must_use]
+    pub const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
     }
 
     #[must_use]
@@ -3317,6 +3331,7 @@ mod tests {
         assert_eq!(pending_metadata[0].instance(), registration.instance());
         assert_eq!(pending_metadata[0].tag(), HookEffectFlags::PASSIVE_EFFECT);
         assert_eq!(pending_metadata[0].create(), callback(70));
+        assert_eq!(pending_metadata[0].destroy(), None);
         assert_eq!(pending_metadata[0].dependencies(), deps(700));
         assert_eq!(pending_metadata[0].lanes(), Lanes::DEFAULT);
         assert!(
@@ -3324,6 +3339,65 @@ mod tests {
                 .passive_effect_metadata(state, Lanes::NO)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn function_component_passive_metadata_carries_destroy_callback_handle_without_taking_it() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous = hook_store
+            .create_current_effect_metadata(
+                &mut arena,
+                current,
+                FunctionComponentEffectPhase::Passive,
+                callback(92),
+                deps(920),
+                Some(callback(921)),
+            )
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(92)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .update_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(922),
+                deps(923),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let pending_metadata = hook_store
+            .passive_effect_metadata(state, Lanes::DEFAULT)
+            .unwrap();
+
+        assert_eq!(pending_metadata.len(), 1);
+        assert_eq!(pending_metadata[0].effect(), registration.effect());
+        assert_eq!(pending_metadata[0].instance(), previous.instance());
+        assert_eq!(pending_metadata[0].instance(), registration.instance());
+        assert_eq!(pending_metadata[0].create(), callback(922));
+        assert_eq!(pending_metadata[0].destroy(), Some(callback(921)));
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(previous.instance())
+                .unwrap()
+                .destroy(),
+            Some(callback(921))
         );
     }
 
