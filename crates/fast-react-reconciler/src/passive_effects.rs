@@ -1,11 +1,11 @@
 //! Private passive-effects flush skeleton.
 //!
 //! This module consumes the accepted pending passive metadata as deterministic
-//! data. The default flush path remains metadata-only; a crate-private,
-//! test-controlled destroy executor and callback invocation gate can consume
-//! accepted callback handles. Those private gates remain detached from public
-//! effect execution, scheduler-driven passive execution, and `act`
-//! compatibility.
+//! data. The default flush path remains metadata-only; crate-private,
+//! test-controlled mount-create and destroy executors plus a callback
+//! invocation gate can consume accepted callback handles. Those private gates
+//! remain detached from public effect execution, scheduler-driven passive
+//! execution, and `act` compatibility.
 
 #![allow(dead_code)]
 
@@ -79,6 +79,7 @@ pub(crate) struct PassiveEffectFlushEffectRecord {
     instance: HookEffectInstanceId,
     create: Option<HookEffectCallbackHandle>,
     destroy: Option<HookEffectCallbackHandle>,
+    create_invoked: bool,
     destroy_invoked: bool,
 }
 
@@ -110,7 +111,7 @@ impl PassiveEffectFlushEffectRecord {
 
     #[must_use]
     pub const fn create_callback_invoked(self) -> bool {
-        false
+        self.create_invoked
     }
 
     #[must_use]
@@ -120,6 +121,10 @@ impl PassiveEffectFlushEffectRecord {
 
     fn mark_destroy_callback_invoked(&mut self) {
         self.destroy_invoked = true;
+    }
+
+    fn mark_create_callback_invoked(&mut self) {
+        self.create_invoked = true;
     }
 }
 
@@ -230,7 +235,10 @@ impl PassiveEffectFlushRecord {
 
     #[must_use]
     pub const fn create_callback_invoked(&self) -> bool {
-        false
+        match self.effect {
+            Some(effect) => effect.create_callback_invoked(),
+            None => false,
+        }
     }
 
     #[must_use]
@@ -244,6 +252,12 @@ impl PassiveEffectFlushRecord {
     fn mark_destroy_callback_invoked(&mut self) {
         if let Some(effect) = self.effect.as_mut() {
             effect.mark_destroy_callback_invoked();
+        }
+    }
+
+    fn mark_create_callback_invoked(&mut self) {
+        if let Some(effect) = self.effect.as_mut() {
+            effect.mark_create_callback_invoked();
         }
     }
 }
@@ -439,6 +453,240 @@ pub(crate) trait PassiveEffectDestroyCallbackExecutor {
     ) -> Result<(), PassiveEffectDestroyCallbackErrorHandle>;
 }
 
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct PassiveEffectMountCreateCallbackErrorHandle(u64);
+
+impl PassiveEffectMountCreateCallbackErrorHandle {
+    pub const NONE: Self = Self(0);
+
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+
+    #[must_use]
+    pub const fn is_some(self) -> bool {
+        self.0 != 0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectMountCreateCallbackExecutionRequest {
+    execution_order: usize,
+    flush_record: PassiveEffectFlushRecord,
+    create: HookEffectCallbackHandle,
+}
+
+impl PassiveEffectMountCreateCallbackExecutionRequest {
+    #[must_use]
+    pub const fn execution_order(self) -> usize {
+        self.execution_order
+    }
+
+    #[must_use]
+    pub const fn flush_record(self) -> PassiveEffectFlushRecord {
+        self.flush_record
+    }
+
+    #[must_use]
+    pub const fn flush_index(self) -> usize {
+        self.flush_record.flush_index()
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.flush_record.root()
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.flush_record.finished_work()
+    }
+
+    #[must_use]
+    pub const fn committed_lanes(self) -> Lanes {
+        self.flush_record.committed_lanes()
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.flush_record.fiber()
+    }
+
+    #[must_use]
+    pub const fn effect_lanes(self) -> Lanes {
+        self.flush_record.effect_lanes()
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> PendingPassiveEffectPhase {
+        self.flush_record.phase()
+    }
+
+    #[must_use]
+    pub const fn pending_order(self) -> PendingPassiveEffectOrder {
+        self.flush_record.pending_order()
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> Option<usize> {
+        self.flush_record.effect_index()
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> Option<HookEffectId> {
+        self.flush_record.effect()
+    }
+
+    #[must_use]
+    pub const fn effect_instance(self) -> Option<HookEffectInstanceId> {
+        self.flush_record.effect_instance()
+    }
+
+    #[must_use]
+    pub const fn create_callback(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectMountCreateCallbackExecutionRecord {
+    request: PassiveEffectMountCreateCallbackExecutionRequest,
+    returned_destroy: Option<HookEffectCallbackHandle>,
+}
+
+impl PassiveEffectMountCreateCallbackExecutionRecord {
+    #[must_use]
+    pub const fn request(self) -> PassiveEffectMountCreateCallbackExecutionRequest {
+        self.request
+    }
+
+    #[must_use]
+    pub const fn returned_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.returned_destroy
+    }
+
+    #[must_use]
+    pub const fn execution_order(self) -> usize {
+        self.request.execution_order()
+    }
+
+    #[must_use]
+    pub const fn flush_index(self) -> usize {
+        self.request.flush_index()
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.request.finished_work()
+    }
+
+    #[must_use]
+    pub const fn committed_lanes(self) -> Lanes {
+        self.request.committed_lanes()
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.request.fiber()
+    }
+
+    #[must_use]
+    pub const fn effect_lanes(self) -> Lanes {
+        self.request.effect_lanes()
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> PendingPassiveEffectPhase {
+        self.request.phase()
+    }
+
+    #[must_use]
+    pub const fn pending_order(self) -> PendingPassiveEffectOrder {
+        self.request.pending_order()
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> Option<usize> {
+        self.request.effect_index()
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> Option<HookEffectId> {
+        self.request.effect()
+    }
+
+    #[must_use]
+    pub const fn effect_instance(self) -> Option<HookEffectInstanceId> {
+        self.request.effect_instance()
+    }
+
+    #[must_use]
+    pub const fn create_callback(self) -> HookEffectCallbackHandle {
+        self.request.create_callback()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectMountCreateCallbackErrorRecord {
+    execution: PassiveEffectMountCreateCallbackExecutionRecord,
+    error: PassiveEffectMountCreateCallbackErrorHandle,
+}
+
+impl PassiveEffectMountCreateCallbackErrorRecord {
+    #[must_use]
+    pub const fn execution(self) -> PassiveEffectMountCreateCallbackExecutionRecord {
+        self.execution
+    }
+
+    #[must_use]
+    pub const fn error(self) -> PassiveEffectMountCreateCallbackErrorHandle {
+        self.error
+    }
+}
+
+pub(crate) trait PassiveEffectMountCreateCallbackExecutor {
+    fn execute_mount_create_callback(
+        &mut self,
+        request: PassiveEffectMountCreateCallbackExecutionRequest,
+    ) -> Result<Option<HookEffectCallbackHandle>, PassiveEffectMountCreateCallbackErrorHandle>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PassiveEffectMountCreateCallbackExecutionGateStatus {
+    TestControlOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PassiveEffectMountCreateCallbackExecutionGateBlocker {
+    PublicEffectExecution,
+    PublicActCompatibility,
+    SchedulerDrivenPassiveExecution,
+}
+
+pub(crate) const PASSIVE_EFFECT_MOUNT_CREATE_CALLBACK_EXECUTION_GATE_BLOCKERS:
+    [PassiveEffectMountCreateCallbackExecutionGateBlocker; 3] = [
+    PassiveEffectMountCreateCallbackExecutionGateBlocker::PublicEffectExecution,
+    PassiveEffectMountCreateCallbackExecutionGateBlocker::PublicActCompatibility,
+    PassiveEffectMountCreateCallbackExecutionGateBlocker::SchedulerDrivenPassiveExecution,
+];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PassiveEffectsFlushResult {
     root: FiberRootId,
@@ -448,6 +696,8 @@ pub(crate) struct PassiveEffectsFlushResult {
     records: Vec<PassiveEffectFlushRecord>,
     destroy_callback_executions: Vec<PassiveEffectDestroyCallbackExecutionRecord>,
     destroy_callback_errors: Vec<PassiveEffectDestroyCallbackErrorRecord>,
+    mount_create_callback_executions: Vec<PassiveEffectMountCreateCallbackExecutionRecord>,
+    mount_create_callback_errors: Vec<PassiveEffectMountCreateCallbackErrorRecord>,
 }
 
 impl PassiveEffectsFlushResult {
@@ -487,6 +737,18 @@ impl PassiveEffectsFlushResult {
     }
 
     #[must_use]
+    pub fn mount_create_callback_executions(
+        &self,
+    ) -> &[PassiveEffectMountCreateCallbackExecutionRecord] {
+        &self.mount_create_callback_executions
+    }
+
+    #[must_use]
+    pub fn mount_create_callback_errors(&self) -> &[PassiveEffectMountCreateCallbackErrorRecord] {
+        &self.mount_create_callback_errors
+    }
+
+    #[must_use]
     pub fn did_flush_records(&self) -> bool {
         !self.records.is_empty()
     }
@@ -502,8 +764,47 @@ impl PassiveEffectsFlushResult {
     }
 
     #[must_use]
+    pub fn did_execute_mount_create_callbacks(&self) -> bool {
+        !self.mount_create_callback_executions.is_empty()
+    }
+
+    #[must_use]
+    pub fn did_record_mount_create_callback_errors(&self) -> bool {
+        !self.mount_create_callback_errors.is_empty()
+    }
+
+    #[must_use]
     pub const fn consumed_pending_passive(&self) -> bool {
         matches!(self.status, PassiveEffectsFlushStatus::Flushed)
+    }
+
+    #[must_use]
+    pub const fn mount_create_callback_execution_gate_status(
+        &self,
+    ) -> PassiveEffectMountCreateCallbackExecutionGateStatus {
+        PassiveEffectMountCreateCallbackExecutionGateStatus::TestControlOnly
+    }
+
+    #[must_use]
+    pub const fn mount_create_callback_execution_gate_blockers(
+        &self,
+    ) -> &[PassiveEffectMountCreateCallbackExecutionGateBlocker; 3] {
+        &PASSIVE_EFFECT_MOUNT_CREATE_CALLBACK_EXECUTION_GATE_BLOCKERS
+    }
+
+    #[must_use]
+    pub const fn public_effect_execution_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
+        false
     }
 }
 
@@ -1280,7 +1581,7 @@ pub(crate) fn flush_passive_effects_after_commit<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     commit: &HostRootCommitRecord,
 ) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
-    flush_passive_effects_after_commit_inner(store, commit, None, None)
+    flush_passive_effects_after_commit_inner(store, commit, None, None, None)
 }
 
 pub(crate) fn flush_passive_effects_after_commit_and_sync_flush_continuation<H: HostTypes>(
@@ -1332,7 +1633,13 @@ pub(crate) fn flush_passive_effects_after_commit_with_function_component_handoff
     commit: &HostRootCommitRecord,
     function_component_handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
 ) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
-    flush_passive_effects_after_commit_inner(store, commit, Some(function_component_handoffs), None)
+    flush_passive_effects_after_commit_inner(
+        store,
+        commit,
+        Some(function_component_handoffs),
+        None,
+        None,
+    )
 }
 
 #[allow(
@@ -1350,6 +1657,26 @@ pub(crate) fn flush_passive_effects_after_commit_with_destroy_executor<H: HostTy
         commit,
         Some(function_component_handoffs),
         Some(destroy_executor),
+        None,
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private passive hook-effect mount-create execution path for deterministic canaries"
+)]
+pub(crate) fn flush_passive_effects_after_commit_with_mount_create_executor<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    function_component_handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+    mount_create_executor: &mut impl PassiveEffectMountCreateCallbackExecutor,
+) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
+    flush_passive_effects_after_commit_inner(
+        store,
+        commit,
+        Some(function_component_handoffs),
+        None,
+        Some(mount_create_executor),
     )
 }
 
@@ -1358,6 +1685,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
     commit: &HostRootCommitRecord,
     function_component_handoffs: Option<&[FunctionComponentPendingPassiveCommitHandoff]>,
     destroy_executor: Option<&mut dyn PassiveEffectDestroyCallbackExecutor>,
+    mount_create_executor: Option<&mut dyn PassiveEffectMountCreateCallbackExecutor>,
 ) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
     let root_id = commit.root();
     let Some(handoff) = commit.pending_passive_handoff() else {
@@ -1369,6 +1697,8 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             records: Vec::new(),
             destroy_callback_executions: Vec::new(),
             destroy_callback_errors: Vec::new(),
+            mount_create_callback_executions: Vec::new(),
+            mount_create_callback_errors: Vec::new(),
         });
     };
 
@@ -1390,6 +1720,13 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         Some(destroy_executor) => execute_passive_destroy_callbacks(&mut records, destroy_executor),
         None => (Vec::new(), Vec::new()),
     };
+    let (mount_create_callback_executions, mount_create_callback_errors) =
+        match mount_create_executor {
+            Some(mount_create_executor) => {
+                execute_passive_mount_create_callbacks(&mut records, mount_create_executor)
+            }
+            None => (Vec::new(), Vec::new()),
+        };
 
     Ok(PassiveEffectsFlushResult {
         root: root_id,
@@ -1399,6 +1736,8 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         records,
         destroy_callback_executions,
         destroy_callback_errors,
+        mount_create_callback_executions,
+        mount_create_callback_errors,
     })
 }
 
@@ -1560,6 +1899,7 @@ fn build_passive_flush_records(
                     instance: record.instance(),
                     create: record.create(),
                     destroy: record.destroy(),
+                    create_invoked: false,
                     destroy_invoked: false,
                 });
             PassiveEffectFlushRecord {
@@ -1610,6 +1950,55 @@ fn execute_passive_destroy_callbacks(
             errors.push(PassiveEffectDestroyCallbackErrorRecord { execution, error });
         }
         record.mark_destroy_callback_invoked();
+        executions.push(execution);
+    }
+
+    (executions, errors)
+}
+
+fn execute_passive_mount_create_callbacks(
+    records: &mut [PassiveEffectFlushRecord],
+    mount_create_executor: &mut dyn PassiveEffectMountCreateCallbackExecutor,
+) -> (
+    Vec<PassiveEffectMountCreateCallbackExecutionRecord>,
+    Vec<PassiveEffectMountCreateCallbackErrorRecord>,
+) {
+    let mut executions = Vec::new();
+    let mut errors = Vec::new();
+
+    for record in records {
+        if record.phase() != PendingPassiveEffectPhase::Mount {
+            continue;
+        }
+
+        let Some(create) = record.create_callback() else {
+            continue;
+        };
+        if create.is_none() {
+            continue;
+        }
+
+        let request = PassiveEffectMountCreateCallbackExecutionRequest {
+            execution_order: executions.len(),
+            flush_record: *record,
+            create,
+        };
+        let returned_destroy = match mount_create_executor.execute_mount_create_callback(request) {
+            Ok(returned_destroy) => returned_destroy.filter(|destroy| destroy.is_some()),
+            Err(error) => {
+                let execution = PassiveEffectMountCreateCallbackExecutionRecord {
+                    request,
+                    returned_destroy: None,
+                };
+                errors.push(PassiveEffectMountCreateCallbackErrorRecord { execution, error });
+                None
+            }
+        };
+        let execution = PassiveEffectMountCreateCallbackExecutionRecord {
+            request,
+            returned_destroy,
+        };
+        record.mark_create_callback_invoked();
         executions.push(execution);
     }
 
@@ -1692,6 +2081,10 @@ mod tests {
 
     fn destroy_error(raw: u64) -> PassiveEffectDestroyCallbackErrorHandle {
         PassiveEffectDestroyCallbackErrorHandle::from_raw(raw)
+    }
+
+    fn mount_create_error(raw: u64) -> PassiveEffectMountCreateCallbackErrorHandle {
+        PassiveEffectMountCreateCallbackErrorHandle::from_raw(raw)
     }
 
     fn deps(raw: u64) -> HookEffectDependencies {
@@ -1816,6 +2209,64 @@ mod tests {
                 Err(self.error)
             } else {
                 Ok(())
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingMountCreateExecutor {
+        fail_callback: Option<HookEffectCallbackHandle>,
+        error: PassiveEffectMountCreateCallbackErrorHandle,
+        returned_destroy: Vec<(HookEffectCallbackHandle, Option<HookEffectCallbackHandle>)>,
+        calls: Vec<PassiveEffectMountCreateCallbackExecutionRequest>,
+    }
+
+    impl RecordingMountCreateExecutor {
+        fn with_error(
+            mut self,
+            callback: HookEffectCallbackHandle,
+            error: PassiveEffectMountCreateCallbackErrorHandle,
+        ) -> Self {
+            self.fail_callback = Some(callback);
+            self.error = error;
+            self
+        }
+
+        fn with_returned_destroy(
+            mut self,
+            callback: HookEffectCallbackHandle,
+            destroy: Option<HookEffectCallbackHandle>,
+        ) -> Self {
+            self.returned_destroy.push((callback, destroy));
+            self
+        }
+
+        fn calls(&self) -> &[PassiveEffectMountCreateCallbackExecutionRequest] {
+            &self.calls
+        }
+
+        fn returned_destroy(
+            &self,
+            callback: HookEffectCallbackHandle,
+        ) -> Option<HookEffectCallbackHandle> {
+            self.returned_destroy
+                .iter()
+                .find(|(accepted, _)| *accepted == callback)
+                .and_then(|(_, destroy)| *destroy)
+        }
+    }
+
+    impl PassiveEffectMountCreateCallbackExecutor for RecordingMountCreateExecutor {
+        fn execute_mount_create_callback(
+            &mut self,
+            request: PassiveEffectMountCreateCallbackExecutionRequest,
+        ) -> Result<Option<HookEffectCallbackHandle>, PassiveEffectMountCreateCallbackErrorHandle>
+        {
+            self.calls.push(request);
+            if self.fail_callback == Some(request.create_callback()) {
+                Err(self.error)
+            } else {
+                Ok(self.returned_destroy(request.create_callback()))
             }
         }
     }
@@ -2044,6 +2495,10 @@ mod tests {
         assert!(!flush.did_record_destroy_callback_errors());
         assert!(flush.destroy_callback_executions().is_empty());
         assert!(flush.destroy_callback_errors().is_empty());
+        assert!(!flush.did_execute_mount_create_callbacks());
+        assert!(!flush.did_record_mount_create_callback_errors());
+        assert!(flush.mount_create_callback_executions().is_empty());
+        assert!(flush.mount_create_callback_errors().is_empty());
         let record = flush.records()[0];
         assert_eq!(record.flush_index(), 0);
         assert_eq!(record.fiber(), function_fiber);
@@ -2236,6 +2691,10 @@ mod tests {
         assert!(!flush.did_record_destroy_callback_errors());
         assert!(flush.destroy_callback_executions().is_empty());
         assert!(flush.destroy_callback_errors().is_empty());
+        assert!(!flush.did_execute_mount_create_callbacks());
+        assert!(!flush.did_record_mount_create_callback_errors());
+        assert!(flush.mount_create_callback_executions().is_empty());
+        assert!(flush.mount_create_callback_errors().is_empty());
         let unmount = flush.records()[0];
         assert_eq!(unmount.flush_index(), 0);
         assert_eq!(unmount.fiber(), finished_function);
@@ -2700,6 +3159,10 @@ mod tests {
         assert!(flush.did_record_destroy_callback_errors());
         assert_eq!(flush.destroy_callback_executions().len(), 2);
         assert_eq!(flush.destroy_callback_errors().len(), 1);
+        assert!(!flush.did_execute_mount_create_callbacks());
+        assert!(!flush.did_record_mount_create_callback_errors());
+        assert!(flush.mount_create_callback_executions().is_empty());
+        assert!(flush.mount_create_callback_errors().is_empty());
         assert_eq!(destroy_executor.calls().len(), 2);
 
         let first_unmount = flush.records()[0];
@@ -2828,6 +3291,226 @@ mod tests {
                 .scheduling()
                 .pending_passive()
                 .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_mount_create_executor_runs_mounts_in_flush_order_and_records_errors() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(910), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let function_fiber = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(911),
+            FiberTypeHandle::from_raw(912),
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), function_fiber)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Mount);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let first_registration = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(913),
+                deps(914),
+            )
+            .unwrap();
+        let second_registration = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(915),
+                deps(916),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(queued.records().len(), 2);
+        assert_eq!(queued.queued_unmount_count(), 0);
+        assert_eq!(queued.queued_mount_count(), 2);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_error(callback(913), mount_create_error(917))
+            .with_returned_destroy(callback(915), Some(callback(918)));
+
+        let flush = flush_passive_effects_after_commit_with_mount_create_executor(
+            &mut store,
+            &commit,
+            std::slice::from_ref(&queued),
+            &mut mount_create_executor,
+        )
+        .unwrap();
+
+        assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(flush.consumed_pending_passive());
+        assert_eq!(flush.root(), root_id);
+        assert_eq!(flush.finished_work(), Some(finished_work));
+        assert_eq!(flush.lanes(), Lanes::DEFAULT);
+        assert_eq!(flush.records().len(), 2);
+        assert!(!flush.did_execute_destroy_callbacks());
+        assert!(!flush.did_record_destroy_callback_errors());
+        assert!(flush.destroy_callback_executions().is_empty());
+        assert!(flush.destroy_callback_errors().is_empty());
+        assert!(flush.did_execute_mount_create_callbacks());
+        assert!(flush.did_record_mount_create_callback_errors());
+        assert_eq!(flush.mount_create_callback_executions().len(), 2);
+        assert_eq!(flush.mount_create_callback_errors().len(), 1);
+        assert_eq!(
+            flush.mount_create_callback_execution_gate_status(),
+            PassiveEffectMountCreateCallbackExecutionGateStatus::TestControlOnly
+        );
+        assert_eq!(
+            flush.mount_create_callback_execution_gate_blockers(),
+            &PASSIVE_EFFECT_MOUNT_CREATE_CALLBACK_EXECUTION_GATE_BLOCKERS
+        );
+        assert!(!flush.public_effect_execution_enabled());
+        assert!(!flush.public_act_compatibility_claimed());
+        assert!(!flush.scheduler_driven_passive_execution_enabled());
+
+        let first_mount = flush.records()[0];
+        let second_mount = flush.records()[1];
+        assert_eq!(first_mount.flush_index(), 0);
+        assert_eq!(second_mount.flush_index(), 1);
+        assert_eq!(first_mount.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(second_mount.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(
+            first_mount.pending_order(),
+            queued.records()[0].mount_order()
+        );
+        assert_eq!(
+            second_mount.pending_order(),
+            queued.records()[1].mount_order()
+        );
+        assert!(first_mount.pending_order() < second_mount.pending_order());
+        assert_eq!(first_mount.fiber(), function_fiber);
+        assert_eq!(second_mount.fiber(), function_fiber);
+        assert_eq!(first_mount.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(second_mount.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(first_mount.effect_index(), Some(0));
+        assert_eq!(second_mount.effect_index(), Some(1));
+        assert_eq!(first_mount.effect(), Some(first_registration.effect()));
+        assert_eq!(second_mount.effect(), Some(second_registration.effect()));
+        assert_eq!(
+            first_mount.effect_instance(),
+            Some(first_registration.instance())
+        );
+        assert_eq!(
+            second_mount.effect_instance(),
+            Some(second_registration.instance())
+        );
+        assert_eq!(first_mount.create_callback(), Some(callback(913)));
+        assert_eq!(second_mount.create_callback(), Some(callback(915)));
+        assert_eq!(first_mount.destroy_callback(), None);
+        assert_eq!(second_mount.destroy_callback(), None);
+        assert!(first_mount.create_callback_invoked());
+        assert!(second_mount.create_callback_invoked());
+        assert!(!first_mount.destroy_callback_invoked());
+        assert!(!second_mount.destroy_callback_invoked());
+        assert_eq!(first_mount.unmount_origin(), None);
+        assert_eq!(second_mount.unmount_origin(), None);
+
+        let first_execution = flush.mount_create_callback_executions()[0];
+        let second_execution = flush.mount_create_callback_executions()[1];
+        assert_eq!(first_execution.execution_order(), 0);
+        assert_eq!(second_execution.execution_order(), 1);
+        assert_eq!(first_execution.flush_index(), first_mount.flush_index());
+        assert_eq!(second_execution.flush_index(), second_mount.flush_index());
+        assert_eq!(first_execution.root(), root_id);
+        assert_eq!(second_execution.root(), root_id);
+        assert_eq!(first_execution.finished_work(), finished_work);
+        assert_eq!(second_execution.finished_work(), finished_work);
+        assert_eq!(first_execution.committed_lanes(), Lanes::DEFAULT);
+        assert_eq!(second_execution.committed_lanes(), Lanes::DEFAULT);
+        assert_eq!(first_execution.fiber(), function_fiber);
+        assert_eq!(second_execution.fiber(), function_fiber);
+        assert_eq!(first_execution.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(second_execution.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(first_execution.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(second_execution.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(first_execution.pending_order(), first_mount.pending_order());
+        assert_eq!(
+            second_execution.pending_order(),
+            second_mount.pending_order()
+        );
+        assert_eq!(first_execution.effect_index(), Some(0));
+        assert_eq!(second_execution.effect_index(), Some(1));
+        assert_eq!(first_execution.effect(), Some(first_registration.effect()));
+        assert_eq!(
+            second_execution.effect(),
+            Some(second_registration.effect())
+        );
+        assert_eq!(
+            first_execution.effect_instance(),
+            Some(first_registration.instance())
+        );
+        assert_eq!(
+            second_execution.effect_instance(),
+            Some(second_registration.instance())
+        );
+        assert_eq!(first_execution.create_callback(), callback(913));
+        assert_eq!(second_execution.create_callback(), callback(915));
+        assert_eq!(first_execution.returned_destroy(), None);
+        assert_eq!(second_execution.returned_destroy(), Some(callback(918)));
+        assert_eq!(mount_create_executor.calls()[0], first_execution.request());
+        assert_eq!(mount_create_executor.calls()[1], second_execution.request());
+
+        let error = flush.mount_create_callback_errors()[0];
+        assert_eq!(error.execution(), first_execution);
+        assert_eq!(error.error(), mount_create_error(917));
+        assert!(error.error().is_some());
+        assert!(!error.error().is_none());
+        assert_eq!(error.error().raw(), 917);
+
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(first_registration.instance())
+                .unwrap()
+                .destroy(),
+            None
+        );
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(second_registration.instance())
+                .unwrap()
+                .destroy(),
+            None
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
