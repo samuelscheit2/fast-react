@@ -2597,6 +2597,12 @@ function createPortalEventOwnerRootGateRecord(
     normalizedOptions.rootContainer,
     targetNode
   );
+  const portalContainerRootBoundary =
+    createPortalContainerRootBoundaryDiagnostic(
+      normalizedDispatchPathRecord,
+      normalizedOptions.portalContainer,
+      ownerRoot
+    );
   const record = Object.freeze({
     blockedReason: PORTAL_EVENT_BUBBLING_BLOCKED_CODE,
     browserDomEventCompatibilityClaimed: false,
@@ -2621,6 +2627,10 @@ function createPortalEventOwnerRootGateRecord(
       normalizedOptions.portalContainer !== null &&
       normalizedOptions.portalContainer === normalizedOptions.rootContainer,
     portalContainerListenerDispatchBlocked: true,
+    portalContainerMatchesDispatchRootBoundary:
+      portalContainerRootBoundary.portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalContainerRootBoundary.portalContainerOwnedBySecondaryRoot,
     portalContainerPath,
     portalContainerPathLength: portalContainerPath.length,
     portalContainerPathStatus: portalContainerPath.status,
@@ -2628,6 +2638,13 @@ function createPortalEventOwnerRootGateRecord(
       portalContainerPath.rootOwnerMatchCount,
     portalContainerPathRootOwnerMismatchCount:
       portalContainerPath.rootOwnerMismatchCount,
+    portalContainerRootBoundary,
+    portalContainerRootBoundaryStatus:
+      portalContainerRootBoundary.containerRootBoundaryStatus,
+    portalContainerRootOwnerMatchesPortalOwner:
+      portalContainerRootBoundary.portalContainerRootOwnerMatchesPortalOwner,
+    portalContainerRootOwnerPresent:
+      portalContainerRootBoundary.portalContainerRootOwnerPresent,
     portalContainerNestedInRootContainer:
       portalContainerPath.portalContainerNestedInRootContainer,
     portalEventPathDiagnostic: true,
@@ -2635,6 +2652,10 @@ function createPortalEventOwnerRootGateRecord(
     portalOwnerRootEventPath,
     portalOwnerRootEventPathLength: portalOwnerRootEventPath.length,
     portalOwnerRootEventPathStatus: normalizedDispatchPathRecord.status,
+    ownerRootPreservedAcrossPortalContainerRoot:
+      portalContainerRootBoundary.ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot:
+      portalContainerRootBoundary.ownerRootPreservedAcrossSecondaryPortalRoot,
     publicDispatchBlocked: true,
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
@@ -2667,6 +2688,8 @@ function createPortalEventOwnerRootGateRecord(
       options: normalizedOptions.rawOptions,
       ownerRoot,
       portalContainer: normalizedOptions.portalContainer,
+      portalContainerRootOwner:
+        portalContainerRootBoundary.portalContainerRootOwner,
       portalContainerPathNodes: portalContainerPathDiagnostic.nodes,
       rootContainer: normalizedOptions.rootContainer,
       targetDispatchPathEntries: entries,
@@ -3015,7 +3038,15 @@ function createFocusBlurPortalOwnerRootSummary(
       dispatchPathRootOwnerMatchCount: 0,
       dispatchPathRootOwnerMismatchCount: 0,
       ownerRootMatchesTargetRoot: false,
+      ownerRootPreservedAcrossPortalContainerRoot: false,
+      ownerRootPreservedAcrossSecondaryPortalRoot: false,
       portalContainerContainsTarget: false,
+      portalContainerMatchesDispatchRootBoundary: false,
+      portalContainerOwnedBySecondaryRoot: false,
+      portalContainerRootBoundaryStatus:
+        'unavailable-no-portal-owner-root-gate',
+      portalContainerRootOwnerMatchesPortalOwner: null,
+      portalContainerRootOwnerPresent: false,
       publicPortalBubblingEnabled: false,
       recordKind: null,
       rootContainerContainsTarget: false,
@@ -3035,8 +3066,22 @@ function createFocusBlurPortalOwnerRootSummary(
       portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
     ownerRootMatchesTargetRoot:
       portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+    ownerRootPreservedAcrossPortalContainerRoot:
+      portalEventOwnerRootGateRecord.ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot:
+      portalEventOwnerRootGateRecord.ownerRootPreservedAcrossSecondaryPortalRoot,
     portalContainerContainsTarget:
       portalEventOwnerRootGateRecord.portalContainerContainsTarget,
+    portalContainerMatchesDispatchRootBoundary:
+      portalEventOwnerRootGateRecord.portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalEventOwnerRootGateRecord.portalContainerOwnedBySecondaryRoot,
+    portalContainerRootBoundaryStatus:
+      portalEventOwnerRootGateRecord.portalContainerRootBoundaryStatus,
+    portalContainerRootOwnerMatchesPortalOwner:
+      portalEventOwnerRootGateRecord.portalContainerRootOwnerMatchesPortalOwner,
+    portalContainerRootOwnerPresent:
+      portalEventOwnerRootGateRecord.portalContainerRootOwnerPresent,
     publicPortalBubblingEnabled:
       portalEventOwnerRootGateRecord.publicPortalBubblingEnabled,
     recordKind: portalEventOwnerRootGateRecord.kind,
@@ -3178,6 +3223,14 @@ function invokePrivateFocusBlurEventDispatchExecutionRecord(
     pluginName: selection.dispatchQueueEntry.pluginName,
     portalOwnerRoot,
     portalOwnerRootAvailable: portalOwnerRoot.available,
+    portalContainerMatchesDispatchRootBoundary:
+      portalOwnerRoot.portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalOwnerRoot.portalContainerOwnedBySecondaryRoot,
+    ownerRootPreservedAcrossPortalContainerRoot:
+      portalOwnerRoot.ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot:
+      portalOwnerRoot.ownerRootPreservedAcrossSecondaryPortalRoot,
     privateListenerInvoked: invocationRecord.listenerInvocationCount === 1,
     privateListenerQueue: true,
     publicDispatchBlocked: true,
@@ -3346,6 +3399,20 @@ function invokePrivateClickEventDelegationDispatchGate(
     portalOwnerRootStatus: portalOwnerRoot.status,
     portalContainerContainsTarget:
       portalOwnerRoot.portalContainerContainsTarget,
+    portalContainerMatchesDispatchRootBoundary:
+      portalOwnerRoot.portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalOwnerRoot.portalContainerOwnedBySecondaryRoot,
+    portalContainerRootBoundaryStatus:
+      portalOwnerRoot.portalContainerRootBoundaryStatus,
+    portalContainerRootOwnerMatchesPortalOwner:
+      portalOwnerRoot.portalContainerRootOwnerMatchesPortalOwner,
+    portalContainerRootOwnerPresent:
+      portalOwnerRoot.portalContainerRootOwnerPresent,
+    ownerRootPreservedAcrossPortalContainerRoot:
+      portalOwnerRoot.ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot:
+      portalOwnerRoot.ownerRootPreservedAcrossSecondaryPortalRoot,
     publicPortalBubblingBlocked: true,
     publicPortalBubblingEnabled:
       portalOwnerRoot.publicPortalBubblingEnabled,
@@ -5192,6 +5259,15 @@ function validatePrivateFocusBlurEventDispatchExecutionPortalOwnerRootGate(
     return Object.freeze({
       available: false,
       ownerRootMatchesTargetRoot: false,
+      ownerRootPreservedAcrossPortalContainerRoot: false,
+      ownerRootPreservedAcrossSecondaryPortalRoot: false,
+      portalContainerContainsTarget: false,
+      portalContainerMatchesDispatchRootBoundary: false,
+      portalContainerOwnedBySecondaryRoot: false,
+      portalContainerRootBoundaryStatus:
+        'unavailable-no-portal-owner-root-gate',
+      portalContainerRootOwnerMatchesPortalOwner: null,
+      portalContainerRootOwnerPresent: false,
       recordKind: null,
       status: 'unavailable-no-portal-owner-root-gate',
       targetDispatchPathLength: 0,
@@ -5233,9 +5309,23 @@ function validatePrivateFocusBlurEventDispatchExecutionPortalOwnerRootGate(
       portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
     ownerRootMatchesTargetRoot:
       portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+    ownerRootPreservedAcrossPortalContainerRoot:
+      portalEventOwnerRootGateRecord.ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot:
+      portalEventOwnerRootGateRecord.ownerRootPreservedAcrossSecondaryPortalRoot,
     portalContainerContainsTarget:
       portalEventOwnerRootGateRecord.portalContainerContainsTarget,
+    portalContainerMatchesDispatchRootBoundary:
+      portalEventOwnerRootGateRecord.portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalEventOwnerRootGateRecord.portalContainerOwnedBySecondaryRoot,
     portalGateDomEventName: portalEventOwnerRootGateRecord.domEventName,
+    portalContainerRootBoundaryStatus:
+      portalEventOwnerRootGateRecord.portalContainerRootBoundaryStatus,
+    portalContainerRootOwnerMatchesPortalOwner:
+      portalEventOwnerRootGateRecord.portalContainerRootOwnerMatchesPortalOwner,
+    portalContainerRootOwnerPresent:
+      portalEventOwnerRootGateRecord.portalContainerRootOwnerPresent,
     publicPortalBubblingEnabled:
       portalEventOwnerRootGateRecord.publicPortalBubblingEnabled,
     recordKind: portalEventOwnerRootGateRecord.kind,
@@ -5705,7 +5795,15 @@ function validatePrivateClickEventDelegationPortalOwnerRootGate(
       dispatchPathRootOwnerMatchCount: 0,
       dispatchPathRootOwnerMismatchCount: 0,
       ownerRootMatchesTargetRoot: false,
+      ownerRootPreservedAcrossPortalContainerRoot: false,
+      ownerRootPreservedAcrossSecondaryPortalRoot: false,
       portalContainerContainsTarget: false,
+      portalContainerMatchesDispatchRootBoundary: false,
+      portalContainerOwnedBySecondaryRoot: false,
+      portalContainerRootBoundaryStatus:
+        'unavailable-no-portal-owner-root-gate',
+      portalContainerRootOwnerMatchesPortalOwner: null,
+      portalContainerRootOwnerPresent: false,
       publicPortalBubblingEnabled: false,
       recordKind: null,
       rootContainerContainsTarget: false,
@@ -5759,8 +5857,22 @@ function validatePrivateClickEventDelegationPortalOwnerRootGate(
       portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
     ownerRootMatchesTargetRoot:
       portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+    ownerRootPreservedAcrossPortalContainerRoot:
+      portalEventOwnerRootGateRecord.ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot:
+      portalEventOwnerRootGateRecord.ownerRootPreservedAcrossSecondaryPortalRoot,
     portalContainerContainsTarget:
       portalEventOwnerRootGateRecord.portalContainerContainsTarget,
+    portalContainerMatchesDispatchRootBoundary:
+      portalEventOwnerRootGateRecord.portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalEventOwnerRootGateRecord.portalContainerOwnedBySecondaryRoot,
+    portalContainerRootBoundaryStatus:
+      portalEventOwnerRootGateRecord.portalContainerRootBoundaryStatus,
+    portalContainerRootOwnerMatchesPortalOwner:
+      portalEventOwnerRootGateRecord.portalContainerRootOwnerMatchesPortalOwner,
+    portalContainerRootOwnerPresent:
+      portalEventOwnerRootGateRecord.portalContainerRootOwnerPresent,
     publicPortalBubblingEnabled:
       portalEventOwnerRootGateRecord.publicPortalBubblingEnabled,
     recordKind: portalEventOwnerRootGateRecord.kind,
@@ -5920,6 +6032,53 @@ function createPortalOwnerRootEventPath(targetDispatchPathRecord, ownerRoot) {
       })
     )
   );
+}
+
+function createPortalContainerRootBoundaryDiagnostic(
+  targetDispatchPathRecord,
+  portalContainer,
+  ownerRoot
+) {
+  const containerRootBoundaryNode =
+    targetDispatchPathRecord.containerRootBoundaryNode || null;
+  const portalContainerMatchesDispatchRootBoundary =
+    containerRootBoundaryNode !== null &&
+    containerRootBoundaryNode === portalContainer;
+  const portalContainerRootOwner = portalContainerMatchesDispatchRootBoundary
+    ? targetDispatchPathRecord.containerRootBoundaryOwner || null
+    : null;
+  const portalContainerRootOwnerPresent =
+    portalContainerRootOwner !== null;
+  const portalContainerRootOwnerMatchesPortalOwner =
+    portalContainerRootOwnerPresent
+      ? portalContainerRootOwner === ownerRoot
+      : null;
+  const ownerRootPreservedAcrossPortalContainerRoot =
+    portalContainerMatchesDispatchRootBoundary &&
+    targetDispatchPathRecord.ownerRootPreservedAcrossContainerRoot === true;
+  const ownerRootPreservedAcrossSecondaryPortalRoot =
+    portalContainerMatchesDispatchRootBoundary &&
+    targetDispatchPathRecord.ownerRootPreservedAcrossForeignContainerRoot ===
+      true;
+
+  return Object.freeze({
+    containerRootBoundaryStatus:
+      targetDispatchPathRecord.containerRootBoundaryStatus ||
+      'unknown-container-root-boundary',
+    delegatedEventHandoffOwnerRootPreserved:
+      ownerRootPreservedAcrossPortalContainerRoot,
+    kind: 'FastReactDomPortalContainerRootBoundaryRecord',
+    ownerRootPreservedAcrossPortalContainerRoot,
+    ownerRootPreservedAcrossSecondaryPortalRoot,
+    portalContainerMatchesDispatchRootBoundary,
+    portalContainerOwnedBySecondaryRoot:
+      portalContainerRootOwnerMatchesPortalOwner === false,
+    portalContainerRootOwner,
+    portalContainerRootOwnerMatchesPortalOwner,
+    portalContainerRootOwnerPresent,
+    publicDispatchEnabled: false,
+    publicPortalBubblingEnabled: false
+  });
 }
 
 function createPortalContainerPathDiagnostic(

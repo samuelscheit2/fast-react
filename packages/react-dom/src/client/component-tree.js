@@ -299,6 +299,8 @@ function createEventTargetDispatchPathRecord(targetNormalizationRecord) {
   const normalizedTargetRecord =
     assertEventTargetNormalizationRecord(targetNormalizationRecord);
   const entries = [];
+  let containerRootBoundaryNode = null;
+  let containerRootBoundaryOwner = null;
   let currentNode = normalizedTargetRecord.closestMountedHostInstanceNode;
 
   while (currentNode !== null) {
@@ -322,7 +324,10 @@ function createEventTargetDispatchPathRecord(targetNormalizationRecord) {
       : null;
     while (parentNode !== null) {
       assertTargetNodeDoesNotHaveMismatchedHostInstanceToken(parentNode);
-      if (getContainerRoot(parentNode) !== null) {
+      const parentContainerRootOwner = getContainerRoot(parentNode);
+      if (parentContainerRootOwner !== null) {
+        containerRootBoundaryNode = parentNode;
+        containerRootBoundaryOwner = parentContainerRootOwner;
         parentNode = null;
         break;
       }
@@ -341,14 +346,43 @@ function createEventTargetDispatchPathRecord(targetNormalizationRecord) {
   const targetEntry = frozenEntries.length === 0 ? null : frozenEntries[0];
   const targetInst =
     targetEntry === null ? null : targetEntry.targetHostInstanceToken;
+  const targetRootOwner = targetEntry === null ? null : targetEntry.rootOwner;
+  const targetRootOwnerMatchCount =
+    targetRootOwner === null
+      ? 0
+      : frozenEntries.filter((entry) => entry.rootOwner === targetRootOwner)
+          .length;
+  const targetRootOwnerMismatchCount =
+    targetRootOwner === null
+      ? 0
+      : frozenEntries.length - targetRootOwnerMatchCount;
+  const containerRootOwnerMatchesTargetRoot =
+    containerRootBoundaryOwner === null || targetRootOwner === null
+      ? null
+      : containerRootBoundaryOwner === targetRootOwner;
+  const ownerRootPreservedAcrossContainerRoot =
+    containerRootBoundaryOwner !== null &&
+    targetRootOwner !== null &&
+    targetRootOwnerMismatchCount === 0;
 
   return Object.freeze({
     browserDomEventCompatibilityClaimed: false,
+    containerRootBoundaryNode,
+    containerRootBoundaryOwner,
+    containerRootBoundaryStatus:
+      containerRootBoundaryOwner === null
+        ? 'no-container-root-boundary'
+        : 'stopped-at-container-root',
+    containerRootOwnerMatchesTargetRoot,
     entries: frozenEntries,
     kind: EVENT_TARGET_DISPATCH_PATH_RECORD_KIND,
     length: frozenEntries.length,
+    ownerRootPreservedAcrossContainerRoot,
+    ownerRootPreservedAcrossForeignContainerRoot:
+      ownerRootPreservedAcrossContainerRoot &&
+      containerRootOwnerMatchesTargetRoot === false,
     publicRootBehaviorChanged: false,
-    rootOwner: targetEntry === null ? null : targetEntry.rootOwner,
+    rootOwner: targetRootOwner,
     status:
       targetInst === null
         ? 'no-mounted-host-instance'
@@ -365,6 +399,8 @@ function createEventTargetDispatchPathRecord(targetNormalizationRecord) {
       targetInst === null
         ? 'not-resolved'
         : 'resolved-component-tree-host-instance',
+    targetRootOwnerMatchCount,
+    targetRootOwnerMismatchCount,
     targetNormalizationRecord: normalizedTargetRecord,
     targetNode: normalizedTargetRecord.targetNode
   });

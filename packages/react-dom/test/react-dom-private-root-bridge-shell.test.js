@@ -3615,6 +3615,100 @@ test('private portal event owner-root gate records portal child event path owner
   assert.equal(portalContainer.__registrations.length, 0);
 });
 
+test('private portal event owner-root gate preserves metadata across a secondary fake root', () => {
+  const document = createDocument('private-portal-secondary-root-owner');
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  const portalChild = {
+    props: {
+      children: 'secondary portal child',
+      onClick() {
+        throw new Error('secondary portal listener should not run');
+      }
+    },
+    type: 'button'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: 'secondary-portal-boundary',
+    portalCommitIdPrefix: 'secondary-portal-commit',
+    portalEventOwnerRootIdPrefix: 'secondary-portal-owner',
+    portalMountIdPrefix: 'secondary-portal-mount'
+  });
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const secondaryCreate = bridge.createClientRoot(portalContainer);
+  const secondarySideEffects =
+    bridge.applyCreateRootSideEffects(secondaryCreate);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    'secondary-portal-key'
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const ownerGate = bridge.createPortalEventOwnerRootGate(mount);
+  const hiddenGate =
+    rootBridge.getPrivateRootPortalEventOwnerRootGatePayload(ownerGate);
+  const pluginGate = hiddenGate.eventOwnerRootGateRecord;
+  const pluginPayload =
+    pluginEventSystem.getPortalEventOwnerRootGateRecordPayload(pluginGate);
+  const dispatchPath = hiddenGate.targetDispatchPathRecord;
+
+  assert.equal(
+    ownerGate.portalContainerOwnership.portalContainerMarkedAsRoot,
+    true
+  );
+  assert.equal(
+    ownerGate.portalContainerOwnership.portalContainerOwnedByAnotherRoot,
+    true
+  );
+  assert.equal(
+    ownerGate.portalContainerOwnership.portalContainerOwnerMatchesRoot,
+    false
+  );
+  assert.equal(dispatchPath.containerRootBoundaryNode, portalContainer);
+  assert.equal(dispatchPath.containerRootBoundaryOwner, secondaryCreate.owner);
+  assert.equal(dispatchPath.containerRootOwnerMatchesTargetRoot, false);
+  assert.equal(dispatchPath.ownerRootPreservedAcrossContainerRoot, true);
+  assert.equal(
+    dispatchPath.ownerRootPreservedAcrossForeignContainerRoot,
+    true
+  );
+  assert.equal(pluginGate.ownerRootMatchesTargetRoot, true);
+  assert.equal(pluginGate.dispatchPathRootOwnerMismatchCount, 0);
+  assert.equal(pluginGate.portalContainerContainsTarget, true);
+  assert.equal(pluginGate.portalContainerMatchesDispatchRootBoundary, true);
+  assert.equal(pluginGate.portalContainerOwnedBySecondaryRoot, true);
+  assert.equal(pluginGate.portalContainerRootOwnerPresent, true);
+  assert.equal(pluginGate.portalContainerRootOwnerMatchesPortalOwner, false);
+  assert.equal(pluginGate.ownerRootPreservedAcrossPortalContainerRoot, true);
+  assert.equal(pluginGate.ownerRootPreservedAcrossSecondaryPortalRoot, true);
+  assert.equal(pluginPayload.portalContainerRootOwner, secondaryCreate.owner);
+  assert.equal(pluginPayload.ownerRoot, create.owner);
+  assert.equal(pluginGate.publicPortalBubblingEnabled, false);
+  assert.equal(pluginGate.publicDispatchEnabled, false);
+  assert.equal(pluginGate.publicDispatchBlocked, true);
+  assert.equal(pluginGate.eventDispatch, false);
+  assert.equal(pluginGate.listenerInvocationCount, 0);
+  assert.equal(pluginGate.syntheticEventCount, 0);
+  assert.equal(ownerGate.publicPortalBubbling, false);
+  assert.equal(ownerGate.eventDispatch, false);
+  assert.equal(ownerGate.listenerInstallation, false);
+  assert.equal(ownerGate.compatibilityClaimed, false);
+
+  bridge.revertCreateRootSideEffects(secondarySideEffects);
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootContainer.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+});
+
 test('private focus/blur blocker gate records phase metadata and portal ownership without dispatch', () => {
   const document = createDocument('private-focus-blur-blocker');
   const rootContainer = createElement('DIV', document);

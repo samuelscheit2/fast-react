@@ -29,6 +29,9 @@ const pluginEventSystem = require(
 const rootListeners = require(
   path.join(packageRoot, 'src/events/root-listeners.js')
 );
+const rootMarkers = require(
+  path.join(packageRoot, 'src/client/root-markers.js')
+);
 const resourceFormGate = require(
   path.join(packageRoot, 'src/resource-form-internals-gate.js')
 );
@@ -543,6 +546,183 @@ test('private root click event delegation dispatch gate invokes a portal child l
       parentListenerRecord
     );
     rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.childToken);
+    componentTree.detachHostInstanceToken(fixture.parentToken);
+  }
+});
+
+test('private click delegation preserves portal owner root across a secondary fake root', () => {
+  const fixture = createPrivateClickPortalDelegationFixture(
+    'click-gate-secondary-root-portal'
+  );
+  const secondaryRootOwner = {
+    kind: 'click-gate-secondary-root:root'
+  };
+  const calls = [];
+  let rootRegistration = null;
+  let childListenerRecord = null;
+
+  try {
+    rootMarkers.markContainerAsRoot(
+      secondaryRootOwner,
+      fixture.portalContainer
+    );
+    childListenerRecord =
+      listenerRegistry.registerPrivateEventListenerQueueEntry(
+        fixture.targetNode,
+        'click',
+        false,
+        event => {
+          calls.push({
+            currentTarget: event.currentTarget,
+            target: event.target,
+            targetInst: event.targetInst
+          });
+        },
+        {
+          listenerType: 'accepted-private-click-secondary-root-portal-test'
+        }
+      );
+
+    const portalDispatch = createPrivateClickDispatchRecord(
+      fixture,
+      'bubble'
+    );
+    const portalOwnerGate =
+      pluginEventSystem.createPortalEventOwnerRootGateRecord(
+        portalDispatch.targetDispatchPathRecord,
+        {
+          domEventName: 'click',
+          ownerRoot: fixture.rootOwner,
+          portalContainer: fixture.portalContainer,
+          portalKey: 'click-gate-secondary-root-portal',
+          rootContainer: fixture.container
+        }
+      );
+    rootRegistration =
+      rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+    const gate =
+      rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+        rootRegistration,
+        fixture.hostOutputPayload,
+        childListenerRecord,
+        {
+          portalEventOwnerRootGateRecord: portalOwnerGate
+        }
+      );
+    const payload =
+      rootListeners.getPrivateRootClickEventDelegationDispatchGatePayload(
+        gate
+      );
+    const pluginPayload =
+      pluginEventSystem.getPrivateClickEventDelegationDispatchGatePayload(
+        payload.pluginGateRecord
+      );
+
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord.containerRootBoundaryNode,
+      fixture.portalContainer
+    );
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord.containerRootBoundaryOwner,
+      secondaryRootOwner
+    );
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord
+        .containerRootOwnerMatchesTargetRoot,
+      false
+    );
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord
+        .ownerRootPreservedAcrossForeignContainerRoot,
+      true
+    );
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord.rootOwner,
+      fixture.rootOwner
+    );
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord.targetRootOwnerMatchCount,
+      2
+    );
+    assert.equal(
+      portalDispatch.targetDispatchPathRecord.targetRootOwnerMismatchCount,
+      0
+    );
+
+    assert.equal(portalOwnerGate.portalContainerContainsTarget, true);
+    assert.equal(
+      portalOwnerGate.portalContainerMatchesDispatchRootBoundary,
+      true
+    );
+    assert.equal(portalOwnerGate.portalContainerOwnedBySecondaryRoot, true);
+    assert.equal(portalOwnerGate.portalContainerRootOwnerPresent, true);
+    assert.equal(
+      portalOwnerGate.portalContainerRootOwnerMatchesPortalOwner,
+      false
+    );
+    assert.equal(
+      portalOwnerGate.ownerRootPreservedAcrossPortalContainerRoot,
+      true
+    );
+    assert.equal(
+      portalOwnerGate.ownerRootPreservedAcrossSecondaryPortalRoot,
+      true
+    );
+    assert.equal(portalOwnerGate.publicPortalBubblingEnabled, false);
+    assert.equal(portalOwnerGate.publicDispatchEnabled, false);
+    assert.equal(portalOwnerGate.eventDispatch, false);
+    assert.equal(portalOwnerGate.listenerInvocationCount, 0);
+    assert.equal(portalOwnerGate.syntheticEventCount, 0);
+
+    assert.equal(gate.listenerInvocationCount, 1);
+    assert.equal(gate.privateListenerInvoked, true);
+    assert.equal(
+      payload.pluginGateRecord.portalContainerOwnedBySecondaryRoot,
+      true
+    );
+    assert.equal(
+      payload.pluginGateRecord.ownerRootPreservedAcrossSecondaryPortalRoot,
+      true
+    );
+    assert.equal(gate.publicPortalBubblingEnabled, false);
+    assert.equal(gate.publicDispatchEnabled, false);
+    assert.equal(gate.eventDispatch, false);
+    assert.equal(gate.syntheticEventCount, 0);
+    assert.equal(
+      pluginPayload.portalEventOwnerRootGateRecord,
+      portalOwnerGate
+    );
+    assert.equal(
+      pluginPayload.portalEventOwnerRootGateRecord.portalContainerRootBoundary
+        .portalContainerRootOwner,
+      secondaryRootOwner
+    );
+    assert.deepEqual(calls, [
+      {
+        currentTarget: fixture.targetNode,
+        target: fixture.targetNode,
+        targetInst: fixture.childToken
+      }
+    ]);
+    assert.equal(fixture.portalContainer.__registrations.length, 0);
+    assert.equal(fixture.parentNode.__registrations.length, 0);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(
+      rootMarkers.getContainerRoot(fixture.portalContainer),
+      secondaryRootOwner
+    );
+  } finally {
+    if (childListenerRecord !== null) {
+      listenerRegistry.removePrivateEventListenerQueueEntry(
+        childListenerRecord
+      );
+    }
+    if (rootRegistration !== null) {
+      rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    }
+    rootMarkers.unmarkContainerAsRoot(fixture.portalContainer);
     componentTree.detachHostInstanceToken(fixture.childToken);
     componentTree.detachHostInstanceToken(fixture.parentToken);
   }
