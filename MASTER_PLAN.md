@@ -47,22 +47,21 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-736 have also been accepted and cleaned
-up. Workers 737-738 have been accepted, merged, and cleaned up.
-
-Workers 740-742 are active in isolated worktrees. The static
-private-admission ledger follow-up for accepted Workers 737-738 is also
-active/current work.
+accepted and cleaned up. Workers 715-745 have also been accepted and are no
+longer active.
 
 ## Near-Term Sequencing
 
-1. Select the next runtime or research queue from accepted Worker 737 ledger
-   evidence, accepted Worker 738 sibling-text handoff/report evidence, accepted
-   Worker 736 nested source-report identity evidence, Worker 735 sibling
-   snapshot blocker evidence, and remaining private blockers; keep public root,
-   act, flushSync, hooks/effects, test-renderer, React DOM, public
-   serialization, JS/CJS, native bridge, package compatibility, and sibling
-   identity admission blocked until each private gate is proven.
+1. Select the next runtime or research queue from accepted private evidence:
+   Worker 745's narrow sibling-text identity gate, Worker 744's 737-738 ledger,
+   Worker 742's delayed act/root Scheduler mock diagnostic, Worker 741's
+   hydrateRoot preflight, Worker 740's native teardown mirror, Worker 738's
+   sibling-text handoff/report, Worker 736's nested source-report identity,
+   Worker 735's sibling snapshot blocker, and remaining private blockers. Keep
+   public root, act, flushSync, hooks/effects, test-renderer, React DOM, public
+   serialization, JS/CJS, native bridge, package compatibility, and broad
+   sibling/multichild identity admission blocked until each private gate is
+   proven.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
@@ -71,30 +70,25 @@ active/current work.
 
 ## Next Queue Candidates
 
-- Active Worker 740 is investigating the native package worker-thread teardown
-  mirror.
-- Active Worker 741 is investigating the React DOM `hydrateRoot` private facade
-  preflight.
-- Active Worker 742 is investigating the Scheduler mock delayed `act` root
-  continuation.
-- Active static ledger follow-up for accepted Workers 737-738 should pin
-  Worker 738's real sibling-text handoff/report evidence and keep every public,
-  JS/CJS, native bridge, package-compatibility, and sibling-identity admission
-  claim blocked unless separately proven.
-- Worker 736 accepts first-class Rust-only nested `toJSON` source-report
-  identity generation backed by committed nested fiber inspection. JS/CJS,
-  public serialization, native bridge loading/execution, package
-  compatibility, and sibling snapshot identity remain blocked.
-- Worker 733 accepts narrow Rust-only unmount finished-work identity admission
-  for private `toJSON` and `toTree` native diagnostics, consuming Worker 730's
-  cleanup evidence. Public unmount, public serialization, native bridge
-  loading/execution, JS/CJS admission, and package compatibility remain
-  blocked.
-- Defer broad multichild/sibling serializer identity admission until the real
-  sibling-text committed output/report path is consumed by a dedicated identity
-  gate. Worker 735 added only a Rust-private snapshot-path blocker/preflight
-  diagnostic; accepted Worker 738 added the real handoff/report prerequisite,
-  not identity admission.
+- Scheduler work can move beyond Worker 742's private delayed act/root mock
+  diagnostic only after public Scheduler timing, public `act`/root semantics,
+  renderer/effect execution, public flush helper behavior, and compatibility are
+  proven together.
+- Native worker-thread teardown can move beyond Worker 740's inert package
+  mirror only after executable native addon loading, cleanup hooks, scheduling,
+  renderer/reconciler output, and no-stale-value behavior are proven together.
+- Public `hydrateRoot` remains blocked after Worker 741's private preflight.
+  Future hydration work must prove real root creation, marker/listener
+  behavior, recoverable error routing, event replay, and DOM mutation semantics
+  against React 19.2.6.
+- Future sibling-text native execution or JS/CJS serialization work should
+  consume Worker 745's dedicated private identity gate explicitly. Public
+  sibling-text serialization, package compatibility, native bridge
+  loading/execution, and broad multichild identity remain blocked.
+- Worker 736's nested `toJSON` source-report identity and Worker 733's unmount
+  identity gates remain available private evidence for later native or
+  serialization gates. JS/CJS, public serialization, native bridge
+  loading/execution, and package compatibility remain blocked.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.
