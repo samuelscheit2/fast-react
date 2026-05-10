@@ -1519,6 +1519,8 @@ const privateToTreeFacadeStatus =
   'private-tree-diagnostics-serializable-public-totree-blocked';
 const privateToTreeAcceptedDiagnosticName =
   'fast-react-test-renderer.serialization.private-tree-canary';
+const privateToTreeCommittedFiberInspectionDiagnosticName =
+  'fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary';
 const privateToTreeAcceptedFiberShape = Object.freeze([
   'HostRoot',
   'HostComponent',
@@ -1594,6 +1596,11 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   acceptedRustPrivateTreeMetadata: true,
   acceptedRustPrivateCompositeTreeMetadata: true,
   acceptedCommittedFiberInspection: true,
+  acceptedCommittedFiberInspectionDiagnosticName:
+    privateToTreeCommittedFiberInspectionDiagnosticName,
+  privateCommittedFiberInspectionShapeDiagnosticsAvailable: true,
+  privateMultiChildCommittedFiberInspectionAvailable: true,
+  privateFunctionComponentCommittedFiberInspectionAvailable: true,
   privateCompositeFunctionMetadataAvailable: true,
   privateMultiChildHostOutputTreeMetadataAvailable: true,
   publicTreeAvailable: false,
@@ -1604,32 +1611,49 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   acceptedWorker: 'worker-364-test-renderer-totree-private-host-output',
   acceptedRustWorkers: Object.freeze([
     'worker-235-test-renderer-private-fiber-inspection',
-    'worker-265-test-renderer-private-json-ready-diagnostics'
+    'worker-265-test-renderer-private-json-ready-diagnostics',
+    'worker-516-test-renderer-committed-fiber-tree-inspection'
   ]),
   acceptedRustApis: Object.freeze([
     'inspect_test_renderer_committed_fiber_tree',
+    'TestRendererCommittedFiberTreeInspection::shape_name',
+    'TestRendererCommittedFiberTreeInspection::nodes',
+    'TestRendererCommittedFiberTreeInspection::root_children',
+    'TestRendererCommittedFiberTreeInspection::host_children',
+    'TestRendererCommittedFiberTreeInspection::function_component',
+    'TestRendererCommittedFiberTreeInspection::host_components',
+    'TestRendererCommittedFiberTreeInspection::host_texts',
+    'TestRendererCommittedFiberTreeInspection::fiber_tag_order',
     'TestRendererCommittedFiberTreeInspection::host_root',
     'TestRendererCommittedFiberTreeInspection::host_component',
     'TestRendererCommittedFiberTreeInspection::host_text',
     'TestRendererRoot::describe_private_json_serialization_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
+    'TestRendererRoot::describe_private_tree_committed_fiber_inspection_for_canary',
     'TestRendererPrivateJsonSerializationReport',
     'TestRendererPrivateTreeMetadataReport',
+    'TestRendererPrivateTreeCommittedFiberInspectionReport',
     'TestRendererPrivateTreeFunctionComponentDiagnostic'
   ]),
   acceptedRustTests: Object.freeze([
     'committed_fiber_inspection_describes_host_root_component_and_text',
+    'committed_fiber_inspection_describes_multi_child_host_root_shape',
+    'committed_fiber_inspection_describes_function_component_above_host_shape',
+    'committed_fiber_inspection_describes_function_component_above_multi_child_shape',
     'root_private_json_serialization_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
-    'root_private_tree_metadata_canary_describes_function_component_above_host_output'
+    'root_private_tree_metadata_canary_describes_function_component_above_host_output',
+    'root_private_tree_committed_fiber_inspection_records_minimal_shape_privately'
   ]),
   multiChildAcceptedWorker:
     'worker-485-test-renderer-totree-multichild-gate',
   multiChildAcceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics',
     'TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererCommittedFiberTreeInspection::host_child_tags',
+    'TestRendererCommittedFiberTreeInspection::has_function_component_wrapper',
     'TestRendererPrivateTreeRenderedRoot',
     'TestRendererPrivateTreeRenderedHostComponent',
     'TestRendererPrivateTreeRenderedFunctionComponent'
@@ -1700,6 +1724,8 @@ const toTreePrivateFacadeGate = Object.freeze({
   multiChildAcceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics',
     'TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics',
+    'TestRendererCommittedFiberTreeInspection::host_child_tags',
+    'TestRendererCommittedFiberTreeInspection::has_function_component_wrapper',
     'TestRendererPrivateTreeRenderedRoot',
     'TestRendererPrivateTreeRenderedHostComponent',
     'TestRendererPrivateTreeRenderedFunctionComponent'
@@ -6735,6 +6761,7 @@ function describePrivateToTreeHostOutputDiagnostic(report) {
       returnsTextValue: true,
       publicTreeObject: false
     }),
+    committedFiberInspection: diagnostic.committedFiberInspection,
     publicTreeObjectAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -6953,10 +6980,22 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
       'public_tree_object_available',
       false
     );
+    const committedFiberInspection =
+      validatePrivateToTreeCommittedFiberInspectionDiagnostic(report, {
+        expectedFiberShape: privateToTreeAcceptedFiberShape,
+        expectedRootChildFiberTags: ['HostComponent'],
+        expectedHostChildFiberTags: ['HostComponent'],
+        expectedRootChildCount: 1,
+        expectedHostChildCount: 1,
+        expectedHostTextCount: 1,
+        expectedFunctionComponentPresent: false,
+        expectedWrapsCommittedHostOutput: false
+      });
 
     return {
       kind: 'minimal',
       hostOutputUpdateKind,
+      committedFiberInspection,
       componentProps,
       componentType: readPrivateToJSONStringField(
         functionComponent,
@@ -7034,6 +7073,7 @@ function describePrivateToTreeMultiChildHostOutputDiagnostic(diagnostic) {
       publicTreeObject: false
     }),
     hostChildren: diagnostic.hostChildren,
+    committedFiberInspection: diagnostic.committedFiberInspection,
     publicTreeObjectAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -7210,17 +7250,166 @@ function validatePrivateToTreeMultiChildHostOutputDiagnostic(
     'public_tree_object_available',
     false
   );
+  const committedFiberInspection =
+    validatePrivateToTreeCommittedFiberInspectionDiagnostic(report, {
+      expectedFiberShape: componentWrapped
+        ? privateToTreeCompositeMultiChildAcceptedFiberShape
+        : privateToTreeMultiChildAcceptedFiberShape,
+      expectedRootChildFiberTags: componentWrapped
+        ? ['FunctionComponent']
+        : ['HostText', 'HostComponent'],
+      expectedHostChildFiberTags: ['HostText', 'HostComponent'],
+      expectedRootChildCount: componentWrapped ? 1 : rootChildCount,
+      expectedHostChildCount: rootChildCount,
+      expectedHostTextCount: 2,
+      expectedFunctionComponentPresent: componentWrapped,
+      expectedWrapsCommittedHostOutput: componentWrapped
+    });
 
   return {
     kind: 'multi-child',
     hostOutputUpdateKind,
     rootChildCount,
     componentWrapped,
+    committedFiberInspection,
     componentProps,
     componentType,
     hostChildren: freezeArray([firstText.metadata, hostComponent.metadata]),
     renderedChildren
   };
+}
+
+function validatePrivateToTreeCommittedFiberInspectionDiagnostic(
+  report,
+  {
+    expectedFiberShape,
+    expectedRootChildFiberTags,
+    expectedHostChildFiberTags,
+    expectedRootChildCount,
+    expectedHostChildCount,
+    expectedHostTextCount,
+    expectedFunctionComponentPresent,
+    expectedWrapsCommittedHostOutput
+  }
+) {
+  const record = readPrivateToJSONRecordField(
+    report,
+    'committedFiberInspection',
+    'committed_fiber_inspection'
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToTreeCommittedFiberInspectionDiagnosticName
+  );
+  assertPrivateToJSONStringField(
+    record,
+    'sourceTreeDiagnosticName',
+    'source_tree_diagnostic_name',
+    privateToTreeAcceptedDiagnosticName
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'fiberShape',
+    'fiber_shape',
+    expectedFiberShape
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'rootChildFiberTags',
+    'root_child_fiber_tags',
+    expectedRootChildFiberTags
+  );
+  assertPrivateToTreeStringArrayField(
+    record,
+    'hostChildFiberTags',
+    'host_child_fiber_tags',
+    expectedHostChildFiberTags
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'rootChildCount',
+    'root_child_count',
+    expectedRootChildCount
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'hostChildCount',
+    'host_child_count',
+    expectedHostChildCount
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'hostComponentCount',
+    'host_component_count',
+    1
+  );
+  assertPrivateToJSONNumberField(
+    record,
+    'hostTextCount',
+    'host_text_count',
+    expectedHostTextCount
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'functionComponentPresent',
+    'function_component_present',
+    expectedFunctionComponentPresent
+  );
+  const functionTag = readPrivateToJSONField(
+    record,
+    'functionComponentFiberTag',
+    'function_component_fiber_tag'
+  );
+  if (expectedFunctionComponentPresent) {
+    if (functionTag !== 'FunctionComponent') {
+      throwPrivateToTreeMetadataError(
+        'Expected committed-fiber inspection to record a FunctionComponent wrapper.'
+      );
+    }
+  } else if (functionTag !== undefined && functionTag !== null) {
+    throwPrivateToTreeMetadataError(
+      'Expected committed-fiber inspection to omit FunctionComponent metadata.'
+    );
+  }
+  assertPrivateToJSONBooleanField(
+    record,
+    'wrapsCommittedHostOutput',
+    'wraps_committed_host_output',
+    expectedWrapsCommittedHostOutput
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+  assertPrivateToJSONBooleanField(
+    record,
+    'compatibilityClaimed',
+    'compatibility_claimed',
+    false
+  );
+
+  return freezeRecord({
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    fiberShape: freezeArray(expectedFiberShape),
+    rootChildFiberTags: freezeArray(expectedRootChildFiberTags),
+    hostChildFiberTags: freezeArray(expectedHostChildFiberTags),
+    rootChildCount: expectedRootChildCount,
+    hostChildCount: expectedHostChildCount,
+    hostComponentCount: 1,
+    hostTextCount: expectedHostTextCount,
+    functionComponentFiberTag: expectedFunctionComponentPresent
+      ? 'FunctionComponent'
+      : null,
+    functionComponentPresent: expectedFunctionComponentPresent,
+    wrapsCommittedHostOutput: expectedWrapsCommittedHostOutput,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  });
 }
 
 function validatePrivateToTreeTextChild(record, label) {

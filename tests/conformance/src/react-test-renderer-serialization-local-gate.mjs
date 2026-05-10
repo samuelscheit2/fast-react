@@ -124,6 +124,12 @@ export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
       "The private toTree metadata must record minimal multi-child host output and composite-above-multi-child shapes without exposing public toTree."
   },
   {
+    id: "js-totree-private-committed-fiber-shape-diagnostics",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree metadata must be backed by committed-fiber inspection shape diagnostics for multi-child and FunctionComponent wrapper shapes."
+  },
+  {
     id: "js-totree-public-tree-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -305,6 +311,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape &&
     localChecks.privateToTreeCompositeFunctionMetadataPresent &&
     localChecks.privateToTreeMultiChildMetadataPresent &&
+    localChecks.privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent &&
     localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
   const requiredLocalTargetsReady =
     privateToJSONFacadeGateReady && privateToTreeMetadataGateReady;
@@ -360,6 +367,12 @@ export function evaluateReactTestRendererSerializationLocalGate({
         }
         if (requirement.id === "js-totree-private-multi-child-metadata") {
           return !localChecks.privateToTreeMultiChildMetadataPresent;
+        }
+        if (
+          requirement.id ===
+          "js-totree-private-committed-fiber-shape-diagnostics"
+        ) {
+          return !localChecks.privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent;
         }
         if (requirement.id === "js-totree-public-tree-blocked") {
           return !localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
@@ -1057,6 +1070,44 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bpublicTreeAvailable\s*:\s*false\b/u
     );
+  const privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent =
+    privateToTreeMultiChildMetadataPresent &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateTreeCommittedFiberInspectionReport\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_tree_committed_fiber_inspection_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      reconcilerSource,
+      /\bcommitted_fiber_inspection_describes_multi_child_host_root_shape\b/u
+    ) &&
+    hasSourcePattern(
+      reconcilerSource,
+      /\bcommitted_fiber_inspection_describes_function_component_above_multi_child_shape\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateCommittedFiberInspectionShapeDiagnosticsAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateToTreeCommittedFiberInspectionDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcommittedFiberInspection\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-516-test-renderer-committed-fiber-tree-inspection\b/u
+    );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
     hasSourcePattern(
@@ -1362,6 +1413,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToTreeHostOutputMetadataRecognizesMinimalShape,
     privateToTreeCompositeFunctionMetadataPresent,
     privateToTreeMultiChildMetadataPresent,
+    privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent,
     privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,

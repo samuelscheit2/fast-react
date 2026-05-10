@@ -40,6 +40,11 @@ pub enum TestRendererCommittedFiberInspectionError {
         root: FiberRootId,
         fiber: FiberId,
     },
+    UnsupportedShape {
+        fiber: FiberId,
+        tag: FiberTag,
+        reason: &'static str,
+    },
 }
 
 impl Display for TestRendererCommittedFiberInspectionError {
@@ -82,6 +87,12 @@ impl Display for TestRendererCommittedFiberInspectionError {
                 fiber.slot().get(),
                 root.raw()
             ),
+            Self::UnsupportedShape { fiber, tag, reason } => write!(
+                formatter,
+                "committed test-renderer {:?} fiber {} has unsupported private inspection shape: {reason}",
+                tag,
+                fiber.slot().get()
+            ),
         }
     }
 }
@@ -95,7 +106,8 @@ impl Error for TestRendererCommittedFiberInspectionError {
             Self::ExpectedFiberTag { .. }
             | Self::UnexpectedChildCount { .. }
             | Self::MissingStateNode { .. }
-            | Self::HostRootStateNodeMismatch { .. } => None,
+            | Self::HostRootStateNodeMismatch { .. }
+            | Self::UnsupportedShape { .. } => None,
         }
     }
 }
@@ -231,6 +243,13 @@ pub struct TestRendererCommittedFiberTreeInspection {
     root: FiberRootId,
     current: FiberId,
     resulting_element: RootElementHandle,
+    shape_name: &'static str,
+    nodes: Vec<TestRendererCommittedFiberNodeInspection>,
+    root_children: Vec<TestRendererCommittedFiberNodeInspection>,
+    host_children: Vec<TestRendererCommittedFiberNodeInspection>,
+    function_component: Option<TestRendererCommittedFiberNodeInspection>,
+    host_components: Vec<TestRendererCommittedFiberNodeInspection>,
+    host_texts: Vec<TestRendererCommittedFiberNodeInspection>,
     host_root: TestRendererCommittedFiberNodeInspection,
     host_component: TestRendererCommittedFiberNodeInspection,
     host_text: TestRendererCommittedFiberNodeInspection,
@@ -250,6 +269,61 @@ impl TestRendererCommittedFiberTreeInspection {
     #[must_use]
     pub const fn resulting_element(&self) -> RootElementHandle {
         self.resulting_element
+    }
+
+    #[must_use]
+    pub const fn shape_name(&self) -> &'static str {
+        self.shape_name
+    }
+
+    #[must_use]
+    pub fn nodes(&self) -> &[TestRendererCommittedFiberNodeInspection] {
+        &self.nodes
+    }
+
+    #[must_use]
+    pub fn root_children(&self) -> &[TestRendererCommittedFiberNodeInspection] {
+        &self.root_children
+    }
+
+    #[must_use]
+    pub fn host_children(&self) -> &[TestRendererCommittedFiberNodeInspection] {
+        &self.host_children
+    }
+
+    #[must_use]
+    pub const fn function_component(&self) -> Option<TestRendererCommittedFiberNodeInspection> {
+        self.function_component
+    }
+
+    #[must_use]
+    pub fn host_components(&self) -> &[TestRendererCommittedFiberNodeInspection] {
+        &self.host_components
+    }
+
+    #[must_use]
+    pub fn host_texts(&self) -> &[TestRendererCommittedFiberNodeInspection] {
+        &self.host_texts
+    }
+
+    #[must_use]
+    pub fn fiber_tag_order(&self) -> Vec<FiberTag> {
+        self.nodes.iter().map(|node| node.tag()).collect()
+    }
+
+    #[must_use]
+    pub fn root_child_tags(&self) -> Vec<FiberTag> {
+        self.root_children.iter().map(|node| node.tag()).collect()
+    }
+
+    #[must_use]
+    pub fn host_child_tags(&self) -> Vec<FiberTag> {
+        self.host_children.iter().map(|node| node.tag()).collect()
+    }
+
+    #[must_use]
+    pub const fn has_function_component_wrapper(&self) -> bool {
+        self.function_component.is_some()
     }
 
     #[must_use]
@@ -283,8 +357,251 @@ pub fn inspect_test_renderer_committed_fiber_tree<H: HostTypes>(
         .element();
     let host_root = inspect_node(host_root_node);
 
-    let root_children = expect_child_count(store, current, 1)?;
-    let component_id = root_children[0];
+    let root_child_ids = expect_child_count_range(
+        store,
+        current,
+        1,
+        2,
+        "HostRoot admits only one child or the accepted HostText/HostComponent sibling pair",
+    )?;
+    let builder = TestRendererCommittedFiberTreeInspectionBuilder::new(
+        root_id,
+        current,
+        resulting_element,
+        host_root,
+    );
+
+    match root_child_ids.as_slice() {
+        [single_child] => {
+            let child_node = store.fiber_arena().get(*single_child)?;
+            match child_node.tag() {
+                FiberTag::HostComponent => {
+                    let component = inspect_host_component_with_text(store, *single_child)?;
+                    builder.finish_host_component_shape(component)
+                }
+                FiberTag::FunctionComponent => {
+                    let function_component = inspect_node(child_node);
+                    let function_child_ids = expect_child_count_range(
+                        store,
+                        *single_child,
+                        1,
+                        2,
+                        "FunctionComponent admits only one host child or the accepted HostText/HostComponent sibling pair",
+                    )?;
+                    let host_children = inspect_host_children(store, &function_child_ids)?;
+                    builder.finish_function_component_shape(function_component, host_children)
+                }
+                actual => Err(
+                    TestRendererCommittedFiberInspectionError::ExpectedFiberTag {
+                        fiber: child_node.id(),
+                        expected: FiberTag::HostComponent,
+                        actual,
+                    },
+                ),
+            }
+        }
+        [first_child, second_child] => {
+            let host_children = inspect_host_children(store, &[*first_child, *second_child])?;
+            builder.finish_multi_child_shape(host_children)
+        }
+        _ => Err(
+            TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                fiber: host_root.fiber(),
+                tag: host_root.tag(),
+                reason: "HostRoot private inspection only admits one or two children",
+            },
+        ),
+    }
+}
+
+struct TestRendererCommittedFiberTreeInspectionBuilder {
+    root: FiberRootId,
+    current: FiberId,
+    resulting_element: RootElementHandle,
+    host_root: TestRendererCommittedFiberNodeInspection,
+}
+
+impl TestRendererCommittedFiberTreeInspectionBuilder {
+    const fn new(
+        root: FiberRootId,
+        current: FiberId,
+        resulting_element: RootElementHandle,
+        host_root: TestRendererCommittedFiberNodeInspection,
+    ) -> Self {
+        Self {
+            root,
+            current,
+            resulting_element,
+            host_root,
+        }
+    }
+
+    fn finish_host_component_shape(
+        self,
+        component: InspectedHostComponentWithText,
+    ) -> Result<TestRendererCommittedFiberTreeInspection, TestRendererCommittedFiberInspectionError>
+    {
+        Ok(self.finish(
+            "HostRoot->HostComponent->HostText",
+            vec![component.component, component.text],
+            vec![component.component],
+            vec![component.component],
+            None,
+            vec![component.component],
+            vec![component.text],
+            component.component,
+            component.text,
+        ))
+    }
+
+    fn finish_multi_child_shape(
+        self,
+        host_children: InspectedHostChildren,
+    ) -> Result<TestRendererCommittedFiberTreeInspection, TestRendererCommittedFiberInspectionError>
+    {
+        Ok(self.finish(
+            "HostRoot->[HostText,HostComponent->HostText]",
+            host_children.nodes,
+            host_children.direct.clone(),
+            host_children.direct,
+            None,
+            vec![host_children.component],
+            vec![host_children.text_sibling, host_children.component_text],
+            host_children.component,
+            host_children.component_text,
+        ))
+    }
+
+    fn finish_function_component_shape(
+        self,
+        function_component: TestRendererCommittedFiberNodeInspection,
+        host_children: InspectedHostChildren,
+    ) -> Result<TestRendererCommittedFiberTreeInspection, TestRendererCommittedFiberInspectionError>
+    {
+        let shape_name = if host_children.direct.len() == 1 {
+            "HostRoot->FunctionComponent->HostComponent->HostText"
+        } else {
+            "HostRoot->FunctionComponent->[HostText,HostComponent->HostText]"
+        };
+        let mut nodes = Vec::with_capacity(1 + host_children.nodes.len());
+        nodes.push(function_component);
+        nodes.extend(host_children.nodes.iter().copied());
+
+        Ok(self.finish(
+            shape_name,
+            nodes,
+            vec![function_component],
+            host_children.direct,
+            Some(function_component),
+            vec![host_children.component],
+            if host_children.has_text_sibling {
+                vec![host_children.text_sibling, host_children.component_text]
+            } else {
+                vec![host_children.component_text]
+            },
+            host_children.component,
+            host_children.component_text,
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finish(
+        self,
+        shape_name: &'static str,
+        nodes_after_root: Vec<TestRendererCommittedFiberNodeInspection>,
+        root_children: Vec<TestRendererCommittedFiberNodeInspection>,
+        host_children: Vec<TestRendererCommittedFiberNodeInspection>,
+        function_component: Option<TestRendererCommittedFiberNodeInspection>,
+        host_components: Vec<TestRendererCommittedFiberNodeInspection>,
+        host_texts: Vec<TestRendererCommittedFiberNodeInspection>,
+        host_component: TestRendererCommittedFiberNodeInspection,
+        host_text: TestRendererCommittedFiberNodeInspection,
+    ) -> TestRendererCommittedFiberTreeInspection {
+        let mut nodes = Vec::with_capacity(1 + nodes_after_root.len());
+        nodes.push(self.host_root);
+        nodes.extend(nodes_after_root);
+
+        TestRendererCommittedFiberTreeInspection {
+            root: self.root,
+            current: self.current,
+            resulting_element: self.resulting_element,
+            shape_name,
+            nodes,
+            root_children,
+            host_children,
+            function_component,
+            host_components,
+            host_texts,
+            host_root: self.host_root,
+            host_component,
+            host_text,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct InspectedHostComponentWithText {
+    component: TestRendererCommittedFiberNodeInspection,
+    text: TestRendererCommittedFiberNodeInspection,
+}
+
+#[derive(Debug, Clone)]
+struct InspectedHostChildren {
+    direct: Vec<TestRendererCommittedFiberNodeInspection>,
+    nodes: Vec<TestRendererCommittedFiberNodeInspection>,
+    component: TestRendererCommittedFiberNodeInspection,
+    component_text: TestRendererCommittedFiberNodeInspection,
+    text_sibling: TestRendererCommittedFiberNodeInspection,
+    has_text_sibling: bool,
+}
+
+fn inspect_host_children<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    child_ids: &[FiberId],
+) -> Result<InspectedHostChildren, TestRendererCommittedFiberInspectionError> {
+    match child_ids {
+        [component_id] => {
+            let component = inspect_host_component_with_text(store, *component_id)?;
+            Ok(InspectedHostChildren {
+                direct: vec![component.component],
+                nodes: vec![component.component, component.text],
+                component: component.component,
+                component_text: component.text,
+                text_sibling: component.text,
+                has_text_sibling: false,
+            })
+        }
+        [text_id, component_id] => {
+            let text_node = store.fiber_arena().get(*text_id)?;
+            expect_fiber_tag(text_node, FiberTag::HostText)?;
+            expect_state_node_present(text_node)?;
+            expect_child_count(store, *text_id, 0)?;
+            let text_sibling = inspect_node(text_node);
+            let component = inspect_host_component_with_text(store, *component_id)?;
+
+            Ok(InspectedHostChildren {
+                direct: vec![text_sibling, component.component],
+                nodes: vec![text_sibling, component.component, component.text],
+                component: component.component,
+                component_text: component.text,
+                text_sibling,
+                has_text_sibling: true,
+            })
+        }
+        _ => Err(
+            TestRendererCommittedFiberInspectionError::UnsupportedShape {
+                fiber: child_ids[0],
+                tag: FiberTag::HostRoot,
+                reason: "private host children must be HostComponent or HostText plus HostComponent",
+            },
+        ),
+    }
+}
+
+fn inspect_host_component_with_text<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    component_id: FiberId,
+) -> Result<InspectedHostComponentWithText, TestRendererCommittedFiberInspectionError> {
     let component_node = store.fiber_arena().get(component_id)?;
     expect_fiber_tag(component_node, FiberTag::HostComponent)?;
     expect_state_node_present(component_node)?;
@@ -298,13 +615,9 @@ pub fn inspect_test_renderer_committed_fiber_tree<H: HostTypes>(
     expect_child_count(store, text_id, 0)?;
     let host_text = inspect_node(text_node);
 
-    Ok(TestRendererCommittedFiberTreeInspection {
-        root: root_id,
-        current,
-        resulting_element,
-        host_root,
-        host_component,
-        host_text,
+    Ok(InspectedHostComponentWithText {
+        component: host_component,
+        text: host_text,
     })
 }
 
@@ -409,16 +722,49 @@ fn expect_child_count<H: HostTypes>(
     )
 }
 
+fn expect_child_count_range<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    fiber: FiberId,
+    min: usize,
+    max: usize,
+    reason: &'static str,
+) -> Result<Vec<FiberId>, TestRendererCommittedFiberInspectionError> {
+    let children = store.fiber_arena().child_ids(fiber)?;
+    if (min..=max).contains(&children.len()) {
+        return Ok(children);
+    }
+
+    let node = store.fiber_arena().get(fiber)?;
+    if children.len() < min {
+        return Err(
+            TestRendererCommittedFiberInspectionError::UnexpectedChildCount {
+                fiber,
+                tag: node.tag(),
+                expected: min,
+                actual: children.len(),
+            },
+        );
+    }
+
+    Err(
+        TestRendererCommittedFiberInspectionError::UnsupportedShape {
+            fiber,
+            tag: node.tag(),
+            reason,
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        RootOptions, TestRendererHostOutputCanaryFixture, commit_finished_host_root,
-        finish_test_renderer_host_output_canary_fibers,
+        HostRootRenderPhaseRecord, RootOptions, TestRendererHostOutputCanaryFixture,
+        commit_finished_host_root, finish_test_renderer_host_output_canary_fibers,
         prepare_test_renderer_host_output_canary_fibers, render_host_root_for_lanes,
         update_container,
     };
-    use fast_react_core::{ElementTypeHandle, Lanes, PropsHandle};
+    use fast_react_core::{ElementTypeHandle, Lanes, PropsHandle, StateNodeHandle};
 
     struct Host;
 
@@ -462,6 +808,147 @@ mod tests {
         (store, root_id)
     }
 
+    #[derive(Debug, Clone, Copy)]
+    struct CommittedShapeFibers {
+        function_component: Option<FiberId>,
+        first_text: Option<FiberId>,
+        component: FiberId,
+        component_text: FiberId,
+    }
+
+    fn prepare_render(
+        store: &mut FiberRootStore<Host>,
+        root_id: FiberRootId,
+        element: RootElementHandle,
+    ) -> HostRootRenderPhaseRecord {
+        update_container(store, root_id, element, None).unwrap();
+        render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap()
+    }
+
+    fn create_host_component_fiber(
+        store: &mut FiberRootStore<Host>,
+        host_root: FiberId,
+        element_type_raw: u64,
+        props_raw: u64,
+        state_node_raw: u64,
+    ) -> FiberId {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let component = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(props_raw),
+            mode,
+        );
+        let node = store.fiber_arena_mut().get_mut(component).unwrap();
+        node.set_element_type(ElementTypeHandle::from_raw(element_type_raw));
+        node.set_memoized_props(PropsHandle::from_raw(props_raw));
+        node.set_state_node(StateNodeHandle::from_raw(state_node_raw));
+        component
+    }
+
+    fn create_host_text_fiber(
+        store: &mut FiberRootStore<Host>,
+        host_root: FiberId,
+        props_raw: u64,
+        state_node_raw: u64,
+    ) -> FiberId {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let text = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(props_raw),
+            mode,
+        );
+        let node = store.fiber_arena_mut().get_mut(text).unwrap();
+        node.set_memoized_props(PropsHandle::from_raw(props_raw));
+        node.set_state_node(StateNodeHandle::from_raw(state_node_raw));
+        text
+    }
+
+    fn create_function_component_fiber(
+        store: &mut FiberRootStore<Host>,
+        host_root: FiberId,
+        element_type_raw: u64,
+        props_raw: u64,
+    ) -> FiberId {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let function_component = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(props_raw),
+            mode,
+        );
+        let node = store.fiber_arena_mut().get_mut(function_component).unwrap();
+        node.set_element_type(ElementTypeHandle::from_raw(element_type_raw));
+        node.set_memoized_props(PropsHandle::from_raw(props_raw));
+        function_component
+    }
+
+    fn commit_multi_child_host_shape(
+        store: &mut FiberRootStore<Host>,
+        render: HostRootRenderPhaseRecord,
+    ) -> CommittedShapeFibers {
+        let host_root = render.work_in_progress();
+        let first_text = create_host_text_fiber(store, host_root, 51, 151);
+        let component = create_host_component_fiber(store, host_root, 52, 53, 152);
+        let component_text = create_host_text_fiber(store, host_root, 54, 153);
+        store
+            .fiber_arena_mut()
+            .set_children(component, &[component_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[first_text, component])
+            .unwrap();
+        commit_finished_host_root(store, render).unwrap();
+        CommittedShapeFibers {
+            function_component: None,
+            first_text: Some(first_text),
+            component,
+            component_text,
+        }
+    }
+
+    fn commit_function_component_shape(
+        store: &mut FiberRootStore<Host>,
+        render: HostRootRenderPhaseRecord,
+        multi_child: bool,
+    ) -> CommittedShapeFibers {
+        let host_root = render.work_in_progress();
+        let function_component = create_function_component_fiber(store, host_root, 61, 62);
+        let component = create_host_component_fiber(store, host_root, 63, 64, 163);
+        let component_text = create_host_text_fiber(store, host_root, 65, 164);
+        store
+            .fiber_arena_mut()
+            .set_children(component, &[component_text])
+            .unwrap();
+        let first_text = if multi_child {
+            let text = create_host_text_fiber(store, host_root, 66, 165);
+            store
+                .fiber_arena_mut()
+                .set_children(function_component, &[text, component])
+                .unwrap();
+            Some(text)
+        } else {
+            store
+                .fiber_arena_mut()
+                .set_children(function_component, &[component])
+                .unwrap();
+            None
+        };
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[function_component])
+            .unwrap();
+        commit_finished_host_root(store, render).unwrap();
+        CommittedShapeFibers {
+            function_component: Some(function_component),
+            first_text,
+            component,
+            component_text,
+        }
+    }
+
     #[test]
     fn committed_fiber_inspection_describes_host_root_component_and_text() {
         let (mut store, root_id) = root_store();
@@ -483,6 +970,23 @@ mod tests {
         assert_eq!(inspection.root(), root_id);
         assert_eq!(inspection.current(), commit.current());
         assert_eq!(inspection.resulting_element(), element);
+        assert_eq!(inspection.shape_name(), "HostRoot->HostComponent->HostText");
+        assert_eq!(
+            inspection.fiber_tag_order(),
+            [
+                FiberTag::HostRoot,
+                FiberTag::HostComponent,
+                FiberTag::HostText
+            ]
+        );
+        assert_eq!(inspection.root_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.host_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.root_children().len(), 1);
+        assert_eq!(inspection.host_children().len(), 1);
+        assert_eq!(inspection.host_components().len(), 1);
+        assert_eq!(inspection.host_texts().len(), 1);
+        assert!(inspection.function_component().is_none());
+        assert!(!inspection.has_function_component_wrapper());
         assert_eq!(host_root.fiber(), commit.current());
         assert_eq!(host_root.tag(), FiberTag::HostRoot);
         assert_eq!(host_root.parent(), None);
@@ -506,6 +1010,167 @@ mod tests {
         assert_eq!(text.pending_props(), PropsHandle::from_raw(42));
         assert_eq!(text.memoized_props(), PropsHandle::from_raw(42));
         assert!(text.state_node_present());
+    }
+
+    #[test]
+    fn committed_fiber_inspection_describes_multi_child_host_root_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(50));
+        let fibers = commit_multi_child_host_shape(&mut store, render);
+
+        let inspection = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap();
+        let first_text = inspection.host_texts()[0];
+        let component = inspection.host_component();
+        let component_text = inspection.host_text();
+
+        assert_eq!(
+            inspection.shape_name(),
+            "HostRoot->[HostText,HostComponent->HostText]"
+        );
+        assert_eq!(
+            inspection.fiber_tag_order(),
+            [
+                FiberTag::HostRoot,
+                FiberTag::HostText,
+                FiberTag::HostComponent,
+                FiberTag::HostText
+            ]
+        );
+        assert_eq!(
+            inspection.root_child_tags(),
+            [FiberTag::HostText, FiberTag::HostComponent]
+        );
+        assert_eq!(
+            inspection.host_child_tags(),
+            [FiberTag::HostText, FiberTag::HostComponent]
+        );
+        assert_eq!(inspection.root_children().len(), 2);
+        assert_eq!(inspection.host_children().len(), 2);
+        assert_eq!(inspection.host_components().len(), 1);
+        assert_eq!(inspection.host_texts().len(), 2);
+        assert!(inspection.function_component().is_none());
+        assert!(!inspection.has_function_component_wrapper());
+        assert_eq!(first_text.fiber(), fibers.first_text.unwrap());
+        assert_eq!(first_text.sibling(), Some(component.fiber()));
+        assert_eq!(first_text.index(), 0);
+        assert_eq!(component.fiber(), fibers.component);
+        assert_eq!(component.parent(), Some(inspection.host_root().fiber()));
+        assert_eq!(component.child(), Some(component_text.fiber()));
+        assert_eq!(component.index(), 1);
+        assert_eq!(component_text.fiber(), fibers.component_text);
+        assert_eq!(component_text.parent(), Some(component.fiber()));
+        assert_eq!(component_text.index(), 0);
+        assert!(first_text.state_node_present());
+        assert!(component.state_node_present());
+        assert!(component_text.state_node_present());
+    }
+
+    #[test]
+    fn committed_fiber_inspection_describes_function_component_above_host_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(60));
+        let fibers = commit_function_component_shape(&mut store, render, false);
+
+        let inspection = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap();
+        let function_component = inspection.function_component().unwrap();
+
+        assert_eq!(
+            inspection.shape_name(),
+            "HostRoot->FunctionComponent->HostComponent->HostText"
+        );
+        assert_eq!(
+            inspection.fiber_tag_order(),
+            [
+                FiberTag::HostRoot,
+                FiberTag::FunctionComponent,
+                FiberTag::HostComponent,
+                FiberTag::HostText
+            ]
+        );
+        assert_eq!(inspection.root_child_tags(), [FiberTag::FunctionComponent]);
+        assert_eq!(inspection.host_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.root_children().len(), 1);
+        assert_eq!(inspection.host_children().len(), 1);
+        assert_eq!(inspection.host_components().len(), 1);
+        assert_eq!(inspection.host_texts().len(), 1);
+        assert!(inspection.has_function_component_wrapper());
+        assert_eq!(
+            function_component.fiber(),
+            fibers.function_component.unwrap()
+        );
+        assert_eq!(
+            function_component.parent(),
+            Some(inspection.host_root().fiber())
+        );
+        assert_eq!(
+            function_component.child(),
+            Some(inspection.host_component().fiber())
+        );
+        assert_eq!(function_component.sibling(), None);
+        assert!(!function_component.state_node_present());
+        assert_eq!(inspection.host_component().fiber(), fibers.component);
+        assert_eq!(
+            inspection.host_component().parent(),
+            Some(function_component.fiber())
+        );
+        assert_eq!(inspection.host_text().fiber(), fibers.component_text);
+    }
+
+    #[test]
+    fn committed_fiber_inspection_describes_function_component_above_multi_child_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(70));
+        let fibers = commit_function_component_shape(&mut store, render, true);
+
+        let inspection = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap();
+        let function_component = inspection.function_component().unwrap();
+        let first_text = inspection.host_texts()[0];
+
+        assert_eq!(
+            inspection.shape_name(),
+            "HostRoot->FunctionComponent->[HostText,HostComponent->HostText]"
+        );
+        assert_eq!(
+            inspection.fiber_tag_order(),
+            [
+                FiberTag::HostRoot,
+                FiberTag::FunctionComponent,
+                FiberTag::HostText,
+                FiberTag::HostComponent,
+                FiberTag::HostText
+            ]
+        );
+        assert_eq!(inspection.root_child_tags(), [FiberTag::FunctionComponent]);
+        assert_eq!(
+            inspection.host_child_tags(),
+            [FiberTag::HostText, FiberTag::HostComponent]
+        );
+        assert_eq!(inspection.root_children().len(), 1);
+        assert_eq!(inspection.host_children().len(), 2);
+        assert_eq!(inspection.host_components().len(), 1);
+        assert_eq!(inspection.host_texts().len(), 2);
+        assert!(inspection.has_function_component_wrapper());
+        assert_eq!(
+            function_component.fiber(),
+            fibers.function_component.unwrap()
+        );
+        assert_eq!(function_component.child(), Some(first_text.fiber()));
+        assert_eq!(first_text.fiber(), fibers.first_text.unwrap());
+        assert_eq!(first_text.parent(), Some(function_component.fiber()));
+        assert_eq!(
+            first_text.sibling(),
+            Some(inspection.host_component().fiber())
+        );
+        assert_eq!(inspection.host_component().fiber(), fibers.component);
+        assert_eq!(
+            inspection.host_component().parent(),
+            Some(function_component.fiber())
+        );
+        assert_eq!(inspection.host_text().fiber(), fibers.component_text);
+        assert_eq!(
+            inspection.host_text().parent(),
+            Some(inspection.host_component().fiber())
+        );
     }
 
     #[test]

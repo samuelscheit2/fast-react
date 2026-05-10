@@ -80,6 +80,8 @@ const privateToTreeFacadeStatus =
   "private-tree-diagnostics-serializable-public-totree-blocked";
 const privateToTreeAcceptedDiagnosticName =
   "fast-react-test-renderer.serialization.private-tree-canary";
+const privateToTreeCommittedFiberInspectionDiagnosticName =
+  "fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary";
 const privateToTreeCompositeAcceptedFiberShape = [
   "HostRoot",
   "FunctionComponent",
@@ -142,6 +144,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToTreeHostOutputMetadataRecognizesMinimalShape: true,
     privateToTreeCompositeFunctionMetadataPresent: true,
     privateToTreeMultiChildMetadataPresent: true,
+    privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent: true,
     privateToTreeHostOutputMetadataPubliclyBlocked: true,
     privateRecordOnlyTestInstanceWrapperPresent: true,
     privateRecordOnlyTestInstanceQueryPathPresent: true,
@@ -199,6 +202,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-totree-recognizes-accepted-minimal-host-output-shape",
       "js-totree-private-composite-function-metadata",
       "js-totree-private-multi-child-metadata",
+      "js-totree-private-committed-fiber-shape-diagnostics",
       "js-totree-public-tree-blocked"
     ]
   );
@@ -684,11 +688,11 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       metadataGate.acceptedWorker,
       "worker-364-test-renderer-totree-private-host-output"
     );
-    assert.deepEqual(metadataGate.acceptedRustWorkers, [
+    const expectedMetadataRustWorkers = [
       "worker-235-test-renderer-private-fiber-inspection",
       "worker-265-test-renderer-private-json-ready-diagnostics"
-    ]);
-    assert.deepEqual(metadataGate.acceptedRustApis, [
+    ];
+    const expectedMetadataRustApis = [
       "inspect_test_renderer_committed_fiber_tree",
       "TestRendererCommittedFiberTreeInspection::host_root",
       "TestRendererCommittedFiberTreeInspection::host_component",
@@ -699,15 +703,68 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "TestRendererPrivateJsonSerializationReport",
       "TestRendererPrivateTreeMetadataReport",
       "TestRendererPrivateTreeFunctionComponentDiagnostic"
-    ]);
-    assert.deepEqual(metadataGate.acceptedRustTests, [
+    ];
+    const expectedMetadataRustTests = [
       "committed_fiber_inspection_describes_host_root_component_and_text",
       "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
       "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
       "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
       "root_private_tree_metadata_canary_describes_function_component_above_host_output"
-    ]);
+    ];
     if (entry.entrypoint.endsWith(".development")) {
+      expectedMetadataRustWorkers.push(
+        "worker-516-test-renderer-committed-fiber-tree-inspection"
+      );
+      expectedMetadataRustApis.splice(
+        1,
+        0,
+        "TestRendererCommittedFiberTreeInspection::shape_name",
+        "TestRendererCommittedFiberTreeInspection::nodes",
+        "TestRendererCommittedFiberTreeInspection::root_children",
+        "TestRendererCommittedFiberTreeInspection::host_children",
+        "TestRendererCommittedFiberTreeInspection::function_component",
+        "TestRendererCommittedFiberTreeInspection::host_components",
+        "TestRendererCommittedFiberTreeInspection::host_texts",
+        "TestRendererCommittedFiberTreeInspection::fiber_tag_order"
+      );
+      expectedMetadataRustApis.splice(
+        expectedMetadataRustApis.indexOf("TestRendererPrivateJsonSerializationReport"),
+        0,
+        "TestRendererRoot::describe_private_tree_committed_fiber_inspection_for_canary"
+      );
+      expectedMetadataRustApis.splice(
+        expectedMetadataRustApis.indexOf(
+          "TestRendererPrivateTreeFunctionComponentDiagnostic"
+        ),
+        0,
+        "TestRendererPrivateTreeCommittedFiberInspectionReport"
+      );
+      expectedMetadataRustTests.splice(
+        1,
+        0,
+        "committed_fiber_inspection_describes_multi_child_host_root_shape",
+        "committed_fiber_inspection_describes_function_component_above_host_shape",
+        "committed_fiber_inspection_describes_function_component_above_multi_child_shape"
+      );
+      expectedMetadataRustTests.push(
+        "root_private_tree_committed_fiber_inspection_records_minimal_shape_privately"
+      );
+      assert.equal(
+        metadataGate.acceptedCommittedFiberInspectionDiagnosticName,
+        privateToTreeCommittedFiberInspectionDiagnosticName
+      );
+      assert.equal(
+        metadataGate.privateCommittedFiberInspectionShapeDiagnosticsAvailable,
+        true
+      );
+      assert.equal(
+        metadataGate.privateMultiChildCommittedFiberInspectionAvailable,
+        true
+      );
+      assert.equal(
+        metadataGate.privateFunctionComponentCommittedFiberInspectionAvailable,
+        true
+      );
       assert.deepEqual(
         metadataGate.acceptedMultiChildFiberShape,
         privateToTreeMultiChildAcceptedFiberShape
@@ -725,6 +782,9 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         "worker-485-test-renderer-totree-multichild-gate"
       );
     }
+    assert.deepEqual(metadataGate.acceptedRustWorkers, expectedMetadataRustWorkers);
+    assert.deepEqual(metadataGate.acceptedRustApis, expectedMetadataRustApis);
+    assert.deepEqual(metadataGate.acceptedRustTests, expectedMetadataRustTests);
     assert.deepEqual(metadataGate.blockedPublicSurfaces, [
       "create().toTree",
       "create().toJSON",
@@ -806,6 +866,8 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       assert.deepEqual(facadeGate.multiChildAcceptedRustApis, [
         "TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics",
         "TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics",
+        "TestRendererCommittedFiberTreeInspection::host_child_tags",
+        "TestRendererCommittedFiberTreeInspection::has_function_component_wrapper",
         "TestRendererPrivateTreeRenderedRoot",
         "TestRendererPrivateTreeRenderedHostComponent",
         "TestRendererPrivateTreeRenderedFunctionComponent"
@@ -1079,6 +1141,22 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
         true
       );
       assert.equal(multiChildShape.hostRoot.rootChildCount, 2);
+      assert.deepEqual(multiChildShape.committedFiberInspection, {
+        diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+        sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+        fiberShape: privateToTreeMultiChildAcceptedFiberShape,
+        rootChildFiberTags: ["HostText", "HostComponent"],
+        hostChildFiberTags: ["HostText", "HostComponent"],
+        rootChildCount: 2,
+        hostChildCount: 2,
+        hostComponentCount: 1,
+        hostTextCount: 2,
+        functionComponentFiberTag: null,
+        functionComponentPresent: false,
+        wrapsCommittedHostOutput: false,
+        publicTreeObjectAvailable: false,
+        compatibilityClaimed: false
+      });
       assert.equal(Object.isFrozen(multiChildShape.hostChildren), true);
       assert.deepEqual(multiChildShape.hostChildren[0], {
         fiberTag: "HostText",
@@ -1124,6 +1202,29 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
           rendered: ["second sibling"]
         }
       ]);
+
+      const compositeMultiChildShape =
+        privateMetadata.describeAcceptedHostOutputDiagnostic(
+          createAcceptedMultiChildTreeMetadataDiagnostic({
+            composite: true
+          })
+        );
+      assert.deepEqual(compositeMultiChildShape.committedFiberInspection, {
+        diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+        sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+        fiberShape: privateToTreeCompositeMultiChildAcceptedFiberShape,
+        rootChildFiberTags: ["FunctionComponent"],
+        hostChildFiberTags: ["HostText", "HostComponent"],
+        rootChildCount: 1,
+        hostChildCount: 2,
+        hostComponentCount: 1,
+        hostTextCount: 2,
+        functionComponentFiberTag: "FunctionComponent",
+        functionComponentPresent: true,
+        wrapsCommittedHostOutput: true,
+        publicTreeObjectAvailable: false,
+        compatibilityClaimed: false
+      });
 
       const compositeMultiChildPrivateTree =
         privateFacade.serializeAcceptedTreeMetadata(
@@ -1267,6 +1368,36 @@ function loadFresh(specifier) {
   const resolved = require.resolve(specifier);
   delete require.cache[resolved];
   return require(resolved);
+}
+
+function createCommittedFiberInspectionDiagnostic({
+  fiberShape,
+  rootChildFiberTags,
+  hostChildFiberTags,
+  rootChildCount,
+  hostChildCount,
+  hostTextCount,
+  functionComponentPresent,
+  wrapsCommittedHostOutput
+}) {
+  return {
+    diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+    sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    fiberShape,
+    rootChildFiberTags,
+    hostChildFiberTags,
+    rootChildCount,
+    hostChildCount,
+    hostComponentCount: 1,
+    hostTextCount,
+    functionComponentFiberTag: functionComponentPresent
+      ? "FunctionComponent"
+      : null,
+    functionComponentPresent,
+    wrapsCommittedHostOutput,
+    publicTreeObjectAvailable: false,
+    compatibilityClaimed: false
+  };
 }
 
 function captureThrown(callback) {
@@ -1545,6 +1676,16 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
       returnsTextValue: true,
       publicTreeObjectAvailable: false
     },
+    committedFiberInspection: createCommittedFiberInspectionDiagnostic({
+      fiberShape: ["HostRoot", "HostComponent", "HostText"],
+      rootChildFiberTags: ["HostComponent"],
+      hostChildFiberTags: ["HostComponent"],
+      rootChildCount: 1,
+      hostChildCount: 1,
+      hostTextCount: 1,
+      functionComponentPresent: false,
+      wrapsCommittedHostOutput: false
+    }),
     publicBlockers: {
       jsonMethodBlocked: true,
       treeMethodBlocked: true,
@@ -1607,6 +1748,20 @@ function createAcceptedMultiChildTreeMetadataDiagnostic({
         publicTreeObjectAvailable: false
       }
     ],
+    committedFiberInspection: createCommittedFiberInspectionDiagnostic({
+      fiberShape: composite
+        ? privateToTreeCompositeMultiChildAcceptedFiberShape
+        : privateToTreeMultiChildAcceptedFiberShape,
+      rootChildFiberTags: composite
+        ? ["FunctionComponent"]
+        : ["HostText", "HostComponent"],
+      hostChildFiberTags: ["HostText", "HostComponent"],
+      rootChildCount: composite ? 1 : 2,
+      hostChildCount: 2,
+      hostTextCount: 2,
+      functionComponentPresent: composite,
+      wrapsCommittedHostOutput: composite
+    }),
     publicBlockers: {
       jsonMethodBlocked: true,
       treeMethodBlocked: true,

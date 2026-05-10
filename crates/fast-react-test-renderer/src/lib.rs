@@ -1766,6 +1766,8 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.private-facade-result";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
+pub const TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_ALL_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.find-all-private-query";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME: &str =
@@ -3440,6 +3442,132 @@ impl TestRendererPrivateTreeMetadataReport {
     #[must_use]
     pub const fn public_tree_object_available(&self) -> bool {
         self.public_tree_object_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeCommittedFiberInspectionReport {
+    diagnostic_name: &'static str,
+    source_tree_diagnostic_name: &'static str,
+    shape_name: &'static str,
+    fiber_shape: Vec<String>,
+    root_child_fiber_tags: Vec<String>,
+    host_child_fiber_tags: Vec<String>,
+    root_child_count: usize,
+    host_child_count: usize,
+    host_component_count: usize,
+    host_text_count: usize,
+    function_component_fiber_tag: Option<String>,
+    function_component_present: bool,
+    wraps_committed_host_output: bool,
+    accepted_minimal_fiber_shape: [&'static str; 3],
+    accepted_composite_fiber_shape: [&'static str; 4],
+    accepted_multi_child_fiber_shape: [&'static str; 4],
+    accepted_composite_multi_child_fiber_shape: [&'static str; 5],
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_tree_object_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTreeCommittedFiberInspectionReport {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_tree_diagnostic_name(&self) -> &'static str {
+        self.source_tree_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn shape_name(&self) -> &'static str {
+        self.shape_name
+    }
+
+    #[must_use]
+    pub fn fiber_shape(&self) -> &[String] {
+        &self.fiber_shape
+    }
+
+    #[must_use]
+    pub fn root_child_fiber_tags(&self) -> &[String] {
+        &self.root_child_fiber_tags
+    }
+
+    #[must_use]
+    pub fn host_child_fiber_tags(&self) -> &[String] {
+        &self.host_child_fiber_tags
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn host_child_count(&self) -> usize {
+        self.host_child_count
+    }
+
+    #[must_use]
+    pub const fn host_component_count(&self) -> usize {
+        self.host_component_count
+    }
+
+    #[must_use]
+    pub const fn host_text_count(&self) -> usize {
+        self.host_text_count
+    }
+
+    #[must_use]
+    pub fn function_component_fiber_tag(&self) -> Option<&str> {
+        self.function_component_fiber_tag.as_deref()
+    }
+
+    #[must_use]
+    pub const fn function_component_present(&self) -> bool {
+        self.function_component_present
+    }
+
+    #[must_use]
+    pub const fn wraps_committed_host_output(&self) -> bool {
+        self.wraps_committed_host_output
+    }
+
+    #[must_use]
+    pub const fn accepted_minimal_fiber_shape(&self) -> &[&'static str; 3] {
+        &self.accepted_minimal_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn accepted_composite_fiber_shape(&self) -> &[&'static str; 4] {
+        &self.accepted_composite_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn accepted_multi_child_fiber_shape(&self) -> &[&'static str; 4] {
+        &self.accepted_multi_child_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn accepted_composite_multi_child_fiber_shape(&self) -> &[&'static str; 5] {
+        &self.accepted_composite_multi_child_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_tree_object_available(&self) -> bool {
+        self.public_tree_object_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
     }
 }
 
@@ -5155,6 +5283,17 @@ impl TestRendererRoot {
         Ok(Self::private_tree_metadata_from_json_report(json_report))
     }
 
+    pub fn describe_private_tree_committed_fiber_inspection_for_canary(
+        &self,
+        commit: &HostRootCommitRecord,
+    ) -> Result<TestRendererPrivateTreeCommittedFiberInspectionReport, TestRendererRootError> {
+        let inspection = self.describe_committed_fiber_tree_for_canary(commit)?;
+
+        Ok(Self::private_tree_committed_fiber_inspection_from_report(
+            &inspection,
+        ))
+    }
+
     pub fn describe_private_test_instance_find_all_query_for_canary(
         &self,
         output: &TestRendererCommittedHostOutput,
@@ -6688,6 +6827,54 @@ impl TestRendererRoot {
             public_blockers: json_report.public_blockers(),
             public_tree_object_available: false,
         }
+    }
+
+    fn private_tree_committed_fiber_inspection_from_report(
+        inspection: &TestRendererCommittedFiberTreeInspection,
+    ) -> TestRendererPrivateTreeCommittedFiberInspectionReport {
+        TestRendererPrivateTreeCommittedFiberInspectionReport {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME,
+            source_tree_diagnostic_name: TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            shape_name: inspection.shape_name(),
+            fiber_shape: inspection
+                .nodes()
+                .iter()
+                .map(|node| Self::private_fiber_tag_name(*node))
+                .collect(),
+            root_child_fiber_tags: inspection
+                .root_children()
+                .iter()
+                .map(|node| Self::private_fiber_tag_name(*node))
+                .collect(),
+            host_child_fiber_tags: inspection
+                .host_children()
+                .iter()
+                .map(|node| Self::private_fiber_tag_name(*node))
+                .collect(),
+            root_child_count: inspection.root_children().len(),
+            host_child_count: inspection.host_children().len(),
+            host_component_count: inspection.host_components().len(),
+            host_text_count: inspection.host_texts().len(),
+            function_component_fiber_tag: inspection
+                .function_component()
+                .map(Self::private_fiber_tag_name),
+            function_component_present: inspection.function_component().is_some(),
+            wraps_committed_host_output: inspection.has_function_component_wrapper(),
+            accepted_minimal_fiber_shape: TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE,
+            accepted_composite_fiber_shape:
+                TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE,
+            accepted_multi_child_fiber_shape:
+                TEST_RENDERER_PRIVATE_TREE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
+            accepted_composite_multi_child_fiber_shape:
+                TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
+            public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers::blocked(),
+            public_tree_object_available: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    fn private_fiber_tag_name(node: TestRendererCommittedFiberNodeInspection) -> String {
+        format!("{:?}", node.tag())
     }
 
     fn private_test_instance_find_all_query_from_tree_report(
@@ -8743,6 +8930,66 @@ mod tests {
         assert_eq!(report.host_component().rendered_text(), "hello");
         assert!(!report.public_tree_object_available());
         assert!(report.public_blockers().tree_method_blocked());
+    }
+
+    #[test]
+    fn root_private_tree_committed_fiber_inspection_records_minimal_shape_privately() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_tree_committed_fiber_inspection_for_canary(output.commit())
+            .unwrap();
+
+        assert_eq!(
+            report.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.source_tree_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(report.shape_name(), "HostRoot->HostComponent->HostText");
+        assert_eq!(
+            report.fiber_shape(),
+            &["HostRoot", "HostComponent", "HostText"]
+        );
+        assert_eq!(report.root_child_fiber_tags(), &["HostComponent"]);
+        assert_eq!(report.host_child_fiber_tags(), &["HostComponent"]);
+        assert_eq!(report.root_child_count(), 1);
+        assert_eq!(report.host_child_count(), 1);
+        assert_eq!(report.host_component_count(), 1);
+        assert_eq!(report.host_text_count(), 1);
+        assert!(report.function_component_fiber_tag().is_none());
+        assert!(!report.function_component_present());
+        assert!(!report.wraps_committed_host_output());
+        assert_eq!(
+            report.accepted_minimal_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(
+            report.accepted_composite_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(
+            report.accepted_multi_child_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(
+            report.accepted_composite_multi_child_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+        );
+        assert!(report.public_blockers().all_blocked());
+        assert!(!report.public_tree_object_available());
+        assert!(!report.compatibility_claimed());
     }
 
     #[test]
