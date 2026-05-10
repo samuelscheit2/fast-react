@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 import {
@@ -8,6 +9,7 @@ import {
   readCheckedSchedulerVariantOracle,
   readCheckedSchedulerVariantOracleText
 } from "../src/scheduler-variant-oracle.mjs";
+import { inspectSchedulerPostTaskPriorityDiagnostics } from "../src/scheduler-post-task-oracle.mjs";
 import {
   SCHEDULER_VARIANT_DEEP_CJS_SPECIFIERS,
   SCHEDULER_VARIANT_GATE_DECISIONS,
@@ -19,7 +21,14 @@ import {
   SCHEDULER_VARIANT_TARGET
 } from "../src/scheduler-variant-targets.mjs";
 
+const require = createRequire(import.meta.url);
 const oracle = readCheckedSchedulerVariantOracle();
+const {
+  ROOT_CONTINUATION_BLOCKED_STATUS,
+  ROOT_CONTINUATION_METADATA_STATUS,
+  ROOT_CONTINUATION_REJECTED_STATUS,
+  createPrivatePostTaskRootContinuationMetadataRow
+} = require("../../../packages/scheduler/src/scheduler-post-task.js");
 
 const ROOT_EXPORT_KEYS = [
   "unstable_IdlePriority",
@@ -344,6 +353,51 @@ test("unstable_post_task oracle captures plain Node failure and shimmed behavior
       }
     ]);
   }
+});
+
+test("scheduler variant oracle keeps postTask root-continuation metadata private and blocked", () => {
+  const report = inspectSchedulerPostTaskPriorityDiagnostics({
+    nodeEnv: "development",
+    withYield: false
+  });
+  const diagnostics =
+    report.continuationAbortAfterFallback.diagnosticsAfterCancel;
+  const row = createPrivatePostTaskRootContinuationMetadataRow(diagnostics);
+
+  assert.equal(row.status, ROOT_CONTINUATION_METADATA_STATUS);
+  assert.equal(row.compatibilityClaimed, false);
+  assert.equal(row.browserPostTaskCompatibilityClaimed, false);
+  assert.equal(row.browserTaskOrderingCompatibilityClaimed, false);
+  assert.equal(row.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(
+    row.blockedRootExecution.status,
+    ROOT_CONTINUATION_BLOCKED_STATUS
+  );
+  assert.equal(row.blockedRootExecution.rendererWorkExecuted, false);
+  assert.equal(row.blockedRootExecution.reconcilerWorkExecuted, false);
+  assert.equal(row.blockedRootExecution.publicRootExecution, false);
+  assert.deepEqual(
+    {
+      fastReactComparedToScheduler:
+        oracle.conformanceClaims.fastReactComparedToScheduler,
+      fastReactBehaviorCompatible:
+        oracle.conformanceClaims.fastReactBehaviorCompatible,
+      compatibilityClaimed: oracle.conformanceClaims.compatibilityClaimed
+    },
+    {
+      fastReactComparedToScheduler: false,
+      fastReactBehaviorCompatible: false,
+      compatibilityClaimed: false
+    }
+  );
+
+  const staleRow = createPrivatePostTaskRootContinuationMetadataRow(
+    diagnostics,
+    { continuationId: "stale-root-continuation" }
+  );
+  assert.equal(staleRow.status, ROOT_CONTINUATION_REJECTED_STATUS);
+  assert.equal(staleRow.rejectionReason, "stale-continuation");
+  assert.equal(staleRow.compatibilityClaimed, false);
 });
 
 test("native variant oracle captures fallback and nativeRuntimeScheduler delegation", () => {
