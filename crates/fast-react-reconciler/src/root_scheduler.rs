@@ -23,8 +23,7 @@ use crate::root_commit::{HostRootCommitRecord, PendingPassiveCommitHandoff};
 use crate::root_commit::{
     HostRootFinishedWorkCommitHandoffErrorForCanary,
     HostRootFinishedWorkCommitHandoffRecordForCanary,
-    commit_finished_host_root_with_finished_work_handoff_for_canary,
-    record_host_root_finished_work_pending_commit_for_canary,
+    commit_completed_host_root_render_with_finished_work_handoff_for_canary,
 };
 use crate::root_config::{RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord};
 use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
@@ -1394,7 +1393,7 @@ impl RootSyncSchedulerContinuationExecutionRecord {
     pub(crate) fn accepted_root_commit_execution_evidence_for_canary(&self) -> bool {
         self.root_commit_handoff
             .as_ref()
-            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_finished_work_commit_execution)
+            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_root_finished_work_commit_metadata_handoff)
     }
 
     #[cfg(test)]
@@ -2012,7 +2011,7 @@ impl SchedulerBridgeActContinuationExecutionRecord {
     pub(crate) fn accepted_root_commit_execution_evidence_for_canary(&self) -> bool {
         self.root_commit_handoff
             .as_ref()
-            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_finished_work_commit_execution)
+            .is_some_and(HostRootFinishedWorkCommitHandoffRecordForCanary::proves_private_root_finished_work_commit_metadata_handoff)
     }
 
     #[cfg(test)]
@@ -3668,19 +3667,13 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
     let render_phase = render_host_root_for_lanes(store, continuation.root(), selected_lanes)
         .map_err(RootSchedulerError::from)?;
     #[cfg(test)]
-    let root_commit_handoff = {
-        let pending = record_host_root_finished_work_pending_commit_for_canary(
+    let root_commit_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
             store,
             render_phase,
             continuation.sync_flush_order(),
-        )?;
-        commit_finished_host_root_with_finished_work_handoff_for_canary(
-            store,
-            render_phase,
-            Some(pending),
             continuation.sync_flush_order().saturating_add(1),
-        )?
-    };
+        )?;
     #[cfg(test)]
     let commit = root_commit_handoff.commit().clone();
     #[cfg(not(test))]
@@ -3972,19 +3965,13 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
     }
 
     #[cfg(test)]
-    let root_commit_handoff = {
-        let pending = record_host_root_finished_work_pending_commit_for_canary(
+    let root_commit_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
             store,
             handoff.render_phase(),
             handoff.order(),
-        )?;
-        commit_finished_host_root_with_finished_work_handoff_for_canary(
-            store,
-            handoff.render_phase(),
-            Some(pending),
             handoff.order().saturating_add(1),
-        )?
-    };
+        )?;
     #[cfg(test)]
     let commit = root_commit_handoff.commit().clone();
     #[cfg(not(test))]
@@ -6811,10 +6798,15 @@ mod tests {
         assert!(!record.public_scheduler_timing_compatibility_claimed());
         assert!(!record.executes_effects());
         let handoff = record.root_commit_handoff_for_canary().unwrap();
-        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert!(handoff.proves_private_root_finished_work_commit_metadata_handoff());
         assert_eq!(handoff.pending().root(), root_id);
+        assert_eq!(
+            handoff.pending().root_finished_work(),
+            Some(handoff.pending().finished_work())
+        );
         assert_eq!(handoff.pending().render_lanes(), Lanes::DEFAULT);
         assert_eq!(handoff.execution_request().render_lanes(), Lanes::DEFAULT);
+        assert!(handoff.execution_request().records_root_finished_work());
         assert!(handoff.execution_request().compatibility_claim_blocked());
         let render_phase = record.render_phase().unwrap();
         assert_eq!(render_phase.root(), root_id);
@@ -7116,12 +7108,21 @@ mod tests {
         assert!(!execution.public_root_compatibility_claimed());
         assert!(!execution.executes_public_effects());
         let handoff_record = execution.root_commit_handoff_for_canary().unwrap();
-        assert!(handoff_record.proves_private_finished_work_commit_execution());
+        assert!(handoff_record.proves_private_root_finished_work_commit_metadata_handoff());
         assert_eq!(handoff_record.pending().root(), root_id);
+        assert_eq!(
+            handoff_record.pending().root_finished_work(),
+            Some(handoff_record.pending().finished_work())
+        );
         assert_eq!(handoff_record.pending().render_lanes(), Lanes::SYNC);
         assert_eq!(
             handoff_record.execution_request().render_lanes(),
             Lanes::SYNC
+        );
+        assert!(
+            handoff_record
+                .execution_request()
+                .records_root_finished_work()
         );
         assert!(
             handoff_record

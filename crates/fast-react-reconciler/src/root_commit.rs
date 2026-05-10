@@ -8491,6 +8491,40 @@ pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H:
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary handoff diagnostics intentionally retain full finished-work evidence"
+)]
+pub(crate) fn commit_completed_host_root_render_with_finished_work_handoff_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    handoff_order: usize,
+    commit_order: usize,
+) -> Result<
+    HostRootFinishedWorkCommitHandoffRecordForCanary,
+    HostRootFinishedWorkCommitHandoffErrorForCanary,
+> {
+    validate_finished_host_root(store, render)?;
+    {
+        let root = store
+            .root_mut(render.root())
+            .map_err(RootCommitError::from)?;
+        root.record_finished_work_for_canary(render.finished_work(), render.render_lanes());
+    }
+
+    let pending =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, handoff_order)?;
+    commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending),
+        commit_order,
+    )
+}
+
+#[cfg(test)]
 pub(crate) fn record_context_provider_update_two_consumer_commit_handoff_for_canary<
     H: HostTypes,
 >(
@@ -23173,6 +23207,97 @@ mod tests {
         assert_eq!(handoff.finished_lanes_after_commit(), Lanes::NO);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_completed_host_root_entrypoint_records_finished_work_identity() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(512), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+
+        let handoff = commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            &mut store, render, 7, 8,
+        )
+        .unwrap();
+        let pending = handoff.pending();
+        let request = *handoff.execution_request();
+        let commit = handoff.commit();
+
+        assert_eq!(pending.root(), root_id);
+        assert_eq!(pending.root_token(), root_id.state_node_handle());
+        assert_eq!(pending.previous_current(), previous_current);
+        assert_eq!(pending.pending_work(), Some(render.finished_work()));
+        assert_eq!(pending.root_finished_work(), Some(render.finished_work()));
+        assert_eq!(pending.finished_work(), render.finished_work());
+        assert_eq!(pending.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending.root_finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending.remaining_lanes(), Lanes::NO);
+        assert_eq!(pending.pending_lanes_before_commit(), Lanes::DEFAULT);
+        assert_eq!(
+            pending.render_exit_status(),
+            RootRenderExitStatus::Completed
+        );
+        assert_eq!(pending.handoff_order(), 7);
+        assert!(pending.records_finished_work());
+        assert!(pending.records_root_finished_work());
+
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.root_token(), root_id.state_node_handle());
+        assert_eq!(request.previous_current(), previous_current);
+        assert_eq!(request.pending_work(), Some(render.finished_work()));
+        assert_eq!(request.root_finished_work(), Some(render.finished_work()));
+        assert_eq!(request.finished_work(), render.finished_work());
+        assert_eq!(request.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(request.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(request.root_finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(request.remaining_lanes(), Lanes::NO);
+        assert_eq!(request.pending_lanes_before_commit(), Lanes::DEFAULT);
+        assert_eq!(
+            request.render_exit_status(),
+            RootRenderExitStatus::Completed
+        );
+        assert_eq!(request.source_handoff_order(), 7);
+        assert_eq!(request.request_order(), 8);
+        assert!(request.execution_requested());
+        assert!(request.records_root_finished_work());
+        assert!(request.host_mutation_execution_blocked());
+        assert!(request.public_root_rendering_blocked());
+        assert!(request.refs_effects_and_hydration_blocked());
+        assert!(request.compatibility_claim_blocked());
+
+        assert_eq!(handoff.commit_order(), 8);
+        assert!(handoff.commit_order_after_pending_record());
+        assert!(handoff.consumed_finished_work_record());
+        assert!(handoff.proves_private_root_finished_work_commit_metadata_handoff());
+        assert_eq!(handoff.current_after_commit(), render.finished_work());
+        assert_eq!(handoff.finished_work_after_commit(), None);
+        assert_eq!(handoff.finished_lanes_after_commit(), Lanes::NO);
+        assert_eq!(handoff.render_phase_work_after_commit(), None);
+
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), previous_current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.finished_work(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(commit.remaining_lanes(), Lanes::NO);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

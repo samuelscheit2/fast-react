@@ -129,6 +129,7 @@ use crate::{
         HostRootPlacementApplyDiagnosticForCanary,
         HostRootSingleHostUpdateApplyRecordErrorForCanary,
         HostRootSingleHostUpdateApplyRecordForCanary,
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary,
         commit_finished_host_root_with_finished_work_handoff_for_canary,
         record_context_provider_update_two_consumer_commit_handoff_for_canary,
         record_host_root_finished_work_pending_commit_for_canary,
@@ -1652,14 +1653,10 @@ fn handoff_completed_host_root_render_to_test_complete_work_and_commit(
     let complete_work =
         handoff_completed_host_root_render_to_test_complete_work(store, host, render, source)?;
     let host_operation_count_after_complete_work = host.operations().len();
-    let pending_finished_work =
-        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
-    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
-        store,
-        render,
-        Some(pending_finished_work),
-        2,
-    )?;
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store, render, 1, 2,
+        )?;
     let host_operation_count_after_commit = host.operations().len();
     let placement_apply_diagnostics = finished_work_handoff
         .commit()
@@ -3016,14 +3013,10 @@ fn handoff_completed_function_component_use_state_host_child_to_test_complete_wo
     }
 
     let host_operation_count_after_complete_work = host.operations().len();
-    let pending_finished_work =
-        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
-    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
-        store,
-        render,
-        Some(pending_finished_work),
-        2,
-    )?;
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store, render, 1, 2,
+        )?;
     let host_operation_count_after_commit = host.operations().len();
     let placement_apply_diagnostics = finished_work_handoff
         .commit()
@@ -3154,14 +3147,10 @@ fn handoff_completed_function_component_use_reducer_single_child_to_test_complet
     }
 
     let host_operation_count_after_complete_work = host.operations().len();
-    let pending_finished_work =
-        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
-    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
-        store,
-        render,
-        Some(pending_finished_work),
-        2,
-    )?;
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store, render, 1, 2,
+        )?;
     let host_operation_count_after_commit = host.operations().len();
     let placement_apply_diagnostics = finished_work_handoff
         .commit()
@@ -3267,14 +3256,10 @@ fn handoff_completed_function_component_use_reducer_single_host_update_to_commit
     )?;
 
     let pending_host_update = record_host_root_single_host_update_apply_for_canary(store, render)?;
-    let pending_finished_work =
-        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
-    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
-        store,
-        render,
-        Some(pending_finished_work),
-        2,
-    )?;
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store, render, 1, 2,
+        )?;
     let committed_host_update = finished_work_handoff
         .commit()
         .single_host_update_apply_record_for_canary()?;
@@ -4866,14 +4851,10 @@ fn handoff_nested_context_provider_two_consumer_update_to_test_render_commit(
         ),
     )?;
 
-    let pending_finished_work =
-        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
-    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
-        store,
-        render,
-        Some(pending_finished_work),
-        2,
-    )?;
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store, render, 1, 2,
+        )?;
     let context_update_commit_handoff =
         record_context_provider_update_two_consumer_commit_handoff_for_canary(
             store,
@@ -5262,14 +5243,10 @@ fn handoff_context_provider_update_to_test_render_commit_traversal(
     }
 
     let host_operation_count_after_complete_work = host.operations().len();
-    let pending_finished_work =
-        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
-    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
-        store,
-        render,
-        Some(pending_finished_work),
-        2,
-    )?;
+    let finished_work_handoff =
+        commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+            store, render, 1, 2,
+        )?;
     let host_operation_count_after_commit = host.operations().len();
     let placement_apply_diagnostics = finished_work_handoff
         .commit()
@@ -12158,6 +12135,12 @@ mod tests {
         );
         assert_eq!(pending_finished_work.handoff_order(), 1);
         assert!(pending_finished_work.records_finished_work());
+        assert_eq!(
+            pending_finished_work.root_finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(pending_finished_work.root_finished_lanes(), Lanes::DEFAULT);
+        assert!(pending_finished_work.records_root_finished_work());
         let execution_request = *finished_work_handoff.execution_request();
         assert_eq!(
             execution_request.status(),
@@ -12175,6 +12158,11 @@ mod tests {
         assert_eq!(execution_request.finished_work(), render.finished_work());
         assert_eq!(execution_request.render_lanes(), Lanes::DEFAULT);
         assert_eq!(execution_request.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            execution_request.root_finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(execution_request.root_finished_lanes(), Lanes::DEFAULT);
         assert_eq!(execution_request.remaining_lanes(), Lanes::NO);
         assert_eq!(
             execution_request.pending_lanes_before_commit(),
@@ -12218,6 +12206,7 @@ mod tests {
         assert!(finished_work_handoff.mutation_execution_blocked());
         assert!(finished_work_handoff.public_root_rendering_blocked());
         assert!(finished_work_handoff.effects_refs_and_hydration_blocked());
+        assert!(finished_work_handoff.proves_private_root_finished_work_commit_metadata_handoff());
 
         let commit = record.commit();
         assert_eq!(commit.root(), root_id);
@@ -12347,6 +12336,18 @@ mod tests {
         assert!(execution.public_update_scheduling_blocked());
         assert!(!execution.public_root_compatibility_claimed());
         assert!(!execution.executes_public_effects());
+        let root_commit_handoff = execution.root_commit_handoff_for_canary().unwrap();
+        assert!(root_commit_handoff.proves_private_root_finished_work_commit_metadata_handoff());
+        assert_eq!(
+            root_commit_handoff.pending().root_finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(
+            root_commit_handoff
+                .execution_request()
+                .root_finished_lanes(),
+            Lanes::SYNC
+        );
         let commit = execution.commit().unwrap();
         assert_eq!(commit.root(), root_id);
         assert_eq!(commit.previous_current(), current);
@@ -12444,6 +12445,18 @@ mod tests {
         assert!(execution.public_update_scheduling_blocked());
         assert!(!execution.public_root_compatibility_claimed());
         assert!(!execution.executes_public_effects());
+        let root_commit_handoff = execution.root_commit_handoff_for_canary().unwrap();
+        assert!(root_commit_handoff.proves_private_root_finished_work_commit_metadata_handoff());
+        assert_eq!(
+            root_commit_handoff.pending().root_finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(
+            root_commit_handoff
+                .execution_request()
+                .root_finished_lanes(),
+            Lanes::DEFAULT
+        );
         let commit = execution.commit().unwrap();
         assert_eq!(commit.root(), root_id);
         assert_eq!(commit.previous_current(), current);
