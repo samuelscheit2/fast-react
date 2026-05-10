@@ -1081,6 +1081,16 @@ function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
     expectedRoot.privateRuntimeFacadeSymbols?.toTree,
     `${label}.create().toTree`
   );
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.getInstance,
+    expectedRoot.privateRuntimeFacadeSymbols?.getInstance,
+    `${label}.create().getInstance`
+  );
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.unstable_flushSync,
+    expectedRoot.privateRuntimeFacadeSymbols?.unstableFlushSync,
+    `${label}.create().unstable_flushSync`
+  );
 }
 
 function assertReactTestRendererShallowBehavior(moduleExports, entry, label) {
