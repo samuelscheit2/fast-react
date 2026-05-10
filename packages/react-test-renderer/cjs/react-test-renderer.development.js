@@ -2619,6 +2619,10 @@ const privateToTreeFacadeSymbol = Symbol.for(
 );
 const privateToTreeFacadeStatus =
   'private-tree-diagnostics-serializable-public-totree-blocked';
+const privateToTreeNativeExecutionDiagnosticName =
+  'fast-react-test-renderer.totree.private-native-execution-evidence';
+const privateToTreeNativeExecutionStatus =
+  'private-totree-native-execution-records-consumed-public-totree-blocked';
 const privateToTreeAcceptedDiagnosticName =
   'fast-react-test-renderer.serialization.private-tree-canary';
 const privateToTreeCommittedFiberInspectionDiagnosticName =
@@ -2787,6 +2791,14 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateTreeMetadataSerializable: true,
   privateCompositeFunctionMetadataSerializable: true,
   privateMultiChildTreeMetadataSerializable: true,
+  privateNativeExecutionEvidenceAvailable: true,
+  privateNativeExecutionDiagnosticName:
+    privateToTreeNativeExecutionDiagnosticName,
+  privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
+  acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+  acceptedNativeExecutionOperations:
+    privateToJSONNativeExecutionAcceptedOperations,
+  consumesAcceptedNativeCreateUpdateUnmountExecutionRecords: true,
   privateFacadeSymbol: privateToTreeFacadeSymbol.description,
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedRustPrivateTreeMetadata: true,
@@ -2796,7 +2808,8 @@ const toTreePrivateFacadeGate = Object.freeze({
   acceptedCompositeFiberShape: privateToTreeCompositeAcceptedFiberShape,
   acceptedHostOutputUpdateKinds: Object.freeze([
     'Create',
-    'Update'
+    'Update',
+    'Unmount'
   ]),
   hostOutputSnapshotFreshnessRequired: true,
   staleSnapshotRejection: true,
@@ -2810,7 +2823,11 @@ const toTreePrivateFacadeGate = Object.freeze({
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
+    'TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary',
     'TestRendererPrivateTreeMetadataReport',
+    'TestRendererPrivateToTreeNativeExecutionEvidence',
     'TestRendererPrivateTreeFunctionComponentDiagnostic',
     'TestRendererPrivateTreeHostComponentDiagnostic',
     'TestRendererPrivateTreeHostTextDiagnostic'
@@ -2819,8 +2836,11 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
+    'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
   ]),
+  nativeExecutionEvidenceWorker:
+    'worker-667-test-renderer-totree-native-execution',
   multiChildAcceptedWorker:
     'worker-485-test-renderer-totree-multichild-gate',
   multiChildAcceptedRustApis: Object.freeze([
@@ -12295,6 +12315,13 @@ function createPrivateToTreeFacade(rootRequest) {
     privateTreeMetadataSerializable: true,
     privateCompositeFunctionMetadataSerializable: true,
     privateMultiChildTreeMetadataSerializable: true,
+    privateNativeExecutionEvidenceAvailable: true,
+    privateNativeExecutionDiagnosticName:
+      privateToTreeNativeExecutionDiagnosticName,
+    privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
+    acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+    acceptedNativeExecutionOperations:
+      privateToJSONNativeExecutionAcceptedOperations,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -12310,6 +12337,25 @@ function createPrivateToTreeFacade(rootRequest) {
     },
     serializeAcceptedTreeMetadata(report) {
       return serializePrivateToTreeMetadataDiagnostic(report);
+    },
+    canCreateAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+      try {
+        createPrivateToTreeNativeExecutionDiagnosticResult(
+          rootRequest,
+          executionRecord,
+          report
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+      return createPrivateToTreeNativeExecutionDiagnosticResult(
+        rootRequest,
+        executionRecord,
+        report
+      );
     }
   });
 }
@@ -12466,6 +12512,18 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     if (rootChildCount !== 1) {
       throwPrivateToTreeMetadataError(
         'Expected private tree metadata rootChildCount to be 1.'
+      );
+    }
+    const hostOutputRow = validatePrivateToJSONUpdateUnmountRowMetadata(
+      report,
+      hostOutputUpdateKind,
+      rootChildCount
+    );
+    const hostOutputShape =
+      hostOutputRow === null ? 'SingleHostText' : hostOutputRow.hostOutputShape;
+    if (hostOutputShape !== 'SingleHostText') {
+      throwPrivateToTreeMetadataError(
+        'Expected private tree metadata to describe a minimal host text output shape.'
       );
     }
 
@@ -12651,6 +12709,10 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     return {
       kind: 'minimal',
       hostOutputUpdateKind,
+      hostOutputShape,
+      hostOutputRow,
+      rootChildCount,
+      sourceFiberCount: privateToTreeAcceptedFiberShape.length,
       committedFiberInspection,
       componentProps,
       componentType: readPrivateToJSONStringField(
@@ -13258,6 +13320,210 @@ function serializePrivateToTreeMetadataDiagnostic(report) {
     instance: null,
     rendered: renderedHostTree
   });
+}
+
+function createPrivateToTreeNativeExecutionDiagnosticResult(
+  rootRequest,
+  executionRecord,
+  report
+) {
+  const execution = consumeAcceptedToTreeNativeExecutionRecord(
+    rootRequest,
+    executionRecord
+  );
+  const diagnostic = validatePrivateToTreeNativeExecutionDiagnostic(report);
+  const expectedHostOutputUpdateKind =
+    hostOutputUpdateKindForRootExecutionOperation(execution.operation);
+
+  if (diagnostic.hostOutputUpdateKind !== expectedHostOutputUpdateKind) {
+    throwPrivateToTreeMetadataError(
+      `Expected private native ${execution.operation} execution to consume ${expectedHostOutputUpdateKind} toTree evidence.`
+    );
+  }
+  if (!isMinimalToTreeNativeExecutionShape(diagnostic)) {
+    throwPrivateToTreeMetadataError(
+      'Expected private native execution toTree evidence to describe the minimal host tree.'
+    );
+  }
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-totree-after-native-execution-result',
+    diagnosticName: privateToTreeNativeExecutionDiagnosticName,
+    status: privateToTreeNativeExecutionStatus,
+    entrypoint,
+    publicSurface: 'create().toTree',
+    sourceDiagnostic: privateToTreeAcceptedDiagnosticName,
+    acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+    rootRequest,
+    rootExecutionResult: execution,
+    operation: execution.operation,
+    requestId: execution.requestId,
+    requestSequence: execution.requestSequence,
+    rootId: execution.request.rootId,
+    hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
+    hostOutputShape: diagnostic.hostOutputShape,
+    hostOutputRowId:
+      diagnostic.hostOutputRow === null ? null : diagnostic.hostOutputRow.id,
+    hostOutputRow: diagnostic.hostOutputRow,
+    hostOutputSnapshotCurrent: true,
+    sourceFiberCount: diagnostic.sourceFiberCount,
+    rootChildCount: diagnostic.rootChildCount,
+    result: diagnostic.result,
+    consumesAcceptedNativeExecutionRecord: true,
+    consumesAcceptedNativeCreateExecutionRecord:
+      execution.operation === 'create',
+    consumesAcceptedNativeUpdateExecutionRecord:
+      execution.operation === 'update',
+    consumesAcceptedNativeUnmountExecutionRecord:
+      execution.operation === 'unmount',
+    consumesAcceptedRustLifecycleDiagnostic: true,
+    consumesPrivateToTreeEvidence: true,
+    consumesAcceptedHostOutputRow: diagnostic.hostOutputRow !== null,
+    minimalTreeShape: true,
+    publicTreeAvailable: false,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function consumeAcceptedToTreeNativeExecutionRecord(
+  rootRequest,
+  executionRecord
+) {
+  try {
+    return consumeAcceptedToJSONNativeExecutionRecordImpl(
+      rootRequest,
+      executionRecord
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error && typeof error.message === 'string'
+        ? error.message.replaceAll('toJSON', 'toTree')
+        : 'Expected accepted private native root execution evidence.';
+    throwPrivateToTreeMetadataError(message);
+  }
+}
+
+function validatePrivateToTreeNativeExecutionDiagnostic(report) {
+  const hostOutputUpdateKind = readPrivateToJSONStringField(
+    report,
+    'hostOutputUpdateKind',
+    'host_output_update_kind'
+  );
+
+  if (hostOutputUpdateKind === 'Unmount') {
+    return validatePrivateToTreeUnmountNativeExecutionDiagnostic(report);
+  }
+
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  if (diagnostic.kind !== 'minimal') {
+    throwPrivateToTreeMetadataError(
+      'Expected private native toTree evidence to use the minimal tree diagnostic.'
+    );
+  }
+
+  return {
+    hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
+    hostOutputShape: diagnostic.hostOutputShape,
+    hostOutputRow: diagnostic.hostOutputRow,
+    rootChildCount: diagnostic.rootChildCount,
+    sourceFiberCount: diagnostic.sourceFiberCount,
+    result: serializePrivateToTreeMetadataDiagnostic(report)
+  };
+}
+
+function validatePrivateToTreeUnmountNativeExecutionDiagnostic(report) {
+  assertPrivateToJSONRecord(report, 'report');
+  assertPrivateToJSONStringField(
+    report,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToTreeAcceptedDiagnosticName
+  );
+  assertPrivateToJSONStringField(
+    report,
+    'sourceJsonDiagnosticName',
+    'source_json_diagnostic_name',
+    privateToJSONAcceptedDiagnosticName
+  );
+  assertPrivateToJSONBooleanField(
+    report,
+    'hostOutputSnapshotCurrent',
+    'host_output_snapshot_current',
+    true
+  );
+  const rootChildCount = readPrivateToJSONNonNegativeIntegerField(
+    report,
+    'rootChildCount',
+    'root_child_count'
+  );
+  if (rootChildCount !== 0) {
+    throwPrivateToTreeMetadataError(
+      'Expected private unmount toTree native evidence rootChildCount to be 0.'
+    );
+  }
+  const hostOutputRow = validatePrivateToJSONUpdateUnmountRowMetadata(
+    report,
+    'Unmount',
+    rootChildCount
+  );
+  if (
+    hostOutputRow === null ||
+    hostOutputRow.hostOutputShape !== 'EmptyRoot'
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Expected private unmount toTree native evidence to consume an empty-root host output row.'
+    );
+  }
+  assertPrivateToJSONPublicBlockers(
+    readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
+  );
+  assertPrivateToJSONBooleanField(
+    report,
+    'publicTreeObjectAvailable',
+    'public_tree_object_available',
+    false
+  );
+
+  return {
+    hostOutputUpdateKind: 'Unmount',
+    hostOutputShape: 'EmptyRoot',
+    hostOutputRow,
+    rootChildCount,
+    sourceFiberCount: 0,
+    result: null
+  };
+}
+
+function isMinimalToTreeNativeExecutionShape(diagnostic) {
+  if (diagnostic.hostOutputUpdateKind === 'Unmount') {
+    return (
+      diagnostic.hostOutputShape === 'EmptyRoot' &&
+      diagnostic.rootChildCount === 0 &&
+      diagnostic.sourceFiberCount === 0 &&
+      diagnostic.result === null
+    );
+  }
+  const result = diagnostic.result;
+  return (
+    diagnostic.hostOutputShape === 'SingleHostText' &&
+    diagnostic.rootChildCount === 1 &&
+    diagnostic.sourceFiberCount === privateToTreeAcceptedFiberShape.length &&
+    result !== null &&
+    typeof result === 'object' &&
+    result.nodeType === 'component' &&
+    result.type === privateToTreeFunctionComponentType &&
+    result.instance === null &&
+    result.rendered !== null &&
+    typeof result.rendered === 'object' &&
+    result.rendered.nodeType === 'host' &&
+    Array.isArray(result.rendered.rendered) &&
+    result.rendered.rendered.length === 1 &&
+    typeof result.rendered.rendered[0] === 'string'
+  );
 }
 
 function describePrivateGetInstanceClassRootDiagnostic(report) {

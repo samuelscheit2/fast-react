@@ -146,6 +146,14 @@ const privateToJSONNativeExecutionDiagnosticName =
   "fast-react-test-renderer.tojson.private-native-execution-evidence";
 const privateToJSONNativeExecutionStatus =
   "private-tojson-native-execution-records-consumed-public-tojson-blocked";
+const privateToTreeNativeExecutionDiagnosticName =
+  "fast-react-test-renderer.totree.private-native-execution-evidence";
+const privateToTreeNativeExecutionStatus =
+  "private-totree-native-execution-records-consumed-public-totree-blocked";
+const privateToTreeAcceptedDiagnosticName =
+  "fast-react-test-renderer.serialization.private-tree-canary";
+const privateToTreeCommittedFiberInspectionDiagnosticName =
+  "fast-react-test-renderer.serialization.private-tree-committed-fiber-inspection-canary";
 const privateToJSONUpdateUnmountDependencyIds = [
   "react-test-renderer-update-route-private-diagnostic",
   "react-test-renderer-unmount-route-private-diagnostic",
@@ -2175,6 +2183,226 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.match(mismatchError.message, /Update toJSON evidence/u);
 });
 
+test("react-test-renderer CJS development private toTree facade consumes accepted native execution records", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    {
+      props: { children: "hello" },
+      type: "span"
+    },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
+  const updateError = captureThrown(() =>
+    renderer.update({ props: { children: "goodbye" }, type: "span" })
+  );
+  const unmountError = captureThrown(() => renderer.unmount());
+  const facade = renderer.toTree[privateToTreeFacadeSymbol];
+  const executor = (handoff) => {
+    const request =
+      handoff.requestSequence === 1
+        ? createRequest
+        : handoff.requestSequence === 2
+          ? updateError.rootRequest
+          : unmountError.rootRequest;
+    if (request.operation === "unmount") {
+      return {
+        ...createRustUnmountNativeBridgeAdmissionEvidence(request),
+        nativeAddonLoaded: false,
+        nativeExecution: false,
+        rustExecution: true
+      };
+    }
+    if (request.operation === "update") {
+      return createRustUpdateNativeBridgeAdmissionEvidence(request);
+    }
+    return {
+      rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+      privateCreateNativeBridgeHostOutputHandoff:
+        createRustCreateNativeBridgeHostOutputHandoffSource(
+          request,
+          createAdmission
+        ),
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+  };
+
+  const createResult = bridge.executeRootRequest(createRequest, executor);
+  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
+  const unmountResult = bridge.executeRootRequest(
+    unmountError.rootRequest,
+    executor
+  );
+
+  assert.equal(facade.privateNativeExecutionEvidenceAvailable, true);
+  assert.equal(
+    facade.privateNativeExecutionDiagnosticName,
+    privateToTreeNativeExecutionDiagnosticName
+  );
+  assert.equal(
+    facade.privateNativeExecutionStatus,
+    privateToTreeNativeExecutionStatus
+  );
+  assert.deepEqual(facade.acceptedNativeExecutionOperations, [
+    "create",
+    "update",
+    "unmount"
+  ]);
+  assert.equal(
+    typeof facade.createAcceptedNativeExecutionDiagnosticResult,
+    "function"
+  );
+  assert.equal(
+    typeof facade.canCreateAcceptedNativeExecutionDiagnosticResult,
+    "function"
+  );
+
+  const createEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Create",
+        rowId: null,
+        rowShape: null,
+        rootChildCount: 1,
+        text: "hello"
+      })
+    );
+  assert.equal(createEvidence.diagnosticName, privateToTreeNativeExecutionDiagnosticName);
+  assert.equal(createEvidence.status, privateToTreeNativeExecutionStatus);
+  assert.equal(createEvidence.operation, "create");
+  assert.equal(createEvidence.hostOutputUpdateKind, "Create");
+  assert.equal(createEvidence.hostOutputShape, "SingleHostText");
+  assert.equal(createEvidence.hostOutputRowId, null);
+  assert.equal(createEvidence.sourceFiberCount, 3);
+  assert.equal(createEvidence.rootChildCount, 1);
+  assert.deepEqual(createEvidence.result, {
+    nodeType: "component",
+    type: "CanaryFunctionComponent",
+    props: {},
+    instance: null,
+    rendered: {
+      nodeType: "host",
+      type: "span",
+      props: {},
+      instance: null,
+      rendered: ["hello"]
+    }
+  });
+  assert.equal(createEvidence.consumesAcceptedNativeExecutionRecord, true);
+  assert.equal(createEvidence.consumesAcceptedNativeCreateExecutionRecord, true);
+  assert.equal(createEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
+  assert.equal(createEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
+  assert.equal(createEvidence.consumesPrivateToTreeEvidence, true);
+  assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
+  assert.equal(createEvidence.minimalTreeShape, true);
+  assert.equal(createEvidence.publicTreeAvailable, false);
+  assert.equal(createEvidence.publicSerializationAvailable, false);
+  assert.equal(createEvidence.publicRouteAvailable, false);
+  assert.equal(createEvidence.nativeBridgeAvailable, false);
+  assert.equal(createEvidence.nativeExecution, false);
+  assert.equal(createEvidence.compatibilityClaimed, false);
+
+  const updateEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONUpdateHostOutputRowId,
+        rowShape: "SingleHostText",
+        rootChildCount: 1,
+        text: "goodbye"
+      })
+    );
+  assert.equal(updateEvidence.operation, "update");
+  assert.equal(updateEvidence.hostOutputUpdateKind, "Update");
+  assert.equal(updateEvidence.hostOutputRowId, privateToJSONUpdateHostOutputRowId);
+  assert.equal(updateEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
+  assert.equal(updateEvidence.consumesAcceptedNativeUpdateExecutionRecord, true);
+  assert.equal(updateEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
+  assert.equal(updateEvidence.consumesAcceptedHostOutputRow, true);
+  assert.equal(updateEvidence.result.rendered.rendered[0], "goodbye");
+
+  const unmountEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      unmountResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        text: null
+      })
+    );
+  assert.equal(unmountEvidence.operation, "unmount");
+  assert.equal(unmountEvidence.hostOutputUpdateKind, "Unmount");
+  assert.equal(unmountEvidence.hostOutputShape, "EmptyRoot");
+  assert.equal(
+    unmountEvidence.hostOutputRowId,
+    privateToJSONUnmountHostOutputRowId
+  );
+  assert.equal(unmountEvidence.sourceFiberCount, 0);
+  assert.equal(unmountEvidence.rootChildCount, 0);
+  assert.equal(unmountEvidence.result, null);
+  assert.equal(unmountEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
+  assert.equal(unmountEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
+  assert.equal(unmountEvidence.consumesAcceptedNativeUnmountExecutionRecord, true);
+  assert.equal(unmountEvidence.consumesAcceptedHostOutputRow, true);
+  assert.equal(unmountEvidence.publicTreeAvailable, false);
+  assert.equal(unmountEvidence.nativeExecution, false);
+  assert.equal(unmountEvidence.compatibilityClaimed, false);
+
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Create",
+        rowId: null,
+        rowShape: null,
+        rootChildCount: 1,
+        text: "wrong"
+      })
+    ),
+    false
+  );
+  const mismatchError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Create",
+        rowId: null,
+        rowShape: null,
+        rootChildCount: 1,
+        text: "wrong"
+      })
+    )
+  );
+  assert.equal(
+    mismatchError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  assert.equal(mismatchError.publicTreeAvailable, false);
+  assert.equal(mismatchError.nativeExecution, false);
+  assert.match(mismatchError.message, /Update toTree evidence/u);
+
+  assert.throws(() => renderer.toTree(), {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    name: "FastReactTestRendererUnimplementedError"
+  });
+});
+
 test("react-test-renderer CJS development private act route flushes accepted scheduler mock create-root evidence", () => {
   const entry = entrypoints.find(
     (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
@@ -3190,6 +3418,121 @@ function privateToJSONReport({
       compatibilityClaimBlocked: true
     },
     nodes
+  };
+}
+
+function privateToTreeReport({
+  hostOutputUpdateKind = "Update",
+  rowId,
+  rowShape,
+  rootChildCount,
+  text
+}) {
+  const report = {
+    diagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent: true,
+    ...(rowId === null
+      ? {}
+      : {
+          hostOutputRow: {
+            id: rowId,
+            status:
+              "private-tojson-update-unmount-host-output-rows-public-tojson-blocked",
+            hostOutputUpdateKind,
+            hostOutputShape: rowShape,
+            currentRootChildCount: rootChildCount,
+            dependencyMetadata: {
+              acceptedPrivateDiagnosticDependencyIds:
+                privateToJSONUpdateUnmountDependencyIds,
+              serializationDiagnosticsAvailable: true,
+              hostOutputSnapshotFreshnessRequired: true,
+              staleSnapshotRejection: true,
+              mismatchedUpdateUnmountRecordRejection: true,
+              publicToJSONAvailable: false,
+              publicTestInstanceAvailable: false,
+              nativeExecutionAvailable: false,
+              compatibilityClaimed: false
+            }
+          }
+        }),
+    rootChildCount,
+    publicBlockers: {
+      jsonMethodBlocked: true,
+      treeMethodBlocked: true,
+      instanceWrapperBlocked: true,
+      jsFacadeRoutingBlocked: true,
+      publicActBlocked: true,
+      compatibilityClaimBlocked: true
+    },
+    publicTreeObjectAvailable: false
+  };
+
+  if (hostOutputUpdateKind === "Unmount") {
+    return report;
+  }
+
+  return {
+    ...report,
+    acceptedFiberShape: ["HostRoot", "HostComponent", "HostText"],
+    acceptedCompositeFiberShape: [
+      "HostRoot",
+      "FunctionComponent",
+      "HostComponent",
+      "HostText"
+    ],
+    hostRoot: {
+      fiberTag: "HostRoot",
+      delegatesToChild: true,
+      childFiberTag: "HostComponent",
+      publicTreeObjectAvailable: false
+    },
+    functionComponent: {
+      fiberTag: "FunctionComponent",
+      nodeType: "component",
+      componentType: "CanaryFunctionComponent",
+      props: {},
+      instanceAvailable: false,
+      renderedChildFiberTag: "HostComponent",
+      renderedChildNodeType: "host",
+      renderedChildCount: 1,
+      wrapsCommittedHostOutput: true,
+      publicTreeObjectAvailable: false
+    },
+    hostComponent: {
+      fiberTag: "HostComponent",
+      nodeType: "host",
+      elementType: "span",
+      props: {},
+      instanceAvailable: false,
+      renderedChildCount: 1,
+      renderedText: text,
+      publicTreeObjectAvailable: false
+    },
+    hostText: {
+      fiberTag: "HostText",
+      text,
+      returnsTextValue: true,
+      publicTreeObjectAvailable: false
+    },
+    committedFiberInspection: {
+      diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
+      sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
+      fiberShape: ["HostRoot", "HostComponent", "HostText"],
+      rootChildFiberTags: ["HostComponent"],
+      hostChildFiberTags: ["HostComponent"],
+      rootChildCount: 1,
+      hostChildCount: 1,
+      hostComponentCount: 1,
+      hostTextCount: 1,
+      functionComponentFiberTag: null,
+      functionComponentPresent: false,
+      wrapsCommittedHostOutput: false,
+      publicTreeObjectAvailable: false,
+      compatibilityClaimed: false
+    }
   };
 }
 
@@ -7225,6 +7568,38 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
   );
   assert.equal(gate.privateFacadeGateAvailable, true, entrypoint);
   assert.equal(gate.privateTreeMetadataSerializable, true, entrypoint);
+  const nativeToTreeEvidence =
+    gate.privateNativeExecutionEvidenceAvailable === true;
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(nativeToTreeEvidence, true, entrypoint);
+  }
+  if (nativeToTreeEvidence) {
+    assert.equal(
+      gate.privateNativeExecutionDiagnosticName,
+      privateToTreeNativeExecutionDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      gate.privateNativeExecutionStatus,
+      privateToTreeNativeExecutionStatus,
+      entrypoint
+    );
+    assert.equal(
+      gate.acceptedNativeExecutionRecordKind,
+      "FastReactTestRendererPrivateRootExecutionResult",
+      entrypoint
+    );
+    assert.deepEqual(gate.acceptedNativeExecutionOperations, [
+      "create",
+      "update",
+      "unmount"
+    ]);
+    assert.equal(
+      gate.consumesAcceptedNativeCreateUpdateUnmountExecutionRecords,
+      true,
+      entrypoint
+    );
+  }
   assert.equal(
     gate.privateFacadeSymbol,
     privateToTreeFacadeSymbolDescription,
@@ -7254,10 +7629,10 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     "HostText"
   ]);
   assert.equal(gate.privateCompositeFunctionMetadataSerializable, true, entrypoint);
-  assert.deepEqual(gate.acceptedHostOutputUpdateKinds, [
-    "Create",
-    "Update"
-  ]);
+  assert.deepEqual(
+    gate.acceptedHostOutputUpdateKinds,
+    nativeToTreeEvidence ? ["Create", "Update", "Unmount"] : ["Create", "Update"]
+  );
   assert.equal(gate.hostOutputSnapshotFreshnessRequired, true, entrypoint);
   assert.equal(gate.staleSnapshotRejection, true, entrypoint);
   assert.equal(gate.publicTreeAvailable, false, entrypoint);
@@ -7273,7 +7648,17 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
   assert.deepEqual(gate.acceptedRustApis, [
     "TestRendererRoot::describe_private_tree_metadata_for_canary",
     "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+    ...(nativeToTreeEvidence
+      ? [
+          "TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary",
+          "TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary",
+          "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary"
+        ]
+      : []),
     "TestRendererPrivateTreeMetadataReport",
+    ...(nativeToTreeEvidence
+      ? ["TestRendererPrivateToTreeNativeExecutionEvidence"]
+      : []),
     "TestRendererPrivateTreeFunctionComponentDiagnostic",
     "TestRendererPrivateTreeHostComponentDiagnostic",
     "TestRendererPrivateTreeHostTextDiagnostic"
@@ -7282,8 +7667,20 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
     "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
     "root_private_tree_metadata_canary_describes_function_component_above_host_output",
+    ...(nativeToTreeEvidence
+      ? [
+          "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records"
+        ]
+      : []),
     "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
   ]);
+  if (nativeToTreeEvidence) {
+    assert.equal(
+      gate.nativeExecutionEvidenceWorker,
+      "worker-667-test-renderer-totree-native-execution",
+      entrypoint
+    );
+  }
   assert.deepEqual(gate.blockedPublicSurfaces, [
     "create().toTree",
     "create().toJSON",
@@ -7316,6 +7713,28 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   assertPrivateToTreeFacadeGate(record.gate, entrypoint);
   assertPrivateToTreeHostOutputMetadataGate(record.metadataGate, entrypoint);
   assert.equal(record.privateTreeMetadataSerializable, true, entrypoint);
+  const nativeToTreeEvidence =
+    record.privateNativeExecutionEvidenceAvailable === true;
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(nativeToTreeEvidence, true, entrypoint);
+  }
+  if (nativeToTreeEvidence) {
+    assert.equal(
+      record.privateNativeExecutionDiagnosticName,
+      privateToTreeNativeExecutionDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      record.privateNativeExecutionStatus,
+      privateToTreeNativeExecutionStatus,
+      entrypoint
+    );
+    assert.deepEqual(record.acceptedNativeExecutionOperations, [
+      "create",
+      "update",
+      "unmount"
+    ]);
+  }
   assert.equal(record.publicTreeAvailable, false, entrypoint);
   assert.equal(record.publicRouteAvailable, false, entrypoint);
   assert.equal(record.nativeBridgeAvailable, false, entrypoint);
@@ -7331,6 +7750,18 @@ function assertPrivateToTreeFacade(record, entrypoint) {
     "function",
     entrypoint
   );
+  if (nativeToTreeEvidence) {
+    assert.equal(
+      typeof record.canCreateAcceptedNativeExecutionDiagnosticResult,
+      "function",
+      entrypoint
+    );
+    assert.equal(
+      typeof record.createAcceptedNativeExecutionDiagnosticResult,
+      "function",
+      entrypoint
+    );
+  }
 }
 
 function assertPrivateTestInstanceWrapperSkeleton(
