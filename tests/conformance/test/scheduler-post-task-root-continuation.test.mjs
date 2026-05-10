@@ -8,6 +8,11 @@ const require = createRequire(import.meta.url);
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const conformanceRoot = path.resolve(testDirectory, '..');
 const repoRoot = path.resolve(conformanceRoot, '..', '..');
+const workspaceSchedulerPackageRoot = path.join(repoRoot, 'packages/scheduler');
+const workspaceSchedulerPostTaskEntrypoint = path.join(
+  workspaceSchedulerPackageRoot,
+  'unstable_post_task.js'
+);
 const {
   ACCEPTED_ROOT_CONTINUATION_STATUS,
   ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS,
@@ -471,6 +476,346 @@ test('private postTask delayed scheduler.yield handoff stays diagnostic-only aft
   assert.equal(publicYieldHandoffClaimRow.compatibilityClaimed, false);
 });
 
+test('private postTask deferred scheduler.yield handoff stays pending until release and rejects after continuation execution', async () => {
+  const {readSchedulerPostTaskPriorityDiagnostics} =
+    await loadPostTaskOracleModule();
+  const flow = withDeferredSchedulerYieldRuntime(
+    {nodeEnv: 'development'},
+    ({Scheduler, shim}) => {
+      const events = [];
+      const node = Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_LowPriority,
+        () => {
+          events.push({
+            label: 'delayed-start',
+            currentPriorityLevel:
+              Scheduler.unstable_getCurrentPriorityLevel()
+          });
+          return () => {
+            events.push({
+              label: 'delayed-continuation',
+              currentPriorityLevel:
+                Scheduler.unstable_getCurrentPriorityLevel()
+            });
+          };
+        },
+        {delay: 17}
+      );
+      const scheduleEvents = shim.takeEvents();
+      const initialFlush = shim.flushPostTasks(1);
+      const diagnosticsAfterFallback =
+        readSchedulerPostTaskPriorityDiagnostics(node);
+      const fallbackEvents = shim.takeEvents();
+      const eventsAfterFallback = events.slice();
+      const pendingYieldContinuationCountAfterFallback =
+        shim.pendingYieldContinuationCount();
+      const rowBeforeRelease =
+        createPrivatePostTaskRootContinuationMetadataRow(
+          diagnosticsAfterFallback
+        );
+      const releaseFlush = shim.flushYieldContinuations(1);
+      const diagnosticsAfterRelease =
+        readSchedulerPostTaskPriorityDiagnostics(node);
+      const releaseEvents = shim.takeEvents();
+      const rowAfterRelease =
+        createPrivatePostTaskRootContinuationMetadataRow(
+          diagnosticsAfterRelease
+        );
+
+      return {
+        publicNodeKeys: Object.keys(node),
+        scheduleEvents,
+        initialFlush,
+        diagnosticsAfterFallback,
+        fallbackEvents,
+        eventsAfterFallback,
+        pendingYieldContinuationCountAfterFallback,
+        rowBeforeRelease,
+        releaseFlush,
+        diagnosticsAfterRelease,
+        releaseEvents,
+        eventsAfterRelease: events,
+        pendingYieldContinuationCountAfterRelease:
+          shim.pendingYieldContinuationCount(),
+        rowAfterRelease
+      };
+    }
+  );
+  const diagnosticsAfterFallback = flow.diagnosticsAfterFallback;
+  const continuation = diagnosticsAfterFallback.continuationFallbacks[0];
+  const route = diagnosticsAfterFallback.rootContinuationExecutionRoute;
+  const handoff = route.actRootWorkHandoff;
+  const rowBeforeRelease = flow.rowBeforeRelease;
+  const diagnosticsAfterRelease = flow.diagnosticsAfterRelease;
+  const rowAfterRelease = flow.rowAfterRelease;
+
+  assert.deepEqual(flow.publicNodeKeys, ['_controller']);
+  assert.deepEqual(flow.scheduleEvents, [
+    {
+      type: 'TaskController',
+      priority: 'user-visible',
+      signalId: 1
+    },
+    {
+      type: 'postTask',
+      hasDelayProperty: true,
+      delay: {
+        type: 'number',
+        value: 17
+      },
+      signal: {
+        id: 1,
+        priority: 'user-visible',
+        aborted: false
+      }
+    }
+  ]);
+  assert.deepEqual(flow.initialFlush, [
+    {
+      type: 'run-post-task',
+      signal: {
+        id: 1,
+        priority: 'user-visible',
+        aborted: false
+      }
+    }
+  ]);
+  assert.deepEqual(flow.fallbackEvents, [
+    {
+      type: 'yield',
+      signal: {
+        id: 1,
+        priority: 'user-visible',
+        aborted: false
+      }
+    },
+    {
+      type: 'yield.then-deferred',
+      signal: {
+        id: 1,
+        priority: 'user-visible',
+        aborted: false
+      },
+      callbackType: 'function',
+      pendingYieldContinuationCount: 1
+    }
+  ]);
+  assert.deepEqual(flow.eventsAfterFallback, [
+    {
+      label: 'delayed-start',
+      currentPriorityLevel: 4
+    }
+  ]);
+  assert.equal(flow.pendingYieldContinuationCountAfterFallback, 1);
+  assert.equal(diagnosticsAfterFallback.environmentCapabilities.hasSchedulerYield, true);
+  assert.equal(diagnosticsAfterFallback.callbackRuns.length, 1);
+  assert.equal(diagnosticsAfterFallback.continuationFallbacks.length, 1);
+  assert.equal(diagnosticsAfterFallback.compatibilityClaimed, false);
+  assert.equal(
+    diagnosticsAfterFallback.browserPostTaskCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    diagnosticsAfterFallback.browserTaskOrderingCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    diagnosticsAfterFallback.publicSchedulerTimingCompatibilityClaimed,
+    false
+  );
+  assert.equal(continuation.fallback, 'scheduler.yield');
+  assert.equal(
+    continuation.continuationMetadata.selectedFallback,
+    'scheduler.yield'
+  );
+  assert.equal(
+    continuation.continuationMetadata.schedulerYieldAvailableAtSchedule,
+    true
+  );
+  assert.equal(
+    continuation.continuationMetadata.actRootWorkHandoffStatus,
+    ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS
+  );
+  assert.equal(
+    continuation.continuationMetadata.actRootWorkHandoffAccepted,
+    true
+  );
+  assert.deepEqual(
+    continuation.fallbackEnvironmentClassification,
+    expectedFallbackEnvironmentClassification(true)
+  );
+  assert.equal(route.routeStatus, ROOT_CONTINUATION_PENDING_EXECUTION_STATUS);
+  assert.equal(route.hasActRootWorkHandoff, true);
+  assert.equal(route.fallback, 'scheduler.yield');
+  assert.equal(route.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(route.publicReactActCompatibilityClaimed, false);
+  assert.equal(route.publicRootSchedulerCompatibilityClaimed, false);
+  assert.equal(route.publicRendererCompatibilityClaimed, false);
+  assert.equal(
+    route.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    route.privateRootContinuationExecution.continuationCallbackExecuted,
+    false
+  );
+  assert.equal(route.privateRootContinuationExecution.rendererWorkExecuted, false);
+  assert.equal(route.privateRootContinuationExecution.reconcilerWorkExecuted, false);
+  assert.equal(
+    route.privateRootContinuationExecution.nativeRendererWorkExecuted,
+    false
+  );
+  assert.equal(route.privateRootContinuationExecution.publicRootExecution, false);
+  assert.equal(route.privateRootContinuationExecution.publicSchedulerFlush, false);
+  assert.equal(handoff.status, ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS);
+  assert.equal(handoff.accepted, true);
+  assert.equal(handoff.delayedCallbackPathAccepted, true);
+  assert.equal(handoff.actQueueHandoffOnly, true);
+  assert.equal(handoff.rootWorkMetadataOnly, true);
+  assert.equal(handoff.rendererWorkExecutionBlocked, true);
+  assert.equal(handoff.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(handoff.drainsPublicReactActQueue, false);
+  assert.equal(handoff.executesQueuedWork, false);
+  assert.equal(handoff.executesEffects, false);
+  assert.equal(handoff.executesRendererWork, false);
+  assert.equal(handoff.executesRendererRoots, false);
+  assert.equal(handoff.publicCompatibilityClaimed, false);
+  assert.equal(handoff.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(handoff.publicReactActCompatibilityClaimed, false);
+  assert.equal(handoff.publicRootSchedulerCompatibilityClaimed, false);
+  assert.equal(handoff.publicRendererCompatibilityClaimed, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+
+  assert.equal(rowBeforeRelease.status, ROOT_CONTINUATION_METADATA_STATUS);
+  assert.equal(rowBeforeRelease.accepted, true);
+  assert.equal(rowBeforeRelease.rejected, false);
+  assert.equal(
+    rowBeforeRelease.rootContinuationExecutionRoute.routeStatus,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    rowBeforeRelease.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    rowBeforeRelease.acceptedRootContinuation.privateRootContinuationExecution.status,
+    ROOT_CONTINUATION_PENDING_EXECUTION_STATUS
+  );
+  assert.equal(
+    rowBeforeRelease.acceptedActRootWorkHandoff.status,
+    ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS
+  );
+  assert.equal(rowBeforeRelease.blockedRootExecution.status, ROOT_CONTINUATION_BLOCKED_STATUS);
+  assert.equal(rowBeforeRelease.blockedRootExecution.rendererWorkExecuted, false);
+  assert.equal(rowBeforeRelease.blockedRootExecution.reconcilerWorkExecuted, false);
+  assert.equal(
+    rowBeforeRelease.blockedRootExecution.nativeRendererWorkExecuted,
+    false
+  );
+  assert.equal(rowBeforeRelease.blockedRootExecution.publicRootExecution, false);
+  assert.equal(rowBeforeRelease.blockedRootExecution.publicSchedulerFlush, false);
+  assert.equal(rowBeforeRelease.browserPostTaskCompatibilityClaimed, false);
+  assert.equal(rowBeforeRelease.browserTaskOrderingCompatibilityClaimed, false);
+  assert.equal(rowBeforeRelease.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(rowBeforeRelease.compatibilityClaimed, false);
+
+  assert.deepEqual(flow.releaseFlush, [
+    {
+      type: 'run-yield-continuation',
+      signal: {
+        id: 1,
+        priority: 'user-visible',
+        aborted: false
+      }
+    }
+  ]);
+  assert.deepEqual(flow.releaseEvents, []);
+  assert.deepEqual(flow.eventsAfterRelease, [
+    {
+      label: 'delayed-start',
+      currentPriorityLevel: 4
+    },
+    {
+      label: 'delayed-continuation',
+      currentPriorityLevel: 4
+    }
+  ]);
+  assert.equal(flow.pendingYieldContinuationCountAfterRelease, 0);
+  assert.equal(diagnosticsAfterRelease.callbackRuns.length, 2);
+  assert.equal(diagnosticsAfterRelease.continuationFallbacks.length, 1);
+  assert.equal(
+    diagnosticsAfterRelease.rootContinuationExecutionRoute.privateRootContinuationExecution.continuationCallbackExecuted,
+    false
+  );
+  assert.equal(diagnosticsAfterRelease.compatibilityClaimed, false);
+  assert.equal(
+    diagnosticsAfterRelease.browserPostTaskCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    diagnosticsAfterRelease.browserTaskOrderingCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    diagnosticsAfterRelease.publicSchedulerTimingCompatibilityClaimed,
+    false
+  );
+  assert.equal(rowAfterRelease.status, ROOT_CONTINUATION_REJECTED_STATUS);
+  assert.equal(rowAfterRelease.accepted, false);
+  assert.equal(rowAfterRelease.rejected, true);
+  assert.equal(rowAfterRelease.rejectionReason, 'stale-continuation');
+  assert.equal(rowAfterRelease.rejectionDetails.continuationIndex, 0);
+  assert.equal(
+    rowAfterRelease.rejectionDetails.continuationId,
+    derivePrivatePostTaskRootContinuationId(
+      diagnosticsAfterRelease,
+      diagnosticsAfterRelease.continuationFallbacks[0]
+    )
+  );
+  assert.equal(rowAfterRelease.rejectionDetails.callbackRunCountAtSchedule, 1);
+  assert.equal(rowAfterRelease.rejectionDetails.currentCallbackRunCount, 2);
+  assert.equal(rowAfterRelease.blockedRootExecution.rendererWorkExecuted, false);
+  assert.equal(rowAfterRelease.blockedRootExecution.reconcilerWorkExecuted, false);
+  assert.equal(
+    rowAfterRelease.blockedRootExecution.nativeRendererWorkExecuted,
+    false
+  );
+  assert.equal(rowAfterRelease.blockedRootExecution.publicRootExecution, false);
+  assert.equal(rowAfterRelease.blockedRootExecution.publicSchedulerFlush, false);
+  assert.equal(rowAfterRelease.browserPostTaskCompatibilityClaimed, false);
+  assert.equal(rowAfterRelease.browserTaskOrderingCompatibilityClaimed, false);
+  assert.equal(rowAfterRelease.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(rowAfterRelease.compatibilityClaimed, false);
+
+  const publicClaimAfterReleaseRecord = {
+    ...diagnosticsAfterRelease,
+    rootContinuationExecutionRoute: {
+      ...diagnosticsAfterRelease.rootContinuationExecutionRoute,
+      actRootWorkHandoff: {
+        ...diagnosticsAfterRelease.rootContinuationExecutionRoute.actRootWorkHandoff,
+        publicRendererCompatibilityClaimed: true
+      }
+    }
+  };
+  const publicClaimAfterReleaseRow =
+    createPrivatePostTaskRootContinuationMetadataRow(
+      publicClaimAfterReleaseRecord
+    );
+  assert.equal(
+    publicClaimAfterReleaseRow.status,
+    ROOT_CONTINUATION_REJECTED_STATUS
+  );
+  assert.equal(
+    publicClaimAfterReleaseRow.rejectionReason,
+    'public-compatibility-claimed'
+  );
+  assert.equal(
+    publicClaimAfterReleaseRow.rejectionDetails.claimPath,
+    'record.rootContinuationExecutionRoute.actRootWorkHandoff.publicRendererCompatibilityClaimed'
+  );
+  assert.equal(publicClaimAfterReleaseRow.compatibilityClaimed, false);
+});
+
 test('private postTask root continuation metadata rejects missing signal, stale continuation, and unsupported priority records', async () => {
   const {inspectSchedulerPostTaskPriorityDiagnostics} =
     await loadPostTaskOracleModule();
@@ -706,4 +1051,250 @@ function expectedFallbackEnvironmentClassification(withYield) {
     publicSchedulerTimingCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
+}
+
+function withDeferredSchedulerYieldRuntime({nodeEnv}, callback) {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousGlobals = capturePostTaskGlobals();
+
+  clearWorkspaceSchedulerPostTaskCache();
+  delete globalThis.window;
+  delete globalThis.scheduler;
+  delete globalThis.TaskController;
+  delete globalThis.__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__;
+
+  globalThis.__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__ = true;
+  process.env.NODE_ENV = nodeEnv;
+  const shim = installDeferredSchedulerYieldShim();
+
+  try {
+    const Scheduler = require(workspaceSchedulerPostTaskEntrypoint);
+    return callback({Scheduler, shim});
+  } finally {
+    clearWorkspaceSchedulerPostTaskCache();
+    restorePostTaskGlobals(previousGlobals);
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
+}
+
+function installDeferredSchedulerYieldShim() {
+  const events = [];
+  const postTaskQueue = [];
+  const yieldContinuationQueue = [];
+  let now = 100;
+  let nextSignalId = 1;
+
+  class TaskController {
+    constructor(options) {
+      this.priority = options.priority;
+      this.signal = {
+        id: nextSignalId++,
+        aborted: false,
+        priority: options.priority
+      };
+      events.push({
+        type: 'TaskController',
+        priority: options.priority,
+        signalId: this.signal.id
+      });
+    }
+
+    abort() {
+      this.signal.aborted = true;
+      events.push({
+        type: 'abort',
+        priority: this.priority,
+        signalId: this.signal.id
+      });
+    }
+  }
+
+  globalThis.window = {
+    performance: {
+      now: () => now
+    },
+    setTimeout(callback) {
+      events.push({
+        type: 'window.setTimeout',
+        callbackType: typeof callback
+      });
+      return 1;
+    }
+  };
+  globalThis.TaskController = TaskController;
+  globalThis.scheduler = {
+    postTask(task, options = {}) {
+      events.push(describePostTaskShimCall(options));
+      postTaskQueue.push({task, options});
+      return catchablePostTaskThenable();
+    },
+    yield(options = {}) {
+      events.push({
+        type: 'yield',
+        signal: describeShimSignal(options.signal)
+      });
+      return {
+        then(onFulfilled) {
+          yieldContinuationQueue.push({onFulfilled, options});
+          events.push({
+            type: 'yield.then-deferred',
+            signal: describeShimSignal(options.signal),
+            callbackType: typeof onFulfilled,
+            pendingYieldContinuationCount: yieldContinuationQueue.length
+          });
+          return catchablePostTaskThenable();
+        },
+        catch() {
+          return this;
+        }
+      };
+    }
+  };
+
+  return {
+    setNow(value) {
+      now = value;
+    },
+    takeEvents() {
+      const taken = events.slice();
+      events.length = 0;
+      return taken;
+    },
+    flushPostTasks(maxTasks) {
+      const flushEvents = [];
+      let flushedTaskCount = 0;
+      let guard = 0;
+      while (
+        postTaskQueue.length > 0 &&
+        (maxTasks === undefined || flushedTaskCount < maxTasks)
+      ) {
+        if (guard++ > 20) {
+          throw new Error('postTask diagnostics shim exceeded flush guard');
+        }
+        const next = postTaskQueue.shift();
+        flushedTaskCount++;
+        if (next.options.signal?.aborted) {
+          flushEvents.push({
+            type: 'skip-aborted',
+            signal: describeShimSignal(next.options.signal)
+          });
+          continue;
+        }
+        flushEvents.push({
+          type: 'run-post-task',
+          signal: describeShimSignal(next.options.signal)
+        });
+        next.task();
+      }
+      return flushEvents;
+    },
+    flushYieldContinuations(maxContinuations) {
+      const flushEvents = [];
+      let flushedContinuationCount = 0;
+      let guard = 0;
+      while (
+        yieldContinuationQueue.length > 0 &&
+        (maxContinuations === undefined ||
+          flushedContinuationCount < maxContinuations)
+      ) {
+        if (guard++ > 20) {
+          throw new Error('scheduler.yield diagnostics shim exceeded flush guard');
+        }
+        const next = yieldContinuationQueue.shift();
+        flushedContinuationCount++;
+        if (next.options.signal?.aborted) {
+          flushEvents.push({
+            type: 'skip-aborted-yield-continuation',
+            signal: describeShimSignal(next.options.signal)
+          });
+          continue;
+        }
+        flushEvents.push({
+          type: 'run-yield-continuation',
+          signal: describeShimSignal(next.options.signal)
+        });
+        next.onFulfilled();
+      }
+      return flushEvents;
+    },
+    pendingYieldContinuationCount() {
+      return yieldContinuationQueue.length;
+    }
+  };
+}
+
+function describePostTaskShimCall(options) {
+  return {
+    type: 'postTask',
+    hasDelayProperty: Object.hasOwn(options, 'delay'),
+    delay:
+      options.delay === undefined
+        ? {type: 'undefined', value: null}
+        : {type: typeof options.delay, value: options.delay},
+    signal: describeShimSignal(options.signal)
+  };
+}
+
+function describeShimSignal(signal) {
+  return {
+    id: signal?.id ?? null,
+    priority: signal?.priority ?? null,
+    aborted: signal?.aborted === true
+  };
+}
+
+function catchablePostTaskThenable() {
+  return {
+    catch() {
+      return this;
+    }
+  };
+}
+
+function capturePostTaskGlobals() {
+  return {
+    window: captureGlobalProperty('window'),
+    scheduler: captureGlobalProperty('scheduler'),
+    TaskController: captureGlobalProperty('TaskController'),
+    diagnosticsFlag: captureGlobalProperty(
+      '__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__'
+    )
+  };
+}
+
+function captureGlobalProperty(propertyName) {
+  return {
+    hadProperty: Object.hasOwn(globalThis, propertyName),
+    value: globalThis[propertyName]
+  };
+}
+
+function restorePostTaskGlobals(previousGlobals) {
+  restoreGlobalProperty('window', previousGlobals.window);
+  restoreGlobalProperty('scheduler', previousGlobals.scheduler);
+  restoreGlobalProperty('TaskController', previousGlobals.TaskController);
+  restoreGlobalProperty(
+    '__FAST_REACT_ENABLE_POST_TASK_PRIORITY_DIAGNOSTICS__',
+    previousGlobals.diagnosticsFlag
+  );
+}
+
+function restoreGlobalProperty(propertyName, previous) {
+  if (previous.hadProperty) {
+    globalThis[propertyName] = previous.value;
+  } else {
+    delete globalThis[propertyName];
+  }
+}
+
+function clearWorkspaceSchedulerPostTaskCache() {
+  for (const id of Object.keys(require.cache)) {
+    if (id.startsWith(workspaceSchedulerPackageRoot)) {
+      delete require.cache[id];
+    }
+  }
 }
