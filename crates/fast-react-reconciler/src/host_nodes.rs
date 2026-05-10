@@ -321,6 +321,29 @@ impl<H: HostTypes> HostNodeStore<H> {
         self.invalidate(handle, scope, HostFiberTokenTarget::TextInstance)
     }
 
+    pub(crate) fn invalidate_deleted_instance(
+        &mut self,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+    ) -> Result<HostNodeMetadata, HostNodeValidationError> {
+        self.invalidate_deleted(handle, root_id, fiber_id, HostFiberTokenTarget::Instance)
+    }
+
+    pub(crate) fn invalidate_deleted_text(
+        &mut self,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+    ) -> Result<HostNodeMetadata, HostNodeValidationError> {
+        self.invalidate_deleted(
+            handle,
+            root_id,
+            fiber_id,
+            HostFiberTokenTarget::TextInstance,
+        )
+    }
+
     pub(crate) fn remove_instance(
         &mut self,
         handle: StateNodeHandle,
@@ -436,6 +459,22 @@ impl<H: HostTypes> HostNodeStore<H> {
         Ok(())
     }
 
+    fn invalidate_deleted(
+        &mut self,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+        target: HostFiberTokenTarget,
+    ) -> Result<HostNodeMetadata, HostNodeValidationError> {
+        let index = self.record_index_for_deleted_fiber(handle, root_id, fiber_id, target)?;
+        let record = self.records[index]
+            .as_mut()
+            .ok_or_else(|| Self::invalid_handle(handle, HostFiberTokenPhase::Deletion, target))?;
+        let metadata = record.metadata;
+        record.metadata.active = false;
+        Ok(metadata)
+    }
+
     fn remove(
         &mut self,
         handle: StateNodeHandle,
@@ -497,6 +536,32 @@ impl<H: HostTypes> HostNodeStore<H> {
         Ok(index)
     }
 
+    fn record_index_for_deleted_fiber(
+        &self,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+        target: HostFiberTokenTarget,
+    ) -> Result<usize, HostNodeValidationError> {
+        if handle.is_none() {
+            return Err(Self::invalid_handle(
+                handle,
+                HostFiberTokenPhase::Deletion,
+                target,
+            ));
+        }
+
+        let index = (handle.raw() - 1) as usize;
+        let record = self
+            .records
+            .get(index)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| Self::invalid_handle(handle, HostFiberTokenPhase::Deletion, target))?;
+
+        Self::validate_deleted_metadata(record.metadata, root_id, fiber_id, target)?;
+        Ok(index)
+    }
+
     fn validate_metadata(
         metadata: HostNodeMetadata,
         scope: HostNodeScope,
@@ -547,6 +612,48 @@ impl<H: HostTypes> HostNodeStore<H> {
             return Err(HostNodeValidationError::new(
                 metadata.handle,
                 scope.phase(),
+                target,
+                HostNodeViolation::Stale,
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_deleted_metadata(
+        metadata: HostNodeMetadata,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+        target: HostFiberTokenTarget,
+    ) -> Result<(), HostNodeValidationError> {
+        if metadata.target != target {
+            return Err(HostNodeValidationError::new(
+                metadata.handle,
+                HostFiberTokenPhase::Deletion,
+                target,
+                HostNodeViolation::WrongTarget,
+            ));
+        }
+        if metadata.root_id != root_id {
+            return Err(HostNodeValidationError::new(
+                metadata.handle,
+                HostFiberTokenPhase::Deletion,
+                target,
+                HostNodeViolation::WrongRoot,
+            ));
+        }
+        if metadata.fiber_id != fiber_id {
+            return Err(HostNodeValidationError::new(
+                metadata.handle,
+                HostFiberTokenPhase::Deletion,
+                target,
+                HostNodeViolation::WrongFiber,
+            ));
+        }
+        if !metadata.active {
+            return Err(HostNodeValidationError::new(
+                metadata.handle,
+                HostFiberTokenPhase::Deletion,
                 target,
                 HostNodeViolation::Stale,
             ));
@@ -913,5 +1020,98 @@ mod tests {
         assert_eq!(store.active_instance_count(), 0);
         assert_eq!(store.active_text_count(), 0);
         assert_violation(store.text(handle, scope), HostNodeViolation::Stale);
+    }
+
+    #[test]
+    fn host_nodes_invalidate_deleted_records_by_root_and_fiber_identity() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let instance_scope = instance_scope();
+        let text_scope = text_scope();
+        let instance_handle = store.insert_instance(
+            instance_scope,
+            TestInstance {
+                id: 1,
+                label: "article",
+            },
+        );
+        let text_handle = store.insert_text(
+            text_scope,
+            TestTextInstance {
+                id: 2,
+                text: "deleted".to_owned(),
+            },
+        );
+
+        assert_violation(
+            store.invalidate_deleted_instance(
+                instance_handle,
+                root_id(2),
+                instance_scope.fiber_id(),
+            ),
+            HostNodeViolation::WrongRoot,
+        );
+        assert_violation(
+            store.invalidate_deleted_instance(
+                instance_handle,
+                instance_scope.root_id(),
+                text_scope.fiber_id(),
+            ),
+            HostNodeViolation::WrongFiber,
+        );
+        assert_violation(
+            store.invalidate_deleted_text(
+                instance_handle,
+                instance_scope.root_id(),
+                instance_scope.fiber_id(),
+            ),
+            HostNodeViolation::WrongTarget,
+        );
+
+        let previous_instance = store
+            .invalidate_deleted_instance(
+                instance_handle,
+                instance_scope.root_id(),
+                instance_scope.fiber_id(),
+            )
+            .unwrap();
+        assert_eq!(previous_instance.phase(), HostFiberTokenPhase::Creation);
+        assert_eq!(previous_instance.token_id(), instance_scope.token_id());
+        assert!(previous_instance.is_active());
+        assert!(
+            !store
+                .instance_metadata(instance_handle, instance_scope)
+                .unwrap()
+                .is_active()
+        );
+        assert_violation(
+            store.instance(instance_handle, instance_scope),
+            HostNodeViolation::Stale,
+        );
+        assert_violation(
+            store.invalidate_deleted_instance(
+                instance_handle,
+                instance_scope.root_id(),
+                instance_scope.fiber_id(),
+            ),
+            HostNodeViolation::Stale,
+        );
+
+        let previous_text = store
+            .invalidate_deleted_text(text_handle, text_scope.root_id(), text_scope.fiber_id())
+            .unwrap();
+        assert_eq!(previous_text.phase(), HostFiberTokenPhase::Creation);
+        assert_eq!(previous_text.token_id(), text_scope.token_id());
+        assert!(previous_text.is_active());
+        assert!(
+            !store
+                .text_metadata(text_handle, text_scope)
+                .unwrap()
+                .is_active()
+        );
+        assert_violation(
+            store.text(text_handle, text_scope),
+            HostNodeViolation::Stale,
+        );
+        assert_eq!(store.active_len(), 0);
     }
 }
