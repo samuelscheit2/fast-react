@@ -264,6 +264,222 @@ test('private hydration target claiming records one inert dehydrated boundary ta
   assert.deepEqual(fixture.document.__registrations, []);
 });
 
+test('private hydration target claiming records one blocked replay target-dispatch execution', () => {
+  let recoverableErrorCalls = 0;
+  const fixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-execution',
+    {
+      hydrationOptions: {
+        onRecoverableError() {
+          recoverableErrorCalls++;
+        }
+      }
+    }
+  );
+  const dispatchRecord = createDispatchRecord(
+    fixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    fixture.boundaryTarget
+  );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-claim-execution-link'
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-claim-execution-ownership'
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    fixture.record,
+    ownershipDiagnostics,
+    targetDispatchLink,
+    {
+      source: 'hydration-private-claim-execution-claim'
+    }
+  );
+  const execution =
+    hydrationGate.createHydrationClaimedReplayTargetDispatchExecutionRecord(
+      claim,
+      targetDispatchLink,
+      {
+        source: 'hydration-private-claim-execution'
+      }
+    );
+
+  assert.equal(
+    execution.kind,
+    hydrationGate
+      .HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND
+  );
+  assert.equal(
+    execution.gateId,
+    hydrationGate
+      .privateHydrationClaimedReplayTargetDispatchExecutionGateId
+  );
+  assert.equal(execution.metadataId, 'hydration-claimed-replay-target-dispatch-execution');
+  assert.equal(
+    execution.status,
+    hydrationGate.privateHydrationClaimedReplayTargetDispatchExecutionStatus
+  );
+  assert.equal(Object.isFrozen(execution), true);
+  assert.equal(execution.diagnosticOnly, true);
+  assert.equal(execution.readOnly, true);
+  assert.equal(execution.compatibilityClaimed, false);
+  assert.equal(execution.publicHydrationCompatibilityClaimed, false);
+  assert.equal(execution.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(execution.publicHydrationTargetClaimed, false);
+  assert.equal(execution.publicHydrateRootSupported, false);
+  assert.equal(execution.publicDispatchEnabled, false);
+  assert.equal(execution.eventReplaySupported, false);
+  assert.equal(execution.hydrationReplaySupported, false);
+  assert.equal(execution.queueMutationAllowed, false);
+  assert.equal(execution.replayQueuesDrained, false);
+  assert.equal(execution.eventsReplayed, false);
+  assert.equal(execution.eventDispatch, false);
+  assert.equal(execution.willDispatch, false);
+  assert.equal(execution.willHydrate, false);
+  assert.equal(execution.willReplay, false);
+  assert.equal(
+    execution.blockedReason,
+    pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+  );
+  assert.equal(
+    execution.eventDispatchBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(
+    execution.eventTargetResolutionBlockedReason,
+    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  );
+  assert.equal(
+    execution.publicDispatchBlockedReason,
+    pluginEventSystem.PUBLIC_EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(execution.rootRecordId, 'hydration-link:1');
+  assert.equal(execution.targetClaimingDiagnostic, claim);
+  assert.equal(execution.targetClaimAccepted, true);
+  assert.equal(execution.claimRecorded, true);
+  assert.equal(execution.claimedTargetMetadata, true);
+  assert.equal(execution.targetClaimExecuted, false);
+  assert.equal(execution.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(execution.targetDispatchLinkAccepted, true);
+  assert.equal(execution.inputOrder, 0);
+  assert.equal(execution.domEventName, 'click');
+  assert.equal(execution.queueName, 'discrete-hydration-replay-attempt');
+  assert.equal(execution.ownershipDiagnostics, ownershipDiagnostics);
+  assert.equal(
+    execution.ownershipRowStatus,
+    'retained-root-and-boundary-ownership-through-drain-order'
+  );
+  assert.equal(execution.ownershipRetainedThroughDrainOrder, true);
+  assert.equal(execution.markerRow, fixture.record.markerDiagnostics.markers[0]);
+  assert.equal(execution.markerId, 'suspense-completed-start@container.childNodes[0]');
+  assert.equal(execution.dehydratedBoundaryOwnerId, 'hydration-link:1:boundary:0');
+  assert.equal(execution.ownerBoundaryKind, 'suspense-boundary');
+  assert.equal(execution.targetPath, 'container.childNodes[1]');
+  assert.equal(execution.targetPathIndex, 1);
+  assert.equal(execution.dispatchRecord, dispatchRecord);
+  assert.equal(execution.dispatchRecordStatus, 'blocked');
+  assert.equal(
+    execution.dispatchRecordBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(
+    execution.targetDispatchPathRecord,
+    dispatchRecord.targetDispatchPathRecord
+  );
+  assert.equal(execution.targetDispatchPathStatus, 'no-mounted-host-instance');
+  assert.equal(execution.targetDispatchPathLength, 0);
+  assert.equal(execution.executionRecordCount, 1);
+  assert.equal(execution.blockedReplayTargetDispatchExecutionCount, 1);
+  assert.equal(execution.replayTargetDispatchExecutionRecorded, true);
+  assert.equal(execution.replayTargetDispatchExecutionBlocked, true);
+  assert.equal(execution.dispatchExecutionRecorded, true);
+  assert.equal(execution.dispatchExecutionBlocked, true);
+  assert.equal(execution.targetDispatchExecuted, false);
+  assert.equal(execution.eventReplayDispatchAttempted, false);
+  assert.equal(
+    execution.pluginDispatchEventForPluginEventSystemCalled,
+    false
+  );
+  assert.equal(execution.nativeEventRedispatched, false);
+  assert.equal(execution.syntheticEventCreated, false);
+  assert.equal(execution.listenerInvocationCount, 0);
+  assert.equal(execution.willInvokeListeners, false);
+  assert.equal(execution.hydrateInstanceCalled, false);
+  assert.equal(execution.hydrateTextInstanceCalled, false);
+  assert.equal(execution.replayQueueDrained, false);
+  assert.equal(execution.queued, false);
+  assert.equal(
+    execution.recoverableErrorMetadata,
+    fixture.record.recoverableErrorMetadata
+  );
+  assert.equal(execution.recoverableErrorMetadataAccepted, true);
+  assert.equal(
+    execution.recoverableErrorMetadataStatus,
+    'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded'
+  );
+  assert.equal(execution.recoverableErrorRowCount, 1);
+  assert.equal(execution.queuedRecoverableErrorCount, 0);
+  assert.equal(execution.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(execution.recoverableErrorsQueued, false);
+  assert.equal(execution.onRecoverableErrorConfigured, true);
+  assert.equal(execution.onRecoverableErrorInvoked, false);
+  assert.equal(execution.publicOnRecoverableErrorInvoked, false);
+  assert.equal(recoverableErrorCalls, 0);
+  assert.equal(
+    execution.unsupportedHydrationPrerequisiteCount,
+    hydrationGate.unsupportedHydrationPrerequisites.length
+  );
+  assert.equal(
+    execution.unsupportedHydrationPrerequisites,
+    hydrationGate.unsupportedHydrationPrerequisites
+  );
+  assert.equal(
+    execution.hydrationEventReplayBlockerCount,
+    hydrationGate.hydrationEventReplayBlockerContracts.length
+  );
+  assert.equal(
+    execution.hydrationEventReplayBlockers,
+    hydrationGate.hydrationEventReplayBlockerContracts
+  );
+
+  const payload =
+    hydrationGate
+      .getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+        execution
+      );
+  assert.equal(payload.hydrationBoundaryRecord, fixture.record);
+  assert.equal(payload.targetClaimingDiagnostic, claim);
+  assert.equal(payload.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(payload.dispatchRecord, dispatchRecord);
+  assert.equal(payload.recoverableErrorMetadata, fixture.record.recoverableErrorMetadata);
+  assert.equal(
+    rootBridge.getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+      execution
+    ),
+    payload
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+      execution
+    ),
+    true
+  );
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(fixture.container.__registrations, []);
+  assert.deepEqual(fixture.document.__registrations, []);
+});
+
 test('private hydration replay target-dispatch link rejects stale queue entries and missing ownership', () => {
   const fixture = createHydrationReplayTargetDispatchFixture(
     'target-dispatch-link-stale'
@@ -497,6 +713,98 @@ test('private hydration target claiming rejects stale markers missing ownership 
   assert.deepEqual(nestedFixture.document.__registrations, []);
 });
 
+test('private hydration claimed replay target-dispatch execution rejects stale links', () => {
+  const fixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-execution-stale'
+  );
+  const dispatchRecord = createDispatchRecord(
+    fixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    fixture.boundaryTarget
+  );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-claim-execution-stale-link'
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-claim-execution-stale-ownership'
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    fixture.record,
+    ownershipDiagnostics,
+    targetDispatchLink,
+    {
+      source: 'hydration-private-claim-execution-stale-claim'
+    }
+  );
+  const otherFixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-execution-other'
+  );
+  const otherDispatchRecord = createDispatchRecord(
+    otherFixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    otherFixture.boundaryTarget
+  );
+  const otherTargetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      otherFixture.record,
+      otherDispatchRecord,
+      {
+        source: 'hydration-private-claim-execution-other-link'
+      }
+    );
+
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationClaimedReplayTargetDispatchExecutionRecord(
+          claim,
+          otherTargetDispatchLink,
+          {
+            source: 'hydration-private-claim-execution-foreign-link'
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE
+    }
+  );
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationClaimedReplayTargetDispatchExecutionRecord(
+          targetDispatchLink,
+          targetDispatchLink,
+          {
+            source: 'hydration-private-claim-execution-missing-claim'
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE
+    }
+  );
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(otherDispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(fixture.container.__registrations, []);
+  assert.deepEqual(fixture.document.__registrations, []);
+  assert.deepEqual(otherFixture.container.__registrations, []);
+  assert.deepEqual(otherFixture.document.__registrations, []);
+});
+
 function createHydrationReplayTargetDispatchFixture(label, options) {
   const normalizedOptions = options || {};
   const document = createDocument(label);
@@ -521,14 +829,15 @@ function createHydrationReplayTargetDispatchFixture(label, options) {
   });
   const record = gate.recordUnsupportedHydrateRoot(
     container,
-    {
+    normalizedOptions.initialChildren || {
       props: {
         children: 'link'
       },
       type: 'App'
     },
     {
-      identifierPrefix: `${label}-`
+      identifierPrefix: `${label}-`,
+      ...(normalizedOptions.hydrationOptions || {})
     }
   );
 

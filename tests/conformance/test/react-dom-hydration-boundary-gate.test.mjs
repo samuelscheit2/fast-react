@@ -857,6 +857,176 @@ test("private hydration replay queue drain-order diagnostic sorts blocked target
   assert.deepEqual(document.__registrations, []);
 });
 
+test("private hydration target claim links to one blocked replay target-dispatch execution", () => {
+  let recoverableErrorCalls = 0;
+  const document = createDocument("claim-execution");
+  const container = createElement("DIV", document);
+  const target = createElement("BUTTON", document);
+  target.parentNode = container;
+  container.childNodes = [
+    createComment("$"),
+    target,
+    createComment("/$")
+  ];
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    markerOracle: oracle,
+    recordIdPrefix: "hydration-claim-execution"
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    { props: { children: "claim execution" }, type: "App" },
+    {
+      identifierPrefix: "claim-execution-",
+      onRecoverableError() {
+        recoverableErrorCalls++;
+      }
+    }
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "click",
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent("click", target)
+    );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      record,
+      dispatchRecord,
+      {
+        source: "conformance-hydration-claim-execution-link"
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      record,
+      dispatchRecord,
+      {
+        source: "conformance-hydration-claim-execution-ownership"
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    record,
+    ownershipDiagnostics,
+    targetDispatchLink,
+    {
+      source: "conformance-hydration-claim-execution-claim"
+    }
+  );
+  const execution =
+    hydrationGate.createHydrationClaimedReplayTargetDispatchExecutionRecord(
+      claim,
+      targetDispatchLink,
+      {
+        source: "conformance-hydration-claim-execution"
+      }
+    );
+
+  assert.equal(
+    execution.kind,
+    hydrationGate
+      .HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND
+  );
+  assert.equal(
+    execution.status,
+    hydrationGate.privateHydrationClaimedReplayTargetDispatchExecutionStatus
+  );
+  assert.equal(execution.targetClaimingDiagnostic, claim);
+  assert.equal(execution.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(execution.dispatchRecord, dispatchRecord);
+  assert.equal(execution.executionRecordCount, 1);
+  assert.equal(execution.blockedReplayTargetDispatchExecutionCount, 1);
+  assert.equal(execution.replayTargetDispatchExecutionRecorded, true);
+  assert.equal(execution.replayTargetDispatchExecutionBlocked, true);
+  assert.equal(execution.targetDispatchExecuted, false);
+  assert.equal(execution.eventDispatch, false);
+  assert.equal(execution.publicDispatchEnabled, false);
+  assert.equal(execution.eventsReplayed, false);
+  assert.equal(execution.willDispatch, false);
+  assert.equal(execution.willHydrate, false);
+  assert.equal(execution.willReplay, false);
+  assert.equal(execution.targetClaimExecuted, false);
+  assert.equal(execution.publicHydrationTargetClaimed, false);
+  assert.equal(execution.publicHydrateRootSupported, false);
+  assert.equal(execution.compatibilityClaimed, false);
+  assert.equal(
+    execution.blockedReason,
+    pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+  );
+  assert.equal(
+    execution.eventDispatchBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(
+    execution.eventTargetResolutionBlockedReason,
+    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  );
+  assert.deepEqual(
+    [
+      execution.inputOrder,
+      execution.domEventName,
+      execution.queueName,
+      execution.targetPath,
+      execution.ownerBoundaryKind,
+      execution.dehydratedBoundaryOwnerId,
+      execution.targetDispatchPathStatus
+    ],
+    [
+      0,
+      "click",
+      "discrete-hydration-replay-attempt",
+      "container.childNodes[1]",
+      "suspense-boundary",
+      "hydration-claim-execution:1:boundary:0",
+      "no-mounted-host-instance"
+    ]
+  );
+  assert.equal(execution.recoverableErrorMetadata, record.recoverableErrorMetadata);
+  assert.equal(execution.recoverableErrorRowCount, 1);
+  assert.equal(execution.queuedRecoverableErrorCount, 0);
+  assert.equal(execution.wouldQueueRecoverableErrorCount, 1);
+  assert.equal(execution.recoverableErrorsQueued, false);
+  assert.equal(execution.onRecoverableErrorConfigured, true);
+  assert.equal(execution.onRecoverableErrorInvoked, false);
+  assert.equal(execution.publicOnRecoverableErrorInvoked, false);
+  assert.equal(recoverableErrorCalls, 0);
+  assert.equal(
+    execution.unsupportedHydrationPrerequisiteCount,
+    hydrationGate.unsupportedHydrationPrerequisites.length
+  );
+  assert.equal(
+    execution.hydrationEventReplayBlockerCount,
+    hydrationGate.hydrationEventReplayBlockerContracts.length
+  );
+
+  const payload =
+    hydrationGate
+      .getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+        execution
+      );
+  assert.equal(payload.hydrationBoundaryRecord, record);
+  assert.equal(payload.targetClaimingDiagnostic, claim);
+  assert.equal(payload.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(payload.dispatchRecord, dispatchRecord);
+  assert.equal(
+    rootBridge.getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+      execution
+    ),
+    payload
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+      execution
+    ),
+    true
+  );
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+});
+
 test("private root bridge hydrateRoot requests preserve accepted marker evidence record-only", () => {
   const first = createRootBridgeHydrateRootScenario("root-bridge");
   const second = createRootBridgeHydrateRootScenario("root-bridge");
