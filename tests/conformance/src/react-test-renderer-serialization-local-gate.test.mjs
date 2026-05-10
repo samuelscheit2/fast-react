@@ -37,6 +37,13 @@ const jsEntrypoints = [
       "../../../packages/react-test-renderer/cjs/react-test-renderer.production.js"
   }
 ];
+const packageRootEntrypoint = "react-test-renderer";
+function hasSiblingTextPrivateAdmission(entry) {
+  return (
+    entry.entrypoint === packageRootEntrypoint ||
+    entry.entrypoint.includes("/cjs/")
+  );
+}
 const expectedToJSONFacadeRustApis = [
   "TestRendererRoot::describe_private_json_serialization_for_canary",
   "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
@@ -393,7 +400,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       true
     );
     assert.equal(facadeGate.consumesCommittedHostRootFinishedWorkLanes, true);
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       assert.equal(
         facadeGate.privateSiblingTextFinishedWorkIdentityGateAvailable,
         true
@@ -744,7 +751,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       true
     );
     assert.equal(privateFacade.consumesCommittedHostRootFinishedWorkLanes, true);
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       assert.equal(
         privateFacade.privateSiblingTextFinishedWorkIdentityGateAvailable,
         true
@@ -858,7 +865,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       typeof privateFacade.canValidateAcceptedFinishedWorkIdentity,
       "function"
     );
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       assert.equal(
         typeof privateFacade.createAcceptedSiblingTextDiagnosticResult,
         "function"
@@ -2119,7 +2126,7 @@ test("react-test-renderer JS private serialization finished-work identity valida
     );
     assert.equal(jsonUpdateIdentity.rootRequestOperation, "update");
     assert.equal(jsonUpdateIdentity.hostOutputUpdateKind, "Update");
-    if (entry.entrypoint.includes("/cjs/")) {
+    if (hasSiblingTextPrivateAdmission(entry)) {
       const siblingTextReport = createAcceptedSiblingTextHostOutputDiagnostic();
       const siblingTextIdentity =
         createAcceptedSiblingTextFinishedWorkIdentityEvidence({
@@ -2191,6 +2198,46 @@ test("react-test-renderer JS private serialization finished-work identity valida
         siblingTextDiagnostic.finishedWorkIdentity.rootRequest,
         updateError.rootRequest
       );
+      if (entry.entrypoint === packageRootEntrypoint) {
+        assert.equal(
+          siblingTextDiagnostic.finishedWorkIdentity
+            .rootFinishedLanesHandoffAccepted,
+          true
+        );
+        assert.equal(
+          siblingTextDiagnostic.finishedWorkIdentity
+            .consumesPrivateRootFinishedLanesHandoffGate,
+          true
+        );
+        assert.equal(
+          siblingTextDiagnostic.finishedWorkIdentity
+            .rootFinishedLanesHandoffDiagnosticName,
+          privateRootFinishedLanesHandoffDiagnosticName
+        );
+        assert.equal(
+          siblingTextDiagnostic.finishedWorkIdentity
+            .rootFinishedLanesHandoffStatus,
+          privateRootFinishedLanesHandoffStatus
+        );
+        assert.equal(
+          Object.isFrozen(
+            siblingTextDiagnostic.finishedWorkIdentity.rootFinishedLanesHandoff
+          ),
+          true
+        );
+        assert.equal(
+          siblingTextDiagnostic.rootFinishedLanesHandoffAccepted,
+          true
+        );
+        assert.equal(
+          siblingTextDiagnostic.consumesPrivateRootFinishedLanesHandoffGate,
+          true
+        );
+        assert.equal(
+          siblingTextDiagnostic.rootFinishedLanesHandoff,
+          siblingTextDiagnostic.finishedWorkIdentity.rootFinishedLanesHandoff
+        );
+      }
       assert.deepEqual(siblingTextDiagnostic.result, [
         "first sibling",
         {
@@ -2238,6 +2285,32 @@ test("react-test-renderer JS private serialization finished-work identity valida
         updateError.rootRequest,
         /broad-multichild-identity-unexpectedly-open/u
       );
+      if (entry.entrypoint === packageRootEntrypoint) {
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          siblingTextReport,
+          withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+            delete evidence.rootFinishedLanesHandoff;
+          }),
+          updateError.rootRequest,
+          /rootFinishedLanesHandoff/u
+        );
+        assertSiblingTextRootFinishedLanesHandoffAliasRejections(
+          jsonFacade,
+          siblingTextReport,
+          siblingTextIdentity,
+          updateError.rootRequest
+        );
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          siblingTextReport,
+          withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+            evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+          }),
+          updateError.rootRequest,
+          /finished_lanes/u
+        );
+      }
       assertSiblingTextAdmissionRejection(
         jsonFacade,
         siblingTextReport,
@@ -3974,7 +4047,7 @@ function createAcceptedSiblingTextFinishedWorkIdentityEvidence({
 }) {
   const current = { arenaId: 1, slot: 20, generation: 1 };
   const finishedWork = { arenaId: 1, slot: 21, generation: 1 };
-  return {
+  const evidence = {
     diagnosticName: privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
     status: privateToJSONSiblingTextFinishedWorkIdentityStatus,
     publicSurface: "create().update -> create().toJSON",
@@ -4045,6 +4118,11 @@ function createAcceptedSiblingTextFinishedWorkIdentityEvidence({
     packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
+  evidence.rootFinishedLanesHandoff = createAcceptedRootFinishedLanesHandoff(
+    rootRequest,
+    evidence
+  );
+  return evidence;
 }
 
 function getUnmountCleanupCounts(variant) {
@@ -4218,6 +4296,27 @@ function assertRootFinishedLanesHandoffAliasRejections(
       report,
       errorName,
       sourceRootRequest
+    );
+  }
+}
+
+function assertSiblingTextRootFinishedLanesHandoffAliasRejections(
+  privateFacade,
+  report,
+  evidence,
+  sourceRootRequest
+) {
+  for (const alias of privateRootFinishedLanesHandoffAliasKeys) {
+    assertSiblingTextAdmissionRejection(
+      privateFacade,
+      report,
+      withSiblingTextIdentityChange(evidence, (changedEvidence) => {
+        const handoff = changedEvidence.rootFinishedLanesHandoff;
+        delete changedEvidence.rootFinishedLanesHandoff;
+        changedEvidence[alias] = handoff;
+      }),
+      sourceRootRequest,
+      /rootFinishedLanesHandoff/u
     );
   }
 }
