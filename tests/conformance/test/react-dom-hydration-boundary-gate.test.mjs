@@ -35,6 +35,12 @@ const rootMarkers = require(
 const listenerRegistry = require(
   path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
 );
+const eventListener = require(
+  path.join(repoRoot, "packages/react-dom/src/events/react-dom-event-listener.js")
+);
+const eventSystemFlags = require(
+  path.join(repoRoot, "packages/react-dom/src/events/event-system-flags.js")
+);
 const pluginEventSystem = require(
   path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
 );
@@ -285,6 +291,136 @@ test("private hydration boundary gate records unsupported hydrateRoot determinis
   assert.equal(payload.hydrationOptions, first.hydrationOptions);
   assert.equal(hydrationGate.isPrivateHydrationBoundaryRecord(first.record), true);
   assert.equal(hydrationGate.isPrivateHydrationBoundaryRecord({}), false);
+});
+
+test("private hydration replay event queue diagnostic records blocked target order", () => {
+  const { container, document, record } =
+    createUnsupportedRecordScenario("event-order");
+  const hoverTarget = createElement("BUTTON", document);
+  hoverTarget.parentNode = container;
+  const clickTarget = createElement("INPUT", document);
+  clickTarget.parentNode = container;
+  const hoverWrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "mouseover",
+      0
+    );
+  const clickWrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "click",
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const hoverRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      hoverWrapper,
+      createNativeEvent("mouseover", hoverTarget)
+    );
+  const clickRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      clickWrapper,
+      createNativeEvent("click", clickTarget)
+    );
+  const diagnostics =
+    pluginEventSystem.createHydrationReplayEventQueueDiagnostic(
+      [hoverRecord, clickRecord],
+      {
+        markerReplayTargetCandidates:
+          record.replayQueueDiagnostics.markerReplayTargetCandidates,
+        source: "conformance-hydration-boundary-gate"
+      }
+    );
+
+  assertHydrationReplayEventQueueDiagnostics(record.eventReplayQueueDiagnostics, {
+    blockedEventReplayTargetCount: 0,
+    markerReplayTargetCandidateCount: 1,
+    status: "blocked-no-event-replay-targets-recorded"
+  });
+  assert.equal(
+    record.eventReplayBlockers.eventReplayQueueDiagnostics,
+    record.eventReplayQueueDiagnostics
+  );
+  assert.equal(record.eventReplayBlockers.eventReplayQueueDiagnosticsAccepted, true);
+  assert.equal(record.eventReplayBlockers.blockedEventReplayTargetCount, 0);
+
+  assertHydrationReplayEventQueueDiagnostics(diagnostics, {
+    blockedEventReplayTargetCount: 2,
+    markerReplayTargetCandidateCount: 1,
+    status: "blocked-event-replay-targets-recorded"
+  });
+  assert.deepEqual(
+    diagnostics.eventQueueOrder.map((entry) => [
+      entry.inputOrder,
+      entry.domEventName,
+      entry.queueName,
+      entry.targetResolutionStatus
+    ]),
+    [
+      [0, "mouseover", "queuedMouse", "blocked"],
+      [1, "click", "discrete-hydration-replay-attempt", "blocked"]
+    ]
+  );
+  assert.deepEqual(
+    diagnostics.priorityQueueOrder.map((entry) => [
+      entry.priorityOrder,
+      entry.domEventName,
+      entry.prioritySortKey
+    ]),
+    [
+      [0, "click", 2],
+      [1, "mouseover", 8]
+    ]
+  );
+  assert.deepEqual(
+    diagnostics.blockedEventReplayTargets.map((entry) => ({
+      domEventName: entry.domEventName,
+      nativeEventTargetInfo: entry.nativeEventTargetInfo,
+      queueCategory: entry.queueCategory,
+      queueName: entry.queueName,
+      queued: entry.queued,
+      targetInstStatus: entry.targetInstStatus,
+      targetResolutionStatus: entry.targetResolutionStatus,
+      willHydrate: entry.willHydrate,
+      willReplay: entry.willReplay
+    })),
+    [
+      {
+        domEventName: "mouseover",
+        nativeEventTargetInfo: {
+          kind: "object",
+          nodeName: "BUTTON",
+          nodeType: domContainer.ELEMENT_NODE
+        },
+        queueCategory: "continuous-event",
+        queueName: "queuedMouse",
+        queued: false,
+        targetInstStatus: "not-resolved",
+        targetResolutionStatus: "blocked",
+        willHydrate: false,
+        willReplay: false
+      },
+      {
+        domEventName: "click",
+        nativeEventTargetInfo: {
+          kind: "object",
+          nodeName: "INPUT",
+          nodeType: domContainer.ELEMENT_NODE
+        },
+        queueCategory: "discrete-event",
+        queueName: "discrete-hydration-replay-attempt",
+        queued: false,
+        targetInstStatus: "not-resolved",
+        targetResolutionStatus: "blocked",
+        willHydrate: false,
+        willReplay: false
+      }
+    ]
+  );
+  assert.equal(hoverRecord.hydrationReplay.queued, false);
+  assert.equal(clickRecord.hydrationReplay.queued, false);
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
 });
 
 test("private root bridge hydrateRoot requests preserve accepted marker evidence record-only", () => {
@@ -670,6 +806,67 @@ function assertHydrationMarkerReplayQueueDiagnostics(record, expected) {
   );
 }
 
+function assertHydrationReplayEventQueueDiagnostics(diagnostics, expected) {
+  assert.equal(Object.isFrozen(diagnostics), true);
+  assert.equal(
+    diagnostics.kind,
+    pluginEventSystem.HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND
+  );
+  assert.equal(diagnostics.status, expected.status);
+  assert.equal(diagnostics.diagnosticOnly, true);
+  assert.equal(diagnostics.readOnly, true);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.browserDomEventCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicRootBehaviorChanged, false);
+  assert.equal(diagnostics.eventReplayInstalled, false);
+  assert.equal(diagnostics.eventReplaySupported, false);
+  assert.equal(diagnostics.hydrationReplaySupported, false);
+  assert.equal(diagnostics.hostInstanceHydrationAttempted, false);
+  assert.equal(diagnostics.hasScheduledReplayAttempt, false);
+  assert.equal(diagnostics.queueMutationAllowed, false);
+  assert.equal(diagnostics.eventsReplayed, false);
+  assert.equal(diagnostics.willDispatchEvents, false);
+  assert.equal(diagnostics.willHydrateHostInstances, false);
+  assert.equal(
+    diagnostics.blockedReason,
+    pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.eventDispatchBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.eventTargetResolutionBlockedReason,
+    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.markerReplayTargetCandidateCount,
+    expected.markerReplayTargetCandidateCount
+  );
+  assert.equal(
+    diagnostics.blockedEventReplayTargetCount,
+    expected.blockedEventReplayTargetCount
+  );
+  assert.equal(
+    diagnostics.eventDispatchRecordCount,
+    expected.blockedEventReplayTargetCount
+  );
+  assert.equal(diagnostics.queuedEventReplayTargetCount, 0);
+  assert.equal(diagnostics.replayedEventCount, 0);
+  assert.equal(
+    diagnostics.blockedEventReplayTargets.length,
+    expected.blockedEventReplayTargetCount
+  );
+  assert.equal(
+    diagnostics.eventQueueOrder.length,
+    expected.blockedEventReplayTargetCount
+  );
+  assert.equal(
+    diagnostics.priorityQueueOrder.length,
+    expected.blockedEventReplayTargetCount
+  );
+}
+
 function createUnsupportedRecordScenario(label) {
   const document = createDocument(label);
   const container = createElement("DIV", document);
@@ -866,6 +1063,13 @@ function createElement(nodeName, ownerDocument) {
     nodeType: domContainer.ELEMENT_NODE,
     ownerDocument
   });
+}
+
+function createNativeEvent(type, target) {
+  return {
+    target,
+    type
+  };
 }
 
 function createEventTarget(fields) {
