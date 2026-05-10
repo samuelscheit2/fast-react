@@ -66,6 +66,18 @@ pub enum RootCommitError {
         fiber: FiberId,
         tag: FiberTag,
     },
+    CommittedPassiveEffectsWithoutPendingPassiveHandoff {
+        root: FiberRootId,
+    },
+    CommittedPassiveEffectHandoffRootMismatch {
+        commit_root: FiberRootId,
+        handoff_root: FiberRootId,
+    },
+    CommittedPassiveEffectHandoffLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
     RefHostInstanceMissing {
         root: FiberRootId,
         fiber: FiberId,
@@ -200,6 +212,31 @@ impl Display for RootCommitError {
                 root.raw(),
                 fiber.slot().get(),
                 tag
+            ),
+            Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { root } => write!(
+                formatter,
+                "root {} cannot record committed passive effect records without a pending passive commit handoff",
+                root.raw()
+            ),
+            Self::CommittedPassiveEffectHandoffRootMismatch {
+                commit_root,
+                handoff_root,
+            } => write!(
+                formatter,
+                "commit root {} cannot record committed passive effect records for root {}",
+                commit_root.raw(),
+                handoff_root.raw()
+            ),
+            Self::CommittedPassiveEffectHandoffLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} committed passive effect handoff lanes {:?} do not match committed lanes {:?}",
+                root.raw(),
+                actual,
+                expected
             ),
             Self::RefHostInstanceMissing { root, fiber } => write!(
                 formatter,
@@ -392,6 +429,9 @@ impl Error for RootCommitError {
             | Self::PendingPassiveAlreadyCommitted { .. }
             | Self::PendingPassiveQueueRejected { .. }
             | Self::ExpectedFunctionComponentPassiveEffectFiber { .. }
+            | Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { .. }
+            | Self::CommittedPassiveEffectHandoffRootMismatch { .. }
+            | Self::CommittedPassiveEffectHandoffLanesMismatch { .. }
             | Self::RefHostInstanceMissing { .. }
             | Self::EmptyFinishedLanes { .. }
             | Self::CurrentMismatch { .. }
@@ -724,6 +764,108 @@ impl FunctionComponentPendingPassiveCommitHandoff {
         }
 
         phase_records
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCommittedPassiveEffectFiberRecord {
+    fiber: FiberId,
+    phase: FunctionComponentHookRenderPhase,
+    lanes: Lanes,
+    records: Vec<FunctionComponentPendingPassiveEffectPhaseCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private committed function-component passive effect records for traversal canaries"
+)]
+impl FunctionComponentCommittedPassiveEffectFiberRecord {
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn phase(&self) -> FunctionComponentHookRenderPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[FunctionComponentPendingPassiveEffectPhaseCommitRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn queued_unmount_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.phase() == PendingPassiveEffectPhase::Unmount)
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn queued_mount_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.phase() == PendingPassiveEffectPhase::Mount)
+            .count()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCommittedPassiveEffectsSnapshot {
+    fibers: Vec<FunctionComponentCommittedPassiveEffectFiberRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private committed function-component passive effect records for traversal canaries"
+)]
+impl FunctionComponentCommittedPassiveEffectsSnapshot {
+    #[must_use]
+    pub(crate) fn fibers(&self) -> &[FunctionComponentCommittedPassiveEffectFiberRecord] {
+        &self.fibers
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.fibers.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn fiber_count(&self) -> usize {
+        self.fibers.len()
+    }
+
+    #[must_use]
+    pub(crate) fn queued_unmount_count(&self) -> usize {
+        self.fibers
+            .iter()
+            .map(FunctionComponentCommittedPassiveEffectFiberRecord::queued_unmount_count)
+            .sum()
+    }
+
+    #[must_use]
+    pub(crate) fn queued_mount_count(&self) -> usize {
+        self.fibers
+            .iter()
+            .map(FunctionComponentCommittedPassiveEffectFiberRecord::queued_mount_count)
+            .sum()
+    }
+
+    #[must_use]
+    pub(crate) fn phase_records(
+        &self,
+    ) -> Vec<FunctionComponentPendingPassiveEffectPhaseCommitRecord> {
+        self.fibers
+            .iter()
+            .flat_map(|fiber| fiber.records().iter().copied())
+            .collect()
     }
 }
 
@@ -1460,6 +1602,7 @@ pub struct HostRootCommitRecord {
     root_update_callbacks: RootUpdateCallbackSnapshot,
     root_update_callback_invocation_gate: RootUpdateCallbackInvocationGateSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
+    function_component_committed_passive_effects: FunctionComponentCommittedPassiveEffectsSnapshot,
     deletion_lists: Vec<HostRootDeletionListRecord>,
     host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
     ref_commit_metadata: HostRootRefCommitSnapshot,
@@ -1739,6 +1882,71 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "crate-private committed passive effect records for traversal canaries"
+    )]
+    #[must_use]
+    pub(crate) const fn function_component_committed_passive_effects(
+        &self,
+    ) -> &FunctionComponentCommittedPassiveEffectsSnapshot {
+        &self.function_component_committed_passive_effects
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private committed passive effect records for traversal canaries"
+    )]
+    pub(crate) fn record_function_component_committed_passive_effects_for_canary(
+        &mut self,
+        handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+    ) -> Result<&FunctionComponentCommittedPassiveEffectsSnapshot, RootCommitError> {
+        let Some(pending_passive_handoff) = self.pending_passive_handoff else {
+            if handoffs.is_empty() {
+                self.function_component_committed_passive_effects =
+                    FunctionComponentCommittedPassiveEffectsSnapshot::default();
+                return Ok(&self.function_component_committed_passive_effects);
+            }
+
+            return Err(
+                RootCommitError::CommittedPassiveEffectsWithoutPendingPassiveHandoff {
+                    root: self.root,
+                },
+            );
+        };
+
+        let mut fibers = Vec::with_capacity(handoffs.len());
+        for handoff in handoffs {
+            if handoff.root() != self.root {
+                return Err(RootCommitError::CommittedPassiveEffectHandoffRootMismatch {
+                    commit_root: self.root,
+                    handoff_root: handoff.root(),
+                });
+            }
+            if handoff.lanes() != pending_passive_handoff.lanes() {
+                return Err(
+                    RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                        root: self.root,
+                        expected: pending_passive_handoff.lanes(),
+                        actual: handoff.lanes(),
+                    },
+                );
+            }
+
+            fibers.push(FunctionComponentCommittedPassiveEffectFiberRecord {
+                fiber: handoff.fiber(),
+                phase: handoff.phase(),
+                lanes: handoff.lanes(),
+                records: handoff.effect_phase_records(),
+            });
+        }
+
+        self.function_component_committed_passive_effects =
+            FunctionComponentCommittedPassiveEffectsSnapshot { fibers };
+
+        Ok(&self.function_component_committed_passive_effects)
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private deletion metadata for future mutation/passive deletion workers"
     )]
     #[must_use]
@@ -1825,6 +2033,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         root_update_callbacks,
         root_update_callback_invocation_gate,
         pending_passive_handoff,
+        function_component_committed_passive_effects:
+            FunctionComponentCommittedPassiveEffectsSnapshot::default(),
         deletion_lists,
         host_node_deletion_cleanup_log,
         ref_commit_metadata,
