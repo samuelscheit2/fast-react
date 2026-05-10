@@ -9,14 +9,15 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    ContextHandle, ContextStack, ContextStackError, ContextStackSnapshot, ContextValueHandle,
-    ElementTypeHandle, FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError,
-    FiberTypeHandle, HookEffectArena, HookEffectArenaError, HookEffectCallbackHandle,
-    HookEffectDependencies, HookEffectFlags, HookEffectId, HookEffectInstanceId, HookEffectPayload,
-    HookEffectRing, HookListArena, HookListError, HookListId, HookListMountCursor,
-    HookListTraversalResult, HookListUpdateCursor, HookQueueError, HookQueueId, HookQueueStore,
-    HookRevertLane, HookSlotId, HookSlotPayload, HookStatePayload, HookStateSlot, HookUpdateId,
-    HookUpdateLane, Lanes, ProcessHookQueueResult, PropsHandle, StateHandle, UpdateQueueHandle,
+    ContextHandle, ContextStack, ContextStackError, ContextStackSnapshot, ContextValueChange,
+    ContextValueHandle, ElementTypeHandle, FiberArena, FiberFlags, FiberId, FiberTag,
+    FiberTopologyError, FiberTypeHandle, HookEffectArena, HookEffectArenaError,
+    HookEffectCallbackHandle, HookEffectDependencies, HookEffectFlags, HookEffectId,
+    HookEffectInstanceId, HookEffectPayload, HookEffectRing, HookListArena, HookListError,
+    HookListId, HookListMountCursor, HookListTraversalResult, HookListUpdateCursor, HookQueueError,
+    HookQueueId, HookQueueStore, HookRevertLane, HookSlotId, HookSlotPayload, HookStatePayload,
+    HookStateSlot, HookUpdateId, HookUpdateLane, Lanes, ProcessHookQueueResult, PropsHandle,
+    StateHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
@@ -24,6 +25,7 @@ use crate::root_scheduler::{RootRescheduleRequestRecord, ensure_root_is_reschedu
 use crate::{
     ConcurrentUpdateError, FiberRootId, FiberRootStore, RootElementHandle, RootSchedulerError,
     ScheduledRootUpdateResult, mark_update_lane_from_fiber_to_root,
+    mark_update_lanes_from_fiber_to_root,
 };
 
 #[repr(transparent)]
@@ -1511,6 +1513,258 @@ impl FunctionComponentContextReadRecord {
     #[must_use]
     pub const fn dependency(self) -> FunctionComponentContextDependencyHandle {
         self.dependency
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentContextChangePropagationRequest {
+    change: ContextValueChange,
+    propagation_lanes: Lanes,
+}
+
+impl FunctionComponentContextChangePropagationRequest {
+    #[must_use]
+    pub const fn new(change: ContextValueChange, propagation_lanes: Lanes) -> Self {
+        Self {
+            change,
+            propagation_lanes,
+        }
+    }
+
+    #[must_use]
+    pub const fn change(self) -> ContextValueChange {
+        self.change
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.change.context()
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.change.previous_value()
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.change.next_value()
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentContextChangePropagationDependencyRecord {
+    dependency: FunctionComponentContextDependencyHandle,
+    fiber: FiberId,
+    context: ContextHandle,
+    memoized_value: ContextValueHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+    previous_dependency_lanes: Lanes,
+    dependency_lanes: Lanes,
+    root: FiberRootId,
+}
+
+impl FunctionComponentContextChangePropagationDependencyRecord {
+    #[must_use]
+    pub const fn dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.dependency
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn memoized_value(self) -> ContextValueHandle {
+        self.memoized_value
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn previous_dependency_lanes(self) -> Lanes {
+        self.previous_dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn dependency_lanes(self) -> Lanes {
+        self.dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentContextChangePropagationRecord {
+    render: FunctionComponentRenderRecord,
+    change: ContextValueChange,
+    propagation_lanes: Lanes,
+    scanned_dependency_count: usize,
+    marked_dependencies: Vec<FunctionComponentContextChangePropagationDependencyRecord>,
+    roots: Vec<FiberRootId>,
+}
+
+impl FunctionComponentContextChangePropagationRecord {
+    #[must_use]
+    pub const fn render(&self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn change(&self) -> ContextValueChange {
+        self.change
+    }
+
+    #[must_use]
+    pub const fn context(&self) -> ContextHandle {
+        self.change.context()
+    }
+
+    #[must_use]
+    pub const fn previous_value(&self) -> ContextValueHandle {
+        self.change.previous_value()
+    }
+
+    #[must_use]
+    pub const fn next_value(&self) -> ContextValueHandle {
+        self.change.next_value()
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(&self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn scanned_dependency_count(&self) -> usize {
+        self.scanned_dependency_count
+    }
+
+    #[must_use]
+    pub fn marked_dependencies(
+        &self,
+    ) -> &[FunctionComponentContextChangePropagationDependencyRecord] {
+        &self.marked_dependencies
+    }
+
+    #[must_use]
+    pub fn roots(&self) -> &[FiberRootId] {
+        &self.roots
+    }
+
+    #[must_use]
+    pub fn marked_dependency_count(&self) -> usize {
+        self.marked_dependencies.len()
+    }
+
+    #[must_use]
+    pub fn root_count(&self) -> usize {
+        self.roots.len()
+    }
+
+    #[must_use]
+    pub fn has_marked_dependencies(&self) -> bool {
+        !self.marked_dependencies.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FunctionComponentContextChangePropagationError {
+    FiberTopology(FiberTopologyError),
+    ConcurrentUpdate(ConcurrentUpdateError),
+    MissingContextDependencies {
+        fiber: FiberId,
+    },
+    EmptyPropagationLanes {
+        context: ContextHandle,
+    },
+    UnsupportedDependencyFiberTag {
+        dependency: FunctionComponentContextDependencyHandle,
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+}
+
+impl Display for FunctionComponentContextChangePropagationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
+            Self::MissingContextDependencies { fiber } => write!(
+                formatter,
+                "function component fiber {} has no private context dependencies to propagate",
+                fiber.slot().get()
+            ),
+            Self::EmptyPropagationLanes { context } => write!(
+                formatter,
+                "context {} propagation requires at least one lane",
+                context.raw()
+            ),
+            Self::UnsupportedDependencyFiberTag {
+                dependency,
+                fiber,
+                tag,
+            } => write!(
+                formatter,
+                "context dependency {} belongs to fiber {} with unsupported tag {:?}; private context propagation admits FunctionComponent only",
+                dependency.raw(),
+                fiber.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+impl Error for FunctionComponentContextChangePropagationError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::ConcurrentUpdate(error) => Some(error),
+            Self::MissingContextDependencies { .. }
+            | Self::EmptyPropagationLanes { .. }
+            | Self::UnsupportedDependencyFiberTag { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for FunctionComponentContextChangePropagationError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+impl From<ConcurrentUpdateError> for FunctionComponentContextChangePropagationError {
+    fn from(error: ConcurrentUpdateError) -> Self {
+        Self::ConcurrentUpdate(error)
     }
 }
 
@@ -5405,6 +5659,112 @@ fn render_function_component_with_use_context_impl(
     })
 }
 
+pub(crate) fn propagate_context_change_to_function_component_dependencies<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    context_store: &mut FunctionComponentContextRenderStore,
+    render: FunctionComponentRenderRecord,
+    request: FunctionComponentContextChangePropagationRequest,
+) -> Result<
+    FunctionComponentContextChangePropagationRecord,
+    FunctionComponentContextChangePropagationError,
+> {
+    if request.propagation_lanes().is_empty() {
+        return Err(
+            FunctionComponentContextChangePropagationError::EmptyPropagationLanes {
+                context: request.context(),
+            },
+        );
+    }
+
+    let Some(context_state) = render.context_state() else {
+        return Err(
+            FunctionComponentContextChangePropagationError::MissingContextDependencies {
+                fiber: render.work_in_progress(),
+            },
+        );
+    };
+    let start = context_state.start_dependency_index();
+    let end = start + render.context_read_count();
+    let scanned_dependency_count = render.context_read_count();
+    let mut marked_dependencies = Vec::new();
+    let mut roots = Vec::new();
+
+    if !request.change().is_changed() {
+        return Ok(FunctionComponentContextChangePropagationRecord {
+            render,
+            change: request.change(),
+            propagation_lanes: request.propagation_lanes(),
+            scanned_dependency_count,
+            marked_dependencies,
+            roots,
+        });
+    }
+
+    let matching_dependency_indices = context_store.dependencies[start..end]
+        .iter()
+        .enumerate()
+        .filter_map(|(relative_index, dependency)| {
+            if dependency.context() == request.context()
+                && request
+                    .change()
+                    .changes_memoized_value(dependency.memoized_value())
+            {
+                Some(start + relative_index)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    for dependency_index in matching_dependency_indices {
+        let dependency = context_store.dependencies[dependency_index];
+        let fiber = store.fiber_arena().get(dependency.fiber())?;
+        if fiber.tag() != FiberTag::FunctionComponent {
+            return Err(
+                FunctionComponentContextChangePropagationError::UnsupportedDependencyFiberTag {
+                    dependency: dependency.handle(),
+                    fiber: dependency.fiber(),
+                    tag: fiber.tag(),
+                },
+            );
+        }
+
+        let previous_dependency_lanes = dependency.dependency_lanes();
+        let root = mark_update_lanes_from_fiber_to_root(
+            store,
+            dependency.fiber(),
+            request.propagation_lanes(),
+        )?;
+        let dependency_lanes = previous_dependency_lanes.merge(request.propagation_lanes());
+        context_store.dependencies[dependency_index].dependency_lanes = dependency_lanes;
+
+        if !roots.contains(&root) {
+            roots.push(root);
+        }
+        marked_dependencies.push(FunctionComponentContextChangePropagationDependencyRecord {
+            dependency: dependency.handle(),
+            fiber: dependency.fiber(),
+            context: dependency.context(),
+            memoized_value: dependency.memoized_value(),
+            previous_value: request.previous_value(),
+            next_value: request.next_value(),
+            propagation_lanes: request.propagation_lanes(),
+            previous_dependency_lanes,
+            dependency_lanes,
+            root,
+        });
+    }
+
+    Ok(FunctionComponentContextChangePropagationRecord {
+        render,
+        change: request.change(),
+        propagation_lanes: request.propagation_lanes(),
+        scanned_dependency_count,
+        marked_dependencies,
+        roots,
+    })
+}
+
 pub(crate) fn reconcile_function_component_single_child_output(
     arena: &mut FiberArena,
     render: FunctionComponentRenderRecord,
@@ -5782,6 +6142,14 @@ mod tests {
             .unwrap();
 
         (arena, current, work_in_progress, component)
+    }
+
+    fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId) {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        (store, root_id)
     }
 
     fn attached_function_component_pair(
@@ -6468,6 +6836,227 @@ mod tests {
         assert_eq!(
             context_store.current_value(expected_context).unwrap(),
             context_value(730)
+        );
+    }
+
+    #[test]
+    fn function_component_context_change_propagation_marks_dependency_fiber_and_root_lanes() {
+        let (mut store, root_id) = root_store();
+        let host_root = store.root(root_id).unwrap().current();
+        let (current, work_in_progress, component) =
+            attached_function_component_pair(&mut store, root_id);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(740);
+        let previous_value = context_value(741);
+        let next_value = context_value(742);
+        let context = context_store.create_context(default_value);
+        let provider_snapshot = context_store
+            .push_provider(context, previous_value)
+            .unwrap();
+        let mut registry =
+            TestUseContextComponentRegistry::new(component, UseContextBehavior::Single { context });
+        let render = render_function_component_with_use_context(
+            store.fiber_arena_mut(),
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap()
+        .render();
+        context_store.restore_snapshot(provider_snapshot).unwrap();
+        let read = context_store.context_reads_for_record(render)[0];
+        let dependency = context_store.context_dependency(read.dependency()).unwrap();
+        assert_eq!(dependency.dependency_lanes(), Lanes::NO);
+        let propagation_lanes = Lanes::SYNC.merge_lane(Lane::TRANSITION_1);
+
+        let propagation = propagate_context_change_to_function_component_dependencies(
+            &mut store,
+            &mut context_store,
+            render,
+            FunctionComponentContextChangePropagationRequest::new(
+                ContextValueChange::new(context, previous_value, next_value),
+                propagation_lanes,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(propagation.render(), render);
+        assert_eq!(propagation.context(), context);
+        assert_eq!(propagation.previous_value(), previous_value);
+        assert_eq!(propagation.next_value(), next_value);
+        assert_eq!(propagation.propagation_lanes(), propagation_lanes);
+        assert_eq!(propagation.scanned_dependency_count(), 1);
+        assert_eq!(propagation.marked_dependency_count(), 1);
+        assert!(propagation.has_marked_dependencies());
+        assert_eq!(propagation.roots(), &[root_id]);
+        assert_eq!(propagation.root_count(), 1);
+
+        let marked = propagation.marked_dependencies()[0];
+        assert_eq!(marked.dependency(), read.dependency());
+        assert_eq!(marked.fiber(), work_in_progress);
+        assert_eq!(marked.context(), context);
+        assert_eq!(marked.memoized_value(), previous_value);
+        assert_eq!(marked.previous_value(), previous_value);
+        assert_eq!(marked.next_value(), next_value);
+        assert_eq!(marked.propagation_lanes(), propagation_lanes);
+        assert_eq!(marked.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(marked.dependency_lanes(), propagation_lanes);
+        assert_eq!(marked.root(), root_id);
+
+        let updated_dependency = context_store.context_dependency(read.dependency()).unwrap();
+        assert_eq!(updated_dependency.dependency_lanes(), propagation_lanes);
+        assert!(!updated_dependency.renderer_visible_propagation());
+        assert_eq!(updated_dependency.propagation_flags(), FiberFlags::NO);
+        assert!(
+            store
+                .fiber_arena()
+                .get(work_in_progress)
+                .unwrap()
+                .lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(current)
+                .unwrap()
+                .lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(host_root)
+                .unwrap()
+                .child_lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_all(propagation_lanes)
+        );
+        let fiber = store.fiber_arena().get(work_in_progress).unwrap();
+        assert_eq!(fiber.dependencies(), DependenciesHandle::NONE);
+        assert!(!fiber.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
+    }
+
+    #[test]
+    fn function_component_context_change_propagation_skips_unchanged_and_unmatched_dependencies() {
+        let (mut store, root_id) = root_store();
+        let host_root = store.root(root_id).unwrap().current();
+        let (_current, work_in_progress, component) =
+            attached_function_component_pair(&mut store, root_id);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let previous_value = context_value(750);
+        let context = context_store.create_context(context_value(749));
+        let other_context = context_store.create_context(context_value(760));
+        let provider_snapshot = context_store
+            .push_provider(context, previous_value)
+            .unwrap();
+        let mut registry =
+            TestUseContextComponentRegistry::new(component, UseContextBehavior::Single { context });
+        let render = render_function_component_with_use_context(
+            store.fiber_arena_mut(),
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap()
+        .render();
+        context_store.restore_snapshot(provider_snapshot).unwrap();
+        let read = context_store.context_reads_for_record(render)[0];
+
+        let unchanged = propagate_context_change_to_function_component_dependencies(
+            &mut store,
+            &mut context_store,
+            render,
+            FunctionComponentContextChangePropagationRequest::new(
+                ContextValueChange::new(context, previous_value, previous_value),
+                Lanes::SYNC,
+            ),
+        )
+        .unwrap();
+        let unmatched = propagate_context_change_to_function_component_dependencies(
+            &mut store,
+            &mut context_store,
+            render,
+            FunctionComponentContextChangePropagationRequest::new(
+                ContextValueChange::new(other_context, context_value(760), context_value(761)),
+                Lanes::SYNC,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(unchanged.scanned_dependency_count(), 1);
+        assert_eq!(unchanged.marked_dependency_count(), 0);
+        assert_eq!(unchanged.roots(), &[]);
+        assert_eq!(unmatched.scanned_dependency_count(), 1);
+        assert_eq!(unmatched.marked_dependency_count(), 0);
+        assert_eq!(unmatched.roots(), &[]);
+        assert_eq!(
+            context_store
+                .context_dependency(read.dependency())
+                .unwrap()
+                .dependency_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            store.fiber_arena().get(work_in_progress).unwrap().lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            store.fiber_arena().get(host_root).unwrap().child_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+    }
+
+    #[test]
+    fn function_component_context_change_propagation_rejects_empty_lanes() {
+        let (mut store, root_id) = root_store();
+        let (_current, work_in_progress, component) =
+            attached_function_component_pair(&mut store, root_id);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let context = context_store.create_context(context_value(770));
+        let mut registry =
+            TestUseContextComponentRegistry::new(component, UseContextBehavior::Single { context });
+        let render = render_function_component_with_use_context(
+            store.fiber_arena_mut(),
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap()
+        .render();
+
+        let error = propagate_context_change_to_function_component_dependencies(
+            &mut store,
+            &mut context_store,
+            render,
+            FunctionComponentContextChangePropagationRequest::new(
+                ContextValueChange::new(context, context_value(770), context_value(771)),
+                Lanes::NO,
+            ),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentContextChangePropagationError::EmptyPropagationLanes { context }
+        );
+        assert_eq!(
+            store.fiber_arena().get(work_in_progress).unwrap().lanes(),
+            Lanes::NO
         );
     }
 

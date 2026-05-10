@@ -47,6 +47,53 @@ opaque_context_handle!(ContextHandle);
 opaque_context_handle!(ContextValueHandle);
 opaque_context_handle!(ContextFrameId);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContextValueChange {
+    context: ContextHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+}
+
+impl ContextValueChange {
+    #[must_use]
+    pub const fn new(
+        context: ContextHandle,
+        previous_value: ContextValueHandle,
+        next_value: ContextValueHandle,
+    ) -> Self {
+        Self {
+            context,
+            previous_value,
+            next_value,
+        }
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn is_changed(self) -> bool {
+        self.previous_value.raw() != self.next_value.raw()
+    }
+
+    #[must_use]
+    pub const fn changes_memoized_value(self, memoized_value: ContextValueHandle) -> bool {
+        self.next_value.raw() != memoized_value.raw()
+    }
+}
+
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct ContextStackId(u64);
@@ -391,6 +438,25 @@ mod tests {
         assert_eq!(stack.stack_depth(), 0);
         assert!(!slot.has_active_provider());
         assert!(stack.snapshot().is_root());
+    }
+
+    #[test]
+    fn context_value_change_reports_context_identity_and_value_change() {
+        let context = ContextHandle::from_raw(41);
+        let previous_value = value(42);
+        let next_value = value(43);
+        let change = ContextValueChange::new(context, previous_value, next_value);
+
+        assert_eq!(change.context(), context);
+        assert_eq!(change.previous_value(), previous_value);
+        assert_eq!(change.next_value(), next_value);
+        assert!(change.is_changed());
+        assert!(change.changes_memoized_value(previous_value));
+        assert!(!change.changes_memoized_value(next_value));
+
+        let unchanged = ContextValueChange::new(context, previous_value, previous_value);
+        assert!(!unchanged.is_changed());
+        assert!(!unchanged.changes_memoized_value(previous_value));
     }
 
     #[test]

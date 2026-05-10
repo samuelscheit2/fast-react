@@ -34,7 +34,7 @@ pub use compatibility::{
 };
 pub use context_stack::{
     ContextFrameId, ContextHandle, ContextSlot, ContextStack, ContextStackError,
-    ContextStackSnapshot, ContextValueHandle,
+    ContextStackSnapshot, ContextValueChange, ContextValueHandle,
 };
 pub use element::{
     ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactPortalRecord, ReactRefSlot,

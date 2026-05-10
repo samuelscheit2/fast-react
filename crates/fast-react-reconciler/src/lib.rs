@@ -49,6 +49,7 @@ pub use concurrent_updates::{
     ConcurrentUpdateError, ConcurrentUpdateStaging, FinishedConcurrentUpdates,
     StagedConcurrentUpdate, enqueue_concurrent_host_root_update,
     finish_queueing_concurrent_updates, mark_update_lane_from_fiber_to_root,
+    mark_update_lanes_from_fiber_to_root,
 };
 pub use execution_context::{
     ExecutionContext, ExecutionContextState, SyncFlushExecutionContextRecord,

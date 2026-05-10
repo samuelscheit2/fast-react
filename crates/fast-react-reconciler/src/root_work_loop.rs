@@ -19,6 +19,8 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 #[cfg(test)]
+use fast_react_core::ContextValueChange;
+#[cfg(test)]
 use fast_react_core::bubble_properties;
 use fast_react_core::{
     ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
@@ -48,10 +50,11 @@ use crate::{
     HostRootCommitRecord, RootCommitError,
     begin_work::{
         ContextProviderBeginWorkError, ContextProviderBeginWorkRecord,
-        ContextProviderBeginWorkRequest,
+        ContextProviderBeginWorkRequest, ContextProviderUseContextBeginWorkRecord,
         ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
         ContextProviderUseContextSingleChildBeginWorkRecord,
         FunctionComponentSingleChildBeginWorkRecord, begin_work_context_provider_child,
+        begin_work_context_provider_use_context_child,
         begin_work_context_provider_use_context_single_child,
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
         begin_work_reconcile_function_component_single_child,
@@ -63,7 +66,11 @@ use crate::{
         unwind_context_provider_for_test,
     },
     function_component::{
-        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentContextChangePropagationError,
+        FunctionComponentContextChangePropagationRecord,
+        FunctionComponentContextChangePropagationRequest, FunctionComponentSingleChildOutput,
+        FunctionComponentSingleChildOutputResolver,
+        propagate_context_change_to_function_component_dependencies,
     },
     host_work::{
         HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
@@ -1466,6 +1473,150 @@ impl From<HostRootCompleteWorkHandoffError>
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootContextProviderUseContextPropagationGateRequest {
+    context: ContextHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+}
+
+#[cfg(test)]
+impl HostRootContextProviderUseContextPropagationGateRequest {
+    #[must_use]
+    const fn new(
+        context: ContextHandle,
+        previous_value: ContextValueHandle,
+        next_value: ContextValueHandle,
+        propagation_lanes: Lanes,
+    ) -> Self {
+        Self {
+            context,
+            previous_value,
+            next_value,
+            propagation_lanes,
+        }
+    }
+
+    #[must_use]
+    const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    const fn change(self) -> ContextValueChange {
+        ContextValueChange::new(self.context, self.previous_value, self.next_value)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootContextProviderUseContextPropagationGateRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    provider: FiberId,
+    function_component: FiberId,
+    begin_work: ContextProviderUseContextBeginWorkRecord,
+    propagation: FunctionComponentContextChangePropagationRecord,
+}
+
+#[cfg(test)]
+impl HostRootContextProviderUseContextPropagationGateRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn provider(&self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    const fn function_component(&self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    const fn begin_work(&self) -> ContextProviderUseContextBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    const fn propagation(&self) -> &FunctionComponentContextChangePropagationRecord {
+        &self.propagation
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootContextProviderUseContextPropagationGateError {
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    ContextProvider(ContextProviderBeginWorkError),
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    Propagation(FunctionComponentContextChangePropagationError),
+    MissingContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+}
+
+#[cfg(test)]
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootContextProviderUseContextPropagationGateError
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<ContextProviderBeginWorkError> for HostRootContextProviderUseContextPropagationGateError {
+    fn from(error: ContextProviderBeginWorkError) -> Self {
+        Self::ContextProvider(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootContextProviderUseContextPropagationGateError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentContextChangePropagationError>
+    for HostRootContextProviderUseContextPropagationGateError
+{
+    fn from(error: FunctionComponentContextChangePropagationError) -> Self {
+        Self::Propagation(error)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct HostRootContextProviderUseContextCompleteUnwindTraversalRecord {
     root: FiberRootId,
     host_root_work_in_progress: FiberId,
@@ -1667,6 +1818,78 @@ impl From<ContextProviderStackRestorationError>
     fn from(error: ContextProviderStackRestorationError) -> Self {
         Self::ProviderStackRestoration(error)
     }
+}
+
+#[cfg(test)]
+fn propagate_host_root_context_provider_use_context_change_for_test(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    request: HostRootContextProviderUseContextPropagationGateRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    HostRootContextProviderUseContextPropagationGateRecord,
+    HostRootContextProviderUseContextPropagationGateError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        render.render_lanes(),
+    )?;
+    let provider = validated.child.ok_or(
+        HostRootContextProviderUseContextPropagationGateError::MissingContextProviderChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootContextProviderUseContextPropagationGateError::MissingContextProviderChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::ContextProvider {
+        return Err(
+            HostRootContextProviderUseContextPropagationGateError::ExpectedContextProviderChild {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                child: provider,
+                tag: child_tag,
+            },
+        );
+    }
+
+    let begin_work = begin_work_context_provider_use_context_child(
+        store.fiber_arena_mut(),
+        ContextProviderBeginWorkRequest::new(
+            provider,
+            render.render_lanes(),
+            request.context(),
+            request.previous_value(),
+        ),
+        context_store,
+        invoker,
+    )?;
+    let propagation = propagate_context_change_to_function_component_dependencies(
+        store,
+        context_store,
+        begin_work.child_render(),
+        FunctionComponentContextChangePropagationRequest::new(
+            request.change(),
+            request.propagation_lanes(),
+        ),
+    )?;
+
+    Ok(HostRootContextProviderUseContextPropagationGateRecord {
+        root: render.root(),
+        host_root_work_in_progress: render.work_in_progress(),
+        provider,
+        function_component: begin_work.child(),
+        begin_work,
+        propagation,
+    })
 }
 
 #[cfg(test)]
@@ -2926,9 +3149,9 @@ mod tests {
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
-        ContextHandle, ContextValueHandle, ElementTypeHandle, FiberFlags, FiberMode, FiberTag,
-        FiberTypeHandle, Lane, Lanes, PropsHandle, ReactKey, RootFinishedLanes, StateHandle,
-        StateNodeHandle, UpdateQueueHandle,
+        ContextHandle, ContextValueHandle, DependenciesHandle, ElementTypeHandle, FiberFlags,
+        FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, ReactKey,
+        RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -3860,6 +4083,130 @@ mod tests {
                 .return_fiber(),
             Some(provider)
         );
+    }
+
+    #[test]
+    fn root_work_loop_context_provider_change_propagation_marks_consumer_and_root_lanes() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(132), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (provider, function_component, component) =
+            attach_context_provider_wip_child(&mut store, host_root_work_in_progress);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_100);
+        let previous_value = context_value(1_101);
+        let next_value = context_value(1_102);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        let propagation_lanes = Lanes::SYNC.merge_lane(Lane::TRANSITION_1);
+
+        let record = propagate_host_root_context_provider_use_context_change_for_test(
+            &mut store,
+            render,
+            HostRootContextProviderUseContextPropagationGateRequest::new(
+                context,
+                previous_value,
+                next_value,
+                propagation_lanes,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.function_component(), function_component);
+        assert_eq!(record.begin_work().provider(), provider);
+        assert_eq!(record.begin_work().child(), function_component);
+        assert_eq!(record.begin_work().context(), context);
+        assert_eq!(record.begin_work().value(), previous_value);
+        assert_eq!(record.begin_work().child_context_read_count(), 1);
+        assert_eq!(record.begin_work().restored_stack_depth(), 0);
+
+        let read = record.begin_work().child_context_read();
+        assert_eq!(read.fiber(), function_component);
+        assert_eq!(read.context(), context);
+        assert_eq!(read.default_value(), default_value);
+        assert_eq!(read.value(), previous_value);
+        assert_eq!(registry.reads(), &[read]);
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+
+        let propagation = record.propagation();
+        assert_eq!(propagation.context(), context);
+        assert_eq!(propagation.previous_value(), previous_value);
+        assert_eq!(propagation.next_value(), next_value);
+        assert_eq!(propagation.propagation_lanes(), propagation_lanes);
+        assert_eq!(propagation.scanned_dependency_count(), 1);
+        assert_eq!(propagation.marked_dependency_count(), 1);
+        assert_eq!(propagation.roots(), &[root_id]);
+        let marked = propagation.marked_dependencies()[0];
+        assert_eq!(marked.dependency(), read.dependency());
+        assert_eq!(marked.fiber(), function_component);
+        assert_eq!(marked.memoized_value(), previous_value);
+        assert_eq!(marked.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(marked.dependency_lanes(), propagation_lanes);
+        assert_eq!(
+            context_store
+                .context_dependency(read.dependency())
+                .unwrap()
+                .dependency_lanes(),
+            propagation_lanes
+        );
+
+        assert!(
+            store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(provider)
+                .unwrap()
+                .child_lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(host_root_work_in_progress)
+                .unwrap()
+                .child_lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_all(propagation_lanes)
+        );
+        let function_node = store.fiber_arena().get(function_component).unwrap();
+        assert_eq!(function_node.dependencies(), DependenciesHandle::NONE);
+        assert!(
+            !function_node
+                .flags()
+                .contains_any(FiberFlags::NEEDS_PROPAGATION)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
     }
 
     #[test]

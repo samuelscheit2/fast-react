@@ -181,7 +181,7 @@ pub fn enqueue_concurrent_host_root_update<H: HostTypes>(
     update: UpdateId,
     lane: Lane,
 ) -> Result<FiberRootId, ConcurrentUpdateError> {
-    mark_source_fiber_lanes(store, fiber, lane)?;
+    mark_source_fiber_lanes(store, fiber, lane.to_lanes())?;
     store
         .concurrent_updates_mut()
         .push(fiber, Some(queue), Some(update), lane);
@@ -220,19 +220,27 @@ pub fn mark_update_lane_from_fiber_to_root<H: HostTypes>(
     source_fiber: FiberId,
     lane: Lane,
 ) -> Result<FiberRootId, ConcurrentUpdateError> {
-    mark_source_fiber_lanes(store, source_fiber, lane)?;
+    mark_update_lanes_from_fiber_to_root(store, source_fiber, lane.to_lanes())
+}
+
+pub fn mark_update_lanes_from_fiber_to_root<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    source_fiber: FiberId,
+    lanes: Lanes,
+) -> Result<FiberRootId, ConcurrentUpdateError> {
+    mark_source_fiber_lanes(store, source_fiber, lanes)?;
     let mut node = source_fiber;
     let mut parent = store.fiber_arena().get(node)?.return_fiber();
 
     while let Some(parent_id) = parent {
         {
             let parent_node = store.fiber_arena_mut().get_mut(parent_id)?;
-            parent_node.set_child_lanes(parent_node.child_lanes().merge_lane(lane));
+            parent_node.set_child_lanes(parent_node.child_lanes().merge(lanes));
         }
 
         if let Some(alternate) = store.fiber_arena().get(parent_id)?.alternate() {
             let alternate_node = store.fiber_arena_mut().get_mut(alternate)?;
-            alternate_node.set_child_lanes(alternate_node.child_lanes().merge_lane(lane));
+            alternate_node.set_child_lanes(alternate_node.child_lanes().merge(lanes));
         }
 
         node = parent_id;
@@ -240,7 +248,7 @@ pub fn mark_update_lane_from_fiber_to_root<H: HostTypes>(
     }
 
     let root = host_root_id_for_fiber(store, node)?;
-    if lane.is_non_empty() {
+    for lane in non_empty_lanes(lanes) {
         store.root_mut(root)?.lanes_mut().mark_updated(lane);
     }
     Ok(root)
@@ -249,9 +257,8 @@ pub fn mark_update_lane_from_fiber_to_root<H: HostTypes>(
 fn mark_source_fiber_lanes<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     source_fiber: FiberId,
-    lane: Lane,
+    lanes: Lanes,
 ) -> Result<(), ConcurrentUpdateError> {
-    let lanes = lane.to_lanes();
     {
         let source = store.fiber_arena_mut().get_mut(source_fiber)?;
         source.merge_lanes(lanes);
@@ -263,6 +270,17 @@ fn mark_source_fiber_lanes<H: HostTypes>(
     }
 
     Ok(())
+}
+
+fn non_empty_lanes(mut lanes: Lanes) -> impl Iterator<Item = Lane> {
+    std::iter::from_fn(move || {
+        if lanes.is_empty() {
+            return None;
+        }
+        let lane = lanes.highest_priority_lane();
+        lanes = lanes.remove_lane(lane);
+        Some(lane)
+    })
 }
 
 pub(crate) fn root_for_updated_fiber<H: HostTypes>(
@@ -405,6 +423,51 @@ mod tests {
                 .lanes()
                 .pending_lanes()
                 .contains_lane(Lane::DEFAULT)
+        );
+    }
+
+    #[test]
+    fn concurrent_updates_mark_function_component_lanes_to_root_path() {
+        let (mut store, root_id) = root_store();
+        let host_root = store.root(root_id).unwrap().current();
+        let function = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            fast_react_core::PropsHandle::from_raw(21),
+            fast_react_core::FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[function])
+            .unwrap();
+        let lanes = Lanes::SYNC.merge_lane(Lane::TRANSITION_1);
+
+        let root = mark_update_lanes_from_fiber_to_root(&mut store, function, lanes).unwrap();
+
+        assert_eq!(root, root_id);
+        assert!(
+            store
+                .fiber_arena()
+                .get(function)
+                .unwrap()
+                .lanes()
+                .contains_all(lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(host_root)
+                .unwrap()
+                .child_lanes()
+                .contains_all(lanes)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_all(lanes)
         );
     }
 }
