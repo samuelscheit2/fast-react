@@ -209,6 +209,11 @@ const actSchedulerReactQueueDiagnosticRecordIds = [
   "scheduler-private-act-queue-flush-diagnostics",
   "react-private-act-internal-test-queue-factories"
 ];
+const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
+  "scheduler-private-act-queue-flush-diagnostics",
+  "test-renderer-mock-scheduler-flush-helper-routing",
+  "react-private-act-internal-test-queue-factories"
+];
 const actSchedulerSyncFlushRecordIds = [
   "sync-flush-act-continuation-record",
   "sync-flush-act-post-passive-continuation-gate",
@@ -269,6 +274,8 @@ const entrypoints = [
     production: true
   }
 ];
+const cjsDevelopmentEntrypoint =
+  "react-test-renderer/cjs/react-test-renderer.development";
 const cjsEntrypoints = entrypoints.filter((entry) =>
   entry.entrypoint.includes("/cjs/")
 );
@@ -3796,19 +3803,17 @@ function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
 }
 
 function assertActSchedulerGate(gate, entrypoint) {
+  const cjsDevelopmentOnly = entrypoint === cjsDevelopmentEntrypoint;
   const expectedRootFlushRecordIds = entrypoint.includes("/cjs/")
     ? [
         ...actSchedulerRootFlushRecordIds,
         "test-renderer-private-getinstance-class-root-diagnostic"
       ]
     : actSchedulerRootFlushRecordIds;
-
-  assert.equal(Object.isFrozen(gate), true, entrypoint);
-  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
-  assert.equal(gate.status, actSchedulerGateStatus);
-  assert.equal(gate.entrypoint, entrypoint);
-  assert.equal(gate.deterministic, true);
-  assert.deepEqual(gate.acceptedWorkers, [
+  const expectedReactQueueDiagnosticRecordIds = cjsDevelopmentOnly
+    ? actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds
+    : actSchedulerReactQueueDiagnosticRecordIds;
+  const expectedAcceptedWorkers = [
     "worker-176-act-queue-routing-skeleton",
     "worker-252-sync-flush-act-continuation-skeleton",
     "worker-277-react-act-queue-private-dispatcher-gate",
@@ -3827,7 +3832,22 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-426-test-renderer-testinstance-bridge-query",
     "worker-349-hook-effect-destroy-callback-execution-private",
     "worker-377-scheduler-act-queue-flush-helper-private"
-  ]);
+  ];
+  if (cjsDevelopmentOnly) {
+    expectedAcceptedWorkers.push(
+      "worker-404-scheduler-mock-private-callback-execution",
+      "worker-436-scheduler-mock-continuation-execution",
+      "worker-469-scheduler-mock-expired-continuation-gate",
+      "worker-482-test-renderer-act-scheduler-flush-gate"
+    );
+  }
+
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
+  assert.equal(gate.status, actSchedulerGateStatus);
+  assert.equal(gate.entrypoint, entrypoint);
+  assert.equal(gate.deterministic, true);
+  assert.deepEqual(gate.acceptedWorkers, expectedAcceptedWorkers);
   assert.equal(gate.publicActBehaviorAvailable, false);
   assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
   assert.equal(gate.publicRootSyncFlushRouteAvailable, false);
@@ -3846,6 +3866,11 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.schedulerReactActQueueDiagnosticsAccepted, true);
   assert.equal(gate.privateSchedulerActQueueDiagnosticsConsumed, true);
   assert.equal(gate.privateActQueueDiagnosticConsumptionReady, true);
+  if (cjsDevelopmentOnly) {
+    assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
+    assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
+    assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
+  }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
   assert.equal(gate.rootActRecordsAccepted, true);
   assert.equal(gate.syncFlushActRecordsAccepted, true);
@@ -3866,7 +3891,7 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.recognizedSchedulerReactActQueueDiagnostics.map(
       (record) => record.id
     ),
-    actSchedulerReactQueueDiagnosticRecordIds
+    expectedReactQueueDiagnosticRecordIds
   );
   assert.equal(
     gate.privateActQueueFlushDiagnostics.exportName,
