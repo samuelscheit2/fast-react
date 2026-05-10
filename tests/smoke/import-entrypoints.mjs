@@ -582,12 +582,30 @@ const reactTestRendererPlaceholderVersion =
 const reactTestRendererPrivateRuntimeFacadeSymbols = {
   create: ['fast.react_test_renderer.root_request_bridge'],
   renderer: ['fast.react_test_renderer.private_test_instance_wrapper_record'],
+  rendererDevelopment: [
+    'fast.react_test_renderer.private_error_boundary_diagnostics',
+    'fast.react_test_renderer.private_test_instance_wrapper_record'
+  ],
+  getInstanceCjs: ['fast.react_test_renderer.private_get_instance_diagnostics'],
   toJSON: ['fast.react_test_renderer.private_tojson_serialization_facade'],
   toTree: [
     'fast.react_test_renderer.private_totree_facade',
     'fast.react_test_renderer.private_totree_host_output_metadata'
   ]
 };
+
+function reactTestRendererRendererSymbolsForEntrypoint(entrypoint) {
+  return entrypoint.resolvedFileName ===
+    path.join('cjs', 'react-test-renderer.development.js')
+    ? reactTestRendererPrivateRuntimeFacadeSymbols.rendererDevelopment
+    : reactTestRendererPrivateRuntimeFacadeSymbols.renderer;
+}
+
+function reactTestRendererGetInstanceSymbolsForEntrypoint(entrypoint) {
+  return entrypoint.resolvedFileName.startsWith(`cjs${path.sep}`)
+    ? reactTestRendererPrivateRuntimeFacadeSymbols.getInstanceCjs
+    : [];
+}
 
 const reactTestRendererEntrypoints = [
   {
@@ -1494,7 +1512,7 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
   assertNoPrivateDiagnosticRuntimeExports(renderer, `${label}.create()`);
   assertPrivateRuntimeFacadeSymbols(
     renderer,
-    reactTestRendererPrivateRuntimeFacadeSymbols.renderer,
+    reactTestRendererRendererSymbolsForEntrypoint(entrypoint),
     `${label}.create()`
   );
   const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
@@ -1519,6 +1537,15 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
   assert.equal(renderer.update.length, 1, `${label}.update length`);
   assert.equal(renderer.unmount.length, 0, `${label}.unmount length`);
   assert.equal(renderer.getInstance.length, 0, `${label}.getInstance length`);
+  assertNoPrivateDiagnosticRuntimeExports(
+    renderer.getInstance,
+    `${label}.getInstance`
+  );
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.getInstance,
+    reactTestRendererGetInstanceSymbolsForEntrypoint(entrypoint),
+    `${label}.create().getInstance`
+  );
   assert.equal(
     renderer.unstable_flushSync.length,
     1,
@@ -4236,9 +4263,13 @@ async function runReactTestRendererPackageProbe(tempRoot) {
           renderer,
           specifier + ' renderer'
         );
+        const expectedRendererSymbols =
+          resolvedFileName === path.join('cjs', 'react-test-renderer.development.js')
+            ? privateRuntimeFacadeSymbols.rendererDevelopment
+            : privateRuntimeFacadeSymbols.renderer;
         assertPrivateRuntimeFacadeSymbols(
           renderer,
-          privateRuntimeFacadeSymbols.renderer,
+          expectedRendererSymbols,
           specifier + ' renderer'
         );
         const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
@@ -4269,6 +4300,17 @@ async function runReactTestRendererPackageProbe(tempRoot) {
         assert.equal(renderer.update.length, 1, specifier);
         assert.equal(renderer.unmount.length, 0, specifier);
         assert.equal(renderer.getInstance.length, 0, specifier);
+        assertNoPrivateDiagnosticRuntimeExports(
+          renderer.getInstance,
+          specifier + ' getInstance'
+        );
+        assertPrivateRuntimeFacadeSymbols(
+          renderer.getInstance,
+          resolvedFileName.startsWith('cjs/')
+            ? privateRuntimeFacadeSymbols.getInstanceCjs
+            : [],
+          specifier + ' getInstance'
+        );
         assert.equal(renderer.unstable_flushSync.length, 1, specifier);
         assert.equal(renderer._Scheduler, cjsModule._Scheduler, specifier);
         assertSchedulerShell(

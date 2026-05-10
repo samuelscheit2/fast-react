@@ -2,6 +2,37 @@ import { readFileSync } from "node:fs";
 
 import { REACT_TEST_RENDERER_ERROR_SURFACE_ORACLE_ARTIFACT_PATH } from "./react-test-renderer-error-surface-targets.mjs";
 
+export const REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS =
+  "private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked";
+
+export const REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME =
+  "fast-react-test-renderer.error-boundary.private-root-options-canary";
+
+export const REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS = [
+  {
+    id: "react-test-renderer-render-error-root-option-private-diagnostic",
+    phase: "Render",
+    area: "render error root option metadata",
+    rootErrorChannel: "onUncaughtError",
+    privatePrerequisite:
+      "TestRendererRoot render error diagnostics read RootOptions error handles",
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicRootErrorCallbacksInvoked: false,
+    compatibilityClaimed: false
+  },
+  {
+    id: "react-test-renderer-commit-error-root-option-private-diagnostic",
+    phase: "Commit",
+    area: "commit error root option metadata",
+    rootErrorChannel: "onUncaughtError",
+    privatePrerequisite:
+      "TestRendererRoot commit error diagnostics read RootOptions error handles",
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicRootErrorCallbacksInvoked: false,
+    compatibilityClaimed: false
+  }
+];
+
 export function stringifyReactTestRendererErrorSurfaceOracle(oracle) {
   return `${JSON.stringify(oracle, null, 2)}\n`;
 }
@@ -47,6 +78,11 @@ export function formatReactTestRendererErrorSurfaceOracleAsMarkdown(oracle) {
   const claimLines = Object.entries(oracle.conformanceClaims).map(
     ([key, value]) => `- ${key}: ${value}`
   );
+  const privateDiagnosticLines =
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
+      (row) =>
+        `- ${row.id}: ${row.phase}; channel: ${row.rootErrorChannel}; status: ${REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS}`
+    );
 
   return [
     "# Fast React React Test Renderer Error Surface Oracle",
@@ -64,6 +100,10 @@ export function formatReactTestRendererErrorSurfaceOracleAsMarkdown(oracle) {
     "## Conformance Claims",
     "",
     ...claimLines,
+    "",
+    "## Fast React Private Error Boundary Diagnostics",
+    "",
+    ...privateDiagnosticLines,
     ""
   ].join("\n");
 }

@@ -41,6 +41,11 @@ const privateTestInstanceWrapperRecordSymbolDescription =
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   privateTestInstanceWrapperRecordSymbolDescription
 );
+const privateErrorBoundaryDiagnosticsSymbolDescription =
+  "fast.react_test_renderer.private_error_boundary_diagnostics";
+const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
+  privateErrorBoundaryDiagnosticsSymbolDescription
+);
 const privateToTreeHostOutputMetadataSymbolDescription =
   "fast.react_test_renderer.private_totree_host_output_metadata";
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
@@ -1703,14 +1708,20 @@ function assertRustCanaryMetadata(metadata, label) {
   );
   assert.equal(metadata.compatibilityTarget, compatibilityTarget, label);
   assert.equal(metadata.acceptedRustCrate, "fast-react-test-renderer", label);
-  assert.deepEqual(metadata.acceptedRustWorkers, [
+  const expectedAcceptedRustWorkers = [
     "worker-153-test-renderer-root-canary",
     "worker-188-test-renderer-commit-handoff-canary",
     "worker-195-test-renderer-root-callback-snapshot",
     "worker-208-test-renderer-host-output-canary",
     "worker-234-test-renderer-host-output-update-unmount-canary",
     "worker-265-test-renderer-private-json-ready-diagnostics"
-  ]);
+  ];
+  if (metadata.errorBoundaryDiagnostics !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-465-test-renderer-error-boundary-diagnostics"
+    );
+  }
+  assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
   assert.deepEqual(metadata.acceptedJsBridgeWorkers, [
     "worker-304-test-renderer-js-private-root-request-bridge",
     "worker-306-test-renderer-testinstance-private-wrapper-skeleton",
@@ -2013,6 +2024,13 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
 }
 
 function assertRendererShape(renderer, label, moduleScheduler) {
+  const expectedPrivateSymbols = label.includes("development")
+    ? [
+        privateTestInstanceWrapperRecordSymbol,
+        privateErrorBoundaryDiagnosticsSymbol
+      ]
+    : [privateTestInstanceWrapperRecordSymbol];
+
   assert.deepEqual(Object.keys(renderer), rendererKeys, label);
   assert.deepEqual(Object.getOwnPropertyNames(renderer), rendererKeys, label);
   assert.deepEqual(
@@ -2022,7 +2040,7 @@ function assertRendererShape(renderer, label, moduleScheduler) {
   );
   assert.deepEqual(
     Object.getOwnPropertySymbols(renderer),
-    [privateTestInstanceWrapperRecordSymbol],
+    expectedPrivateSymbols,
     label
   );
   assert.equal(Object.hasOwn(renderer, "routingGate"), false, label);
