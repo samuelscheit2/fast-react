@@ -45,16 +45,10 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 204: host work text update diff in
-  `/Users/user/Developer/Developer/fast-react-worker-204-host-work-text-update-diff`.
-- Worker 205: root commit mutation log skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-205-root-commit-mutation-log-skeleton`.
 - Worker 206: root commit deletion metadata in
   `/Users/user/Developer/Developer/fast-react-worker-206-root-commit-deletion-metadata`.
 - Worker 208: test renderer host output canary in
   `/Users/user/Developer/Developer/fast-react-worker-208-test-renderer-host-output-canary`.
-- Worker 209: test renderer serialization private gate in
-  `/Users/user/Developer/Developer/fast-react-worker-209-test-renderer-serialization-private-gate`.
 - Worker 210: react-test-renderer JS create fail-closed surface in
   `/Users/user/Developer/Developer/fast-react-worker-210-react-test-renderer-js-create-failclosed`.
 - Worker 211: DOM host text-content local gate integration in
@@ -65,32 +59,18 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-214-dom-component-tree-mounted-map`.
 - Worker 215: DOM root bridge private update path in
   `/Users/user/Developer/Developer/fast-react-worker-215-dom-root-bridge-private-update-path`.
-- Worker 216: DOM event listener priority wrappers in
-  `/Users/user/Developer/Developer/fast-react-worker-216-dom-event-listener-priority-wrapper`.
 - Worker 217: DOM createPortal local gate in
   `/Users/user/Developer/Developer/fast-react-worker-217-dom-create-portal-local-gate`.
 - Worker 218: hydration boundary fail-closed gate in
   `/Users/user/Developer/Developer/fast-react-worker-218-hydration-boundary-failclosed`.
-- Worker 219: resource/form unsupported gates in
-  `/Users/user/Developer/Developer/fast-react-worker-219-resource-form-unsupported-gates`.
-- Worker 220: React hook dispatcher useState fail-closed surface in
-  `/Users/user/Developer/Developer/fast-react-worker-220-react-hook-dispatcher-usestate-failclosed`.
 - Worker 221: React context provider object coverage in
   `/Users/user/Developer/Developer/fast-react-worker-221-react-context-provider-object-coverage`.
-- Worker 222: core context stack reconciler canary in
-  `/Users/user/Developer/Developer/fast-react-worker-222-core-context-stack-reconciler-canary`.
 - Worker 223: function component useState private dispatch in
   `/Users/user/Developer/Developer/fast-react-worker-223-function-component-usestate-private-dispatch`.
-- Worker 224: function component effect registration private slice in
-  `/Users/user/Developer/Developer/fast-react-worker-224-function-component-effect-registration`.
-- Worker 225: passive effects flush skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-225-passive-effects-flush-skeleton`.
 - Worker 226: ref attach/detach commit metadata in
   `/Users/user/Developer/Developer/fast-react-worker-226-ref-attach-detach-commit-metadata`.
 - Worker 227: Suspense/Offscreen fail-closed lane tests in
   `/Users/user/Developer/Developer/fast-react-worker-227-suspense-offscreen-failclosed-lane-tests`.
-- Worker 229: benchmark root render manifest gate expansion in
-  `/Users/user/Developer/Developer/fast-react-worker-229-benchmark-root-render-manifest-gate`.
 - Worker 230: DOM text dual-run conformance gate in
   `/Users/user/Developer/Developer/fast-react-worker-230-dom-text-dual-run-conformance-gate`.
 - Worker 231: package surface React DOM subpath tightening in

@@ -350,9 +350,70 @@ sequencing belong in `MASTER_PLAN.md`.
   generation retirement, wrong-environment isolation, environment teardown, and
   post-teardown slot reuse without Node-API bindings, JS values, reconciler
   integration, or public native APIs.
+- Worker 204 host work text update diff was merged, adding private test-only
+  HostText update/diff metadata through `HostNodeStore` with changed and
+  unchanged text coverage while keeping container commit, public renderer
+  output, DOM/native adapters, root work-loop, sync flush, and test-renderer
+  boundaries untouched.
+- Worker 205 root commit mutation log skeleton was merged, adding
+  reconciler-private data-only HostRoot child placement/update mutation
+  metadata to `HostRootCommitRecord` without host mutation, callbacks, effect
+  execution, deletions, renderer package behavior, or public API changes.
+- Worker 209 test-renderer serialization private gate was merged, adding a
+  Rust-only diagnostic gate over committed HostRoot canary metadata that stays
+  fail-closed before real host output, public JS `create`, `act`, DOM behavior,
+  or compatibility claims exist.
+- Worker 216 DOM event listener priority wrappers was merged, wiring private
+  React DOM root listener shells to frozen priority wrapper records while
+  preserving inert dispatch behavior and leaving plugin extraction, event
+  queues, node maps, hydration replay, controlled restore, and public root
+  behavior unchanged.
+- Worker 219 resource/form unsupported gates was merged, adding a React DOM
+  package-local gate tied to accepted resource hint, form action, and
+  controlled input oracles so unsupported paths stay fail-closed without
+  resource side effects, form submission, controlled tracking, public root
+  integration, or compatibility claims.
+- Worker 220 React hook dispatcher `useState` fail-closed surface was merged,
+  gating `useState` and `useReducer` behind a marked private state-hook
+  dispatcher while preserving non-state hook guard behavior and keeping native
+  dispatcher, reconciler hook queues, React DOM, and compatibility claims out
+  of scope.
+- Worker 222 core context stack reconciler canary was merged, adding a private
+  begin-work test canary that pushes, reads, and unwinds the accepted core
+  `ContextStack` around a fake Provider-like boundary without production
+  context propagation, public `useContext`, renderer wiring, or compatibility
+  claims.
+- Worker 224 function-component effect registration was merged, connecting the
+  private function-component hook render store to inert core hook-effect ring
+  metadata for mount/update effect records and fiber flags without public hook
+  facades, JS dispatcher wiring, passive scheduling, effect execution, child
+  reconciliation, renderer integration, or commit behavior.
+- Worker 225 passive effects flush skeleton was merged, adding a private
+  data-only `passive_effects` module that consumes accepted pending passive
+  commit handoff metadata into deterministic flush records and clears the root
+  state without hook traversal, callback execution, scheduler/public act or
+  flushSync routing, host mutation, or renderer API changes.
+- Worker 229 benchmark root lifecycle manifest gate was merged, adding
+  schema-backed benchmark readiness milestones for the next public root
+  lifecycle admissions while keeping every new milestone blocked by
+  conformance and avoiding benchmark runners, timing results, browser
+  artifacts, source implementation, or speed claims.
 
 ## Latest Accepted Verification
 
+- Workers 204, 205, 209, 216, 219, 220, 222, 224, 225, and 229 were verified
+  on their integrated worktrees and again on `main` with focused host-work,
+  root-commit, test-renderer, event-priority, resource/form, hook-dispatcher,
+  begin-work/context, function-component, passive-effects, and benchmark
+  checks; the combined `main` result passed `cargo fmt --all --check`, full
+  `fast-react-reconciler` tests with 175 unit tests plus 1 compile-fail
+  doctest, full `fast-react-test-renderer` tests with 35 unit tests, clippy
+  for both touched Rust packages with warnings denied, focused JS gates,
+  `npm run check:benchmarks` with 4 manifests, 58 scenarios, and 6 milestones,
+  `npm run check:js` with 484 conformance tests plus package-surface,
+  benchmark, workspace, and native checks, and `git diff --check`; worker 204
+  required a scoped `host_work.rs` conflict resolution with worker 203, and
+  the remaining merge commits applied cleanly to `main`.
 - Workers 203, 207, 212, 228, and 232 were verified on their integrated
   worktrees and again on `main` with focused root-work-loop, host-work,
   sync-flush, root-commit, scheduler, scheduler-bridge, DOM mutation smoke,
