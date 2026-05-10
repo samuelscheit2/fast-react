@@ -17,6 +17,7 @@ const ReactSharedInternals = {
 };
 
 const privateEffectHookDispatchers = new WeakSet();
+const privateEffectHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateStateHookDispatchers = new WeakSet();
 const privateStateHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateCallbackHookDispatchers = new WeakSet();
@@ -24,6 +25,7 @@ const privateCallbackHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateMemoHookDispatchers = new WeakSet();
 const privateMemoHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateContextHookDispatchers = new WeakSet();
+const privateContextHookDispatcherMetadataByDispatcher = new WeakMap();
 
 const effectRegistrationFieldNames = Object.freeze([
   'hook',
@@ -62,6 +64,7 @@ const passiveEffectMetadataFieldNames = Object.freeze([
   'instance',
   'tag',
   'create',
+  'destroy',
   'dependencies',
   'lanes'
 ]);
@@ -83,6 +86,48 @@ const pendingPassiveEffectCommitFieldNames = Object.freeze([
 const pendingPassivePhaseNames = Object.freeze(['Unmount', 'Mount']);
 const noPassiveFieldNames = Object.freeze([]);
 const noPassivePhaseNames = Object.freeze([]);
+const contextReadRecordFieldNames = Object.freeze([
+  'read_index',
+  'fiber',
+  'context',
+  'default_value',
+  'value',
+  'active_provider_count',
+  'dependency'
+]);
+const contextDependencyRecordFieldNames = Object.freeze([
+  'handle',
+  'fiber',
+  'context',
+  'memoized_value',
+  'read_index',
+  'render_read_index',
+  'render_lanes',
+  'dependency_lanes',
+  'next',
+  'renderer_visible_propagation',
+  'propagation_flags'
+]);
+const contextPropagationDependencyRecordFieldNames = Object.freeze([
+  'dependency',
+  'fiber',
+  'context',
+  'memoized_value',
+  'previous_value',
+  'next_value',
+  'propagation_lanes',
+  'previous_dependency_lanes',
+  'dependency_lanes',
+  'root'
+]);
+const contextPropagationRecordFieldNames = Object.freeze([
+  'render',
+  'change',
+  'propagation_lanes',
+  'scanned_dependency_count',
+  'marked_dependencies',
+  'roots'
+]);
 
 const effectHookMetadataByHookName = Object.freeze({
   useEffect: createEffectHookMetadata({
@@ -119,6 +164,81 @@ const effectHookMetadataByHookName = Object.freeze({
   })
 });
 const effectHookNames = Object.freeze(Object.keys(effectHookMetadataByHookName));
+
+const privateEffectHookDispatcherMetadata = freezeRecord({
+  capability: 'fast-react.private.effect_hook_dispatcher',
+  compatibilityTarget: 'react@19.2.6',
+  compatibilityClaimed: false,
+  exposesPublicHookImplementation: false,
+  rendererIntegration: false,
+  schedulesPublicAct: false,
+  executesEffectCallbacks: false,
+  hookNames: freezeArray(effectHookNames),
+  effectRegistrationFieldNames,
+  effectUpdateQueueRecordFieldNames,
+  effectDependencyStatusNames,
+  hookRenderPhaseNames,
+  passiveEffectMetadataFieldNames,
+  pendingPassiveCommitHandoffFieldNames,
+  pendingPassiveEffectCommitFieldNames,
+  pendingPassivePhaseNames,
+  acceptedReconcilerRecords: freezeArray([
+    'FunctionComponentEffectRegistration',
+    'FunctionComponentEffectUpdateQueueRecord',
+    'FunctionComponentEffectDependencyStatus',
+    'FunctionComponentHookRenderPhase',
+    'FunctionComponentUseEffectHookRenderRecord',
+    'FunctionComponentUseEffectRenderRecord',
+    'FunctionComponentPassiveEffectMetadata',
+    'FunctionComponentPendingPassiveCommitHandoff',
+    'FunctionComponentPendingPassiveEffectCommitRecord'
+  ])
+});
+
+const privateEffectHookDispatcherMetadataArrayKeys = freezeArray([
+  'hookNames',
+  'effectRegistrationFieldNames',
+  'effectUpdateQueueRecordFieldNames',
+  'effectDependencyStatusNames',
+  'hookRenderPhaseNames',
+  'passiveEffectMetadataFieldNames',
+  'pendingPassiveCommitHandoffFieldNames',
+  'pendingPassiveEffectCommitFieldNames',
+  'pendingPassivePhaseNames',
+  'acceptedReconcilerRecords'
+]);
+
+const privateContextHookDispatcherMetadata = freezeRecord({
+  capability: 'fast-react.private.context_hook_dispatcher',
+  compatibilityTarget: 'react@19.2.6',
+  compatibilityClaimed: false,
+  exposesPublicHookImplementation: false,
+  rendererIntegration: false,
+  runtimeProviderPropagation: false,
+  rendererVisiblePropagation: false,
+  hookNames: freezeArray(['useContext']),
+  contextReadRecordFields: contextReadRecordFieldNames,
+  contextDependencyRecordFields: contextDependencyRecordFieldNames,
+  contextPropagationDependencyRecordFields:
+    contextPropagationDependencyRecordFieldNames,
+  contextPropagationRecordFields: contextPropagationRecordFieldNames,
+  acceptedReconcilerRecords: freezeArray([
+    'FunctionComponentContextReadRecord',
+    'FunctionComponentContextDependencyRecord',
+    'FunctionComponentUseContextRenderRecord',
+    'FunctionComponentContextChangePropagationDependencyRecord',
+    'FunctionComponentContextChangePropagationRecord'
+  ])
+});
+
+const privateContextHookDispatcherMetadataArrayKeys = freezeArray([
+  'hookNames',
+  'contextReadRecordFields',
+  'contextDependencyRecordFields',
+  'contextPropagationDependencyRecordFields',
+  'contextPropagationRecordFields',
+  'acceptedReconcilerRecords'
+]);
 
 const privateStateHookDispatcherMetadata = freezeRecord({
   capability: 'fast-react.private.state_hook_dispatcher',
@@ -501,11 +621,19 @@ function isPrivateMemoHookDispatcher(dispatcher) {
 }
 
 function isPrivateContextHookDispatcher(dispatcher) {
-  return isObjectLike(dispatcher) && privateContextHookDispatchers.has(dispatcher);
+  return (
+    isObjectLike(dispatcher) &&
+    privateContextHookDispatchers.has(dispatcher) &&
+    privateContextHookDispatcherMetadataByDispatcher.has(dispatcher)
+  );
 }
 
 function isPrivateEffectHookDispatcher(dispatcher) {
-  return isObjectLike(dispatcher) && privateEffectHookDispatchers.has(dispatcher);
+  return (
+    isObjectLike(dispatcher) &&
+    privateEffectHookDispatchers.has(dispatcher) &&
+    privateEffectHookDispatcherMetadataByDispatcher.has(dispatcher)
+  );
 }
 
 function validatePrivateStateHookDispatcher(dispatcher, metadata) {
@@ -538,13 +666,15 @@ function validatePrivateMemoHookDispatcher(dispatcher, metadata) {
   validatePrivateMemoHookDispatcherMetadata(metadata);
 }
 
-function validatePrivateContextHookDispatcher(dispatcher) {
+function validatePrivateContextHookDispatcher(dispatcher, metadata) {
   if (!isObjectLike(dispatcher) || typeof dispatcher.useContext !== 'function') {
     throw createInvalidHookCallError('useContext');
   }
+
+  validatePrivateContextHookDispatcherMetadata(metadata);
 }
 
-function validatePrivateEffectHookDispatcher(dispatcher) {
+function validatePrivateEffectHookDispatcher(dispatcher, metadata) {
   if (!isObjectLike(dispatcher)) {
     throw createInvalidHookCallError('useEffect');
   }
@@ -554,6 +684,8 @@ function validatePrivateEffectHookDispatcher(dispatcher) {
       throw createInvalidHookCallError(hookName);
     }
   }
+
+  validatePrivateEffectHookDispatcherMetadata(metadata);
 }
 
 function markPrivateStateHookDispatcher(dispatcher, metadata) {
@@ -586,15 +718,23 @@ function markPrivateMemoHookDispatcher(dispatcher, metadata) {
   return dispatcher;
 }
 
-function markPrivateContextHookDispatcher(dispatcher) {
-  validatePrivateContextHookDispatcher(dispatcher);
+function markPrivateContextHookDispatcher(dispatcher, metadata) {
+  validatePrivateContextHookDispatcher(dispatcher, metadata);
   privateContextHookDispatchers.add(dispatcher);
+  privateContextHookDispatcherMetadataByDispatcher.set(
+    dispatcher,
+    privateContextHookDispatcherMetadata
+  );
   return dispatcher;
 }
 
-function markPrivateEffectHookDispatcher(dispatcher) {
-  validatePrivateEffectHookDispatcher(dispatcher);
+function markPrivateEffectHookDispatcher(dispatcher, metadata) {
+  validatePrivateEffectHookDispatcher(dispatcher, metadata);
   privateEffectHookDispatchers.add(dispatcher);
+  privateEffectHookDispatcherMetadataByDispatcher.set(
+    dispatcher,
+    privateEffectHookDispatcherMetadata
+  );
   return dispatcher;
 }
 
@@ -788,6 +928,22 @@ function getPrivateMemoHookDispatcherMetadata(dispatcher) {
   return privateMemoHookDispatcherMetadataByDispatcher.get(dispatcher);
 }
 
+function getPrivateContextHookDispatcherMetadata(dispatcher) {
+  if (!isPrivateContextHookDispatcher(dispatcher)) {
+    return null;
+  }
+
+  return privateContextHookDispatcherMetadataByDispatcher.get(dispatcher);
+}
+
+function getPrivateEffectHookDispatcherMetadata(dispatcher) {
+  if (!isPrivateEffectHookDispatcher(dispatcher)) {
+    return null;
+  }
+
+  return privateEffectHookDispatcherMetadataByDispatcher.get(dispatcher);
+}
+
 function getPrivateStateHookDispatcherMetadata(dispatcher) {
   if (!isPrivateStateHookDispatcher(dispatcher)) {
     return null;
@@ -879,6 +1035,64 @@ function isPrivateMemoHookDispatcherMetadata(metadata) {
   return true;
 }
 
+function isPrivateContextHookDispatcherMetadata(metadata) {
+  if (
+    !isObjectLike(metadata) ||
+    metadata.capability !== privateContextHookDispatcherMetadata.capability ||
+    metadata.compatibilityTarget !==
+      privateContextHookDispatcherMetadata.compatibilityTarget ||
+    metadata.compatibilityClaimed !== false ||
+    metadata.exposesPublicHookImplementation !== false ||
+    metadata.rendererIntegration !== false ||
+    metadata.runtimeProviderPropagation !== false ||
+    metadata.rendererVisiblePropagation !== false
+  ) {
+    return false;
+  }
+
+  for (const key of privateContextHookDispatcherMetadataArrayKeys) {
+    if (
+      !hasSameStringArray(
+        metadata[key],
+        privateContextHookDispatcherMetadata[key]
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isPrivateEffectHookDispatcherMetadata(metadata) {
+  if (
+    !isObjectLike(metadata) ||
+    metadata.capability !== privateEffectHookDispatcherMetadata.capability ||
+    metadata.compatibilityTarget !==
+      privateEffectHookDispatcherMetadata.compatibilityTarget ||
+    metadata.compatibilityClaimed !== false ||
+    metadata.exposesPublicHookImplementation !== false ||
+    metadata.rendererIntegration !== false ||
+    metadata.schedulesPublicAct !== false ||
+    metadata.executesEffectCallbacks !== false
+  ) {
+    return false;
+  }
+
+  for (const key of privateEffectHookDispatcherMetadataArrayKeys) {
+    if (
+      !hasSameStringArray(
+        metadata[key],
+        privateEffectHookDispatcherMetadata[key]
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function validatePrivateStateHookDispatcherMetadata(metadata) {
   if (!isPrivateStateHookDispatcherMetadata(metadata)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -894,6 +1108,18 @@ function validatePrivateCallbackHookDispatcherMetadata(metadata) {
 function validatePrivateMemoHookDispatcherMetadata(metadata) {
   if (!isPrivateMemoHookDispatcherMetadata(metadata)) {
     throw createInvalidHookCallError('useMemo');
+  }
+}
+
+function validatePrivateContextHookDispatcherMetadata(metadata) {
+  if (!isPrivateContextHookDispatcherMetadata(metadata)) {
+    throw createInvalidHookCallError('useContext');
+  }
+}
+
+function validatePrivateEffectHookDispatcherMetadata(metadata) {
+  if (!isPrivateEffectHookDispatcherMetadata(metadata)) {
+    throw createInvalidHookCallError('useEffect');
   }
 }
 
@@ -993,6 +1219,8 @@ module.exports = {
   effectHookNames,
   getEffectHookMetadata,
   getPrivateCallbackHookDispatcherMetadata,
+  getPrivateContextHookDispatcherMetadata,
+  getPrivateEffectHookDispatcherMetadata,
   getPrivateMemoHookDispatcherMetadata,
   getPrivateStateHookDispatcherMetadata,
   invalidHookCallErrorCode,
@@ -1000,7 +1228,9 @@ module.exports = {
   isPrivateCallbackHookDispatcher,
   isPrivateCallbackHookDispatcherMetadata,
   isPrivateContextHookDispatcher,
+  isPrivateContextHookDispatcherMetadata,
   isPrivateEffectHookDispatcher,
+  isPrivateEffectHookDispatcherMetadata,
   isPrivateMemoHookDispatcher,
   isPrivateMemoHookDispatcherMetadata,
   isPrivateStateHookDispatcher,
@@ -1011,6 +1241,8 @@ module.exports = {
   markPrivateMemoHookDispatcher,
   markPrivateStateHookDispatcher,
   privateCallbackHookDispatcherMetadata,
+  privateContextHookDispatcherMetadata,
+  privateEffectHookDispatcherMetadata,
   privateMemoHookDispatcherMetadata,
   privateStateHookDispatcherMetadata,
   resolveDispatcher,

@@ -97,6 +97,7 @@ const passiveEffectMetadataFieldNames = [
   "instance",
   "tag",
   "create",
+  "destroy",
   "dependencies",
   "lanes"
 ];
@@ -114,6 +115,66 @@ const pendingPassiveEffectCommitFieldNames = [
   "instance",
   "unmount_order",
   "mount_order"
+];
+const contextReadRecordFieldNames = [
+  "read_index",
+  "fiber",
+  "context",
+  "default_value",
+  "value",
+  "active_provider_count",
+  "dependency"
+];
+const contextDependencyRecordFieldNames = [
+  "handle",
+  "fiber",
+  "context",
+  "memoized_value",
+  "read_index",
+  "render_read_index",
+  "render_lanes",
+  "dependency_lanes",
+  "next",
+  "renderer_visible_propagation",
+  "propagation_flags"
+];
+const contextPropagationDependencyRecordFieldNames = [
+  "dependency",
+  "fiber",
+  "context",
+  "memoized_value",
+  "previous_value",
+  "next_value",
+  "propagation_lanes",
+  "previous_dependency_lanes",
+  "dependency_lanes",
+  "root"
+];
+const contextPropagationRecordFieldNames = [
+  "render",
+  "change",
+  "propagation_lanes",
+  "scanned_dependency_count",
+  "marked_dependencies",
+  "roots"
+];
+const acceptedEffectReconcilerRecords = [
+  "FunctionComponentEffectRegistration",
+  "FunctionComponentEffectUpdateQueueRecord",
+  "FunctionComponentEffectDependencyStatus",
+  "FunctionComponentHookRenderPhase",
+  "FunctionComponentUseEffectHookRenderRecord",
+  "FunctionComponentUseEffectRenderRecord",
+  "FunctionComponentPassiveEffectMetadata",
+  "FunctionComponentPendingPassiveCommitHandoff",
+  "FunctionComponentPendingPassiveEffectCommitRecord"
+];
+const acceptedContextReconcilerRecords = [
+  "FunctionComponentContextReadRecord",
+  "FunctionComponentContextDependencyRecord",
+  "FunctionComponentUseContextRenderRecord",
+  "FunctionComponentContextChangePropagationDependencyRecord",
+  "FunctionComponentContextChangePropagationRecord"
 ];
 
 const expectedEffectHookMetadata = {
@@ -291,6 +352,68 @@ test("effect hook private metadata names stay aligned to accepted effect records
   }
 
   assert.equal(hookDispatcher.getEffectHookMetadata("useEffectEvent"), null);
+});
+
+test("private effect-hook dispatcher metadata names match accepted effect diagnostics", () => {
+  const metadata = hookDispatcher.privateEffectHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.effect_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.exposesPublicHookImplementation, false);
+  assert.equal(metadata.rendererIntegration, false);
+  assert.equal(metadata.schedulesPublicAct, false);
+  assert.equal(metadata.executesEffectCallbacks, false);
+  assert.deepEqual(metadata.hookNames, [
+    "useEffect",
+    "useImperativeHandle",
+    "useInsertionEffect",
+    "useLayoutEffect"
+  ]);
+  assert.deepEqual(
+    metadata.effectRegistrationFieldNames,
+    effectRegistrationFieldNames
+  );
+  assert.deepEqual(
+    metadata.effectUpdateQueueRecordFieldNames,
+    effectUpdateQueueRecordFieldNames
+  );
+  assert.deepEqual(
+    metadata.effectDependencyStatusNames,
+    effectDependencyStatusNames
+  );
+  assert.deepEqual(metadata.hookRenderPhaseNames, hookRenderPhaseNames);
+  assert.deepEqual(
+    metadata.passiveEffectMetadataFieldNames,
+    passiveEffectMetadataFieldNames
+  );
+  assert.deepEqual(
+    metadata.pendingPassiveCommitHandoffFieldNames,
+    pendingPassiveCommitHandoffFieldNames
+  );
+  assert.deepEqual(
+    metadata.pendingPassiveEffectCommitFieldNames,
+    pendingPassiveEffectCommitFieldNames
+  );
+  assert.deepEqual(metadata.pendingPassivePhaseNames, ["Unmount", "Mount"]);
+  assert.deepEqual(
+    metadata.acceptedReconcilerRecords,
+    acceptedEffectReconcilerRecords
+  );
+  assert.equal(
+    hookDispatcher.isPrivateEffectHookDispatcherMetadata(metadata),
+    true
+  );
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(React.privateEffectHookDispatcherMetadata, undefined);
+  assert.equal(React.markPrivateEffectHookDispatcher, undefined);
 });
 
 test("selected public React hooks throw the invalid-hook-call boundary without a dispatcher", () => {
@@ -676,6 +799,50 @@ test("private memo-hook dispatcher metadata names match accepted useMemo diagnos
   assert.equal(React.markPrivateMemoHookDispatcher, undefined);
 });
 
+test("private context-hook dispatcher metadata names match accepted context diagnostics", () => {
+  const metadata = hookDispatcher.privateContextHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.context_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.exposesPublicHookImplementation, false);
+  assert.equal(metadata.rendererIntegration, false);
+  assert.equal(metadata.runtimeProviderPropagation, false);
+  assert.equal(metadata.rendererVisiblePropagation, false);
+  assert.deepEqual(metadata.hookNames, ["useContext"]);
+  assert.deepEqual(metadata.contextReadRecordFields, contextReadRecordFieldNames);
+  assert.deepEqual(
+    metadata.contextDependencyRecordFields,
+    contextDependencyRecordFieldNames
+  );
+  assert.deepEqual(
+    metadata.contextPropagationDependencyRecordFields,
+    contextPropagationDependencyRecordFieldNames
+  );
+  assert.deepEqual(
+    metadata.contextPropagationRecordFields,
+    contextPropagationRecordFieldNames
+  );
+  assert.deepEqual(
+    metadata.acceptedReconcilerRecords,
+    acceptedContextReconcilerRecords
+  );
+  assert.equal(
+    hookDispatcher.isPrivateContextHookDispatcherMetadata(metadata),
+    true
+  );
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(React.privateContextHookDispatcherMetadata, undefined);
+  assert.equal(React.markPrivateContextHookDispatcher, undefined);
+});
+
 test("private callback-hook dispatcher marker rejects dependency metadata drift", () => {
   const dispatcher = {
     useCallback() {
@@ -723,6 +890,61 @@ test("private memo-hook dispatcher marker rejects diagnostic metadata drift", ()
     "useMemo"
   );
   assert.equal(hookDispatcher.isPrivateMemoHookDispatcher(dispatcher), false);
+});
+
+test("private context-hook dispatcher marker rejects diagnostic metadata drift", () => {
+  const dispatcher = {
+    useContext() {
+      throw new Error("unreachable context dispatch");
+    }
+  };
+  const driftedMetadata = {
+    ...hookDispatcher.privateContextHookDispatcherMetadata,
+    contextDependencyRecordFields: ["context", "memoized_value"]
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateContextHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateContextHookDispatcher(
+        dispatcher,
+        driftedMetadata
+      ),
+    "useContext"
+  );
+  assert.equal(hookDispatcher.isPrivateContextHookDispatcher(dispatcher), false);
+});
+
+test("private effect-hook dispatcher marker rejects passive metadata drift", () => {
+  const dispatcher = Object.fromEntries(
+    effectDefaultHooks.map(([hookName]) => [
+      hookName,
+      function () {
+        throw new Error(`unreachable ${hookName} dispatch`);
+      }
+    ])
+  );
+  const driftedMetadata = {
+    ...hookDispatcher.privateEffectHookDispatcherMetadata,
+    passiveEffectMetadataFieldNames: ["fiber", "effect", "create"]
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateEffectHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateEffectHookDispatcher(
+        dispatcher,
+        driftedMetadata
+      ),
+    "useEffect"
+  );
+  assert.equal(hookDispatcher.isPrivateEffectHookDispatcher(dispatcher), false);
 });
 
 test("private state-hook dispatcher marker rejects lane and update metadata drift", () => {
@@ -794,6 +1016,10 @@ test("useContext fails closed without a marked private context dispatcher", () =
   hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
 
   assertInvalidHookCall(() => React.useContext(context), "useContext");
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateContextHookDispatcher(genericDispatcher),
+    "useContext"
+  );
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateContextHookDispatcher(genericDispatcher),
@@ -819,11 +1045,75 @@ test("effect hooks fail closed without a marked private effect-hook dispatcher",
     assertInvalidHookCall(() => React[hookName](...args), hookName);
   }
 
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateEffectHookDispatcher(genericDispatcher),
+    "useEffect"
+  );
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateEffectHookDispatcher(genericDispatcher),
     false
   );
+});
+
+test("accepted private hook methods stay public-blocked on an unmarked dispatcher", () => {
+  const calls = [];
+  const context = { $$typeof: Symbol.for("react.context") };
+  const create = () => {
+    calls.push("create");
+  };
+  const callback = () => {
+    calls.push("callback");
+    return "callback";
+  };
+  const dispatcher = {
+    useCallback(...args) {
+      calls.push(["useCallback", args]);
+      return callback;
+    },
+    useContext(...args) {
+      calls.push(["useContext", args]);
+      return "context";
+    },
+    useEffect(...args) {
+      calls.push(["useEffect", args]);
+    },
+    useImperativeHandle(...args) {
+      calls.push(["useImperativeHandle", args]);
+    },
+    useInsertionEffect(...args) {
+      calls.push(["useInsertionEffect", args]);
+    },
+    useLayoutEffect(...args) {
+      calls.push(["useLayoutEffect", args]);
+    },
+    useMemo(...args) {
+      calls.push(["useMemo", args]);
+      return "memo";
+    },
+    useReducer(...args) {
+      calls.push(["useReducer", args]);
+      return ["reducer"];
+    },
+    useState(...args) {
+      calls.push(["useState", args]);
+      return ["state"];
+    }
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assertStateHookDispatcherUnavailable(() => React.useState(0), "useState");
+  assertStateHookDispatcherUnavailable(
+    () => React.useReducer((state) => state, 0),
+    "useReducer"
+  );
+  assertInvalidHookCall(() => React.useCallback(callback, []), "useCallback");
+  assertInvalidHookCall(() => React.useMemo(create, []), "useMemo");
+  assertInvalidHookCall(() => React.useContext(context), "useContext");
+  assertInvalidHookCall(() => React.useEffect(create, []), "useEffect");
+
+  assert.deepEqual(calls, []);
 });
 
 test("selected public React hooks forward to the installed dispatcher", () => {
@@ -1015,15 +1305,19 @@ test("useState and useReducer forward only to a marked private state-hook dispat
 
 test("useContext forwards only to a marked private context dispatcher", () => {
   const calls = [];
-  const dispatcher = hookDispatcher.markPrivateContextHookDispatcher({
-    useContext(context) {
-      calls.push({
-        context,
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return context._currentValue;
-    }
-  });
+  const metadata = hookDispatcher.privateContextHookDispatcherMetadata;
+  const dispatcher = hookDispatcher.markPrivateContextHookDispatcher(
+    {
+      useContext(context) {
+        calls.push({
+          context,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return context._currentValue;
+      }
+    },
+    metadata
+  );
   const context = {
     $$typeof: Symbol.for("react.context"),
     _currentValue: "private-context-value"
@@ -1039,11 +1333,16 @@ test("useContext forwards only to a marked private context dispatcher", () => {
     }
   ]);
   assert.equal(hookDispatcher.isPrivateContextHookDispatcher(dispatcher), true);
+  assert.equal(
+    hookDispatcher.getPrivateContextHookDispatcherMetadata(dispatcher),
+    metadata
+  );
 });
 
 test("effect hooks forward only to a marked private effect-hook dispatcher", () => {
   const calls = [];
   const createdEffects = [];
+  const metadata = hookDispatcher.privateEffectHookDispatcherMetadata;
   const passiveCreate = () => {
     createdEffects.push("passive");
   };
@@ -1058,44 +1357,47 @@ test("effect hooks forward only to a marked private effect-hook dispatcher", () 
   const layoutCreate = () => {
     createdEffects.push("layout");
   };
-  const dispatcher = hookDispatcher.markPrivateEffectHookDispatcher({
-    useEffect(create, deps, metadata) {
-      calls.push({
-        args: [create, deps],
-        hookName: "useEffect",
-        metadata,
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return "return:useEffect";
+  const dispatcher = hookDispatcher.markPrivateEffectHookDispatcher(
+    {
+      useEffect(create, deps, receivedMetadata) {
+        calls.push({
+          args: [create, deps],
+          hookName: "useEffect",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return "return:useEffect";
+      },
+      useImperativeHandle(ref, create, deps, receivedMetadata) {
+        calls.push({
+          args: [ref, create, deps],
+          hookName: "useImperativeHandle",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return "return:useImperativeHandle";
+      },
+      useInsertionEffect(create, deps, receivedMetadata) {
+        calls.push({
+          args: [create, deps],
+          hookName: "useInsertionEffect",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return "return:useInsertionEffect";
+      },
+      useLayoutEffect(create, deps, receivedMetadata) {
+        calls.push({
+          args: [create, deps],
+          hookName: "useLayoutEffect",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return "return:useLayoutEffect";
+      }
     },
-    useImperativeHandle(ref, create, deps, metadata) {
-      calls.push({
-        args: [ref, create, deps],
-        hookName: "useImperativeHandle",
-        metadata,
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return "return:useImperativeHandle";
-    },
-    useInsertionEffect(create, deps, metadata) {
-      calls.push({
-        args: [create, deps],
-        hookName: "useInsertionEffect",
-        metadata,
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return "return:useInsertionEffect";
-    },
-    useLayoutEffect(create, deps, metadata) {
-      calls.push({
-        args: [create, deps],
-        hookName: "useLayoutEffect",
-        metadata,
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return "return:useLayoutEffect";
-    }
-  });
+    metadata
+  );
 
   hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
 
@@ -1148,6 +1450,10 @@ test("effect hooks forward only to a marked private effect-hook dispatcher", () 
     }
   ]);
   assert.equal(hookDispatcher.isPrivateEffectHookDispatcher(dispatcher), true);
+  assert.equal(
+    hookDispatcher.getPrivateEffectHookDispatcherMetadata(dispatcher),
+    metadata
+  );
 });
 
 test("react-server hooks share the generic guard while memo and callback stay private", () => {
