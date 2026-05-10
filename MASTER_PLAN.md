@@ -45,8 +45,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 655-684 is being launched in isolated
-`worker/<slug>` branches and worktrees.
+Top-level cap: 30 workers. Queue 655-684 is running in isolated
+`worker/<slug>` branches and worktrees from queue base `243817c`.
 
 - 655-666: Rust reconciler execution paths for commit mutation, effects, refs,
   context, Suspense, Offscreen, error recovery, sync flush callbacks, and
