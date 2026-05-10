@@ -321,9 +321,21 @@ sequencing belong in `MASTER_PLAN.md`.
   and CJS exports, shallow subpath preservation, package-surface coverage, and
   a lockfile entry while keeping serialization, `act`, create/update behavior,
   Rust test-renderer wiring, and compatibility claims blocked.
+- Worker 201 DOM text-content oracle was merged, adding a React DOM 19.2.6
+  text-content, HostText, and `dangerouslySetInnerHTML` oracle, generator and
+  print scripts, fail-closed local gate, focused tests, and checked artifact
+  while leaving React DOM implementation/package exports unchanged and
+  compatibility claims blocked.
 
 ## Latest Accepted Verification
 
+- Worker 201 was verified on its integrated worktree and again on `main` with
+  the focused 13-test DOM text-content oracle suite, byte-stable artifact
+  regeneration, `npm run test:conformance -- --runInBand` with 480 tests,
+  `npm run check:js` with 480 conformance tests plus package-surface,
+  benchmark, workspace, and native checks, and `git diff --check`; merging
+  current `main` into the worker branch produced no conflicts, and the merge
+  commit applied cleanly to `main`.
 - Worker 202 was verified on its integrated worktree and again on `main` with
   node syntax checks for new/touched JS files, `npm run check:package-surface`,
   `node tests/smoke/import-entrypoints.mjs`, the focused

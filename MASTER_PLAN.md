@@ -45,8 +45,7 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 201: DOM text-content oracle in
-  `/Users/user/Developer/Developer/fast-react-worker-201-dom-text-content-oracle`.
+- No active top-level workers.
 
 ## Near-Term Sequencing
 
