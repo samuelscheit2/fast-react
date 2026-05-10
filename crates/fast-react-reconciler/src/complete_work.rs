@@ -1736,6 +1736,114 @@ mod tests {
     }
 
     #[test]
+    fn complete_offscreen_hidden_update_defers_subtree_until_offscreen_lane() {
+        let render_lanes = Lanes::DEFAULT;
+        let previous_lanes = Lanes::SYNC;
+        let previous_child_lanes = Lanes::NO;
+        let work_in_progress_lanes = Lanes::DEFAULT;
+        let work_in_progress_child_lanes = Lanes::DEFAULT;
+        let (mut arena, previous, work_in_progress, first_child, second_child) =
+            offscreen_complete_transition_pair(
+                "complete-deferred-hidden-update",
+                StateHandle::NONE,
+                StateHandle::from_raw(9_061),
+                previous_lanes,
+                previous_child_lanes,
+                work_in_progress_lanes,
+                work_in_progress_child_lanes,
+                false,
+            );
+        {
+            let child = arena.get_mut(first_child).unwrap();
+            child.set_lanes(Lanes::DEFAULT);
+            child.set_subtree_flags(FiberFlags::UPDATE);
+        }
+        let begin_work_record =
+            offscreen_begin_work_visibility_record(&mut arena, work_in_progress, render_lanes);
+
+        let record = complete_offscreen_visibility_transition_blocker_for_test(
+            &arena,
+            work_in_progress,
+            &begin_work_record,
+            render_lanes,
+        )
+        .unwrap();
+
+        assert_eq!(record.offscreen(), work_in_progress);
+        assert_eq!(record.child(), Some(first_child));
+        assert_eq!(record.child_tag(), Some(FiberTag::HostComponent));
+        assert_eq!(record.child_sibling(), second_child);
+        let transition = record.transition();
+        assert!(
+            record
+                .begin_work_transition()
+                .has_same_transition_identity(transition)
+        );
+        assert_eq!(transition.previous(), previous);
+        assert_eq!(transition.work_in_progress(), work_in_progress);
+        assert_eq!(
+            transition.key().map(ReactKey::as_str),
+            Some("complete-deferred-hidden-update")
+        );
+        assert_eq!(
+            transition.transition(),
+            UnsupportedOffscreenVisibilityTransitionKind::VisibleToHidden
+        );
+        assert_eq!(
+            transition.child_traversal_blocker(),
+            UnsupportedOffscreenVisibilityChildTraversalBlocker::CompleteWorkDoesNotBubbleChildrenOrScheduleVisibility
+        );
+        assert_eq!(transition.render_lanes(), render_lanes);
+        assert_eq!(transition.previous_lanes(), previous_lanes);
+        assert_eq!(transition.previous_child_lanes(), previous_child_lanes);
+        assert_eq!(transition.work_in_progress_lanes(), work_in_progress_lanes);
+        assert_eq!(
+            transition.work_in_progress_child_lanes(),
+            work_in_progress_child_lanes
+        );
+        assert!(!transition.render_includes_offscreen_lane());
+        assert!(!transition.work_in_progress_includes_offscreen_lane());
+        assert!(!transition.records_offscreen_lane_participation());
+        assert_eq!(
+            record.subtree_flag_bubbling_intent(),
+            OffscreenVisibilitySubtreeFlagBubblingIntent::DeferHiddenSubtreeUntilOffscreenLane
+        );
+        assert!(
+            !record
+                .subtree_flag_bubbling_intent()
+                .should_bubble_subtree_flags()
+        );
+        assert_eq!(
+            record.subtree_flag_bubbling_intent().as_str(),
+            "defer-hidden-subtree-until-offscreen-lane"
+        );
+        assert_eq!(record.candidate_child_lanes(), Lanes::DEFAULT);
+        assert!(
+            record
+                .candidate_subtree_flags()
+                .contains_all(FiberFlags::PLACEMENT | FiberFlags::UPDATE)
+        );
+        assert!(record.would_schedule_visibility_effect());
+        assert!(!record.would_schedule_visibility_for_subtree_mutation());
+        assert!(record.child_traversal_blocked());
+        assert!(record.host_mutation_blocked());
+        assert!(record.public_compatibility_blocked());
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().subtree_flags(),
+            FiberFlags::NO
+        );
+        assert_eq!(
+            offscreen_reveal_commit_metadata_for_test(&record, render_lanes),
+            Err(
+                OffscreenRevealCommitMetadataError::UnsupportedVisibilityTransition {
+                    offscreen: work_in_progress,
+                    transition: UnsupportedOffscreenVisibilityTransitionKind::VisibleToHidden,
+                },
+            )
+        );
+    }
+
+    #[test]
     fn complete_offscreen_visibility_transition_blocker_rejects_shapes_and_stale_begin_work() {
         let render_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
         let (mut arena, _, work_in_progress, _, _) = offscreen_complete_transition_pair(

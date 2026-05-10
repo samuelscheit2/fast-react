@@ -1578,6 +1578,39 @@ impl HostRootOffscreenRevealCommitHandoffRecordForCanary {
         self.execution_request
             .public_passive_compatibility_blocked()
     }
+
+    #[must_use]
+    pub(crate) fn deferred_hidden_update_callbacks_match_reveal_metadata(&self) -> bool {
+        let callbacks = self.commit().root_update_callbacks();
+        callbacks.visible().is_empty()
+            && callbacks.hidden().is_empty()
+            && callbacks.deferred_hidden().len() == self.execution_request.hidden_update_count()
+            && callbacks
+                .deferred_hidden()
+                .iter()
+                .all(|record| record.visibility().is_deferred())
+    }
+
+    #[must_use]
+    pub(crate) fn proves_hidden_update_deferred_and_revealed_through_commit_metadata(
+        &self,
+    ) -> bool {
+        self.complete_metadata_matches_commit()
+            && self.deferred_hidden_update_callbacks_match_reveal_metadata()
+            && self.execution_request.committed_lanes_match_render()
+            && self.execution_request.offscreen_lane_metadata_recorded()
+            && self.execution_request.hidden_to_visible_reveal()
+            && self
+                .commit()
+                .finished_lanes()
+                .contains_lane(Lane::OFFSCREEN)
+            && self
+                .commit()
+                .finished_lanes()
+                .remove_lane(Lane::OFFSCREEN)
+                .contains_lane(self.execution_request.hidden_update_lane())
+            && self.public_compatibility_blocked()
+    }
 }
 
 #[cfg(test)]
@@ -15313,6 +15346,7 @@ mod tests {
         offscreen: FiberId,
         child: FiberId,
         hidden_update: UpdateId,
+        hidden_callback: RootUpdateCallbackHandle,
     }
 
     fn prepare_offscreen_reveal_commit_fixture(
@@ -15323,13 +15357,8 @@ mod tests {
         reveal_committed_lanes: Lanes,
         child_tag: FiberTag,
     ) -> OffscreenRevealCommitFixture {
-        let hidden_update = update_container(
-            store,
-            root,
-            element,
-            Some(RootUpdateCallbackHandle::from_raw(element.raw() + 10_000)),
-        )
-        .unwrap();
+        let hidden_callback = RootUpdateCallbackHandle::from_raw(element.raw() + 10_000);
+        let hidden_update = update_container(store, root, element, Some(hidden_callback)).unwrap();
         if retain_offscreen_lane {
             store
                 .update_queues_mut()
@@ -15373,6 +15402,7 @@ mod tests {
             offscreen,
             child,
             hidden_update: hidden_update.update(),
+            hidden_callback,
         }
     }
 
@@ -22498,6 +22528,129 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().current(),
             fixture.render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_offscreen_hidden_update_is_deferred_then_revealed_with_lane_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_offscreen_reveal_commit_fixture(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(8_615),
+            true,
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN),
+            FiberTag::HostText,
+        );
+        let before_commit_callbacks = store
+            .update_queues()
+            .peek_root_update_callback_records(fixture.render.work_in_progress_update_queue())
+            .unwrap();
+
+        assert!(before_commit_callbacks.visible().is_empty());
+        assert_eq!(
+            callback_handles(before_commit_callbacks.hidden()),
+            vec![fixture.hidden_callback]
+        );
+        assert!(before_commit_callbacks.deferred_hidden().is_empty());
+        assert_eq!(
+            before_commit_callbacks.hidden()[0].update(),
+            fixture.hidden_update
+        );
+        assert_eq!(
+            before_commit_callbacks.hidden()[0].visibility(),
+            RootUpdateCallbackVisibility::Hidden
+        );
+
+        let handoff = commit_offscreen_reveal_complete_metadata_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.reveal_metadata.clone(),
+            3,
+        )
+        .unwrap();
+
+        assert!(handoff.proves_hidden_update_deferred_and_revealed_through_commit_metadata());
+        assert!(handoff.deferred_hidden_update_callbacks_match_reveal_metadata());
+        assert!(handoff.complete_metadata_matches_commit());
+        assert_eq!(handoff.commit_order(), 3);
+
+        let request = handoff.execution_request();
+        assert_eq!(request.hidden_update_lane(), Lane::DEFAULT);
+        assert_eq!(request.hidden_update_count(), 1);
+        assert!(request.offscreen_lane_metadata_recorded());
+        assert!(request.hidden_to_visible_reveal());
+        assert_eq!(
+            request.render_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(request.committed_lanes(), request.render_lanes());
+        assert!(request.committed_lanes_match_render());
+
+        let callbacks = handoff.commit().root_update_callbacks();
+        assert!(callbacks.visible().is_empty());
+        assert!(callbacks.hidden().is_empty());
+        assert_eq!(
+            callback_handles(callbacks.deferred_hidden()),
+            vec![fixture.hidden_callback]
+        );
+        assert_eq!(
+            callbacks.deferred_hidden()[0].update(),
+            fixture.hidden_update
+        );
+        assert_eq!(
+            callbacks.deferred_hidden()[0].visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
+
+        let diagnostics = handoff
+            .commit()
+            .root_update_callback_drain_snapshot_for_canary(
+                &store,
+                handoff.commit_order(),
+                request.render_lanes(),
+            )
+            .unwrap();
+
+        assert_eq!(diagnostics.root(), root_id);
+        assert_eq!(diagnostics.commit_order(), handoff.commit_order());
+        assert_eq!(diagnostics.render_lanes(), request.render_lanes());
+        assert_eq!(diagnostics.finished_lanes(), request.render_lanes());
+        assert_eq!(diagnostics.pending_lanes_after_commit(), Lanes::NO);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics.visible_callback_count(), 0);
+        assert_eq!(diagnostics.hidden_callback_count(), 1);
+        assert!(diagnostics.records_match_commit_lanes());
+        assert!(diagnostics.hidden_callbacks_deferred_without_invocation());
+        assert!(diagnostics.proves_deterministic_lane_order());
+        assert!(!diagnostics.public_callbacks_invoked());
+        assert!(!diagnostics.public_root_callback_behavior_exposed());
+
+        let record = diagnostics.records()[0];
+        assert_eq!(record.update(), fixture.hidden_update);
+        assert_eq!(record.callback(), fixture.hidden_callback);
+        assert_eq!(
+            record.visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
+        assert_eq!(
+            record.update_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(record.callback_lanes(), Lanes::DEFAULT);
+        assert!(record.update_lanes_include_offscreen());
+        assert!(record.callback_lanes_match_commit());
+        assert!(!record.public_callback_invoked());
+        assert!(!record.public_root_callback_behavior_exposed());
+        assert_eq!(
+            store
+                .update_queues()
+                .update(fixture.hidden_update)
+                .unwrap()
+                .lane(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
