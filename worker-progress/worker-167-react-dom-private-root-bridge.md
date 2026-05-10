@@ -42,6 +42,20 @@ Evidence gathered:
 - Tests assert the private bridge does not create root markers or listener
   registrations.
 
+Orchestrator acceptance verification:
+- Worker tmux pane reported `Goal achieved`.
+- Merged current `main` into `worker/167-react-dom-private-root-bridge`
+  without conflicts.
+- `node --check packages/react-dom/src/client/root-bridge.js` passed.
+- `node --check tests/smoke/react-dom-private-root-bridge-shell.mjs` passed.
+- `node tests/smoke/react-dom-private-root-bridge-shell.mjs` passed.
+- `npm run check:package-surface` passed with the package-surface snapshot
+  guard.
+- `npm run check:js` passed on the integrated branch, including the package
+  surface guard, import smoke, benchmark gate, workspace checks, and 428
+  conformance tests.
+- `git diff --check main...HEAD` passed.
+
 Nested agents:
 - Spawned two read-only explorers for helper-boundary and test-shape checks.
   They did not return usable final findings before timeout; they were closed
