@@ -121,6 +121,22 @@ const actSchedulerNestedScopeMissingBeforeExecution = [
   "public-react-test-renderer-nested-act-queue-reuse",
   "public-react-test-renderer-overlapping-act-warning-emission"
 ];
+const actPrivateRootPassiveSequenceRecordId =
+  "react-test-renderer-act-private-root-passive-prerequisite-sequence";
+const actPrivateRootPassiveRequiredPrerequisiteIds = [
+  "test-renderer-private-root-request-records",
+  "scheduler-mock-flush-helper-metadata",
+  "passive-effect-scheduler-flush-metadata",
+  "act-warning-thenable-public-compatibility-blockers",
+  "act-nested-scope-public-compatibility-blockers"
+];
+const actPrivateRootPassiveSequencePhases = [
+  "private-root-request",
+  "scheduler-flush-helper",
+  "passive-scheduler-request",
+  "public-act-warning-thenable-blocker",
+  "public-act-nested-scope-blocker"
+];
 const privateRouteStatus = "blocked-js-native-bridge-not-loaded";
 const privateRootBridgeStatus =
   "blocked-private-test-renderer-root-bridge-execution";
@@ -267,6 +283,7 @@ const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
   "test-renderer-mock-scheduler-flush-helper-routing",
   "react-test-renderer-act-warning-thenable-blockers",
   "react-test-renderer-act-nested-scope-blockers",
+  actPrivateRootPassiveSequenceRecordId,
   "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
@@ -319,7 +336,8 @@ const acceptedPrivateActFlushCjsDevelopmentPrerequisiteIds = [
   ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(0, 4),
   "act-warning-thenable-public-compatibility-blockers",
   "act-nested-scope-public-compatibility-blockers",
-  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(4)
+  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(4),
+  actPrivateRootPassiveSequenceRecordId
 ];
 const blockedPrivateActFlushPrerequisiteIds = [
   "private-act-queue-drain-execution",
@@ -5121,7 +5139,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-482-test-renderer-act-scheduler-flush-gate",
       "worker-517-test-renderer-act-warning-thenable-blockers",
       "worker-518-scheduler-mock-expired-act-route",
-      "worker-541-test-renderer-act-nested-scope-blockers"
+      "worker-541-test-renderer-act-nested-scope-blockers",
+      "worker-576-test-renderer-act-private-root-passive-sequence"
     );
   }
 
@@ -5183,6 +5202,10 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.equal(
     gate.nestedScopeBlockerDiagnosticsAccepted,
+    cjsDevelopmentOnly ? true : undefined
+  );
+  assert.equal(
+    gate.privateRootPassivePrerequisiteSequenceAccepted,
     cjsDevelopmentOnly ? true : undefined
   );
   assert.equal(
@@ -5299,6 +5322,91 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(nestedScopeRecord.executesEffects, false);
     assert.equal(nestedScopeRecord.executesPassiveEffects, false);
     assert.equal(nestedScopeRecord.compatibilityClaimed, false);
+
+    const sequenceRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === actPrivateRootPassiveSequenceRecordId
+      );
+    assert.notEqual(sequenceRecord, undefined);
+    assert.equal(
+      sequenceRecord.status,
+      "blocked-private-react-test-renderer-act-root-passive-sequence-diagnostics-only"
+    );
+    assert.deepEqual(
+      sequenceRecord.requiredPrerequisiteIds,
+      actPrivateRootPassiveRequiredPrerequisiteIds
+    );
+    assert.deepEqual(
+      sequenceRecord.prerequisiteSequence.map((row) => row.phase),
+      actPrivateRootPassiveSequencePhases
+    );
+    assert.deepEqual(
+      sequenceRecord.prerequisiteSequence.map((row) => row.order),
+      [0, 1, 2, 3, 4]
+    );
+    assert.equal(
+      sequenceRecord.privateRootRequestPrerequisiteMetadataAccepted,
+      true
+    );
+    assert.equal(
+      sequenceRecord.schedulerFlushHelperPrerequisiteMetadataAccepted,
+      true
+    );
+    assert.equal(
+      sequenceRecord.passiveSchedulerPrerequisiteMetadataAccepted,
+      true
+    );
+    assert.equal(sequenceRecord.publicActBlockerPrerequisiteRowsAccepted, true);
+    assert.equal(
+      gate.recognizedPrivateRootPassivePrerequisiteSequence,
+      sequenceRecord.diagnostics
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .rootPassivePrerequisiteSequenceDiagnostics,
+      sequenceRecord.diagnostics
+    );
+    const sequenceReport =
+      sequenceRecord.diagnostics
+        .assertAcceptedPrivateRootPassivePrerequisiteSequence(
+          gate.acceptedPrivateFlushPrerequisites
+        );
+    assert.equal(sequenceReport.accepted, true);
+    assert.equal(sequenceReport.rejectionReason, null);
+    for (const [missingId, expectedReason] of [
+      [
+        "test-renderer-private-root-request-records",
+        "missing-root-request-prerequisite-metadata"
+      ],
+      [
+        "scheduler-mock-flush-helper-metadata",
+        "missing-scheduler-flush-helper-prerequisite-metadata"
+      ],
+      [
+        "passive-effect-scheduler-flush-metadata",
+        "missing-passive-scheduler-prerequisite-metadata"
+      ]
+    ]) {
+      const missingPrerequisites =
+        gate.acceptedPrivateFlushPrerequisites.filter(
+          (prerequisite) => prerequisite.id !== missingId
+        );
+      const rejected =
+        sequenceRecord.diagnostics
+          .describeAcceptedPrivateRootPassivePrerequisiteSequence(
+            missingPrerequisites
+          );
+      assert.equal(rejected.accepted, false, missingId);
+      assert.equal(rejected.rejectionReason, expectedReason, missingId);
+    }
+    assert.equal(sequenceRecord.invokesActCallback, false);
+    assert.equal(sequenceRecord.awaitsThenables, false);
+    assert.equal(sequenceRecord.emitsWarnings, false);
+    assert.equal(sequenceRecord.executesQueuedWork, false);
+    assert.equal(sequenceRecord.executesScheduledCallbacks, false);
+    assert.equal(sequenceRecord.executesPassiveEffects, false);
+    assert.equal(sequenceRecord.executesRootRequests, false);
+    assert.equal(sequenceRecord.compatibilityClaimed, false);
   } else {
     const nestedScopeRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
@@ -5308,7 +5416,16 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(nestedScopeRecord, undefined);
     assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
     assert.equal(
+      gate.recognizedPrivateRootPassivePrerequisiteSequence,
+      undefined
+    );
+    assert.equal(
       gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics,
+      undefined
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .rootPassivePrerequisiteSequenceDiagnostics,
       undefined
     );
   }
