@@ -2374,6 +2374,7 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     "TestRendererRoot::describe_private_to_json_after_nested_update_native_execution_for_canary",
     "TestRendererRoot::describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics",
     "TestRendererRoot::describe_private_to_json_after_unmount_native_execution_for_canary",
+    "TestRendererRoot::describe_private_to_json_finished_work_identity_gate_for_canary",
     "TestRendererPrivateToJsonNativeExecutionEvidence"
   ]);
   assert.deepEqual(facade.nativeExecutionAcceptedRustTests, [
@@ -2381,7 +2382,13 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     "root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row",
     "root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row",
     "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
-    "root_private_to_json_native_execution_evidence_rejects_stale_update_record"
+    "root_private_to_json_native_execution_evidence_rejects_stale_update_record",
+    "root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff",
+    "root_private_serialization_finished_work_identity_gate_rejects_missing_evidence",
+    "root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence",
+    "root_private_serialization_finished_work_identity_gate_rejects_stale_evidence",
+    "root_private_serialization_finished_work_identity_gate_rejects_non_committed_identity",
+    "root_private_serialization_finished_work_identity_gate_rejects_lane_mismatch"
   ]);
   assert.equal(
     typeof facade.createAcceptedNativeExecutionDiagnosticResult,
@@ -9255,6 +9262,27 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
   );
   assert.equal(gate.privateFacadeGateAvailable, true, entrypoint);
   assert.equal(gate.privateTreeMetadataSerializable, true, entrypoint);
+  assert.equal(gate.privateFinishedWorkIdentityGateAvailable, true, entrypoint);
+  assert.equal(
+    gate.privateFinishedWorkIdentityDiagnosticName,
+    "fast-react-test-renderer.serialization.private-finished-work-identity",
+    entrypoint
+  );
+  assert.equal(
+    gate.privateFinishedWorkIdentityStatus,
+    "private-serialization-finished-work-identity-validated-public-serialization-blocked",
+    entrypoint
+  );
+  assert.equal(
+    gate.consumesCommittedHostRootFinishedWorkIdentity,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    gate.consumesCommittedHostRootFinishedWorkLanes,
+    true,
+    entrypoint
+  );
   const nativeToTreeEvidence =
     gate.privateNativeExecutionEvidenceAvailable === true;
   const developmentCompositeToTreeEvidence =
@@ -9358,10 +9386,12 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
           "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary"
         ]
       : []),
+    "TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary",
     "TestRendererPrivateTreeMetadataReport",
     ...(nativeToTreeEvidence
       ? ["TestRendererPrivateToTreeNativeExecutionEvidence"]
       : []),
+    "TestRendererPrivateSerializationFinishedWorkIdentityGate",
     "TestRendererPrivateTreeFunctionComponentDiagnostic",
     "TestRendererPrivateTreeHostComponentDiagnostic",
     "TestRendererPrivateTreeHostTextDiagnostic"
@@ -9380,6 +9410,7 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
             : [])
         ]
       : []),
+    "root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff",
     "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
   ]);
   if (nativeToTreeEvidence) {
@@ -9428,6 +9459,31 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   assertPrivateToTreeFacadeGate(record.gate, entrypoint);
   assertPrivateToTreeHostOutputMetadataGate(record.metadataGate, entrypoint);
   assert.equal(record.privateTreeMetadataSerializable, true, entrypoint);
+  assert.equal(
+    record.privateFinishedWorkIdentityGateAvailable,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    record.privateFinishedWorkIdentityDiagnosticName,
+    "fast-react-test-renderer.serialization.private-finished-work-identity",
+    entrypoint
+  );
+  assert.equal(
+    record.privateFinishedWorkIdentityStatus,
+    "private-serialization-finished-work-identity-validated-public-serialization-blocked",
+    entrypoint
+  );
+  assert.equal(
+    record.consumesCommittedHostRootFinishedWorkIdentity,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    record.consumesCommittedHostRootFinishedWorkLanes,
+    true,
+    entrypoint
+  );
   const nativeToTreeEvidence =
     record.privateNativeExecutionEvidenceAvailable === true;
   const developmentCompositeToTreeEvidence =
@@ -9483,6 +9539,16 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   );
   assert.equal(
     typeof record.serializeAcceptedTreeMetadata,
+    "function",
+    entrypoint
+  );
+  assert.equal(
+    typeof record.canValidateAcceptedFinishedWorkIdentity,
+    "function",
+    entrypoint
+  );
+  assert.equal(
+    typeof record.validateAcceptedFinishedWorkIdentity,
     "function",
     entrypoint
   );

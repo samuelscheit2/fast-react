@@ -91,6 +91,12 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
       "The private toJSON facade must retain an accepted HostComponent prop plus text update payload while public serialization stays blocked."
   },
   {
+    id: "js-tojson-finished-work-identity-gate",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON facade must validate serialization evidence against the committed HostRoot finished_work identity and lane handoff."
+  },
+  {
     id: "js-tojson-public-serialization-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -140,6 +146,12 @@ export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
     requiredBeforePrivateDiagnostics: true,
     reason:
       "The private toTree metadata must be backed by committed-fiber inspection shape diagnostics for multi-child and FunctionComponent wrapper shapes."
+  },
+  {
+    id: "js-totree-finished-work-identity-gate",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree facade must validate metadata against the committed HostRoot finished_work identity and lane handoff."
   },
   {
     id: "js-totree-public-tree-blocked",
@@ -316,6 +328,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult &&
     localChecks.privateToJSONUpdateUnmountRowsPresent &&
     localChecks.privateToJSONUpdatePropAndTextDiagnosticsPresent &&
+    localChecks.privateToJSONFinishedWorkIdentityGatePresent &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
   const privateToTreeMetadataGateReady =
     privateDiagnosticsReady &&
@@ -326,6 +339,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToTreeCompositeFunctionMetadataPresent &&
     localChecks.privateToTreeMultiChildMetadataPresent &&
     localChecks.privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent &&
+    localChecks.privateToTreeFinishedWorkIdentityGatePresent &&
     localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
   const requiredLocalTargetsReady =
     privateToJSONFacadeGateReady && privateToTreeMetadataGateReady;
@@ -388,6 +402,9 @@ export function evaluateReactTestRendererSerializationLocalGate({
         ) {
           return !localChecks.privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent;
         }
+        if (requirement.id === "js-totree-finished-work-identity-gate") {
+          return !localChecks.privateToTreeFinishedWorkIdentityGatePresent;
+        }
         if (requirement.id === "js-totree-public-tree-blocked") {
           return !localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
         }
@@ -430,6 +447,9 @@ export function evaluateReactTestRendererSerializationLocalGate({
           requirement.id === "js-tojson-update-prop-and-text-diagnostics"
         ) {
           return !localChecks.privateToJSONUpdatePropAndTextDiagnosticsPresent;
+        }
+        if (requirement.id === "js-tojson-finished-work-identity-gate") {
+          return !localChecks.privateToJSONFinishedWorkIdentityGatePresent;
         }
         if (requirement.id === "js-tojson-public-serialization-blocked") {
           return !localChecks.privateToJSONSerializationFacadePubliclyBlocked;
@@ -1009,6 +1029,52 @@ export function inspectReactTestRendererSerializationLocalTargets({
       testRendererSource,
       /\broot_private_json_serialization_canary_describes_updated_host_component_text_after_commit\b/u
     );
+  const privateToJSONFinishedWorkIdentityGatePresent =
+    privateToJSONSerializationFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfast-react-test-renderer\.serialization\.private-finished-work-identity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesCommittedHostRootFinishedWorkIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesCommittedHostRootFinishedWorkLanes\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidateAcceptedFinishedWorkIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreatePrivateSerializationFinishedWorkIdentityGateResult\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateSerializationFinishedWorkIdentityGate\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_json_finished_work_identity_gate_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_serialization_finished_work_identity_gate_rejects_stale_evidence\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_serialization_finished_work_identity_gate_rejects_lane_mismatch\b/u
+    );
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
     hasSourcePattern(
@@ -1273,6 +1339,44 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bworker-516-test-renderer-committed-fiber-tree-inspection\b/u
+    );
+  const privateToTreeFinishedWorkIdentityGatePresent =
+    privateToTreePrivateFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfast-react-test-renderer\.serialization\.private-finished-work-identity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesCommittedHostRootFinishedWorkIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesCommittedHostRootFinishedWorkLanes\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidateAcceptedFinishedWorkIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreatePrivateSerializationFinishedWorkIdentityGateResult\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateSerializationFinishedWorkIdentityGate\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_tree_finished_work_identity_gate_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
     );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
@@ -1574,6 +1678,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeExposesDiagnosticResult,
     privateToJSONUpdateUnmountRowsPresent,
     privateToJSONUpdatePropAndTextDiagnosticsPresent,
+    privateToJSONFinishedWorkIdentityGatePresent,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
     privateToTreePrivateFacadeGatePresent,
@@ -1582,6 +1687,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToTreeCompositeFunctionMetadataPresent,
     privateToTreeMultiChildMetadataPresent,
     privateToTreeCommittedFiberInspectionShapeDiagnosticsPresent,
+    privateToTreeFinishedWorkIdentityGatePresent,
     privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,
