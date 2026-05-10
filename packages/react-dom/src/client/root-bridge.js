@@ -340,8 +340,14 @@ const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_PASSIVE_EVIDENCE_ACCEPTED =
   'accepted-private-root-public-facade-unmount-ref-passive-evidence';
 const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_DETACH_METADATA_ACCEPTED =
   'accepted-private-root-public-facade-unmount-ref-detach-metadata';
+const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_HANDLE_METADATA_ACCEPTED =
+  'accepted-private-root-public-facade-unmount-ref-cleanup-handle-metadata';
+const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_EXECUTION_ACCEPTED =
+  'accepted-private-root-public-facade-unmount-ref-cleanup-execution';
 const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_EVIDENCE_ACCEPTED =
   'accepted-private-root-public-facade-unmount-passive-destroy-evidence';
+const ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_ORDERING_ACCEPTED =
+  'accepted-private-root-public-facade-unmount-passive-destroy-ordering-metadata';
 const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED =
   'cleared-private-root-public-facade-unmount-metadata';
 const ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED =
@@ -2199,6 +2205,27 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_PASSIVE_ACCEPTED_CAPABIL
         'The private facade root.unmount cleanup recorded ref detach and passive destroy evidence before fake-DOM host cleanup metadata.'
     })
   ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_CLEANUP_PASSIVE_ORDER_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'root-unmount-ref-cleanup-execution',
+      accepted: true,
+      reason:
+        'The private facade root.unmount cleanup consumed the accepted ref cleanup-return execution gate under explicit test control.'
+    }),
+    freezeRecord({
+      id: 'root-unmount-passive-destroy-ordering-metadata',
+      accepted: true,
+      reason:
+        'The private facade root.unmount cleanup consumed accepted deleted-subtree passive destroy ordering metadata without running passive callbacks.'
+    }),
+    freezeRecord({
+      id: 'ref-cleanup-passive-destroy-before-host-cleanup-order',
+      accepted: true,
+      reason:
+        'The private facade root.unmount cleanup recorded ref cleanup, passive destroy ordering metadata, then fake-DOM host cleanup.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_BLOCKED_CAPABILITIES =
   freezeArray([
     freezeRecord({
@@ -2299,6 +2326,66 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_PASSIVE_BLOCKED_CAPABILI
       blocked: true,
       reason:
         'Ref callback invocation and object ref mutation remain outside the public facade root.unmount cleanup.'
+    }),
+    freezeRecord({
+      id: 'passive-effect-execution',
+      blocked: true,
+      reason:
+        'Passive destroy callbacks remain metadata-only and test-control-only; scheduler-driven passive execution is not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM public root compatibility remains unclaimed.'
+    })
+  ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_CLEANUP_PASSIVE_ORDER_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The diagnostic never enables public React DOM createRoot, render, or unmount behavior.'
+    }),
+    freezeRecord({
+      id: 'public-root-unmount',
+      blocked: true,
+      reason:
+        'Public React DOM root unmount behavior remains unimplemented.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No public reconciler scheduling, render, complete-work, deletion, ref, passive, or commit traversal is admitted.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-compatibility',
+      blocked: true,
+      reason:
+        'Only deterministic fake-DOM host nodes are admitted by this private diagnostic.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction, dispatch, and listener invocation are not admitted.'
+    }),
+    freezeRecord({
+      id: 'public-ref-compatibility',
+      blocked: true,
+      reason:
+        'Ref cleanup execution is private test-control evidence only and does not enable public root ref behavior.'
     }),
     freezeRecord({
       id: 'passive-effect-execution',
@@ -5049,10 +5136,22 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
       unmountRefPassiveEvidence === null
         ? false
         : unmountRefPassiveEvidence.passiveDestroyEvidenceAccepted,
+    unmountRefCleanupExecutionAccepted:
+      unmountRefPassiveEvidence === null
+        ? false
+        : unmountRefPassiveEvidence.refCleanupExecutionAccepted,
+    unmountPassiveDestroyOrderingAccepted:
+      unmountRefPassiveEvidence === null
+        ? false
+        : unmountRefPassiveEvidence.passiveDestroyOrderingAccepted,
     unmountRefPassiveEvidenceBeforeHostCleanup:
       unmountRefPassiveEvidence === null
         ? false
         : unmountRefPassiveEvidence.beforeHostCleanup,
+    unmountRefCleanupPassiveDestroyBeforeHostCleanup:
+      unmountRefPassiveEvidence === null
+        ? false
+        : unmountRefPassiveEvidence.refCleanupPassiveDestroyBeforeHostCleanup,
     acceptedCapabilities:
       createPublicFacadeHostOutputUnmountAcceptedCapabilities(
         unmountRefPassiveEvidence
@@ -5088,6 +5187,9 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     hydration: false,
     eventDispatch: false,
     refEffects: false,
+    privateRefCleanupExecution:
+      unmountRefPassiveEvidence !== null &&
+      unmountRefPassiveEvidence.refCleanupExecutionAccepted === true,
     passiveEffects: false,
     compatibilityClaimed: false,
     cleanupRequired: false
@@ -5141,16 +5243,48 @@ function createPrivateRootPublicFacadeUnmountRefPassiveEvidence({
     );
   }
 
-  const refDetachEvidence = createPublicFacadeUnmountRefDetachEvidence({
+  const refContext = createPublicFacadeUnmountRefEvidenceContext({
     hostOutputPayload,
     payload,
     ref,
     unmountRecord
   });
-  const passiveDestroyEvidence =
-    createPublicFacadeUnmountPassiveDestroyEvidence(
+  const consumeRefCleanupExecution =
+    shouldConsumePublicFacadeUnmountRefCleanupExecution(
       passiveDestroyDescriptor
     );
+  const initialRefAttachEvidence = consumeRefCleanupExecution
+    ? createPublicFacadeUnmountInitialRefAttachEvidence({
+        hostOutputPayload,
+        payload,
+        ref,
+        refContext
+      })
+    : null;
+  const refDetachEvidence = createPublicFacadeUnmountRefDetachEvidence({
+    payload,
+    ref,
+    refContext,
+    unmountRecord
+  });
+  const refCleanupExecutionEvidence = consumeRefCleanupExecution
+    ? createPublicFacadeUnmountRefCleanupExecutionEvidence({
+        initialRefAttachEvidence,
+        refContext,
+        refDetachEvidence
+      })
+    : null;
+  const passiveDestroyEvidence =
+    createPublicFacadeUnmountPassiveDestroyEvidence(passiveDestroyDescriptor, {
+      requiresOrderingMetadata: consumeRefCleanupExecution
+    });
+  const passiveDestroyOrderingAccepted =
+    passiveDestroyEvidence.destroyOrderingMetadataAccepted === true;
+  const refCleanupPassiveDestroyBeforeHostCleanup =
+    refCleanupExecutionEvidence !== null &&
+    passiveDestroyOrderingAccepted === true &&
+    passiveDestroyEvidence.refCleanupBeforePassiveDestroy === true &&
+    passiveDestroyEvidence.passiveDestroyBeforeHostCleanup === true;
 
   return freezeRecord({
     kind: 'FastReactDomPrivateRootPublicFacadeUnmountRefPassiveEvidence',
@@ -5158,13 +5292,26 @@ function createPrivateRootPublicFacadeUnmountRefPassiveEvidence({
       ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_PASSIVE_EVIDENCE_ACCEPTED,
     refDetachMetadataAccepted: true,
     passiveDestroyEvidenceAccepted: true,
+    refCleanupExecutionAccepted: refCleanupExecutionEvidence !== null,
+    passiveDestroyOrderingAccepted,
     beforeHostCleanup: true,
-    order: freezeArray([
-      'root-unmount-ref-detach-metadata',
-      'root-unmount-passive-destroy-evidence',
-      'fake-dom-host-output-cleanup'
-    ]),
+    refCleanupPassiveDestroyBeforeHostCleanup,
+    order:
+      refCleanupExecutionEvidence === null
+        ? freezeArray([
+            'root-unmount-ref-detach-metadata',
+            'root-unmount-passive-destroy-evidence',
+            'fake-dom-host-output-cleanup'
+          ])
+        : freezeArray([
+            'root-unmount-ref-cleanup-handle-metadata',
+            'root-unmount-ref-cleanup-execution',
+            'root-unmount-passive-destroy-ordering-metadata',
+            'fake-dom-host-output-cleanup'
+          ]),
+    initialRefAttachEvidence,
     refDetachEvidence,
+    refCleanupExecutionEvidence,
     passiveDestroyEvidence,
     publicRootExecution: false,
     publicRootUnmountCompatibilityClaimed: false,
@@ -5174,7 +5321,15 @@ function createPrivateRootPublicFacadeUnmountRefPassiveEvidence({
   });
 }
 
-function createPublicFacadeUnmountRefDetachEvidence({
+function shouldConsumePublicFacadeUnmountRefCleanupExecution(descriptor) {
+  return (
+    descriptor !== null &&
+    typeof descriptor === 'object' &&
+    descriptor.consumeRefCleanupExecution === true
+  );
+}
+
+function createPublicFacadeUnmountRefEvidenceContext({
   hostOutputPayload,
   payload,
   ref,
@@ -5187,30 +5342,114 @@ function createPublicFacadeUnmountRefDetachEvidence({
 
   if (hostOwner === null || rootOwner !== payload.createRecord.owner) {
     throwInvalidRootPublicFacadeHostOutputUnmount(
-      'Private public-facade root.unmount ref detach evidence requires mounted host ownership metadata.'
+      'Private public-facade root.unmount ref evidence requires mounted host ownership metadata.'
     );
   }
 
-  const refHandle = freezeRecord({
-    kind: 'FastReactDomPrivateRootPublicFacadeUnmountRefHandle',
-    rootId: unmountRecord.rootId,
-    sourceRenderRequestId:
-      hostOutputPayload.renderRecord === undefined
-        ? null
-        : hostOutputPayload.renderRecord.requestId,
-    unmountRequestId: unmountRecord.requestId
-  });
-  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
-    rootOwner,
+  return {
     hostOwner,
     hostInstanceToken: hostOutputPayload.hostToken,
+    hostNode: hostOutputPayload.hostNode,
+    refHandle: freezeRecord({
+      kind: 'FastReactDomPrivateRootPublicFacadeUnmountRefHandle',
+      rootId: unmountRecord.rootId,
+      sourceRenderRequestId:
+        hostOutputPayload.renderRecord === undefined
+          ? null
+          : hostOutputPayload.renderRecord.requestId,
+      unmountRequestId: unmountRecord.requestId
+    }),
+    rootOwner
+  };
+}
+
+function createPublicFacadeUnmountInitialRefAttachEvidence({
+  hostOutputPayload,
+  payload,
+  ref,
+  refContext
+}) {
+  if (
+    hostOutputPayload.renderRecord === undefined ||
+    hostOutputPayload.renderRecord === null
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Private public-facade root.unmount ref cleanup evidence requires the source render request record.'
+    );
+  }
+
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner: refContext.rootOwner,
+    hostOwner: refContext.hostOwner,
+    hostInstanceToken: hostOutputPayload.hostToken,
+    fiber: freezeRecord({
+      kind: 'FastReactDomPrivateRootPublicFacadeUnmountInitialRefFiber',
+      rootId: hostOutputPayload.renderRecord.rootId,
+      renderRequestId: hostOutputPayload.renderRecord.requestId
+    }),
+    stateNode: hostOutputPayload.hostNode,
+    refHandle: refContext.refHandle,
+    ref,
+    sourceToken: `${hostOutputPayload.renderRecord.requestId}:public-facade-unmount-ref-cleanup-handle`,
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_COMMIT,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE
+  });
+  const metadataRecord = payload.bridge.admitRootCommitRefMetadata(
+    hostOutputPayload.renderRecord,
+    {
+      detach: [],
+      attach: [attachRecord]
+    },
+    {label: 'public-facade-root-unmount-ref-cleanup-handle'}
+  );
+
+  if (
+    metadataRecord.metadataStatus !==
+      ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED ||
+    metadataRecord.hostOutputCanary !== 'initial-host-output' ||
+    metadataRecord.attachCount !== 1 ||
+    metadataRecord.detachCount !== 0
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Private public-facade root.unmount ref cleanup evidence requires accepted initial attach metadata.'
+    );
+  }
+
+  return freezeRecord({
+    kind: 'FastReactDomPrivateRootPublicFacadeUnmountInitialRefAttachEvidence',
+    status:
+      ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_HANDLE_METADATA_ACCEPTED,
+    rootCommitRefMetadataStatus: metadataRecord.metadataStatus,
+    rootCommitRefMetadataId: metadataRecord.metadataId,
+    hostOutputCanary: metadataRecord.hostOutputCanary,
+    attachCount: metadataRecord.attachCount,
+    detachCount: metadataRecord.detachCount,
+    callbackRefsInvoked: metadataRecord.callbackRefsInvoked,
+    objectRefsMutated: metadataRecord.objectRefsMutated,
+    publicRootExecution: metadataRecord.publicRootExecution,
+    compatibilityClaimed: metadataRecord.compatibilityClaimed,
+    attachRecord,
+    metadataRecord
+  });
+}
+
+function createPublicFacadeUnmountRefDetachEvidence({
+  payload,
+  ref,
+  refContext,
+  unmountRecord
+}) {
+  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner: refContext.rootOwner,
+    hostOwner: refContext.hostOwner,
+    hostInstanceToken: refContext.hostInstanceToken,
     fiber: freezeRecord({
       kind: 'FastReactDomPrivateRootPublicFacadeUnmountRefFiber',
       rootId: unmountRecord.rootId,
       unmountRequestId: unmountRecord.requestId
     }),
-    stateNode: hostOutputPayload.hostNode,
-    refHandle,
+    stateNode: refContext.hostNode,
+    refHandle: refContext.refHandle,
     ref,
     sourceToken: `${unmountRecord.requestId}:public-facade-unmount-ref-detach`,
     tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION,
@@ -5244,11 +5483,106 @@ function createPublicFacadeUnmountRefDetachEvidence({
     exposesHostNode: metadataRecord.exposesHostNode,
     publicRootExecution: metadataRecord.publicRootExecution,
     compatibilityClaimed: metadataRecord.compatibilityClaimed,
+    detachRecord,
     metadataRecord
   });
 }
 
-function createPublicFacadeUnmountPassiveDestroyEvidence(descriptor) {
+function createPublicFacadeUnmountRefCleanupExecutionEvidence({
+  initialRefAttachEvidence,
+  refContext,
+  refDetachEvidence
+}) {
+  if (
+    initialRefAttachEvidence === null ||
+    initialRefAttachEvidence.attachRecord == null ||
+    refDetachEvidence.detachRecord == null
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Private public-facade root.unmount ref cleanup execution requires accepted attach and detach metadata.'
+    );
+  }
+
+  const executionSnapshot =
+    refCallbackGate.createRefCallbackCleanupReturnExecutionGateSnapshot({
+      steps: [
+        {
+          label: 'root-unmount-records-ref-cleanup-handle',
+          rootCommitRefMetadata: {
+            detach: [],
+            attach: [initialRefAttachEvidence.attachRecord]
+          }
+        },
+        {
+          label: 'root-unmount-executes-ref-cleanup-before-passive-destroy',
+          rootCommitRefMetadata: {
+            detach: [refDetachEvidence.detachRecord],
+            attach: []
+          }
+        }
+      ]
+    });
+  const executionPayload =
+    refCallbackGate.getPrivateRefCallbackCleanupReturnExecutionGateSnapshotPayload(
+      executionSnapshot
+    );
+
+  if (
+    executionPayload === null ||
+    executionSnapshot.status !==
+      refCallbackGate.REF_CALLBACK_CLEANUP_RETURN_EXECUTION_GATE_STATUS ||
+    executionSnapshot.testOnlyExecution !== true ||
+    executionSnapshot.attachCount !== 1 ||
+    executionSnapshot.detachCount !== 1 ||
+    executionSnapshot.callbackInvocationAttemptCount !== 1 ||
+    executionSnapshot.cleanupInvocationAttemptCount !== 1 ||
+    executionSnapshot.cleanupInvocationErrorCount !== 0 ||
+    executionSnapshot.callbackInvocationErrorCount !== 0 ||
+    executionSnapshot.cleanupReturnHandleConsumedCount !== 1 ||
+    executionSnapshot.cleanupReturnHandleExecutionCount !== 1 ||
+    executionSnapshot.publicRootsTouched !== false ||
+    executionSnapshot.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadeHostOutputUnmount(
+      'Private public-facade root.unmount ref cleanup execution requires accepted test-control cleanup-return evidence.'
+    );
+  }
+
+  return freezeRecord({
+    kind: 'FastReactDomPrivateRootPublicFacadeUnmountRefCleanupExecutionEvidence',
+    status:
+      ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_EXECUTION_ACCEPTED,
+    executionGateStatus: executionSnapshot.status,
+    testOnlyExecution: executionSnapshot.testOnlyExecution,
+    stepCount: executionSnapshot.stepCount,
+    recordCount: executionSnapshot.recordCount,
+    attachCount: executionSnapshot.attachCount,
+    detachCount: executionSnapshot.detachCount,
+    callbackInvocationAttemptCount:
+      executionSnapshot.callbackInvocationAttemptCount,
+    cleanupInvocationAttemptCount:
+      executionSnapshot.cleanupInvocationAttemptCount,
+    cleanupInvocationErrorCount: executionSnapshot.cleanupInvocationErrorCount,
+    cleanupReturnHandleConsumedCount:
+      executionSnapshot.cleanupReturnHandleConsumedCount,
+    cleanupReturnHandleExecutionCount:
+      executionSnapshot.cleanupReturnHandleExecutionCount,
+    callbackRefsInvoked: executionSnapshot.callbackRefsInvoked,
+    callbackCleanupReturnsInvoked:
+      executionSnapshot.callbackCleanupReturnsInvoked,
+    objectRefsMutated: executionSnapshot.objectRefsMutated,
+    publicRootsTouched: executionSnapshot.publicRootsTouched,
+    compatibilityClaimed: executionSnapshot.compatibilityClaimed,
+    refCleanupBeforePassiveDestroy: true,
+    refCleanupHandleRootId: refContext.refHandle.rootId,
+    executionSnapshot
+  });
+}
+
+function createPublicFacadeUnmountPassiveDestroyEvidence(
+  descriptor,
+  options
+) {
   if (descriptor.metadataOnly !== true || descriptor.destroyCount < 1) {
     throwInvalidRootPublicFacadeHostOutputUnmount(
       'Private public-facade root.unmount passive destroy evidence must be metadata-only and include at least one destroy record.'
@@ -5258,6 +5592,22 @@ function createPublicFacadeUnmountPassiveDestroyEvidence(descriptor) {
   const gate = testUtilsActGate.getReactDomTestUtilsActPrivateRoutingGate();
   const handles = gate.passiveEffectCallbackHandles;
   const passiveDiagnostics = gate.privatePassiveDiagnostics;
+  const requiresOrderingMetadata =
+    options != null && options.requiresOrderingMetadata === true;
+  const deletionOrdering =
+    passiveDiagnostics == null
+      ? null
+      : passiveDiagnostics.deletedSubtreeRefPassiveCleanupOrder;
+  const destroyOrderingMetadataAccepted =
+    requiresOrderingMetadata === true &&
+    deletionOrdering != null &&
+    deletionOrdering.status ===
+      testUtilsActGate.passiveEffectDeletedSubtreeRefPassiveOrderingStatus &&
+    deletionOrdering.refCleanupBeforePassiveDestroy === true &&
+    deletionOrdering.passiveDestroyBeforeHostCleanup === true &&
+    deletionOrdering.publicEffectExecution === false &&
+    deletionOrdering.publicRootExecution === false &&
+    deletionOrdering.compatibilityClaimed === false;
 
   if (
     handles == null ||
@@ -5272,7 +5622,9 @@ function createPublicFacadeUnmountPassiveDestroyEvidence(descriptor) {
     passiveDiagnostics.publicEffectExecution !== false ||
     passiveDiagnostics.schedulerDrivenPassiveExecution !== false ||
     passiveDiagnostics.publicRootExecution !== false ||
-    passiveDiagnostics.compatibilityClaimed !== false
+    passiveDiagnostics.compatibilityClaimed !== false ||
+    (requiresOrderingMetadata === true &&
+      destroyOrderingMetadataAccepted !== true)
   ) {
     throwInvalidRootPublicFacadeHostOutputUnmount(
       'Private public-facade root.unmount passive destroy evidence requires blocked private passive diagnostics.'
@@ -5296,6 +5648,31 @@ function createPublicFacadeUnmountPassiveDestroyEvidence(descriptor) {
     publicActCompatibilityClaimed: handles.publicActCompatibilityClaimed,
     publicActPassiveDrain: passiveDiagnostics.publicActPassiveDrain,
     publicRootExecution: passiveDiagnostics.publicRootExecution,
+    destroyOrderingMetadataAccepted,
+    rootUnmountPassiveDestroyOrderingStatus:
+      destroyOrderingMetadataAccepted === true
+        ? ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_ORDERING_ACCEPTED
+        : null,
+    destroyOrderingMetadataStatus:
+      destroyOrderingMetadataAccepted === true
+        ? deletionOrdering.status
+        : null,
+    refCleanupBeforePassiveDestroy:
+      destroyOrderingMetadataAccepted === true
+        ? deletionOrdering.refCleanupBeforePassiveDestroy
+        : false,
+    passiveDestroyBeforeHostCleanup:
+      destroyOrderingMetadataAccepted === true
+        ? deletionOrdering.passiveDestroyBeforeHostCleanup
+        : false,
+    hostCleanupAfterPassiveDestroy:
+      destroyOrderingMetadataAccepted === true
+        ? deletionOrdering.hostCleanupAfterPassiveDestroy
+        : false,
+    deletionCleanupOrderRecordCount:
+      destroyOrderingMetadataAccepted === true
+        ? deletionOrdering.records.length
+        : 0,
     compatibilityClaimed: passiveDiagnostics.compatibilityClaimed
   });
 }
@@ -5333,7 +5710,8 @@ function getPublicFacadeUnmountPassiveDestroyDescriptor(element) {
     return freezeRecord({
       source: 'element.privatePassiveDestroy',
       destroyCount: 1,
-      metadataOnly: true
+      metadataOnly: true,
+      consumeRefCleanupExecution: false
     });
   }
   if (
@@ -5348,6 +5726,9 @@ function getPublicFacadeUnmountPassiveDestroyDescriptor(element) {
     return freezeRecord({
       source: 'element.privatePassiveDestroy',
       destroyCount,
+      consumeRefCleanupExecution:
+        element.privatePassiveDestroy.consumeRefCleanupExecution === true ||
+        element.privatePassiveDestroy.consumeRefCleanup === true,
       metadataOnly:
         element.privatePassiveDestroy.metadataOnly !== false
     });
@@ -5373,16 +5754,25 @@ function createPublicFacadeHostOutputUnmountAcceptedCapabilities(evidence) {
     return ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES;
   }
 
-  return freezeArray([
+  const capabilities = [
     ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES,
     ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_PASSIVE_ACCEPTED_CAPABILITIES
-  ]);
+  ];
+  if (evidence.refCleanupExecutionAccepted === true) {
+    capabilities.push(
+      ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_CLEANUP_PASSIVE_ORDER_ACCEPTED_CAPABILITIES
+    );
+  }
+  return freezeArray(capabilities);
 }
 
 function createPublicFacadeHostOutputUnmountBlockedCapabilities(evidence) {
-  return isAcceptedPublicFacadeUnmountRefPassiveEvidence(evidence)
-    ? ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_PASSIVE_BLOCKED_CAPABILITIES
-    : ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_BLOCKED_CAPABILITIES;
+  if (!isAcceptedPublicFacadeUnmountRefPassiveEvidence(evidence)) {
+    return ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_BLOCKED_CAPABILITIES;
+  }
+  return evidence.refCleanupExecutionAccepted === true
+    ? ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_CLEANUP_PASSIVE_ORDER_BLOCKED_CAPABILITIES
+    : ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_REF_PASSIVE_BLOCKED_CAPABILITIES;
 }
 
 function createClientRootRecord(container, rootOptions) {
@@ -18079,6 +18469,9 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED,
   ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_EVIDENCE_ACCEPTED,
+  ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_ORDERING_ACCEPTED,
+  ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_HANDLE_METADATA_ACCEPTED,
+  ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_EXECUTION_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_DETACH_METADATA_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_PASSIVE_EVIDENCE_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED,

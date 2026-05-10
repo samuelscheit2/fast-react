@@ -513,6 +513,104 @@ test("root render E2E gate links private facade root.unmount cleanup to ref deta
   });
 });
 
+test("root render E2E gate consumes private root.unmount ref cleanup and passive destroy ordering below public compatibility", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputRenderIdPrefix:
+      "conformance-root-unmount-ref-cleanup-passive-render",
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      "conformance-root-unmount-ref-cleanup-passive-cleanup"
+  });
+  const root = adapter.createRoot(container);
+  const calls = [];
+  function privateUnmountCleanupRef(value) {
+    calls.push(`attach:${value.localName}`);
+    return function cleanupPrivateUnmountRef() {
+      calls.push("cleanup");
+    };
+  }
+
+  root.render({
+    privatePassiveDestroy: {
+      consumeRefCleanupExecution: true,
+      destroyCount: 1,
+      metadataOnly: true
+    },
+    props: {
+      children: "conformance private unmount ref cleanup passive",
+      id: "conformance-unmount-ref-cleanup-passive",
+      ref: privateUnmountCleanupRef
+    },
+    type: "section"
+  });
+
+  const unmount = root.unmount();
+  const [cleanup] = adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
+  const evidence = cleanup.unmountRefPassiveEvidence;
+
+  assert.deepEqual(calls, ["attach:section", "cleanup"]);
+  assert.equal(unmount.noOp, false);
+  assert.equal(cleanup.unmountRefCleanupExecutionAccepted, true);
+  assert.equal(cleanup.unmountPassiveDestroyOrderingAccepted, true);
+  assert.equal(
+    cleanup.unmountRefCleanupPassiveDestroyBeforeHostCleanup,
+    true
+  );
+  assert.deepEqual(evidence.order, [
+    "root-unmount-ref-cleanup-handle-metadata",
+    "root-unmount-ref-cleanup-execution",
+    "root-unmount-passive-destroy-ordering-metadata",
+    "fake-dom-host-output-cleanup"
+  ]);
+  assert.equal(
+    evidence.refCleanupExecutionEvidence.status,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_EXECUTION_ACCEPTED
+  );
+  assert.equal(
+    evidence.initialRefAttachEvidence.status,
+    rootBridge
+      .ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_CLEANUP_HANDLE_METADATA_ACCEPTED
+  );
+  assert.equal(evidence.refCleanupExecutionEvidence.testOnlyExecution, true);
+  assert.equal(
+    evidence.refCleanupExecutionEvidence.cleanupInvocationAttemptCount,
+    1
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.destroyOrderingMetadataAccepted,
+    true
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.rootUnmountPassiveDestroyOrderingStatus,
+    rootBridge
+      .ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_ORDERING_ACCEPTED
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.refCleanupBeforePassiveDestroy,
+    true
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.passiveDestroyBeforeHostCleanup,
+    true
+  );
+  assert.equal(cleanup.privateRefCleanupExecution, true);
+  assert.equal(cleanup.refEffects, false);
+  assert.equal(cleanup.passiveEffects, false);
+  assert.equal(cleanup.publicRootUnmounted, false);
+  assert.equal(cleanup.publicRootExecution, false);
+  assert.equal(cleanup.publicRootCompatibilitySurface, false);
+  assert.equal(cleanup.compatibilityClaimed, false);
+  assert.equal(container.childNodes.length, 0);
+  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
+    code: "FAST_REACT_UNIMPLEMENTED"
+  });
+});
+
 function createDocument() {
   const document = createEventTarget({
     nodeName: "#document",

@@ -642,6 +642,36 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(passiveDiagnostics.publicRootErrorCallbacksInvoked, false);
   assert.equal(passiveDiagnostics.publicActErrorAggregation, false);
   assert.equal(passiveDiagnostics.compatibilityClaimed, false);
+  assert.deepEqual(
+    passiveDiagnostics.deletedSubtreeRefPassiveCleanupOrder,
+    {
+      status:
+        "accepted-private-deleted-subtree-ref-passive-cleanup-order-without-public-passive-drain",
+      records: [
+        "HostRootDeletionCleanupOrderGateSnapshot",
+        "HostRootDeletionCleanupOrderPhase::RefCleanupReturn",
+        "HostRootDeletionCleanupOrderPhase::PassiveDestroy",
+        "HostRootDeletionCleanupOrderPhase::HostCleanup",
+        "deletion_cleanup_order_gate_for_canary",
+        "deletion_ref_passive_cleanup_execution",
+        "host_work_deletion_executes_passive_destroy_before_host_cleanup_with_ref_order_evidence"
+      ],
+      source: "crates/fast-react-reconciler/src/root_commit.rs",
+      executionSource:
+        "crates/fast-react-reconciler/src/passive_effects.rs",
+      consumesDeletionCleanupOrderGate: true,
+      consumesRefCleanupExecution: true,
+      consumesPassiveDestroyMetadata: true,
+      refCleanupBeforePassiveDestroy: true,
+      passiveDestroyBeforeHostCleanup: true,
+      hostCleanupAfterPassiveDestroy: true,
+      publicActPassiveDrain: false,
+      publicEffectExecution: false,
+      schedulerDrivenPassiveExecution: false,
+      publicRootExecution: false,
+      compatibilityClaimed: false
+    }
+  );
 
   const passiveCommittedFiberDiagnostic =
     passiveDiagnostics.acceptedDiagnostics.find(
