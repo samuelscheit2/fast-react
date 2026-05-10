@@ -40,6 +40,7 @@ use fast_react_reconciler::{
     inspect_test_renderer_host_output_canary_commit,
     prepare_test_renderer_host_output_canary_fibers,
     prepare_test_renderer_host_output_unmount_canary_fibers,
+    prepare_test_renderer_host_output_unmount_ref_passive_cleanup_canary,
     prepare_test_renderer_host_output_update_canary_fibers, process_root_schedule_in_microtask,
     render_host_root_for_lanes, scheduled_roots, update_container, update_container_sync,
 };
@@ -12254,8 +12255,26 @@ impl TestRendererRoot {
     pub fn execute_private_unmount_native_bridge_cleanup_handoff_for_canary(
         &mut self,
     ) -> Result<TestRendererUnmountNativeBridgeCleanupHandoff, TestRendererRootError> {
+        self.execute_private_unmount_native_bridge_cleanup_handoff_inner_for_canary(false)
+    }
+
+    pub fn execute_private_unmount_native_bridge_cleanup_handoff_with_ref_passive_cleanup_for_canary(
+        &mut self,
+    ) -> Result<TestRendererUnmountNativeBridgeCleanupHandoff, TestRendererRootError> {
+        self.execute_private_unmount_native_bridge_cleanup_handoff_inner_for_canary(true)
+    }
+
+    fn execute_private_unmount_native_bridge_cleanup_handoff_inner_for_canary(
+        &mut self,
+        include_ref_passive_cleanup: bool,
+    ) -> Result<TestRendererUnmountNativeBridgeCleanupHandoff, TestRendererRootError> {
         let route_outcome = self.unmount()?;
-        let Some(unmounted) = self.render_and_commit_host_output_unmount_for_canary()? else {
+        let unmounted = if include_ref_passive_cleanup {
+            self.render_and_commit_host_output_unmount_with_ref_passive_cleanup_for_canary()?
+        } else {
+            self.render_and_commit_host_output_unmount_for_canary()?
+        };
+        let Some(unmounted) = unmounted else {
             return Err(
                 TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingDeletionCommitHandoff
                     .into(),
@@ -12416,7 +12435,12 @@ impl TestRendererRoot {
                 .into(),
             );
         }
-        if handoff.cleanup_order_record_count() != handoff.host_node_cleanup_count() {
+        let passive_ref_cleanup_order = handoff.passive_ref_cleanup_order();
+        let expected_cleanup_order_record_count = passive_ref_cleanup_order
+            .ref_cleanup_return_count()
+            + passive_ref_cleanup_order.passive_destroy_count()
+            + passive_ref_cleanup_order.host_node_cleanup_count();
+        if handoff.cleanup_order_record_count() != expected_cleanup_order_record_count {
             return Err(
                 TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
                     reason: "cleanup-order-count-mismatch",
@@ -12424,7 +12448,6 @@ impl TestRendererRoot {
                 .into(),
             );
         }
-        let passive_ref_cleanup_order = handoff.passive_ref_cleanup_order();
         if passive_ref_cleanup_order.diagnostic_id()
             != TEST_RENDERER_PRIVATE_UNMOUNT_PASSIVE_REF_CLEANUP_ORDER_DIAGNOSTIC_ID
             || passive_ref_cleanup_order.status()
@@ -14772,6 +14795,19 @@ impl TestRendererRoot {
     pub fn render_and_commit_host_output_unmount_for_canary(
         &mut self,
     ) -> Result<Option<TestRendererUnmountedHostOutput>, TestRendererRootError> {
+        self.render_and_commit_host_output_unmount_inner_for_canary(false)
+    }
+
+    pub fn render_and_commit_host_output_unmount_with_ref_passive_cleanup_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererUnmountedHostOutput>, TestRendererRootError> {
+        self.render_and_commit_host_output_unmount_inner_for_canary(true)
+    }
+
+    fn render_and_commit_host_output_unmount_inner_for_canary(
+        &mut self,
+        include_ref_passive_cleanup: bool,
+    ) -> Result<Option<TestRendererUnmountedHostOutput>, TestRendererRootError> {
         let Some(update) = self.scheduled_updates.last() else {
             return Ok(None);
         };
@@ -14790,12 +14826,26 @@ impl TestRendererRoot {
             return Ok(None);
         };
         let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let ref_passive_cleanup = if include_ref_passive_cleanup {
+            Some(
+                prepare_test_renderer_host_output_unmount_ref_passive_cleanup_canary(
+                    &mut self.store,
+                    render,
+                    current.fibers,
+                )?,
+            )
+        } else {
+            None
+        };
         let deleted = prepare_test_renderer_host_output_unmount_canary_fibers(
             &mut self.store,
             render,
             current.fibers,
         )?;
-        let commit = self.commit_host_root_render_for_canary(render)?;
+        let mut commit = self.commit_host_root_render_for_canary(render)?;
+        if let Some(ref_passive_cleanup) = ref_passive_cleanup {
+            ref_passive_cleanup.record_passive_destroy_metadata_for_canary(&mut commit)?;
+        }
         let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
 
         let mut container = self.container;
@@ -23900,6 +23950,134 @@ mod tests {
                 .children()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn root_private_unmount_native_bridge_cleanup_handoff_carries_ref_passive_cleanup_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let cleanup_handoff = root
+            .execute_private_unmount_native_bridge_cleanup_handoff_with_ref_passive_cleanup_for_canary()
+            .unwrap();
+        let deletion_handoff = cleanup_handoff.deletion_commit_handoff();
+        let admission = cleanup_handoff.native_bridge_admission();
+        let passive_ref_order = cleanup_handoff.passive_ref_cleanup_order();
+
+        assert_eq!(cleanup_handoff.previous_root_child_count(), 1);
+        assert_eq!(cleanup_handoff.current_root_child_count(), 0);
+        assert!(cleanup_handoff.detached_instance());
+        assert_eq!(cleanup_handoff.detached_instance_child_count(), 0);
+        assert_eq!(cleanup_handoff.host_node_cleanup_count(), 2);
+        assert_eq!(cleanup_handoff.ref_cleanup_return_count(), 1);
+        assert_eq!(cleanup_handoff.passive_destroy_count(), 1);
+        assert_eq!(cleanup_handoff.cleanup_order_record_count(), 4);
+        assert!(cleanup_handoff.native_cleanup_after_ref_and_passive_ordering());
+        assert!(!cleanup_handoff.minimal_tree_cleanup_handoff());
+        assert!(cleanup_handoff.rust_unmount_cleanup_handoff_executed());
+        assert!(cleanup_handoff.host_output_produced());
+
+        assert_eq!(deletion_handoff.host_node_cleanup_count(), 2);
+        assert_eq!(deletion_handoff.cleanup_order_record_count(), 4);
+        assert!(deletion_handoff.cleanup_records_match_deletion_commit());
+        assert_eq!(passive_ref_order.ref_cleanup_return_count(), 1);
+        assert_eq!(passive_ref_order.passive_destroy_count(), 1);
+        assert_eq!(passive_ref_order.host_node_cleanup_count(), 2);
+        assert_eq!(passive_ref_order.cleanup_order_record_count(), 4);
+        assert_eq!(passive_ref_order.last_ref_cleanup_return_order(), Some(0));
+        assert_eq!(passive_ref_order.first_passive_destroy_order(), Some(1));
+        assert_eq!(passive_ref_order.last_passive_destroy_order(), Some(1));
+        assert_eq!(passive_ref_order.first_host_node_cleanup_order(), Some(2));
+        assert!(passive_ref_order.ref_cleanup_return_precedes_passive_destroy());
+        assert!(passive_ref_order.host_cleanup_follows_ref_cleanup_return());
+        assert!(passive_ref_order.host_cleanup_follows_passive_destroy());
+        assert!(passive_ref_order.native_cleanup_after_ref_and_passive_ordering());
+        assert!(!passive_ref_order.minimal_tree_ordering_is_host_cleanup_only());
+        assert!(!passive_ref_order.ref_cleanup_return_callbacks_invoked());
+        assert!(!passive_ref_order.passive_destroy_callbacks_invoked());
+        assert!(!passive_ref_order.public_effects_flushed());
+        assert!(!passive_ref_order.public_ref_or_effect_compatibility_claimed());
+        assert!(!passive_ref_order.public_unmount_compatibility_claimed());
+        assert!(!passive_ref_order.act_flushing_claimed());
+
+        assert_eq!(admission.host_node_cleanup_count(), 2);
+        assert_eq!(admission.ref_cleanup_return_count(), 1);
+        assert_eq!(admission.passive_destroy_count(), 1);
+        assert_eq!(admission.cleanup_order_record_count(), 4);
+        assert!(admission.native_cleanup_after_ref_and_passive_ordering());
+        assert!(!admission.minimal_tree_cleanup_handoff());
+        assert!(admission.rust_unmount_cleanup_handoff_executed());
+        assert!(admission.host_output_produced());
+        assert!(!cleanup_handoff.public_unmount_compatibility_claimed());
+        assert!(!cleanup_handoff.public_host_teardown_compatibility_claimed());
+        assert!(!cleanup_handoff.act_flushing_claimed());
+        assert!(!cleanup_handoff.native_bridge_available());
+        assert!(!cleanup_handoff.native_execution());
+        assert!(!admission.public_unmount_compatibility_claimed());
+        assert!(!admission.public_host_teardown_compatibility_claimed());
+        assert!(!admission.act_flushing_claimed());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
+        assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(host_node_activity_counts(&root), (0, 2));
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+    }
+
+    #[test]
+    fn root_private_unmount_native_bridge_admission_rejects_stale_ref_passive_cleanup_order_count()
+    {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let outcome = root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_with_ref_passive_cleanup_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        assert_eq!(handoff.cleanup_order_record_count(), 4);
+        assert_eq!(
+            handoff
+                .passive_ref_cleanup_order()
+                .ref_cleanup_return_count(),
+            1
+        );
+        assert_eq!(
+            handoff.passive_ref_cleanup_order().passive_destroy_count(),
+            1
+        );
+        handoff.cleanup_order_record_count = handoff.host_node_cleanup_count();
+        handoff.passive_ref_cleanup_order.cleanup_order_record_count =
+            handoff.host_node_cleanup_count();
+
+        let error = root
+            .describe_private_unmount_native_bridge_admission_for_canary(&outcome, Some(&handoff))
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUnmountNativeBridgeAdmission(error) = error else {
+            panic!("expected private unmount native bridge cleanup order rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                reason: "cleanup-order-count-mismatch"
+            }
+        ));
     }
 
     #[test]
