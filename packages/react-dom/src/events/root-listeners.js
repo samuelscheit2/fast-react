@@ -188,6 +188,8 @@ function invokePrivateRootHostOutputClickDispatchCanary(
   hostOutputPayloadOrTargetRecord,
   options
 ) {
+  const diagnosticOptions =
+    normalizePrivateRootHostOutputClickDispatchCanaryOptions(options);
   const registrationPayload =
     assertActiveRootListenerRegistrationPayload(listenerRegistrationRecord);
   const targetRecord = isPrivateRootHostOutputEventTargetRecord(
@@ -222,6 +224,10 @@ function invokePrivateRootHostOutputClickDispatchCanary(
   const queueInvocationRecord = invokeDispatchQueueCanaryFromDispatchRecords(
     [captureDispatchRecord, bubbleDispatchRecord],
     {
+      enableListenerErrorRoutingDiagnostics:
+        diagnosticOptions.enableListenerErrorRoutingDiagnostics,
+      enablePropagationStopDiagnostics:
+        diagnosticOptions.enablePropagationStopDiagnostics,
       useProcessingOrder: true
     }
   );
@@ -244,12 +250,32 @@ function invokePrivateRootHostOutputClickDispatchCanary(
     invocationRecordCount: queueInvocationRecord.invocationRecordCount,
     kind: PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
     listenerErrorCount: queueInvocationRecord.listenerErrorCount,
+    listenerErrorRouteCount: queueInvocationRecord.listenerErrorRouteCount,
+    listenerErrorRoutes: freezeArray(queueInvocationRecord.listenerErrorRoutes),
+    listenerErrorRoutingDiagnosticEnabled:
+      queueInvocationRecord.listenerErrorRoutingDiagnosticEnabled,
+    listenerErrorRoutingStatus:
+      queueInvocationRecord.listenerErrorRoutingStatus,
     listenerInvocationCount: queueInvocationRecord.listenerInvocationCount,
     nativeEventPreventDefaultCallCount:
       nativeEvent.preventDefaultCallCount,
     nativeEventStopPropagationCallCount:
       nativeEvent.stopPropagationCallCount,
     privateCanaryInvocation: true,
+    propagationSkippedListenerCount:
+      queueInvocationRecord.propagationSkippedListenerCount,
+    propagationStopCallCount:
+      queueInvocationRecord.propagationStopCallCount,
+    propagationStopDiagnosticEnabled:
+      queueInvocationRecord.propagationStopDiagnosticEnabled,
+    propagationStopDiagnosticStatus:
+      queueInvocationRecord.propagationStopDiagnosticStatus,
+    propagationStopDiagnostics: freezeArray(
+      queueInvocationRecord.propagationStopDiagnostics
+    ),
+    propagationStopNativeCallCount:
+      queueInvocationRecord.propagationStopNativeCallCount,
+    propagationStopped: queueInvocationRecord.propagationStopped,
     publicDispatchBlockedReason:
       queueInvocationRecord.publicDispatchBlockedReason,
     publicDispatchEnabled: false,
@@ -283,6 +309,7 @@ function invokePrivateRootHostOutputClickDispatchCanary(
       invocationRecords,
       listenerRegistrationRecord,
       nativeEvent,
+      options: diagnosticOptions,
       queueInvocationRecord,
       targetPayload,
       targetRecord
@@ -1196,6 +1223,21 @@ function assertActiveRootListenerRegistrationPayload(registrationRecord) {
     );
   }
   return payload;
+}
+
+function normalizePrivateRootHostOutputClickDispatchCanaryOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+
+  return freezeRecord({
+    enableListenerErrorRoutingDiagnostics:
+      normalizedOptions.enableListenerErrorRoutingDiagnostics === true,
+    enablePropagationStopDiagnostics:
+      normalizedOptions.enablePropagationStopDiagnostics === true
+  });
 }
 
 function getInstalledRootListenerPair(registrationPayload, domEventName) {

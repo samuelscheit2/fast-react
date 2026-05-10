@@ -38,6 +38,10 @@ const SYNTHETIC_EVENT_SHAPE_RECORD_KIND =
   'FastReactDomSyntheticEventShapeRecord';
 const SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
   'FastReactDomSyntheticEventShapeGateRecord';
+const DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND =
+  'FastReactDomDispatchPropagationStopDiagnosticRecord';
+const DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND =
+  'FastReactDomDispatchListenerErrorRouteRecord';
 const HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayEventQueueDiagnostic';
 const HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND =
@@ -52,6 +56,10 @@ const SYNTHETIC_EVENT_BLOCKED_CODE =
   'FAST_REACT_DOM_SYNTHETIC_EVENT_BLOCKED';
 const PUBLIC_EVENT_DISPATCH_BLOCKED_CODE =
   'FAST_REACT_DOM_PUBLIC_EVENT_DISPATCH_BLOCKED';
+const PROPAGATION_STOP_DIAGNOSTIC_BLOCKED_CODE =
+  'FAST_REACT_DOM_PROPAGATION_STOP_DIAGNOSTIC_BLOCKED';
+const LISTENER_ERROR_ROUTING_BLOCKED_CODE =
+  'FAST_REACT_DOM_LISTENER_ERROR_ROUTING_BLOCKED';
 const HYDRATION_REPLAY_BLOCKED_CODE =
   'FAST_REACT_DOM_HYDRATION_REPLAY_BLOCKED';
 const CONTROLLED_STATE_RESTORE_BLOCKED_CODE =
@@ -72,6 +80,10 @@ const PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS =
   'controlled-private-synthetic-event-shape-gate';
 const PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS =
   'validated-private-synthetic-event-shape';
+const PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS =
+  'controlled-private-propagation-stop-diagnostic';
+const PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS =
+  'controlled-private-listener-error-routing-diagnostic';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -210,6 +222,7 @@ const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
 const syntheticEventShapeRecordPayloads = new WeakMap();
 const syntheticEventShapeGateRecordPayloads = new WeakMap();
+const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
 
 function isObjectLike(value) {
   return (
@@ -621,13 +634,18 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
   const normalizedDispatchRecords = normalizeDispatchRecordList(
     dispatchRecords
   );
-  const normalizedOptions = isObjectLike(options) ? options : {};
-  const useProcessingOrder = normalizedOptions.useProcessingOrder !== false;
+  const normalizedOptions = normalizeDispatchQueueCanaryOptions(options);
+  const useProcessingOrder = normalizedOptions.useProcessingOrder;
+  const propagationState =
+    createDispatchQueuePropagationDiagnosticState(normalizedOptions);
   const invocationRecords = [];
+  const listenerErrorRoutes = [];
+  const propagationStopDiagnostics = [];
   let dispatchQueueEntryCount = 0;
   let listenerCandidateCount = 0;
   let listenerInvocationCount = 0;
   let listenerErrorCount = 0;
+  let propagationSkippedListenerCount = 0;
 
   for (
     let dispatchRecordIndex = 0;
@@ -650,20 +668,73 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
       const listenerRecords = useProcessingOrder
         ? entryPayload.processingListenerRecords
         : entryPayload.listenerRecords;
+      const canaryEventContext = createDispatchQueueCanaryEventContext(
+        dispatchQueueEntry,
+        entryPayload,
+        normalizedOptions,
+        propagationState
+      );
       dispatchQueueEntryCount++;
       listenerCandidateCount += listenerRecords.length;
+      let previousInstance = null;
 
       for (
         let listenerIndex = 0;
         listenerIndex < listenerRecords.length;
         listenerIndex++
       ) {
+        const listenerRecord = listenerRecords[listenerIndex];
+        if (
+          shouldSkipDispatchListenerForPropagationStop(
+            listenerRecord,
+            previousInstance,
+            canaryEventContext
+          )
+        ) {
+          const skippedRecord =
+            createSkippedSingleListenerInvocationCanaryRecord(
+              dispatchRecord,
+              dispatchQueueEntry,
+              listenerRecord,
+              {
+                dispatchQueueEntryIndex,
+                listenerIndex,
+                useProcessingOrder
+              },
+              'propagation-stopped'
+            );
+          invocationRecords.push(skippedRecord);
+          propagationSkippedListenerCount++;
+          propagationStopDiagnostics.push(
+            createDispatchPropagationStopDiagnosticRecord({
+              action: 'skip-listener',
+              dispatchQueueEntry,
+              dispatchRecord,
+              listenerRecord,
+              propagationState,
+              skipped: true
+            })
+          );
+          break;
+        }
+
+        prepareDispatchQueueCanaryEventForListener(
+          canaryEventContext,
+          listenerRecord
+        );
+        const stopCountBefore =
+          propagationState === null
+            ? 0
+            : propagationState.stopPropagationCallCount;
         const invocationRecord = invokeDispatchListenerRecordForCanary(
-          listenerRecords[listenerIndex],
+          listenerRecord,
           {
+            canaryEventContext,
             dispatchQueueEntry,
             dispatchRecord,
             listenerIndex,
+            listenerErrorRoutingDiagnosticsEnabled:
+              normalizedOptions.enableListenerErrorRoutingDiagnostics,
             selectedFromProcessingOrder: useProcessingOrder
           }
         );
@@ -671,21 +742,56 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
         listenerInvocationCount += invocationRecord.listenerInvocationCount;
         if (invocationRecord.listenerErrorCaptured) {
           listenerErrorCount++;
+          if (normalizedOptions.enableListenerErrorRoutingDiagnostics) {
+            listenerErrorRoutes.push(
+              createDispatchListenerErrorRouteRecord(
+                invocationRecord,
+                listenerErrorRoutes.length
+              )
+            );
+          }
         }
+        if (
+          propagationState !== null &&
+          propagationState.stopPropagationCallCount > stopCountBefore
+        ) {
+          propagationStopDiagnostics.push(
+            createDispatchPropagationStopDiagnosticRecord({
+              action: 'stop-propagation',
+              dispatchQueueEntry,
+              dispatchRecord,
+              listenerRecord,
+              propagationState,
+              skipped: false
+            })
+          );
+        }
+        previousInstance = listenerRecord.targetInst;
       }
+      finishDispatchQueueCanaryEventContext(canaryEventContext);
     }
   }
 
   const frozenInvocationRecords = Object.freeze(invocationRecords.slice());
+  const frozenListenerErrorRoutes = Object.freeze(
+    listenerErrorRoutes.slice()
+  );
+  const frozenPropagationStopDiagnostics = Object.freeze(
+    propagationStopDiagnostics.slice()
+  );
   const invocationOrder = Object.freeze(
     frozenInvocationRecords.map((invocationRecord, index) =>
       Object.freeze({
         currentTarget: invocationRecord.currentTarget,
         dispatchPathIndex: invocationRecord.dispatchPathIndex,
         index,
+        invocationStatus: invocationRecord.invocationStatus,
         listenerErrorCaptured: invocationRecord.listenerErrorCaptured,
         phase: invocationRecord.phase,
         registrationName: invocationRecord.registrationName,
+        skippedByPropagationStop:
+          invocationRecord.invocationStatus ===
+          'skipped-propagation-stopped',
         targetInst: invocationRecord.targetInst
       })
     )
@@ -716,7 +822,35 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
     kind: DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND,
     listenerCandidateCount,
     listenerErrorCount,
+    listenerErrorRouteCount: frozenListenerErrorRoutes.length,
+    listenerErrorRoutes: frozenListenerErrorRoutes,
+    listenerErrorRoutingBlockedReason:
+      LISTENER_ERROR_ROUTING_BLOCKED_CODE,
+    listenerErrorRoutingDiagnosticEnabled:
+      normalizedOptions.enableListenerErrorRoutingDiagnostics,
+    listenerErrorRoutingStatus:
+      frozenListenerErrorRoutes.length === 0
+        ? 'not-applicable'
+        : PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS,
     listenerInvocationCount,
+    propagationSkippedListenerCount,
+    propagationStopCallCount:
+      propagationState === null ? 0 : propagationState.stopPropagationCallCount,
+    propagationStopDiagnosticEnabled:
+      normalizedOptions.enablePropagationStopDiagnostics,
+    propagationStopDiagnosticStatus:
+      frozenPropagationStopDiagnostics.length === 0
+        ? 'not-applicable'
+        : PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
+    propagationStopDiagnostics: frozenPropagationStopDiagnostics,
+    propagationStopNativeCallCount:
+      propagationState === null
+        ? 0
+        : propagationState.nativeStopPropagationCallCount,
+    propagationStopBlockedReason:
+      PROPAGATION_STOP_DIAGNOSTIC_BLOCKED_CODE,
+    propagationStopped:
+      propagationState !== null && propagationState.propagationStopped,
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
     publicRootBehaviorChanged: false,
@@ -738,9 +872,224 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
     Object.freeze({
       dispatchRecords: Object.freeze(normalizedDispatchRecords.slice()),
       invocationRecords: frozenInvocationRecords,
+      listenerErrorRoutes: frozenListenerErrorRoutes,
       options: Object.freeze({
+        enableListenerErrorRoutingDiagnostics:
+          normalizedOptions.enableListenerErrorRoutingDiagnostics,
+        enablePropagationStopDiagnostics:
+          normalizedOptions.enablePropagationStopDiagnostics,
         useProcessingOrder
-      })
+      }),
+      propagationStopDiagnostics: frozenPropagationStopDiagnostics
+    })
+  );
+
+  return record;
+}
+
+function normalizeDispatchQueueCanaryOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+
+  return {
+    enableListenerErrorRoutingDiagnostics:
+      normalizedOptions.enableListenerErrorRoutingDiagnostics === true,
+    enablePropagationStopDiagnostics:
+      normalizedOptions.enablePropagationStopDiagnostics === true,
+    useProcessingOrder: normalizedOptions.useProcessingOrder !== false
+  };
+}
+
+function createDispatchQueuePropagationDiagnosticState(options) {
+  if (!options.enablePropagationStopDiagnostics) {
+    return null;
+  }
+
+  return {
+    currentDispatchListenerRecord: null,
+    currentTarget: null,
+    nativeEvent: null,
+    nativeStopPropagationCallCount: 0,
+    propagationStopped: false,
+    stoppedNativeEvent: null,
+    stopPropagationCallCount: 0,
+    stopSourceListenerRecord: null
+  };
+}
+
+function createDispatchQueueCanaryEventContext(
+  dispatchQueueEntry,
+  entryPayload,
+  options,
+  propagationState
+) {
+  if (propagationState === null) {
+    return null;
+  }
+
+  const listenerRecords = options.useProcessingOrder
+    ? entryPayload.processingListenerRecords
+    : entryPayload.listenerRecords;
+  const firstListenerRecord = listenerRecords[0] || null;
+  if (firstListenerRecord === null) {
+    return null;
+  }
+
+  const firstListenerPayload =
+    getDispatchListenerRecordPayload(firstListenerRecord);
+  if (firstListenerPayload === null) {
+    return null;
+  }
+
+  propagationState.nativeEvent = firstListenerPayload.nativeEvent;
+  if (propagationState.stoppedNativeEvent !== firstListenerPayload.nativeEvent) {
+    propagationState.propagationStopped = false;
+  }
+  propagationState.nativeStopPropagationCallCount =
+    getNativeStopPropagationCallCount(firstListenerPayload.nativeEvent);
+
+  return {
+    canaryEvent: createDispatchListenerCanaryEvent(
+      firstListenerRecord,
+      firstListenerPayload,
+      {
+        propagationState
+      }
+    ),
+    dispatchQueueEntry,
+    propagationState
+  };
+}
+
+function prepareDispatchQueueCanaryEventForListener(
+  canaryEventContext,
+  listenerRecord
+) {
+  if (canaryEventContext === null) {
+    return;
+  }
+
+  const propagationState = canaryEventContext.propagationState;
+  propagationState.currentDispatchListenerRecord = listenerRecord;
+  propagationState.currentTarget = listenerRecord.currentTarget;
+}
+
+function finishDispatchQueueCanaryEventContext(canaryEventContext) {
+  if (canaryEventContext === null) {
+    return;
+  }
+
+  const propagationState = canaryEventContext.propagationState;
+  propagationState.currentDispatchListenerRecord = null;
+  propagationState.currentTarget = null;
+}
+
+function shouldSkipDispatchListenerForPropagationStop(
+  listenerRecord,
+  previousInstance,
+  canaryEventContext
+) {
+  if (canaryEventContext === null) {
+    return false;
+  }
+
+  return (
+    canaryEventContext.propagationState.propagationStopped &&
+    listenerRecord.targetInst !== previousInstance
+  );
+}
+
+function createDispatchPropagationStopDiagnosticRecord({
+  action,
+  dispatchQueueEntry,
+  dispatchRecord,
+  listenerRecord,
+  propagationState,
+  skipped
+}) {
+  return Object.freeze({
+    action,
+    blockedReason: PROPAGATION_STOP_DIAGNOSTIC_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    currentTarget: listenerRecord.currentTarget,
+    diagnosticOnly: true,
+    dispatchPathIndex: listenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind: dispatchQueueEntry.kind,
+    dispatchRecordKind: dispatchRecord.kind,
+    domEventName: listenerRecord.domEventName,
+    kind: DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
+    nativeStopPropagationCallCount:
+      propagationState.nativeStopPropagationCallCount,
+    phase: listenerRecord.phase,
+    propagationSkippedListener: skipped,
+    propagationStopCallCount:
+      propagationState.stopPropagationCallCount,
+    propagationStopped: propagationState.propagationStopped,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName: listenerRecord.registrationName,
+    status: PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
+    stoppedByCurrentTarget:
+      propagationState.stopSourceListenerRecord === null
+        ? null
+        : propagationState.stopSourceListenerRecord.currentTarget,
+    stoppedByDispatchPathIndex:
+      propagationState.stopSourceListenerRecord === null
+        ? null
+        : propagationState.stopSourceListenerRecord.dispatchPathIndex,
+    stoppedByPhase:
+      propagationState.stopSourceListenerRecord === null
+        ? null
+        : propagationState.stopSourceListenerRecord.phase,
+    stoppedByRegistrationName:
+      propagationState.stopSourceListenerRecord === null
+        ? null
+        : propagationState.stopSourceListenerRecord.registrationName,
+    stoppedByTargetInst:
+      propagationState.stopSourceListenerRecord === null
+        ? null
+        : propagationState.stopSourceListenerRecord.targetInst,
+    syntheticEventCount: 0,
+    targetInst: listenerRecord.targetInst
+  });
+}
+
+function createDispatchListenerErrorRouteRecord(
+  invocationRecord,
+  errorRouteIndex
+) {
+  const invocationPayload =
+    getDispatchListenerInvocationCanaryRecordPayload(invocationRecord);
+  const record = Object.freeze({
+    blockedReason: LISTENER_ERROR_ROUTING_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    currentTarget: invocationRecord.currentTarget,
+    diagnosticOnly: true,
+    dispatchPathIndex: invocationRecord.dispatchPathIndex,
+    domEventName: invocationRecord.domEventName,
+    errorReported: false,
+    errorRouteIndex,
+    errorRouteTarget: 'reportGlobalError',
+    exposesError: false,
+    kind: DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND,
+    listenerErrorCaptured: invocationRecord.listenerErrorCaptured,
+    nativeEventType: invocationRecord.nativeEventType,
+    phase: invocationRecord.phase,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName: invocationRecord.registrationName,
+    status: PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS,
+    syntheticEventCount: 0,
+    targetInst: invocationRecord.targetInst
+  });
+
+  dispatchListenerErrorRouteRecordPayloads.set(
+    record,
+    Object.freeze({
+      error: invocationPayload === null ? null : invocationPayload.error,
+      invocationPayload,
+      invocationRecord
     })
   );
 
@@ -768,6 +1117,19 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     0,
     'listenerIndex'
   );
+  const canaryEventContext = isObjectLike(
+    normalizedOptions.canaryEventContext
+  )
+    ? normalizedOptions.canaryEventContext
+    : null;
+  const propagationState =
+    canaryEventContext === null
+      ? null
+      : canaryEventContext.propagationState;
+  const propagationStoppedBeforeInvocation =
+    propagationState !== null && propagationState.propagationStopped;
+  const stopPropagationCallCountBefore =
+    propagationState === null ? 0 : propagationState.stopPropagationCallCount;
 
   if (typeof payload.listener !== 'function') {
     return createSkippedSingleListenerInvocationCanaryRecord(
@@ -783,10 +1145,10 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     );
   }
 
-  const canaryEvent = createDispatchListenerCanaryEvent(
-    normalizedListenerRecord,
-    payload
-  );
+  const canaryEvent =
+    canaryEventContext === null
+      ? createDispatchListenerCanaryEvent(normalizedListenerRecord, payload)
+      : canaryEventContext.canaryEvent;
   let returnValue;
   let error = null;
 
@@ -823,6 +1185,16 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     kind: DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND,
     latestPropsStatus: normalizedListenerRecord.latestPropsStatus,
     listenerErrorCaptured: error !== null,
+    listenerErrorRoutingBlockedReason:
+      LISTENER_ERROR_ROUTING_BLOCKED_CODE,
+    listenerErrorRoutingDiagnosticEnabled:
+      normalizedOptions.listenerErrorRoutingDiagnosticsEnabled === true,
+    listenerErrorRoutingStatus:
+      error === null
+        ? 'not-applicable'
+        : normalizedOptions.listenerErrorRoutingDiagnosticsEnabled === true
+          ? PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS
+          : 'captured-without-routing-diagnostic',
     listenerIndex,
     listenerInvocationCount: 1,
     listenerReturnStatus:
@@ -831,6 +1203,24 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     nativeEventTarget: normalizedListenerRecord.nativeEventTarget,
     nativeEventType: normalizedListenerRecord.nativeEventType,
     phase: normalizedListenerRecord.phase,
+    propagationDiagnosticEnabled: propagationState !== null,
+    propagationSkipped: false,
+    propagationStopCallCount:
+      propagationState === null
+        ? 0
+        : propagationState.stopPropagationCallCount,
+    propagationStopCallCountDelta:
+      propagationState === null
+        ? 0
+        : propagationState.stopPropagationCallCount -
+          stopPropagationCallCountBefore,
+    propagationStopDiagnosticStatus:
+      propagationState === null
+        ? 'not-applicable'
+        : PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
+    propagationStoppedAfterInvocation:
+      propagationState !== null && propagationState.propagationStopped,
+    propagationStoppedBeforeInvocation,
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
     publicRootBehaviorChanged: false,
@@ -862,6 +1252,7 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
       nativeEvent: payload.nativeEvent,
       nativeEventTarget: payload.nativeEventTarget,
       pathEntry: payload.pathEntry,
+      propagationState,
       returnValue,
       targetListenerLookupRecord: payload.targetListenerLookupRecord
     })
@@ -937,6 +1328,20 @@ function createSkippedSingleListenerInvocationCanaryRecord(
         : dispatchListenerRecord.nativeEventType,
     phase:
       dispatchListenerRecord === null ? null : dispatchListenerRecord.phase,
+    listenerErrorRoutingBlockedReason:
+      LISTENER_ERROR_ROUTING_BLOCKED_CODE,
+    listenerErrorRoutingDiagnosticEnabled: false,
+    listenerErrorRoutingStatus: 'not-applicable',
+    propagationDiagnosticEnabled: reason === 'propagation-stopped',
+    propagationSkipped: reason === 'propagation-stopped',
+    propagationStopCallCount: 0,
+    propagationStopCallCountDelta: 0,
+    propagationStopDiagnosticStatus:
+      reason === 'propagation-stopped'
+        ? PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS
+        : 'not-applicable',
+    propagationStoppedAfterInvocation: reason === 'propagation-stopped',
+    propagationStoppedBeforeInvocation: reason === 'propagation-stopped',
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
     publicRootBehaviorChanged: false,
@@ -992,14 +1397,22 @@ function createSkippedSingleListenerInvocationCanaryRecord(
   return record;
 }
 
-function createDispatchListenerCanaryEvent(dispatchListenerRecord, payload) {
-  return Object.freeze({
+function createDispatchListenerCanaryEvent(
+  dispatchListenerRecord,
+  payload,
+  options
+) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const propagationState = isObjectLike(normalizedOptions.propagationState)
+    ? normalizedOptions.propagationState
+    : null;
+  const event = {
     browserDomEventCompatibilityClaimed: false,
-    currentTarget: dispatchListenerRecord.currentTarget,
     domEventName: dispatchListenerRecord.domEventName,
     kind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
     nativeEventType: dispatchListenerRecord.nativeEventType,
     phase: dispatchListenerRecord.phase,
+    propagationStopDiagnosticEnabled: propagationState !== null,
     publicRootBehaviorChanged: false,
     registrationName: dispatchListenerRecord.registrationName,
     status: 'private-canary-not-synthetic-event',
@@ -1007,7 +1420,72 @@ function createDispatchListenerCanaryEvent(dispatchListenerRecord, payload) {
     target: payload.nativeEventTarget,
     targetInst: dispatchListenerRecord.targetInst,
     type: dispatchListenerRecord.nativeEventType
-  });
+  };
+
+  if (propagationState === null) {
+    event.currentTarget = dispatchListenerRecord.currentTarget;
+  } else {
+    Object.defineProperties(event, {
+      currentTarget: {
+        enumerable: true,
+        get() {
+          return propagationState.currentTarget;
+        }
+      },
+      isPropagationStopped: {
+        enumerable: true,
+        value() {
+          return propagationState.propagationStopped;
+        }
+      },
+      stopPropagation: {
+        enumerable: true,
+        value() {
+          propagationState.propagationStopped = true;
+          propagationState.stoppedNativeEvent =
+            propagationState.nativeEvent;
+          propagationState.stopPropagationCallCount++;
+          propagationState.stopSourceListenerRecord =
+            propagationState.currentDispatchListenerRecord;
+          routeCanaryStopPropagationToNativeEvent(
+            propagationState.nativeEvent
+          );
+          propagationState.nativeStopPropagationCallCount =
+            getNativeStopPropagationCallCount(
+              propagationState.nativeEvent
+            );
+        }
+      }
+    });
+  }
+
+  return Object.freeze(event);
+}
+
+function routeCanaryStopPropagationToNativeEvent(nativeEvent) {
+  if (!isObjectLike(nativeEvent)) {
+    return;
+  }
+
+  if (typeof nativeEvent.stopPropagation === 'function') {
+    nativeEvent.stopPropagation();
+    return;
+  }
+
+  if (typeof nativeEvent.cancelBubble !== 'unknown') {
+    nativeEvent.cancelBubble = true;
+  }
+}
+
+function getNativeStopPropagationCallCount(nativeEvent) {
+  if (
+    isObjectLike(nativeEvent) &&
+    typeof nativeEvent.stopPropagationCallCount === 'number'
+  ) {
+    return nativeEvent.stopPropagationCallCount;
+  }
+
+  return 0;
 }
 
 function SyntheticBaseEvent(
@@ -1426,6 +1904,18 @@ function getDispatchQueueInvocationCanaryRecordPayload(record) {
 
 function isDispatchQueueInvocationCanaryRecord(record) {
   return getDispatchQueueInvocationCanaryRecordPayload(record) !== null;
+}
+
+function getDispatchListenerErrorRouteRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return dispatchListenerErrorRouteRecordPayloads.get(record) || null;
+}
+
+function isDispatchListenerErrorRouteRecord(record) {
+  return getDispatchListenerErrorRouteRecordPayload(record) !== null;
 }
 
 function assertEventDispatchRecord(record) {
@@ -1987,10 +2477,12 @@ module.exports = {
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
   DISPATCH_LISTENER_RECORD_KIND,
   DISPATCH_LISTENER_CANARY_EVENT_KIND,
+  DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND,
   DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND,
   DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND,
   DISPATCH_QUEUE_ENTRY_RECORD_KIND,
   DISPATCH_QUEUE_RECORD_KIND,
+  DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
@@ -2003,14 +2495,18 @@ module.exports = {
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
+  LISTENER_ERROR_ROUTING_BLOCKED_CODE,
   PLUGIN_EXTRACTION_BLOCKED_CODE,
   PLUGIN_EXTRACTION_RECORD_KIND,
   POLYFILL_EVENT_PLUGIN_NAMES,
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
   PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
+  PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS,
+  PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS,
+  PROPAGATION_STOP_DIAGNOSTIC_BLOCKED_CODE,
   PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
   SCROLL_END_EVENT_PLUGIN_NAME,
   SIMPLE_EVENT_PLUGIN_NAME,
@@ -2023,6 +2519,7 @@ module.exports = {
   createPluginExtractionRecord,
   createSyntheticEventShapeGateFromDispatchRecords,
   createSyntheticEventShapeRecordForDispatchListenerRecord,
+  getDispatchListenerErrorRouteRecordPayload,
   getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
@@ -2036,6 +2533,7 @@ module.exports = {
   invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord,
   isDispatchListenerInvocationCanaryRecord,
+  isDispatchListenerErrorRouteRecord,
   isDispatchListenerRecord,
   isDispatchQueueEntryRecord,
   isDispatchQueueInvocationCanaryRecord,
