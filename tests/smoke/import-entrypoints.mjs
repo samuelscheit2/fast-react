@@ -245,6 +245,9 @@ const reactServerReactDomKeys = [
 ];
 
 const reactDomClientKeys = ['createRoot', 'hydrateRoot', 'version'];
+const reactDomClientPrivateRuntimeFacadeSymbols = {
+  createRoot: ['fast.react_dom.client.private_root_public_facade_adapter']
+};
 const reactDomServerNodeKeys = [
   'version',
   'renderToString',
@@ -784,6 +787,17 @@ const schedulerMockKeys = [
   'unstable_shouldYield',
   'unstable_wrapCallback'
 ];
+const privateActQueueFlushDiagnosticsRuntimeKey =
+  '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
+const schedulerMockPrivateRuntimeFacadeStringProperties = {
+  unstable_flushAll: [privateActQueueFlushDiagnosticsRuntimeKey],
+  unstable_flushAllWithoutAsserting: [
+    privateActQueueFlushDiagnosticsRuntimeKey
+  ],
+  unstable_flushExpired: [privateActQueueFlushDiagnosticsRuntimeKey],
+  unstable_flushNumberOfYields: [privateActQueueFlushDiagnosticsRuntimeKey],
+  unstable_flushUntilNextPaint: [privateActQueueFlushDiagnosticsRuntimeKey]
+};
 const reactTestRendererSchedulerFunctionShapes = {
   log: { length: 1, name: '' },
   reset: { length: 0, name: '' },
@@ -1033,6 +1047,101 @@ function assertPrivateRuntimeFacadeSymbols(target, expectedSymbols, label) {
   }
 }
 
+function assertPrivateRuntimeFacadeStringProperties(
+  target,
+  expectedProperties,
+  label
+) {
+  const actualProperties = Reflect.ownKeys(target)
+    .filter(
+      (key) =>
+        typeof key === 'string' &&
+        !allowedRuntimeMetadataKeys.has(key) &&
+        privateDiagnosticRuntimeExportPattern.test(key)
+    )
+    .sort();
+
+  assert.deepEqual(
+    actualProperties,
+    expectedProperties,
+    `${label} private runtime facade string properties`
+  );
+
+  for (const propertyName of expectedProperties) {
+    assert.equal(
+      Object.keys(target).includes(propertyName),
+      false,
+      `${label} must not expose ${propertyName} as a public key`
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(target, propertyName);
+    assert.notEqual(descriptor, undefined, `${label} ${propertyName}`);
+    assert.equal(
+      descriptor.enumerable,
+      false,
+      `${label} ${propertyName} enumerable`
+    );
+    assert.equal(
+      descriptor.configurable,
+      false,
+      `${label} ${propertyName} configurable`
+    );
+    assert.equal(
+      descriptor.writable,
+      false,
+      `${label} ${propertyName} writable`
+    );
+    assert.equal(
+      descriptor.value !== null && typeof descriptor.value === 'object',
+      true,
+      `${label} ${propertyName} value type`
+    );
+    assert.equal(
+      Object.isFrozen(descriptor.value),
+      true,
+      `${label} ${propertyName} value frozen`
+    );
+    if (Object.hasOwn(descriptor.value, 'exportName')) {
+      assert.equal(
+        descriptor.value.exportName,
+        propertyName,
+        `${label} ${propertyName} export name`
+      );
+    }
+  }
+}
+
+function assertPrivateRuntimeFacadeStringPropertyMap(
+  container,
+  expectedPropertiesByName,
+  label
+) {
+  for (const expectedName of Object.keys(expectedPropertiesByName)) {
+    assert.equal(
+      Object.hasOwn(container, expectedName),
+      true,
+      `${label}.${expectedName}`
+    );
+    assert.equal(
+      typeof container[expectedName],
+      'function',
+      `${label}.${expectedName} type`
+    );
+  }
+
+  for (const publicName of Object.keys(container)) {
+    if (typeof container[publicName] !== 'function') {
+      continue;
+    }
+
+    assertPrivateRuntimeFacadeStringProperties(
+      container[publicName],
+      expectedPropertiesByName[publicName] ?? [],
+      `${label}.${publicName}`
+    );
+  }
+}
+
 function assertPlaceholderMetadata(moduleExports, label) {
   assert.equal(
     moduleExports.__FAST_REACT_PLACEHOLDER__,
@@ -1272,6 +1381,11 @@ function assertReactTestRendererSchedulerShell(scheduler, label) {
     `${label} own keys`
   );
   assertNoPrivateDiagnosticRuntimeExports(scheduler, label);
+  assertPrivateRuntimeFacadeStringPropertyMap(
+    scheduler,
+    schedulerMockPrivateRuntimeFacadeStringProperties,
+    label
+  );
 
   for (const [key, expectedValue] of Object.entries(
     reactTestRendererSchedulerConstantValues
@@ -1500,6 +1614,11 @@ function assertSchedulerImplementedRootKeys(moduleExports, expectedKeys, label) 
 function assertSchedulerImplementedMockKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
   assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
+  assertPrivateRuntimeFacadeStringPropertyMap(
+    moduleExports,
+    schedulerMockPrivateRuntimeFacadeStringProperties,
+    label
+  );
   assert.equal(
     Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
     false,
@@ -2682,6 +2801,14 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
     assertReactDomTestUtilsActFailClosed(cjsModule, labelPrefix);
   }
 
+  if (entrypoint.specifier === '@fast-react/react-dom/client') {
+    assertPrivateRuntimeFacadeSymbols(
+      cjsModule.createRoot,
+      reactDomClientPrivateRuntimeFacadeSymbols.createRoot,
+      `${labelPrefix}.createRoot`
+    );
+  }
+
   if (entrypoint.specifier === '@fast-react/react-dom/server.bun') {
     assert.equal(cjsModule.resume, undefined, `${labelPrefix}.resume`);
   }
@@ -3448,6 +3575,9 @@ async function runReactDomPackageProbe(
       blockedReactDomExtensionSubpaths
     )};
     const placeholderVersion = ${JSON.stringify(reactDomPlaceholderVersion)};
+    const privateRuntimeFacadeSymbols = ${JSON.stringify(
+      reactDomClientPrivateRuntimeFacadeSymbols
+    )};
 
     function assertInventoryKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
@@ -3463,6 +3593,36 @@ async function runReactDomPackageProbe(
         false,
         label
       );
+    }
+
+    function assertPrivateRuntimeFacadeSymbols(target, expectedSymbols, label) {
+      const actualSymbols = Reflect.ownKeys(target).filter(
+        (key) => typeof key === 'symbol'
+      );
+
+      assert.deepEqual(
+        actualSymbols.map((symbol) => symbol.description).sort(),
+        expectedSymbols,
+        label + ' private runtime facade symbols'
+      );
+
+      for (const symbolDescription of expectedSymbols) {
+        assert.equal(
+          Object.keys(target).includes(symbolDescription),
+          false,
+          label + ' must not expose ' + symbolDescription + ' as a public key'
+        );
+
+        const descriptor = Object.getOwnPropertyDescriptor(
+          target,
+          Symbol.for(symbolDescription)
+        );
+        assert.notEqual(descriptor, undefined, label + ' ' + symbolDescription);
+        assert.equal(descriptor.enumerable, false, label + ' enumerable');
+        assert.equal(descriptor.configurable, false, label + ' configurable');
+        assert.equal(descriptor.writable, false, label + ' writable');
+        assert.notEqual(descriptor.value, undefined, label + ' value');
+      }
     }
 
     function assertUnimplemented(callback, label) {
@@ -3552,6 +3712,13 @@ async function runReactDomPackageProbe(
         );
         if (specifier === '@fast-react/react-dom/test-utils') {
           assertTestUtilsActFailClosed(cjsModule, specifier);
+        }
+        if (specifier === '@fast-react/react-dom/client') {
+          assertPrivateRuntimeFacadeSymbols(
+            cjsModule.createRoot,
+            privateRuntimeFacadeSymbols.createRoot,
+            specifier + ' createRoot'
+          );
         }
 
         const esmModule = await import(specifier);
@@ -3692,6 +3859,9 @@ async function runReactTestRendererPackageProbe(tempRoot) {
     const privateRuntimeFacadeSymbols = ${JSON.stringify(
       reactTestRendererPrivateRuntimeFacadeSymbols
     )};
+    const schedulerPrivateRuntimeFacadeStringProperties = ${JSON.stringify(
+      schedulerMockPrivateRuntimeFacadeStringProperties
+    )};
     const allowedRuntimeMetadataKeys = new Set([
       '__FAST_REACT_ENTRYPOINT__',
       '__FAST_REACT_PLACEHOLDER__',
@@ -3760,6 +3930,73 @@ async function runReactTestRendererPackageProbe(tempRoot) {
       }
     }
 
+    function assertPrivateRuntimeFacadeStringProperties(
+      target,
+      expectedProperties,
+      label
+    ) {
+      const actualProperties = Reflect.ownKeys(target)
+        .filter(
+          (key) =>
+            typeof key === 'string' &&
+            !allowedRuntimeMetadataKeys.has(key) &&
+            privateDiagnosticRuntimeExportPattern.test(key)
+        )
+        .sort();
+
+      assert.deepEqual(
+        actualProperties,
+        expectedProperties,
+        label + ' private runtime facade string properties'
+      );
+
+      for (const propertyName of expectedProperties) {
+        assert.equal(
+          Object.keys(target).includes(propertyName),
+          false,
+          label + ' must not expose ' + propertyName + ' as a public key'
+        );
+
+        const descriptor = Object.getOwnPropertyDescriptor(target, propertyName);
+        assert.notEqual(descriptor, undefined, label + ' ' + propertyName);
+        assert.equal(descriptor.enumerable, false, label + ' enumerable');
+        assert.equal(descriptor.configurable, false, label + ' configurable');
+        assert.equal(descriptor.writable, false, label + ' writable');
+        assert.equal(
+          descriptor.value !== null && typeof descriptor.value === 'object',
+          true,
+          label + ' value type'
+        );
+        assert.equal(Object.isFrozen(descriptor.value), true, label + ' frozen');
+        if (Object.hasOwn(descriptor.value, 'exportName')) {
+          assert.equal(descriptor.value.exportName, propertyName, label);
+        }
+      }
+    }
+
+    function assertPrivateRuntimeFacadeStringPropertyMap(
+      container,
+      expectedPropertiesByName,
+      label
+    ) {
+      for (const expectedName of Object.keys(expectedPropertiesByName)) {
+        assert.equal(Object.hasOwn(container, expectedName), true, label);
+        assert.equal(typeof container[expectedName], 'function', label);
+      }
+
+      for (const publicName of Object.keys(container)) {
+        if (typeof container[publicName] !== 'function') {
+          continue;
+        }
+
+        assertPrivateRuntimeFacadeStringProperties(
+          container[publicName],
+          expectedPropertiesByName[publicName] ?? [],
+          label + ' ' + publicName
+        );
+      }
+    }
+
     function assertInventoryKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
       assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
@@ -3813,6 +4050,11 @@ async function runReactTestRendererPackageProbe(tempRoot) {
     function assertSchedulerShell(scheduler, label) {
       assert.deepEqual(Object.keys(scheduler), schedulerMockKeys, label);
       assert.deepEqual(Reflect.ownKeys(scheduler), schedulerMockKeys, label);
+      assertPrivateRuntimeFacadeStringPropertyMap(
+        scheduler,
+        schedulerPrivateRuntimeFacadeStringProperties,
+        label
+      );
 
       for (const [key, expectedValue] of Object.entries(
         schedulerConstantValues
@@ -4273,6 +4515,9 @@ async function runSchedulerPackageProbe(tempRoot) {
     ]);
     const privateDiagnosticRuntimeExportPattern =
       /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu;
+    const privateRuntimeFacadeStringProperties = ${JSON.stringify(
+      schedulerMockPrivateRuntimeFacadeStringProperties
+    )};
 
     function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
       for (const key of Reflect.ownKeys(moduleExports)) {
@@ -4284,6 +4529,73 @@ async function runSchedulerPackageProbe(tempRoot) {
           privateDiagnosticRuntimeExportPattern.test(key),
           false,
           label + ' must not expose private diagnostic export ' + key
+        );
+      }
+    }
+
+    function assertPrivateRuntimeFacadeStringProperties(
+      target,
+      expectedProperties,
+      label
+    ) {
+      const actualProperties = Reflect.ownKeys(target)
+        .filter(
+          (key) =>
+            typeof key === 'string' &&
+            !allowedRuntimeMetadataKeys.has(key) &&
+            privateDiagnosticRuntimeExportPattern.test(key)
+        )
+        .sort();
+
+      assert.deepEqual(
+        actualProperties,
+        expectedProperties,
+        label + ' private runtime facade string properties'
+      );
+
+      for (const propertyName of expectedProperties) {
+        assert.equal(
+          Object.keys(target).includes(propertyName),
+          false,
+          label + ' must not expose ' + propertyName + ' as a public key'
+        );
+
+        const descriptor = Object.getOwnPropertyDescriptor(target, propertyName);
+        assert.notEqual(descriptor, undefined, label + ' ' + propertyName);
+        assert.equal(descriptor.enumerable, false, label + ' enumerable');
+        assert.equal(descriptor.configurable, false, label + ' configurable');
+        assert.equal(descriptor.writable, false, label + ' writable');
+        assert.equal(
+          descriptor.value !== null && typeof descriptor.value === 'object',
+          true,
+          label + ' value type'
+        );
+        assert.equal(Object.isFrozen(descriptor.value), true, label + ' frozen');
+        if (Object.hasOwn(descriptor.value, 'exportName')) {
+          assert.equal(descriptor.value.exportName, propertyName, label);
+        }
+      }
+    }
+
+    function assertPrivateRuntimeFacadeStringPropertyMap(
+      container,
+      expectedPropertiesByName,
+      label
+    ) {
+      for (const expectedName of Object.keys(expectedPropertiesByName)) {
+        assert.equal(Object.hasOwn(container, expectedName), true, label);
+        assert.equal(typeof container[expectedName], 'function', label);
+      }
+
+      for (const publicName of Object.keys(container)) {
+        if (typeof container[publicName] !== 'function') {
+          continue;
+        }
+
+        assertPrivateRuntimeFacadeStringProperties(
+          container[publicName],
+          expectedPropertiesByName[publicName] ?? [],
+          label + ' ' + publicName
         );
       }
     }
@@ -4323,6 +4635,11 @@ async function runSchedulerPackageProbe(tempRoot) {
     function assertImplementedMockKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
       assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
+      assertPrivateRuntimeFacadeStringPropertyMap(
+        moduleExports,
+        privateRuntimeFacadeStringProperties,
+        label
+      );
       assert.equal(
         Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
         false,
