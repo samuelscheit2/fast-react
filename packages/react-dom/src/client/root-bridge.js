@@ -109,6 +109,8 @@ const privateRootPortalChildReconciliationDiagnosticRecordType =
   'fast.react_dom.private_root_portal_child_reconciliation_diagnostic_record';
 const privateRootHostOutputUpdateHandoffRecordType =
   'fast.react_dom.private_root_host_output_update_handoff_record';
+const privateRootCommitHostComponentUpdateHandoffRecordType =
+  'fast.react_dom.private_root_commit_host_component_update_handoff_record';
 const privateRootCommitRefMetadataRecordType =
   'fast.react_dom.private_root_commit_ref_metadata_record';
 const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
@@ -163,6 +165,8 @@ const ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED =
   'admitted-private-root-portal-child-reconciliation-diagnostic';
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-host-output-update';
+const ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED =
+  'applied-private-root-commit-host-component-update';
 const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED =
   'accepted-private-root-commit-ref-metadata';
 const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
@@ -652,6 +656,16 @@ const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES = freezeArray([
     reason: 'React DOM root update compatibility remains unclaimed.'
   })
 ]);
+const ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'host-text-update',
+      blocked: true,
+      reason:
+        'HostText root commit updates remain outside this HostComponent handoff.'
+    }),
+    ...ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES
+  ]);
 const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-root-execution',
@@ -744,6 +758,8 @@ const rootPortalFakeDomMountPayloads = new WeakMap();
 const rootPortalChildReconciliationDiagnosticPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffRecords = new WeakMap();
+const rootCommitHostComponentUpdateHandoffPayloads = new WeakMap();
+const rootCommitHostComponentUpdateHandoffRecords = new WeakMap();
 const rootCommitRefMetadataPayloads = new WeakMap();
 const rootCommitRefMetadataRecordsByRequest = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
@@ -874,6 +890,18 @@ function createPrivateRootBridgeShell(options) {
       return applyPrivateRootHostOutputUpdateWithBridge(
         bridgeState,
         record,
+        options
+      );
+    },
+    applyRootCommitHostComponentUpdate(
+      record,
+      rootCommitHostComponentUpdateMetadata,
+      options
+    ) {
+      return applyPrivateRootCommitHostComponentUpdateWithBridge(
+        bridgeState,
+        record,
+        rootCommitHostComponentUpdateMetadata,
         options
       );
     },
@@ -1141,6 +1169,19 @@ function createRefCallbackHostOutputOrderingDiagnosticRecord(
 
 function applyPrivateRootHostOutputUpdate(record, options) {
   return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
+}
+
+function applyPrivateRootCommitHostComponentUpdate(
+  record,
+  rootCommitHostComponentUpdateMetadata,
+  options
+) {
+  return applyPrivateRootCommitHostComponentUpdateWithBridge(
+    null,
+    record,
+    rootCommitHostComponentUpdateMetadata,
+    options
+  );
 }
 
 function admitPrivateRootCommitRefMetadata(
@@ -1745,6 +1786,136 @@ function applyPrivateRootHostOutputUpdateWithBridge(
   return handoff;
 }
 
+function applyPrivateRootCommitHostComponentUpdateWithBridge(
+  bridgeState,
+  record,
+  rootCommitHostComponentUpdateMetadata,
+  options
+) {
+  const validation = validateHostOutputUpdateRequestRecord(record);
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const existing = rootCommitHostComponentUpdateHandoffRecords.get(record);
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const normalized = normalizeRootCommitHostComponentUpdateOptions(options);
+  const metadata = normalizeRootCommitHostComponentUpdateMetadata(
+    rootCommitHostComponentUpdateMetadata,
+    normalized
+  );
+  const hostOutputHandoff = applyPrivateRootHostOutputUpdateWithBridge(
+    bridgeState,
+    record,
+    {
+      hostInstanceToken: normalized.hostInstanceToken,
+      nextProps: normalized.nextProps,
+      tag: normalized.tag,
+      textUpdate: null
+    }
+  );
+  const hostOutputPayload =
+    rootHostOutputUpdateHandoffPayloads.get(hostOutputHandoff);
+  if (hostOutputPayload === undefined) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require an applied host-output update handoff.'
+    );
+  }
+  if (
+    hostOutputPayload.hostInstanceToken !== normalized.hostInstanceToken ||
+    hostOutputPayload.nextProps !== normalized.nextProps ||
+    hostOutputPayload.textUpdate !== null
+  ) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require a property-only host-output update for the selected host instance.'
+    );
+  }
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence =
+    rootBridgeState.nextRootCommitHostComponentUpdateSequence++;
+  const handoffId =
+    `${rootBridgeState.rootCommitHostComponentUpdateIdPrefix}:${sequence}`;
+  const acceptedCapabilities =
+    createRootCommitHostComponentUpdateAcceptedCapabilities(
+      hostOutputHandoff
+    );
+  const latestPropsPublished =
+    hostOutputHandoff.latestPropsPublished === true;
+  const handoff = freezeRecord({
+    $$typeof: privateRootCommitHostComponentUpdateHandoffRecordType,
+    kind: 'FastReactDomPrivateRootCommitHostComponentUpdateHandoffRecord',
+    operation: 'root-commit-host-component-update',
+    handoffId,
+    handoffSequence: sequence,
+    updateStatus: ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED,
+    sourceRequestId: record.requestId,
+    sourceRequestSequence: record.requestSequence,
+    sourceRequestType: record.requestType,
+    sourceUpdateId: record.updateId,
+    sourceLifecycleStatusBefore: record.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: record.lifecycleStatusAfter,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    hostTag: normalized.tag,
+    rootCommitMetadataSource: metadata.source,
+    rootCommitMetadataRecordCount: metadata.recordCount,
+    rootCommitHostComponentUpdateRecordCount:
+      metadata.hostComponentUpdateRecordCount,
+    rootCommitHostComponentUpdate:
+      metadata.selected.publicRecord,
+    hostOutputUpdateHandoffId: hostOutputHandoff.handoffId,
+    hostOutputUpdateStatus: hostOutputHandoff.updateStatus,
+    propertyMutation: hostOutputHandoff.propertyMutation,
+    textMutation: hostOutputHandoff.textMutation,
+    latestPropsPublished,
+    latestPropsPublishOrder: hostOutputHandoff.latestPropsPublishOrder,
+    acceptedCapabilities,
+    blockedCapabilities:
+      ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_BLOCKED_CAPABILITIES,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootCommitHostComponentUpdateHandoffRecords.set(record, handoff);
+  rootCommitHostComponentUpdateHandoffPayloads.set(handoff, {
+    bridgeState: rootBridgeState,
+    hostInstanceNode: hostOutputPayload.hostInstanceNode,
+    hostInstanceToken: normalized.hostInstanceToken,
+    hostOutputHandoff,
+    hostOutputPayload,
+    latestPropsPublished,
+    nextProps: normalized.nextProps,
+    previousProps: hostOutputPayload.previousProps,
+    propertyHandoff: hostOutputPayload.propertyHandoff,
+    propertyHandoffPayload: hostOutputPayload.propertyHandoffPayload,
+    propertyMutationEvidence: hostOutputPayload.propertyMutationEvidence,
+    rootCommitMetadata: rootCommitHostComponentUpdateMetadata,
+    rootCommitMetadataSelection: metadata.selected,
+    rootHandle: hostOutputPayload.rootHandle,
+    selectedRootCommitRecord: metadata.selected.record,
+    sourceRecord: record
+  });
+
+  return handoff;
+}
+
 function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
   if (bridgeState !== null && validation.bridgeState !== bridgeState) {
@@ -2105,6 +2276,14 @@ function getPrivateRootHostOutputUpdateHandoffPayload(record) {
 
 function isPrivateRootHostOutputUpdateHandoffRecord(value) {
   return rootHostOutputUpdateHandoffPayloads.has(value);
+}
+
+function getPrivateRootCommitHostComponentUpdateHandoffPayload(record) {
+  return rootCommitHostComponentUpdateHandoffPayloads.get(record) || null;
+}
+
+function isPrivateRootCommitHostComponentUpdateHandoffRecord(value) {
+  return rootCommitHostComponentUpdateHandoffPayloads.has(value);
 }
 
 function getPrivateRootCommitRefMetadataPayload(record) {
@@ -4063,6 +4242,10 @@ function createBridgeState(options) {
       options && options.hostOutputUpdateIdPrefix,
       'host-output-update'
     ),
+    rootCommitHostComponentUpdateIdPrefix: getIdPrefix(
+      options && options.rootCommitHostComponentUpdateIdPrefix,
+      'root-commit-host-component-update'
+    ),
     nextRequestSequence: 1,
     portalBoundaryIdPrefix: getIdPrefix(
       options && options.portalBoundaryIdPrefix,
@@ -4101,6 +4284,7 @@ function createBridgeState(options) {
     nextHydrateSequence: 1,
     nextInitialHostOutputSequence: 1,
     nextHostOutputUpdateSequence: 1,
+    nextRootCommitHostComponentUpdateSequence: 1,
     nextPortalBoundarySequence: 1,
     nextPortalCommitSequence: 1,
     nextPortalMountSequence: 1,
@@ -4399,6 +4583,471 @@ function normalizeHostOutputTextUpdate(textUpdate) {
   };
 }
 
+function normalizeRootCommitHostComponentUpdateOptions(options) {
+  if (options === null || typeof options !== 'object') {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require an options object.'
+    );
+  }
+
+  const hostInstanceToken = options.hostInstanceToken;
+  if (!isHostInstanceToken(hostInstanceToken)) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require a host instance token.'
+    );
+  }
+
+  const tag = options.tag;
+  if (typeof tag !== 'string' || tag === '') {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require a host tag.'
+    );
+  }
+
+  const nextProps = options.nextProps;
+  if (!isObjectOrFunction(nextProps)) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require object next props.'
+    );
+  }
+
+  if (options.textUpdate != null) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates do not accept HostText update metadata.'
+    );
+  }
+
+  return {
+    hostInstanceToken,
+    nextProps,
+    recordIndex: normalizeRootCommitRecordIndexOption(options),
+    stateNodeRaw: normalizeRootCommitStateNodeSelectorOption(options),
+    tag
+  };
+}
+
+function normalizeRootCommitHostComponentUpdateMetadata(
+  rootCommitHostComponentUpdateMetadata,
+  selector
+) {
+  const recordEntries = getRootCommitMetadataRecordEntries(
+    rootCommitHostComponentUpdateMetadata
+  );
+  if (recordEntries.records.length === 0) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require root commit mutation records.'
+    );
+  }
+
+  const hostComponentUpdateRecords = [];
+  for (const entry of recordEntries.records) {
+    const snapshot = createRootCommitHostComponentUpdateSnapshot(
+      entry.record,
+      entry.index,
+      recordEntries.source
+    );
+    if (snapshot !== null) {
+      hostComponentUpdateRecords.push(snapshot);
+    }
+  }
+
+  if (hostComponentUpdateRecords.length === 0) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Expected accepted root commit HostComponent update metadata.'
+    );
+  }
+
+  let selectedRecords = hostComponentUpdateRecords;
+  if (selector.recordIndex !== null) {
+    selectedRecords = selectedRecords.filter(
+      (candidate) => candidate.recordIndex === selector.recordIndex
+    );
+  }
+  if (selector.stateNodeRaw !== null) {
+    selectedRecords = selectedRecords.filter((candidate) =>
+      rootCommitRawHandlesEqual(candidate.stateNodeRaw, selector.stateNodeRaw)
+    );
+  }
+
+  if (selectedRecords.length === 0) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'No root commit HostComponent update metadata matched the requested selector.'
+    );
+  }
+  if (selectedRecords.length > 1) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Multiple root commit HostComponent update records require a stateNodeRaw or recordIndex selector.'
+    );
+  }
+
+  return {
+    hostComponentUpdateRecordCount: hostComponentUpdateRecords.length,
+    recordCount: recordEntries.records.length,
+    selected: selectedRecords[0],
+    source: recordEntries.source
+  };
+}
+
+function getRootCommitMetadataRecordEntries(rootCommitMetadata) {
+  if (Array.isArray(rootCommitMetadata)) {
+    return {
+      records: createRootCommitMetadataRecordEntries(rootCommitMetadata),
+      source: 'array'
+    };
+  }
+  if (!isObjectOrFunction(rootCommitMetadata)) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require reconciler-shaped metadata.'
+    );
+  }
+
+  const recordPaths = [
+    ['mutationApplyRecords'],
+    ['mutation_apply_records'],
+    ['applyRecords'],
+    ['apply_records'],
+    ['mutationApplyLog', 'records'],
+    ['mutation_apply_log', 'records'],
+    ['mutationRecords'],
+    ['mutation_records'],
+    ['mutationLog', 'records'],
+    ['mutation_log', 'records'],
+    ['records']
+  ];
+  for (const path of recordPaths) {
+    const pathValue = getRootCommitMetadataPathValue(
+      rootCommitMetadata,
+      path
+    );
+    if (pathValue.found && Array.isArray(pathValue.value)) {
+      return {
+        records: createRootCommitMetadataRecordEntries(pathValue.value),
+        source: path.join('.')
+      };
+    }
+  }
+
+  if (looksLikeRootCommitMutationRecord(rootCommitMetadata)) {
+    return {
+      records: [
+        {
+          index: 0,
+          record: rootCommitMetadata
+        }
+      ],
+      source: 'self'
+    };
+  }
+
+  return {
+    records: [],
+    source: 'none'
+  };
+}
+
+function createRootCommitMetadataRecordEntries(records) {
+  return records.map((record, index) => ({
+    index,
+    record
+  }));
+}
+
+function createRootCommitHostComponentUpdateSnapshot(
+  record,
+  recordIndex,
+  metadataSource
+) {
+  if (!isObjectOrFunction(record)) {
+    return null;
+  }
+
+  const tag = normalizeRootCommitFiberTag(
+    getFirstRootCommitMetadataValue(record, [
+      'tag',
+      'fiberTag',
+      'fiber_tag',
+      'tagName',
+      'tag_name'
+    ])
+  );
+  if (tag !== 'HostComponent') {
+    return null;
+  }
+
+  const rawKind = getFirstRootCommitMetadataValue(record, [
+    'kind',
+    'recordKind',
+    'record_kind'
+  ]);
+  const rawApplyKind = getFirstRootCommitMetadataValue(record, [
+    'applyKind',
+    'apply_kind',
+    'mutationApplyKind',
+    'mutation_apply_kind'
+  ]);
+  let applyKind = normalizeRootCommitHostComponentApplyKind(rawApplyKind);
+  if (applyKind === null) {
+    applyKind = normalizeRootCommitHostComponentApplyKind(rawKind);
+  }
+  const phaseKind = normalizeRootCommitMutationPhaseKind(rawKind);
+  if (applyKind === null && phaseKind !== 'Update') {
+    return null;
+  }
+
+  const stateNodeRaw = getRootCommitRawHandle(record, [
+    ['stateNodeRaw'],
+    ['state_node_raw'],
+    ['stateNode', 'raw'],
+    ['state_node', 'raw'],
+    ['stateNode'],
+    ['state_node']
+  ]);
+  const pendingPropsRaw = getRootCommitRawHandle(record, [
+    ['pendingPropsRaw'],
+    ['pending_props_raw'],
+    ['pendingProps', 'raw'],
+    ['pending_props', 'raw'],
+    ['pendingProps'],
+    ['pending_props']
+  ]);
+  const memoizedPropsRaw = getRootCommitRawHandle(record, [
+    ['memoizedPropsRaw'],
+    ['memoized_props_raw'],
+    ['memoizedProps', 'raw'],
+    ['memoized_props', 'raw'],
+    ['memoizedProps'],
+    ['memoized_props']
+  ]);
+  const alternateMemoizedPropsRaw = getRootCommitRawHandle(record, [
+    ['alternateMemoizedPropsRaw'],
+    ['alternate_memoized_props_raw'],
+    ['alternateMemoizedProps', 'raw'],
+    ['alternate_memoized_props', 'raw'],
+    ['alternateMemoizedProps'],
+    ['alternate_memoized_props']
+  ]);
+
+  if (
+    stateNodeRaw === null ||
+    pendingPropsRaw === null ||
+    memoizedPropsRaw === null ||
+    alternateMemoizedPropsRaw === null
+  ) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Accepted root commit HostComponent update metadata requires state and props handles.'
+    );
+  }
+
+  const root = getFirstRootCommitMetadataValue(record, ['root']);
+  const hostRoot = getFirstRootCommitMetadataValue(record, [
+    'hostRoot',
+    'host_root'
+  ]);
+  const parent = getFirstRootCommitMetadataValue(record, ['parent']);
+  const parentTag = normalizeRootCommitFiberTag(
+    getFirstRootCommitMetadataValue(record, ['parentTag', 'parent_tag'])
+  );
+  const fiber = getFirstRootCommitMetadataValue(record, ['fiber']);
+  const alternateFiber = getFirstRootCommitMetadataValue(record, [
+    'alternateFiber',
+    'alternate_fiber'
+  ]);
+  const source = getFirstRootCommitMetadataValue(record, ['source']);
+  const recordKind =
+    applyKind === null ? 'Update' : 'CommitHostComponentUpdate';
+  const publicRecord = freezeRecord({
+    metadataSource,
+    recordIndex,
+    recordKind,
+    applyKind,
+    phaseKind,
+    tag,
+    parentTag,
+    stateNodeRaw,
+    pendingPropsRaw,
+    memoizedPropsRaw,
+    alternateMemoizedPropsRaw,
+    rootInfo: describeBridgeValue(root),
+    hostRootInfo: describeBridgeValue(hostRoot),
+    parentInfo: describeBridgeValue(parent),
+    fiberInfo: describeBridgeValue(fiber),
+    alternateFiberInfo: describeBridgeValue(alternateFiber),
+    sourceInfo: describeBridgeValue(source)
+  });
+
+  return {
+    applyKind,
+    metadataSource,
+    phaseKind,
+    publicRecord,
+    record,
+    recordIndex,
+    stateNodeRaw
+  };
+}
+
+function looksLikeRootCommitMutationRecord(value) {
+  return (
+    hasOwnBridgeProperty(value, 'tag') ||
+    hasOwnBridgeProperty(value, 'fiberTag') ||
+    hasOwnBridgeProperty(value, 'fiber_tag') ||
+    hasOwnBridgeProperty(value, 'kind') ||
+    hasOwnBridgeProperty(value, 'applyKind') ||
+    hasOwnBridgeProperty(value, 'apply_kind')
+  );
+}
+
+function normalizeRootCommitRecordIndexOption(options) {
+  const indexOption = getFirstRootCommitMetadataValue(options, [
+    'recordIndex',
+    'record_index',
+    'rootCommitRecordIndex',
+    'root_commit_record_index'
+  ]);
+  if (indexOption === undefined || indexOption === null) {
+    return null;
+  }
+  if (Number.isSafeInteger(indexOption) && indexOption >= 0) {
+    return indexOption;
+  }
+  if (typeof indexOption === 'string' && /^(0|[1-9][0-9]*)$/.test(indexOption)) {
+    const parsedIndex = Number(indexOption);
+    if (Number.isSafeInteger(parsedIndex)) {
+      return parsedIndex;
+    }
+  }
+  throwInvalidRootCommitHostComponentUpdateHandoff(
+    'Private root commit HostComponent update recordIndex selectors must be non-negative integers.'
+  );
+}
+
+function normalizeRootCommitStateNodeSelectorOption(options) {
+  const stateNodeOption = getFirstRootCommitMetadataValue(options, [
+    'stateNodeRaw',
+    'state_node_raw',
+    'rootCommitStateNodeRaw',
+    'root_commit_state_node_raw'
+  ]);
+  if (stateNodeOption === undefined || stateNodeOption === null) {
+    return null;
+  }
+  const normalized = normalizeRootCommitRawHandle(stateNodeOption);
+  if (normalized !== null) {
+    return normalized;
+  }
+  throwInvalidRootCommitHostComponentUpdateHandoff(
+    'Private root commit HostComponent update stateNodeRaw selectors must be positive integers.'
+  );
+}
+
+function getRootCommitRawHandle(record, paths) {
+  for (const path of paths) {
+    const pathValue = getRootCommitMetadataPathValue(record, path);
+    if (pathValue.found) {
+      const normalized = normalizeRootCommitRawHandle(pathValue.value);
+      if (normalized !== null) {
+        return normalized;
+      }
+    }
+  }
+  return null;
+}
+
+function normalizeRootCommitRawHandle(value) {
+  if (Number.isSafeInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === 'bigint' && value > 0n) {
+    return value.toString();
+  }
+  if (typeof value === 'string' && /^[1-9][0-9]*$/.test(value)) {
+    return value;
+  }
+  if (isObjectOrFunction(value) && hasOwnBridgeProperty(value, 'raw')) {
+    return normalizeRootCommitRawHandle(value.raw);
+  }
+  return null;
+}
+
+function rootCommitRawHandlesEqual(left, right) {
+  return String(left) === String(right);
+}
+
+function getRootCommitMetadataPathValue(record, path) {
+  let current = record;
+  for (const segment of path) {
+    if (!isObjectOrFunction(current) || !hasOwnBridgeProperty(current, segment)) {
+      return {
+        found: false,
+        value: undefined
+      };
+    }
+    current = current[segment];
+  }
+  return {
+    found: true,
+    value: current
+  };
+}
+
+function getFirstRootCommitMetadataValue(record, fields) {
+  for (const field of fields) {
+    if (hasOwnBridgeProperty(record, field)) {
+      return record[field];
+    }
+  }
+  return undefined;
+}
+
+function normalizeRootCommitFiberTag(tag) {
+  if (tag === 3) {
+    return 'HostRoot';
+  }
+  if (tag === 5) {
+    return 'HostComponent';
+  }
+  if (tag === 6) {
+    return 'HostText';
+  }
+
+  const normalized = normalizeRootCommitName(tag);
+  if (normalized === 'hostroot') {
+    return 'HostRoot';
+  }
+  if (normalized === 'hostcomponent') {
+    return 'HostComponent';
+  }
+  if (normalized === 'hosttext') {
+    return 'HostText';
+  }
+  return null;
+}
+
+function normalizeRootCommitHostComponentApplyKind(kind) {
+  const normalized = normalizeRootCommitName(kind);
+  if (normalized === 'commithostcomponentupdate') {
+    return 'commit-host-component-update';
+  }
+  return null;
+}
+
+function normalizeRootCommitMutationPhaseKind(kind) {
+  const normalized = normalizeRootCommitName(kind);
+  if (normalized === 'update') {
+    return 'Update';
+  }
+  if (normalized === 'placement') {
+    return 'Placement';
+  }
+  return null;
+}
+
+function normalizeRootCommitName(value) {
+  return typeof value === 'string'
+    ? value.replace(/[^a-z0-9]/gi, '').toLowerCase()
+    : null;
+}
+
 function assertHostOutputTextInstanceBelongsToHost(hostNode, textInstance) {
   if (textInstance.parentNode === hostNode) {
     return;
@@ -4614,9 +5263,30 @@ function createHostOutputUpdateAcceptedCapabilities(
   return freezeArray(capabilities);
 }
 
+function createRootCommitHostComponentUpdateAcceptedCapabilities(
+  hostOutputHandoff
+) {
+  return freezeArray([
+    freezeRecord({
+      id: 'root-commit-host-component-update-metadata',
+      accepted: true,
+      reason:
+        'Accepted root commit HostComponent update metadata selected the fake-DOM host-output mutation handoff.'
+    }),
+    ...hostOutputHandoff.acceptedCapabilities
+  ]);
+}
+
 function isObjectOrFunction(value) {
   return (
     value !== null && (typeof value === 'object' || typeof value === 'function')
+  );
+}
+
+function hasOwnBridgeProperty(value, key) {
+  return (
+    isObjectOrFunction(value) &&
+    Object.prototype.hasOwnProperty.call(value, key)
   );
 }
 
@@ -5664,6 +6334,13 @@ function throwInvalidHostOutputUpdateHandoff(message) {
   throw error;
 }
 
+function throwInvalidRootCommitHostComponentUpdateHandoff(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_ROOT_COMMIT_HOST_COMPONENT_UPDATE_HANDOFF';
+  throw error;
+}
+
 function throwInvalidRootCommitRefMetadata(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_COMMIT_REF_METADATA';
@@ -5818,6 +6495,8 @@ module.exports = {
   ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED,
   ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED,
+  ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_INITIAL_HOST_OUTPUT_APPLIED,
   ROOT_BRIDGE_INITIAL_HOST_OUTPUT_BLOCKED_CAPABILITIES,
@@ -5863,6 +6542,7 @@ module.exports = {
   admitPrivateCreateRenderPath,
   admitPrivateRootCommitRefMetadata,
   admitRootBridgeRequestRecord,
+  applyPrivateRootCommitHostComponentUpdate,
   applyPrivateRootHostOutputUpdate,
   applyPrivateCreateRootSideEffects,
   applyPrivateInitialRenderHostOutput,
@@ -5888,6 +6568,7 @@ module.exports = {
   describeUnmountMarkerGuard,
   getNativeRootBridgeHandoffPayload,
   getPrivateRootCreateRenderAdmissionPayload,
+  getPrivateRootCommitHostComponentUpdateHandoffPayload,
   getPrivateRootHostOutputUpdateHandoffPayload,
   getPrivateRootInitialHostOutputHandoffPayload,
   getPrivateRootCommitRefMetadataPayload,
@@ -5902,6 +6583,7 @@ module.exports = {
   getPrivateRootUnmountHostOutputCleanupPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
+  isPrivateRootCommitHostComponentUpdateHandoffRecord,
   isPrivateRootHostOutputUpdateHandoffRecord,
   isPrivateRootCommitRefMetadataRecord,
   isPrivateRootCreateRenderAdmissionRecord,
@@ -5920,6 +6602,7 @@ module.exports = {
   privateRootCreateRenderAdmissionRecordType,
   privateRootCreateSideEffectCleanupRecordType,
   privateRootCreateSideEffectRecordType,
+  privateRootCommitHostComponentUpdateHandoffRecordType,
   privateRootHostOutputUpdateHandoffRecordType,
   privateRootCommitRefMetadataRecordType,
   privateRootInitialHostOutputCleanupRecordType,

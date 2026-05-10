@@ -339,8 +339,10 @@ assertPrivateRecordInvariants(second);
     capabilityIds(updateHandoff.acceptedCapabilities),
     [
       'fake-dom-property-update',
+      'property-payload-evidence',
       'fake-dom-text-update',
-      'latest-props-after-mutation'
+      'latest-props-after-mutation',
+      'attribute-payload-rows'
     ]
   );
   assert.deepEqual(
