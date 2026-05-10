@@ -13,6 +13,9 @@ const repoRoot = path.resolve(
 const componentTree = require(
   path.join(repoRoot, 'packages/react-dom/src/client/component-tree.js')
 );
+const refCallbackGate = require(
+  path.join(repoRoot, 'packages/react-dom/src/client/ref-callback-gate.js')
+);
 const domContainer = require(
   path.join(repoRoot, 'packages/react-dom/src/client/dom-container.js')
 );
@@ -357,6 +360,327 @@ const reactDomPackage = require(
 }
 
 {
+  const rootOwner = {kind: 'RefGateRoot'};
+  const hostOwner = {kind: 'RefGateHost'};
+  const node = createElement('DIV');
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  let refCallCount = 0;
+
+  function firstRef() {
+    refCallCount += 1;
+  }
+
+  function secondRef() {
+    refCallCount += 1;
+  }
+
+  const firstProps = {
+    id: 'first',
+    onClick() {
+      refCallCount += 10;
+    },
+    ref: firstRef
+  };
+  const secondProps = {
+    id: 'second',
+    onClick() {
+      refCallCount += 10;
+    },
+    ref: secondRef
+  };
+
+  componentTree.attachHostInstanceNode(node, token, firstProps);
+  componentTree.commitLatestPropsFromMutationRecord(
+    domHost.createLatestPropsCommitRecord(node, secondProps, [
+      setAttributePayload('id', 'id', 'second'),
+      nonPayload('onClick', 'event'),
+      nonPayload('ref', 'ref')
+    ])
+  );
+
+  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'current-fiber'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'first-ref-handle'},
+    ref: firstRef,
+    expectedLatestRef: secondRef,
+    sourceToken: 'deletion-token:1',
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+    detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
+  });
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'finished-fiber'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'second-ref-handle'},
+    ref: secondRef,
+    sourceToken: 'commit-token:2',
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_COMMIT,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE
+  });
+
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackMetadataRecord(detachRecord),
+    true
+  );
+  assert.equal(Object.hasOwn(detachRecord, 'ref'), false);
+  assert.equal(Object.hasOwn(detachRecord, 'hostInstanceToken'), false);
+  assert.equal(Object.hasOwn(detachRecord, 'latestProps'), false);
+
+  const snapshot =
+    refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+      detach: [detachRecord],
+      attach: [attachRecord]
+    });
+
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackComponentTreeGateSnapshot(snapshot),
+    true
+  );
+  assert.equal(
+    snapshot.$$typeof,
+    refCallbackGate.privateDomRefCallbackComponentTreeGateSnapshotType
+  );
+  assert.equal(
+    snapshot.status,
+    refCallbackGate.REF_CALLBACK_COMPONENT_TREE_GATE_STATUS
+  );
+  assert.equal(snapshot.recordCount, 2);
+  assert.equal(snapshot.detachCount, 1);
+  assert.equal(snapshot.attachCount, 1);
+  assert.equal(snapshot.callbackRefsInvoked, false);
+  assert.equal(snapshot.objectRefsMutated, false);
+  assert.equal(snapshot.layoutEffectsRun, false);
+  assert.equal(snapshot.domMutated, false);
+  assert.equal(snapshot.publicRootsTouched, false);
+  assert.equal(snapshot.compatibilityClaimed, false);
+  assert.deepEqual(
+    snapshot.blockedCapabilities.map((capability) => capability.id),
+    [
+      'callback-ref-invocation',
+      'object-ref-mutation',
+      'layout-effect-execution',
+      'dom-mutation',
+      'public-root-integration',
+      'react-dom-ref-compatibility-claim'
+    ]
+  );
+  assert.deepEqual(
+    snapshot.records.map((record) => [
+      record.sequence,
+      record.action,
+      record.detachReason,
+      record.tokenPhase,
+      record.tokenTarget,
+      record.componentTreeStatus,
+      record.latestRefStatus,
+      record.compatibilityClaimed
+    ]),
+    [
+      [
+        0,
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_DETACH_REASON_REF_CHANGED,
+        refCallbackGate.REF_TOKEN_PHASE_DELETION,
+        refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+        'mounted-latest-props-validated',
+        'matches-private-metadata',
+        false
+      ],
+      [
+        1,
+        refCallbackGate.REF_ACTION_ATTACH,
+        null,
+        refCallbackGate.REF_TOKEN_PHASE_COMMIT,
+        refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+        'mounted-latest-props-validated',
+        'matches-private-metadata',
+        false
+      ]
+    ]
+  );
+
+  for (const record of snapshot.records) {
+    assert.equal(
+      refCallbackGate.isPrivateRefCallbackComponentTreeGateRecord(record),
+      true
+    );
+    assert.equal(Object.hasOwn(record, 'ref'), false);
+    assert.equal(Object.hasOwn(record, 'node'), false);
+    assert.equal(Object.hasOwn(record, 'latestProps'), false);
+    assert.equal(record.callbackRefsInvoked, false);
+    assert.equal(record.objectRefsMutated, false);
+    assert.equal(record.layoutEffectsRun, false);
+    assert.equal(record.domMutated, false);
+    assert.equal(record.publicRootsTouched, false);
+  }
+
+  const firstPayload =
+    refCallbackGate.getPrivateRefCallbackComponentTreeGateRecordPayload(
+      snapshot.records[0]
+    );
+  const secondPayload =
+    refCallbackGate.getPrivateRefCallbackComponentTreeGateRecordPayload(
+      snapshot.records[1]
+    );
+  assert.equal(firstPayload.componentTree.node, node);
+  assert.equal(firstPayload.componentTree.latestProps, secondProps);
+  assert.equal(firstPayload.componentTree.latestRef, secondRef);
+  assert.equal(firstPayload.metadata.ref, firstRef);
+  assert.equal(secondPayload.componentTree.node, node);
+  assert.equal(secondPayload.componentTree.latestProps, secondProps);
+  assert.equal(secondPayload.metadata.ref, secondRef);
+  assert.equal(refCallCount, 0);
+  assert.deepEqual(node.childNodes, []);
+
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+}
+
+{
+  const rootOwner = {kind: 'RefGateDeletedRoot'};
+  const hostOwner = {kind: 'RefGateDeletedHost'};
+  const node = createElement('SPAN');
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const objectRef = {current: 'unchanged'};
+  const props = {ref: objectRef};
+
+  componentTree.attachHostInstanceNode(node, token, props);
+
+  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'deleted-fiber'},
+    stateNode: {id: 'deleted-state-node'},
+    refHandle: {id: 'object-ref-handle'},
+    ref: objectRef,
+    sourceToken: 'deletion-token:object',
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+  const snapshot =
+    refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+      detach: [detachRecord],
+      attach: []
+    });
+
+  assert.equal(snapshot.records.length, 1);
+  assert.equal(
+    snapshot.records[0].detachReason,
+    refCallbackGate.REF_DETACH_REASON_DELETED
+  );
+  assert.equal(objectRef.current, 'unchanged');
+  assert.equal(snapshot.objectRefsMutated, false);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+}
+
+{
+  const rootOwner = {kind: 'RefGateFailureRoot'};
+  const hostOwner = {kind: 'RefGateFailureHost'};
+  const node = createElement('DIV');
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  function expectedRef() {}
+  function actualRef() {}
+
+  componentTree.attachHostInstanceNode(node, token, {ref: actualRef});
+
+  const mismatchedLatestRef = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'latest-ref-mismatch'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'expected-ref-handle'},
+    ref: expectedRef,
+    sourceToken: 'commit-token:mismatch'
+  });
+  assert.throws(
+    () =>
+      refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+        detach: [],
+        attach: [mismatchedLatestRef]
+      }),
+    {
+      code: 'FAST_REACT_DOM_REF_CALLBACK_GATE_LATEST_REF_MISMATCH'
+    }
+  );
+  assert.equal(refCallbackGate.noSideEffects.callbackRefsInvoked, false);
+
+  const wrongScope = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'wrong-scope'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'actual-ref-handle'},
+    ref: actualRef,
+    sourceToken: 'deletion-token:wrong-scope',
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION
+  });
+  assert.throws(
+    () =>
+      refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+        detach: [],
+        attach: [wrongScope]
+      }),
+    {
+      code: 'FAST_REACT_DOM_REF_CALLBACK_GATE_TOKEN_SCOPE_MISMATCH'
+    }
+  );
+
+  assert.throws(
+    () =>
+      refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+        detach: [wrongScope],
+        attach: []
+      }),
+    {
+      code: 'FAST_REACT_DOM_REF_CALLBACK_GATE_ACTION_MISMATCH'
+    }
+  );
+
+  const unmountedRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'unmounted'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'actual-ref-handle'},
+    ref: actualRef,
+    sourceToken: 'commit-token:unmounted'
+  });
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+  assert.throws(
+    () =>
+      refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+        detach: [],
+        attach: [unmountedRecord]
+      }),
+    {
+      code: 'FAST_REACT_DOM_REF_CALLBACK_GATE_UNMOUNTED_HOST_INSTANCE'
+    }
+  );
+
+  assert.throws(
+    () =>
+      refCallbackGate.createRefCallbackComponentTreeGateSnapshot({
+        detach: [{}],
+        attach: []
+      }),
+    {
+      code: 'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_METADATA_RECORD'
+    }
+  );
+}
+
+{
   const rootOwner = {kind: 'ClosestRoot'};
   const parentOwner = {kind: 'ClosestParentHost'};
   const childOwner = {kind: 'ClosestChildHost'};
@@ -494,7 +818,10 @@ const reactDomPackage = require(
     'getMountedHostInstanceNodeFromToken',
     'getMountedHostInstanceTokenFromNode',
     'updateLatestPropsForHostInstanceToken',
-    'updateLatestPropsForNode'
+    'updateLatestPropsForNode',
+    'createRefAttachMetadataRecord',
+    'createRefCallbackComponentTreeGateSnapshot',
+    'createRefDetachMetadataRecord'
   ];
 
   for (const name of privateHelperNames) {
@@ -510,6 +837,14 @@ const reactDomPackage = require(
   );
   assert.equal(
     Object.hasOwn(reactDomPackage.exports, './src/client/component-tree.js'),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(reactDomPackage.exports, './src/client/ref-callback-gate'),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(reactDomPackage.exports, './src/client/ref-callback-gate.js'),
     false
   );
 }
