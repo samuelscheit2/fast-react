@@ -683,6 +683,137 @@ test("private root bridge hydrateRoot requests preserve accepted marker evidence
   ]);
 });
 
+test("private hydration text mismatch gate records recoverable-error metadata without public hydration", () => {
+  const document = createDocument("text-mismatch");
+  const container = createElement("DIV", document);
+  container.childNodes = [createText("server text")];
+  let recoverableErrorCalls = 0;
+  const initialChildren = {
+    props: {
+      children: ["client ", 42]
+    },
+    type: "App"
+  };
+  const hydrationOptions = {
+    identifierPrefix: "text-mismatch-",
+    onRecoverableError() {
+      recoverableErrorCalls++;
+    }
+  };
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    markerOracle: oracle,
+    recordIdPrefix: "hydration-text"
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hydrateIdPrefix: "hydrate-text",
+    hydrationRecordIdPrefix: "hydrate-text-boundary",
+    markerOracle: oracle,
+    requestIdPrefix: "hydrate-text-request"
+  });
+  const bridgeRecord = bridge.createHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const admission = bridge.admitRequest(bridgeRecord);
+
+  assertHydrationTextMismatchDiagnostics(record.textMismatchDiagnostics, {
+    actualTextRowCount: 1,
+    expectedTextRowCount: 2,
+    mismatchCount: 2,
+    rootRecordId: "hydration-text:1"
+  });
+  assert.deepEqual(
+    record.textMismatchDiagnostics.expectedTextRows.map((row) => [
+      row.index,
+      row.path,
+      row.text,
+      row.normalizedText
+    ]),
+    [
+      [0, "initialChildren.props.children[0]", "client ", "client "],
+      [1, "initialChildren.props.children[1]", "42", "42"]
+    ]
+  );
+  assert.deepEqual(
+    record.textMismatchDiagnostics.mismatchRows.map((row) => ({
+      actualPath: row.actualPath,
+      actualText: row.actualText,
+      expectedPath: row.expectedPath,
+      expectedText: row.expectedText,
+      reason: row.reason,
+      rowId: row.rowId,
+      status: row.status,
+      willPatchText: row.willPatchText
+    })),
+    [
+      {
+        actualPath: "container.childNodes[0]",
+        actualText: "server text",
+        expectedPath: "initialChildren.props.children[0]",
+        expectedText: "client ",
+        reason: "text-content-different",
+        rowId: "hydration-text:1:text-mismatch:0",
+        status: "blocked-before-hydrate-text-instance",
+        willPatchText: false
+      },
+      {
+        actualPath: null,
+        actualText: null,
+        expectedPath: "initialChildren.props.children[1]",
+        expectedText: "42",
+        reason: "missing-server-text",
+        rowId: "hydration-text:1:text-mismatch:1",
+        status: "blocked-before-hydrate-text-instance",
+        willPatchText: false
+      }
+    ]
+  );
+  assertHydrationTextMismatchRecoverableMetadata(
+    record.recoverableErrorMetadata,
+    {
+      callbackPresent: true,
+      recoverableErrorMetadataCount: 2,
+      rootRecordId: "hydration-text:1"
+    }
+  );
+  assert.equal(
+    record.textMismatchDiagnostics.recoverableErrorMetadata,
+    record.recoverableErrorMetadata
+  );
+  assert.equal(
+    bridgeRecord.textMismatchDiagnostics,
+    bridgeRecord.hydrationBoundaryRecord.textMismatchDiagnostics
+  );
+  assert.equal(
+    bridgeRecord.recoverableErrorMetadata,
+    bridgeRecord.hydrationBoundaryRecord.recoverableErrorMetadata
+  );
+  assertHydrationTextMismatchDiagnostics(bridgeRecord.textMismatchDiagnostics, {
+    actualTextRowCount: 1,
+    expectedTextRowCount: 2,
+    mismatchCount: 2,
+    rootRecordId: "hydrate-text-boundary:1"
+  });
+  assert.equal(
+    admission.textMismatchDiagnostics,
+    bridgeRecord.textMismatchDiagnostics
+  );
+  assert.equal(
+    admission.recoverableErrorMetadata,
+    bridgeRecord.recoverableErrorMetadata
+  );
+  assert.equal(recoverableErrorCalls, 0);
+  assert.equal(container.childNodes[0].nodeValue, "server text");
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+});
+
 test("private hydration boundary gate does not mark containers, install listeners, or mutate DOM-like nodes", () => {
   const { container, document, record } =
     createUnsupportedRecordScenario("side-effects");
@@ -1089,6 +1220,122 @@ function assertHydrationDehydratedTargetResolutionDiagnostics(
   assert.equal(diagnostics.replayedEventCount, 0);
 }
 
+function assertHydrationTextMismatchDiagnostics(diagnostics, expected) {
+  assert.equal(Object.isFrozen(diagnostics), true);
+  assert.equal(
+    diagnostics.kind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    diagnostics.status,
+    expected.mismatchCount === 0
+      ? "blocked-no-hydration-text-mismatches-recorded"
+      : "blocked-hydration-text-mismatches-recorded"
+  );
+  assert.equal(diagnostics.diagnosticOnly, true);
+  assert.equal(diagnostics.readOnly, true);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.canHydrate, false);
+  assert.equal(diagnostics.hydrateTextInstanceCalled, false);
+  assert.equal(diagnostics.diffHydratedTextForDevWarningsCalled, false);
+  assert.equal(diagnostics.recoverableErrorsQueued, false);
+  assert.equal(diagnostics.onRecoverableErrorInvoked, false);
+  assert.equal(diagnostics.publicRootCreated, false);
+  assert.equal(diagnostics.domMutated, false);
+  assert.equal(diagnostics.textPatched, false);
+  assert.equal(diagnostics.boundaryCleared, false);
+  assert.equal(
+    diagnostics.blockedReason,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_BLOCKED_REASON
+  );
+  assert.equal(diagnostics.rootRecordId, expected.rootRecordId);
+  assert.equal(
+    diagnostics.source,
+    "unsupported-hydrate-root-boundary-record"
+  );
+  assert.equal(diagnostics.expectedTextSource, "initialChildren");
+  assert.equal(
+    diagnostics.actualTextSource,
+    "container.childNodes text nodes depth-first"
+  );
+  assert.equal(diagnostics.markerDiagnosticsAccepted, true);
+  assert.equal(diagnostics.expectedTextRowCount, expected.expectedTextRowCount);
+  assert.equal(diagnostics.actualTextRowCount, expected.actualTextRowCount);
+  assert.equal(diagnostics.mismatchCount, expected.mismatchCount);
+  assert.equal(
+    diagnostics.expectedTextRows.length,
+    expected.expectedTextRowCount
+  );
+  assert.equal(diagnostics.actualTextRows.length, expected.actualTextRowCount);
+  assert.equal(diagnostics.mismatchRows.length, expected.mismatchCount);
+  assert.equal(
+    diagnostics.recoverableErrorMetadata.kind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND
+  );
+}
+
+function assertHydrationTextMismatchRecoverableMetadata(metadata, expected) {
+  assert.equal(Object.isFrozen(metadata), true);
+  assert.equal(
+    metadata.kind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND
+  );
+  assert.equal(
+    metadata.status,
+    "blocked-hydration-text-mismatch-recoverable-error-metadata-recorded"
+  );
+  assert.equal(metadata.diagnosticOnly, true);
+  assert.equal(metadata.readOnly, true);
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(
+    metadata.blockedReason,
+    hydrationGate.HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON
+  );
+  assert.equal(metadata.rootRecordId, expected.rootRecordId);
+  assert.equal(
+    metadata.source,
+    "ReactFiberHydrationContext.throwOnHydrationMismatch/queueRecoverableErrors"
+  );
+  assert.equal(
+    metadata.onRecoverableErrorOption.present,
+    expected.callbackPresent
+  );
+  assert.equal(metadata.onRecoverableErrorOption.callbackInfo.type, "function");
+  assert.equal(metadata.onRecoverableErrorOption.callbackInvoked, false);
+  assert.equal(metadata.onRecoverableErrorOption.publicCallbackInvoked, false);
+  assert.equal(
+    metadata.recoverableErrorMetadataCount,
+    expected.recoverableErrorMetadataCount
+  );
+  assert.equal(metadata.queuedRecoverableErrorCount, 0);
+  assert.equal(metadata.onRecoverableErrorInvocationCount, 0);
+  assert.equal(
+    metadata.wouldQueueRecoverableErrorCount,
+    expected.recoverableErrorMetadataCount
+  );
+  assert.equal(
+    metadata.recoverableErrorRows.length,
+    expected.recoverableErrorMetadataCount
+  );
+  for (const row of metadata.recoverableErrorRows) {
+    assert.equal(row.status, "metadata-recorded-callback-not-invoked");
+    assert.equal(row.errorName, "Error");
+    assert.equal(row.messageCategory, "hydration-text-mismatch");
+    assert.equal(row.errorInfo.componentStack, null);
+    assert.equal(row.errorInfo.digest, null);
+    assert.equal(row.queuedRecoverableError, false);
+    assert.equal(row.onRecoverableErrorInvoked, false);
+    assert.equal(row.publicCallbackInvoked, false);
+    assert.equal(row.recoveredByClientRender, false);
+    assert.equal(row.surfacedToUI, false);
+  }
+  assert.equal(metadata.recoverableErrorsQueued, false);
+  assert.equal(metadata.onRecoverableErrorInvoked, false);
+  assert.equal(metadata.publicRootCreated, false);
+  assert.equal(metadata.hydratingPublicRoot, false);
+  assert.equal(metadata.domMutated, false);
+}
+
 function createUnsupportedRecordScenario(label) {
   const document = createDocument(label);
   const container = createElement("DIV", document);
@@ -1250,6 +1497,13 @@ function createComment(data) {
   return {
     data,
     nodeType: domContainer.COMMENT_NODE
+  };
+}
+
+function createText(nodeValue) {
+  return {
+    nodeType: domContainer.TEXT_NODE,
+    nodeValue
   };
 }
 

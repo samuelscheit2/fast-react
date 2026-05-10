@@ -3285,6 +3285,10 @@ function createHydrateRootRecordWithBridge(
     markerDiagnostics: hydrationBoundaryRecord.markerDiagnostics,
     markerParserEvidence: hydrationBoundaryRecord.markerParserEvidence,
     markerEvidence: hydrationBoundaryRecord.markerEvidence,
+    textMismatchDiagnostics:
+      hydrationBoundaryRecord.textMismatchDiagnostics,
+    recoverableErrorMetadata:
+      hydrationBoundaryRecord.recoverableErrorMetadata,
     replayQueueDiagnostics: hydrationBoundaryRecord.replayQueueDiagnostics,
     targetResolutionDiagnostics:
       hydrationBoundaryRecord.targetResolutionDiagnostics,
@@ -3768,6 +3772,16 @@ function validateHydrateRootBridgeRequestRecord(record) {
   );
   assertRecordField(
     record,
+    'textMismatchDiagnostics',
+    hydrationBoundaryRecord.textMismatchDiagnostics
+  );
+  assertRecordField(
+    record,
+    'recoverableErrorMetadata',
+    hydrationBoundaryRecord.recoverableErrorMetadata
+  );
+  assertRecordField(
+    record,
     'replayQueueDiagnostics',
     hydrationBoundaryRecord.replayQueueDiagnostics
   );
@@ -3896,6 +3910,8 @@ function createRootBridgeAdmissionRecord(record, validation) {
     }),
     markerParserEvidence: record.markerParserEvidence || null,
     markerEvidence: record.markerEvidence || null,
+    textMismatchDiagnostics: record.textMismatchDiagnostics || null,
+    recoverableErrorMetadata: record.recoverableErrorMetadata || null,
     replayQueueDiagnostics: record.replayQueueDiagnostics || null,
     targetResolutionDiagnostics: record.targetResolutionDiagnostics || null,
     eventReplayBlockers: record.eventReplayBlockers || null,

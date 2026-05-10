@@ -1,6 +1,10 @@
 'use strict';
 
-const {assertValidContainer, describeContainer} = require('./dom-container.js');
+const {
+  TEXT_NODE,
+  assertValidContainer,
+  describeContainer
+} = require('./dom-container.js');
 const {
   inspectHydrationContainerMarkers:
     inspectHydrationContainerMarkersWithContracts
@@ -29,6 +33,14 @@ const HYDRATION_MARKER_ORACLE_KIND =
 const HYDRATION_MARKER_ORACLE_SCHEMA_VERSION = 1;
 const UNSUPPORTED_HYDRATION_ROOT_KIND = 'unsupported-hydration';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
+const HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationTextMismatchDiagnostics';
+const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND =
+  'FastReactDomHydrationTextMismatchRecoverableErrorMetadata';
+const HYDRATION_TEXT_MISMATCH_BLOCKED_REASON =
+  'FAST_REACT_DOM_HYDRATION_TEXT_MISMATCH_BLOCKED';
+const HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON =
+  'FAST_REACT_DOM_HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED';
 
 const privateHydrationBoundaryRecordType =
   'fast.react_dom.unsupported_hydration_boundary_record';
@@ -416,6 +428,8 @@ function createUnsupportedHydrateRootRecordWithGate(
   hydrationOptions
 ) {
   assertValidContainer(container, gateState.validationOptions);
+  const sequence = gateState.nextRecordSequence++;
+  const recordId = `${gateState.recordIdPrefix}:${sequence}`;
   const markerDiagnostics = inspectHydrationContainerMarkers(
     container,
     gateState
@@ -423,9 +437,16 @@ function createUnsupportedHydrateRootRecordWithGate(
   const markerParserEvidence =
     createHydrationMarkerParserEvidence(markerDiagnostics);
   const markerEvidence = createHydrationMarkerEvidence(markerDiagnostics);
+  const textMismatchDiagnostics = createHydrationTextMismatchDiagnostics({
+    container,
+    hydrationOptions,
+    initialChildren,
+    markerDiagnostics,
+    recordId
+  });
+  const recoverableErrorMetadata =
+    textMismatchDiagnostics.recoverableErrorMetadata;
 
-  const sequence = gateState.nextRecordSequence++;
-  const recordId = `${gateState.recordIdPrefix}:${sequence}`;
   const markerGuard = describeHydrationRootMarkerGuard(
     container,
     gateState.markerOptions
@@ -484,6 +505,8 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerDiagnostics,
     markerParserEvidence,
     markerEvidence,
+    textMismatchDiagnostics,
+    recoverableErrorMetadata,
     replayQueueDiagnostics,
     targetResolutionDiagnostics,
     eventReplayQueueDiagnostics,
@@ -625,6 +648,366 @@ function createHydrationMarkerParserEvidence(markerDiagnostics) {
       )
     )
   });
+}
+
+function createHydrationTextMismatchDiagnostics({
+  container,
+  hydrationOptions,
+  initialChildren,
+  markerDiagnostics,
+  recordId
+}) {
+  const expectedTextRows = collectExpectedHydrationTextRows(initialChildren);
+  const actualTextRows = collectActualHydrationTextRows(container);
+  const mismatchRows = createHydrationTextMismatchRows({
+    actualTextRows,
+    expectedTextRows,
+    recordId
+  });
+  const recoverableErrorMetadata =
+    createHydrationTextMismatchRecoverableErrorMetadata({
+      hydrationOptions,
+      mismatchRows,
+      recordId
+    });
+
+  return freezeRecord({
+    kind: HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
+    status:
+      mismatchRows.length === 0
+        ? 'blocked-no-hydration-text-mismatches-recorded'
+        : 'blocked-hydration-text-mismatches-recorded',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    canHydrate: false,
+    hydrateTextInstanceCalled: false,
+    diffHydratedTextForDevWarningsCalled: false,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorInvoked: false,
+    publicRootCreated: false,
+    domMutated: false,
+    textPatched: false,
+    boundaryCleared: false,
+    blockedReason: HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
+    rootRecordId: recordId,
+    source: 'unsupported-hydrate-root-boundary-record',
+    expectedTextSource: 'initialChildren',
+    actualTextSource: 'container.childNodes text nodes depth-first',
+    markerDiagnosticsAccepted:
+      markerDiagnostics.status === 'diagnostic-only',
+    acceptedMarkerCount: markerDiagnostics.acceptedMarkerCount,
+    expectedTextRowCount: expectedTextRows.length,
+    actualTextRowCount: actualTextRows.length,
+    mismatchCount: mismatchRows.length,
+    expectedTextRows,
+    actualTextRows,
+    mismatchRows,
+    recoverableErrorMetadata
+  });
+}
+
+function collectExpectedHydrationTextRows(initialChildren) {
+  const state = {
+    rows: [],
+    visitedObjects: new Set()
+  };
+  collectExpectedHydrationTextValue(initialChildren, 'initialChildren', state);
+  return freezeArray(state.rows);
+}
+
+function collectExpectedHydrationTextValue(value, path, state) {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint'
+  ) {
+    state.rows.push(
+      createHydrationTextRow({
+        index: state.rows.length,
+        path,
+        source: 'client-expected',
+        text: String(value)
+      })
+    );
+    return;
+  }
+
+  if (value == null || typeof value !== 'object') {
+    return;
+  }
+
+  if (state.visitedObjects.has(value)) {
+    return;
+  }
+  state.visitedObjects.add(value);
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      collectExpectedHydrationTextValue(
+        value[index],
+        `${path}[${index}]`,
+        state
+      );
+    }
+    return;
+  }
+
+  const props = value.props;
+  if (props != null && typeof props === 'object') {
+    if (state.visitedObjects.has(props)) {
+      return;
+    }
+    state.visitedObjects.add(props);
+    if (Object.prototype.hasOwnProperty.call(props, 'children')) {
+      collectExpectedHydrationTextValue(
+        props.children,
+        `${path}.props.children`,
+        state
+      );
+    }
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, 'children')) {
+    collectExpectedHydrationTextValue(
+      value.children,
+      `${path}.children`,
+      state
+    );
+  }
+}
+
+function collectActualHydrationTextRows(container) {
+  const state = {
+    rows: [],
+    visitedObjects: new Set()
+  };
+  collectActualHydrationTextNode(container, 'container', state);
+  return freezeArray(state.rows);
+}
+
+function collectActualHydrationTextNode(node, path, state) {
+  if (node == null || typeof node !== 'object') {
+    return;
+  }
+  if (state.visitedObjects.has(node)) {
+    return;
+  }
+  state.visitedObjects.add(node);
+
+  if (node.nodeType === TEXT_NODE) {
+    state.rows.push(
+      createHydrationTextRow({
+        index: state.rows.length,
+        path,
+        source: 'server-actual',
+        text: readTextNodeValue(node)
+      })
+    );
+    return;
+  }
+
+  const childNodes = Array.isArray(node.childNodes) ? node.childNodes : [];
+  for (let index = 0; index < childNodes.length; index++) {
+    collectActualHydrationTextNode(
+      childNodes[index],
+      `${path}.childNodes[${index}]`,
+      state
+    );
+  }
+}
+
+function readTextNodeValue(node) {
+  if (typeof node.nodeValue === 'string') {
+    return node.nodeValue;
+  }
+  if (typeof node.data === 'string') {
+    return node.data;
+  }
+  if (typeof node.textContent === 'string') {
+    return node.textContent;
+  }
+  return '';
+}
+
+function createHydrationTextRow({index, path, source, text}) {
+  const normalizedText = normalizeHydrationText(text);
+  return freezeRecord({
+    index,
+    path,
+    source,
+    text,
+    textLength: text.length,
+    normalizedText,
+    normalizedTextLength: normalizedText.length
+  });
+}
+
+function createHydrationTextMismatchRows({
+  actualTextRows,
+  expectedTextRows,
+  recordId
+}) {
+  const rows = [];
+  const rowCount = Math.max(expectedTextRows.length, actualTextRows.length);
+  for (let index = 0; index < rowCount; index++) {
+    const expected = expectedTextRows[index] || null;
+    const actual = actualTextRows[index] || null;
+    if (expected !== null && actual !== null) {
+      const exactTextMatches = actual.text === expected.text;
+      const normalizedTextMatches =
+        actual.normalizedText === expected.normalizedText;
+      if (normalizedTextMatches) {
+        continue;
+      }
+      rows.push(
+        createHydrationTextMismatchRow({
+          actual,
+          exactTextMatches,
+          expected,
+          index,
+          normalizedTextMatches,
+          reason: 'text-content-different',
+          recordId
+        })
+      );
+      continue;
+    }
+
+    rows.push(
+      createHydrationTextMismatchRow({
+        actual,
+        exactTextMatches: false,
+        expected,
+        index,
+        normalizedTextMatches: false,
+        reason:
+          expected === null
+            ? 'unexpected-server-text'
+            : 'missing-server-text',
+        recordId
+      })
+    );
+  }
+  return freezeArray(rows);
+}
+
+function createHydrationTextMismatchRow({
+  actual,
+  exactTextMatches,
+  expected,
+  index,
+  normalizedTextMatches,
+  reason,
+  recordId
+}) {
+  return freezeRecord({
+    rowId: `${recordId}:text-mismatch:${index}`,
+    index,
+    status: 'blocked-before-hydrate-text-instance',
+    reason,
+    expectedPath: expected === null ? null : expected.path,
+    actualPath: actual === null ? null : actual.path,
+    expectedText: expected === null ? null : expected.text,
+    actualText: actual === null ? null : actual.text,
+    normalizedExpectedText: expected === null ? null : expected.normalizedText,
+    normalizedActualText: actual === null ? null : actual.normalizedText,
+    exactTextMatches,
+    normalizedTextMatches,
+    recoverable: true,
+    canHydrate: false,
+    hydrateTextInstanceCalled: false,
+    willPatchText: false,
+    domMutated: false,
+    recoverableErrorMetadataId: `${recordId}:recoverable-error:${index}`
+  });
+}
+
+function createHydrationTextMismatchRecoverableErrorMetadata({
+  hydrationOptions,
+  mismatchRows,
+  recordId
+}) {
+  const recoverableErrorRows = freezeArray(
+    mismatchRows.map((row, index) =>
+      freezeRecord({
+        id: `${recordId}:recoverable-error:${index}`,
+        textMismatchRowId: row.rowId,
+        status: 'metadata-recorded-callback-not-invoked',
+        errorName: 'Error',
+        messageCategory: 'hydration-text-mismatch',
+        messageTemplate:
+          'Hydration failed because the server rendered text did not match the client.',
+        errorInfo: freezeRecord({
+          componentStack: null,
+          digest: null
+        }),
+        sourceFiber: null,
+        queuedRecoverableError: false,
+        onRecoverableErrorInvoked: false,
+        publicCallbackInvoked: false,
+        recoveredByClientRender: false,
+        surfacedToUI: false
+      })
+    )
+  );
+
+  return freezeRecord({
+    kind: HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
+    status:
+      recoverableErrorRows.length === 0
+        ? 'blocked-no-hydration-text-mismatch-recoverable-errors-recorded'
+        : 'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    blockedReason: HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
+    rootRecordId: recordId,
+    source:
+      'ReactFiberHydrationContext.throwOnHydrationMismatch/queueRecoverableErrors',
+    onRecoverableErrorOption: describeRecoverableErrorOption(
+      hydrationOptions
+    ),
+    recoverableErrorMetadataCount: recoverableErrorRows.length,
+    queuedRecoverableErrorCount: 0,
+    onRecoverableErrorInvocationCount: 0,
+    wouldQueueRecoverableErrorCount: recoverableErrorRows.length,
+    recoverableErrorRows,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorInvoked: false,
+    publicRootCreated: false,
+    hydratingPublicRoot: false,
+    domMutated: false
+  });
+}
+
+function describeRecoverableErrorOption(hydrationOptions) {
+  const hasOptions =
+    hydrationOptions !== null &&
+    typeof hydrationOptions === 'object' &&
+    !Array.isArray(hydrationOptions);
+  const hasCallback =
+    hasOptions &&
+    Object.prototype.hasOwnProperty.call(
+      hydrationOptions,
+      'onRecoverableError'
+    );
+  const callback =
+    hasCallback === true ? hydrationOptions.onRecoverableError : undefined;
+
+  return freezeRecord({
+    present: hasCallback,
+    callbackInfo: hasCallback ? describeHydrationValue(callback) : null,
+    callbackInvoked: false,
+    publicCallbackInvoked: false,
+    invocationBlockedReason:
+      HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON
+  });
+}
+
+function normalizeHydrationText(text) {
+  return text.replace(/\r\n?/g, '\n').replace(/\u0000|\uFFFD/g, '');
 }
 
 function createHydrationMarkerReplayQueueDiagnostics({
@@ -1004,8 +1387,12 @@ function freezeRecord(record) {
 
 module.exports = {
   CONCURRENT_ROOT_TAG,
+  HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
   HYDRATION_MARKER_ORACLE_KIND,
   HYDRATION_MARKER_ORACLE_SCHEMA_VERSION,
+  HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
+  HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
+  HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
