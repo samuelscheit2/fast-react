@@ -92,6 +92,8 @@ const PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS =
   'controlled-private-propagation-stop-diagnostic';
 const PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS =
   'controlled-private-listener-error-routing-diagnostic';
+const PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS =
+  'validated-private-current-target-progression';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -679,6 +681,7 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
         ? entryPayload.processingListenerRecords
         : entryPayload.listenerRecords;
       const canaryEventContext = createDispatchQueueCanaryEventContext(
+        dispatchRecord,
         dispatchQueueEntry,
         entryPayload,
         normalizedOptions,
@@ -728,10 +731,6 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
           break;
         }
 
-        prepareDispatchQueueCanaryEventForListener(
-          canaryEventContext,
-          listenerRecord
-        );
         const stopCountBefore =
           propagationState === null
             ? 0
@@ -789,10 +788,43 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
   const frozenPropagationStopDiagnostics = Object.freeze(
     propagationStopDiagnostics.slice()
   );
+  const currentTargetProgression = Object.freeze(
+    frozenInvocationRecords.map((invocationRecord, index) =>
+      Object.freeze({
+        currentTargetAfterInvocation:
+          invocationRecord.currentTargetAfterInvocation,
+        currentTargetBeforeInvocation:
+          invocationRecord.currentTargetBeforeInvocation,
+        currentTargetDuringInvocation:
+          invocationRecord.currentTargetDuringInvocation,
+        currentTargetResetAfterInvocation:
+          invocationRecord.currentTargetResetAfterInvocation,
+        dispatchPathIndex: invocationRecord.dispatchPathIndex,
+        index,
+        invocationStatus: invocationRecord.invocationStatus,
+        phase: invocationRecord.phase,
+        registrationName: invocationRecord.registrationName,
+        targetInst: invocationRecord.targetInst
+      })
+    )
+  );
+  const currentTargetResetCount = frozenInvocationRecords.filter(
+    (invocationRecord) =>
+      invocationRecord.listenerInvocationCount > 0 &&
+      invocationRecord.currentTargetResetAfterInvocation === true
+  ).length;
   const invocationOrder = Object.freeze(
     frozenInvocationRecords.map((invocationRecord, index) =>
       Object.freeze({
         currentTarget: invocationRecord.currentTarget,
+        currentTargetAfterInvocation:
+          invocationRecord.currentTargetAfterInvocation,
+        currentTargetBeforeInvocation:
+          invocationRecord.currentTargetBeforeInvocation,
+        currentTargetDuringInvocation:
+          invocationRecord.currentTargetDuringInvocation,
+        currentTargetResetAfterInvocation:
+          invocationRecord.currentTargetResetAfterInvocation,
         dispatchPathIndex: invocationRecord.dispatchPathIndex,
         index,
         invocationStatus: invocationRecord.invocationStatus,
@@ -814,6 +846,14 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
         invocationRecord.phase === 'capture' &&
         invocationRecord.listenerInvocationCount > 0
     ).length,
+    currentTargetDiagnosticStatus:
+      listenerInvocationCount === 0
+        ? 'not-applicable'
+        : PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS,
+    currentTargetProgression,
+    currentTargetResetAfterDispatch:
+      listenerInvocationCount === currentTargetResetCount,
+    currentTargetResetCount,
     dispatchQueueEntryCount,
     dispatchQueueProcessed: false,
     dispatchRecordCount: normalizedDispatchRecords.length,
@@ -890,6 +930,7 @@ function invokeDispatchQueueCanaryFromDispatchRecords(
           normalizedOptions.enablePropagationStopDiagnostics,
         useProcessingOrder
       }),
+      currentTargetProgression,
       propagationStopDiagnostics: frozenPropagationStopDiagnostics
     })
   );
@@ -927,15 +968,12 @@ function createDispatchQueuePropagationDiagnosticState(options) {
 }
 
 function createDispatchQueueCanaryEventContext(
+  dispatchRecord,
   dispatchQueueEntry,
   entryPayload,
   options,
   propagationState
 ) {
-  if (propagationState === null) {
-    return null;
-  }
-
   const listenerRecords = options.useProcessingOrder
     ? entryPayload.processingListenerRecords
     : entryPayload.listenerRecords;
@@ -950,21 +988,33 @@ function createDispatchQueueCanaryEventContext(
     return null;
   }
 
-  propagationState.nativeEvent = firstListenerPayload.nativeEvent;
-  if (propagationState.stoppedNativeEvent !== firstListenerPayload.nativeEvent) {
-    propagationState.propagationStopped = false;
+  const currentTargetState = {
+    currentDispatchListenerRecord: null,
+    currentTarget: null
+  };
+
+  if (propagationState !== null) {
+    propagationState.nativeEvent = firstListenerPayload.nativeEvent;
+    if (
+      propagationState.stoppedNativeEvent !== firstListenerPayload.nativeEvent
+    ) {
+      propagationState.propagationStopped = false;
+    }
+    propagationState.nativeStopPropagationCallCount =
+      getNativeStopPropagationCallCount(firstListenerPayload.nativeEvent);
   }
-  propagationState.nativeStopPropagationCallCount =
-    getNativeStopPropagationCallCount(firstListenerPayload.nativeEvent);
 
   return {
     canaryEvent: createDispatchListenerCanaryEvent(
       firstListenerRecord,
       firstListenerPayload,
       {
-        propagationState
+        currentTargetState,
+        propagationState,
+        targetInst: dispatchRecord.targetInst
       }
     ),
+    currentTargetState,
     dispatchQueueEntry,
     propagationState
   };
@@ -978,9 +1028,31 @@ function prepareDispatchQueueCanaryEventForListener(
     return;
   }
 
+  const currentTargetState = canaryEventContext.currentTargetState;
+  currentTargetState.currentDispatchListenerRecord = listenerRecord;
+  currentTargetState.currentTarget = listenerRecord.currentTarget;
+
   const propagationState = canaryEventContext.propagationState;
-  propagationState.currentDispatchListenerRecord = listenerRecord;
-  propagationState.currentTarget = listenerRecord.currentTarget;
+  if (propagationState !== null) {
+    propagationState.currentDispatchListenerRecord = listenerRecord;
+    propagationState.currentTarget = listenerRecord.currentTarget;
+  }
+}
+
+function resetDispatchQueueCanaryEventAfterListener(canaryEventContext) {
+  if (canaryEventContext === null) {
+    return;
+  }
+
+  const currentTargetState = canaryEventContext.currentTargetState;
+  currentTargetState.currentDispatchListenerRecord = null;
+  currentTargetState.currentTarget = null;
+
+  const propagationState = canaryEventContext.propagationState;
+  if (propagationState !== null) {
+    propagationState.currentDispatchListenerRecord = null;
+    propagationState.currentTarget = null;
+  }
 }
 
 function finishDispatchQueueCanaryEventContext(canaryEventContext) {
@@ -988,9 +1060,7 @@ function finishDispatchQueueCanaryEventContext(canaryEventContext) {
     return;
   }
 
-  const propagationState = canaryEventContext.propagationState;
-  propagationState.currentDispatchListenerRecord = null;
-  propagationState.currentTarget = null;
+  resetDispatchQueueCanaryEventAfterListener(canaryEventContext);
 }
 
 function shouldSkipDispatchListenerForPropagationStop(
@@ -999,6 +1069,9 @@ function shouldSkipDispatchListenerForPropagationStop(
   canaryEventContext
 ) {
   if (canaryEventContext === null) {
+    return false;
+  }
+  if (canaryEventContext.propagationState === null) {
     return false;
   }
 
@@ -1159,14 +1232,39 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     canaryEventContext === null
       ? createDispatchListenerCanaryEvent(normalizedListenerRecord, payload)
       : canaryEventContext.canaryEvent;
+  let currentTargetBeforeInvocation =
+    canaryEventContext === null ? canaryEvent.currentTarget : null;
+  let currentTargetDuringInvocation =
+    canaryEventContext === null ? canaryEvent.currentTarget : null;
+  let currentTargetAfterInvocation =
+    canaryEventContext === null ? canaryEvent.currentTarget : null;
+  let currentTargetResetAfterInvocation = false;
   let returnValue;
   let error = null;
 
   try {
+    if (canaryEventContext !== null) {
+      currentTargetBeforeInvocation =
+        canaryEventContext.currentTargetState.currentTarget;
+      prepareDispatchQueueCanaryEventForListener(
+        canaryEventContext,
+        normalizedListenerRecord
+      );
+      currentTargetDuringInvocation =
+        canaryEventContext.currentTargetState.currentTarget;
+    }
     returnValue = payload.listener.call(undefined, canaryEvent);
   } catch (thrownValue) {
     error = thrownValue;
     returnValue = undefined;
+  } finally {
+    if (canaryEventContext !== null) {
+      resetDispatchQueueCanaryEventAfterListener(canaryEventContext);
+      currentTargetAfterInvocation =
+        canaryEventContext.currentTargetState.currentTarget;
+      currentTargetResetAfterInvocation =
+        currentTargetAfterInvocation === null;
+    }
   }
 
   const record = Object.freeze({
@@ -1174,6 +1272,14 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
     browserDomEventCompatibilityClaimed: false,
     canaryEventKind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
     currentTarget: normalizedListenerRecord.currentTarget,
+    currentTargetAfterInvocation,
+    currentTargetBeforeInvocation,
+    currentTargetDuringInvocation,
+    currentTargetResetAfterInvocation,
+    currentTargetResetDiagnosticStatus:
+      currentTargetResetAfterInvocation === true
+        ? PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS
+        : 'not-applicable',
     dispatchPathIndex: normalizedListenerRecord.dispatchPathIndex,
     dispatchQueueEntryKind:
       dispatchQueueEntry === null ? null : dispatchQueueEntry.kind,
@@ -1286,6 +1392,11 @@ function createSkippedSingleListenerInvocationCanaryRecord(
       dispatchListenerRecord === null
         ? null
         : dispatchListenerRecord.currentTarget,
+    currentTargetAfterInvocation: null,
+    currentTargetBeforeInvocation: null,
+    currentTargetDuringInvocation: null,
+    currentTargetResetAfterInvocation: false,
+    currentTargetResetDiagnosticStatus: 'not-applicable',
     dispatchPathIndex:
       dispatchListenerRecord === null
         ? null
@@ -1413,9 +1524,18 @@ function createDispatchListenerCanaryEvent(
   options
 ) {
   const normalizedOptions = isObjectLike(options) ? options : {};
+  const currentTargetState = isObjectLike(
+    normalizedOptions.currentTargetState
+  )
+    ? normalizedOptions.currentTargetState
+    : null;
   const propagationState = isObjectLike(normalizedOptions.propagationState)
     ? normalizedOptions.propagationState
     : null;
+  const targetInst =
+    Object.prototype.hasOwnProperty.call(normalizedOptions, 'targetInst')
+      ? normalizedOptions.targetInst
+      : dispatchListenerRecord.targetInst;
   const event = {
     browserDomEventCompatibilityClaimed: false,
     domEventName: dispatchListenerRecord.domEventName,
@@ -1428,20 +1548,25 @@ function createDispatchListenerCanaryEvent(
     status: 'private-canary-not-synthetic-event',
     syntheticEvent: false,
     target: payload.nativeEventTarget,
-    targetInst: dispatchListenerRecord.targetInst,
+    targetInst,
     type: dispatchListenerRecord.nativeEventType
   };
 
-  if (propagationState === null) {
+  if (currentTargetState === null) {
     event.currentTarget = dispatchListenerRecord.currentTarget;
   } else {
     Object.defineProperties(event, {
       currentTarget: {
         enumerable: true,
         get() {
-          return propagationState.currentTarget;
+          return currentTargetState.currentTarget;
         }
-      },
+      }
+    });
+  }
+
+  if (propagationState !== null) {
+    Object.defineProperties(event, {
       isPropagationStopped: {
         enumerable: true,
         value() {
@@ -3234,6 +3359,7 @@ module.exports = {
   PLUGIN_EXTRACTION_RECORD_KIND,
   POLYFILL_EVENT_PLUGIN_NAMES,
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+  PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS,
   PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
   PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
