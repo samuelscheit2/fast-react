@@ -2,9 +2,10 @@
 //!
 //! This module models the configuration/state shape needed to create an
 //! internal FiberRoot. It deliberately does not schedule work, enqueue
-//! HostRoot updates, call host APIs, or expose public React DOM root behavior.
+//! HostRoot updates, call host APIs, flush passive effects, or expose public
+//! React DOM root behavior.
 
-use fast_react_core::{FiberMode, Lane, Lanes};
+use fast_react_core::{FiberId, FiberMode, Lane, Lanes};
 
 use crate::FiberRootId;
 
@@ -497,31 +498,206 @@ pub enum RootRenderExitStatus {
     Errored,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum PendingPassiveEffectPhase {
+    Unmount = 0,
+    Mount = 1,
+}
+
+impl PendingPassiveEffectPhase {
+    #[must_use]
+    pub const fn flush_rank(self) -> u8 {
+        match self {
+            Self::Unmount => 0,
+            Self::Mount => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PendingPassiveUnmountOrigin {
+    UpdatedFiber,
+    DeletedSubtree { nearest_mounted_ancestor: FiberId },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct PendingPassiveEffectOrder {
+    phase: PendingPassiveEffectPhase,
+    sequence: u64,
+}
+
+impl PendingPassiveEffectOrder {
+    #[must_use]
+    pub const fn new(phase: PendingPassiveEffectPhase, sequence: u64) -> Self {
+        Self { phase, sequence }
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> PendingPassiveEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn sequence(self) -> u64 {
+        self.sequence
+    }
+
+    #[must_use]
+    pub const fn flush_rank(self) -> u8 {
+        self.phase.flush_rank()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PendingPassiveEffectRecord {
+    fiber: FiberId,
+    lanes: Lanes,
+    order: PendingPassiveEffectOrder,
+    unmount_origin: Option<PendingPassiveUnmountOrigin>,
+}
+
+impl PendingPassiveEffectRecord {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub const fn order(self) -> PendingPassiveEffectOrder {
+        self.order
+    }
+
+    #[must_use]
+    pub const fn unmount_origin(self) -> Option<PendingPassiveUnmountOrigin> {
+        self.unmount_origin
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingPassiveState {
     root: Option<FiberRootId>,
     lanes: Lanes,
+    passive_unmounts: Vec<PendingPassiveEffectRecord>,
+    passive_mounts: Vec<PendingPassiveEffectRecord>,
+    next_sequence: u64,
 }
 
 impl PendingPassiveState {
     pub const NONE: Self = Self {
         root: None,
         lanes: Lanes::NO,
+        passive_unmounts: Vec::new(),
+        passive_mounts: Vec::new(),
+        next_sequence: 0,
     };
 
     #[must_use]
     pub const fn new(root: Option<FiberRootId>, lanes: Lanes) -> Self {
-        Self { root, lanes }
+        Self {
+            root,
+            lanes,
+            passive_unmounts: Vec::new(),
+            passive_mounts: Vec::new(),
+            next_sequence: 0,
+        }
     }
 
     #[must_use]
-    pub const fn root(self) -> Option<FiberRootId> {
+    pub const fn root(&self) -> Option<FiberRootId> {
         self.root
     }
 
     #[must_use]
-    pub const fn lanes(self) -> Lanes {
+    pub const fn lanes(&self) -> Lanes {
         self.lanes
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.root.is_none()
+            && self.lanes.is_empty()
+            && self.passive_unmounts.is_empty()
+            && self.passive_mounts.is_empty()
+    }
+
+    #[must_use]
+    pub fn has_effects(&self) -> bool {
+        self.root.is_some()
+            && (!self.passive_unmounts.is_empty() || !self.passive_mounts.is_empty())
+    }
+
+    #[must_use]
+    pub fn passive_unmounts(&self) -> &[PendingPassiveEffectRecord] {
+        &self.passive_unmounts
+    }
+
+    #[must_use]
+    pub fn passive_mounts(&self) -> &[PendingPassiveEffectRecord] {
+        &self.passive_mounts
+    }
+
+    pub fn queue_unmount(
+        &mut self,
+        fiber: FiberId,
+        origin: PendingPassiveUnmountOrigin,
+        lanes: Lanes,
+    ) -> Option<PendingPassiveEffectOrder> {
+        let order = self.next_order(PendingPassiveEffectPhase::Unmount, lanes)?;
+        self.passive_unmounts.push(PendingPassiveEffectRecord {
+            fiber,
+            lanes,
+            order,
+            unmount_origin: Some(origin),
+        });
+        Some(order)
+    }
+
+    pub fn queue_mount(
+        &mut self,
+        fiber: FiberId,
+        lanes: Lanes,
+    ) -> Option<PendingPassiveEffectOrder> {
+        let order = self.next_order(PendingPassiveEffectPhase::Mount, lanes)?;
+        self.passive_mounts.push(PendingPassiveEffectRecord {
+            fiber,
+            lanes,
+            order,
+            unmount_origin: None,
+        });
+        Some(order)
+    }
+
+    pub fn flush_ordered_records(&self) -> impl Iterator<Item = &PendingPassiveEffectRecord> {
+        self.passive_unmounts
+            .iter()
+            .chain(self.passive_mounts.iter())
+    }
+
+    fn next_order(
+        &mut self,
+        phase: PendingPassiveEffectPhase,
+        lanes: Lanes,
+    ) -> Option<PendingPassiveEffectOrder> {
+        if self.root.is_none() || lanes.is_empty() {
+            return None;
+        }
+
+        let sequence = self.next_sequence;
+        self.next_sequence = self.next_sequence.checked_add(1)?;
+        self.lanes = self.lanes.merge(lanes);
+        Some(PendingPassiveEffectOrder::new(phase, sequence))
+    }
+}
+
+impl Default for PendingPassiveState {
+    fn default() -> Self {
+        Self::NONE
     }
 }
 
@@ -660,5 +836,112 @@ mod tests {
         assert_eq!(boundary.raw(), 4);
         assert_eq!(tree_context.raw(), 5);
         assert_eq!(errors.raw(), 6);
+    }
+
+    fn root_id() -> FiberRootId {
+        FiberRootId::new(1).unwrap()
+    }
+
+    fn fiber_id(slot: usize) -> FiberId {
+        use fast_react_core::{FiberArenaId, FiberGeneration, FiberSlot};
+
+        FiberId::new(
+            FiberArenaId::new(1).unwrap(),
+            FiberSlot::new(slot),
+            FiberGeneration::INITIAL,
+        )
+    }
+
+    #[test]
+    fn root_config_pending_passive_state_defaults_to_empty_noop() {
+        let mut state = PendingPassiveState::default();
+
+        assert!(state.is_empty());
+        assert!(!state.has_effects());
+        assert_eq!(state.root(), None);
+        assert_eq!(state.lanes(), Lanes::NO);
+        assert!(state.passive_unmounts().is_empty());
+        assert!(state.passive_mounts().is_empty());
+        assert_eq!(state.flush_ordered_records().count(), 0);
+        assert_eq!(state.queue_mount(fiber_id(0), Lanes::DEFAULT), None);
+        assert_eq!(
+            state.queue_unmount(
+                fiber_id(1),
+                PendingPassiveUnmountOrigin::UpdatedFiber,
+                Lanes::DEFAULT,
+            ),
+            None
+        );
+        assert!(state.is_empty());
+    }
+
+    #[test]
+    fn root_config_pending_passive_records_keep_unmounts_before_mounts() {
+        let mut state = PendingPassiveState::new(Some(root_id()), Lanes::NO);
+        let mounted_fiber = fiber_id(1);
+        let deleted_fiber = fiber_id(2);
+        let ancestor = fiber_id(3);
+
+        let mount_order = state.queue_mount(mounted_fiber, Lanes::DEFAULT).unwrap();
+        let unmount_order = state
+            .queue_unmount(
+                deleted_fiber,
+                PendingPassiveUnmountOrigin::DeletedSubtree {
+                    nearest_mounted_ancestor: ancestor,
+                },
+                Lanes::SYNC,
+            )
+            .unwrap();
+
+        assert_eq!(mount_order.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(mount_order.sequence(), 0);
+        assert_eq!(unmount_order.phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(unmount_order.sequence(), 1);
+        assert!(unmount_order.flush_rank() < mount_order.flush_rank());
+        assert_eq!(state.lanes(), Lanes::DEFAULT.merge(Lanes::SYNC));
+        assert!(state.has_effects());
+
+        let unmount = state.passive_unmounts()[0];
+        assert_eq!(unmount.fiber(), deleted_fiber);
+        assert_eq!(unmount.lanes(), Lanes::SYNC);
+        assert_eq!(unmount.order(), unmount_order);
+        assert_eq!(
+            unmount.unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+                nearest_mounted_ancestor: ancestor,
+            })
+        );
+
+        let mount = state.passive_mounts()[0];
+        assert_eq!(mount.fiber(), mounted_fiber);
+        assert_eq!(mount.lanes(), Lanes::DEFAULT);
+        assert_eq!(mount.order(), mount_order);
+        assert_eq!(mount.unmount_origin(), None);
+
+        let flush_order: Vec<FiberId> = state
+            .flush_ordered_records()
+            .map(|record| record.fiber())
+            .collect();
+        assert_eq!(flush_order, vec![deleted_fiber, mounted_fiber]);
+    }
+
+    #[test]
+    fn root_config_pending_passive_rejects_no_lane_records() {
+        let mut state = PendingPassiveState::new(Some(root_id()), Lanes::NO);
+
+        assert_eq!(state.queue_mount(fiber_id(0), Lanes::NO), None);
+        assert_eq!(
+            state.queue_unmount(
+                fiber_id(1),
+                PendingPassiveUnmountOrigin::UpdatedFiber,
+                Lanes::NO,
+            ),
+            None
+        );
+
+        assert!(!state.has_effects());
+        assert_eq!(state.lanes(), Lanes::NO);
+        assert!(state.passive_unmounts().is_empty());
+        assert!(state.passive_mounts().is_empty());
     }
 }

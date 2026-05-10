@@ -448,8 +448,20 @@ impl<H: HostTypes> RootSchedulingState<H> {
     }
 
     #[must_use]
-    pub const fn pending_passive(&self) -> PendingPassiveState {
-        self.pending_passive
+    pub const fn pending_passive(&self) -> &PendingPassiveState {
+        &self.pending_passive
+    }
+
+    pub fn pending_passive_mut(&mut self) -> &mut PendingPassiveState {
+        &mut self.pending_passive
+    }
+
+    pub fn prepare_pending_passive(&mut self, root: FiberRootId, lanes: Lanes) {
+        self.pending_passive = PendingPassiveState::new(Some(root), lanes);
+    }
+
+    pub fn clear_pending_passive(&mut self) {
+        self.pending_passive = PendingPassiveState::NONE;
     }
 
     pub(crate) fn record_render_phase_work(
@@ -645,8 +657,54 @@ mod tests {
     use super::*;
     use fast_react_core::{FiberFlags, UpdateQueueHandle};
 
+    struct Host;
+
+    impl HostTypes for Host {
+        type HostFiberToken = ();
+        type Type = ();
+        type Props = ();
+        type Container = ();
+        type Instance = ();
+        type TextInstance = ();
+        type PublicInstance = ();
+        type HostContext = ();
+        type UpdatePayload = ();
+        type TimeoutHandle = usize;
+        type NoTimeout = ();
+        type CommitState = ();
+        type EventPriority = ();
+        type EventType = ();
+        type EventTimestamp = ();
+        type ActivityInstance = ();
+        type SuspenseInstance = ();
+        type HydratableInstance = ();
+        type FormInstance = ();
+        type ChildSet = ();
+        type Resource = ();
+        type HoistableRoot = ();
+        type TransitionStatus = ();
+        type SuspendedState = ();
+        type RunningViewTransition = ();
+        type ViewTransitionInstance = ();
+        type InstanceMeasurement = ();
+        type EventResponder = ();
+        type GestureTimeline = ();
+        type FragmentInstance = ();
+        type RendererInspectionConfig = ();
+    }
+
     fn root_id() -> FiberRootId {
         FiberRootId::new(1).unwrap()
+    }
+
+    fn fiber_id(slot: usize) -> FiberId {
+        use fast_react_core::{FiberArenaId, FiberGeneration, FiberSlot};
+
+        FiberId::new(
+            FiberArenaId::new(1).unwrap(),
+            FiberSlot::new(slot),
+            FiberGeneration::INITIAL,
+        )
     }
 
     #[test]
@@ -769,42 +827,6 @@ mod tests {
 
     #[test]
     fn fiber_root_scheduling_state_starts_empty() {
-        struct Host;
-
-        impl HostTypes for Host {
-            type HostFiberToken = ();
-            type Type = ();
-            type Props = ();
-            type Container = ();
-            type Instance = ();
-            type TextInstance = ();
-            type PublicInstance = ();
-            type HostContext = ();
-            type UpdatePayload = ();
-            type TimeoutHandle = usize;
-            type NoTimeout = ();
-            type CommitState = ();
-            type EventPriority = ();
-            type EventType = ();
-            type EventTimestamp = ();
-            type ActivityInstance = ();
-            type SuspenseInstance = ();
-            type HydratableInstance = ();
-            type FormInstance = ();
-            type ChildSet = ();
-            type Resource = ();
-            type HoistableRoot = ();
-            type TransitionStatus = ();
-            type SuspendedState = ();
-            type RunningViewTransition = ();
-            type ViewTransitionInstance = ();
-            type InstanceMeasurement = ();
-            type EventResponder = ();
-            type GestureTimeline = ();
-            type FragmentInstance = ();
-            type RendererInspectionConfig = ();
-        }
-
         let scheduling = RootSchedulingState::<Host>::new();
 
         assert_eq!(scheduling.next_scheduled_root(), None);
@@ -824,6 +846,52 @@ mod tests {
             scheduling.render_exit_status(),
             RootRenderExitStatus::NoWork
         );
-        assert_eq!(scheduling.pending_passive(), PendingPassiveState::NONE);
+        assert!(scheduling.pending_passive().is_empty());
+        assert!(!scheduling.pending_passive().has_effects());
+    }
+
+    #[test]
+    fn fiber_root_scheduling_state_records_passive_metadata_without_flushing() {
+        let mut scheduling = RootSchedulingState::<Host>::new();
+        let mounted_fiber = fiber_id(1);
+        let deleted_fiber = fiber_id(2);
+
+        scheduling.prepare_pending_passive(root_id(), Lanes::DEFAULT);
+
+        assert_eq!(scheduling.pending_passive().root(), Some(root_id()));
+        assert_eq!(scheduling.pending_passive().lanes(), Lanes::DEFAULT);
+        assert!(!scheduling.pending_passive().has_effects());
+
+        let mount_order = scheduling
+            .pending_passive_mut()
+            .queue_mount(mounted_fiber, Lanes::DEFAULT)
+            .unwrap();
+        let unmount_order = scheduling
+            .pending_passive_mut()
+            .queue_unmount(
+                deleted_fiber,
+                crate::root_config::PendingPassiveUnmountOrigin::UpdatedFiber,
+                Lanes::SYNC,
+            )
+            .unwrap();
+
+        assert!(unmount_order.flush_rank() < mount_order.flush_rank());
+        assert_eq!(
+            scheduling.pending_passive().lanes(),
+            Lanes::DEFAULT.merge(Lanes::SYNC)
+        );
+        assert_eq!(
+            scheduling
+                .pending_passive()
+                .flush_ordered_records()
+                .map(|record| record.fiber())
+                .collect::<Vec<_>>(),
+            vec![deleted_fiber, mounted_fiber]
+        );
+
+        scheduling.clear_pending_passive();
+
+        assert!(scheduling.pending_passive().is_empty());
+        assert!(!scheduling.pending_passive().has_effects());
     }
 }
