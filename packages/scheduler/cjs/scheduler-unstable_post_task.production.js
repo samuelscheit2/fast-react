@@ -89,6 +89,7 @@ function createPrivatePostTaskPriorityRecord(
     diagnosticEventSequence: 0,
     environmentCapabilities: null,
     priorityMapping: null,
+    priorityTimeout: null,
     schedule: null,
     cancellation: null,
     callbackRuns: [],
@@ -97,6 +98,7 @@ function createPrivatePostTaskPriorityRecord(
     actRootWorkHandoffDiagnostics: false,
     environmentCapabilityDiagnostics: true,
     priorityMappingDiagnostics: true,
+    priorityTimeoutDiagnostics: true,
     shimmedTaskControllerScheduling: true,
     shimmedTaskControllerCancellation: false,
     continuationFallbackDiagnostics: false,
@@ -118,12 +120,17 @@ function createPrivatePostTaskPriorityRecord(
     priorityLevel,
     postTaskPriority
   );
+  record.priorityTimeout = describePrivatePostTaskPriorityTimeout(
+    priorityLevel,
+    record.priorityMapping
+  );
   record.schedule = {
     status: "scheduled-shimmed-task-controller",
     diagnosticEventIndex: claimPrivatePostTaskDiagnosticEventIndex(record),
     priorityLevel: priorityLevel,
     postTaskPriority: postTaskPriority,
     priorityMapping: record.priorityMapping,
+    priorityTimeout: record.priorityTimeout,
     delay: describePrivatePostTaskDelay(postTaskOptions),
     environmentCapabilities: record.environmentCapabilities,
     controller: describePrivatePostTaskController(controller),
@@ -158,8 +165,11 @@ function recordPrivatePostTaskCallbackRun(
     priorityLevel: priorityLevel,
     postTaskPriority: postTaskPriority,
     scheduledDelay: record.schedule ? record.schedule.delay : null,
+    priorityTimeout: record.priorityTimeout,
     currentPriorityLevel: currentPriorityLevel_DEPRECATED,
     didTimeout: false,
+    didTimeoutSource:
+      "scheduler-post-task-deprecated-didTimeout-is-always-false",
     shouldYieldAtStart: getCurrentTime() >= deadline,
     signal: describePrivatePostTaskSignal(node._controller.signal),
     continuationStatus: "callback-running",
@@ -251,6 +261,11 @@ function recordPrivatePostTaskContinuationFallback(
       signalValidationStatus: signalValidation.status,
       signalValidationRejectionReason: signalValidation.rejectionReason,
       abortOrderingStatus: abortOrdering.status,
+      priorityTimeoutStatus: record.priorityTimeout.status,
+      timeoutMs: record.priorityTimeout.timeoutMs,
+      sourceCallbackDidTimeout: sourceCallbackRun
+        ? sourceCallbackRun.didTimeout
+        : null,
       fallbackEnvironmentClassification:
         fallbackEnvironmentClassification.classification,
       fallbackEnvironmentKind:
@@ -264,6 +279,10 @@ function recordPrivatePostTaskContinuationFallback(
     fallbackEnvironmentClassification: fallbackEnvironmentClassification,
     signalValidation: signalValidation,
     abortOrdering: abortOrdering,
+    priorityTimeout: record.priorityTimeout,
+    sourceCallbackDidTimeout: sourceCallbackRun
+      ? sourceCallbackRun.didTimeout
+      : null,
     reusesOriginalSignal: reusesOriginalSignal,
     signalAtSchedule: signalAtSchedule,
     signal: signalAtSchedule,
@@ -501,6 +520,8 @@ function createPrivatePostTaskRootContinuationExecutionRoute(
     schedulerPriorityName: record.priorityMapping
       ? record.priorityMapping.schedulerPriorityName
       : null,
+    priorityTimeout: record.priorityTimeout,
+    sourceCallbackDidTimeout: continuation.sourceCallbackDidTimeout,
     postTaskPriority: continuation.postTaskPriority,
     taskControllerPriority: record.priorityMapping
       ? record.priorityMapping.taskControllerPriority
@@ -521,7 +542,8 @@ function createPrivatePostTaskRootContinuationExecutionRoute(
         "pending-private-root-continuation-execution-route",
         continuation,
         null,
-        null
+        null,
+        record.priorityTimeout
       ),
     browserPostTaskCompatibilityClaimed: false,
     browserTaskOrderingCompatibilityClaimed: false,
@@ -556,7 +578,8 @@ function createPrivatePostTaskRootContinuationExecutionRecord(
   status,
   continuation,
   cancellation,
-  abortSignal
+  abortSignal,
+  priorityTimeout
 ) {
   return {
     status: status,
@@ -564,6 +587,8 @@ function createPrivatePostTaskRootContinuationExecutionRecord(
     routeSelected: true,
     continuationIndex: continuation.continuationIndex,
     sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+    sourceCallbackDidTimeout: continuation.sourceCallbackDidTimeout,
+    priorityTimeout: priorityTimeout,
     callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
     callbackRunCountAtAbortRequest: cancellation
       ? cancellation.abortOrdering.callbackRunCountAtRequest
@@ -653,6 +678,8 @@ function createPrivatePostTaskActRootWorkHandoff(
     schedulerPriorityName: record.priorityMapping
       ? record.priorityMapping.schedulerPriorityName
       : null,
+    priorityTimeout: record.priorityTimeout,
+    sourceCallbackDidTimeout: continuation.sourceCallbackDidTimeout,
     postTaskPriority: continuation.postTaskPriority,
     taskControllerPriority: record.priorityMapping
       ? record.priorityMapping.taskControllerPriority
@@ -699,6 +726,8 @@ function createPrivatePostTaskActQueueHandoff(record, continuation) {
       ? record.priorityMapping.schedulerPriorityName
       : null,
     priorityLevel: continuation.priorityLevel,
+    priorityTimeout: record.priorityTimeout,
+    sourceCallbackDidTimeout: continuation.sourceCallbackDidTimeout,
     postTaskPriority: continuation.postTaskPriority,
     actQueueHandoffOnly: true,
     rootWorkMetadataOnly: true,
@@ -746,6 +775,8 @@ function createPrivatePostTaskActRootWorkRecord(
     schedulerPriorityName: record.priorityMapping
       ? record.priorityMapping.schedulerPriorityName
       : null,
+    priorityTimeout: record.priorityTimeout,
+    sourceCallbackDidTimeout: continuation.sourceCallbackDidTimeout,
     postTaskPriority: continuation.postTaskPriority,
     delayedCallbackPath: true,
     rendererWorkExecutionBlocked: true,
@@ -798,7 +829,8 @@ function recordPrivatePostTaskRootContinuationExecutionRouteAbort(
       "aborted-before-private-root-continuation-execution",
       continuation,
       cancellation,
-      cancellation.signalAfterAbort
+      cancellation.signalAfterAbort,
+      record.priorityTimeout
     );
 }
 function describePrivatePostTaskEnvironmentCapabilities() {
@@ -881,6 +913,63 @@ function describePrivatePostTaskPriorityMapping(
     taskControllerPriority: postTaskPriority,
     mappingReason: mappingReason,
     browserPostTaskCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+function describePrivatePostTaskPriorityTimeout(
+  priorityLevel,
+  priorityMapping
+) {
+  switch (priorityLevel) {
+    case 1:
+      var timeoutMs = -1,
+        timeoutReason = "immediate-priority-timeout";
+      break;
+    case 2:
+      timeoutMs = 250;
+      timeoutReason = "user-blocking-priority-timeout";
+      break;
+    case 5:
+      timeoutMs = 1073741823;
+      timeoutReason = "idle-priority-never-times-out";
+      break;
+    case 4:
+      timeoutMs = 10000;
+      timeoutReason = "low-priority-timeout";
+      break;
+    case 3:
+      timeoutMs = 5000;
+      timeoutReason = "normal-priority-timeout";
+      break;
+    default:
+      timeoutMs = 5000;
+      timeoutReason = "unknown-priority-defaults-to-normal-timeout";
+  }
+  return {
+    status: "scheduler-post-task-private-priority-timeout-diagnostics",
+    priorityLevel: priorityLevel,
+    schedulerPriorityName: priorityMapping
+      ? priorityMapping.schedulerPriorityName
+      : "unknown",
+    recognizedPriority: priorityMapping
+      ? priorityMapping.recognizedPriority === true
+      : false,
+    timeoutMs: timeoutMs,
+    timeoutReason: timeoutReason,
+    timeoutClassification:
+      0 > timeoutMs
+        ? "expired-priority-timeout"
+        : 1073741823 === timeoutMs
+          ? "idle-priority-timeout"
+          : "finite-priority-timeout",
+    didTimeoutArgument: false,
+    didTimeoutSource:
+      "scheduler-post-task-deprecated-didTimeout-is-always-false",
+    expiresAt: null,
+    rawTimingCaptured: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
@@ -1088,6 +1177,7 @@ function snapshotPrivatePostTaskPriorityRecord(record) {
     diagnosticEventCount: record.diagnosticEventSequence,
     environmentCapabilities: record.environmentCapabilities,
     priorityMapping: record.priorityMapping,
+    priorityTimeout: record.priorityTimeout,
     schedule: record.schedule,
     cancellation: record.cancellation,
     callbackRuns: record.callbackRuns,
@@ -1096,6 +1186,7 @@ function snapshotPrivatePostTaskPriorityRecord(record) {
     environmentCapabilityDiagnostics:
       record.environmentCapabilityDiagnostics,
     priorityMappingDiagnostics: record.priorityMappingDiagnostics,
+    priorityTimeoutDiagnostics: record.priorityTimeoutDiagnostics,
     shimmedTaskControllerScheduling: record.shimmedTaskControllerScheduling,
     shimmedTaskControllerCancellation: record.shimmedTaskControllerCancellation,
     continuationFallbackDiagnostics: record.continuationFallbackDiagnostics,
