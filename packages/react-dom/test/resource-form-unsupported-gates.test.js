@@ -11775,6 +11775,200 @@ test('private resource-map commit rejects duplicate stylesheet precedence rows',
   assert.equal(scenario.fakeDom.head.childNodes.length, 1);
 });
 
+test('private resource-map commit can execute one preload/preinit fake-head precedence path', () => {
+  const scenario = createResourceMapCommitScenario(
+    'resource-map-fake-head-precedence',
+    [
+      [
+        'L',
+        [
+          '/style.css',
+          'style',
+          {
+            crossOrigin: undefined,
+            integrity: undefined,
+            nonce: undefined,
+            type: undefined,
+            fetchPriority: 'low',
+            referrerPolicy: undefined,
+            imageSrcSet: undefined,
+            imageSizes: undefined,
+            media: undefined
+          }
+        ]
+      ],
+      [
+        'S',
+        [
+          '/style.css',
+          'theme',
+          {
+            crossOrigin: '',
+            integrity: 'sha256-style',
+            fetchPriority: 'high'
+          }
+        ]
+      ]
+    ],
+    (admissions) => [
+      {
+        sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+        resourceKind: 'style',
+        resourceKey: 'style-main'
+      },
+      {
+        sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+        resourceKind: 'style',
+        resourceKey: 'style-main',
+        precedenceKey: 'precedence-main'
+      }
+    ],
+    [
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'stylesheet',
+          'data-precedence': 'theme',
+          'data-fast-react-resource-key': 'existing-style',
+          'data-fast-react-precedence-key': 'precedence-main'
+        }
+      },
+      {
+        tagName: 'meta',
+        attributes: {
+          name: 'description'
+        }
+      }
+    ]
+  );
+  const diagnostic = scenario.commitGate.recordResourceMapCommitDiagnostic(
+    scenario.order,
+    scenario.stylesheet,
+    {
+      explicitResourceMapCommitDiagnostic: true,
+      fakeHeadExecution: {
+        explicitFakeHeadExecution: true,
+        executionId: 'style-preload-preinit-fake-head',
+        fakeDocument: scenario.fakeDom.document,
+        fakeHead: scenario.fakeDom.head
+      }
+    }
+  );
+
+  assert.equal(
+    diagnostic.preloadPreinitFakeHeadExecution.executionStatus,
+    resourceFormGate.privateResourceHintPreloadPreinitFakeHeadExecutionStatus
+  );
+  assert.equal(diagnostic.commitAdmission.fakeHeadExecutionAllowed, true);
+  assert.equal(
+    diagnostic.commitAdmission.fakeHeadExecution.rawHeadCaptured,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.preloadPreinitFakeHeadExecution.rows.map((row) => ({
+      contractId: row.contractId,
+      recordKind: row.recordKind,
+      resourceKey: row.resourceKey,
+      precedenceKey: row.precedenceKey,
+      insertionMethod: row.insertionMethod,
+      fakeDomCommitApplied: row.fakeDomCommitApplied,
+      stylesheetPrecedenceApplied: row.stylesheetPrecedenceApplied,
+      publicResourceHintDomInsertion: row.publicResourceHintDomInsertion,
+      publicResourceMapCommitBehavior: row.publicResourceMapCommitBehavior
+    })),
+    [
+      {
+        contractId: 'preload',
+        recordKind: 'preload',
+        resourceKey: 'style:style-main',
+        precedenceKey: null,
+        insertionMethod: 'appendChild',
+        fakeDomCommitApplied: true,
+        stylesheetPrecedenceApplied: false,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false
+      },
+      {
+        contractId: 'preinit-style',
+        recordKind: 'stylesheet',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-main',
+        insertionMethod: 'insertBefore',
+        fakeDomCommitApplied: true,
+        stylesheetPrecedenceApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    scenario.fakeDom.head.childNodes.map((node) => ({
+      nodeName: node.nodeName,
+      rel: node.attributes.rel || null,
+      as: node.attributes.as || null,
+      resourceKey: node.attributes['data-fast-react-resource-key'] || null,
+      precedenceKey:
+        node.attributes['data-fast-react-precedence-key'] || null
+    })),
+    [
+      {
+        nodeName: 'LINK',
+        rel: 'stylesheet',
+        as: null,
+        resourceKey: 'existing-style',
+        precedenceKey: 'precedence-main'
+      },
+      {
+        nodeName: 'LINK',
+        rel: 'stylesheet',
+        as: null,
+        resourceKey: 'style-main',
+        precedenceKey: 'precedence-main'
+      },
+      {
+        nodeName: 'META',
+        rel: null,
+        as: null,
+        resourceKey: null,
+        precedenceKey: null
+      },
+      {
+        nodeName: 'LINK',
+        rel: 'preload',
+        as: 'style',
+        resourceKey: 'style-main',
+        precedenceKey: null
+      }
+    ]
+  );
+  assert.equal(
+    scenario.fakeDom.head.childNodes[1].attributes.href,
+    '[fast-react-redacted-resource-hint:href]'
+  );
+  assert.equal(
+    scenario.fakeDom.head.childNodes[1].attributes['data-precedence'],
+    '[fast-react-redacted-resource-hint:precedence]'
+  );
+  assert.equal(diagnostic.resourceMapCommitPlan.fakeDomCommitApplied, true);
+  assert.equal(diagnostic.resourceLifecycleBoundary.fakeDomCommitApplied, true);
+  assert.equal(diagnostic.resourceLifecycleBoundary.hostNodeInserted, true);
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, true);
+  assert.equal(diagnostic.sideEffects.fakeResourceElementCreated, true);
+  assert.equal(diagnostic.sideEffects.fakeResourceElementInserted, true);
+  assert.equal(
+    diagnostic.sideEffects.preloadOrStyleDomWorkDispatched,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(
+    diagnostic.sideEffects.publicResourceMapCommitBehavior,
+    false
+  );
+  assert.equal(JSON.stringify(diagnostic).includes('/style.css'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('sha256-style'), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+});
+
 test('private resource-map commit rejects conflicting script and modulepreload duplicate records', () => {
   const scenario = createResourceMapCommitScenario(
     'resource-map-conflicting-module',
@@ -14558,6 +14752,20 @@ function createDeterministicFakeResourceDom() {
       this.childNodes.push(child);
       child.parentNode = this;
       log.push({child: child.nodeName, type: 'head.appendChild'});
+      return child;
+    },
+    insertBefore(child, before) {
+      const index = this.childNodes.indexOf(before);
+      if (index < 0) {
+        throw new Error('Unexpected fake resource head insert target');
+      }
+      this.childNodes.splice(index, 0, child);
+      child.parentNode = this;
+      log.push({
+        before: before.nodeName,
+        child: child.nodeName,
+        type: 'head.insertBefore'
+      });
       return child;
     }
   };

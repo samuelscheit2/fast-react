@@ -141,6 +141,8 @@ const privateResourceHintResourceMapCommitExecutionStatus =
   'diagnosed-private-resource-hint-resource-map-commit-records';
 const privateResourceHintResourceMapCommitCompatibilityBlockedStatus =
   'blocked-private-resource-hint-resource-map-commit-compatibility';
+const privateResourceHintPreloadPreinitFakeHeadExecutionStatus =
+  'executed-private-resource-hint-fake-head-preload-preinit-precedence-path';
 const privateResourceHintStylesheetLoadErrorStateAdmissionRequiredStatus =
   'blocked-private-resource-hint-stylesheet-load-error-state-admission-required';
 const privateResourceHintStylesheetLoadErrorStateStatus =
@@ -3036,6 +3038,14 @@ function describePrivateResourceHintResourceMapCommitGate() {
     rejectsDuplicateStylesheetPrecedenceRows: true,
     rejectsStaleStylesheetResourceMapEntries: true,
     rejectsPublicResourceDispatchClaims: true,
+    acceptsPrivateFakeHeadExecution: true,
+    acceptedPrivateFakeHeadExecutionKind:
+      'deterministic-private-fake-head-preload-preinit-precedence',
+    acceptedPrivateFakeHeadExecutionPath:
+      'stylesheet-preload-preinit-precedence',
+    privateFakeHeadExecutionStatus:
+      privateResourceHintPreloadPreinitFakeHeadExecutionStatus,
+    mutatesFakeHeadForPrivateExecution: true,
     mutatesRealResourceMaps: false,
     mutatesFakeResourceMaps: false,
     mutatesFakeHead: false,
@@ -4308,7 +4318,9 @@ function recordResourceHintResourceMapCommitWithGate(
   const commitPlan = createResourceHintResourceMapCommitPlan(
     order,
     stylesheetPrecedence,
-    stylesheetLoadErrorState
+    stylesheetLoadErrorState,
+    diagnostic.fakeHeadExecution,
+    commitAdmission.fakeHeadExecution
   );
   gateState.resourceMapCommitConsumed = true;
 
@@ -4364,6 +4376,8 @@ function recordResourceHintResourceMapCommitWithGate(
     moduleResourceMapOrder: commitPlan.moduleResourceMapOrder,
     scriptModuleFakeDomCommitExecution:
       commitPlan.scriptModuleFakeDomCommitExecution,
+    preloadPreinitFakeHeadExecution:
+      commitPlan.preloadPreinitFakeHeadExecution,
     stylesheetLoadStateCommitOrder:
       commitPlan.stylesheetLoadStateCommitOrder,
     resourceMapConflictBoundary: commitPlan.resourceMapConflictBoundary,
@@ -4375,7 +4389,8 @@ function recordResourceHintResourceMapCommitWithGate(
     publicHeadBoundary: createPublicHeadSingletonBoundary(),
     blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities,
     sideEffects: createResourceHintResourceMapCommitSideEffects(
-      commitPlan.stylesheetLoadStateCommitOrder
+      commitPlan.stylesheetLoadStateCommitOrder,
+      commitPlan.preloadPreinitFakeHeadExecution
     ),
     missingPrerequisites:
       resourceHintResourceMapCommitMissingPrerequisites
@@ -4386,13 +4401,24 @@ function recordResourceHintResourceMapCommitWithGate(
 }
 
 function createResourceHintResourceMapCommitSideEffects(
-  stylesheetLoadStateCommitOrder
+  stylesheetLoadStateCommitOrder,
+  preloadPreinitFakeHeadExecution
 ) {
   const transitionRecorded =
     stylesheetLoadStateCommitOrder.commitTransitionRecorded === true;
+  const fakeHeadExecutionApplied =
+    preloadPreinitFakeHeadExecution !== null &&
+    preloadPreinitFakeHeadExecution.fakeDomCommitApplied === true;
 
   return freezeRecord({
     ...resourceHintResourceMapCommitSideEffects,
+    fakeHeadRead: fakeHeadExecutionApplied,
+    fakeHeadMutated: fakeHeadExecutionApplied,
+    fakeResourceElementCreated: fakeHeadExecutionApplied,
+    fakeResourceElementInserted: fakeHeadExecutionApplied,
+    fakeResourceElementAttributesApplied: fakeHeadExecutionApplied,
+    fakeHeadInsertionOrderObserved: fakeHeadExecutionApplied,
+    fakeHeadInsertionOrderMutated: fakeHeadExecutionApplied,
     stylesheetLoadErrorStateRecordConsumed:
       stylesheetLoadStateCommitOrder.loadStateConsumed === true,
     stylesheetLoadStateCommitOrderRowsRecorded:
@@ -8717,6 +8743,10 @@ function normalizeResourceHintResourceMapCommitAdmission(diagnostic) {
     throwInvalidResourceHintResourceMapCommitAdmission,
     'resource-map commit gate'
   );
+  const fakeHeadExecution =
+    normalizeResourceMapCommitFakeHeadExecutionAdmission(
+      diagnostic.fakeHeadExecution
+    );
 
   return freezeRecord({
     commitKind,
@@ -8740,6 +8770,8 @@ function normalizeResourceHintResourceMapCommitAdmission(diagnostic) {
     fakeResourceMapMutationAllowed: false,
     privateResourceMapRecordCreationAllowed: true,
     privateResourceMapRecordMutationAllowed: false,
+    fakeHeadExecution,
+    fakeHeadExecutionAllowed: fakeHeadExecution !== null,
     singletonOwnershipAllowed: false,
     fetchOrPreloadAllowed: false,
     loadStateMutationAllowed: false,
@@ -8772,6 +8804,149 @@ function assertNoResourceMapCommitTargets(diagnostic) {
         `${field} must not be passed to the resource-map commit gate`
       );
     }
+  }
+}
+
+function normalizeResourceMapCommitFakeHeadExecutionAdmission(
+  fakeHeadExecution
+) {
+  if (fakeHeadExecution == null) {
+    return null;
+  }
+
+  if (typeof fakeHeadExecution !== 'object') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'fakeHeadExecution metadata must be an object'
+    );
+  }
+
+  if (fakeHeadExecution.explicitFakeHeadExecution !== true) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'explicitFakeHeadExecution must be true'
+    );
+  }
+
+  assertNoPublicResourceDispatchClaims(
+    fakeHeadExecution,
+    throwInvalidResourceHintResourceMapCommitAdmission,
+    'resource-map commit fake-head execution gate'
+  );
+
+  const executionKind = getAdmissionStringProperty(
+    fakeHeadExecution,
+    'executionKind',
+    'deterministic-private-fake-head-preload-preinit-precedence'
+  );
+  if (
+    executionKind !==
+    'deterministic-private-fake-head-preload-preinit-precedence'
+  ) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'executionKind must be deterministic-private-fake-head-preload-preinit-precedence'
+    );
+  }
+
+  const executionPath = getAdmissionStringProperty(
+    fakeHeadExecution,
+    'executionPath',
+    'stylesheet-preload-preinit-precedence'
+  );
+  if (executionPath !== 'stylesheet-preload-preinit-precedence') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'executionPath must be stylesheet-preload-preinit-precedence'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    fakeHeadExecution,
+    'targetKind',
+    'document-head'
+  );
+  if (targetKind !== 'document-head') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'targetKind must be document-head'
+    );
+  }
+
+  const hostTag = getAdmissionStringProperty(
+    fakeHeadExecution,
+    'hostTag',
+    'head'
+  );
+  if (hostTag !== 'head') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'hostTag must be head'
+    );
+  }
+
+  assertDeterministicResourceMapCommitFakeHeadTarget(
+    fakeHeadExecution.fakeDocument,
+    fakeHeadExecution.fakeHead
+  );
+
+  return freezeRecord({
+    executionKind,
+    executionPath,
+    executionId: getAdmissionStringProperty(
+      fakeHeadExecution,
+      'executionId',
+      'anonymous-private-fake-head-preload-preinit-execution'
+    ),
+    targetKind,
+    hostTag,
+    explicitFakeHeadExecution: true,
+    deterministicFakeDomOnly: true,
+    rawDocumentCaptured: false,
+    rawHeadCaptured: false,
+    rawElementCaptured: false,
+    rawValuesRetained: false,
+    consumesPrivateResourceMapRecords: true,
+    privateFakeHeadMutationAllowed: true,
+    realHeadMutationAllowed: false,
+    realResourceMapMutationAllowed: false,
+    fakeResourceMapMutationAllowed: false,
+    publicResourceHintDomInsertion: false,
+    publicResourceMapCommitBehavior: false,
+    publicScriptModuleResourceDispatch: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertDeterministicResourceMapCommitFakeHeadTarget(
+  fakeDocument,
+  fakeHead
+) {
+  if (
+    fakeDocument == null ||
+    typeof fakeDocument !== 'object' ||
+    fakeDocument.__fastReactFakeResourceDocument !== true
+  ) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'fakeDocument must be an explicit deterministic fake resource document'
+    );
+  }
+
+  if (
+    fakeHead == null ||
+    typeof fakeHead !== 'object' ||
+    fakeHead.__fastReactFakeResourceHead !== true ||
+    fakeHead.ownerDocument !== fakeDocument
+  ) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'fakeHead must belong to the deterministic fake resource document'
+    );
+  }
+
+  if (
+    typeof fakeDocument.createElement !== 'function' ||
+    typeof fakeHead.appendChild !== 'function' ||
+    typeof fakeHead.insertBefore !== 'function' ||
+    !Array.isArray(fakeHead.childNodes)
+  ) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'fake DOM target must expose createElement, appendChild, insertBefore, and childNodes'
+    );
   }
 }
 
@@ -9383,7 +9558,9 @@ function assertNoResourceMapCommitTargets(diagnostic) {
 function createResourceHintResourceMapCommitPlan(
   order,
   stylesheetPrecedence,
-  stylesheetLoadErrorState
+  stylesheetLoadErrorState,
+  fakeHeadExecutionTarget,
+  fakeHeadExecutionAdmission
 ) {
   const privateResourceMapRecords = freezeArray(
     order.dedupeRows
@@ -9409,6 +9586,12 @@ function createResourceHintResourceMapCommitPlan(
       privateResourceMapRecords,
       stylesheetLoadErrorState
     );
+  const preloadPreinitFakeHeadExecution =
+    createResourceMapCommitPreloadPreinitFakeHeadExecution(
+      privateResourceMapRecords,
+      fakeHeadExecutionTarget,
+      fakeHeadExecutionAdmission
+    );
   const stylesheetResourceMapRecords = freezeArray(
     privateResourceMapRecords.filter((row) => row.recordKind === 'stylesheet')
   );
@@ -9429,7 +9612,8 @@ function createResourceHintResourceMapCommitPlan(
         moduleResourceMapOrder,
         scriptModuleFakeDomCommitExecution,
         resourceMapConflictBoundary,
-        stylesheetLoadStateCommitOrder
+        stylesheetLoadStateCommitOrder,
+        preloadPreinitFakeHeadExecution
       ),
     privateResourceMapRecords,
     stylesheetResourceMapRecords,
@@ -9437,6 +9621,7 @@ function createResourceHintResourceMapCommitPlan(
     scriptResourceMapRecords,
     moduleResourceMapOrder,
     scriptModuleFakeDomCommitExecution,
+    preloadPreinitFakeHeadExecution,
     stylesheetLoadStateCommitOrder,
     resourceMapConflictBoundary,
     stylesheetPrecedenceBoundary:
@@ -10062,6 +10247,380 @@ function createResourceMapCommitScriptModuleDedupeOrderBoundary(
   });
 }
 
+function createResourceMapCommitPreloadPreinitFakeHeadExecution(
+  privateResourceMapRecords,
+  fakeHeadExecutionTarget,
+  fakeHeadExecutionAdmission
+) {
+  if (fakeHeadExecutionAdmission === null) {
+    return null;
+  }
+
+  const fakeDocument = fakeHeadExecutionTarget.fakeDocument;
+  const fakeHead = fakeHeadExecutionTarget.fakeHead;
+  const fakeHeadBeforeChildCount = fakeHead.childNodes.length;
+  const path = findPreloadPreinitStylesheetExecutionPath(
+    privateResourceMapRecords
+  );
+  if (path === null) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'fake-head execution requires one stylesheet preload/preinit resource-map path'
+    );
+  }
+
+  const rows = [];
+  rows.push(
+    executePreloadPreinitFakeHeadRow(
+      path.preloadRow,
+      fakeDocument,
+      fakeHead,
+      rows.length
+    )
+  );
+  rows.push(
+    executePreloadPreinitFakeHeadRow(
+      path.stylesheetRow,
+      fakeDocument,
+      fakeHead,
+      rows.length
+    )
+  );
+
+  return freezeRecord({
+    executionKind: fakeHeadExecutionAdmission.executionKind,
+    executionPath: fakeHeadExecutionAdmission.executionPath,
+    executionId: fakeHeadExecutionAdmission.executionId,
+    executionStatus:
+      privateResourceHintPreloadPreinitFakeHeadExecutionStatus,
+    targetKind: 'document-head',
+    hostTag: 'head',
+    sourceResourceMapCommitRowIds: freezeArray(
+      rows.map((row) => row.sourceResourceMapCommitRowId)
+    ),
+    sourceAdapterAdmissionIds: freezeArray(
+      rows.map((row) => row.sourceAdapterAdmissionId)
+    ),
+    rowCount: rows.length,
+    insertedElementCount: rows.length,
+    stylesheetPreloadRowCount: rows.filter(
+      (row) => row.recordKind === 'preload'
+    ).length,
+    stylesheetPreinitRowCount: rows.filter(
+      (row) => row.recordKind === 'stylesheet'
+    ).length,
+    resourceKeys: freezeArray(uniqueStrings(rows.map((row) => row.resourceKey))),
+    precedenceKeys: freezeArray(
+      uniqueStrings(
+        rows
+          .map((row) => row.precedenceKey)
+          .filter((precedenceKey) => precedenceKey !== null)
+      )
+    ),
+    rows: freezeArray(rows),
+    fakeHeadBeforeChildCount,
+    fakeHeadAfterChildCount: fakeHead.childNodes.length,
+    fakeDomCommitApplied: true,
+    fakeHeadRead: true,
+    fakeHeadMutated: true,
+    realHeadMutated: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsMutated: false,
+    preloadOrStyleDomWorkDispatched: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    loadEventSubscribed: false,
+    errorEventSubscribed: false,
+    loadingStateMutated: false,
+    publicResourceDispatchBlocked: true,
+    publicResourceHintDomInsertion: false,
+    publicResourceMapCommitBehavior: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function findPreloadPreinitStylesheetExecutionPath(
+  privateResourceMapRecords
+) {
+  for (const stylesheetRow of privateResourceMapRecords) {
+    if (
+      stylesheetRow.recordKind !== 'stylesheet' ||
+      stylesheetRow.contractId !== 'preinit-style' ||
+      stylesheetRow.precedenceKey === null
+    ) {
+      continue;
+    }
+
+    const preloadRow =
+      privateResourceMapRecords.find(
+        (row) =>
+          row.recordKind === 'preload' &&
+          row.contractId === 'preload' &&
+          row.resourceKind === 'style' &&
+          row.resourceKey === stylesheetRow.resourceKey &&
+          row.resourceMapOrderIndex < stylesheetRow.resourceMapOrderIndex
+      ) || null;
+    if (preloadRow !== null) {
+      return {preloadRow, stylesheetRow};
+    }
+  }
+
+  return null;
+}
+
+function executePreloadPreinitFakeHeadRow(
+  resourceMapRow,
+  fakeDocument,
+  fakeHead,
+  executionOrderIndex
+) {
+  const element = createPreloadPreinitFakeHeadElement(
+    resourceMapRow,
+    fakeDocument
+  );
+  const insertion = insertPreloadPreinitFakeHeadElement(
+    resourceMapRow,
+    element,
+    fakeHead
+  );
+
+  return freezeRecord({
+    rowId: `preload-preinit-fake-head-execution-${executionOrderIndex}`,
+    rowType: 'preload-preinit-fake-head-execution',
+    executionOrderIndex,
+    sourceResourceMapCommitRowId: resourceMapRow.rowId,
+    sourceDedupeRowId: resourceMapRow.sourceDedupeRowId,
+    sourceStylesheetDedupeRowId:
+      resourceMapRow.sourceStylesheetDedupeRowId,
+    resourceMapOrderIndex: resourceMapRow.resourceMapOrderIndex,
+    inputIndex: resourceMapRow.inputIndex,
+    sourceAdapterAdmissionId: resourceMapRow.sourceAdapterAdmissionId,
+    sourceRequestId: resourceMapRow.sourceRequestId,
+    contractId: resourceMapRow.contractId,
+    privateDispatcherKey: resourceMapRow.privateDispatcherKey,
+    publicName: resourceMapRow.publicName,
+    recordKind: resourceMapRow.recordKind,
+    mapKind: resourceMapRow.mapKind,
+    resourceStage: resourceMapRow.resourceStage,
+    resourceKind: resourceMapRow.resourceKind,
+    resourceKey: resourceMapRow.resourceKey,
+    opaqueResourceKey: resourceMapRow.opaqueResourceKey,
+    resourceMapDedupeKey: resourceMapRow.resourceMapDedupeKey,
+    precedenceKey: resourceMapRow.precedenceKey,
+    relationship: resourceMapRow.relationship,
+    dedupeAction: resourceMapRow.dedupeAction,
+    dedupeMatched: resourceMapRow.dedupeMatched,
+    matchedSourceAdapterAdmissionId:
+      resourceMapRow.matchedSourceAdapterAdmissionId,
+    preloadSeenBefore: resourceMapRow.preloadSeenBefore,
+    preinitSeenBefore: resourceMapRow.preinitSeenBefore,
+    fakeDomCommitOperation:
+      resourceMapRow.recordKind === 'stylesheet'
+        ? 'insert-stylesheet-preinit-with-precedence-fake-head'
+        : 'append-stylesheet-preload-link-fake-head',
+    elementTag: 'link',
+    relationshipApplied: element.relationship,
+    insertionMethod: insertion.insertionMethod,
+    insertionIndex: insertion.insertionIndex,
+    insertedBeforeNodeName: insertion.insertedBeforeNodeName,
+    insertedAfterNodeName: insertion.insertedAfterNodeName,
+    attributeNames: element.attributeNames,
+    attributeValueKinds: element.attributeValueKinds,
+    fakeDomCommitApplied: true,
+    headInsertionApplied: true,
+    stylesheetPrecedenceApplied:
+      resourceMapRow.recordKind === 'stylesheet',
+    resourceMapRecordConsumed: true,
+    realHeadMutated: false,
+    realResourceMapMutated: false,
+    fakeResourceMapMutated: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    loadEventSubscribed: false,
+    errorEventSubscribed: false,
+    loadingStateMutated: false,
+    publicResourceDispatchBlocked: true,
+    publicResourceHintDomInsertion: false,
+    publicResourceMapCommitBehavior: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPreloadPreinitFakeHeadElement(resourceMapRow, fakeDocument) {
+  const element = fakeDocument.createElement('link');
+  assertDeterministicPreloadPreinitFakeHeadElement(element, fakeDocument);
+
+  const attributes = createPreloadPreinitFakeHeadAttributes(resourceMapRow);
+  for (const attribute of attributes) {
+    element.setAttribute(attribute.name, attribute.value);
+  }
+
+  return freezeRecord({
+    element,
+    relationship:
+      resourceMapRow.recordKind === 'stylesheet' ? 'stylesheet' : 'preload',
+    attributeNames: freezeArray(
+      attributes.map((attribute) => attribute.name)
+    ),
+    attributeValueKinds: freezeArray(
+      attributes.map((attribute) =>
+        freezeRecord({
+          name: attribute.name,
+          valueKind: attribute.valueKind,
+          rawValueRetained: false
+        })
+      )
+    )
+  });
+}
+
+function assertDeterministicPreloadPreinitFakeHeadElement(
+  element,
+  fakeDocument
+) {
+  if (
+    element == null ||
+    typeof element !== 'object' ||
+    element.__fastReactFakeResourceElement !== true ||
+    element.ownerDocument !== fakeDocument ||
+    typeof element.setAttribute !== 'function'
+  ) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'fake document must create deterministic fake preload/preinit resource elements'
+    );
+  }
+}
+
+function createPreloadPreinitFakeHeadAttributes(resourceMapRow) {
+  const attributes = [
+    insertionAttribute(
+      'rel',
+      'relationship',
+      resourceMapRow.recordKind === 'stylesheet' ? 'stylesheet' : 'preload'
+    ),
+    insertionAttribute(
+      'href',
+      'redacted-dispatcher-string',
+      redactedResourceHintValue('href')
+    ),
+    insertionAttribute(
+      'data-fast-react-resource-key',
+      'opaque-resource-key',
+      resourceMapRow.opaqueResourceKey
+    )
+  ];
+
+  if (resourceMapRow.recordKind === 'preload') {
+    attributes.push(insertionAttribute('as', 'resource-kind', 'style'));
+  } else {
+    attributes.push(
+      insertionAttribute(
+        'data-precedence',
+        'redacted-precedence',
+        redactedResourceHintValue('precedence')
+      )
+    );
+    attributes.push(
+      insertionAttribute(
+        'data-fast-react-precedence-key',
+        'opaque-precedence-key',
+        resourceMapRow.precedenceKey
+      )
+    );
+  }
+
+  return freezeArray(attributes);
+}
+
+function insertPreloadPreinitFakeHeadElement(
+  resourceMapRow,
+  elementPlan,
+  fakeHead
+) {
+  if (resourceMapRow.recordKind !== 'stylesheet') {
+    fakeHead.appendChild(elementPlan.element);
+    return freezeRecord({
+      insertionMethod: 'appendChild',
+      insertionIndex: fakeHead.childNodes.length - 1,
+      insertedBeforeNodeName: null,
+      insertedAfterNodeName:
+        fakeHead.childNodes.length > 1
+          ? fakeHead.childNodes[fakeHead.childNodes.length - 2].nodeName
+          : null
+    });
+  }
+
+  const insertionTarget = findFakeHeadStylesheetPrecedenceInsertionTarget(
+    fakeHead,
+    resourceMapRow.precedenceKey
+  );
+  if (insertionTarget.beforeNode === null) {
+    fakeHead.appendChild(elementPlan.element);
+  } else {
+    fakeHead.insertBefore(elementPlan.element, insertionTarget.beforeNode);
+  }
+
+  return freezeRecord({
+    insertionMethod:
+      insertionTarget.beforeNode === null ? 'appendChild' : 'insertBefore',
+    insertionIndex: fakeHead.childNodes.indexOf(elementPlan.element),
+    insertedBeforeNodeName:
+      insertionTarget.beforeNode === null
+        ? null
+        : insertionTarget.beforeNode.nodeName,
+    insertedAfterNodeName:
+      insertionTarget.afterNode === null
+        ? null
+        : insertionTarget.afterNode.nodeName
+  });
+}
+
+function findFakeHeadStylesheetPrecedenceInsertionTarget(
+  fakeHead,
+  precedenceKey
+) {
+  const stylesheetNodes = fakeHead.childNodes.filter(
+    isFakeHeadStylesheetPrecedenceNode
+  );
+  if (stylesheetNodes.length === 0) {
+    return freezeRecord({
+      beforeNode: fakeHead.childNodes[0] || null,
+      afterNode: null
+    });
+  }
+
+  const last = stylesheetNodes[stylesheetNodes.length - 1];
+  let prior = last;
+  for (const node of stylesheetNodes) {
+    if (
+      getFakeHeadNodeAttribute(node, 'data-fast-react-precedence-key') ===
+      precedenceKey
+    ) {
+      prior = node;
+    } else if (prior !== last) {
+      break;
+    }
+  }
+
+  const priorIndex = fakeHead.childNodes.indexOf(prior);
+  return freezeRecord({
+    beforeNode: fakeHead.childNodes[priorIndex + 1] || null,
+    afterNode: prior
+  });
+}
+
+function isFakeHeadStylesheetPrecedenceNode(node) {
+  const nodeName =
+    node != null && typeof node.nodeName === 'string'
+      ? node.nodeName.toUpperCase()
+      : '';
+  return (
+    (nodeName === 'LINK' || nodeName === 'STYLE') &&
+    hasFakeHeadNodeAttribute(node, 'data-precedence')
+  );
+}
+
 function createResourceMapCommitStylesheetLoadStateOrder(
   privateResourceMapRecords,
   stylesheetLoadErrorState
@@ -10333,7 +10892,8 @@ function createResourceMapCommitPlanSummary(
   moduleResourceMapOrder,
   scriptModuleFakeDomCommitExecution,
   resourceMapConflictBoundary,
-  stylesheetLoadStateCommitOrder
+  stylesheetLoadStateCommitOrder,
+  preloadPreinitFakeHeadExecution
 ) {
   const uniquePrivateRecordKeys = new Set(
     privateResourceMapRecords.map(
@@ -10411,7 +10971,9 @@ function createResourceMapCommitPlanSummary(
     preloadPropsMapCreated: false,
     preloadPropsMapMutated: false,
     scriptModuleFakeDomCommitEvidenceRecorded: true,
-    fakeDomCommitApplied: false,
+    fakeDomCommitApplied:
+      preloadPreinitFakeHeadExecution !== null &&
+      preloadPreinitFakeHeadExecution.fakeDomCommitApplied === true,
     modulePreloadStarted: false,
     scriptPreinitStarted: false,
     moduleScriptPreinitStarted: false,
@@ -10485,10 +11047,12 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
     resourceCountIncremented: false,
     resourceInstanceCreated: false,
     scriptModuleFakeDomCommitEvidenceRecorded: true,
-    fakeDomCommitApplied: false,
+    fakeDomCommitApplied:
+      commitPlan.resourceMapCommitPlan.fakeDomCommitApplied,
     preloadPropsMapMutated: false,
     hoistableScriptsMapMutated: false,
-    hostNodeInserted: false,
+    hostNodeInserted:
+      commitPlan.resourceMapCommitPlan.fakeDomCommitApplied,
     fetchStarted: false,
     preloadStarted: false,
     modulePreloadStarted: false,
@@ -13040,6 +13604,7 @@ module.exports = {
   privateResourceHintPreloadPreinitOrderInvalidRecordCode,
   privateResourceHintPreloadPreinitOrderRecordType,
   privateResourceHintPreloadPreinitOrderStatus,
+  privateResourceHintPreloadPreinitFakeHeadExecutionStatus,
   privateResourceHintResourceMapCommitAdmissionRequiredStatus,
   privateResourceHintResourceMapCommitCompatibilityBlockedStatus,
   privateResourceHintResourceMapCommitExecutionStatus,
