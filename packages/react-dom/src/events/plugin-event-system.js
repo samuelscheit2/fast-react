@@ -7,7 +7,9 @@ const {
   createEventListenerTargetLookupRecord,
   createEventTargetDispatchPathRecord,
   createEventTargetNormalizationRecord,
-  getEventListenerTargetLookupRecordPayload
+  getEventListenerTargetLookupRecordPayload,
+  getPrivateRootHostOutputEventTargetRecordPayload,
+  isPrivateRootHostOutputEventTargetRecord
 } = require('../client/component-tree.js');
 const {describeContainer} = require('../client/dom-container.js');
 const {
@@ -46,6 +48,8 @@ const EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomEventTypeDispatchCanaryRecord';
 const PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND =
   'FastReactDomPrivateClickEventDelegationDispatchGateRecord';
+const PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_RECORD_KIND =
+  'FastReactDomPrivateClickEventDelegationAcceptedListenerOrderRecord';
 const PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND =
   'FastReactDomPrivateFocusBlurEventDispatchExecutionRecord';
 const INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND =
@@ -134,6 +138,8 @@ const INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION';
 const INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE';
+const INVALID_PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER';
 const INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK';
 const INVALID_HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_CODE =
@@ -168,6 +174,8 @@ const PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS =
   'admitted-private-focus-blur-event-dispatch-execution';
 const PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS =
   'admitted-private-click-event-delegation-dispatch-gate';
+const PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_STATUS =
+  'admitted-private-click-event-delegation-accepted-listener-order';
 const PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS =
   'controlled-private-input-change-event-extraction-preflight';
 const PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS =
@@ -343,6 +351,8 @@ const portalEventOwnerRootGateRecordPayloads = new WeakMap();
 const focusBlurEventBlockerGateRecordPayloads = new WeakMap();
 const privateFocusBlurEventDispatchExecutionPayloads = new WeakMap();
 const privateClickEventDelegationDispatchGatePayloads = new WeakMap();
+const privateClickEventDelegationAcceptedListenerOrderPayloads =
+  new WeakMap();
 const hydrationReplayEventQueueDiagnosticPayloads = new WeakMap();
 const hydrationDehydratedTargetResolutionDiagnosticPayloads =
   new WeakMap();
@@ -3434,6 +3444,172 @@ function isPrivateClickEventDelegationDispatchGateRecord(record) {
   return getPrivateClickEventDelegationDispatchGatePayload(record) !== null;
 }
 
+function invokePrivateClickEventDelegationAcceptedListenerOrder(
+  dispatchRecords,
+  listenerQueueEntryRecords,
+  options
+) {
+  const normalizedDispatchRecords = normalizeDispatchRecordList(
+    dispatchRecords
+  ).map((dispatchRecord) =>
+    assertPrivateClickEventDelegationDispatchRecord(dispatchRecord)
+  );
+  if (normalizedDispatchRecords.length === 0) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order requires at least one click dispatch record.',
+      'missing-dispatch-records'
+    );
+  }
+
+  const normalizedOptions =
+    normalizePrivateClickEventDelegationAcceptedListenerOrderOptions(
+      options
+    );
+  const acceptedListenerQueueEntryRecords =
+    normalizePrivateClickEventDelegationAcceptedListenerQueueEntryRecords(
+      listenerQueueEntryRecords
+    );
+  const targetRecordMetadata =
+    validatePrivateClickEventDelegationAcceptedListenerOrderTargetRecord(
+      normalizedDispatchRecords,
+      normalizedOptions
+    );
+  const selections =
+    collectPrivateClickEventDelegationAcceptedListenerOrderSelections(
+      normalizedDispatchRecords,
+      acceptedListenerQueueEntryRecords
+    );
+  const invocationRecords = selections.map((selection) =>
+    invokeDispatchListenerRecordForCanary(selection.dispatchListenerRecord, {
+      dispatchQueueEntry: selection.dispatchQueueEntry,
+      dispatchRecord: selection.dispatchRecord,
+      listenerIndex: selection.listenerIndex,
+      selectedFromProcessingOrder: true
+    })
+  );
+  const acceptedListenerOrder = Object.freeze(
+    selections.map((selection, index) => {
+      const listenerRecord = selection.dispatchListenerRecord;
+      return Object.freeze({
+        currentTarget: listenerRecord.currentTarget,
+        dispatchPathIndex: listenerRecord.dispatchPathIndex,
+        dispatchRecordIndex: selection.dispatchRecordIndex,
+        dispatchQueueEntryIndex: selection.dispatchQueueEntryIndex,
+        index,
+        listenerIndex: selection.listenerIndex,
+        listenerQueueIndex: listenerRecord.listenerQueueIndex,
+        listenerQueueKey: listenerRecord.listenerQueueKey,
+        phase: listenerRecord.phase,
+        registrationName: listenerRecord.registrationName,
+        targetInst: listenerRecord.targetInst
+      });
+    })
+  );
+  const listenerInvocationCount = invocationRecords.reduce(
+    (count, invocationRecord) =>
+      count + invocationRecord.listenerInvocationCount,
+    0
+  );
+  const targetDispatchPathLength =
+    normalizedDispatchRecords[0].targetDispatchPathLength;
+  const targetDispatchPathStatus =
+    normalizedDispatchRecords[0].targetDispatchPathStatus;
+  const targetInst = normalizedDispatchRecords[0].targetInst;
+  const targetInstStatus = normalizedDispatchRecords[0].targetInstStatus;
+  const record = Object.freeze({
+    acceptedListenerCount: acceptedListenerQueueEntryRecords.length,
+    acceptedListenerOrder,
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    clickEventDelegationAcceptedListenerOrder: true,
+    compatibilityClaimed: false,
+    dispatchRecordCount: normalizedDispatchRecords.length,
+    domEventName: 'click',
+    eventDispatch: false,
+    invocationRecordCount: invocationRecords.length,
+    kind:
+      PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_RECORD_KIND,
+    listenerInvocationCount,
+    phases: Object.freeze(
+      acceptedListenerOrder.map((entry) => entry.phase)
+    ),
+    privateListenerQueue: true,
+    publicDispatchBlocked: true,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationNames: Object.freeze(
+      acceptedListenerOrder.map((entry) => entry.registrationName)
+    ),
+    rootRenderHostOutputActive:
+      targetRecordMetadata.rootRenderHostOutputActive,
+    rootRenderMetadataAvailable:
+      targetRecordMetadata.rootRenderMetadataAvailable,
+    rootRenderMetadataRequired:
+      normalizedOptions.requireRootRenderMetadata,
+    rootRenderMetadataStatus:
+      targetRecordMetadata.rootRenderMetadataStatus,
+    selectedFromProcessingOrder: true,
+    status:
+      PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_STATUS,
+    syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetDispatchPathLength,
+    targetDispatchPathStatus,
+    targetInst,
+    targetInstStatus,
+    targetRecordAvailable: targetRecordMetadata.available,
+    targetRecordKind: targetRecordMetadata.recordKind,
+    targetRecordStatus: targetRecordMetadata.status,
+    willDispatchPublicEvent: false,
+    willInvokeListeners: false,
+    willInvokePublicListeners: false
+  });
+
+  privateClickEventDelegationAcceptedListenerOrderPayloads.set(
+    record,
+    Object.freeze({
+      acceptedListenerQueueEntryRecords: Object.freeze(
+        acceptedListenerQueueEntryRecords.slice()
+      ),
+      dispatchListenerRecords: Object.freeze(
+        selections.map((selection) => selection.dispatchListenerRecord)
+      ),
+      dispatchRecords: Object.freeze(normalizedDispatchRecords.slice()),
+      invocationRecords: Object.freeze(invocationRecords.slice()),
+      options: normalizedOptions.rawOptions,
+      selections: Object.freeze(selections.slice()),
+      targetRecord: normalizedOptions.targetRecord,
+      targetRecordMetadata
+    })
+  );
+
+  return record;
+}
+
+function getPrivateClickEventDelegationAcceptedListenerOrderPayload(
+  record
+) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return (
+    privateClickEventDelegationAcceptedListenerOrderPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateClickEventDelegationAcceptedListenerOrderRecord(
+  record
+) {
+  return (
+    getPrivateClickEventDelegationAcceptedListenerOrderPayload(record) !==
+    null
+  );
+}
+
 function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) {
   const normalizedListenerRecord =
     assertDispatchListenerRecord(dispatchListenerRecord);
@@ -5121,6 +5297,72 @@ function normalizePrivateClickEventDelegationDispatchGateOptions(options) {
   };
 }
 
+function normalizePrivateClickEventDelegationAcceptedListenerOrderOptions(
+  options
+) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const targetRecord =
+    normalizedOptions.rootHostOutputEventTargetRecord ||
+    normalizedOptions.targetRecord ||
+    null;
+
+  if (
+    targetRecord !== null &&
+    !isPrivateRootHostOutputEventTargetRecord(targetRecord)
+  ) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order requires a private root host-output target record when target metadata is provided.',
+      'invalid-target-record'
+    );
+  }
+
+  return {
+    rawOptions: options,
+    requireRootRenderMetadata:
+      normalizedOptions.requireRootRenderMetadata === true,
+    targetRecord
+  };
+}
+
+function normalizePrivateClickEventDelegationAcceptedListenerQueueEntryRecords(
+  listenerQueueEntryRecords
+) {
+  const records = Array.isArray(listenerQueueEntryRecords)
+    ? listenerQueueEntryRecords
+    : [listenerQueueEntryRecords];
+  if (records.length === 0) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order requires at least one accepted listener queue record.',
+      'missing-listener-records'
+    );
+  }
+
+  const seenRecords = new Set();
+  return records.map((record) => {
+    const payload = getPrivateEventListenerQueueEntryPayload(record);
+    if (payload === null || payload.active !== true) {
+      throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+        'Private click event delegation accepted listener order requires active private listener queue records.',
+        'stale-listener-record'
+      );
+    }
+    if (payload.domEventName !== 'click') {
+      throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+        'Private click event delegation accepted listener order only accepts click listener queue records.',
+        'unsupported-event-type'
+      );
+    }
+    if (seenRecords.has(record)) {
+      throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+        'Private click event delegation accepted listener order cannot consume duplicate listener queue records.',
+        'duplicate-listener-record'
+      );
+    }
+    seenRecords.add(record);
+    return record;
+  });
+}
+
 function assertPrivateClickEventDelegationDispatchRecord(dispatchRecord) {
   const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
   if (
@@ -5205,6 +5447,158 @@ function assertPrivateClickEventDelegationDispatchListenerRecord(
   }
 
   return normalizedListenerRecord;
+}
+
+function validatePrivateClickEventDelegationAcceptedListenerOrderTargetRecord(
+  dispatchRecords,
+  options
+) {
+  const targetRecord = options.targetRecord;
+  if (targetRecord === null) {
+    if (options.requireRootRenderMetadata) {
+      throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+        'Private click event delegation accepted listener order requires root-render host-output target metadata.',
+        'missing-root-render-target-record'
+      );
+    }
+    return Object.freeze({
+      available: false,
+      recordKind: null,
+      rootRenderHostOutputActive: false,
+      rootRenderMetadataAvailable: false,
+      rootRenderMetadataStatus: 'unavailable-no-target-record',
+      status: 'unavailable-no-target-record'
+    });
+  }
+
+  const targetPayload =
+    getPrivateRootHostOutputEventTargetRecordPayload(targetRecord);
+  if (targetPayload === null) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order requires a known private root host-output target record.',
+      'invalid-target-record'
+    );
+  }
+
+  for (const dispatchRecord of dispatchRecords) {
+    if (
+      dispatchRecord.targetInst !== targetRecord.targetInst ||
+      dispatchRecord.nativeEventTarget !== targetPayload.targetNode
+    ) {
+      throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+        'Private click event delegation accepted listener order target metadata does not match the click dispatch target.',
+        'target-record-mismatch'
+      );
+    }
+  }
+
+  if (
+    options.requireRootRenderMetadata &&
+    targetRecord.rootRenderMetadataStatus !==
+      'active-private-root-render-host-output'
+  ) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order requires active root-render host-output metadata.',
+      'target-record-not-root-render-host-output'
+    );
+  }
+
+  return Object.freeze({
+    available: true,
+    recordKind: targetRecord.kind,
+    rootRenderHostOutputActive:
+      targetRecord.rootRenderHostOutputActive === true,
+    rootRenderMetadataAvailable:
+      targetRecord.rootRenderMetadataAvailable === true,
+    rootRenderMetadataStatus:
+      targetRecord.rootRenderMetadataStatus || 'unknown',
+    status: targetRecord.status
+  });
+}
+
+function collectPrivateClickEventDelegationAcceptedListenerOrderSelections(
+  dispatchRecords,
+  listenerQueueEntryRecords
+) {
+  const acceptedRecords = new Set(listenerQueueEntryRecords);
+  const selectedRecords = new Set();
+  const selections = [];
+
+  for (
+    let dispatchRecordIndex = 0;
+    dispatchRecordIndex < dispatchRecords.length;
+    dispatchRecordIndex++
+  ) {
+    const dispatchRecord = dispatchRecords[dispatchRecordIndex];
+
+    for (
+      let dispatchQueueEntryIndex = 0;
+      dispatchQueueEntryIndex < dispatchRecord.dispatchQueue.entries.length;
+      dispatchQueueEntryIndex++
+    ) {
+      const dispatchQueueEntry = assertDispatchQueueEntryRecord(
+        dispatchRecord.dispatchQueue.entries[dispatchQueueEntryIndex]
+      );
+      const entryPayload =
+        getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+      const listenerRecords =
+        entryPayload === null ? [] : entryPayload.processingListenerRecords;
+
+      for (
+        let listenerIndex = 0;
+        listenerIndex < listenerRecords.length;
+        listenerIndex++
+      ) {
+        const dispatchListenerRecord = listenerRecords[listenerIndex];
+        const listenerPayload =
+          getDispatchListenerRecordPayload(dispatchListenerRecord);
+        const listenerQueueEntryRecord =
+          listenerPayload === null
+            ? null
+            : listenerPayload.privateEventListenerQueueEntryRecord;
+
+        if (!acceptedRecords.has(listenerQueueEntryRecord)) {
+          continue;
+        }
+        if (selectedRecords.has(listenerQueueEntryRecord)) {
+          throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+            'Private click event delegation accepted listener order found the same accepted listener more than once in the dispatch path.',
+            'duplicate-listener-record'
+          );
+        }
+
+        const normalizedListenerRecord =
+          assertPrivateClickEventDelegationDispatchListenerRecord(
+            dispatchListenerRecord,
+            dispatchRecord
+          );
+        assertFreshPrivateClickEventDelegationListenerRecord(
+          normalizedListenerRecord
+        );
+        selectedRecords.add(listenerQueueEntryRecord);
+        selections.push(
+          Object.freeze({
+            dispatchListenerRecord: normalizedListenerRecord,
+            dispatchQueueEntry,
+            dispatchQueueEntryIndex,
+            dispatchRecord,
+            dispatchRecordIndex,
+            listenerIndex,
+            listenerQueueEntryRecord
+          })
+        );
+      }
+    }
+  }
+
+  if (selectedRecords.size !== acceptedRecords.size) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order could not route every accepted listener through the click dispatch queue.',
+      'accepted-listener-not-on-dispatch-path'
+    );
+  }
+
+  return Object.freeze(selections);
 }
 
 function assertFreshPrivateClickEventDelegationListenerRecord(
@@ -5426,6 +5820,18 @@ function createPrivateClickEventDelegationDispatchGateError(
   const error = createPluginEventSystemError(
     message,
     INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE
+  );
+  error.reason = reason;
+  return error;
+}
+
+function createPrivateClickEventDelegationAcceptedListenerOrderError(
+  message,
+  reason
+) {
+  const error = createPluginEventSystemError(
+    message,
+    INVALID_PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_CODE
   );
   error.reason = reason;
   return error;
@@ -7970,6 +8376,7 @@ module.exports = {
   EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND,
   PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND,
   PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
+  PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
@@ -8001,6 +8408,7 @@ module.exports = {
   INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
   INVALID_HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_CODE,
   INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE,
+  INVALID_PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_CODE,
   INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
   INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE,
   LISTENER_ERROR_ROUTING_BLOCKED_CODE,
@@ -8019,6 +8427,7 @@ module.exports = {
   PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
+  PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_STATUS,
   PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
   PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS,
   PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS,
@@ -8063,6 +8472,7 @@ module.exports = {
   getHydrationReplayTargetDispatchLinkDiagnosticPayload,
   getFocusBlurEventBlockerGateRecordPayload,
   getPrivateFocusBlurEventDispatchExecutionPayload,
+  getPrivateClickEventDelegationAcceptedListenerOrderPayload,
   getPrivateClickEventDelegationDispatchGatePayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
@@ -8070,6 +8480,7 @@ module.exports = {
   getSyntheticEventShapeRecordPayload,
   getWrapperRecord,
   invokePrivateFocusBlurEventDispatchExecutionRecord,
+  invokePrivateClickEventDelegationAcceptedListenerOrder,
   invokePrivateClickEventDelegationDispatchGate,
   invokeDispatchListenerRecordForCanary,
   invokeDispatchQueueCanaryFromDispatchRecords,
@@ -8085,6 +8496,7 @@ module.exports = {
   isFocusBlurEventBlockerGateRecord,
   isHydrationReplayClickDispatchDiagnostic,
   isPrivateFocusBlurEventDispatchExecutionRecord,
+  isPrivateClickEventDelegationAcceptedListenerOrderRecord,
   isPrivateClickEventDelegationDispatchGateRecord,
   isPortalEventOwnerRootGateRecord,
   isSyntheticEventShapeGateRecord,

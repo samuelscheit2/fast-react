@@ -563,6 +563,10 @@ function createPrivateRootHostOutputEventTargetRecord(
   }
 
   const targetLatestProps = getLatestPropsFromNode(targetNode);
+  const rootRenderMetadata =
+    createPrivateRootHostOutputEventTargetRootRenderMetadata(
+      normalizedPayload
+    );
   const record = Object.freeze({
     $$typeof: privateRootHostOutputEventTargetRecordType,
     browserDomEventCompatibilityClaimed: false,
@@ -580,6 +584,9 @@ function createPrivateRootHostOutputEventTargetRecord(
     nodeType:
       typeof targetNode.nodeType === 'number' ? targetNode.nodeType : null,
     publicRootBehaviorChanged: false,
+    rootRenderHostOutputActive: rootRenderMetadata.hostOutputActive,
+    rootRenderMetadataAvailable: rootRenderMetadata.available,
+    rootRenderMetadataStatus: rootRenderMetadata.status,
     rootOwner: targetRootOwner,
     sourceHostInstanceStatus: 'mounted-host-instance',
     status: 'validated-private-root-host-output-event-target',
@@ -599,7 +606,8 @@ function createPrivateRootHostOutputEventTargetRecord(
       sourceHostToken,
       targetNode,
       targetHostInstanceToken,
-      targetRootOwner
+      targetRootOwner,
+      rootRenderMetadata
     })
   );
 
@@ -936,6 +944,27 @@ function assertPrivateRootHostOutputEventTargetPayload(payload) {
   }
 
   return payload;
+}
+
+function createPrivateRootHostOutputEventTargetRootRenderMetadata(
+  payload
+) {
+  const createRecordAvailable = isObjectLike(payload.createRecord);
+  const renderRecordAvailable = isObjectLike(payload.renderRecord);
+  const available = createRecordAvailable && renderRecordAvailable;
+  const hostOutputActive = payload.active === true;
+
+  return Object.freeze({
+    available,
+    createRecordAvailable,
+    hostOutputActive,
+    renderRecordAvailable,
+    status: available
+      ? hostOutputActive
+        ? 'active-private-root-render-host-output'
+        : 'inactive-private-root-render-host-output'
+      : 'not-private-root-render-host-output'
+  });
 }
 
 function shouldPreventMouseEvent(registrationName, node, latestProps) {

@@ -8,11 +8,14 @@ const packageRoot = path.resolve(__dirname, '..');
 const componentTree = require(
   path.join(packageRoot, 'src/client/component-tree.js')
 );
-const {ELEMENT_NODE} = require(
+const {ELEMENT_NODE, TEXT_NODE} = require(
   path.join(packageRoot, 'src/client/dom-container.js')
 );
 const controlledRestoreQueue = require(
   path.join(packageRoot, 'src/client/controlled-restore-queue.js')
+);
+const rootBridge = require(
+  path.join(packageRoot, 'src/client/root-bridge.js')
 );
 const eventListener = require(
   path.join(packageRoot, 'src/events/react-dom-event-listener.js')
@@ -139,6 +142,189 @@ test('private click event delegation dispatch gate routes one accepted listener 
     listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
     rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
     componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private click event delegation accepted order targets root-render fake DOM metadata', () => {
+  const fixture = createPrivateRootRenderClickDelegationFixture(
+    'click-after-root-render'
+  );
+  const calls = [];
+  const captureListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      true,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: 'capture',
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-root-render-click-capture-test'
+      }
+    );
+  const bubbleListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: 'bubble',
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      },
+      {
+        listenerType: 'accepted-private-root-render-click-bubble-test'
+      }
+    );
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      fixture.hostOutputPayload
+    );
+  const captureDispatchRecord = createPrivateClickDispatchRecord(
+    fixture,
+    'capture'
+  );
+  const bubbleDispatchRecord = createPrivateClickDispatchRecord(
+    fixture,
+    'bubble'
+  );
+
+  try {
+    const orderRecord =
+      pluginEventSystem.invokePrivateClickEventDelegationAcceptedListenerOrder(
+        [captureDispatchRecord, bubbleDispatchRecord],
+        [bubbleListenerRecord, captureListenerRecord],
+        {
+          requireRootRenderMetadata: true,
+          rootHostOutputEventTargetRecord: targetRecord
+        }
+      );
+    const payload =
+      pluginEventSystem
+        .getPrivateClickEventDelegationAcceptedListenerOrderPayload(
+          orderRecord
+        );
+    const targetPayload =
+      componentTree.getPrivateRootHostOutputEventTargetRecordPayload(
+        targetRecord
+      );
+
+    assert.equal(
+      orderRecord.kind,
+      pluginEventSystem
+        .PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_RECORD_KIND
+    );
+    assert.equal(
+      orderRecord.status,
+      pluginEventSystem
+        .PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_STATUS
+    );
+    assert.equal(
+      pluginEventSystem
+        .isPrivateClickEventDelegationAcceptedListenerOrderRecord(
+          orderRecord
+        ),
+      true
+    );
+    assert.equal(orderRecord.acceptedListenerCount, 2);
+    assert.equal(orderRecord.listenerInvocationCount, 2);
+    assert.deepEqual(orderRecord.phases, ['capture', 'bubble']);
+    assert.deepEqual(orderRecord.registrationNames, [
+      'onClickCapture',
+      'onClick'
+    ]);
+    assert.equal(orderRecord.selectedFromProcessingOrder, true);
+    assert.equal(orderRecord.targetInst, fixture.token);
+    assert.equal(orderRecord.targetRecordKind, targetRecord.kind);
+    assert.equal(orderRecord.targetRecordStatus, targetRecord.status);
+    assert.equal(orderRecord.rootRenderMetadataAvailable, true);
+    assert.equal(orderRecord.rootRenderHostOutputActive, true);
+    assert.equal(
+      orderRecord.rootRenderMetadataStatus,
+      'active-private-root-render-host-output'
+    );
+    assert.equal(orderRecord.publicDispatchEnabled, false);
+    assert.equal(orderRecord.publicDispatchBlocked, true);
+    assert.equal(orderRecord.browserDomEventCompatibilityClaimed, false);
+    assert.equal(orderRecord.compatibilityClaimed, false);
+    assert.equal(orderRecord.syntheticEventCount, 0);
+    assert.equal(orderRecord.willDispatchPublicEvent, false);
+    assert.deepEqual(
+      orderRecord.acceptedListenerOrder.map(entry => [
+        entry.phase,
+        entry.registrationName,
+        entry.currentTarget,
+        entry.targetInst,
+        entry.listenerQueueIndex
+      ]),
+      [
+        [
+          'capture',
+          'onClickCapture',
+          fixture.targetNode,
+          fixture.token,
+          captureListenerRecord.listenerQueueIndex
+        ],
+        [
+          'bubble',
+          'onClick',
+          fixture.targetNode,
+          fixture.token,
+          bubbleListenerRecord.listenerQueueIndex
+        ]
+      ]
+    );
+    assert.deepEqual(calls, [
+      {
+        currentTarget: fixture.targetNode,
+        phase: 'capture',
+        registrationName: 'onClickCapture',
+        target: fixture.targetNode,
+        targetInst: fixture.token,
+        type: 'click'
+      },
+      {
+        currentTarget: fixture.targetNode,
+        phase: 'bubble',
+        registrationName: 'onClick',
+        target: fixture.targetNode,
+        targetInst: fixture.token,
+        type: 'click'
+      }
+    ]);
+    assert.equal(payload.dispatchRecords[0], captureDispatchRecord);
+    assert.equal(payload.dispatchRecords[1], bubbleDispatchRecord);
+    assert.deepEqual(payload.acceptedListenerQueueEntryRecords, [
+      bubbleListenerRecord,
+      captureListenerRecord
+    ]);
+    assert.equal(payload.targetRecord, targetRecord);
+    assert.equal(targetPayload.hostOutputPayload, fixture.hostOutputPayload);
+    assert.equal(targetPayload.rootRenderMetadata.available, true);
+    assert.equal(targetPayload.rootRenderMetadata.hostOutputActive, true);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      captureListenerRecord
+    );
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      bubbleListenerRecord
+    );
+    cleanupPrivateRootRenderClickDelegationFixture(fixture);
   }
 });
 
@@ -1377,6 +1563,58 @@ function createPrivateClickDelegationFixture(label) {
   };
 }
 
+function createPrivateRootRenderClickDelegationFixture(label) {
+  const document = createDocument();
+  const container = createNode('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: `${label}:admission`,
+    initialHostOutputIdPrefix: `${label}:output`,
+    requestIdPrefix: `${label}:request`,
+    rootIdPrefix: `${label}:root`,
+    sideEffectIdPrefix: `${label}:side-effect`,
+    updateIdPrefix: `${label}:update`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const element = {
+    props: {
+      children: `${label} target`,
+      id: `${label}-target`,
+      title: 'Private root-render delegated click target'
+    },
+    type: 'button'
+  };
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+
+  return {
+    bridge,
+    container,
+    create,
+    document,
+    element,
+    handoff,
+    hostOutputPayload,
+    render,
+    rootOwner: hostOutputPayload.rootOwner,
+    sideEffects,
+    targetNode: hostOutputPayload.hostNode,
+    token: hostOutputPayload.hostToken
+  };
+}
+
+function cleanupPrivateRootRenderClickDelegationFixture(fixture) {
+  fixture.bridge.cleanupInitialRenderHostOutput(fixture.handoff);
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
 function createPrivateClickPortalDelegationFixture(label) {
   const document = installEventTargetMethods(createDocument());
   const container = installEventTargetMethods(createNode('DIV', document));
@@ -1751,21 +1989,152 @@ function createPrivateInputChangeDispatch(options) {
 
 function createDocument() {
   const document = {
+    __registrations: [],
     localName: '#document',
     nodeName: '#document',
     nodeType: 9
   };
   document.ownerDocument = document;
+  document.defaultView = {__registrations: []};
+  installEventTargetMethods(document.defaultView);
+  installEventTargetMethods(document);
+  document.createElement = function createElement(tagName) {
+    return createNode(String(tagName).toUpperCase(), document);
+  };
+  document.createTextNode = function createTextNode(text) {
+    const node = createNode('#text', document, TEXT_NODE);
+    let textValue = String(text);
+    Object.defineProperties(node, {
+      data: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+        }
+      },
+      nodeValue: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+        }
+      },
+      textContent: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+        }
+      }
+    });
+    return node;
+  };
   return document;
 }
 
-function createNode(nodeName, ownerDocument) {
-  return {
+function createNode(nodeName, ownerDocument, nodeType = ELEMENT_NODE) {
+  const node = {
     __registrations: [],
+    attributeLog: [],
+    attributes: new Map(),
+    childNodes: [],
     localName: nodeName.toLowerCase(),
     nodeName,
-    nodeType: ELEMENT_NODE,
+    nodeType,
     ownerDocument,
-    parentNode: null
+    parentNode: null,
+    appendChild(child) {
+      detachNodeFromParent(child);
+      this.childNodes.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    removeChild(child) {
+      if (child.parentNode !== this) {
+        throw new Error('Cannot remove a child from another parent.');
+      }
+      detachNodeFromParent(child);
+      return child;
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributes.set(attributeName, stringValue);
+      this.attributeLog.push(['setAttribute', attributeName, stringValue]);
+    },
+    removeAttribute(name) {
+      const attributeName = String(name);
+      const hadAttribute = this.attributes.has(attributeName);
+      this.attributes.delete(attributeName);
+      this.attributeLog.push(['removeAttribute', attributeName, hadAttribute]);
+    },
+    hasAttribute(name) {
+      return this.attributes.has(String(name));
+    },
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
+    }
   };
+  Object.defineProperties(node, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    lastChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[this.childNodes.length - 1] || null;
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map(child => child.textContent).join('');
+        }
+        return this._textContent || '';
+      },
+      set(value) {
+        for (const child of [...this.childNodes]) {
+          detachNodeFromParent(child);
+        }
+        this._textContent = String(value);
+      }
+    }
+  });
+  installEventTargetMethods(node);
+  return node;
+}
+
+function detachNodeFromParent(child) {
+  if (child == null || typeof child !== 'object') {
+    throw new Error('Expected a fake-DOM child object.');
+  }
+  if (child.parentNode == null) {
+    child.parentNode = null;
+    return;
+  }
+  const siblings = child.parentNode.childNodes;
+  const index = Array.isArray(siblings) ? siblings.indexOf(child) : -1;
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
