@@ -209,6 +209,11 @@ const actSchedulerReactQueueDiagnosticRecordIds = [
   "scheduler-private-act-queue-flush-diagnostics",
   "react-private-act-internal-test-queue-factories"
 ];
+const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
+  "scheduler-private-act-queue-flush-diagnostics",
+  "test-renderer-mock-scheduler-flush-helper-routing",
+  "react-private-act-internal-test-queue-factories"
+];
 const actSchedulerSyncFlushRecordIds = [
   "sync-flush-act-continuation-record",
   "sync-flush-act-post-passive-continuation-gate",
@@ -280,6 +285,8 @@ const entrypoints = [
     production: true
   }
 ];
+const cjsDevelopmentEntrypoint =
+  "react-test-renderer/cjs/react-test-renderer.development";
 const cjsEntrypoints = entrypoints.filter((entry) =>
   entry.entrypoint.includes("/cjs/")
 );
@@ -3808,6 +3815,7 @@ function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
 
 function assertActSchedulerGate(gate, entrypoint) {
   const isCjs = entrypoint.includes("/cjs/");
+  const cjsDevelopmentOnly = entrypoint === cjsDevelopmentEntrypoint;
   const expectedRootFlushRecordIds = isCjs
     ? [
         ...actSchedulerRootFlushRecordIds,
@@ -3820,6 +3828,9 @@ function assertActSchedulerGate(gate, entrypoint) {
   const expectedAcceptedPrerequisiteIds = isCjs
     ? acceptedPrivateActFlushCjsPrerequisiteIds
     : acceptedPrivateActFlushPrerequisiteIds;
+  const expectedReactQueueDiagnosticRecordIds = cjsDevelopmentOnly
+    ? actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds
+    : actSchedulerReactQueueDiagnosticRecordIds;
   const expectedAcceptedWorkers = [
     "worker-176-act-queue-routing-skeleton",
     "worker-252-sync-flush-act-continuation-skeleton",
@@ -3844,6 +3855,14 @@ function assertActSchedulerGate(gate, entrypoint) {
     expectedAcceptedWorkers.push(
       "worker-449-passive-effect-scheduler-flush-gate",
       "worker-473-test-renderer-act-passive-effect-drain"
+    );
+  }
+  if (cjsDevelopmentOnly) {
+    expectedAcceptedWorkers.push(
+      "worker-404-scheduler-mock-private-callback-execution",
+      "worker-436-scheduler-mock-continuation-execution",
+      "worker-469-scheduler-mock-expired-continuation-gate",
+      "worker-482-test-renderer-act-scheduler-flush-gate"
     );
   }
 
@@ -3871,6 +3890,11 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.schedulerReactActQueueDiagnosticsAccepted, true);
   assert.equal(gate.privateSchedulerActQueueDiagnosticsConsumed, true);
   assert.equal(gate.privateActQueueDiagnosticConsumptionReady, true);
+  if (cjsDevelopmentOnly) {
+    assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
+    assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
+    assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
+  }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
   assert.equal(gate.rootActRecordsAccepted, true);
   assert.equal(gate.syncFlushActRecordsAccepted, true);
@@ -3899,7 +3923,7 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.recognizedSchedulerReactActQueueDiagnostics.map(
       (record) => record.id
     ),
-    actSchedulerReactQueueDiagnosticRecordIds
+    expectedReactQueueDiagnosticRecordIds
   );
   assert.equal(
     gate.privateActQueueFlushDiagnostics.exportName,
