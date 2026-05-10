@@ -11,6 +11,7 @@ const hasOwn = Object.prototype.hasOwnProperty;
 const resourceFormActionInternalsGateSchemaVersion = 1;
 const resourceHintDispatcherMetadataGateSchemaVersion = 1;
 const resourceHintFakeDomAdapterGateSchemaVersion = 1;
+const resourceHintFakeDomInsertionGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputPrivateWrapperGateSchemaVersion = 1;
 const privateResourceFormActionGateRecordType =
@@ -19,6 +20,8 @@ const privateResourceHintDispatcherMetadataRecordType =
   'fast.react_dom.private_resource_hint_dispatcher_metadata_record';
 const privateResourceHintFakeDomAdapterAdmissionRecordType =
   'fast.react_dom.private_resource_hint_fake_dom_adapter_admission_record';
+const privateResourceHintFakeDomInsertionRecordType =
+  'fast.react_dom.private_resource_hint_fake_dom_insertion_record';
 const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputWrapperPropertyPayloadRecordType =
@@ -27,6 +30,8 @@ const privateResourceHintDispatcherMetadataGateId =
   'resource-hint-private-dispatcher-metadata-gate-1';
 const privateResourceHintFakeDomAdapterGateId =
   'resource-hint-private-dispatcher-fake-dom-adapter-gate-1';
+const privateResourceHintFakeDomInsertionGateId =
+  'resource-hint-private-fake-dom-insertion-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
   'blocked-private-resource-hint-fake-dom-adapter-admission-required';
 const privateResourceHintFakeDomAdapterAdmissionStatus =
@@ -35,6 +40,14 @@ const privateResourceHintFakeDomAdapterExecutionBlockedStatus =
   'blocked-private-resource-hint-fake-dom-adapter-execution';
 const privateResourceHintFakeDomAdapterCompatibilityBlockedStatus =
   'blocked-private-resource-hint-fake-dom-adapter-compatibility';
+const privateResourceHintFakeDomInsertionAdmissionRequiredStatus =
+  'blocked-private-resource-hint-fake-dom-insertion-admission-required';
+const privateResourceHintFakeDomInsertionStatus =
+  'admitted-private-resource-hint-fake-dom-insertion-record';
+const privateResourceHintFakeDomInsertionExecutionStatus =
+  'executed-private-resource-hint-deterministic-fake-dom-insertion';
+const privateResourceHintFakeDomInsertionCompatibilityBlockedStatus =
+  'blocked-private-resource-hint-fake-dom-insertion-compatibility';
 const privateResourceFormActionGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE';
 const privateResourceFormActionGateUnknownRequestCode =
@@ -51,6 +64,12 @@ const privateResourceHintFakeDomAdapterInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_ADAPTER_INVALID_RECORD';
 const privateResourceHintFakeDomAdapterInvalidAdmissionCode =
   'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_ADAPTER_INVALID_ADMISSION';
+const privateResourceHintFakeDomInsertionGateErrorCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_INSERTION_GATE';
+const privateResourceHintFakeDomInsertionInvalidRecordCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_INSERTION_INVALID_RECORD';
+const privateResourceHintFakeDomInsertionInvalidAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_INSERTION_INVALID_ADMISSION';
 const privateControlledInputValueTrackerGateErrorCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
 const privateControlledInputValueTrackerGateUnknownScenarioCode =
@@ -106,6 +125,42 @@ const resourceHintFakeDomAdapterSideEffects = freezeRecord({
   resourceFetchStarted: false,
   resourceRecordCommitted: false,
   stylesheetPrecedenceApplied: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const resourceHintFakeDomInsertionBlockedSideEffects = freezeRecord({
+  fakeDomInsertionGateInvoked: false,
+  fakeDocumentRead: false,
+  fakeDocumentMutated: false,
+  fakeHeadRead: false,
+  fakeHeadMutated: false,
+  fakeResourceElementCreated: false,
+  fakeResourceElementInserted: false,
+  fakeResourceElementAttributesApplied: false,
+  resourceFetchStarted: false,
+  resourceRecordCommitted: false,
+  stylesheetPrecedenceApplied: false,
+  realDocumentMutated: false,
+  publicResourceHintDomInsertion: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const resourceHintFakeDomInsertionSideEffects = freezeRecord({
+  fakeDomInsertionGateInvoked: true,
+  fakeDocumentRead: false,
+  fakeDocumentMutated: false,
+  fakeHeadRead: false,
+  fakeHeadMutated: true,
+  fakeResourceElementCreated: true,
+  fakeResourceElementInserted: true,
+  fakeResourceElementAttributesApplied: true,
+  resourceFetchStarted: false,
+  resourceRecordCommitted: false,
+  stylesheetPrecedenceApplied: false,
+  realDocumentMutated: false,
+  publicResourceHintDomInsertion: false,
   publicRootTouched: false,
   compatibilityClaimed: false
 });
@@ -211,6 +266,29 @@ const resourceHintFakeDomAdapterMissingPrerequisites = freezeArray([
     'no-public-resource-hint-dom-insertion',
     'react-dom-resource',
     'Public resource hint APIs remain placeholders and do not reach this adapter.'
+  )
+]);
+
+const resourceHintFakeDomInsertionMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-real-document-resource-insertion',
+    'react-dom-resource',
+    'Only deterministic fake DOM insertion diagnostics are admitted.'
+  ),
+  prerequisite(
+    'no-resource-dedupe-or-precedence',
+    'react-dom-resource',
+    'Resource dedupe, ordering, and stylesheet precedence are not admitted.'
+  ),
+  prerequisite(
+    'no-resource-fetch-side-effects',
+    'react-dom-resource',
+    'Fake resource elements use redacted diagnostic attributes and cannot start fetches.'
+  ),
+  prerequisite(
+    'no-public-resource-hint-dom-insertion',
+    'react-dom-resource',
+    'Public resource hint APIs remain placeholders and do not reach fake or real DOM insertion.'
   )
 ]);
 
@@ -355,6 +433,36 @@ const resourceHintFakeDomAdapterContracts = freezeArray([
     'script',
     'script',
     ['src', 'async', 'crossOrigin', 'integrity', 'fetchPriority', 'nonce']
+  )
+]);
+
+const resourceHintFakeDomInsertionContracts = freezeArray([
+  resourceHintFakeDomInsertionContract(
+    'preconnect',
+    'C',
+    'link',
+    'preconnect',
+    ['rel', 'href', 'crossOrigin']
+  ),
+  resourceHintFakeDomInsertionContract(
+    'preload',
+    'L',
+    'link',
+    'preload',
+    [
+      'rel',
+      'href',
+      'as',
+      'crossOrigin',
+      'integrity',
+      'nonce',
+      'type',
+      'fetchPriority',
+      'referrerPolicy',
+      'imageSrcSet',
+      'imageSizes',
+      'media'
+    ]
   )
 ]);
 
@@ -562,6 +670,7 @@ indexControlledInputPrivateWrapperPropertyPayloadContracts();
 const recordPayloads = new WeakMap();
 const resourceHintDispatcherMetadataPayloads = new WeakMap();
 const resourceHintFakeDomAdapterAdmissionPayloads = new WeakMap();
+const resourceHintFakeDomInsertionPayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputPrivateWrapperPropertyPayloadRecordPayloads =
   new WeakMap();
@@ -642,6 +751,24 @@ function createResourceHintFakeDomAdapterGate(options) {
         gateState,
         record,
         admission
+      );
+    }
+  });
+}
+
+function createResourceHintFakeDomInsertionGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'resource-hint-fake-dom-insertion'
+  );
+  gateState.insertionConsumed = false;
+
+  return Object.freeze({
+    insertAdapterAdmissionRecord(record, insertion) {
+      return insertResourceHintFakeDomAdapterAdmissionRecordWithGate(
+        gateState,
+        record,
+        insertion
       );
     }
   });
@@ -756,6 +883,14 @@ function isPrivateResourceHintFakeDomAdapterAdmissionRecord(value) {
   return resourceHintFakeDomAdapterAdmissionPayloads.has(value);
 }
 
+function getPrivateResourceHintFakeDomInsertionRecordPayload(record) {
+  return resourceHintFakeDomInsertionPayloads.get(record) || null;
+}
+
+function isPrivateResourceHintFakeDomInsertionRecord(value) {
+  return resourceHintFakeDomInsertionPayloads.has(value);
+}
+
 function getPrivateControlledInputValueTrackerRecordPayload(record) {
   return controlledInputValueTrackerRecordPayloads.get(record) || null;
 }
@@ -790,6 +925,7 @@ function describeResourceFormActionInternalsGate() {
       resourceHints: resourceHintContracts,
       resourceHintDispatchers: resourceHintDispatcherMetadataContracts,
       resourceHintFakeDomAdapters: resourceHintFakeDomAdapterContracts,
+      resourceHintFakeDomInsertions: resourceHintFakeDomInsertionContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
       controlledForms: controlledFormContracts,
@@ -839,7 +975,33 @@ function describePrivateResourceHintFakeDomAdapterGate() {
     deterministicFakeDomOnly: true,
     contracts: resourceHintFakeDomAdapterContracts,
     sideEffects: resourceHintFakeDomAdapterSideEffects,
-    missingPrerequisites: resourceHintFakeDomAdapterMissingPrerequisites
+    missingPrerequisites: resourceHintFakeDomAdapterMissingPrerequisites,
+    fakeDomInsertion: describePrivateResourceHintFakeDomInsertionGate()
+  });
+}
+
+function describePrivateResourceHintFakeDomInsertionGate() {
+  return freezeRecord({
+    schemaVersion: resourceHintFakeDomInsertionGateSchemaVersion,
+    gateId: privateResourceHintFakeDomInsertionGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    admissionStatus:
+      privateResourceHintFakeDomInsertionAdmissionRequiredStatus,
+    executionStatus: null,
+    compatibilityStatus:
+      privateResourceHintFakeDomInsertionCompatibilityBlockedStatus,
+    acceptedRecordType: privateResourceHintFakeDomAdapterAdmissionRecordType,
+    acceptsFakeDomAdapterAdmissions: true,
+    acceptsContractIds: freezeArray(['preconnect', 'preload']),
+    maxInsertionsPerGate: 1,
+    deterministicFakeDomOnly: true,
+    rawValuesRetained: false,
+    publicResourceHintDomInsertion: false,
+    contracts: resourceHintFakeDomInsertionContracts,
+    sideEffects: resourceHintFakeDomInsertionBlockedSideEffects,
+    missingPrerequisites: resourceHintFakeDomInsertionMissingPrerequisites
   });
 }
 
@@ -981,6 +1143,32 @@ function createUnsupportedResourceHintFakeDomAdapterError(record) {
   return error;
 }
 
+function createUnsupportedResourceHintFakeDomInsertionError(record) {
+  const payload = assertPrivateResourceHintFakeDomInsertionRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was inserted',
+    'The private resource hint fake DOM insertion gate is a deterministic fake-DOM diagnostic only.'
+  );
+
+  error.code = privateResourceHintFakeDomInsertionGateErrorCode;
+  error.insertionId = payload.insertionId;
+  error.insertionSequence = payload.insertionSequence;
+  error.sourceAdapterAdmissionId = payload.sourceAdapterAdmissionId;
+  error.sourceRequestId = payload.sourceRequestId;
+  error.sourceRequestSequence = payload.sourceRequestSequence;
+  error.requestType = payload.requestType;
+  error.contractId = payload.contractId;
+  error.privateDispatcherKey = payload.privateDispatcherKey;
+  error.insertionStatus = payload.insertionStatus;
+  error.executionStatus = payload.executionStatus;
+  error.compatibilityStatus = payload.compatibilityStatus;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
 function recordUnsupportedRequestWithGate(
   gateState,
   behaviorArea,
@@ -1106,6 +1294,80 @@ function admitResourceHintFakeDomAdapterRecordWithGate(
   });
 
   resourceHintFakeDomAdapterAdmissionPayloads.set(payload, payload);
+  return payload;
+}
+
+function insertResourceHintFakeDomAdapterAdmissionRecordWithGate(
+  gateState,
+  record,
+  insertion
+) {
+  if (gateState.insertionConsumed === true) {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'fake DOM insertion gate admits exactly one record'
+    );
+  }
+
+  const adapterAdmission =
+    assertFakeDomAdapterAdmissionRecordForInsertion(record);
+  const contract = getResourceHintFakeDomInsertionContract(
+    adapterAdmission.contractId
+  );
+  const insertionAdmission =
+    normalizeResourceHintFakeDomInsertionAdmission(insertion);
+  const insertedElement = insertFakeDomResourceHintElement(
+    contract,
+    adapterAdmission,
+    insertion.fakeDocument,
+    insertion.fakeHead
+  );
+  gateState.insertionConsumed = true;
+
+  const insertionSequence = gateState.nextRequestSequence++;
+  const insertionId = `${gateState.requestIdPrefix}:${insertionSequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: resourceHintFakeDomInsertionGateSchemaVersion,
+    $$typeof: privateResourceHintFakeDomInsertionRecordType,
+    kind: 'FastReactDomPrivateResourceHintFakeDomInsertionRecord',
+    gateId: privateResourceHintFakeDomInsertionGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    insertionId,
+    insertionSequence,
+    sourceAdapterAdmissionId: adapterAdmission.adapterAdmissionId,
+    sourceAdapterAdmissionSequence:
+      adapterAdmission.adapterAdmissionSequence,
+    sourceRequestId: adapterAdmission.sourceRequestId,
+    sourceRequestSequence: adapterAdmission.sourceRequestSequence,
+    sourceRequestType: adapterAdmission.sourceRequestType,
+    requestType: `resource-hint-fake-dom-insertion.${contract.id}`,
+    requestName: adapterAdmission.requestName,
+    contractId: contract.id,
+    oracleKind: adapterAdmission.oracleKind,
+    oracleSchemaVersion: adapterAdmission.oracleSchemaVersion,
+    publicName: adapterAdmission.publicName,
+    privateDispatcherKey: adapterAdmission.privateDispatcherKey,
+    admissionStatus: adapterAdmission.admissionStatus,
+    insertionStatus: privateResourceHintFakeDomInsertionStatus,
+    executionStatus: privateResourceHintFakeDomInsertionExecutionStatus,
+    compatibilityStatus:
+      privateResourceHintFakeDomInsertionCompatibilityBlockedStatus,
+    dispatcherShape: adapterAdmission.dispatcherShape,
+    adapterAdmission: adapterAdmission.adapterAdmission,
+    insertionAdmission,
+    resourceElementPlan:
+      createResourceHintFakeDomInsertedResourceElementPlan(
+        contract,
+        insertedElement
+      ),
+    publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
+    sideEffects: resourceHintFakeDomInsertionSideEffects,
+    missingPrerequisites: resourceHintFakeDomInsertionMissingPrerequisites
+  });
+
+  resourceHintFakeDomInsertionPayloads.set(payload, payload);
   return payload;
 }
 
@@ -1281,6 +1543,25 @@ function getResourceHintFakeDomAdapterContract(contractId) {
   throw error;
 }
 
+function getResourceHintFakeDomInsertionContract(contractId) {
+  for (const contract of resourceHintFakeDomInsertionContracts) {
+    if (contract.id === contractId) {
+      return contract;
+    }
+  }
+
+  const error = new Error(
+    `Unsupported private React DOM resource hint fake DOM insertion contract: ${String(
+      contractId
+    )}.`
+  );
+  error.name = 'FastReactDomResourceHintFakeDomInsertionGateError';
+  error.code = privateResourceHintFakeDomInsertionInvalidRecordCode;
+  error.contractId = contractId;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertPrivateResourceHintDispatcherMetadataRecord(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -1313,6 +1594,22 @@ function assertPrivateResourceHintFakeDomAdapterAdmissionRecord(record) {
   throw error;
 }
 
+function assertPrivateResourceHintFakeDomInsertionRecord(record) {
+  const payload =
+    getPrivateResourceHintFakeDomInsertionRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint fake DOM insertion record.'
+  );
+  error.name = 'FastReactDomResourceHintFakeDomInsertionGateError';
+  error.code = privateResourceHintFakeDomInsertionInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertResourceHintDispatcherMetadataRecordForFakeDomAdapter(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -1325,6 +1622,30 @@ function assertResourceHintDispatcherMetadataRecordForFakeDomAdapter(record) {
   );
   error.name = 'FastReactDomResourceHintFakeDomAdapterGateError';
   error.code = privateResourceHintFakeDomAdapterInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertFakeDomAdapterAdmissionRecordForInsertion(record) {
+  const payload =
+    getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.admissionStatus ===
+      privateResourceHintFakeDomAdapterAdmissionStatus &&
+    payload.executionStatus ===
+      privateResourceHintFakeDomAdapterExecutionBlockedStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintFakeDomAdapterCompatibilityBlockedStatus
+  ) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected an admitted private React DOM resource hint fake DOM adapter record for fake DOM insertion.'
+  );
+  error.name = 'FastReactDomResourceHintFakeDomInsertionGateError';
+  error.code = privateResourceHintFakeDomInsertionInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -1670,9 +1991,301 @@ function createResourceHintFakeDomResourceElementPlan(contract) {
   });
 }
 
+function normalizeResourceHintFakeDomInsertionAdmission(insertion) {
+  if (insertion == null || typeof insertion !== 'object') {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'insertion admission metadata must be an object'
+    );
+  }
+
+  if (insertion.explicitInsertion !== true) {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'explicitInsertion must be true'
+    );
+  }
+
+  const insertionKind = getAdmissionStringProperty(
+    insertion,
+    'insertionKind',
+    'deterministic-fake-dom-head-append'
+  );
+  if (insertionKind !== 'deterministic-fake-dom-head-append') {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'insertionKind must be deterministic-fake-dom-head-append'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    insertion,
+    'targetKind',
+    'document-head'
+  );
+  if (targetKind !== 'document-head') {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'targetKind must be document-head'
+    );
+  }
+
+  assertDeterministicFakeResourceTarget(
+    insertion.fakeDocument,
+    insertion.fakeHead
+  );
+
+  return freezeRecord({
+    insertionKind,
+    insertionId: getAdmissionStringProperty(
+      insertion,
+      'insertionId',
+      'anonymous-fake-dom-resource-hint-insertion'
+    ),
+    targetKind,
+    explicitInsertion: true,
+    deterministicFakeDomOnly: true,
+    rawDocumentCaptured: false,
+    rawHeadCaptured: false,
+    rawElementCaptured: false,
+    fakeDocumentHeadRead: false,
+    insertionMethod: 'appendChild',
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertDeterministicFakeResourceTarget(fakeDocument, fakeHead) {
+  if (
+    fakeDocument == null ||
+    typeof fakeDocument !== 'object' ||
+    fakeDocument.__fastReactFakeResourceDocument !== true
+  ) {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'fakeDocument must be an explicit deterministic fake resource document'
+    );
+  }
+
+  if (
+    fakeHead == null ||
+    typeof fakeHead !== 'object' ||
+    fakeHead.__fastReactFakeResourceHead !== true ||
+    fakeHead.ownerDocument !== fakeDocument
+  ) {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'fakeHead must belong to the deterministic fake resource document'
+    );
+  }
+
+  if (
+    typeof fakeDocument.createElement !== 'function' ||
+    typeof fakeHead.appendChild !== 'function'
+  ) {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      'fake DOM target must expose createElement and appendChild'
+    );
+  }
+}
+
+function insertFakeDomResourceHintElement(
+  contract,
+  adapterAdmission,
+  fakeDocument,
+  fakeHead
+) {
+  const element = fakeDocument.createElement(contract.elementTag);
+  assertDeterministicFakeResourceElement(element, fakeDocument, contract);
+
+  const attributes = createResourceHintFakeDomInsertionAttributePlan(
+    contract,
+    adapterAdmission
+  );
+  for (const attribute of attributes) {
+    element.setAttribute(attribute.name, attribute.value);
+  }
+
+  fakeHead.appendChild(element);
+
+  return freezeRecord({
+    elementTag: contract.elementTag,
+    relationship: contract.relationship,
+    insertionMethod: 'appendChild',
+    attributeNames: freezeArray(
+      attributes.map((attribute) => attribute.name)
+    ),
+    attributeValueKinds: freezeArray(
+      attributes.map((attribute) =>
+        freezeRecord({
+          name: attribute.name,
+          valueKind: attribute.valueKind,
+          rawValueRetained: false
+        })
+      )
+    )
+  });
+}
+
+function assertDeterministicFakeResourceElement(
+  element,
+  fakeDocument,
+  contract
+) {
+  if (
+    element == null ||
+    typeof element !== 'object' ||
+    element.__fastReactFakeResourceElement !== true ||
+    element.ownerDocument !== fakeDocument ||
+    typeof element.setAttribute !== 'function'
+  ) {
+    throwInvalidResourceHintFakeDomInsertionAdmission(
+      `fake document must create deterministic fake ${contract.elementTag} resource elements`
+    );
+  }
+}
+
+function createResourceHintFakeDomInsertionAttributePlan(
+  contract,
+  adapterAdmission
+) {
+  const attributes = [
+    insertionAttribute('rel', 'relationship', contract.relationship),
+    insertionAttribute(
+      contract.elementTag === 'script' ? 'src' : 'href',
+      'redacted-dispatcher-string',
+      redactedResourceHintValue('href')
+    )
+  ];
+
+  if (contract.id === 'preconnect') {
+    const crossOrigin = getDispatcherArgumentSummary(
+      adapterAdmission.dispatcherShape,
+      'crossOrigin'
+    );
+    appendStringAttributeIfPresent(attributes, 'crossOrigin', crossOrigin);
+    return freezeArray(attributes);
+  }
+
+  const as = getDispatcherArgumentSummary(
+    adapterAdmission.dispatcherShape,
+    'as'
+  );
+  appendStringAttributeIfPresent(attributes, 'as', as);
+
+  const options = getDispatcherArgumentSummary(
+    adapterAdmission.dispatcherShape,
+    'options'
+  );
+  for (const name of contract.attributeNames) {
+    if (name === 'rel' || name === 'href' || name === 'as') {
+      continue;
+    }
+    appendStringAttributeIfPresent(
+      attributes,
+      name,
+      getDispatcherOptionFieldSummary(options, name)
+    );
+  }
+
+  return freezeArray(attributes);
+}
+
+function appendStringAttributeIfPresent(attributes, name, summary) {
+  if (summary == null || summary.type !== 'string') {
+    return;
+  }
+
+  attributes.push(
+    insertionAttribute(
+      name,
+      summary.empty ? 'normalized-empty-string' : 'redacted-string',
+      summary.empty ? '' : redactedResourceHintValue(name)
+    )
+  );
+}
+
+function insertionAttribute(name, valueKind, value) {
+  return freezeRecord({
+    name,
+    valueKind,
+    value
+  });
+}
+
+function redactedResourceHintValue(name) {
+  return `[fast-react-redacted-resource-hint:${name}]`;
+}
+
+function getDispatcherArgumentSummary(dispatcherShape, name) {
+  for (const argument of dispatcherShape.arguments) {
+    if (argument.name === name) {
+      return argument;
+    }
+  }
+  return null;
+}
+
+function getDispatcherOptionFieldSummary(options, name) {
+  if (options == null || options.type !== 'object') {
+    return null;
+  }
+
+  for (const field of options.fields) {
+    if (field.name === name) {
+      return field;
+    }
+  }
+  return null;
+}
+
+function createResourceHintFakeDomInsertedResourceElementPlan(
+  contract,
+  insertedElement
+) {
+  return freezeRecord({
+    adapterContractId: contract.id,
+    privateDispatcherKey: contract.privateDispatcherKey,
+    targetKind: 'document-head',
+    elementTag: insertedElement.elementTag,
+    relationship: insertedElement.relationship,
+    insertionMethod: insertedElement.insertionMethod,
+    attributeNames: insertedElement.attributeNames,
+    attributeValueKinds: insertedElement.attributeValueKinds,
+    normalizedDispatcherRecordRequired: true,
+    fakeDocumentMarkerRequired: true,
+    fakeHeadMarkerRequired: true,
+    rawValuesRetained: false,
+    elementCreated: true,
+    elementInserted: true,
+    resourceFetchStarted: false,
+    stylesheetPrecedenceApplied: false,
+    publicResourceHintDomInsertion: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPublicResourceHintDomInsertionBoundary() {
+  return freezeRecord({
+    status: 'blocked-public-resource-hint-dom-insertion',
+    publicResourceHintCallsReachable: false,
+    publicDispatcherInvoked: false,
+    publicRootTouched: false,
+    realDocumentMutated: false,
+    realHeadMutated: false,
+    resourceFetchStarted: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getAdmissionStringProperty(record, key, fallback) {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function throwInvalidResourceHintFakeDomInsertionAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM resource hint fake DOM insertion admission: ${reason}.`
+  );
+  error.name = 'FastReactDomResourceHintFakeDomInsertionGateError';
+  error.code = privateResourceHintFakeDomInsertionInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
 }
 
 function throwInvalidResourceHintFakeDomAdapterAdmission(reason) {
@@ -2205,6 +2818,26 @@ function resourceHintFakeDomAdapterContract(
   });
 }
 
+function resourceHintFakeDomInsertionContract(
+  id,
+  privateDispatcherKey,
+  elementTag,
+  relationship,
+  attributeNames
+) {
+  return freezeRecord({
+    id,
+    privateDispatcherKey,
+    elementTag,
+    relationship,
+    attributeNames: freezeArray(attributeNames),
+    capability: 'react-dom-resource-hint-fake-dom-insertion',
+    oracleKind: resourceHintOracleKind,
+    deterministicFakeDomOnly: true,
+    compatibilityClaimed: false
+  });
+}
+
 function singletonContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -2338,23 +2971,28 @@ module.exports = {
   createControlledInputPrivateWrapperPropertyPayloadRecord,
   createControlledInputValueTrackerGate,
   createResourceHintFakeDomAdapterGate,
+  createResourceHintFakeDomInsertionGate,
   createResourceFormActionInternalsGate,
   createUnsupportedControlledInputValueTrackerError,
   createUnsupportedResourceHintFakeDomAdapterError,
+  createUnsupportedResourceHintFakeDomInsertionError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
   describeControlledInputValueTrackerGate,
   describeControlledInputPrivateWrapperPropertyPayloadGate,
   describePrivateResourceHintFakeDomAdapterGate,
+  describePrivateResourceHintFakeDomInsertionGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
   formActionContracts,
   getPrivateControlledInputValueTrackerRecordPayload,
   getPrivateControlledInputWrapperPropertyPayloadRecordPayload,
   getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload,
+  getPrivateResourceHintFakeDomInsertionRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
   isPrivateResourceHintFakeDomAdapterAdmissionRecord,
+  isPrivateResourceHintFakeDomInsertionRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputWrapperPropertyPayloadRecord,
   isPrivateResourceFormActionGateRecord,
@@ -2378,6 +3016,15 @@ module.exports = {
   privateResourceHintFakeDomAdapterGateId,
   privateResourceHintFakeDomAdapterInvalidAdmissionCode,
   privateResourceHintFakeDomAdapterInvalidRecordCode,
+  privateResourceHintFakeDomInsertionAdmissionRequiredStatus,
+  privateResourceHintFakeDomInsertionCompatibilityBlockedStatus,
+  privateResourceHintFakeDomInsertionExecutionStatus,
+  privateResourceHintFakeDomInsertionGateErrorCode,
+  privateResourceHintFakeDomInsertionGateId,
+  privateResourceHintFakeDomInsertionInvalidAdmissionCode,
+  privateResourceHintFakeDomInsertionInvalidRecordCode,
+  privateResourceHintFakeDomInsertionRecordType,
+  privateResourceHintFakeDomInsertionStatus,
   privateResourceHintDispatcherMetadataGateErrorCode,
   privateResourceHintDispatcherMetadataGateId,
   privateResourceHintDispatcherMetadataInvalidShapeCode,
@@ -2394,6 +3041,11 @@ module.exports = {
   resourceHintFakeDomAdapterGateSchemaVersion,
   resourceHintFakeDomAdapterMissingPrerequisites,
   resourceHintFakeDomAdapterSideEffects,
+  resourceHintFakeDomInsertionBlockedSideEffects,
+  resourceHintFakeDomInsertionContracts,
+  resourceHintFakeDomInsertionGateSchemaVersion,
+  resourceHintFakeDomInsertionMissingPrerequisites,
+  resourceHintFakeDomInsertionSideEffects,
   resourceHintDispatcherMetadataContracts,
   resourceHintDispatcherMetadataGateSchemaVersion,
   resourceHintDispatcherMissingPrerequisites,
