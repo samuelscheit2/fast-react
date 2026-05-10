@@ -4,7 +4,18 @@ export const SCHEDULER_ROOT_ORACLE_ARTIFACT_PATH =
 export const SCHEDULER_ROOT_TARGET = {
   packageName: "scheduler",
   version: "0.27.0",
-  role: "official-public-scheduler-root-target"
+  role: "official-public-scheduler-root-target",
+  expectedDistIntegrity:
+    "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==",
+  expectedDistShasum: "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
+};
+
+export const SCHEDULER_ROOT_FAST_REACT_TARGET = {
+  packageName: "fast-react-scheduler",
+  sourcePackageName: "scheduler",
+  version: "0.27.0",
+  role: "local-fast-react-scheduler-root-implementation",
+  targetStatus: "local-workspace-implementation-copied-under-isolated-alias"
 };
 
 export const SCHEDULER_ROOT_PROBE_MODES = [
@@ -33,5 +44,6 @@ export const SCHEDULER_ROOT_SOURCE_DOCUMENTS = [
   "worker-progress/worker-002-conformance.md",
   "worker-progress/worker-007-scheduler-fiber.md",
   "worker-progress/worker-017-runtime-inventory-generation.md",
-  "worker-progress/worker-034-scheduler-package-inventory.md"
+  "worker-progress/worker-034-scheduler-package-inventory.md",
+  "worker-progress/worker-164-scheduler-regression-tests.md"
 ];
