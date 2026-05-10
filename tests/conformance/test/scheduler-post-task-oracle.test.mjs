@@ -1800,6 +1800,215 @@ test("scheduler post-task private diagnostics connect delayed continuation metad
   }
 });
 
+test("scheduler post-task private diagnostics preserve delayed act/root handoff on scheduler.yield path", () => {
+  for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
+    const report = inspectSchedulerPostTaskPriorityDiagnostics({
+      nodeEnv: mode.nodeEnv,
+      withYield: true
+    });
+    const flow = report.delayedContinuationActRootHandoff;
+    const expectedLowPriorityTimeout = expectedPriorityTimeout({
+      priorityLevel: 4,
+      schedulerPriorityName: "unstable_LowPriority",
+      timeoutMs: 10000,
+      timeoutReason: "low-priority-timeout"
+    });
+    const expectedYieldClassification =
+      expectedFallbackEnvironmentClassification(true);
+
+    assert.deepEqual(report.exportKeys, EXPECTED_EXPORT_KEYS);
+    assert.deepEqual(flow.publicNodeKeys, ["_controller"]);
+    assert.equal(flow.privateDiagnosticSymbolPresent, true);
+    assert.deepEqual(flow.initialFlush, [
+      {
+        type: "run-post-task",
+        signal: {
+          id: 10,
+          priority: "user-visible",
+          aborted: false
+        }
+      }
+    ]);
+    assert.deepEqual(flow.fallbackEvents, [
+      {
+        type: "yield",
+        signal: {
+          id: 10,
+          priority: "user-visible",
+          aborted: false
+        }
+      },
+      {
+        type: "yield.then",
+        signal: {
+          id: 10,
+          priority: "user-visible",
+          aborted: false
+        }
+      }
+    ]);
+    assert.deepEqual(flow.events, [
+      {
+        label: "delayed-start",
+        currentPriorityLevel: 4
+      },
+      {
+        label: "delayed-continuation",
+        currentPriorityLevel: 4
+      }
+    ]);
+
+    const diagnostics = flow.diagnosticsAfterFallback;
+    assert.equal(diagnostics.diagnosticEventCount, 4);
+    assert.equal(diagnostics.actRootWorkHandoffDiagnostics, true);
+    assert.equal(diagnostics.compatibilityClaimed, false);
+    assert.equal(diagnostics.browserPostTaskCompatibilityClaimed, false);
+    assert.equal(diagnostics.browserTaskOrderingCompatibilityClaimed, false);
+    assert.equal(diagnostics.publicSchedulerTimingCompatibilityClaimed, false);
+    assert.equal(diagnostics.environmentCapabilities.hasSchedulerYield, true);
+    assert.deepEqual(
+      diagnostics.schedule.delay,
+      expectedPostTaskDelayDiagnostic("number", 17, "delayed-task")
+    );
+    assert.deepEqual(diagnostics.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(diagnostics.callbackRuns.length, 2);
+    assert.deepEqual(
+      diagnostics.callbackRuns.map((entry) => [
+        entry.runIndex,
+        entry.continuationStatus,
+        entry.continuationFallbackIndex,
+        entry.fallbackEnvironmentClassification
+          ? entry.fallbackEnvironmentClassification.selectedFallback
+          : null
+      ]),
+      [
+        [0, "scheduled-continuation-fallback", 0, "scheduler.yield"],
+        [1, "completed-without-continuation", null, null]
+      ]
+    );
+    assert.equal(diagnostics.continuationFallbacks.length, 1);
+
+    const continuation = diagnostics.continuationFallbacks[0];
+    assert.equal(continuation.fallback, "scheduler.yield");
+    assert.deepEqual(
+      continuation.fallbackEnvironmentClassification,
+      expectedYieldClassification
+    );
+    assert.deepEqual(
+      continuation.continuationMetadata.fallbackEnvironmentClassification,
+      "controlled-shim-scheduler-yield-continuation"
+    );
+    assert.equal(
+      continuation.continuationMetadata.schedulerYieldAvailableAtSchedule,
+      true
+    );
+    assert.equal(
+      continuation.continuationMetadata.actRootWorkHandoffStatus,
+      "accepted-private-scheduler-post-task-act-root-work-handoff"
+    );
+    assert.equal(
+      continuation.continuationMetadata.actRootWorkHandoffAccepted,
+      true
+    );
+    assert.equal(
+      continuation.continuationMetadata.delayedCallbackPathAccepted,
+      true
+    );
+    assert.deepEqual(continuation.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(continuation.sourceCallbackDidTimeout, false);
+    assert.deepEqual(
+      continuation.signalValidation,
+      expectedContinuationSignalValidation(10, "user-visible")
+    );
+    assert.deepEqual(
+      continuation.abortOrdering,
+      expectedContinuationAbortOrderingPending({
+        signalId: 10,
+        signalPriority: "user-visible"
+      })
+    );
+
+    const route = diagnostics.rootContinuationExecutionRoute;
+    assert.equal(route.hasActRootWorkHandoff, true);
+    assert.equal(route.fallback, "scheduler.yield");
+    assert.deepEqual(
+      route.fallbackEnvironmentClassification,
+      expectedYieldClassification
+    );
+    assert.equal(route.publicSchedulerTimingCompatibilityClaimed, false);
+    assert.equal(route.publicReactActCompatibilityClaimed, false);
+    assert.equal(route.publicRootSchedulerCompatibilityClaimed, false);
+    assert.equal(route.publicRendererCompatibilityClaimed, false);
+    assert.deepEqual(route.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(route.sourceCallbackDidTimeout, false);
+    assert.deepEqual(
+      route.signalAtSchedule,
+      expectedPostTaskSignal(10, "user-visible", false)
+    );
+    assert.deepEqual(
+      route.signalValidation,
+      expectedContinuationSignalValidation(10, "user-visible")
+    );
+    assert.deepEqual(
+      route.privateRootContinuationExecution,
+      expectedPrivateRootContinuationExecution({
+        status: "pending-private-root-continuation-execution-route",
+        abortSignalState: null,
+        abortSemanticsPreserved: null,
+        callbackRunCountAtAbortRequest: null,
+        callbackRunCountAtAbortCompletion: null,
+        continuationFallbackCountAtAbortRequest: null,
+        continuationFallbackCountAtAbortCompletion: null,
+        priorityTimeout: expectedLowPriorityTimeout
+      })
+    );
+
+    const handoff = route.actRootWorkHandoff;
+    assert.equal(
+      handoff.status,
+      "accepted-private-scheduler-post-task-act-root-work-handoff"
+    );
+    assert.equal(handoff.accepted, true);
+    assert.equal(handoff.delayedCallbackPathAccepted, true);
+    assert.deepEqual(handoff.priorityTimeout, expectedLowPriorityTimeout);
+    assert.equal(handoff.sourceCallbackDidTimeout, false);
+    assert.deepEqual(
+      handoff.signalAtSchedule,
+      expectedPostTaskSignal(10, "user-visible", false)
+    );
+    assert.equal(handoff.actQueueHandoffOnly, true);
+    assert.equal(handoff.rootWorkMetadataOnly, true);
+    assert.equal(handoff.rendererWorkExecutionBlocked, true);
+    assert.equal(handoff.drainsPublicSchedulerTaskQueue, false);
+    assert.equal(handoff.drainsPublicReactActQueue, false);
+    assert.equal(handoff.executesQueuedWork, false);
+    assert.equal(handoff.executesEffects, false);
+    assert.equal(handoff.executesRendererWork, false);
+    assert.equal(handoff.executesRendererRoots, false);
+    assert.equal(handoff.publicCompatibilityClaimed, false);
+    assert.equal(handoff.publicSchedulerTimingCompatibilityClaimed, false);
+    assert.equal(handoff.publicReactActCompatibilityClaimed, false);
+    assert.equal(handoff.publicRootSchedulerCompatibilityClaimed, false);
+    assert.equal(handoff.publicRendererCompatibilityClaimed, false);
+    assert.equal(handoff.compatibilityClaimed, false);
+
+    for (const rootWorkRecord of handoff.rootWorkRecords) {
+      assert.equal(rootWorkRecord.rootWorkMetadataOnly, true);
+      assert.equal(rootWorkRecord.rendererWorkExecutionBlocked, true);
+      assert.equal(rootWorkRecord.drainsPublicSchedulerTaskQueue, false);
+      assert.equal(rootWorkRecord.drainsPublicReactActQueue, false);
+      assert.equal(rootWorkRecord.executesQueuedWork, false);
+      assert.equal(rootWorkRecord.executesEffects, false);
+      assert.equal(rootWorkRecord.executesRendererWork, false);
+      assert.equal(rootWorkRecord.executesRendererRoots, false);
+      assert.equal(rootWorkRecord.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(rootWorkRecord.publicRootSchedulerCompatibilityClaimed, false);
+      assert.equal(rootWorkRecord.publicRendererCompatibilityClaimed, false);
+      assert.equal(rootWorkRecord.compatibilityClaimed, false);
+    }
+  }
+});
+
 test("scheduler post-task oracle artifact has no local temp path leaks", () => {
   const oracleText = readCheckedSchedulerPostTaskOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
