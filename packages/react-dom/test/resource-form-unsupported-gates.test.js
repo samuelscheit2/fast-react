@@ -5009,6 +5009,420 @@ test('private controlled restore queue write execution records mutation intent o
   }
 });
 
+test('private controlled restore wrapper mutation intent consumes execution and flush blockers only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'wrapper-intent'
+    });
+  const rows = [
+    {
+      domEventName: 'input',
+      latestProps: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'text-wrapper-intent'
+    },
+    {
+      domEventName: 'click',
+      latestProps: {
+        type: 'radio',
+        name: 'choice',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'radio-wrapper-intent'
+    },
+    {
+      domEventName: 'change',
+      latestProps: {
+        multiple: true,
+        value: ['a', 'c'],
+        onChange() {}
+      },
+      nodeName: 'SELECT',
+      queueId: 'select-wrapper-intent'
+    }
+  ];
+  const preflightAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+    queueId: 'controlled-wrapper-intent-preflight-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+  };
+  const executionAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-execution',
+    queueId: 'controlled-wrapper-intent-execution-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-write-execution'
+  };
+  const flushBlockerAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-flush-blocker',
+    queueId: 'controlled-wrapper-intent-flush-blocker-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-flush-blocker'
+  };
+  const wrapperIntentAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-wrapper-mutation-intent',
+    queueId: 'controlled-wrapper-mutation-intent-queue',
+    targetKind: 'controlled-input-post-event-restore-wrapper-mutation-intent'
+  };
+  const records = rows.map((row) => {
+    const dispatch = createControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      value: 'browser-mutated'
+    });
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+    return {dispatch, intent};
+  });
+  const preflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    preflightAdmission
+  );
+  const execution = gate.recordRestoreQueueWriteExecution(
+    preflight,
+    executionAdmission
+  );
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(
+    preflight,
+    flushBlockerAdmission
+  );
+  const wrapperIntent = gate.recordRestoreQueueWrapperMutationIntent(
+    execution,
+    flushBlocker,
+    wrapperIntentAdmission
+  );
+
+  assert.equal(Object.isFrozen(wrapperIntent), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueWrapperMutationIntentRecord(
+      wrapperIntent
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordPayload(
+      wrapperIntent
+    ),
+    wrapperIntent
+  );
+  assert.equal(
+    wrapperIntent.$$typeof,
+    controlledRestoreQueue.privateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordType
+  );
+  assert.equal(
+    wrapperIntent.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueWrapperMutationIntentStatus
+  );
+  assert.equal(wrapperIntent.requestId, 'wrapper-intent:7');
+  assert.equal(wrapperIntent.sourceWriteExecutionRequestId, 'wrapper-intent:5');
+  assert.equal(wrapperIntent.sourceFlushBlockerRequestId, 'wrapper-intent:6');
+  assert.equal(wrapperIntent.sourcePreflightRequestId, 'wrapper-intent:4');
+  assert.deepEqual(wrapperIntent.wrapperOperationNames, [
+    'input-value-sync',
+    'input-checked-sync',
+    'select-multiple-options-sync'
+  ]);
+  assert.deepEqual(
+    wrapperIntent.wrapperMutationIntentRows.map((row) => ({
+      rowId: row.rowId,
+      sourceWriteExecutionRowId: row.sourceWriteExecutionRowId,
+      sourceFlushIndex: row.sourceFlushIndex,
+      sourceRequestId: row.sourceRequestId,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      wrapperOperationName: row.wrapperOperationName,
+      wrapperMutationKind: row.wrapperMutationKind,
+      hostTag: row.hostTag,
+      controlKind: row.controlKind,
+      trackedField: row.trackedField,
+      controlledPropName: row.controlledPropName,
+      intendedUpdateKind: row.intendedUpdateKind,
+      valueTargetField: row.intendedValueUpdate?.targetField || null,
+      valueKind: row.intendedValueUpdate?.valueKind || null,
+      checkedTargetField: row.intendedCheckedUpdate?.targetField || null,
+      checkedValueKind: row.intendedCheckedUpdate?.valueKind || null,
+      wrapperInvocationBlocked: row.wrapperInvocationBlocked,
+      wrapperWriteBlocked: row.wrapperWriteBlocked,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      radioGroupLookupRequired: row.radioGroupLookupRequired,
+      radioGroupLookupPerformed: row.radioGroupLookupPerformed,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      hostValueRead: row.hostValueRead,
+      hostValueWritten: row.hostValueWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        rowId: 'wrapper-intent:7:row:1',
+        sourceWriteExecutionRowId: 'wrapper-intent:5:row:1',
+        sourceFlushIndex: 0,
+        sourceRequestId: 'wrapper-intent:1',
+        acceptedRestoreKind: 'input-text-value',
+        wrapperOperationName: 'input-value-sync',
+        wrapperMutationKind: 'value-property-sync',
+        hostTag: 'input',
+        controlKind: 'value',
+        trackedField: 'value',
+        controlledPropName: 'value',
+        intendedUpdateKind: 'value',
+        valueTargetField: 'value',
+        valueKind: 'string-current-value',
+        checkedTargetField: null,
+        checkedValueKind: null,
+        wrapperInvocationBlocked: true,
+        wrapperWriteBlocked: true,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'wrapper-intent:7:row:2',
+        sourceWriteExecutionRowId: 'wrapper-intent:5:row:2',
+        sourceFlushIndex: 1,
+        sourceRequestId: 'wrapper-intent:2',
+        acceptedRestoreKind: 'input-radio-checked',
+        wrapperOperationName: 'input-checked-sync',
+        wrapperMutationKind: 'checked-property-sync',
+        hostTag: 'input',
+        controlKind: 'checked',
+        trackedField: 'checked',
+        controlledPropName: 'checked',
+        intendedUpdateKind: 'checked',
+        valueTargetField: null,
+        valueKind: null,
+        checkedTargetField: 'checked',
+        checkedValueKind: 'boolean-string-current-value',
+        wrapperInvocationBlocked: true,
+        wrapperWriteBlocked: true,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupRequired: true,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      },
+      {
+        rowId: 'wrapper-intent:7:row:3',
+        sourceWriteExecutionRowId: 'wrapper-intent:5:row:3',
+        sourceFlushIndex: 2,
+        sourceRequestId: 'wrapper-intent:3',
+        acceptedRestoreKind: 'select-multiple-value',
+        wrapperOperationName: 'select-multiple-options-sync',
+        wrapperMutationKind: 'multiple-option-selection-sync',
+        hostTag: 'select',
+        controlKind: 'multiple',
+        trackedField: 'selectedOptions',
+        controlledPropName: 'value',
+        intendedUpdateKind: 'value',
+        valueTargetField: 'selectedOptions',
+        valueKind: 'array-option-values',
+        checkedTargetField: null,
+        checkedValueKind: null,
+        wrapperInvocationBlocked: true,
+        wrapperWriteBlocked: true,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupRequired: false,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(wrapperIntent.wrapperMutationPlan.wrapperSequence, [
+    'consume-restore-queue-write-execution',
+    'consume-restore-queue-flush-blocker',
+    'cross-check-shared-source-preflight',
+    'record-wrapper-operation-mutation-intents',
+    'keep-wrapper-invocation-blocked',
+    'keep-live-wrapper-writes-blocked'
+  ]);
+  assert.equal(wrapperIntent.wrapperMutationPlan.valueUpdateIntentCount, 2);
+  assert.equal(wrapperIntent.wrapperMutationPlan.checkedUpdateIntentCount, 1);
+  assert.equal(wrapperIntent.wrapperMutationPlan.restoreQueueFlushed, false);
+  assert.equal(wrapperIntent.wrapperMutationPlan.hostWrapperInvoked, false);
+  assert.equal(wrapperIntent.wrapperMutationPlan.wrapperWritePerformed, false);
+  assert.equal(wrapperIntent.blockedSideEffects.liveDomReadBlocked, true);
+  assert.equal(wrapperIntent.blockedSideEffects.liveDomWriteBlocked, true);
+  assert.equal(wrapperIntent.blockedSideEffects.valueTrackerWriteBlocked, true);
+  assert.equal(wrapperIntent.blockedSideEffects.queueFlushBlocked, true);
+  assert.equal(wrapperIntent.blockedSideEffects.hostWrapperInvoked, false);
+  assert.equal(wrapperIntent.blockedSideEffects.hostValueWritten, false);
+  assert.equal(wrapperIntent.blockedSideEffects.browserInputMutated, false);
+  assert.equal(
+    wrapperIntent.postEventRestoreBoundary.sourceRecordsSharePreflight,
+    true
+  );
+  assert.equal(
+    wrapperIntent.sideEffects.sourceRestoreQueueWriteExecutionAccepted,
+    true
+  );
+  assert.equal(
+    wrapperIntent.sideEffects.sourceRestoreQueueFlushBlockerAccepted,
+    true
+  );
+  assert.equal(
+    wrapperIntent.sideEffects.restoreWrapperMutationIntentRecorded,
+    true
+  );
+  assert.equal(wrapperIntent.sideEffects.wrapperMutationIntentRowCount, 3);
+  assert.equal(
+    wrapperIntent.sideEffects.wrapperIntendedValueUpdateRecorded,
+    true
+  );
+  assert.equal(
+    wrapperIntent.sideEffects.wrapperIntendedCheckedUpdateRecorded,
+    true
+  );
+  assert.equal(wrapperIntent.sideEffects.wrapperSideEffectsBlocked, true);
+  assert.equal(wrapperIntent.sideEffects.restoreQueueFlushed, false);
+  assert.equal(wrapperIntent.sideEffects.hostWrapperInvoked, false);
+  assert.equal(wrapperIntent.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(wrapperIntent.sideEffects.hostValueWritten, false);
+  assert.equal(wrapperIntent.sideEffects.browserInputMutated, false);
+  assert.equal(
+    wrapperIntent.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(summary.recordsRestoreWrapperMutationIntent, true);
+  assert.equal(
+    summary.restoreWrapperMutationIntent.acceptsWriteExecutionMetadata,
+    true
+  );
+  assert.equal(
+    summary.restoreWrapperMutationIntent.acceptsFlushBlockerMetadata,
+    true
+  );
+  assert.equal(
+    summary.restoreWrapperMutationIntent.recordsIntendedCheckedUpdates,
+    true
+  );
+  assert.equal(
+    summary.restoreWrapperMutationIntent.rejectsStaleSourcePairs,
+    true
+  );
+  assert.equal(summary.restoreWrapperMutationIntent.wrapperWrites, false);
+  assert.equal(summary.restoreWrapperMutationIntent.hostValueWrites, false);
+  assert.equal(summary.restoreWrapperMutationIntent.liveDomMutations, false);
+
+  assert.throws(
+    () =>
+      gate.recordRestoreQueueWrapperMutationIntent(
+        preflight,
+        flushBlocker,
+        wrapperIntentAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWrapperMutationIntentCode,
+      compatibilityTarget,
+      reason:
+        'expected a private controlled restore queue write execution record'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordRestoreQueueWrapperMutationIntent(
+        execution,
+        execution,
+        wrapperIntentAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWrapperMutationIntentCode,
+      compatibilityTarget,
+      reason: 'expected a private controlled restore queue flush blocker record'
+    }
+  );
+
+  const stale = createWrapperMutationIntentSources('stale-wrapper', rows);
+  assert.throws(
+    () =>
+      stale.gate.recordRestoreQueueWrapperMutationIntent(
+        stale.later.execution,
+        stale.earlier.flushBlocker,
+        wrapperIntentAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWrapperMutationIntentCode,
+      compatibilityTarget,
+      reason: 'stale-flush-blocker-source'
+    }
+  );
+  const foreignASources = createWrapperMutationIntentSources(
+    'foreign-wrapper-a',
+    rows
+  );
+  const foreignBSources = createWrapperMutationIntentSources(
+    'foreign-wrapper-b',
+    rows
+  );
+  const foreignA = foreignASources.earlier;
+  const foreignB = foreignBSources.earlier;
+  assert.throws(
+    () =>
+      foreignA.gate.recordRestoreQueueWrapperMutationIntent(
+        foreignA.execution,
+        foreignB.flushBlocker,
+        wrapperIntentAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWrapperMutationIntentCode,
+      compatibilityTarget,
+      reason: 'foreign-source-preflight'
+    }
+  );
+
+  for (const {dispatch} of records) {
+    assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+  stale.cleanup();
+  foreignASources.cleanup();
+  foreignBSources.cleanup();
+});
+
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
   const gate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'fake-tracker-error'
@@ -11181,6 +11595,84 @@ function createRootBridgeElement(nodeName, ownerDocument) {
     __registrations: [],
     addEventListener(type, listener) {
       this.__registrations.push({ listener, type });
+    }
+  };
+}
+
+function createWrapperMutationIntentSources(prefix, rows) {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: prefix
+    });
+  const earlier = createWrapperMutationIntentSourceSet(gate, rows);
+  const later = createWrapperMutationIntentSourceSet(gate, rows);
+
+  return {
+    gate,
+    earlier,
+    later,
+    cleanup() {
+      earlier.cleanup();
+      later.cleanup();
+    }
+  };
+}
+
+function createWrapperMutationIntentSourceSet(gate, rows) {
+  const records = rows.map((row) => {
+    const dispatch = createControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      value: 'browser-mutated'
+    });
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+    return {dispatch, intent};
+  });
+  const preflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+      queueId: `${records[0].intent.requestId}-preflight`,
+      targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+    }
+  );
+  const execution = gate.recordRestoreQueueWriteExecution(preflight, {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-execution',
+    queueId: `${preflight.requestId}-execution`,
+    targetKind: 'controlled-input-post-event-restore-queue-write-execution'
+  });
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(preflight, {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-flush-blocker',
+    queueId: `${preflight.requestId}-flush-blocker`,
+    targetKind: 'controlled-input-post-event-restore-queue-flush-blocker'
+  });
+
+  return {
+    gate,
+    preflight,
+    execution,
+    flushBlocker,
+    cleanup() {
+      for (const {dispatch} of records) {
+        componentTree.detachHostInstanceToken(dispatch.token);
+      }
     }
   };
 }
