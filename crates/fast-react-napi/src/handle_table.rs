@@ -1099,6 +1099,59 @@ mod tests {
     }
 
     #[test]
+    fn handoff_admission_after_teardown_rejects_stale_root_and_value_handles() {
+        let mut table = environment(1);
+        let root_handle = table.insert_root(PlaceholderRootRecord::new(71));
+        let value_handle = table.insert_value(PlaceholderValueRecord::new(72));
+
+        table.teardown_environment(table.environment_id());
+
+        assert_eq!(
+            table
+                .admit_root_handoff_handle(root_handle, PlaceholderRootRecord::new(73))
+                .unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: root_handle,
+                current_generation: root_handle.generation() + 1,
+            }
+        );
+        assert_eq!(
+            table
+                .admit_value_handoff_handle(value_handle, PlaceholderValueRecord::new(74))
+                .unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: value_handle,
+                current_generation: value_handle.generation() + 1,
+            }
+        );
+
+        let replacement_root = table.insert_root(PlaceholderRootRecord::new(75));
+        let replacement_value = table.insert_value(PlaceholderValueRecord::new(76));
+
+        assert_eq!(replacement_root.slot(), root_handle.slot());
+        assert_eq!(replacement_value.slot(), value_handle.slot());
+        assert_eq!(replacement_root.generation(), root_handle.generation() + 1);
+        assert_eq!(
+            replacement_value.generation(),
+            value_handle.generation() + 1
+        );
+        assert_eq!(
+            table.get_root(root_handle).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: root_handle,
+                current_generation: replacement_root.generation(),
+            }
+        );
+        assert_eq!(
+            table.get_value(value_handle).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: value_handle,
+                current_generation: replacement_value.generation(),
+            }
+        );
+    }
+
+    #[test]
     fn admits_js_handoff_handles_at_explicit_slots() {
         let mut table = environment(376);
         let root = BridgeHandle::new(table.environment_id(), 1, 1, BridgeHandleKind::Root);
