@@ -21,6 +21,9 @@ const repoRoot = path.resolve(
 const eventPriorities = require(
   path.join(repoRoot, "packages/react-dom/src/events/event-priorities.js")
 );
+const eventNames = require(
+  path.join(repoRoot, "packages/react-dom/src/events/event-names.js")
+);
 const eventListener = require(
   path.join(repoRoot, "packages/react-dom/src/events/react-dom-event-listener.js")
 );
@@ -53,6 +56,17 @@ test("private React DOM event priority mapping matches the checked oracle bucket
         entry.priorityName,
         `${bucket}:${entry.eventName} priority name`
       );
+      assert.deepEqual(
+        eventPriorities.createEventPriorityRecord(entry.eventName),
+        {
+          domEventName: entry.eventName,
+          eventPriority: entry.priorityValue,
+          eventPriorityLabel: bucket,
+          eventPriorityLane: entry.priorityValue,
+          eventPriorityName: entry.priorityName
+        },
+        `${bucket}:${entry.eventName} priority record`
+      );
     }
   }
 
@@ -72,6 +86,13 @@ test("private message event priority bridge follows Scheduler priority oracle ca
       }),
       entry.eventPriorityValue,
       entry.schedulerPriorityName
+    );
+    assert.equal(
+      eventPriorities.createEventPriorityRecord("message", {
+        schedulerPriority: entry.schedulerValue
+      }).eventPriorityName,
+      entry.eventPriorityName,
+      `${entry.schedulerPriorityName} priority record`
     );
   }
 
@@ -123,6 +144,10 @@ test("private event listener wrappers select priority entry points but stay iner
 
     assert.equal(listener.__FAST_REACT_DOM_EVENT_WRAPPER__, true);
     assert.equal(
+      listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__.listener,
+      listener
+    );
+    assert.equal(
       listener.__FAST_REACT_DOM_EVENT_WRAPPER_KIND__,
       testCase.expectedWrapperKind
     );
@@ -138,12 +163,49 @@ test("private event listener wrappers select priority entry points but stay iner
   }
 });
 
+test("private event listener wrapper records cover supported DOM event names", () => {
+  const target = createEventTarget("wrapper-record-target");
+  const actualWrapperCounts = createPriorityCountRecord();
+  const expectedWrapperCounts = createPriorityCountRecord();
+
+  for (const domEventName of eventNames.allNativeEvents) {
+    const eventPriority = eventPriorities.getEventPriority(domEventName);
+    const priorityLabel = eventPriorities.getEventPriorityLabel(eventPriority);
+    expectedWrapperCounts[priorityLabel]++;
+
+    const record = eventListener.createEventListenerWrapperRecordWithPriority(
+      target,
+      domEventName,
+      rootListeners.IS_CAPTURE_PHASE
+    );
+
+    actualWrapperCounts[record.eventPriorityLabel]++;
+    assert.equal(Object.isFrozen(record), true, domEventName);
+    assert.equal(record.kind, eventListener.EVENT_WRAPPER_RECORD_KIND);
+    assert.equal(record.domEventName, domEventName);
+    assert.equal(record.eventPriority, eventPriority, domEventName);
+    assert.equal(record.eventPriorityLane, eventPriority, domEventName);
+    assert.equal(record.priorityRecord.domEventName, domEventName);
+    assert.equal(record.priorityRecord.eventPriority, eventPriority);
+    assert.equal(record.listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__, record);
+    assert.equal(record.targetContainer, target);
+    assert.equal(record.listener(createNativeEvent(domEventName)), undefined);
+  }
+
+  assert.deepEqual(actualWrapperCounts, expectedWrapperCounts);
+  assert.equal(target.__registrations.length, 0);
+});
+
 test("root listener shells carry private priority metadata without dispatching", () => {
   const target = createEventTarget("root-listener-target");
   const listener = rootListeners.listenToNativeEvent("click", false, target);
 
   assert.equal(listener.__FAST_REACT_DOM_EVENT_SHELL__, true);
   assert.equal(listener.__FAST_REACT_DOM_EVENT_WRAPPER__, true);
+  assert.equal(
+    listener.__FAST_REACT_DOM_EVENT_SHELL_WRAPPER_RECORD__,
+    listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__
+  );
   assert.equal(
     listener.__FAST_REACT_DOM_EVENT_PRIORITY_NAME__,
     "DiscreteEventPriority"
@@ -154,6 +216,49 @@ test("root listener shells carry private priority metadata without dispatching",
   );
   assert.equal(listener(createNativeEvent("click")), undefined);
   assert.equal(target.__registrations.length, 1);
+});
+
+test("root listener installation wires every shell to a priority wrapper record", () => {
+  const target = createEventTarget("root-listener-record-target");
+  const expectedWrapperCounts = createPriorityCountRecord();
+  const actualWrapperCounts = createPriorityCountRecord();
+
+  for (const domEventName of eventNames.allNativeEvents) {
+    if (domEventName === "selectionchange") {
+      continue;
+    }
+    const registrationCount = eventNames.isNonDelegatedEvent(domEventName)
+      ? 1
+      : 2;
+    expectedWrapperCounts[
+      eventPriorities.getEventPriorityLabel(
+        eventPriorities.getEventPriority(domEventName)
+      )
+    ] += registrationCount;
+  }
+
+  rootListeners.listenToAllSupportedEvents(target);
+  assert.equal(target.__registrations.length, 138);
+
+  for (const registration of target.__registrations) {
+    const { listener, type } = registration;
+    const record = listener.__FAST_REACT_DOM_EVENT_SHELL_WRAPPER_RECORD__;
+
+    assert.equal(listener.__FAST_REACT_DOM_EVENT_SHELL__, true, type);
+    assert.equal(record, listener.__FAST_REACT_DOM_EVENT_WRAPPER_RECORD__, type);
+    assert.equal(record.listener, listener, type);
+    assert.equal(record.domEventName, type, type);
+    assert.equal(record.targetContainer, target, type);
+    assert.equal(
+      record.eventPriority,
+      eventPriorities.getEventPriority(type),
+      type
+    );
+    actualWrapperCounts[record.eventPriorityLabel]++;
+    assert.equal(listener(createNativeEvent(type)), undefined, type);
+  }
+
+  assert.deepEqual(actualWrapperCounts, expectedWrapperCounts);
 });
 
 test("private event priority modules do not change public React DOM exports", () => {
@@ -205,3 +310,11 @@ function createNativeEvent(type) {
   };
 }
 
+function createPriorityCountRecord() {
+  return {
+    continuous: 0,
+    default: 0,
+    discrete: 0,
+    idle: 0
+  };
+}

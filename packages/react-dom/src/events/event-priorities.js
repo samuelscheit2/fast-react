@@ -172,6 +172,21 @@ function eventPriorityToLane(updatePriority) {
   return updatePriority;
 }
 
+function createEventPriorityRecord(domEventName, options) {
+  const eventPriority = getEventPriority(domEventName, options);
+  return createEventPriorityRecordFromPriority(domEventName, eventPriority);
+}
+
+function createEventPriorityRecordFromPriority(domEventName, eventPriority) {
+  return Object.freeze({
+    domEventName,
+    eventPriority,
+    eventPriorityLabel: getEventPriorityLabel(eventPriority),
+    eventPriorityLane: eventPriorityToLane(eventPriority),
+    eventPriorityName: getEventPriorityName(eventPriority)
+  });
+}
+
 module.exports = {
   ContinuousEventPriority,
   DefaultEventPriority,
@@ -185,6 +200,8 @@ module.exports = {
   UserBlockingSchedulerPriority,
   continuousEventNameSet,
   continuousEventNames,
+  createEventPriorityRecord,
+  createEventPriorityRecordFromPriority,
   discreteEventNameSet,
   discreteEventNames,
   eventPriorityToLane,
@@ -194,4 +211,3 @@ module.exports = {
   resolveCurrentSchedulerPriority,
   schedulerPriorityToEventPriority
 };
-
