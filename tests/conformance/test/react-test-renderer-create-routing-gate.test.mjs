@@ -78,6 +78,15 @@ const privateToTreeFacadeSymbolDescription =
 const privateToTreeFacadeSymbol = Symbol.for(
   privateToTreeFacadeSymbolDescription
 );
+const privateRootCreatePreflightDiagnosticName =
+  "fast-react-test-renderer.root-create.private-preflight";
+const privateRootCreatePreflightStatus =
+  "private-root-create-preflight-ready-public-root-blocked";
+const privateRootCreatePreflightSymbolDescription =
+  "fast.react_test_renderer.private_root_create_preflight";
+const privateRootCreatePreflightSymbol = Symbol.for(
+  privateRootCreatePreflightSymbolDescription
+);
 const missingPrerequisites = [
   "public-react-test-renderer-root-lifecycle-routing",
   "react-test-renderer-host-output-serialization"
@@ -816,6 +825,186 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
       entry.entrypoint
     );
   }
+});
+
+test("react-test-renderer CJS development private root-create preflight validates accepted Rust canary metadata", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const element = { props: { children: "hello" }, type: "div" };
+  const options = {
+    onUncaughtError() {
+      throw new Error("must not run onUncaughtError");
+    },
+    unstable_strictMode: true
+  };
+  const renderer = moduleExports.create(element, options);
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const preflight = bridge.getRootCreatePreflight(createRequest);
+  const rendererPreflight = bridge.getRendererRootCreatePreflight(renderer);
+
+  assert.equal(rendererPreflight, preflight);
+  assertPrivateRootCreatePreflight(preflight, createRequest, {
+    entrypoint: entry.entrypoint,
+    ready: true,
+    failureReason: null,
+    supportedChildren: true,
+    rootOptionsMetadataAvailable: true
+  });
+
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      renderer,
+      privateRootCreatePreflightSymbol
+    ),
+    undefined
+  );
+
+  const rustDiagnostic = createRustRootCreatePreflightDiagnosticSource(
+    preflight
+  );
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreatePreflight(
+      createRequest,
+      rustDiagnostic
+    ),
+    true
+  );
+  const consumed = bridge.consumeAcceptedRustRootCreatePreflight(
+    createRequest,
+    rustDiagnostic
+  );
+  assertPrivateRootCreatePreflightConsumption(
+    consumed,
+    preflight,
+    createRequest,
+    entry.entrypoint
+  );
+
+  const staleDiagnostic = {
+    ...rustDiagnostic,
+    canaryApiIdentity: {
+      ...rustDiagnostic.canaryApiIdentity,
+      metadataId: "fast-react-test-renderer-stale-root-canary-metadata"
+    }
+  };
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreatePreflight(
+      createRequest,
+      staleDiagnostic
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      bridge.consumeAcceptedRustRootCreatePreflight(
+        createRequest,
+        staleDiagnostic
+      ),
+    {
+      code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
+      name: "FastReactTestRendererPrivateRootRequestError"
+    }
+  );
+
+  const rootError = captureThrown(() => renderer.root);
+  assertReactTestRendererUnimplemented(
+    rootError,
+    entry.entrypoint,
+    "create().root"
+  );
+  assert.equal(rootError.privateRootCreatePreflight, preflight);
+  assert.equal(rootError.routingGate.privateRootCreatePreflightGate, preflight.gate);
+  assert.equal(rootError.routingGate.createRouteAvailable, false);
+});
+
+test("react-test-renderer CJS development private root-create preflight fails closed for unsupported input", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+
+  const unsupportedRenderer = moduleExports.create(
+    { props: { children: ["a", "b"] }, type: "div" },
+    {}
+  );
+  const [unsupportedRequest] =
+    bridge.getRendererRootRequests(unsupportedRenderer);
+  const unsupportedPreflight =
+    bridge.getRootCreatePreflight(unsupportedRequest);
+  assertPrivateRootCreatePreflight(unsupportedPreflight, unsupportedRequest, {
+    entrypoint: entry.entrypoint,
+    ready: false,
+    failureReason: "unsupported-children",
+    supportedChildren: false,
+    rootOptionsMetadataAvailable: true
+  });
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreatePreflight(
+      unsupportedRequest,
+      createRustRootCreatePreflightDiagnosticSource(unsupportedPreflight)
+    ),
+    false
+  );
+
+  const missingOptionsRenderer = moduleExports.create({
+    props: { children: "hello" },
+    type: "div"
+  });
+  const [missingOptionsRequest] =
+    bridge.getRendererRootRequests(missingOptionsRenderer);
+  const missingOptionsPreflight =
+    bridge.getRootCreatePreflight(missingOptionsRequest);
+  assertPrivateRootCreatePreflight(
+    missingOptionsPreflight,
+    missingOptionsRequest,
+    {
+      entrypoint: entry.entrypoint,
+      ready: false,
+      failureReason: "missing-root-options",
+      supportedChildren: true,
+      rootOptionsMetadataAvailable: false
+    }
+  );
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreatePreflight(
+      missingOptionsRequest,
+      createRustRootCreatePreflightDiagnosticSource(missingOptionsPreflight)
+    ),
+    false
+  );
+
+  assertRendererShape(
+    unsupportedRenderer,
+    entry.entrypoint,
+    moduleExports._Scheduler
+  );
+  assertRendererShape(
+    missingOptionsRenderer,
+    entry.entrypoint,
+    moduleExports._Scheduler
+  );
+  assertCreateRoutingGate(
+    captureThrown(() => unsupportedRenderer.root),
+    entry.entrypoint
+  );
+  assertCreateRoutingGate(
+    captureThrown(() => missingOptionsRenderer.root),
+    entry.entrypoint
+  );
 });
 
 test("react-test-renderer private root request bridge can call a private Rust execution boundary shape", () => {
@@ -1642,6 +1831,18 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(typeof bridge.getRequestPayload, "function");
   assert.equal(typeof bridge.getRustCanaryMetadata, "function");
   assert.equal(typeof bridge.getRustCanaryOperationMetadata, "function");
+  if (entrypoint === cjsDevelopmentEntrypoint) {
+    assert.equal(typeof bridge.getRootCreatePreflight, "function");
+    assert.equal(typeof bridge.getRendererRootCreatePreflight, "function");
+    assert.equal(
+      typeof bridge.canConsumeAcceptedRustRootCreatePreflight,
+      "function"
+    );
+    assert.equal(
+      typeof bridge.consumeAcceptedRustRootCreatePreflight,
+      "function"
+    );
+  }
   assert.equal(typeof bridge.getTestInstanceQueryDiagnostics, "function");
   assert.equal(typeof bridge.getRootTestInstanceQueryDiagnostics, "function");
   assert.equal(typeof bridge.getRendererTestInstanceQueryDiagnostics, "function");
@@ -1864,6 +2065,223 @@ function assertRootExecutionResult(result, request) {
   assert.equal(result.compatibilityClaimed, false);
 }
 
+function assertPrivateRootCreatePreflight(preflight, request, expected) {
+  assert.equal(Object.isFrozen(preflight), true, expected.entrypoint);
+  assert.equal(
+    preflight.kind,
+    "FastReactTestRendererPrivateRootCreatePreflight"
+  );
+  assert.equal(
+    preflight.diagnosticName,
+    privateRootCreatePreflightDiagnosticName
+  );
+  assert.equal(
+    preflight.status,
+    expected.ready
+      ? privateRootCreatePreflightStatus
+      : `blocked-private-root-create-preflight-${expected.failureReason}`
+  );
+  assert.equal(preflight.ready, expected.ready);
+  assert.equal(preflight.failureReason, expected.failureReason);
+  assert.equal(preflight.entrypoint, expected.entrypoint);
+  assert.equal(preflight.compatibilityTarget, compatibilityTarget);
+  assertPrivateRootCreatePreflightGate(preflight.gate, expected.entrypoint);
+  assert.equal(preflight.rootRequest, request);
+  assert.equal(preflight.rootHandle, request.rootHandle);
+  assert.equal(preflight.rootId, request.rootId);
+  assert.equal(preflight.rootSequence, request.rootSequence);
+  assert.equal(preflight.rootRequestId, request.requestId);
+  assert.equal(preflight.rootRequestSequence, request.requestSequence);
+  assert.equal(preflight.operation, "create");
+  assert.equal(preflight.publicSurface, "create()");
+  assert.equal(Object.isFrozen(preflight.createInputShape), true);
+  assert.equal(
+    preflight.createInputShape.kind,
+    "FastReactTestRendererRootCreateInputShape"
+  );
+  assert.equal(
+    preflight.createInputShape.rootElementHandle,
+    request.rootElementHandle
+  );
+  assert.equal(
+    preflight.createInputShape.acceptedShape,
+    expected.supportedChildren ? "HostComponentWithTextChild" : "Unsupported"
+  );
+  assert.equal(preflight.createInputShape.rootNodeKind, "HostComponent");
+  assert.equal(preflight.createInputShape.elementType, "div");
+  assert.equal(
+    preflight.createInputShape.childShape,
+    expected.supportedChildren ? "Text" : "Array"
+  );
+  assert.equal(
+    preflight.createInputShape.supportedChildren,
+    expected.supportedChildren
+  );
+  assert.equal(
+    preflight.createInputShape.failClosedForUnsupportedChildren,
+    true
+  );
+  assert.equal(preflight.rootOptionsMetadata, request.optionsInfo);
+  assert.equal(
+    preflight.rootOptionsMetadataAvailable,
+    expected.rootOptionsMetadataAvailable
+  );
+  assert.equal(preflight.rootOptionsRequired, true);
+  assert.equal(Object.isFrozen(preflight.canaryApiIdentity), true);
+  assert.equal(
+    preflight.canaryApiIdentity.metadataId,
+    request.rustCanaryMetadata.id
+  );
+  assert.equal(
+    preflight.canaryApiIdentity.metadataStatus,
+    request.rustCanaryMetadata.status
+  );
+  assert.equal(preflight.canaryApiIdentity.operation, "create");
+  assert.equal(
+    preflight.canaryApiIdentity.rootApi,
+    "TestRendererRoot::create"
+  );
+  assert.equal(
+    preflight.canaryApiIdentity.preflightApi,
+    "TestRendererRoot::describe_private_root_create_preflight_for_canary"
+  );
+  assert.equal(preflight.canaryApiIdentity.rootOptionsType, "RootOptions");
+  assert.equal(
+    preflight.canaryApiIdentity.testRendererOptionsType,
+    "TestRendererOptions"
+  );
+  assert.equal(
+    preflight.canaryApiIdentity.containerUpdateApi,
+    "update_container"
+  );
+  assert.equal(
+    preflight.canaryApiIdentity.schedulerApi,
+    "ensure_root_is_scheduled"
+  );
+  assert.equal(preflight.rustCanaryMetadata, request.rustCanaryMetadata);
+  assert.equal(
+    preflight.rustCanaryOperationMetadata,
+    request.rustCanaryOperationMetadata
+  );
+  assert.equal(preflight.privateRustRootCreated, expected.ready);
+  assert.equal(
+    preflight.privateRootCanaryBoundaryValidated,
+    expected.ready
+  );
+  assert.equal(
+    preflight.consumesAcceptedRustRootCreatePreflightDiagnostics,
+    expected.ready
+  );
+  assert.equal(Object.isFrozen(preflight.blockedPublicRoot), true);
+  assert.equal(
+    preflight.blockedPublicRoot.status,
+    rootRequestCompatibilityStatus
+  );
+  assert.equal(preflight.blockedPublicRoot.publicRendererRootCreated, false);
+  assert.equal(preflight.blockedPublicRoot.publicRootAvailable, false);
+  assert.equal(
+    preflight.blockedPublicRoot.publicCreateBehaviorAvailable,
+    false
+  );
+  assert.equal(preflight.publicRendererRootCreated, false);
+  assert.equal(preflight.publicRootAvailable, false);
+  assert.equal(preflight.publicCreateBehaviorAvailable, false);
+  assert.equal(preflight.nativeAddonLoaded, false);
+  assert.equal(preflight.nativeBridgeAvailable, false);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.rustExecutionFromJs, false);
+  assert.equal(preflight.reconcilerExecutionFromJs, false);
+  assert.equal(preflight.hostOutputProducedFromJs, false);
+  assert.equal(preflight.compatibilityClaimed, false);
+}
+
+function assertPrivateRootCreatePreflightGate(gate, entrypoint) {
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(
+    gate.id,
+    "react-test-renderer-private-root-create-preflight-gate"
+  );
+  assert.equal(gate.status, privateRootCreatePreflightStatus);
+  assert.equal(gate.entrypoint, entrypoint);
+  assert.equal(gate.publicSurface, "create()");
+  assert.equal(gate.deterministic, true);
+  assert.equal(gate.diagnosticName, privateRootCreatePreflightDiagnosticName);
+  assert.equal(gate.symbol, privateRootCreatePreflightSymbolDescription);
+  assert.deepEqual(gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+    "TestRendererRoot::create",
+    "TestRendererOptions::reconciler_options",
+    "update_container",
+    "ensure_root_is_scheduled"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_private_create_preflight_validates_create_canary_without_public_root",
+    "root_private_create_preflight_fails_closed_for_unsupported_children",
+    "root_private_create_preflight_fails_closed_for_stale_canary_metadata",
+    "root_private_create_preflight_fails_closed_without_root_options"
+  ]);
+  assert.deepEqual(gate.acceptedInputShapes, [
+    "HostComponentWithTextChild"
+  ]);
+  assert.equal(gate.requiredRootOptions, true);
+  assert.equal(gate.validatesAcceptedRustRootCreateCanary, true);
+  assert.equal(gate.privateRustRootCreated, true);
+  assert.equal(gate.publicRendererRootCreated, false);
+  assert.equal(gate.publicRootAvailable, false);
+  assert.equal(gate.publicCreateBehaviorAvailable, false);
+  assert.equal(gate.nativeAddonLoaded, false);
+  assert.equal(gate.nativeBridgeAvailable, false);
+  assert.equal(gate.nativeExecution, false);
+  assert.equal(gate.rustExecutionFromJs, false);
+  assert.equal(gate.compatibilityClaimed, false);
+}
+
+function assertPrivateRootCreatePreflightConsumption(
+  consumed,
+  preflight,
+  request,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(consumed), true, entrypoint);
+  assert.equal(
+    consumed.kind,
+    "FastReactTestRendererPrivateRootCreatePreflightConsumption"
+  );
+  assert.equal(
+    consumed.diagnosticName,
+    privateRootCreatePreflightDiagnosticName
+  );
+  assert.equal(consumed.status, privateRootCreatePreflightStatus);
+  assert.equal(consumed.entrypoint, entrypoint);
+  assert.equal(consumed.compatibilityTarget, compatibilityTarget);
+  assert.equal(consumed.rootRequest, request);
+  assert.equal(consumed.preflight, preflight);
+  assert.equal(Object.isFrozen(consumed.sourceDiagnostic), true);
+  assert.equal(
+    consumed.consumesAcceptedRustRootCreatePreflightDiagnostics,
+    true
+  );
+  assert.equal(consumed.privateRootCanaryBoundaryValidated, true);
+  assert.equal(consumed.publicRendererRootCreated, false);
+  assert.equal(consumed.publicRootAvailable, false);
+  assert.equal(consumed.nativeAddonLoaded, false);
+  assert.equal(consumed.nativeBridgeAvailable, false);
+  assert.equal(consumed.nativeExecution, false);
+  assert.equal(consumed.rustExecutionFromJs, false);
+  assert.equal(consumed.compatibilityClaimed, false);
+}
+
+function createRustRootCreatePreflightDiagnosticSource(preflight) {
+  return {
+    diagnosticName: privateRootCreatePreflightDiagnosticName,
+    status: privateRootCreatePreflightStatus,
+    operation: "create",
+    createInputShape: preflight.createInputShape,
+    rootOptionsMetadata: preflight.rootOptionsMetadata,
+    canaryApiIdentity: preflight.canaryApiIdentity
+  };
+}
+
 function createRustLifecycleDiagnosticSource(request) {
   return {
     operation: request.operation,
@@ -2037,14 +2455,28 @@ function assertRustCanaryMetadata(metadata, label) {
       "worker-530-test-renderer-error-boundary-update-refresh"
     );
   }
+  if (metadata.rootCreatePreflight !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-539-test-renderer-live-rust-root-create-preflight"
+    );
+  }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
-  assert.deepEqual(metadata.acceptedJsBridgeWorkers, [
+  const expectedAcceptedJsBridgeWorkers = [
     "worker-304-test-renderer-js-private-root-request-bridge",
     "worker-306-test-renderer-testinstance-private-wrapper-skeleton",
     "worker-307-test-renderer-update-unmount-private-js-bridge",
     "worker-423-test-renderer-native-root-execution-bridge",
     "worker-426-test-renderer-testinstance-bridge-query"
-  ]);
+  ];
+  if (metadata.rootCreatePreflight !== undefined) {
+    expectedAcceptedJsBridgeWorkers.push(
+      "worker-539-test-renderer-live-rust-root-create-preflight"
+    );
+  }
+  assert.deepEqual(
+    metadata.acceptedJsBridgeWorkers,
+    expectedAcceptedJsBridgeWorkers
+  );
 
   assert.equal(Object.isFrozen(metadata.root), true, label);
   assert.equal(metadata.root.rustType, "TestRendererRoot", label);
@@ -2128,6 +2560,57 @@ function assertRustCanaryMetadata(metadata, label) {
   assert.equal(metadata.hostOutput.fixtureText, "hello", label);
   assert.equal(metadata.hostOutput.realHostOutputCanaryAvailable, true, label);
   assert.equal(metadata.hostOutput.generalMutationTraversalAvailable, false);
+
+  if (metadata.rootCreatePreflight !== undefined) {
+    const rootCreatePreflight = metadata.rootCreatePreflight;
+    assert.equal(Object.isFrozen(rootCreatePreflight), true, label);
+    assert.equal(
+      rootCreatePreflight.diagnosticName,
+      privateRootCreatePreflightDiagnosticName,
+      label
+    );
+    assert.equal(
+      rootCreatePreflight.status,
+      privateRootCreatePreflightStatus,
+      label
+    );
+    assertPrivateRootCreatePreflightGate(
+      rootCreatePreflight.gate,
+      rootCreatePreflight.gate.entrypoint
+    );
+    assert.equal(
+      rootCreatePreflight.bridgeMetadataSource,
+      "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata",
+      label
+    );
+    assert.deepEqual(
+      rootCreatePreflight.acceptedRustApis,
+      rootCreatePreflight.gate.acceptedRustApis
+    );
+    assert.deepEqual(
+      rootCreatePreflight.acceptedRustTests,
+      rootCreatePreflight.gate.acceptedRustTests
+    );
+    assert.deepEqual(rootCreatePreflight.acceptedInputShapes, [
+      "HostComponentWithTextChild"
+    ]);
+    assert.equal(rootCreatePreflight.requiredRootOptions, true, label);
+    assert.equal(
+      rootCreatePreflight.rootOptionsMetadataAvailable,
+      true,
+      label
+    );
+    assert.equal(rootCreatePreflight.staleCanaryMetadataRejection, true);
+    assert.equal(rootCreatePreflight.unsupportedChildrenRejection, true);
+    assert.equal(rootCreatePreflight.missingRootOptionsRejection, true);
+    assert.equal(rootCreatePreflight.publicRendererRootCreated, false);
+    assert.equal(rootCreatePreflight.publicRootAvailable, false);
+    assert.equal(rootCreatePreflight.nativeAddonLoaded, false);
+    assert.equal(rootCreatePreflight.nativeBridgeAvailable, false);
+    assert.equal(rootCreatePreflight.nativeExecution, false);
+    assert.equal(rootCreatePreflight.rustExecutionFromJs, false);
+    assert.equal(rootCreatePreflight.compatibilityClaimed, false);
+  }
 
   assert.equal(Object.isFrozen(metadata.privateJson), true, label);
   assert.equal(
@@ -2261,6 +2744,13 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
   assert.equal(Object.isFrozen(metadata), true, expected.entrypoint);
   assert.equal(metadata.operation, expected.operation);
   assert.equal(metadata.rootApi, `TestRendererRoot::${expected.operation}`);
+  if (metadata.rootCreatePreflightApi !== undefined) {
+    assert.equal(expected.operation, "create");
+    assert.equal(
+      metadata.rootCreatePreflightApi,
+      "TestRendererRoot::describe_private_root_create_preflight_for_canary"
+    );
+  }
   assert.equal(metadata.updateKind, expected.updateKind);
   assert.equal(
     metadata.rustUpdateKind,
@@ -2500,6 +2990,12 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(gate.privateRoutes[1], gate.unmountPrivateRoute);
   assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[0]);
   assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[1]);
+  if (gate.privateRootCreatePreflightGate !== undefined) {
+    assertPrivateRootCreatePreflightGate(
+      gate.privateRootCreatePreflightGate,
+      entrypoint
+    );
+  }
   assertLifecycleDiagnosticGate(gate.updateUnmountRustLifecycleDiagnosticGate);
   assert.equal(gate.privateUpdateUnmountLifecycleDiagnosticsAccepted, true);
   assert.equal(
