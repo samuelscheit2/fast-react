@@ -184,9 +184,21 @@ sequencing belong in `MASTER_PLAN.md`.
   React Test Renderer serialization compatibility remains blocked until
   committed test-renderer host output, fiber inspection, Rust serialization
   APIs, and a public JS facade exist.
+- Worker 179 sync flush commit integration was merged, adding an internal
+  HostRoot-only `flush_sync_commit_work_on_all_roots` path that renders sync
+  lanes, commits completed HostRoot work through the accepted current-switch
+  commit API, recomputes possible sync work, and keeps the existing
+  execution-context guarded render-only sync-flush handoff intact.
 
 ## Latest Accepted Verification
 
+- Worker 179 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `sync_flush`, `root_commit`, and
+  `root_scheduler` tests, full `fast-react-reconciler` tests with 118 unit
+  tests plus 1 doctest, reconciler clippy with warnings denied, and
+  `git diff --check`; the `root_scheduler.rs` merge conflict preserved the
+  existing guarded render-only sync-flush API and added shared sync-lane
+  filtering for the new commit-capable path.
 - Worker 178 was verified on its integrated worktree and again on `main` with
   the focused `test:react-test-renderer:serialization` workspace script, full
   conformance with 437 tests, `npm run check:js` covering the package-surface
