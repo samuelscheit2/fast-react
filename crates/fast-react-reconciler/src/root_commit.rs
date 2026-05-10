@@ -4781,6 +4781,401 @@ const fn host_root_deletion_cleanup_order_phase_name(
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary {
+    MultipleDeletionListsBlocked {
+        root: FiberRootId,
+        finished_work: FiberId,
+        count: usize,
+    },
+    MultipleDeletedRootsBlocked {
+        root: FiberRootId,
+        deletion_list: DeletionListId,
+        count: usize,
+    },
+    MissingDeletedRootTraversalRecord {
+        root: FiberRootId,
+        deletion_list: DeletionListId,
+        deleted_root: FiberId,
+    },
+    PortalDeletedRootBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+    },
+    PortalDeletedSubtreeBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        portal: FiberId,
+    },
+    SuspenseDeletedRootBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        tag: FiberTag,
+    },
+    SuspenseDeletedSubtreeBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    BroadDeletedRootBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        tag: FiberTag,
+    },
+    BroadDeletedSubtreeBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingHostCleanupRecord {
+        root: FiberRootId,
+        deleted_root: FiberId,
+    },
+    MultipleHostChildrenBlocked {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        count: usize,
+    },
+    MissingHostCleanupOrderRecord {
+        root: FiberRootId,
+        cleanup_sequence: usize,
+    },
+    HostCleanupOrderRecordMismatch {
+        root: FiberRootId,
+        cleanup_sequence: usize,
+        order_fiber: FiberId,
+        cleanup_fiber: FiberId,
+    },
+    MissingHostParent {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        host_child: FiberId,
+    },
+    UnsupportedHostParent {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        host_child: FiberId,
+        host_parent: FiberId,
+        host_parent_tag: FiberTag,
+    },
+    MissingHostParentStateNode {
+        root: FiberRootId,
+        deleted_root: FiberId,
+        host_child: FiberId,
+        host_parent: FiberId,
+    },
+}
+
+impl Display for HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MultipleDeletionListsBlocked {
+                root,
+                finished_work,
+                count,
+            } => write!(
+                formatter,
+                "root {} finished work fiber {} has {count} deletion lists; private host child detachment canary admits exactly one",
+                root.raw(),
+                finished_work.slot().get()
+            ),
+            Self::MultipleDeletedRootsBlocked {
+                root,
+                deletion_list,
+                count,
+            } => write!(
+                formatter,
+                "root {} deletion list {} has {count} deleted roots; private host child detachment canary admits exactly one",
+                root.raw(),
+                deletion_list.index()
+            ),
+            Self::MissingDeletedRootTraversalRecord {
+                root,
+                deletion_list,
+                deleted_root,
+            } => write!(
+                formatter,
+                "root {} deletion list {} deleted root fiber {} has no traversal gate record",
+                root.raw(),
+                deletion_list.index(),
+                deleted_root.slot().get()
+            ),
+            Self::PortalDeletedRootBlocked { root, deleted_root } => write!(
+                formatter,
+                "root {} deleted root fiber {} is a Portal; private host child detachment canary keeps portal teardown blocked",
+                root.raw(),
+                deleted_root.slot().get()
+            ),
+            Self::PortalDeletedSubtreeBlocked {
+                root,
+                deleted_root,
+                portal,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} contains Portal fiber {}; private host child detachment canary keeps portal teardown blocked",
+                root.raw(),
+                deleted_root.slot().get(),
+                portal.slot().get()
+            ),
+            Self::SuspenseDeletedRootBlocked {
+                root,
+                deleted_root,
+                tag,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} is {:?}; private host child detachment canary keeps Suspense/Offscreen teardown blocked",
+                root.raw(),
+                deleted_root.slot().get(),
+                tag
+            ),
+            Self::SuspenseDeletedSubtreeBlocked {
+                root,
+                deleted_root,
+                fiber,
+                tag,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} contains {:?} fiber {}; private host child detachment canary keeps Suspense/Offscreen teardown blocked",
+                root.raw(),
+                deleted_root.slot().get(),
+                tag,
+                fiber.slot().get()
+            ),
+            Self::BroadDeletedRootBlocked {
+                root,
+                deleted_root,
+                tag,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} is {:?}; private host child detachment canary keeps broad host teardown blocked",
+                root.raw(),
+                deleted_root.slot().get(),
+                tag
+            ),
+            Self::BroadDeletedSubtreeBlocked {
+                root,
+                deleted_root,
+                fiber,
+                tag,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} contains {:?} fiber {}; private host child detachment canary keeps broad host teardown blocked",
+                root.raw(),
+                deleted_root.slot().get(),
+                tag,
+                fiber.slot().get()
+            ),
+            Self::MissingHostCleanupRecord { root, deleted_root } => write!(
+                formatter,
+                "root {} deleted root fiber {} has no host cleanup record to detach",
+                root.raw(),
+                deleted_root.slot().get()
+            ),
+            Self::MultipleHostChildrenBlocked {
+                root,
+                deleted_root,
+                count,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} exposes {count} direct host children; private host child detachment canary admits one",
+                root.raw(),
+                deleted_root.slot().get()
+            ),
+            Self::MissingHostCleanupOrderRecord {
+                root,
+                cleanup_sequence,
+            } => write!(
+                formatter,
+                "root {} host cleanup sequence {cleanup_sequence} has no cleanup-order gate record",
+                root.raw()
+            ),
+            Self::HostCleanupOrderRecordMismatch {
+                root,
+                cleanup_sequence,
+                order_fiber,
+                cleanup_fiber,
+            } => write!(
+                formatter,
+                "root {} host cleanup sequence {cleanup_sequence} cleanup-order gate fiber {} does not match cleanup fiber {}",
+                root.raw(),
+                order_fiber.slot().get(),
+                cleanup_fiber.slot().get()
+            ),
+            Self::MissingHostParent {
+                root,
+                deleted_root,
+                host_child,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} host child fiber {} has no host parent",
+                root.raw(),
+                deleted_root.slot().get(),
+                host_child.slot().get()
+            ),
+            Self::UnsupportedHostParent {
+                root,
+                deleted_root,
+                host_child,
+                host_parent,
+                host_parent_tag,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} host child fiber {} parent fiber {} is {:?}; private host child detachment canary only admits HostComponent parents",
+                root.raw(),
+                deleted_root.slot().get(),
+                host_child.slot().get(),
+                host_parent.slot().get(),
+                host_parent_tag
+            ),
+            Self::MissingHostParentStateNode {
+                root,
+                deleted_root,
+                host_child,
+                host_parent,
+            } => write!(
+                formatter,
+                "root {} deleted root fiber {} host child fiber {} parent fiber {} has no host state node",
+                root.raw(),
+                deleted_root.slot().get(),
+                host_child.slot().get(),
+                host_parent.slot().get()
+            ),
+        }
+    }
+}
+
+impl Error for HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootDeletionSubtreeHostDetachmentPlanForCanary {
+    root: FiberRootId,
+    finished_work: FiberId,
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    deleted_root: FiberId,
+    deleted_root_tag: FiberTag,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    host_parent: FiberId,
+    host_parent_state_node: StateNodeHandle,
+    host_parent_traversal_depth: usize,
+    host_child: FiberId,
+    host_child_tag: FiberTag,
+    host_child_state_node: StateNodeHandle,
+    host_child_traversal_depth: usize,
+    cleanup_sequence: usize,
+    cleanup_order_sequence: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deterministic deletion detachment canary exposes full source coordinates"
+)]
+impl HostRootDeletionSubtreeHostDetachmentPlanForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_list(self) -> DeletionListId {
+        self.deletion_list
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_list_index(self) -> usize {
+        self.deletion_list_index
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_index(self) -> usize {
+        self.deleted_index
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root_tag(self) -> FiberTag {
+        self.deleted_root_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_tag(self) -> FiberTag {
+        self.parent_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent(self) -> FiberId {
+        self.host_parent
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent_state_node(self) -> StateNodeHandle {
+        self.host_parent_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent_traversal_depth(self) -> usize {
+        self.host_parent_traversal_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn host_child(self) -> FiberId {
+        self.host_child
+    }
+
+    #[must_use]
+    pub(crate) const fn host_child_tag(self) -> FiberTag {
+        self.host_child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn host_child_state_node(self) -> StateNodeHandle {
+        self.host_child_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn host_child_traversal_depth(self) -> usize {
+        self.host_child_traversal_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_sequence(self) -> usize {
+        self.cleanup_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn cleanup_order_sequence(self) -> usize {
+        self.cleanup_order_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn public_unmount_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_host_teardown_enabled(self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PendingHostRootDeletionCleanupRecord {
     root: FiberRootId,
@@ -5779,6 +6174,19 @@ impl HostRootCommitRecord {
         &self,
     ) -> HostRootDeletionCleanupOrderGateSnapshot {
         materialize_deletion_cleanup_order_gate(self)
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private deterministic test-host deletion detachment canary"
+    )]
+    pub(crate) fn deletion_subtree_host_detachment_plan_for_canary(
+        &self,
+    ) -> Result<
+        HostRootDeletionSubtreeHostDetachmentPlanForCanary,
+        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
+    > {
+        materialize_deletion_subtree_host_detachment_plan_for_canary(self)
     }
 
     #[allow(
@@ -11481,6 +11889,294 @@ fn materialize_deletion_cleanup_order_gate(
     }
 }
 
+fn materialize_deletion_subtree_host_detachment_plan_for_canary(
+    commit: &HostRootCommitRecord,
+) -> Result<
+    HostRootDeletionSubtreeHostDetachmentPlanForCanary,
+    HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
+> {
+    if commit.deletion_lists.len() != 1 {
+        return Err(
+            HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MultipleDeletionListsBlocked {
+                root: commit.root,
+                finished_work: commit.finished_work(),
+                count: commit.deletion_lists.len(),
+            },
+        );
+    }
+
+    let deletion_list = &commit.deletion_lists[0];
+    if deletion_list.deleted().len() != 1 {
+        return Err(
+            HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MultipleDeletedRootsBlocked {
+                root: commit.root,
+                deletion_list: deletion_list.list(),
+                count: deletion_list.deleted().len(),
+            },
+        );
+    }
+
+    let deleted_root = deletion_list.deleted()[0];
+    let deleted_root_record = commit
+        .deletion_subtree_traversal_gate
+        .records()
+        .iter()
+        .find(|record| record.deleted_root() == deleted_root && record.traversal_depth() == 0)
+        .ok_or(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingDeletedRootTraversalRecord {
+            root: commit.root,
+            deletion_list: deletion_list.list(),
+            deleted_root,
+        })?;
+    let deleted_root_tag = deleted_root_record.deleted_root_tag();
+
+    match deleted_root_tag {
+        FiberTag::Portal => {
+            return Err(
+                HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::PortalDeletedRootBlocked {
+                    root: commit.root,
+                    deleted_root,
+                },
+            );
+        }
+        FiberTag::Suspense | FiberTag::Offscreen => {
+            return Err(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::SuspenseDeletedRootBlocked {
+                root: commit.root,
+                deleted_root,
+                tag: deleted_root_tag,
+            });
+        }
+        FiberTag::HostComponent
+        | FiberTag::HostText
+        | FiberTag::FunctionComponent
+        | FiberTag::Fragment => {}
+        tag => {
+            return Err(
+                HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::BroadDeletedRootBlocked {
+                    root: commit.root,
+                    deleted_root,
+                    tag,
+                },
+            );
+        }
+    }
+
+    validate_no_blocked_deletion_subtree_boundaries_for_canary(commit, deleted_root)?;
+    validate_host_cleanup_order_records_for_canary(commit)?;
+
+    let host_child_record =
+        host_detachment_child_traversal_record_for_canary(commit, deleted_root)?;
+    let cleanup_record = commit
+        .host_node_deletion_cleanup_log
+        .records()
+        .iter()
+        .find(|cleanup| {
+            cleanup.deleted_root() == deleted_root && cleanup.fiber() == host_child_record.fiber()
+        })
+        .ok_or(
+            HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostCleanupRecord {
+                root: commit.root,
+                deleted_root,
+            },
+        )?;
+    let order_record = host_cleanup_order_record_for_canary(commit, cleanup_record)?;
+
+    let host_parent = cleanup_record.host_parent().ok_or(
+        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostParent {
+            root: commit.root,
+            deleted_root,
+            host_child: cleanup_record.fiber(),
+        },
+    )?;
+    let host_parent_tag = cleanup_record.host_parent_tag().ok_or(
+        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostParent {
+            root: commit.root,
+            deleted_root,
+            host_child: cleanup_record.fiber(),
+        },
+    )?;
+    if host_parent_tag != FiberTag::HostComponent {
+        return Err(
+            HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::UnsupportedHostParent {
+                root: commit.root,
+                deleted_root,
+                host_child: cleanup_record.fiber(),
+                host_parent,
+                host_parent_tag,
+            },
+        );
+    }
+    if cleanup_record.host_parent_state_node().is_none() {
+        return Err(
+            HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostParentStateNode {
+                root: commit.root,
+                deleted_root,
+                host_child: cleanup_record.fiber(),
+                host_parent,
+            },
+        );
+    }
+
+    Ok(HostRootDeletionSubtreeHostDetachmentPlanForCanary {
+        root: commit.root,
+        finished_work: commit.finished_work(),
+        deletion_list: deletion_list.list(),
+        deletion_list_index: 0,
+        deleted_index: 0,
+        deleted_root,
+        deleted_root_tag,
+        parent: cleanup_record.parent(),
+        parent_tag: cleanup_record.parent_tag(),
+        host_parent,
+        host_parent_state_node: cleanup_record.host_parent_state_node(),
+        host_parent_traversal_depth: cleanup_record.host_parent_traversal_depth().unwrap_or(0),
+        host_child: cleanup_record.fiber(),
+        host_child_tag: cleanup_record.tag(),
+        host_child_state_node: cleanup_record.state_node(),
+        host_child_traversal_depth: host_child_record.traversal_depth(),
+        cleanup_sequence: cleanup_record.sequence(),
+        cleanup_order_sequence: order_record.sequence(),
+    })
+}
+
+fn validate_no_blocked_deletion_subtree_boundaries_for_canary(
+    commit: &HostRootCommitRecord,
+    deleted_root: FiberId,
+) -> Result<(), HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary> {
+    for record in commit
+        .deletion_subtree_traversal_gate
+        .records()
+        .iter()
+        .filter(|record| record.deleted_root() == deleted_root && record.fiber() != deleted_root)
+    {
+        match record.status() {
+            HostRootDeletionSubtreeTraversalGateStatus::PortalDeletedSubtreeDiagnostic => {
+                return Err(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::PortalDeletedSubtreeBlocked {
+                    root: commit.root,
+                    deleted_root,
+                    portal: record.fiber(),
+                });
+            }
+            HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked
+            | HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked => {
+                return Err(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::SuspenseDeletedSubtreeBlocked {
+                    root: commit.root,
+                    deleted_root,
+                    fiber: record.fiber(),
+                    tag: record.tag(),
+                });
+            }
+            HostRootDeletionSubtreeTraversalGateStatus::BroadDeletionTraversalBlocked => {
+                return Err(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::BroadDeletedSubtreeBlocked {
+                    root: commit.root,
+                    deleted_root,
+                    fiber: record.fiber(),
+                    tag: record.tag(),
+                });
+            }
+            HostRootDeletionSubtreeTraversalGateStatus::FragmentDeletedSubtreeDiagnostic
+            | HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_host_cleanup_order_records_for_canary(
+    commit: &HostRootCommitRecord,
+) -> Result<(), HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary> {
+    for cleanup_record in commit.host_node_deletion_cleanup_log.records() {
+        host_cleanup_order_record_for_canary(commit, cleanup_record)?;
+    }
+
+    Ok(())
+}
+
+fn host_detachment_child_traversal_record_for_canary(
+    commit: &HostRootCommitRecord,
+    deleted_root: FiberId,
+) -> Result<
+    HostRootDeletionSubtreeTraversalGateRecord,
+    HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
+> {
+    let mut host_records = commit
+        .deletion_subtree_traversal_gate
+        .records()
+        .iter()
+        .filter(|record| {
+            record.deleted_root() == deleted_root
+                && record.status()
+                    == HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata
+        });
+    let first = host_records.next().copied().ok_or(
+        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostCleanupRecord {
+            root: commit.root,
+            deleted_root,
+        },
+    )?;
+    let min_depth = host_records
+        .clone()
+        .fold(first.traversal_depth(), |depth, record| {
+            depth.min(record.traversal_depth())
+        });
+    let mut direct_host_records = commit
+        .deletion_subtree_traversal_gate
+        .records()
+        .iter()
+        .filter(|record| {
+            record.deleted_root() == deleted_root
+                && record.status()
+                    == HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata
+                && record.traversal_depth() == min_depth
+        });
+    let direct = direct_host_records
+        .next()
+        .copied()
+        .expect("first host cleanup record establishes minimum depth");
+    let extra_count = direct_host_records.count();
+    if extra_count != 0 {
+        return Err(
+            HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MultipleHostChildrenBlocked {
+                root: commit.root,
+                deleted_root,
+                count: extra_count + 1,
+            },
+        );
+    }
+
+    Ok(direct)
+}
+
+fn host_cleanup_order_record_for_canary(
+    commit: &HostRootCommitRecord,
+    cleanup_record: &HostRootDeletionCleanupRecord,
+) -> Result<
+    HostRootDeletionCleanupOrderGateRecord,
+    HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
+> {
+    let order_gate = materialize_deletion_cleanup_order_gate(commit);
+    let order_record = order_gate
+        .records()
+        .iter()
+        .find(|record| {
+            record.phase() == HostRootDeletionCleanupOrderPhase::HostNodeCleanup
+                && record.host_cleanup_sequence() == Some(cleanup_record.sequence())
+        })
+        .ok_or(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostCleanupOrderRecord {
+            root: commit.root,
+            cleanup_sequence: cleanup_record.sequence(),
+        })?;
+    if order_record.fiber() != cleanup_record.fiber() {
+        return Err(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::HostCleanupOrderRecordMismatch {
+            root: commit.root,
+            cleanup_sequence: cleanup_record.sequence(),
+            order_fiber: order_record.fiber(),
+            cleanup_fiber: cleanup_record.fiber(),
+        });
+    }
+
+    Ok(*order_record)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DeletionCleanupOrderCoordinate {
     deletion_list: DeletionListId,
@@ -14526,6 +15222,83 @@ mod tests {
             assert_eq!(cleanup_records[0].state_node(), deleted_text_state_node);
             assert_eq!(host.operations(), Vec::<&'static str>::new());
         }
+    }
+
+    #[test]
+    fn root_commit_deletion_subtree_host_detachment_plan_validates_single_fragment_host_child() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let owner = create_test_fiber(&mut store, FiberTag::HostComponent, 9_530);
+        let fragment = create_test_fiber(&mut store, FiberTag::Fragment, 9_531);
+        let text = create_test_fiber(&mut store, FiberTag::HostText, 9_532);
+        let owner_state_node = StateNodeHandle::from_raw(9_540);
+        let text_state_node = StateNodeHandle::from_raw(9_541);
+
+        store
+            .fiber_arena_mut()
+            .get_mut(owner)
+            .unwrap()
+            .set_state_node(owner_state_node);
+        store
+            .fiber_arena_mut()
+            .get_mut(text)
+            .unwrap()
+            .set_state_node(text_state_node);
+        store
+            .fiber_arena_mut()
+            .set_children(fragment, &[text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(owner, &[fragment])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[owner])
+            .unwrap();
+        let deletion_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(owner, fragment)
+            .unwrap();
+        bubble_test_fiber(&mut store, render.finished_work());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let plan = commit
+            .deletion_subtree_host_detachment_plan_for_canary()
+            .unwrap();
+
+        assert_eq!(commit.deletion_lists().len(), 1);
+        assert_eq!(commit.deletion_lists()[0].list(), deletion_list);
+        assert_eq!(commit.deletion_lists()[0].deleted(), &[fragment]);
+        assert_eq!(commit.host_node_deletion_cleanup_log().len(), 1);
+        assert_eq!(
+            commit
+                .deletion_cleanup_order_gate_for_canary()
+                .host_node_cleanup_count(),
+            1
+        );
+        assert_eq!(plan.root(), root_id);
+        assert_eq!(plan.finished_work(), render.finished_work());
+        assert_eq!(plan.deletion_list(), deletion_list);
+        assert_eq!(plan.deletion_list_index(), 0);
+        assert_eq!(plan.deleted_index(), 0);
+        assert_eq!(plan.deleted_root(), fragment);
+        assert_eq!(plan.deleted_root_tag(), FiberTag::Fragment);
+        assert_eq!(plan.parent(), owner);
+        assert_eq!(plan.parent_tag(), FiberTag::HostComponent);
+        assert_eq!(plan.host_parent(), owner);
+        assert_eq!(plan.host_parent_state_node(), owner_state_node);
+        assert_eq!(plan.host_parent_traversal_depth(), 0);
+        assert_eq!(plan.host_child(), text);
+        assert_eq!(plan.host_child_tag(), FiberTag::HostText);
+        assert_eq!(plan.host_child_state_node(), text_state_node);
+        assert_eq!(plan.host_child_traversal_depth(), 1);
+        assert_eq!(plan.cleanup_sequence(), 0);
+        assert_eq!(plan.cleanup_order_sequence(), 0);
+        assert!(!plan.public_unmount_compatibility_claimed());
+        assert!(!plan.broad_host_teardown_enabled());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     #[test]
