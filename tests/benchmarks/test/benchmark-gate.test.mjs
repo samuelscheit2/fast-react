@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ACCEPTED_GATE_STATUSES,
   BENCHMARK_READINESS_STATUSES,
   CLAIM_CAPABLE_TIMING_STATUSES,
   COMPATIBILITY_STATUSES,
@@ -28,8 +29,8 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
   const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
 
   assert.equal(result.manifestCount, 4);
-  assert.equal(result.scenarioCount, 58);
-  assert.equal(result.milestoneCount, 6);
+  assert.equal(result.scenarioCount, 65);
+  assert.equal(result.milestoneCount, 9);
   assert.equal(result.resultCount, 0);
   assert.deepEqual(COMPATIBILITY_STATUSES, [
     "blocked-by-conformance",
@@ -53,6 +54,12 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
     "blocked-by-conformance",
     "diagnostic-admitted",
     "comparable-admitted"
+  ]);
+  assert.deepEqual(ACCEPTED_GATE_STATUSES, [
+    "accepted-blocked",
+    "accepted-private-partial",
+    "accepted-oracle-only",
+    "green-admitted"
   ]);
   assert.deepEqual(CLAIM_CAPABLE_TIMING_STATUSES, [
     "comparable",
@@ -118,6 +125,10 @@ test("benchmark manifest gate rejects unsupported green compatibility claims", (
     errors.join("\n"),
     /unsupported green compatibility claim; react-dom-root-render-e2e has conformanceClaims\.compatibilityClaimed=false/
   );
+  assert.match(
+    errors.join("\n"),
+    /unsupported green compatibility claim; react-dom-root-render-e2e acceptedGate\.admitted=false/
+  );
 });
 
 test("benchmark milestone gate rejects unknown readiness statuses", () => {
@@ -141,6 +152,18 @@ test("benchmark milestone gate rejects comparable admission without green compat
   assert.match(
     errors.join("\n"),
     /benchmarkReadinessStatus comparable-admitted requires compatibilityStatus green/
+  );
+});
+
+test("benchmark milestone gate rejects diagnostic admission without green compatibility", () => {
+  const manifest = clone(minimalRootMilestoneManifest);
+  manifest.milestones[0].benchmarkReadinessStatus = "diagnostic-admitted";
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.match(
+    errors.join("\n"),
+    /benchmarkReadinessStatus diagnostic-admitted requires compatibilityStatus green/
   );
 });
 

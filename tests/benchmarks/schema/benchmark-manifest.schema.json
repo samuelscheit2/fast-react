@@ -93,6 +93,45 @@
         "comparable-admitted"
       ]
     },
+    "acceptedConformanceGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "command",
+        "admitted",
+        "compatibilityClaimed"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "accepted-blocked",
+            "accepted-private-partial",
+            "accepted-oracle-only",
+            "green-admitted"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "admitted": {
+          "type": "boolean"
+        },
+        "compatibilityClaimed": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "conformanceGate": {
       "type": "object",
       "additionalProperties": false,
@@ -117,6 +156,9 @@
             ]
           },
           "uniqueItems": true
+        },
+        "acceptedGate": {
+          "$ref": "#/$defs/acceptedConformanceGate"
         }
       }
     },

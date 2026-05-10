@@ -24,7 +24,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "root-render-dual-run-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 163 accepted this fail-closed gate with 0 admitted and 20 blocked root render scenario-mode rows."
+      }
     }
   ],
   "scenarios": [

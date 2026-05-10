@@ -11,7 +11,14 @@
     "root-access-boundaries",
     "get-instance-boundaries",
     "create-node-mock-ref-lifecycle",
-    "strict-and-concurrent-options"
+    "strict-and-concurrent-options",
+    "host-tree-json-and-tree",
+    "text-root-json-and-tree",
+    "empty-root-nullish-output",
+    "array-root-json-and-tree",
+    "activity-hidden-json-and-tree",
+    "composite-to-tree",
+    "test-instance-find-basics"
   ],
   "conformanceGates": [
     {
@@ -21,7 +28,84 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-root-lifecycle-oracle",
+        "status": "accepted-oracle-only",
+        "command": "node --test tests/conformance/test/react-test-renderer-root-lifecycle-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The accepted root lifecycle artifact records React Test Renderer target behavior; local Fast React create/update/unmount admission remains blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-serialization-local-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-serialization-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-serialization-local-gate",
+        "status": "accepted-blocked",
+        "command": "npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Workers 178 and 209 keep serialization admission blocked until committed host output, fiber inspection, Rust serialization APIs, and a real JS facade exist."
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "test-renderer-create-shell-admission",
+      "description": "React Test Renderer create shell and act-boundary readiness before root lifecycle timings exist.",
+      "scenarioIds": [
+        "renderer-object-shape",
+        "raw-create-act-boundary"
+      ],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "The accepted root lifecycle oracle is React-only, and the local JS create surface is still fail-closed."
+    },
+    {
+      "id": "test-renderer-update-unmount-admission",
+      "description": "React Test Renderer update, unmount, root access, instance, ref, and option readiness.",
+      "scenarioIds": [
+        "create-update-unmount-flow",
+        "root-access-boundaries",
+        "get-instance-boundaries",
+        "create-node-mock-ref-lifecycle",
+        "strict-and-concurrent-options"
+      ],
+      "conformanceGateIds": [
+        "react-test-renderer-root-lifecycle",
+        "react-test-renderer-serialization-local-gate"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Root update/unmount and instance access require a real JS facade, committed host output, and fiber inspection before timing admission."
+    },
+    {
+      "id": "test-renderer-serialization-admission",
+      "description": "React Test Renderer toJSON, toTree, root text/null/array output, hidden output, and TestInstance query readiness.",
+      "scenarioIds": [
+        "host-tree-json-and-tree",
+        "text-root-json-and-tree",
+        "empty-root-nullish-output",
+        "array-root-json-and-tree",
+        "activity-hidden-json-and-tree",
+        "composite-to-tree",
+        "test-instance-find-basics"
+      ],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "The accepted serialization local gate remains closed and does not admit public serialization or TestInstance benchmark timing."
     }
   ],
   "scenarios": [
@@ -94,6 +178,76 @@
       "timingStatus": "blocked-by-conformance",
       "timingDataPolicy": "diagnostic-until-compatible",
       "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "host-tree-json-and-tree",
+      "area": "test renderer serialization",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The accepted serialization local gate is closed before committed host output, fiber inspection, Rust serializers, and a real JS facade exist."
+    },
+    {
+      "id": "text-root-json-and-tree",
+      "area": "test renderer serialization",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The accepted serialization local gate is closed before text-root serialization can be admitted."
+    },
+    {
+      "id": "empty-root-nullish-output",
+      "area": "test renderer serialization",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The accepted serialization local gate is closed before nullish root output can be admitted."
+    },
+    {
+      "id": "array-root-json-and-tree",
+      "area": "test renderer serialization",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The accepted serialization local gate is closed before array root output can be admitted."
+    },
+    {
+      "id": "activity-hidden-json-and-tree",
+      "area": "test renderer hidden output serialization",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Hidden output serialization is blocked by the accepted serialization local gate and unsupported Activity/hidden tree behavior."
+    },
+    {
+      "id": "composite-to-tree",
+      "area": "test renderer fiber tree serialization",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "toTree output remains blocked until committed fiber inspection and public serialization are admitted."
+    },
+    {
+      "id": "test-instance-find-basics",
+      "area": "test renderer TestInstance queries",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-serialization-local-gate"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "TestInstance query timing remains blocked until committed fiber inspection and public wrappers are admitted."
     }
   ]
 }
