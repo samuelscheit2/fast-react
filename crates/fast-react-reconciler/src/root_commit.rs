@@ -10,8 +10,8 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberId, FiberTag, FiberTopologyError, Lanes, RootFinishedLanes, StateHandle, StateNodeHandle,
-    UpdateQueueHandle,
+    FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, RootFinishedLanes,
+    StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
@@ -314,6 +314,7 @@ pub struct HostRootCommitRecord {
     finished_lanes: Lanes,
     remaining_lanes: Lanes,
     pending_lanes: Lanes,
+    mutation_log: HostRootMutationPhaseLog,
     root_update_callbacks: RootUpdateCallbackSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
 }
@@ -366,6 +367,15 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "reconciler-private mutation metadata is reserved for later commit workers"
+    )]
+    #[must_use]
+    pub(crate) const fn mutation_log(&self) -> &HostRootMutationPhaseLog {
+        &self.mutation_log
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private passive commit metadata for future passive-effect workers"
     )]
     #[must_use]
@@ -386,6 +396,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let finished_lanes = render.render_lanes();
     let remaining_lanes = render.remaining_lanes();
     let work_in_progress_update_queue = render.work_in_progress_update_queue();
+    let mutation_log =
+        collect_host_root_mutation_phase_log(store, root_id, finished_work, finished_lanes)?;
 
     let (pending_lanes, pending_passive_handoff) = {
         let root = store.root_mut(root_id)?;
@@ -414,9 +426,232 @@ pub fn commit_finished_host_root<H: HostTypes>(
         finished_lanes,
         remaining_lanes,
         pending_lanes,
+        mutation_log,
         root_update_callbacks,
         pending_passive_handoff,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootMutationPhaseLog {
+    root: FiberRootId,
+    finished_work: FiberId,
+    records: Vec<HostRootMutationPhaseRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "reconciler-private mutation metadata is reserved for later commit workers"
+)]
+impl HostRootMutationPhaseLog {
+    #[must_use]
+    const fn new(root: FiberRootId, finished_work: FiberId) -> Self {
+        Self {
+            root,
+            finished_work,
+            records: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootMutationPhaseRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    fn push(&mut self, record: HostRootMutationPhaseRecord) {
+        self.records.push(record);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootMutationPhaseRecord {
+    root: FiberRootId,
+    host_root: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    kind: HostRootMutationPhaseRecordKind,
+    lanes: Lanes,
+    effect_flag: FiberFlags,
+    state_node: StateNodeHandle,
+    pending_props: PropsHandle,
+    memoized_props: PropsHandle,
+    alternate_memoized_props: Option<PropsHandle>,
+}
+
+#[allow(
+    dead_code,
+    reason = "reconciler-private mutation metadata is reserved for later commit workers"
+)]
+impl HostRootMutationPhaseRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub(crate) const fn kind(self) -> HostRootMutationPhaseRecordKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_flag(self) -> FiberFlags {
+        self.effect_flag
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_props(self) -> PropsHandle {
+        self.pending_props
+    }
+
+    #[must_use]
+    pub(crate) const fn memoized_props(self) -> PropsHandle {
+        self.memoized_props
+    }
+
+    #[must_use]
+    pub(crate) const fn alternate_memoized_props(self) -> Option<PropsHandle> {
+        self.alternate_memoized_props
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostRootMutationPhaseRecordKind {
+    Placement,
+    Update,
+}
+
+fn collect_host_root_mutation_phase_log<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+) -> Result<HostRootMutationPhaseLog, RootCommitError> {
+    let arena = store.fiber_arena();
+    let mut log = HostRootMutationPhaseLog::new(root, finished_work);
+    let finished_root = arena.get(finished_work)?;
+    if !finished_root.subtree_flags().has_mutation_effects() {
+        return Ok(log);
+    }
+
+    let mut next_child = finished_root.child();
+
+    while let Some(child) = next_child {
+        let node = arena.get(child)?;
+        next_child = node.sibling();
+
+        if !is_supported_host_root_mutation_child(node.tag()) {
+            continue;
+        }
+
+        let flags = node.flags();
+        if flags.contains_all(FiberFlags::PLACEMENT) {
+            log.push(host_root_mutation_phase_record(
+                arena,
+                root,
+                finished_work,
+                child,
+                HostRootMutationPhaseRecordKind::Placement,
+                lanes,
+            )?);
+        }
+        if flags.contains_all(FiberFlags::UPDATE) {
+            log.push(host_root_mutation_phase_record(
+                arena,
+                root,
+                finished_work,
+                child,
+                HostRootMutationPhaseRecordKind::Update,
+                lanes,
+            )?);
+        }
+    }
+
+    Ok(log)
+}
+
+fn host_root_mutation_phase_record(
+    arena: &fast_react_core::FiberArena,
+    root: FiberRootId,
+    host_root: FiberId,
+    fiber: FiberId,
+    kind: HostRootMutationPhaseRecordKind,
+    lanes: Lanes,
+) -> Result<HostRootMutationPhaseRecord, RootCommitError> {
+    let node = arena.get(fiber)?;
+    let alternate_memoized_props = match node.alternate() {
+        Some(alternate) => Some(arena.get(alternate)?.memoized_props()),
+        None => None,
+    };
+
+    Ok(HostRootMutationPhaseRecord {
+        root,
+        host_root,
+        fiber,
+        tag: node.tag(),
+        kind,
+        lanes,
+        effect_flag: host_root_mutation_phase_record_flag(kind),
+        state_node: node.state_node(),
+        pending_props: node.pending_props(),
+        memoized_props: node.memoized_props(),
+        alternate_memoized_props,
+    })
+}
+
+const fn is_supported_host_root_mutation_child(tag: FiberTag) -> bool {
+    matches!(tag, FiberTag::HostComponent | FiberTag::HostText)
+}
+
+const fn host_root_mutation_phase_record_flag(kind: HostRootMutationPhaseRecordKind) -> FiberFlags {
+    match kind {
+        HostRootMutationPhaseRecordKind::Placement => FiberFlags::PLACEMENT,
+        HostRootMutationPhaseRecordKind::Update => FiberFlags::UPDATE,
+    }
 }
 
 fn record_pending_passive_commit_handoff<H: HostTypes>(
@@ -598,7 +833,7 @@ mod tests {
         process_root_schedule_in_microtask, render_host_root_for_lanes,
         render_host_root_via_scheduler_callback, update_container,
     };
-    use fast_react_core::{Lane, Lanes};
+    use fast_react_core::{FiberFlags, FiberTag, Lane, Lanes, PropsHandle, StateNodeHandle};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -615,6 +850,38 @@ mod tests {
     ) -> RootElementHandle {
         let state = store.fiber_arena().get(fiber).unwrap().memoized_state();
         store.host_root_states().get(state).unwrap().element()
+    }
+
+    fn attach_host_root_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+        tag: FiberTag,
+        flags: FiberFlags,
+        state_node: StateNodeHandle,
+        pending_props: PropsHandle,
+        memoized_props: PropsHandle,
+    ) -> FiberId {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let child = store
+            .fiber_arena_mut()
+            .create_fiber(tag, None, pending_props, mode);
+        {
+            let node = store.fiber_arena_mut().get_mut(child).unwrap();
+            node.set_flags(flags);
+            node.set_state_node(state_node);
+            node.set_memoized_props(memoized_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[child])
+            .unwrap();
+        let subtree_flags = store.fiber_arena().get(host_root).unwrap().subtree_flags() | flags;
+        store
+            .fiber_arena_mut()
+            .get_mut(host_root)
+            .unwrap()
+            .set_subtree_flags(subtree_flags);
+        child
     }
 
     fn scheduled_callback_node(
@@ -651,6 +918,7 @@ mod tests {
         assert_eq!(commit.remaining_lanes(), Lanes::NO);
         assert_eq!(commit.pending_lanes(), Lanes::NO);
         assert_eq!(commit.pending_passive_handoff(), None);
+        assert!(commit.mutation_log().is_empty());
         assert!(!commit.has_remaining_work());
         assert_eq!(new_current, render.work_in_progress());
         assert_eq!(host_root_element(&store, new_current), element);
@@ -674,6 +942,133 @@ mod tests {
                 .alternate(),
             Some(new_current)
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_host_root_child_placement_metadata_without_host_mutation() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(45), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let child_state_node = StateNodeHandle::from_raw(700);
+        let child_props = PropsHandle::from_raw(701);
+        let child = attach_host_root_child(
+            &mut store,
+            render.finished_work(),
+            FiberTag::HostText,
+            FiberFlags::PLACEMENT,
+            child_state_node,
+            child_props,
+            child_props,
+        );
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let log = commit.mutation_log();
+        let records = log.records();
+
+        assert_eq!(log.root(), root_id);
+        assert_eq!(log.finished_work(), render.finished_work());
+        assert_eq!(log.len(), 1);
+        assert_eq!(records[0].root(), root_id);
+        assert_eq!(records[0].host_root(), render.finished_work());
+        assert_eq!(records[0].fiber(), child);
+        assert_eq!(records[0].tag(), FiberTag::HostText);
+        assert_eq!(
+            records[0].kind(),
+            HostRootMutationPhaseRecordKind::Placement
+        );
+        assert_eq!(records[0].lanes(), Lanes::DEFAULT);
+        assert_eq!(records[0].effect_flag(), FiberFlags::PLACEMENT);
+        assert_eq!(records[0].state_node(), child_state_node);
+        assert_eq!(records[0].pending_props(), child_props);
+        assert_eq!(records[0].memoized_props(), child_props);
+        assert_eq!(records[0].alternate_memoized_props(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_host_root_child_update_metadata_without_invoking_host_commit() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let current_props = PropsHandle::from_raw(801);
+        let next_pending_props = PropsHandle::from_raw(802);
+        let next_memoized_props = PropsHandle::from_raw(803);
+        let state_node = StateNodeHandle::from_raw(804);
+        let current_child = attach_host_root_child(
+            &mut store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            state_node,
+            current_props,
+            current_props,
+        );
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_child = attach_host_root_child(
+            &mut store,
+            render.finished_work(),
+            FiberTag::HostComponent,
+            FiberFlags::UPDATE,
+            state_node,
+            next_pending_props,
+            next_memoized_props,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_child, finished_child)
+            .unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let records = commit.mutation_log().records();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].kind(), HostRootMutationPhaseRecordKind::Update);
+        assert_eq!(records[0].fiber(), finished_child);
+        assert_eq!(records[0].tag(), FiberTag::HostComponent);
+        assert_eq!(records[0].state_node(), state_node);
+        assert_eq!(records[0].pending_props(), next_pending_props);
+        assert_eq!(records[0].memoized_props(), next_memoized_props);
+        assert_eq!(records[0].alternate_memoized_props(), Some(current_props));
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_placement_before_update_without_deletion_records() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(47), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let child = attach_host_root_child(
+            &mut store,
+            render.finished_work(),
+            FiberTag::HostComponent,
+            FiberFlags::PLACEMENT | FiberFlags::UPDATE | FiberFlags::CHILD_DELETION,
+            StateNodeHandle::from_raw(900),
+            PropsHandle::from_raw(901),
+            PropsHandle::from_raw(902),
+        );
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let records = commit.mutation_log().records();
+
+        assert_eq!(records.len(), 2);
+        assert_eq!(
+            records[0].kind(),
+            HostRootMutationPhaseRecordKind::Placement
+        );
+        assert_eq!(records[1].kind(), HostRootMutationPhaseRecordKind::Update);
+        assert_eq!(records[0].fiber(), child);
+        assert_eq!(records[1].fiber(), child);
+        assert_eq!(records[0].effect_flag(), FiberFlags::PLACEMENT);
+        assert_eq!(records[1].effect_flag(), FiberFlags::UPDATE);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
