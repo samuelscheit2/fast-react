@@ -1158,6 +1158,95 @@ function isPrivateHydrationTargetClaimingDiagnostic(value) {
   return hydrationTargetClaimingDiagnosticPayloads.has(value);
 }
 
+function assertCanonicalPrivateHydrationTargetClaimingDiagnostic(
+  record,
+  expected
+) {
+  const expectedEvidence =
+    expected && typeof expected === 'object' ? expected : {};
+  const payload = getPrivateHydrationTargetClaimingDiagnosticPayload(record);
+  if (
+    payload === null ||
+    !record ||
+    typeof record !== 'object' ||
+    !Object.isFrozen(record) ||
+    record.kind !== HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND ||
+    record.gateId !== privateHydrationTargetClaimingGateId ||
+    record.status !== privateHydrationTargetClaimingMetadataStatus ||
+    record.diagnosticOnly !== true ||
+    record.readOnly !== true ||
+    record.compatibilityClaimed !== false ||
+    record.browserDomEventCompatibilityClaimed !== false ||
+    record.publicRootBehaviorChanged !== false ||
+    record.publicHydrationCompatibilityClaimed !== false ||
+    record.publicHydrationReplayCompatibilityClaimed !== false ||
+    record.eventReplaySupported !== false ||
+    record.hydrationReplaySupported !== false ||
+    record.queueMutationAllowed !== false ||
+    record.replayQueuesDrained !== false ||
+    record.eventDispatch !== false ||
+    record.willDispatch !== false ||
+    record.willHydrate !== false ||
+    record.willReplay !== false ||
+    record.targetClaimExecuted !== false ||
+    record.publicHydrationTargetClaimed !== false ||
+    record.claimRecorded !== true ||
+    record.claimedTargetMetadata !== true ||
+    record.markerRow !== payload.markerRow ||
+    record.ownershipDiagnostics !== payload.ownershipDiagnostics ||
+    record.ownershipRow !== payload.ownershipRow ||
+    record.targetDispatchLinkDiagnostic !==
+      payload.targetDispatchLinkDiagnostic ||
+    payload.targetDispatchLinkPayload === null ||
+    payload.targetDispatchLinkPayload === undefined ||
+    !isPrivateHydrationBoundaryRecord(payload.hydrationBoundaryRecord) ||
+    !payload.targetPathEvidence ||
+    typeof payload.targetPathEvidence !== 'object' ||
+    !Object.isFrozen(payload.targetPathEvidence) ||
+    !Object.isFrozen(payload.targetPathEvidence.targetPathRecord) ||
+    !Object.isFrozen(payload.targetPathEvidence.matchedPaths) ||
+    record.targetPathDeterministicallySelected !== true ||
+    record.targetPathResolvedToDispatchTarget !== true ||
+    record.targetPathUniqueInContainer !== true ||
+    record.targetPathParentChainRetained !== true ||
+    record.targetContainerMatchesBoundaryRecord !== true ||
+    record.hydratableLookupTargetPathRetained !== true
+  ) {
+    throwInvalidHydrationTargetClaimingDiagnostic(
+      'Hydration target claiming requires canonical immutable private target-claiming evidence.'
+    );
+  }
+
+  if (
+    expectedEvidence.hydrationBoundaryRecord !== undefined &&
+    payload.hydrationBoundaryRecord !==
+      expectedEvidence.hydrationBoundaryRecord
+  ) {
+    throwInvalidHydrationTargetClaimingDiagnostic(
+      'Hydration target claiming evidence must match the expected hydration boundary record.'
+    );
+  }
+  if (
+    expectedEvidence.ownershipDiagnostics !== undefined &&
+    payload.ownershipDiagnostics !== expectedEvidence.ownershipDiagnostics
+  ) {
+    throwInvalidHydrationTargetClaimingDiagnostic(
+      'Hydration target claiming evidence must match the expected ownership diagnostics.'
+    );
+  }
+  if (
+    expectedEvidence.targetDispatchLinkDiagnostic !== undefined &&
+    payload.targetDispatchLinkDiagnostic !==
+      expectedEvidence.targetDispatchLinkDiagnostic
+  ) {
+    throwInvalidHydrationTargetClaimingDiagnostic(
+      'Hydration target claiming evidence must match the expected target-dispatch link.'
+    );
+  }
+
+  return payload;
+}
+
 function getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
   record
 ) {
@@ -4559,6 +4648,7 @@ module.exports = {
   acceptedHydrationBoundaryMetadataContracts,
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
+  assertCanonicalPrivateHydrationTargetClaimingDiagnostic,
   createHydrationClaimedReplayTargetDispatchExecutionRecord,
   createHydrationReplayOwnershipGateDiagnostic,
   createHydrationReplayTargetDispatchLinkDiagnostic,

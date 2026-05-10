@@ -275,11 +275,24 @@ test('private hydration target claiming records one inert dehydrated boundary ta
 
   const payload =
     hydrationGate.getPrivateHydrationTargetClaimingDiagnosticPayload(claim);
+  const canonicalPayload =
+    hydrationGate.assertCanonicalPrivateHydrationTargetClaimingDiagnostic(
+      claim,
+      {
+        hydrationBoundaryRecord: fixture.record,
+        ownershipDiagnostics,
+        targetDispatchLinkDiagnostic: targetDispatchLink
+      }
+    );
+  assert.equal(canonicalPayload, payload);
   assert.equal(payload.hydrationBoundaryRecord, fixture.record);
   assert.equal(payload.markerRow, fixture.record.markerDiagnostics.markers[0]);
   assert.equal(payload.ownershipDiagnostics, ownershipDiagnostics);
   assert.equal(payload.ownershipRow, claim.ownershipRow);
   assert.equal(payload.targetPathEvidence.deterministicallySelected, true);
+  assert.equal(Object.isFrozen(payload.targetPathEvidence), true);
+  assert.equal(Object.isFrozen(payload.targetPathEvidence.targetPathRecord), true);
+  assert.equal(Object.isFrozen(payload.targetPathEvidence.matchedPaths), true);
   assert.equal(payload.targetPathResolution.node, fixture.boundaryTarget);
   assert.equal(payload.targetDispatchLinkDiagnostic, targetDispatchLink);
   assert.equal(
@@ -1005,7 +1018,57 @@ test('private hydration target claiming rejects stale markers missing ownership 
     }
   );
 
+  const canonicalFixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-canonical-negative'
+  );
+  const canonicalDispatchRecord = createDispatchRecord(
+    canonicalFixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    canonicalFixture.boundaryTarget
+  );
+  const canonicalTargetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      canonicalFixture.record,
+      canonicalDispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-canonical-link'
+      }
+    );
+  const canonicalOwnershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      canonicalFixture.record,
+      canonicalDispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-canonical-ownership'
+      }
+    );
+  const canonicalClaim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    canonicalFixture.record,
+    canonicalOwnershipDiagnostics,
+    canonicalTargetDispatchLink,
+    {
+      source: 'hydration-private-target-claiming-canonical-negative'
+    }
+  );
+  assert.throws(
+    () =>
+      hydrationGate.assertCanonicalPrivateHydrationTargetClaimingDiagnostic(
+        Object.freeze({...canonicalClaim}),
+        {
+          hydrationBoundaryRecord: canonicalFixture.record,
+          ownershipDiagnostics: canonicalOwnershipDiagnostics,
+          targetDispatchLinkDiagnostic: canonicalTargetDispatchLink
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE
+    }
+  );
+
   assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(canonicalDispatchRecord.hydrationReplay.queued, false);
   assert.equal(externalDispatchRecord.hydrationReplay.queued, false);
   assert.equal(ambiguousDispatchRecord.hydrationReplay.queued, false);
   assert.deepEqual(fixture.container.__registrations, []);
@@ -1014,6 +1077,8 @@ test('private hydration target claiming rejects stale markers missing ownership 
   assert.deepEqual(externalFixture.document.__registrations, []);
   assert.deepEqual(ambiguousFixture.container.__registrations, []);
   assert.deepEqual(ambiguousFixture.document.__registrations, []);
+  assert.deepEqual(canonicalFixture.container.__registrations, []);
+  assert.deepEqual(canonicalFixture.document.__registrations, []);
 });
 
 test('private hydration claimed replay target-dispatch execution rejects stale links', () => {
