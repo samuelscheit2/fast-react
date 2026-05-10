@@ -6,9 +6,10 @@
 //! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
 //! HostRoot render/commit handoff, including callback snapshot diagnostics,
 //! plus a private committed host-output canary for one HostComponent with one
-//! HostText child, private JSON diagnostics for create/update canaries, and
-//! private host-node deletion cleanup diagnostics. It still stops before public
-//! serialization, act, or public `react-test-renderer` compatibility.
+//! HostText child, private JSON diagnostics for create/update canaries and
+//! broader host snapshot shapes, and private host-node deletion cleanup
+//! diagnostics. It still stops before public serialization, act, or public
+//! `react-test-renderer` compatibility.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -2227,6 +2228,74 @@ impl TestRendererPrivateJsonNodeDiagnostic {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateJsonRenderedRoot {
+    Null,
+    Text(String),
+    HostComponent(TestRendererPrivateJsonRenderedHostComponent),
+    Array(Vec<TestRendererPrivateJsonRenderedRoot>),
+}
+
+impl TestRendererPrivateJsonRenderedRoot {
+    #[must_use]
+    pub const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    #[must_use]
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Self::Text(text) => Some(text),
+            Self::Null | Self::HostComponent(_) | Self::Array(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_host_component(&self) -> Option<&TestRendererPrivateJsonRenderedHostComponent> {
+        match self {
+            Self::HostComponent(component) => Some(component),
+            Self::Null | Self::Text(_) | Self::Array(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn as_array(&self) -> Option<&[TestRendererPrivateJsonRenderedRoot]> {
+        match self {
+            Self::Array(children) => Some(children),
+            Self::Null | Self::Text(_) | Self::HostComponent(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateJsonRenderedHostComponent {
+    element_type: TestElementType,
+    props: BTreeMap<String, String>,
+    children: Option<Vec<TestRendererPrivateJsonRenderedRoot>>,
+}
+
+impl TestRendererPrivateJsonRenderedHostComponent {
+    #[must_use]
+    pub fn element_type(&self) -> &TestElementType {
+        &self.element_type
+    }
+
+    #[must_use]
+    pub fn props(&self) -> &BTreeMap<String, String> {
+        &self.props
+    }
+
+    #[must_use]
+    pub fn children(&self) -> Option<&[TestRendererPrivateJsonRenderedRoot]> {
+        self.children.as_deref()
+    }
+
+    #[must_use]
+    pub fn child_count(&self) -> usize {
+        self.children.as_ref().map_or(0, Vec::len)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateJsonTextDiagnostic {
     text: String,
     hidden: bool,
@@ -2305,6 +2374,7 @@ pub struct TestRendererPrivateToJsonFacadeResult {
     element_type: TestElementType,
     props: TestProps,
     children: Vec<String>,
+    rendered_root: TestRendererPrivateJsonRenderedRoot,
     source_node_count: usize,
     public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
     public_serialization_available: bool,
@@ -2350,6 +2420,11 @@ impl TestRendererPrivateToJsonFacadeResult {
     #[must_use]
     pub const fn child_count(&self) -> usize {
         self.children.len()
+    }
+
+    #[must_use]
+    pub const fn rendered_root(&self) -> &TestRendererPrivateJsonRenderedRoot {
+        &self.rendered_root
     }
 
     #[must_use]
@@ -3470,6 +3545,7 @@ impl TestRendererRoot {
             element_type: component.element_type().clone(),
             props: component.props().clone(),
             children: vec![component.text_child().text().to_owned()],
+            rendered_root: Self::private_json_rendered_root_from_component(component),
             source_node_count: report.node_count(),
             public_blockers: report.public_blockers(),
             public_serialization_available: false,
@@ -4508,6 +4584,98 @@ impl TestRendererRoot {
                 detached: false,
             },
         ]
+    }
+
+    fn private_json_rendered_root_from_component(
+        component: &TestRendererPrivateJsonHostComponentDiagnostic,
+    ) -> TestRendererPrivateJsonRenderedRoot {
+        let children = if component.text_child().is_hidden() {
+            None
+        } else {
+            Some(vec![TestRendererPrivateJsonRenderedRoot::Text(
+                component.text_child().text().to_owned(),
+            )])
+        };
+
+        TestRendererPrivateJsonRenderedRoot::HostComponent(
+            TestRendererPrivateJsonRenderedHostComponent {
+                element_type: component.element_type().clone(),
+                props: Self::private_json_props_without_children(component.props()),
+                children,
+            },
+        )
+    }
+
+    pub fn describe_private_to_json_host_shape_from_snapshot_for_diagnostics(
+        snapshot: &TestContainerSnapshot,
+    ) -> TestRendererPrivateJsonRenderedRoot {
+        let children = Self::private_json_rendered_children_from_snapshots(snapshot.children());
+        Self::private_json_rendered_root_from_children(children)
+    }
+
+    fn private_json_rendered_root_from_children(
+        mut children: Vec<TestRendererPrivateJsonRenderedRoot>,
+    ) -> TestRendererPrivateJsonRenderedRoot {
+        match children.len() {
+            0 => TestRendererPrivateJsonRenderedRoot::Null,
+            1 => children.remove(0),
+            _ => TestRendererPrivateJsonRenderedRoot::Array(children),
+        }
+    }
+
+    fn private_json_rendered_children_from_snapshots(
+        snapshots: &[TestNodeSnapshot],
+    ) -> Vec<TestRendererPrivateJsonRenderedRoot> {
+        snapshots
+            .iter()
+            .filter_map(Self::private_json_rendered_child_from_snapshot)
+            .collect()
+    }
+
+    fn private_json_rendered_child_from_snapshot(
+        snapshot: &TestNodeSnapshot,
+    ) -> Option<TestRendererPrivateJsonRenderedRoot> {
+        match snapshot {
+            TestNodeSnapshot::Text(text) => {
+                if text.is_hidden() {
+                    None
+                } else {
+                    Some(TestRendererPrivateJsonRenderedRoot::Text(
+                        text.text().to_owned(),
+                    ))
+                }
+            }
+            TestNodeSnapshot::Element(element) => {
+                if element.is_hidden() || element.is_detached() {
+                    return None;
+                }
+
+                let rendered_children =
+                    Self::private_json_rendered_children_from_snapshots(element.children());
+                let children = if rendered_children.is_empty() {
+                    None
+                } else {
+                    Some(rendered_children)
+                };
+
+                Some(TestRendererPrivateJsonRenderedRoot::HostComponent(
+                    TestRendererPrivateJsonRenderedHostComponent {
+                        element_type: element.element_type().clone(),
+                        props: Self::private_json_props_without_children(element.props()),
+                        children,
+                    },
+                ))
+            }
+        }
+    }
+
+    fn private_json_props_without_children(props: &TestProps) -> BTreeMap<String, String> {
+        props
+            .attributes()
+            .iter()
+            .filter(|(name, _)| name.as_str() != "children")
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect()
     }
 
     fn private_json_fiber_diagnostic(
@@ -5896,6 +6064,13 @@ mod tests {
         assert_eq!(result.props(), &TestProps::new());
         assert_eq!(result.children(), &["hello".to_owned()]);
         assert_eq!(result.child_count(), 1);
+        let rendered_root = result.rendered_root().as_host_component().unwrap();
+        assert_eq!(rendered_root.element_type().as_str(), "span");
+        assert!(rendered_root.props().is_empty());
+        assert_eq!(
+            rendered_root.children().unwrap()[0].as_text(),
+            Some("hello")
+        );
         assert_eq!(result.source_node_count(), 2);
         assert!(result.public_blockers().all_blocked());
         assert!(!result.public_serialization_available());
@@ -5940,10 +6115,125 @@ mod tests {
         assert_eq!(result.element_type().as_str(), "span");
         assert_eq!(result.props(), &TestProps::new());
         assert_eq!(result.children(), &["goodbye".to_owned()]);
+        let rendered_root = result.rendered_root().as_host_component().unwrap();
+        assert_eq!(
+            rendered_root.children().unwrap()[0].as_text(),
+            Some("goodbye")
+        );
         assert_eq!(result.source_node_count(), 2);
         assert!(result.public_blockers().all_blocked());
         assert!(!result.public_serialization_available());
         assert!(!result.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_shape_diagnostics_serialize_empty_root_as_null() {
+        let snapshot = TestContainerSnapshot { children: vec![] };
+
+        let rendered =
+            TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(
+                &snapshot,
+            );
+
+        assert!(rendered.is_null());
+    }
+
+    #[test]
+    fn root_private_to_json_shape_diagnostics_serialize_multiple_host_children_and_text_siblings() {
+        let snapshot = TestContainerSnapshot {
+            children: vec![
+                TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: element_type("div"),
+                    props: props().with_attribute("id", "first"),
+                    hidden: false,
+                    detached: false,
+                    children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                        text: "one".to_owned(),
+                        hidden: false,
+                    })],
+                }),
+                TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "tail".to_owned(),
+                    hidden: false,
+                }),
+                TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: element_type("span"),
+                    props: props().with_attribute("className", "tag"),
+                    hidden: false,
+                    detached: false,
+                    children: vec![
+                        TestNodeSnapshot::Text(TestTextSnapshot {
+                            text: "two".to_owned(),
+                            hidden: false,
+                        }),
+                        TestNodeSnapshot::Text(TestTextSnapshot {
+                            text: "three".to_owned(),
+                            hidden: false,
+                        }),
+                    ],
+                }),
+            ],
+        };
+
+        let rendered =
+            TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(
+                &snapshot,
+            );
+        let children = rendered.as_array().unwrap();
+        let first = children[0].as_host_component().unwrap();
+        let second = children[1].as_text().unwrap();
+        let third = children[2].as_host_component().unwrap();
+
+        assert_eq!(children.len(), 3);
+        assert_eq!(first.element_type().as_str(), "div");
+        assert_eq!(first.props().get("id").map(String::as_str), Some("first"));
+        assert_eq!(first.child_count(), 1);
+        assert_eq!(first.children().unwrap()[0].as_text(), Some("one"));
+        assert_eq!(second, "tail");
+        assert_eq!(third.element_type().as_str(), "span");
+        assert_eq!(
+            third.props().get("className").map(String::as_str),
+            Some("tag")
+        );
+        assert_eq!(third.child_count(), 2);
+        assert_eq!(third.children().unwrap()[0].as_text(), Some("two"));
+        assert_eq!(third.children().unwrap()[1].as_text(), Some("three"));
+    }
+
+    #[test]
+    fn root_private_to_json_shape_diagnostics_elide_children_prop() {
+        let snapshot = TestContainerSnapshot {
+            children: vec![TestNodeSnapshot::Element(TestElementSnapshot {
+                element_type: element_type("div"),
+                props: props()
+                    .with_attribute("children", "prop child")
+                    .with_attribute("data-id", "kept"),
+                hidden: false,
+                detached: false,
+                children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "rendered child".to_owned(),
+                    hidden: false,
+                })],
+            })],
+        };
+
+        let rendered =
+            TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(
+                &snapshot,
+            );
+        let component = rendered.as_host_component().unwrap();
+
+        assert_eq!(component.element_type().as_str(), "div");
+        assert_eq!(
+            component.props().get("data-id").map(String::as_str),
+            Some("kept")
+        );
+        assert!(!component.props().contains_key("children"));
+        assert_eq!(component.child_count(), 1);
+        assert_eq!(
+            component.children().unwrap()[0].as_text(),
+            Some("rendered child")
+        );
     }
 
     #[test]

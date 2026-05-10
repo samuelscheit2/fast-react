@@ -67,6 +67,12 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
       "The private toJSON facade must serialize the accepted minimal committed host-output diagnostic shape without exposing public toJSON."
   },
   {
+    id: "js-tojson-broader-host-shape-diagnostics",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON facade must cover multiple host children, text siblings, prop elision, and empty roots while public toJSON stays blocked."
+  },
+  {
     id: "js-tojson-exposes-private-diagnostic-result",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -276,6 +282,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToJSONSerializationFacadeGatePresent &&
     localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics &&
     localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics &&
+    localChecks.privateToJSONSerializationFacadeCoversBroaderHostShapes &&
     localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
   const privateToTreeMetadataGateReady =
@@ -356,6 +363,9 @@ export function evaluateReactTestRendererSerializationLocalGate({
           "js-tojson-serializes-accepted-host-output-diagnostics"
         ) {
           return !localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics;
+        }
+        if (requirement.id === "js-tojson-broader-host-shape-diagnostics") {
+          return !localChecks.privateToJSONSerializationFacadeCoversBroaderHostShapes;
         }
         if (
           requirement.id === "js-tojson-exposes-private-diagnostic-result"
@@ -726,6 +736,44 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\breact-test-renderer-tojson-private-host-output-serializer\b/u
     );
+  const privateToJSONSerializationFacadeCoversBroaderHostShapes =
+    privateToJSONSerializationFacadeSerializesHostOutputDiagnostics &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedHostRootShapes\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpropElisionFromSerializedProps\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreatePrivateToJSONRenderedRoot\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bnormalizePrivateToJSONProps\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateJsonRenderedRoot\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bdescribe_private_to_json_host_shape_from_snapshot_for_diagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_shape_diagnostics_serialize_empty_root_as_null\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_shape_diagnostics_serialize_multiple_host_children_and_text_siblings\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_shape_diagnostics_elide_children_prop\b/u
+    );
   const privateToJSONSerializationFacadeExposesDiagnosticResult =
     privateToJSONSerializationFacadeGatePresent &&
     hasSourcePattern(
@@ -1021,6 +1069,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeGatePresent,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
+    privateToJSONSerializationFacadeCoversBroaderHostShapes,
     privateToJSONSerializationFacadeExposesDiagnosticResult,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
