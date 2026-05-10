@@ -29,6 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 730
+
+- Worker 730 added narrow Rust-only react-test-renderer unmount native cleanup
+  canary evidence. The hidden canary records nonzero deleted ref cleanup and
+  deleted passive destroy metadata alongside host-node cleanup, preserving the
+  expected cleanup order before native bridge cleanup admission can pass.
+- The accepted change stayed private and Rust-only. It did not admit public
+  unmount, public serialization, native bridge loading/execution, JS bridge
+  behavior, host teardown compatibility, `act` flushing, finished-work identity
+  consumption, or multichild/sibling identity admission.
+- Worker 730 was accepted after independent audit and verification with focused
+  unmount native bridge, unmount passive/ref, and root host-output canary Rust
+  tests, formatting, clippy, package-surface guard, import smoke, conflict
+  marker scanning, and `git diff --check`; its subagent, worktree, and branch
+  were removed after merge. Full unmount finished-work identity admission
+  remains deferred behind a separate adapter and proof.
+
+### Worker 729
+
+- Worker 729 added the static private-admission ledger for Workers 727-728.
+  Worker 727 is recorded as skip/meta ledger work, and Worker 728 is recorded
+  as accepted private diagnostic evidence for the react-test-renderer unmount
+  native identity-argument guard.
+- Acceptance audit found initial fail-open risks in the ledger evaluator: rows
+  could lose accepted diagnostic ids, dependency diagnostic ids, blocker
+  context diagnostic ids, blocked surfaces, or blocked claims without
+  violation. The accepted fix keeps those fields fail-closed and preserves
+  update identity work only as blocker context, not as unmount identity
+  admission.
+- Worker 729 was accepted after post-fix audit and verification with focused
+  private-admission tests, focused conformance tests, package-surface guard,
+  import smoke, conflict-marker-free diff inspection, and `git diff --check`;
+  its subagent, worktree, and branch were removed after merge. This is static
+  ledger evidence only and does not execute runtime paths or promote public
+  package compatibility.
+
 ### Worker 728
 
 - Worker 728 added a hidden react-test-renderer native serialization guard so
