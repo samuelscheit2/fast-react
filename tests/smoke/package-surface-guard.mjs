@@ -169,8 +169,118 @@ function assertLoadError(error, expected, label) {
     );
   }
 
+  if (Object.hasOwn(expected, 'entrypoint')) {
+    assert.equal(error.entrypoint, expected.entrypoint, `${label} entrypoint`);
+  } else {
+    assert.equal(
+      Object.hasOwn(error, 'entrypoint'),
+      false,
+      `${label} entrypoint`
+    );
+  }
+
   if (Object.hasOwn(expected, 'message')) {
     assert.equal(error.message, expected.message, `${label} error message`);
+  }
+}
+
+function assertRuntimeVersion(moduleExports, entry, label) {
+  if (!Object.hasOwn(entry, 'version')) {
+    return;
+  }
+
+  assert.equal(
+    Object.hasOwn(moduleExports, 'version'),
+    true,
+    `${label} version export`
+  );
+  assert.equal(moduleExports.version, entry.version, `${label} version`);
+}
+
+function assertUndefinedExports(moduleExports, entry, label) {
+  for (const exportName of entry.undefinedExports ?? []) {
+    assert.equal(
+      Object.hasOwn(moduleExports, exportName),
+      true,
+      `${label}.${exportName} export presence`
+    );
+    assert.equal(
+      moduleExports[exportName],
+      undefined,
+      `${label}.${exportName} must stay undefined`
+    );
+  }
+}
+
+function assertUnsupportedExport(moduleExports, entry, expectedExport, label) {
+  const exportName = expectedExport.exportName;
+  const exportValue = moduleExports[exportName];
+  const entrypoint = entry.metadata.entrypoint;
+  const compatibilityTarget = entry.metadata.compatibilityTarget;
+
+  assert.equal(
+    typeof exportValue,
+    'function',
+    `${label}.${exportName} placeholder type`
+  );
+  assert.equal(
+    exportValue.name,
+    expectedExport.functionName,
+    `${label}.${exportName} placeholder name`
+  );
+  assert.equal(
+    exportValue.length,
+    expectedExport.length,
+    `${label}.${exportName} placeholder length`
+  );
+
+  assert.throws(
+    () => exportValue(),
+    (error) => {
+      assert.equal(
+        error.name,
+        'FastReactDomUnimplementedError',
+        `${label}.${exportName} error name`
+      );
+      assert.equal(
+        error.code,
+        'FAST_REACT_UNIMPLEMENTED',
+        `${label}.${exportName} error code`
+      );
+      assert.equal(
+        error.entrypoint,
+        entrypoint,
+        `${label}.${exportName} error entrypoint`
+      );
+      assert.equal(
+        error.exportName,
+        exportName,
+        `${label}.${exportName} error export name`
+      );
+      assert.equal(
+        error.compatibilityTarget,
+        compatibilityTarget,
+        `${label}.${exportName} compatibility target`
+      );
+      assert.equal(
+        error.message.includes(`${entrypoint}.${exportName} was called`),
+        true,
+        `${label}.${exportName} error message should name the boundary`
+      );
+      assert.equal(
+        error.message.includes('no React DOM behavior implementation yet'),
+        true,
+        `${label}.${exportName} error message should stay unsupported`
+      );
+      return true;
+    },
+    `${label}.${exportName} should remain an unsupported placeholder`
+  );
+}
+
+function assertUnsupportedExports(moduleExports, entry, label) {
+  for (const expectedExport of entry.unsupportedExports ?? []) {
+    assertUnsupportedExport(moduleExports, entry, expectedExport, label);
   }
 }
 
@@ -199,6 +309,9 @@ async function assertRuntimeEntrypoint(packageRoot, entry, packageName) {
   const moduleExports = loadFresh(modulePath);
   assert.deepEqual(Object.keys(moduleExports), expectedKeysFor(entry), label);
   assertPlaceholderMetadata(moduleExports, entry.metadata, label);
+  assertRuntimeVersion(moduleExports, entry, label);
+  assertUndefinedExports(moduleExports, entry, label);
+  assertUnsupportedExports(moduleExports, entry, label);
 }
 
 async function publicResolverFiles(packageRoot, packageJson) {
