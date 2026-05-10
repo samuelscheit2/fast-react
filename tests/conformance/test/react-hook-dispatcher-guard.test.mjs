@@ -660,7 +660,7 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
   assert.equal(React.markPrivateStateHookDispatcher, undefined);
 });
 
-test("private callback-hook dispatcher metadata names match accepted memo records", () => {
+test("private callback-hook dispatcher metadata names match accepted callback diagnostics", () => {
   const metadata = hookDispatcher.privateCallbackHookDispatcherMetadata;
 
   assert.equal(metadata.capability, "fast-react.private.callback_hook_dispatcher");
@@ -679,6 +679,7 @@ test("private callback-hook dispatcher metadata names match accepted memo record
   ]);
   assert.deepEqual(metadata.updateRecordFields, [
     "hook",
+    "previousHook",
     "previousCallback",
     "previousDependencies",
     "requestedCallback",
@@ -686,6 +687,23 @@ test("private callback-hook dispatcher metadata names match accepted memo record
     "dependencies",
     "dependencyStatus"
   ]);
+  assert.deepEqual(metadata.updateDiagnosticRecordFields, [
+    "diagnosticIndex",
+    "fiber",
+    "current",
+    "currentHookList",
+    "hookList",
+    "previousHook",
+    "hook",
+    "renderLanes",
+    "previousCallback",
+    "previousDependencies",
+    "requestedCallback",
+    "callback",
+    "dependencies",
+    "dependencyStatus"
+  ]);
+  assert.deepEqual(metadata.updateDiagnosticsFields, ["hookList", "records"]);
   assert.deepEqual(metadata.memoRecordFields, [
     "hook",
     "value",
@@ -707,6 +725,8 @@ test("private callback-hook dispatcher metadata names match accepted memo record
     "FunctionComponentUseCallbackRenderRequest",
     "FunctionComponentCallbackHookRecord",
     "FunctionComponentCallbackUpdateRecord",
+    "FunctionComponentCallbackUpdateDiagnosticRecord",
+    "FunctionComponentCallbackUpdateDiagnostics",
     "FunctionComponentUseCallbackHookRenderRecord",
     "FunctionComponentUseCallbackRenderRecord",
     "FunctionComponentMemoDependencyStatus",
@@ -843,7 +863,7 @@ test("private context-hook dispatcher metadata names match accepted context diag
   assert.equal(React.markPrivateContextHookDispatcher, undefined);
 });
 
-test("private callback-hook dispatcher marker rejects dependency metadata drift", () => {
+test("private callback-hook dispatcher marker rejects diagnostic metadata drift", () => {
   const dispatcher = {
     useCallback() {
       throw new Error("unreachable callback dispatch");
@@ -851,7 +871,7 @@ test("private callback-hook dispatcher marker rejects dependency metadata drift"
   };
   const driftedMetadata = {
     ...hookDispatcher.privateCallbackHookDispatcherMetadata,
-    dependencyStatusNames: ["Changed"]
+    updateDiagnosticRecordFields: ["hook", "dependencyStatus"]
   };
 
   assert.equal(

@@ -908,6 +908,7 @@ impl FunctionComponentCallbackHookRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentCallbackUpdateRecord {
     hook: HookSlotId,
+    previous_hook: HookSlotId,
     previous_callback: FunctionComponentCallbackHandle,
     previous_dependencies: HookEffectDependencies,
     requested_callback: FunctionComponentCallbackHandle,
@@ -920,6 +921,11 @@ impl FunctionComponentCallbackUpdateRecord {
     #[must_use]
     pub const fn hook(self) -> HookSlotId {
         self.hook
+    }
+
+    #[must_use]
+    pub const fn previous_hook(self) -> HookSlotId {
+        self.previous_hook
     }
 
     #[must_use]
@@ -955,6 +961,117 @@ impl FunctionComponentCallbackUpdateRecord {
     #[must_use]
     pub const fn reused_previous_callback(self) -> bool {
         self.dependency_status.reused_previous_value()
+    }
+
+    #[must_use]
+    pub const fn replaced_callback(self) -> bool {
+        matches!(
+            self.dependency_status,
+            FunctionComponentMemoDependencyStatus::Changed
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCallbackUpdateDiagnosticRecord {
+    diagnostic_index: usize,
+    fiber: FiberId,
+    current: FiberId,
+    current_hook_list: HookListId,
+    hook_list: HookListId,
+    previous_hook: HookSlotId,
+    hook: HookSlotId,
+    render_lanes: Lanes,
+    previous_callback: FunctionComponentCallbackHandle,
+    previous_dependencies: HookEffectDependencies,
+    requested_callback: FunctionComponentCallbackHandle,
+    callback: FunctionComponentCallbackHandle,
+    dependencies: HookEffectDependencies,
+    dependency_status: FunctionComponentMemoDependencyStatus,
+}
+
+impl FunctionComponentCallbackUpdateDiagnosticRecord {
+    #[must_use]
+    pub const fn diagnostic_index(self) -> usize {
+        self.diagnostic_index
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn current(self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn current_hook_list(self) -> HookListId {
+        self.current_hook_list
+    }
+
+    #[must_use]
+    pub const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn previous_hook(self) -> HookSlotId {
+        self.previous_hook
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn previous_callback(self) -> FunctionComponentCallbackHandle {
+        self.previous_callback
+    }
+
+    #[must_use]
+    pub const fn previous_dependencies(self) -> HookEffectDependencies {
+        self.previous_dependencies
+    }
+
+    #[must_use]
+    pub const fn requested_callback(self) -> FunctionComponentCallbackHandle {
+        self.requested_callback
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> FunctionComponentCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> FunctionComponentMemoDependencyStatus {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn reused_previous_callback(self) -> bool {
+        self.dependency_status.reused_previous_value()
+    }
+
+    #[must_use]
+    pub const fn replaced_callback(self) -> bool {
+        matches!(
+            self.dependency_status,
+            FunctionComponentMemoDependencyStatus::Changed
+        )
     }
 }
 
@@ -2493,6 +2610,50 @@ impl FunctionComponentMemoUpdateDiagnostics {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCallbackUpdateDiagnostics {
+    hook_list: HookListId,
+    records: Vec<FunctionComponentCallbackUpdateDiagnosticRecord>,
+}
+
+impl FunctionComponentCallbackUpdateDiagnostics {
+    #[must_use]
+    pub const fn hook_list(&self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[FunctionComponentCallbackUpdateDiagnosticRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn reuse_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.reused_previous_callback())
+            .count()
+    }
+
+    #[must_use]
+    pub fn replacement_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.replaced_callback())
+            .count()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FunctionComponentRefHookBinding {
     hook: HookSlotId,
@@ -2935,6 +3096,7 @@ pub(crate) struct FunctionComponentHookRenderStore {
     committed_effect_queues: Vec<FunctionComponentCommittedEffectQueue>,
     memo_hooks: Vec<FunctionComponentMemoHookBinding>,
     memo_update_diagnostics: Vec<FunctionComponentMemoUpdateDiagnostics>,
+    callback_update_diagnostics: Vec<FunctionComponentCallbackUpdateDiagnostics>,
     ref_hooks: Vec<FunctionComponentRefHookBinding>,
     state_dispatches: Vec<FunctionComponentStateDispatchBinding>,
     next_state_dispatch_raw: u64,
@@ -2954,6 +3116,7 @@ impl Default for FunctionComponentHookRenderStore {
             committed_effect_queues: Vec::new(),
             memo_hooks: Vec::new(),
             memo_update_diagnostics: Vec::new(),
+            callback_update_diagnostics: Vec::new(),
             ref_hooks: Vec::new(),
             state_dispatches: Vec::new(),
             next_state_dispatch_raw: 1,
@@ -3064,6 +3227,34 @@ impl FunctionComponentHookRenderStore {
         state: FunctionComponentHookRenderState,
     ) -> Result<&[FunctionComponentMemoUpdateDiagnosticRecord], FunctionComponentRenderError> {
         match self.memo_update_diagnostics(state)? {
+            Some(queue) => Ok(queue.records()),
+            None => Ok(&[]),
+        }
+    }
+
+    pub fn callback_update_diagnostics(
+        &self,
+        state: FunctionComponentHookRenderState,
+    ) -> Result<Option<&FunctionComponentCallbackUpdateDiagnostics>, FunctionComponentRenderError>
+    {
+        self.hook_lists
+            .list(state.work_in_progress_list())
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+
+        Ok(self
+            .callback_update_diagnostics
+            .iter()
+            .find(|queue| queue.hook_list() == state.work_in_progress_list()))
+    }
+
+    pub fn callback_update_diagnostic_records(
+        &self,
+        state: FunctionComponentHookRenderState,
+    ) -> Result<&[FunctionComponentCallbackUpdateDiagnosticRecord], FunctionComponentRenderError>
+    {
+        match self.callback_update_diagnostics(state)? {
             Some(queue) => Ok(queue.records()),
             None => Ok(&[]),
         }
@@ -4728,6 +4919,89 @@ impl FunctionComponentHookRenderStore {
         }
     }
 
+    pub fn record_callback_update_diagnostic(
+        &mut self,
+        state: FunctionComponentHookRenderState,
+        render_lanes: Lanes,
+        update: FunctionComponentCallbackUpdateRecord,
+    ) -> Result<FunctionComponentCallbackUpdateDiagnosticRecord, FunctionComponentRenderError> {
+        if state.phase() != FunctionComponentHookRenderPhase::Update {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: state.phase(),
+            });
+        }
+
+        let current =
+            state
+                .current()
+                .ok_or(FunctionComponentRenderError::MissingCurrentHookList {
+                    fiber: state.render_fiber(),
+                })?;
+        let current_hook_list =
+            state
+                .current_list()
+                .ok_or(FunctionComponentRenderError::MissingCurrentHookList {
+                    fiber: state.render_fiber(),
+                })?;
+        self.hook_lists.list(current_hook_list).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+        self.hook_lists
+            .list(state.work_in_progress_list())
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+
+        let record = FunctionComponentCallbackUpdateDiagnosticRecord {
+            diagnostic_index: 0,
+            fiber: state.render_fiber(),
+            current,
+            current_hook_list,
+            hook_list: state.work_in_progress_list(),
+            previous_hook: update.previous_hook(),
+            hook: update.hook(),
+            render_lanes,
+            previous_callback: update.previous_callback(),
+            previous_dependencies: update.previous_dependencies(),
+            requested_callback: update.requested_callback(),
+            callback: update.callback(),
+            dependencies: update.dependencies(),
+            dependency_status: update.dependency_status(),
+        };
+        Ok(self.push_callback_update_diagnostic_record(record))
+    }
+
+    fn push_callback_update_diagnostic_record(
+        &mut self,
+        mut record: FunctionComponentCallbackUpdateDiagnosticRecord,
+    ) -> FunctionComponentCallbackUpdateDiagnosticRecord {
+        let queue_index = self.ensure_callback_update_diagnostics_index(record.hook_list());
+        record.diagnostic_index = self.callback_update_diagnostics[queue_index].records.len();
+        self.callback_update_diagnostics[queue_index]
+            .records
+            .push(record);
+        record
+    }
+
+    fn ensure_callback_update_diagnostics_index(&mut self, list: HookListId) -> usize {
+        if let Some(index) = self
+            .callback_update_diagnostics
+            .iter()
+            .position(|queue| queue.hook_list() == list)
+        {
+            index
+        } else {
+            self.callback_update_diagnostics
+                .push(FunctionComponentCallbackUpdateDiagnostics {
+                    hook_list: list,
+                    records: Vec::new(),
+                });
+            self.callback_update_diagnostics.len() - 1
+        }
+    }
+
     fn ensure_effect_update_queue_index(&mut self, list: HookListId) -> usize {
         if let Some(index) = self
             .effect_update_queues
@@ -4922,6 +5196,7 @@ fn callback_update_record_from_memo(
 ) -> FunctionComponentCallbackUpdateRecord {
     FunctionComponentCallbackUpdateRecord {
         hook: record.hook(),
+        previous_hook: record.previous_hook(),
         previous_callback: callback_from_memo_value(record.previous_value()),
         previous_dependencies: record.previous_dependencies(),
         requested_callback: callback_from_memo_value(record.requested_value()),
@@ -6375,6 +6650,7 @@ pub(crate) struct FunctionComponentUseCallbackRenderRecord {
     render: FunctionComponentRenderRecord,
     hook_result: FunctionComponentHookRenderResult,
     callback_hook: FunctionComponentUseCallbackHookRenderRecord,
+    callback_update_diagnostic: Option<FunctionComponentCallbackUpdateDiagnosticRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -6451,6 +6727,13 @@ impl FunctionComponentUseCallbackRenderRecord {
     #[must_use]
     pub const fn callback_hook(self) -> FunctionComponentUseCallbackHookRenderRecord {
         self.callback_hook
+    }
+
+    #[must_use]
+    pub const fn callback_update_diagnostic(
+        self,
+    ) -> Option<FunctionComponentCallbackUpdateDiagnosticRecord> {
+        self.callback_update_diagnostic
     }
 
     #[must_use]
@@ -6791,6 +7074,7 @@ pub(crate) fn render_function_component_with_use_callback(
     request = request.with_hook_state(hook_state);
     reset_function_component_render_state(arena, work_in_progress)?;
 
+    let mut pending_callback_update = None;
     let mut cursor = hook_store.begin_render_cursor(hook_state)?;
     let callback_hook = match hook_state.phase() {
         FunctionComponentHookRenderPhase::Mount => {
@@ -6801,11 +7085,13 @@ pub(crate) fn render_function_component_with_use_callback(
             )?)
         }
         FunctionComponentHookRenderPhase::Update => {
-            FunctionComponentUseCallbackHookRenderRecord::Update(hook_store.update_callback_hook(
+            let update = hook_store.update_callback_hook(
                 &mut cursor,
                 callback_request.callback(),
                 callback_request.dependencies(),
-            )?)
+            )?;
+            pending_callback_update = Some(update);
+            FunctionComponentUseCallbackHookRenderRecord::Update(update)
         }
     };
     let hook_result = hook_store.finish_render_cursor(cursor)?;
@@ -6822,6 +7108,15 @@ pub(crate) fn render_function_component_with_use_callback(
         .get_mut(work_in_progress)?
         .set_memoized_props(request.props());
 
+    let callback_update_diagnostic = match pending_callback_update {
+        Some(update) => Some(hook_store.record_callback_update_diagnostic(
+            hook_state,
+            request.render_lanes(),
+            update,
+        )?),
+        None => None,
+    };
+
     Ok(FunctionComponentUseCallbackRenderRecord {
         render: FunctionComponentRenderRecord {
             current: arena.get(work_in_progress)?.alternate(),
@@ -6836,6 +7131,7 @@ pub(crate) fn render_function_component_with_use_callback(
         },
         hook_result,
         callback_hook,
+        callback_update_diagnostic,
     })
 }
 
@@ -10186,6 +10482,7 @@ mod tests {
         assert_eq!(record.work_in_progress(), work_in_progress);
         assert_eq!(record.output(), output);
         assert_eq!(record.render().hook_state(), Some(hook_state));
+        assert_eq!(record.callback_update_diagnostic(), None);
         assert_eq!(hook_state.phase(), FunctionComponentHookRenderPhase::Mount);
         assert_eq!(record.hook_traversal().traversed_count(), 1);
         assert_eq!(
@@ -10238,12 +10535,14 @@ mod tests {
         .unwrap();
 
         let callback_update = record.callback_hook().update_record().unwrap();
+        let diagnostic = record.callback_update_diagnostic().unwrap();
         assert_eq!(
             record.hook_state().phase(),
             FunctionComponentHookRenderPhase::Update
         );
         assert_eq!(record.hook_traversal().traversed_count(), 1);
         assert_ne!(callback_update.hook(), current_callback.hook());
+        assert_eq!(callback_update.previous_hook(), current_callback.hook());
         assert_eq!(callback_update.previous_callback(), component_callback(830));
         assert_eq!(callback_update.previous_dependencies(), deps(8300));
         assert_eq!(
@@ -10257,7 +10556,45 @@ mod tests {
             FunctionComponentMemoDependencyStatus::Unchanged
         );
         assert!(callback_update.reused_previous_callback());
+        assert!(!callback_update.replaced_callback());
         assert_eq!(record.callback_hook().callback(), component_callback(830));
+        assert_eq!(diagnostic.diagnostic_index(), 0);
+        assert_eq!(diagnostic.fiber(), work_in_progress);
+        assert_eq!(diagnostic.current(), current);
+        assert_eq!(
+            diagnostic.current_hook_list(),
+            record.hook_state().current_list().unwrap()
+        );
+        assert_eq!(
+            diagnostic.hook_list(),
+            record.hook_state().work_in_progress_list()
+        );
+        assert_eq!(diagnostic.previous_hook(), current_callback.hook());
+        assert_eq!(diagnostic.hook(), callback_update.hook());
+        assert_eq!(diagnostic.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(diagnostic.previous_callback(), component_callback(830));
+        assert_eq!(diagnostic.previous_dependencies(), deps(8300));
+        assert_eq!(diagnostic.requested_callback(), component_callback(831));
+        assert_eq!(diagnostic.callback(), component_callback(830));
+        assert_eq!(diagnostic.dependencies(), deps(8300));
+        assert_eq!(
+            diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(diagnostic.reused_previous_callback());
+        assert!(!diagnostic.replaced_callback());
+        let queue = hook_store
+            .callback_update_diagnostics(record.hook_state())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            queue.hook_list(),
+            record.hook_state().work_in_progress_list()
+        );
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue.reuse_count(), 1);
+        assert_eq!(queue.replacement_count(), 0);
+        assert_eq!(queue.records(), &[diagnostic]);
         assert_eq!(
             opaque_value(
                 hook_store
@@ -10274,7 +10611,7 @@ mod tests {
     fn private_use_callback_render_path_records_changed_dependencies() {
         let (mut arena, current, work_in_progress, component) = function_component_pair();
         let mut hook_store = FunctionComponentHookRenderStore::new();
-        hook_store
+        let current_callback = hook_store
             .create_current_callback_hook(current, component_callback(850), deps(8500))
             .unwrap();
         let mut registry = TestFunctionComponentRegistry::default();
@@ -10293,6 +10630,8 @@ mod tests {
         .unwrap();
 
         let callback_update = record.callback_hook().update_record().unwrap();
+        let diagnostic = record.callback_update_diagnostic().unwrap();
+        assert_eq!(callback_update.previous_hook(), current_callback.hook());
         assert_eq!(callback_update.previous_callback(), component_callback(850));
         assert_eq!(callback_update.previous_dependencies(), deps(8500));
         assert_eq!(
@@ -10306,7 +10645,20 @@ mod tests {
             FunctionComponentMemoDependencyStatus::Changed
         );
         assert!(!callback_update.reused_previous_callback());
+        assert!(callback_update.replaced_callback());
         assert_eq!(record.callback_hook().callback(), component_callback(851));
+        assert_eq!(diagnostic.previous_hook(), current_callback.hook());
+        assert_eq!(diagnostic.hook(), callback_update.hook());
+        assert_eq!(
+            diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert!(!diagnostic.reused_previous_callback());
+        assert!(diagnostic.replaced_callback());
+        assert_eq!(diagnostic.previous_callback(), component_callback(850));
+        assert_eq!(diagnostic.requested_callback(), component_callback(851));
+        assert_eq!(diagnostic.callback(), component_callback(851));
+        assert_eq!(diagnostic.dependencies(), deps(8510));
         assert_eq!(
             opaque_value(
                 hook_store
@@ -10317,6 +10669,56 @@ mod tests {
             ),
             StateHandle::from_raw(851)
         );
+    }
+
+    #[test]
+    fn private_use_callback_update_diagnostics_count_reuse_and_replacement() {
+        let (arena, current, work_in_progress, _component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let first_current = hook_store
+            .create_current_callback_hook(current, component_callback(880), deps(8800))
+            .unwrap();
+        let second_current = hook_store
+            .create_current_callback_hook(current, component_callback(881), deps(8810))
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(&arena, work_in_progress)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+
+        let first_update = hook_store
+            .update_callback_hook(&mut cursor, component_callback(890), deps(8800))
+            .unwrap();
+        let second_update = hook_store
+            .update_callback_hook(&mut cursor, component_callback(891), deps(8910))
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.traversal().traversed_count(), 2);
+        assert_eq!(first_update.previous_hook(), first_current.hook());
+        assert_eq!(second_update.previous_hook(), second_current.hook());
+        let first_diagnostic = hook_store
+            .record_callback_update_diagnostic(state, Lanes::DEFAULT, first_update)
+            .unwrap();
+        let second_diagnostic = hook_store
+            .record_callback_update_diagnostic(state, Lanes::SYNC, second_update)
+            .unwrap();
+        let queue = hook_store
+            .callback_update_diagnostics(state)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(first_diagnostic.diagnostic_index(), 0);
+        assert_eq!(second_diagnostic.diagnostic_index(), 1);
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue.reuse_count(), 1);
+        assert_eq!(queue.replacement_count(), 1);
+        assert!(first_diagnostic.reused_previous_callback());
+        assert!(!first_diagnostic.replaced_callback());
+        assert!(!second_diagnostic.reused_previous_callback());
+        assert!(second_diagnostic.replaced_callback());
+        assert_eq!(second_diagnostic.render_lanes(), Lanes::SYNC);
+        assert_eq!(queue.records(), &[first_diagnostic, second_diagnostic]);
     }
 
     #[test]
@@ -10344,6 +10746,7 @@ mod tests {
         .unwrap();
 
         let callback_update = record.callback_hook().update_record().unwrap();
+        let diagnostic = record.callback_update_diagnostic().unwrap();
         assert_eq!(
             callback_update.dependency_status(),
             FunctionComponentMemoDependencyStatus::Changed
@@ -10354,6 +10757,8 @@ mod tests {
             HookEffectDependencies::AlwaysRun
         );
         assert!(callback_update.dependencies().is_always_run());
+        assert!(diagnostic.replaced_callback());
+        assert_eq!(diagnostic.callback(), component_callback(871));
     }
 
     #[test]
