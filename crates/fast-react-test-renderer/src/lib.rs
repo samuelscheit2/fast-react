@@ -1792,6 +1792,14 @@ pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.root-create.private-preflight";
 pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS: &str =
     "private-root-create-preflight-ready-public-root-blocked";
+pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_ROW_ID: &str =
+    "react-test-renderer-root-create-work-loop-finished-work-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_STATUS: &str =
+    "private-root-create-work-loop-finished-work-preflight-public-root-blocked";
+pub const TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_ID: &str =
+    "fast-react-test-renderer-root-work-loop-finished-work-preflight-metadata";
+pub const TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS: &str =
+    "accepted-root-work-loop-finished-work-preflight-metadata";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
@@ -2093,6 +2101,224 @@ impl TestRendererRootCreatePreflightOptionsMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootWorkLoopFinishedWorkPreflightMetadata {
+    metadata_id: &'static str,
+    metadata_status: &'static str,
+    accepted_worker: &'static str,
+    accepted_rust_module: &'static str,
+    render_phase_api: &'static str,
+    render_phase_record: &'static str,
+    finished_work_record: &'static str,
+    pending_finished_work_record: &'static str,
+    commit_handoff_record: &'static str,
+    accepted_input_shape: &'static str,
+}
+
+impl TestRendererRootWorkLoopFinishedWorkPreflightMetadata {
+    #[must_use]
+    pub const fn current() -> Self {
+        Self {
+            metadata_id: TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_ID,
+            metadata_status: TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+            accepted_worker: "worker-534-root-work-loop-finished-work-commit-handoff",
+            accepted_rust_module: "fast-react-reconciler::root_work_loop",
+            render_phase_api: "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+            render_phase_record: "HostRootRenderPhaseRecord",
+            finished_work_record: "HostRootRenderPhaseRecord::finished_work",
+            pending_finished_work_record: "HostRootFinishedWorkPendingCommitRecordForCanary",
+            commit_handoff_record: "HostRootFinishedWorkCommitHandoffRecordForCanary",
+            accepted_input_shape: "HostComponentWithTextChild",
+        }
+    }
+
+    #[must_use]
+    pub const fn new_for_canary(
+        metadata_id: &'static str,
+        metadata_status: &'static str,
+        render_phase_api: &'static str,
+    ) -> Self {
+        Self {
+            metadata_id,
+            metadata_status,
+            accepted_worker: "worker-534-root-work-loop-finished-work-commit-handoff",
+            accepted_rust_module: "fast-react-reconciler::root_work_loop",
+            render_phase_api,
+            render_phase_record: "HostRootRenderPhaseRecord",
+            finished_work_record: "HostRootRenderPhaseRecord::finished_work",
+            pending_finished_work_record: "HostRootFinishedWorkPendingCommitRecordForCanary",
+            commit_handoff_record: "HostRootFinishedWorkCommitHandoffRecordForCanary",
+            accepted_input_shape: "HostComponentWithTextChild",
+        }
+    }
+
+    #[must_use]
+    pub const fn metadata_id(self) -> &'static str {
+        self.metadata_id
+    }
+
+    #[must_use]
+    pub const fn metadata_status(self) -> &'static str {
+        self.metadata_status
+    }
+
+    #[must_use]
+    pub const fn accepted_worker(self) -> &'static str {
+        self.accepted_worker
+    }
+
+    #[must_use]
+    pub const fn accepted_rust_module(self) -> &'static str {
+        self.accepted_rust_module
+    }
+
+    #[must_use]
+    pub const fn render_phase_api(self) -> &'static str {
+        self.render_phase_api
+    }
+
+    #[must_use]
+    pub const fn render_phase_record(self) -> &'static str {
+        self.render_phase_record
+    }
+
+    #[must_use]
+    pub const fn finished_work_record(self) -> &'static str {
+        self.finished_work_record
+    }
+
+    #[must_use]
+    pub const fn pending_finished_work_record(self) -> &'static str {
+        self.pending_finished_work_record
+    }
+
+    #[must_use]
+    pub const fn commit_handoff_record(self) -> &'static str {
+        self.commit_handoff_record
+    }
+
+    #[must_use]
+    pub const fn accepted_input_shape(self) -> &'static str {
+        self.accepted_input_shape
+    }
+
+    fn is_current(self) -> bool {
+        let current = Self::current();
+        self.metadata_id == current.metadata_id
+            && self.metadata_status == current.metadata_status
+            && self.accepted_worker == current.accepted_worker
+            && self.accepted_rust_module == current.accepted_rust_module
+            && self.render_phase_api == current.render_phase_api
+            && self.render_phase_record == current.render_phase_record
+            && self.finished_work_record == current.finished_work_record
+            && self.pending_finished_work_record == current.pending_finished_work_record
+            && self.commit_handoff_record == current.commit_handoff_record
+            && self.accepted_input_shape == current.accepted_input_shape
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+    row_id: &'static str,
+    status: &'static str,
+    metadata: TestRendererRootWorkLoopFinishedWorkPreflightMetadata,
+    root: FiberRootId,
+    previous_current: TestRendererFiberHandleDiagnostics,
+    finished_work: TestRendererFiberHandleDiagnostics,
+    resulting_element: RootElementHandle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    render_lanes_empty: bool,
+    remaining_lanes_empty: bool,
+    finished_work_matches_render_phase: bool,
+    records_accepted_finished_work_metadata: bool,
+    public_create_behavior_available: bool,
+    host_mutation_execution_blocked: bool,
+    effects_refs_and_hydration_blocked: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+    #[must_use]
+    pub const fn row_id(self) -> &'static str {
+        self.row_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn metadata(self) -> TestRendererRootWorkLoopFinishedWorkPreflightMetadata {
+        self.metadata
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn resulting_element(self) -> RootElementHandle {
+        self.resulting_element
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn render_lanes_empty(self) -> bool {
+        self.render_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes_empty(self) -> bool {
+        self.remaining_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn finished_work_matches_render_phase(self) -> bool {
+        self.finished_work_matches_render_phase
+    }
+
+    #[must_use]
+    pub const fn records_accepted_finished_work_metadata(self) -> bool {
+        self.records_accepted_finished_work_metadata
+    }
+
+    #[must_use]
+    pub const fn public_create_behavior_available(self) -> bool {
+        self.public_create_behavior_available
+    }
+
+    #[must_use]
+    pub const fn host_mutation_execution_blocked(self) -> bool {
+        self.host_mutation_execution_blocked
+    }
+
+    #[must_use]
+    pub const fn effects_refs_and_hydration_blocked(self) -> bool {
+        self.effects_refs_and_hydration_blocked
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererRootCreatePreflightDiagnostics {
     diagnostic_name: &'static str,
     status: &'static str,
@@ -2104,6 +2330,7 @@ pub struct TestRendererRootCreatePreflightDiagnostics {
     scheduled_element: RootElementHandle,
     container_update_api: &'static str,
     scheduler_api: &'static str,
+    work_loop_finished_work_preflight: TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics,
     private_rust_root_created: bool,
     private_root_canary_boundary_validated: bool,
     public_renderer_root_created: bool,
@@ -2165,6 +2392,13 @@ impl TestRendererRootCreatePreflightDiagnostics {
     #[must_use]
     pub const fn scheduler_api(self) -> &'static str {
         self.scheduler_api
+    }
+
+    #[must_use]
+    pub const fn work_loop_finished_work_preflight(
+        self,
+    ) -> TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+        self.work_loop_finished_work_preflight
     }
 
     #[must_use]
@@ -5295,6 +5529,13 @@ pub enum TestRendererRootCreatePreflightError {
         actual_root_api: &'static str,
     },
     MissingRootOptions,
+    MissingWorkLoopFinishedWorkPreflightMetadata,
+    StaleWorkLoopFinishedWorkPreflightMetadata {
+        expected_metadata_id: &'static str,
+        actual_metadata_id: &'static str,
+        expected_render_phase_api: &'static str,
+        actual_render_phase_api: &'static str,
+    },
 }
 
 impl Display for TestRendererRootCreatePreflightError {
@@ -5316,6 +5557,18 @@ impl Display for TestRendererRootCreatePreflightError {
             ),
             Self::MissingRootOptions => formatter.write_str(
                 "private root-create preflight requires explicit TestRendererOptions metadata",
+            ),
+            Self::MissingWorkLoopFinishedWorkPreflightMetadata => formatter.write_str(
+                "private root-create preflight requires accepted root work-loop finished-work preflight metadata",
+            ),
+            Self::StaleWorkLoopFinishedWorkPreflightMetadata {
+                expected_metadata_id,
+                actual_metadata_id,
+                expected_render_phase_api,
+                actual_render_phase_api,
+            } => write!(
+                formatter,
+                "private root-create preflight root work-loop finished-work metadata is stale: expected {expected_metadata_id}/{expected_render_phase_api}, found {actual_metadata_id}/{actual_render_phase_api}",
             ),
         }
     }
@@ -5747,6 +6000,7 @@ impl TestRendererRoot {
         input_shape: TestRendererRootCreatePreflightInputShape,
         options: Option<TestRendererOptions>,
         canary_api_identity: TestRendererRootCreatePreflightCanaryApiIdentity,
+        work_loop_metadata: Option<TestRendererRootWorkLoopFinishedWorkPreflightMetadata>,
     ) -> Result<TestRendererRootCreatePreflightDiagnostics, TestRendererRootError> {
         if !input_shape
             .child_shape()
@@ -5769,14 +6023,68 @@ impl TestRendererRoot {
             .into());
         }
 
+        let Some(work_loop_metadata) = work_loop_metadata else {
+            return Err(
+                TestRendererRootCreatePreflightError::MissingWorkLoopFinishedWorkPreflightMetadata
+                    .into(),
+            );
+        };
+        if !work_loop_metadata.is_current() {
+            let current = TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current();
+            return Err(
+                TestRendererRootCreatePreflightError::StaleWorkLoopFinishedWorkPreflightMetadata {
+                    expected_metadata_id: current.metadata_id(),
+                    actual_metadata_id: work_loop_metadata.metadata_id(),
+                    expected_render_phase_api: current.render_phase_api(),
+                    actual_render_phase_api: work_loop_metadata.render_phase_api(),
+                }
+                .into(),
+            );
+        }
+
         let Some(options) = options else {
             return Err(TestRendererRootCreatePreflightError::MissingRootOptions.into());
         };
         let root_options = TestRendererRootCreatePreflightOptionsMetadata::from_options(&options);
-        let root = Self::create(input_shape.element(), options)?;
-        let scheduled_update = root
-            .last_scheduled_update()
-            .expect("TestRendererRoot::create schedules an initial HostRoot update");
+        let mut root = Self::create(input_shape.element(), options)?;
+        let (scheduled_update_kind, scheduled_element) = {
+            let scheduled_update = root
+                .last_scheduled_update()
+                .expect("TestRendererRoot::create schedules an initial HostRoot update");
+            (scheduled_update.kind(), scheduled_update.element())
+        };
+        let render = root
+            .render_latest_scheduled_host_root_for_commit_handoff()?
+            .expect("private root-create preflight schedules HostRoot render work");
+        let previous_current = render.current();
+        let finished_work = render.finished_work();
+        let work_loop_finished_work_preflight =
+            TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+                row_id: TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_ROW_ID,
+                status: TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_STATUS,
+                metadata: work_loop_metadata,
+                root: root.root_id(),
+                previous_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: previous_current.arena_id().get(),
+                    slot: previous_current.slot().get(),
+                    generation: previous_current.generation().get(),
+                },
+                finished_work: TestRendererFiberHandleDiagnostics {
+                    arena_id: finished_work.arena_id().get(),
+                    slot: finished_work.slot().get(),
+                    generation: finished_work.generation().get(),
+                },
+                resulting_element: render.resulting_element(),
+                scheduled_update_kind,
+                render_lanes_empty: render.render_lanes().is_empty(),
+                remaining_lanes_empty: render.remaining_lanes().is_empty(),
+                finished_work_matches_render_phase: finished_work == render.work_in_progress(),
+                records_accepted_finished_work_metadata: true,
+                public_create_behavior_available: false,
+                host_mutation_execution_blocked: true,
+                effects_refs_and_hydration_blocked: true,
+                compatibility_claimed: false,
+            };
 
         Ok(TestRendererRootCreatePreflightDiagnostics {
             diagnostic_name: TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME,
@@ -5785,10 +6093,11 @@ impl TestRendererRoot {
             input_shape,
             root_options,
             canary_api_identity,
-            scheduled_update_kind: scheduled_update.kind(),
-            scheduled_element: scheduled_update.element(),
-            container_update_api: scheduled_update.kind().container_update_api(),
+            scheduled_update_kind,
+            scheduled_element,
+            container_update_api: scheduled_update_kind.container_update_api(),
             scheduler_api: "ensure_root_is_scheduled",
+            work_loop_finished_work_preflight,
             private_rust_root_created: true,
             private_root_canary_boundary_validated: true,
             public_renderer_root_created: false,
@@ -8847,6 +9156,7 @@ mod tests {
             input,
             Some(options),
             TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
         )
         .unwrap();
 
@@ -8872,6 +9182,40 @@ mod tests {
         assert_eq!(diagnostics.scheduled_element(), root_element(91));
         assert_eq!(diagnostics.container_update_api(), "update_container");
         assert_eq!(diagnostics.scheduler_api(), "ensure_root_is_scheduled");
+        let work_loop_preflight = diagnostics.work_loop_finished_work_preflight();
+        assert_eq!(
+            work_loop_preflight.row_id(),
+            TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_ROW_ID
+        );
+        assert_eq!(
+            work_loop_preflight.status(),
+            TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_STATUS
+        );
+        assert_eq!(
+            work_loop_preflight.metadata(),
+            TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()
+        );
+        assert_eq!(work_loop_preflight.root(), diagnostics.root());
+        assert_eq!(
+            work_loop_preflight.resulting_element(),
+            diagnostics.scheduled_element()
+        );
+        assert_eq!(
+            work_loop_preflight.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(!work_loop_preflight.render_lanes_empty());
+        assert!(work_loop_preflight.remaining_lanes_empty());
+        assert!(work_loop_preflight.finished_work_matches_render_phase());
+        assert!(work_loop_preflight.records_accepted_finished_work_metadata());
+        assert_ne!(
+            work_loop_preflight.previous_current(),
+            work_loop_preflight.finished_work()
+        );
+        assert!(!work_loop_preflight.public_create_behavior_available());
+        assert!(work_loop_preflight.host_mutation_execution_blocked());
+        assert!(work_loop_preflight.effects_refs_and_hydration_blocked());
+        assert!(!work_loop_preflight.compatibility_claimed());
 
         let api_identity = diagnostics.canary_api_identity();
         assert_eq!(
@@ -8935,6 +9279,7 @@ mod tests {
             input,
             Some(TestRendererOptions::new()),
             TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
         )
         .unwrap_err();
 
@@ -8965,6 +9310,7 @@ mod tests {
             input,
             Some(TestRendererOptions::new()),
             stale_identity,
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
         )
         .unwrap_err();
 
@@ -8993,6 +9339,7 @@ mod tests {
             input,
             None,
             TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
         )
         .unwrap_err();
 
@@ -9002,6 +9349,65 @@ mod tests {
         assert!(matches!(
             error.as_ref(),
             TestRendererRootCreatePreflightError::MissingRootOptions
+        ));
+    }
+
+    #[test]
+    fn root_private_create_preflight_fails_closed_without_work_loop_metadata() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(95),
+            "div",
+        );
+
+        let error = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            None,
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::RootCreatePreflight(error) = error else {
+            panic!("expected root-create preflight error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererRootCreatePreflightError::MissingWorkLoopFinishedWorkPreflightMetadata
+        ));
+    }
+
+    #[test]
+    fn root_private_create_preflight_fails_closed_for_stale_work_loop_metadata() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(96),
+            "div",
+        );
+        let stale_metadata = TestRendererRootWorkLoopFinishedWorkPreflightMetadata::new_for_canary(
+            "fast-react-test-renderer-stale-work-loop-preflight-metadata",
+            TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+            "TestRendererRoot::render_stale_host_root_for_commit_handoff",
+        );
+
+        let error = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(stale_metadata),
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::RootCreatePreflight(error) = error else {
+            panic!("expected root-create preflight error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererRootCreatePreflightError::StaleWorkLoopFinishedWorkPreflightMetadata {
+                expected_metadata_id:
+                    TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_ID,
+                actual_metadata_id: "fast-react-test-renderer-stale-work-loop-preflight-metadata",
+                expected_render_phase_api: "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+                actual_render_phase_api: "TestRendererRoot::render_stale_host_root_for_commit_handoff"
+            }
         ));
     }
 
