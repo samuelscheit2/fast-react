@@ -48,6 +48,7 @@ const sourceAdapterBehaviorAreas = freezeArray([
 
 const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.noSideEffects,
+  ...internalsGate.resourceHintDispatcherSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
   sourceAdaptersInvoked: false
@@ -62,6 +63,8 @@ function describeResourceFormRootBridgeBlockedGate() {
     unsupportedCode: unimplementedCode,
     publicRootBoundary: describePublicRootBoundary(),
     privateRootBridgeBoundary: describePrivateRootBridgeBoundary(),
+    privateResourceDispatcherBoundary:
+      describePrivateResourceDispatcherBoundary(null),
     sourceAdapterBoundary: describeSourceAdapterBoundary(null),
     sideEffects: rootBoundarySideEffects
   });
@@ -76,6 +79,8 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
   const sourceAdapterBoundary = describeSourceAdapterBoundary(
     request.behaviorArea
   );
+  const privateResourceDispatcherBoundary =
+    describePrivateResourceDispatcherBoundary(request.behaviorArea);
 
   const payload = freezeRecord({
     $$typeof: resourceFormRootBoundaryRecordType,
@@ -93,6 +98,7 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     oracleKind: request.oracleKind,
     rootBridgeBoundary,
     publicRootBoundary,
+    privateResourceDispatcherBoundary,
     sourceAdapterBoundary,
     sideEffects: rootBoundarySideEffects
   });
@@ -217,6 +223,14 @@ function describeSourceAdapterBoundary(behaviorArea) {
     publicRootTouched: false,
     compatibilityClaimed: false
   });
+}
+
+function describePrivateResourceDispatcherBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'resource-hint') {
+    return null;
+  }
+
+  return internalsGate.describePrivateResourceHintDispatcherMetadataGate();
 }
 
 function assertResourceFormGateRecord(record) {
@@ -348,6 +362,7 @@ function freezeRecord(value) {
 
 module.exports = Object.assign({}, internalsGate, {
   describeResourceFormRootBridgeBlockedGate,
+  describePrivateResourceDispatcherBoundary,
   getResourceFormRootBridgeBlockedRecordPayload,
   isResourceFormRootBridgeBlockedRecord,
   privateRootBridgeRecordOnlyStatus,

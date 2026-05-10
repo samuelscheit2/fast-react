@@ -256,6 +256,335 @@ test('private resource/form internals gate records deterministic unsupported met
   );
 });
 
+test('private resource hint dispatcher metadata gate validates normalized shapes without dispatching', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'resource-dispatcher-gate'
+  });
+  const records = [
+    gate.recordResourceHintDispatcherRequest('C', [
+      'https://connect.example.test',
+      null
+    ]),
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/font.woff2',
+      'font',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-font',
+        nonce: undefined,
+        type: 'font/woff2',
+        fetchPriority: 'high',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: 'print'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'low'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('X', [
+      '/script.js',
+      {
+        crossOrigin: 'use-credentials',
+        integrity: 'sha256-script',
+        fetchPriority: 'high',
+        nonce: 'nonce-script'
+      }
+    ])
+  ];
+  const summary =
+    resourceFormGate.describePrivateResourceHintDispatcherMetadataGate();
+
+  assert.deepEqual(records.map(summarizeDispatcherRecord), [
+    {
+      requestId: 'resource-dispatcher-gate:1',
+      requestType: 'resource-hint-dispatcher.preconnect',
+      contractId: 'preconnect',
+      publicName: 'preconnect',
+      privateDispatcherKey: 'C',
+      argumentNames: ['href', 'crossOrigin'],
+      argumentSummaries: [
+        {name: 'href', type: 'string', empty: false},
+        {name: 'crossOrigin', type: 'null'}
+      ]
+    },
+    {
+      requestId: 'resource-dispatcher-gate:2',
+      requestType: 'resource-hint-dispatcher.preload',
+      contractId: 'preload',
+      publicName: 'preload',
+      privateDispatcherKey: 'L',
+      argumentNames: ['href', 'as', 'options'],
+      argumentSummaries: [
+        {name: 'href', type: 'string', empty: false},
+        {name: 'as', type: 'string', empty: false},
+        {
+          name: 'options',
+          type: 'object',
+          exactOwnKeys: [
+            'crossOrigin',
+            'integrity',
+            'nonce',
+            'type',
+            'fetchPriority',
+            'referrerPolicy',
+            'imageSrcSet',
+            'imageSizes',
+            'media'
+          ],
+          fields: [
+            {name: 'crossOrigin', type: 'string', empty: true},
+            {name: 'integrity', type: 'string', empty: false},
+            {name: 'nonce', type: 'undefined'},
+            {name: 'type', type: 'string', empty: false},
+            {name: 'fetchPriority', type: 'string', empty: false},
+            {name: 'referrerPolicy', type: 'undefined'},
+            {name: 'imageSrcSet', type: 'undefined'},
+            {name: 'imageSizes', type: 'undefined'},
+            {name: 'media', type: 'string', empty: false}
+          ]
+        }
+      ]
+    },
+    {
+      requestId: 'resource-dispatcher-gate:3',
+      requestType: 'resource-hint-dispatcher.preinit-style',
+      contractId: 'preinit-style',
+      publicName: 'preinit',
+      privateDispatcherKey: 'S',
+      argumentNames: ['href', 'precedence', 'options'],
+      argumentSummaries: [
+        {name: 'href', type: 'string', empty: false},
+        {name: 'precedence', type: 'string', empty: false},
+        {
+          name: 'options',
+          type: 'object',
+          exactOwnKeys: ['crossOrigin', 'integrity', 'fetchPriority'],
+          fields: [
+            {name: 'crossOrigin', type: 'string', empty: true},
+            {name: 'integrity', type: 'string', empty: false},
+            {name: 'fetchPriority', type: 'string', empty: false}
+          ]
+        }
+      ]
+    },
+    {
+      requestId: 'resource-dispatcher-gate:4',
+      requestType: 'resource-hint-dispatcher.preinit-script',
+      contractId: 'preinit-script',
+      publicName: 'preinit',
+      privateDispatcherKey: 'X',
+      argumentNames: ['href', 'options'],
+      argumentSummaries: [
+        {name: 'href', type: 'string', empty: false},
+        {
+          name: 'options',
+          type: 'object',
+          exactOwnKeys: [
+            'crossOrigin',
+            'integrity',
+            'fetchPriority',
+            'nonce'
+          ],
+          fields: [
+            {name: 'crossOrigin', type: 'string', empty: false},
+            {name: 'integrity', type: 'string', empty: false},
+            {name: 'fetchPriority', type: 'string', empty: false},
+            {name: 'nonce', type: 'string', empty: false}
+          ]
+        }
+      ]
+    }
+  ]);
+
+  for (const record of records) {
+    assert.equal(Object.isFrozen(record), true, record.requestType);
+    assert.equal(
+      resourceFormGate.isPrivateResourceHintDispatcherMetadataRecord(record),
+      true,
+      record.requestType
+    );
+    assert.equal(
+      resourceFormGate.getPrivateResourceHintDispatcherMetadataRecordPayload(
+        record
+      ),
+      record,
+      record.requestType
+    );
+    assert.equal(record.status, resourceFormGate.unsupportedStatus);
+    assert.deepEqual(
+      record.sideEffects,
+      resourceFormGate.resourceHintDispatcherSideEffects
+    );
+    assert.equal(record.sideEffects.resourcesDispatched, false);
+    assert.equal(record.sideEffects.privateDispatcherInvoked, false);
+    assert.equal(record.sideEffects.sourceAdapterInvoked, false);
+    assert.equal(record.sideEffects.documentMutated, false);
+    assert.equal(record.sideEffects.headMutated, false);
+    assert.equal(record.sideEffects.resourceElementCreated, false);
+    assert.equal(record.sideEffects.stylesheetPrecedenceApplied, false);
+    assert.equal(record.sideEffects.fizzInstructionEmitted, false);
+    assert.equal(record.sideEffects.compatibilityClaimed, false);
+  }
+
+  assert.equal(summary.gateId, resourceFormGate.privateResourceHintDispatcherMetadataGateId);
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.deepEqual(summary.sideEffects, resourceFormGate.resourceHintDispatcherSideEffects);
+  assert.deepEqual(
+    summary.contracts.map((contract) => ({
+      id: contract.id,
+      publicName: contract.publicName,
+      privateDispatcherKey: contract.privateDispatcherKey,
+      argumentNames: contract.argumentNames
+    })),
+    [
+      {
+        id: 'preconnect',
+        publicName: 'preconnect',
+        privateDispatcherKey: 'C',
+        argumentNames: ['href', 'crossOrigin']
+      },
+      {
+        id: 'preload',
+        publicName: 'preload',
+        privateDispatcherKey: 'L',
+        argumentNames: ['href', 'as', 'options']
+      },
+      {
+        id: 'preinit-style',
+        publicName: 'preinit',
+        privateDispatcherKey: 'S',
+        argumentNames: ['href', 'precedence', 'options']
+      },
+      {
+        id: 'preinit-script',
+        publicName: 'preinit',
+        privateDispatcherKey: 'X',
+        argumentNames: ['href', 'options']
+      }
+    ]
+  );
+  assert.equal(JSON.stringify(records).includes('/font.woff2'), false);
+  assert.equal(JSON.stringify(records).includes('sha256-script'), false);
+});
+
+test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'resource-dispatcher-error-gate'
+  });
+  const record = gate.recordResourceHintDispatcherRequest('preconnect', [
+    'https://connect.example.test',
+    ''
+  ]);
+  const error =
+    resourceFormGate.createUnsupportedResourceHintDispatcherMetadataError(
+      record
+    );
+
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintDispatcherMetadataGateErrorCode
+  );
+  assert.equal(error.entrypoint, 'react-dom/private-internals');
+  assert.equal(error.exportName, 'resource-hint-dispatcher.preconnect');
+  assert.equal(error.compatibilityTarget, compatibilityTarget);
+  assert.equal(error.requestId, 'resource-dispatcher-error-gate:1');
+  assert.equal(error.requestSequence, 1);
+  assert.equal(error.requestType, 'resource-hint-dispatcher.preconnect');
+  assert.equal(error.contractId, 'preconnect');
+  assert.equal(error.privateDispatcherKey, 'C');
+  assert.deepEqual(error.sideEffects, resourceFormGate.resourceHintDispatcherSideEffects);
+
+  assert.throws(
+    () => gate.recordResourceHintDispatcherRequest('L', ['/asset.js', 'script']),
+    {
+      code: resourceFormGate.privateResourceHintDispatcherMetadataInvalidShapeCode,
+      compatibilityTarget,
+      contractId: 'preload',
+      privateDispatcherKey: 'L'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordResourceHintDispatcherRequest('L', [
+        '/font.woff2',
+        'font',
+        {
+          crossOrigin: undefined,
+          integrity: undefined,
+          nonce: undefined,
+          type: undefined,
+          fetchPriority: undefined,
+          referrerPolicy: undefined,
+          imageSrcSet: undefined,
+          imageSizes: undefined,
+          media: undefined
+        }
+      ]),
+    {
+      code: resourceFormGate.privateResourceHintDispatcherMetadataInvalidShapeCode,
+      compatibilityTarget,
+      contractId: 'preload',
+      privateDispatcherKey: 'L'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordResourceHintDispatcherRequest('S', [
+        '/style.css',
+        'theme',
+        {
+          crossOrigin: '',
+          integrity: 'sha256-style'
+        }
+      ]),
+    {
+      code: resourceFormGate.privateResourceHintDispatcherMetadataInvalidShapeCode,
+      compatibilityTarget,
+      contractId: 'preinit-style',
+      privateDispatcherKey: 'S'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordResourceHintDispatcherRequest('C', [
+        'https://connect.example.test',
+        'anonymous'
+      ]),
+    {
+      code: resourceFormGate.privateResourceHintDispatcherMetadataInvalidShapeCode,
+      compatibilityTarget,
+      contractId: 'preconnect',
+      privateDispatcherKey: 'C'
+    }
+  );
+  assert.throws(
+    () => gate.recordResourceHintDispatcherRequest('M', ['/module.mjs']),
+    {
+      code: resourceFormGate.privateResourceHintDispatcherMetadataUnknownRequestCode,
+      compatibilityTarget,
+      requestName: 'M'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintDispatcherMetadataError({}),
+    {
+      code:
+        'FAST_REACT_DOM_RESOURCE_HINT_DISPATCHER_METADATA_INVALID_RECORD',
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource/form internals gate errors are deterministic and fail closed', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'error-gate'
@@ -325,6 +654,19 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.equal(summary.status, resourceFormGate.unsupportedStatus);
   assert.equal(summary.unsupportedCode, unsupportedCode);
   assert.deepEqual(summary.sideEffects, resourceFormGate.rootBoundarySideEffects);
+  assert.equal(summary.sideEffects.privateDispatcherInvoked, false);
+  assert.equal(summary.sideEffects.documentMutated, false);
+  assert.equal(summary.sideEffects.headMutated, false);
+  assert.equal(summary.sideEffects.stylesheetPrecedenceApplied, false);
+  assert.equal(summary.sideEffects.fizzInstructionEmitted, false);
+  assert.deepEqual(
+    summary.privateResourceDispatcherBoundary,
+    resourceFormGate.describePrivateResourceDispatcherBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateResourceDispatcherBoundary,
+    resourceFormGate.describePrivateResourceHintDispatcherMetadataGate()
+  );
 
   assert.deepEqual(summary.publicRootBoundary, {
     gateId: rootFacadeGate.REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE_ID,
@@ -474,6 +816,22 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
     assert.equal(blockedRecord.rootBridgeBoundary.hydration, false);
     assert.equal(blockedRecord.rootBridgeBoundary.eventDispatch, false);
     assert.equal(blockedRecord.rootBridgeBoundary.compatibilityClaimed, false);
+    if (blockedRecord.behaviorArea === 'resource-hint') {
+      assert.deepEqual(
+        blockedRecord.privateResourceDispatcherBoundary,
+        resourceFormGate.describePrivateResourceHintDispatcherMetadataGate()
+      );
+    } else {
+      assert.equal(blockedRecord.privateResourceDispatcherBoundary, null);
+    }
+    assert.equal(blockedRecord.sideEffects.privateDispatcherInvoked, false);
+    assert.equal(blockedRecord.sideEffects.documentMutated, false);
+    assert.equal(blockedRecord.sideEffects.headMutated, false);
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetPrecedenceApplied,
+      false
+    );
+    assert.equal(blockedRecord.sideEffects.fizzInstructionEmitted, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.adaptersInvoked, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.rawTargetCaptured, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.publicRootTouched, false);
@@ -862,6 +1220,39 @@ function oracleValue(oracle, modeId, scenarioId) {
   assert.ok(observation, `${modeId}:${scenarioId}`);
   assert.equal(observation.result.status, 'ok', `${modeId}:${scenarioId}`);
   return observation.result.value;
+}
+
+function summarizeDispatcherRecord(record) {
+  return {
+    requestId: record.requestId,
+    requestType: record.requestType,
+    contractId: record.contractId,
+    publicName: record.publicName,
+    privateDispatcherKey: record.privateDispatcherKey,
+    argumentNames: record.dispatcherShape.argumentNames,
+    argumentSummaries: record.dispatcherShape.arguments.map(
+      summarizeDispatcherArgument
+    )
+  };
+}
+
+function summarizeDispatcherArgument(argument) {
+  const summary = {
+    name: argument.name,
+    type: argument.type
+  };
+
+  if (Object.hasOwn(argument, 'empty')) {
+    summary.empty = argument.empty;
+  }
+  if (Object.hasOwn(argument, 'exactOwnKeys')) {
+    summary.exactOwnKeys = argument.exactOwnKeys;
+  }
+  if (Object.hasOwn(argument, 'fields')) {
+    summary.fields = argument.fields.map(summarizeDispatcherArgument);
+  }
+
+  return summary;
 }
 
 function requireFresh(fileName) {
