@@ -45,7 +45,9 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 503-532 is assigned in isolated worktrees.
+Top-level cap: 30 workers. Queue 503-533 is assigned in isolated worktrees.
+Worker 509 has been accepted from this queue, leaving 29 active top-level
+workers.
 
 | Worker | Focus |
 | --- | --- |
@@ -55,7 +57,6 @@ Top-level cap: 30 workers. Queue 503-532 is assigned in isolated worktrees.
 | 506 | Form reset queue/commit metadata |
 | 507 | Resource map commit diagnostics |
 | 508 | Stylesheet load/error state diagnostics |
-| 509 | Controlled restore queue flush ordering |
 | 510 | Controlled radio sibling props metadata |
 | 511 | React DOM facade update host-output diagnostic |
 | 512 | React DOM facade unmount cleanup diagnostic |
@@ -79,6 +80,7 @@ Top-level cap: 30 workers. Queue 503-532 is assigned in isolated worktrees.
 | 530 | Test renderer error-boundary update refresh |
 | 531 | Scheduler native entry guard refresh |
 | 532 | Native package surface guard refresh |
+| 533 | Controlled restore queue write preflight |
 
 ## Near-Term Sequencing
 

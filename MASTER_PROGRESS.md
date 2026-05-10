@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 509 was accepted from queue 503-532. It added private controlled
+  restore queue write/flush ordering diagnostics for accepted text,
+  select/textarea, checkbox, and radio metadata while keeping actual queue
+  writes, queue flushing, wrapper execution, live value tracking, radio lookup,
+  and DOM mutation blocked. It was verified after merge with package
+  resource/form/controlled tests, controlled-input conformance, React DOM
+  workspace checks, syntax checks, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 492 was accepted from queue 473-502. It added private form
   submit/requestSubmit action metadata and reset-dispatcher ordering
   diagnostics while keeping real form inspection, FormData, action invocation,
