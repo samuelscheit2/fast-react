@@ -1705,6 +1705,67 @@ impl NestedContextProviderBeginWorkRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SiblingContextProviderBeginWorkRequest {
+    first_provider: FiberId,
+    render_lanes: Lanes,
+    first_context: ContextHandle,
+    first_value: ContextValueHandle,
+    second_context: ContextHandle,
+    second_value: ContextValueHandle,
+}
+
+impl SiblingContextProviderBeginWorkRequest {
+    #[must_use]
+    pub const fn new(
+        first_provider: FiberId,
+        render_lanes: Lanes,
+        first_context: ContextHandle,
+        first_value: ContextValueHandle,
+        second_context: ContextHandle,
+        second_value: ContextValueHandle,
+    ) -> Self {
+        Self {
+            first_provider,
+            render_lanes,
+            first_context,
+            first_value,
+            second_context,
+            second_value,
+        }
+    }
+
+    #[must_use]
+    pub const fn first_provider(self) -> FiberId {
+        self.first_provider
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn first_context(self) -> ContextHandle {
+        self.first_context
+    }
+
+    #[must_use]
+    pub const fn first_value(self) -> ContextValueHandle {
+        self.first_value
+    }
+
+    #[must_use]
+    pub const fn second_context(self) -> ContextHandle {
+        self.second_context
+    }
+
+    #[must_use]
+    pub const fn second_value(self) -> ContextValueHandle {
+        self.second_value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct NestedContextProviderBeginWorkRecord {
     outer_provider: FiberId,
     inner_provider: FiberId,
@@ -1758,6 +1819,28 @@ pub(crate) struct NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
     inner_pushed_stack_depth: usize,
     inner_restored_stack_depth: usize,
     outer_restored_stack_depth: usize,
+    first_child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+    second_child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SiblingContextProviderTwoConsumerUseContextBeginWorkRecord {
+    first_provider: FiberId,
+    second_provider: FiberId,
+    first_child: FiberId,
+    second_child: FiberId,
+    first_context: ContextHandle,
+    first_value: ContextValueHandle,
+    second_context: ContextHandle,
+    second_value: ContextValueHandle,
+    first_provider_snapshot: ContextStackSnapshot,
+    second_provider_snapshot: ContextStackSnapshot,
+    first_provider_token: ContextFrameId,
+    second_provider_token: ContextFrameId,
+    first_pushed_stack_depth: usize,
+    first_restored_stack_depth: usize,
+    second_pushed_stack_depth: usize,
+    second_restored_stack_depth: usize,
     first_child_begin_work: FunctionComponentUseContextBeginWorkRecord,
     second_child_begin_work: FunctionComponentUseContextBeginWorkRecord,
 }
@@ -2085,6 +2168,158 @@ impl NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
     #[must_use]
     pub const fn second_child_context_read_count(self) -> usize {
         self.second_child_begin_work.context_read_count()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.first_child_begin_work.render().render_lanes()
+    }
+}
+
+impl SiblingContextProviderTwoConsumerUseContextBeginWorkRecord {
+    #[must_use]
+    pub const fn first_provider(self) -> FiberId {
+        self.first_provider
+    }
+
+    #[must_use]
+    pub const fn second_provider(self) -> FiberId {
+        self.second_provider
+    }
+
+    #[must_use]
+    pub const fn first_child(self) -> FiberId {
+        self.first_child
+    }
+
+    #[must_use]
+    pub const fn second_child(self) -> FiberId {
+        self.second_child
+    }
+
+    #[must_use]
+    pub const fn first_context(self) -> ContextHandle {
+        self.first_context
+    }
+
+    #[must_use]
+    pub const fn first_value(self) -> ContextValueHandle {
+        self.first_value
+    }
+
+    #[must_use]
+    pub const fn second_context(self) -> ContextHandle {
+        self.second_context
+    }
+
+    #[must_use]
+    pub const fn second_value(self) -> ContextValueHandle {
+        self.second_value
+    }
+
+    #[must_use]
+    pub const fn first_provider_snapshot(self) -> ContextStackSnapshot {
+        self.first_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn second_provider_snapshot(self) -> ContextStackSnapshot {
+        self.second_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn first_provider_token(self) -> ContextFrameId {
+        self.first_provider_token
+    }
+
+    #[must_use]
+    pub const fn second_provider_token(self) -> ContextFrameId {
+        self.second_provider_token
+    }
+
+    #[must_use]
+    pub const fn first_pushed_stack_depth(self) -> usize {
+        self.first_pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn first_restored_stack_depth(self) -> usize {
+        self.first_restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn second_pushed_stack_depth(self) -> usize {
+        self.second_pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn second_restored_stack_depth(self) -> usize {
+        self.second_restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn first_child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.first_child_begin_work
+    }
+
+    #[must_use]
+    pub const fn second_child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.second_child_begin_work
+    }
+
+    #[must_use]
+    pub const fn first_child_render(self) -> FunctionComponentRenderRecord {
+        self.first_child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn second_child_render(self) -> FunctionComponentRenderRecord {
+        self.second_child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn first_child_output(self) -> FunctionComponentOutputHandle {
+        self.first_child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn second_child_output(self) -> FunctionComponentOutputHandle {
+        self.second_child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn first_child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.first_child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn second_child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.second_child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn first_child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.first_child_begin_work.context_dependency()
+    }
+
+    #[must_use]
+    pub const fn second_child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.second_child_begin_work.context_dependency()
+    }
+
+    #[must_use]
+    pub const fn first_child_context_read_count(self) -> usize {
+        self.first_child_begin_work.context_read_count()
+    }
+
+    #[must_use]
+    pub const fn second_child_context_read_count(self) -> usize {
+        self.second_child_begin_work.context_read_count()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.first_child_begin_work.render().render_lanes()
     }
 }
 
@@ -2471,6 +2706,201 @@ impl Error for NestedContextProviderBeginWorkError {
 }
 
 impl From<FiberTopologyError> for NestedContextProviderBeginWorkError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SiblingContextProviderBeginWorkError {
+    FiberTopology(FiberTopologyError),
+    ContextStack {
+        provider: FiberId,
+        context: ContextHandle,
+        error: Box<ContextStackError>,
+    },
+    ContextRestore {
+        provider: FiberId,
+        context: ContextHandle,
+        snapshot: ContextStackSnapshot,
+        error: Box<ContextStackError>,
+    },
+    ContextRestoreAfterChildError {
+        provider: FiberId,
+        child: FiberId,
+        child_error: Box<BeginWorkError>,
+        restore_error: Option<Box<ContextStackError>>,
+    },
+    ChildBeginWork {
+        provider: FiberId,
+        child: FiberId,
+        error: Box<BeginWorkError>,
+    },
+    UnexpectedFiberTag {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingSecondProvider {
+        first_provider: FiberId,
+    },
+    TooManyProviders {
+        first_provider: FiberId,
+        second_provider: FiberId,
+        sibling: FiberId,
+    },
+    MissingChild {
+        provider: FiberId,
+    },
+    MultipleChildren {
+        provider: FiberId,
+        first_child: FiberId,
+        sibling: FiberId,
+    },
+    UnsupportedSecondProviderTag {
+        first_provider: FiberId,
+        second_provider: FiberId,
+        tag: FiberTag,
+    },
+    UnsupportedChildTag {
+        provider: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+}
+
+impl Display for SiblingContextProviderBeginWorkError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::ContextStack {
+                provider,
+                context,
+                error,
+            } => write!(
+                formatter,
+                "sibling ContextProvider fiber {} could not push context {}: {error}",
+                provider.slot().get(),
+                context.raw()
+            ),
+            Self::ContextRestore {
+                provider,
+                context,
+                snapshot,
+                error,
+            } => write!(
+                formatter,
+                "sibling ContextProvider fiber {} could not restore context {} snapshot at depth {}: {error}",
+                provider.slot().get(),
+                context.raw(),
+                snapshot.depth()
+            ),
+            Self::ContextRestoreAfterChildError {
+                provider,
+                child,
+                child_error,
+                restore_error,
+            } => write!(
+                formatter,
+                "sibling ContextProvider fiber {} child {} failed begin-work ({child_error}) and restore error was {:?}",
+                provider.slot().get(),
+                child.slot().get(),
+                restore_error
+            ),
+            Self::ChildBeginWork {
+                provider,
+                child,
+                error,
+            } => write!(
+                formatter,
+                "sibling ContextProvider fiber {} child {} failed private begin-work handoff: {error}",
+                provider.slot().get(),
+                child.slot().get()
+            ),
+            Self::UnexpectedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be first ContextProvider for private sibling provider begin-work handoff, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingSecondProvider { first_provider } => write!(
+                formatter,
+                "ContextProvider fiber {} has no provider sibling; this private sibling handoff requires exactly two sibling ContextProvider fibers",
+                first_provider.slot().get()
+            ),
+            Self::TooManyProviders {
+                first_provider,
+                second_provider,
+                sibling,
+            } => write!(
+                formatter,
+                "ContextProvider siblings {} and {} have extra sibling {}; this private sibling handoff admits exactly two providers",
+                first_provider.slot().get(),
+                second_provider.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::MissingChild { provider } => write!(
+                formatter,
+                "ContextProvider fiber {} has no child; this private sibling handoff requires one FunctionComponent child per provider",
+                provider.slot().get()
+            ),
+            Self::MultipleChildren {
+                provider,
+                first_child,
+                sibling,
+            } => write!(
+                formatter,
+                "ContextProvider fiber {} has multiple children (first {}, sibling {}); this private sibling handoff admits exactly one FunctionComponent child per provider",
+                provider.slot().get(),
+                first_child.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::UnsupportedSecondProviderTag {
+                first_provider,
+                second_provider,
+                tag,
+            } => write!(
+                formatter,
+                "first ContextProvider fiber {} sibling {} has unsupported tag {:?}; this private sibling handoff requires a second ContextProvider",
+                first_provider.slot().get(),
+                second_provider.slot().get(),
+                tag
+            ),
+            Self::UnsupportedChildTag {
+                provider,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "ContextProvider fiber {} child {} has unsupported tag {:?}; this private sibling handoff admits FunctionComponent children only",
+                provider.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+impl Error for SiblingContextProviderBeginWorkError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::ContextStack { error, .. } | Self::ContextRestore { error, .. } => Some(error),
+            Self::ContextRestoreAfterChildError { child_error, .. }
+            | Self::ChildBeginWork {
+                error: child_error, ..
+            } => Some(child_error),
+            Self::UnexpectedFiberTag { .. }
+            | Self::MissingSecondProvider { .. }
+            | Self::TooManyProviders { .. }
+            | Self::MissingChild { .. }
+            | Self::MultipleChildren { .. }
+            | Self::UnsupportedSecondProviderTag { .. }
+            | Self::UnsupportedChildTag { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for SiblingContextProviderBeginWorkError {
     fn from(error: FiberTopologyError) -> Self {
         Self::FiberTopology(error)
     }
@@ -4110,6 +4540,46 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
     NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
     NestedContextProviderBeginWorkError,
 > {
+    begin_work_nested_context_provider_two_consumer_use_context_children_with_required_contexts(
+        arena,
+        request,
+        request.inner_context(),
+        request.inner_context(),
+        context_store,
+        invoker,
+    )
+}
+
+pub(crate) fn begin_work_nested_context_provider_two_provider_use_context_children(
+    arena: &mut FiberArena,
+    request: NestedContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
+    NestedContextProviderBeginWorkError,
+> {
+    begin_work_nested_context_provider_two_consumer_use_context_children_with_required_contexts(
+        arena,
+        request,
+        request.outer_context(),
+        request.inner_context(),
+        context_store,
+        invoker,
+    )
+}
+
+fn begin_work_nested_context_provider_two_consumer_use_context_children_with_required_contexts(
+    arena: &mut FiberArena,
+    request: NestedContextProviderBeginWorkRequest,
+    first_required_context: ContextHandle,
+    second_required_context: ContextHandle,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
+    NestedContextProviderBeginWorkError,
+> {
     let shape = validate_nested_context_provider_two_consumer_handoff_shape(
         arena,
         request.outer_provider(),
@@ -4151,7 +4621,7 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
         arena,
         BeginWorkRequest::new(shape.first_child, request.render_lanes()),
         context_store,
-        request.inner_context(),
+        first_required_context,
         invoker,
     );
     let child_result = match first_child_result {
@@ -4160,7 +4630,7 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
                 arena,
                 BeginWorkRequest::new(shape.second_child, request.render_lanes()),
                 context_store,
-                request.inner_context(),
+                second_required_context,
                 invoker,
             );
 
@@ -4234,6 +4704,136 @@ pub(crate) fn begin_work_nested_context_provider_two_consumer_use_context_childr
     }
 }
 
+pub(crate) fn begin_work_sibling_context_provider_two_consumer_use_context_children(
+    arena: &mut FiberArena,
+    request: SiblingContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    SiblingContextProviderTwoConsumerUseContextBeginWorkRecord,
+    SiblingContextProviderBeginWorkError,
+> {
+    let shape = validate_sibling_context_provider_two_consumer_handoff_shape(
+        arena,
+        request.first_provider(),
+    )?;
+
+    let first_snapshot = context_store
+        .push_provider(request.first_context(), request.first_value())
+        .map_err(|error| SiblingContextProviderBeginWorkError::ContextStack {
+            provider: request.first_provider(),
+            context: request.first_context(),
+            error: Box::new(error),
+        })?;
+    let first_provider_token = context_store.context_stack().snapshot().top_frame();
+    let first_pushed_stack_depth = context_store.stack_depth();
+    let first_child_result = begin_work_function_component_required_use_context(
+        arena,
+        BeginWorkRequest::new(shape.first_child, request.render_lanes()),
+        context_store,
+        request.first_context(),
+        invoker,
+    );
+    let first_restore_result = context_store.restore_snapshot(first_snapshot);
+    let first_restored_stack_depth = context_store.stack_depth();
+    let first_child_begin_work = match (first_child_result, first_restore_result) {
+        (Ok(first_child_begin_work), Ok(())) => first_child_begin_work,
+        (Ok(_), Err(error)) => {
+            return Err(SiblingContextProviderBeginWorkError::ContextRestore {
+                provider: request.first_provider(),
+                context: request.first_context(),
+                snapshot: first_snapshot,
+                error: Box::new(error),
+            });
+        }
+        (Err(error), Ok(())) => {
+            return Err(SiblingContextProviderBeginWorkError::ChildBeginWork {
+                provider: request.first_provider(),
+                child: shape.first_child,
+                error: Box::new(error),
+            });
+        }
+        (Err(child_error), restore_error) => {
+            return Err(
+                SiblingContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                    provider: request.first_provider(),
+                    child: shape.first_child,
+                    child_error: Box::new(child_error),
+                    restore_error: restore_error.err().map(Box::new),
+                },
+            );
+        }
+    };
+
+    let second_snapshot = context_store
+        .push_provider(request.second_context(), request.second_value())
+        .map_err(|error| SiblingContextProviderBeginWorkError::ContextStack {
+            provider: shape.second_provider,
+            context: request.second_context(),
+            error: Box::new(error),
+        })?;
+    let second_provider_token = context_store.context_stack().snapshot().top_frame();
+    let second_pushed_stack_depth = context_store.stack_depth();
+    let second_child_result = begin_work_function_component_required_use_context(
+        arena,
+        BeginWorkRequest::new(shape.second_child, request.render_lanes()),
+        context_store,
+        request.second_context(),
+        invoker,
+    );
+    let second_restore_result = context_store.restore_snapshot(second_snapshot);
+    let second_restored_stack_depth = context_store.stack_depth();
+    let second_child_begin_work = match (second_child_result, second_restore_result) {
+        (Ok(second_child_begin_work), Ok(())) => second_child_begin_work,
+        (Ok(_), Err(error)) => {
+            return Err(SiblingContextProviderBeginWorkError::ContextRestore {
+                provider: shape.second_provider,
+                context: request.second_context(),
+                snapshot: second_snapshot,
+                error: Box::new(error),
+            });
+        }
+        (Err(error), Ok(())) => {
+            return Err(SiblingContextProviderBeginWorkError::ChildBeginWork {
+                provider: shape.second_provider,
+                child: shape.second_child,
+                error: Box::new(error),
+            });
+        }
+        (Err(child_error), restore_error) => {
+            return Err(
+                SiblingContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                    provider: shape.second_provider,
+                    child: shape.second_child,
+                    child_error: Box::new(child_error),
+                    restore_error: restore_error.err().map(Box::new),
+                },
+            );
+        }
+    };
+
+    Ok(SiblingContextProviderTwoConsumerUseContextBeginWorkRecord {
+        first_provider: request.first_provider(),
+        second_provider: shape.second_provider,
+        first_child: shape.first_child,
+        second_child: shape.second_child,
+        first_context: request.first_context(),
+        first_value: request.first_value(),
+        second_context: request.second_context(),
+        second_value: request.second_value(),
+        first_provider_snapshot: first_snapshot,
+        second_provider_snapshot: second_snapshot,
+        first_provider_token,
+        second_provider_token,
+        first_pushed_stack_depth,
+        first_restored_stack_depth,
+        second_pushed_stack_depth,
+        second_restored_stack_depth,
+        first_child_begin_work,
+        second_child_begin_work,
+    })
+}
+
 fn validate_context_provider_handoff_shape(
     arena: &FiberArena,
     provider: FiberId,
@@ -4284,6 +4884,13 @@ struct NestedContextProviderHandoffShape {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct NestedContextProviderTwoConsumerHandoffShape {
     inner_provider: FiberId,
+    first_child: FiberId,
+    second_child: FiberId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SiblingContextProviderTwoConsumerHandoffShape {
+    second_provider: FiberId,
     first_child: FiberId,
     second_child: FiberId,
 }
@@ -4456,6 +5063,94 @@ fn validate_nested_context_provider_two_consumer_handoff_shape(
 
     Ok(NestedContextProviderTwoConsumerHandoffShape {
         inner_provider,
+        first_child,
+        second_child,
+    })
+}
+
+fn validate_sibling_context_provider_two_consumer_handoff_shape(
+    arena: &FiberArena,
+    first_provider: FiberId,
+) -> Result<SiblingContextProviderTwoConsumerHandoffShape, SiblingContextProviderBeginWorkError> {
+    let first_node = arena.get(first_provider)?;
+    let first_tag = first_node.tag();
+    if first_tag != FiberTag::ContextProvider {
+        return Err(SiblingContextProviderBeginWorkError::UnexpectedFiberTag {
+            fiber: first_provider,
+            tag: first_tag,
+        });
+    }
+
+    let second_provider = first_node
+        .sibling()
+        .ok_or(SiblingContextProviderBeginWorkError::MissingSecondProvider { first_provider })?;
+    let second_node = arena.get(second_provider)?;
+    let second_tag = second_node.tag();
+    if second_tag != FiberTag::ContextProvider {
+        return Err(
+            SiblingContextProviderBeginWorkError::UnsupportedSecondProviderTag {
+                first_provider,
+                second_provider,
+                tag: second_tag,
+            },
+        );
+    }
+    if let Some(sibling) = second_node.sibling() {
+        return Err(SiblingContextProviderBeginWorkError::TooManyProviders {
+            first_provider,
+            second_provider,
+            sibling,
+        });
+    }
+
+    let first_child =
+        first_node
+            .child()
+            .ok_or(SiblingContextProviderBeginWorkError::MissingChild {
+                provider: first_provider,
+            })?;
+    let first_child_node = arena.get(first_child)?;
+    if let Some(sibling) = first_child_node.sibling() {
+        return Err(SiblingContextProviderBeginWorkError::MultipleChildren {
+            provider: first_provider,
+            first_child,
+            sibling,
+        });
+    }
+    let first_child_tag = first_child_node.tag();
+    if first_child_tag != FiberTag::FunctionComponent {
+        return Err(SiblingContextProviderBeginWorkError::UnsupportedChildTag {
+            provider: first_provider,
+            child: first_child,
+            tag: first_child_tag,
+        });
+    }
+
+    let second_child =
+        second_node
+            .child()
+            .ok_or(SiblingContextProviderBeginWorkError::MissingChild {
+                provider: second_provider,
+            })?;
+    let second_child_node = arena.get(second_child)?;
+    if let Some(sibling) = second_child_node.sibling() {
+        return Err(SiblingContextProviderBeginWorkError::MultipleChildren {
+            provider: second_provider,
+            first_child: second_child,
+            sibling,
+        });
+    }
+    let second_child_tag = second_child_node.tag();
+    if second_child_tag != FiberTag::FunctionComponent {
+        return Err(SiblingContextProviderBeginWorkError::UnsupportedChildTag {
+            provider: second_provider,
+            child: second_child,
+            tag: second_child_tag,
+        });
+    }
+
+    Ok(SiblingContextProviderTwoConsumerHandoffShape {
+        second_provider,
         first_child,
         second_child,
     })
@@ -5475,6 +6170,308 @@ mod tests {
     }
 
     #[test]
+    fn nested_context_provider_two_provider_use_context_children_read_distinct_providers() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let outer_default_value = context_value(461);
+        let inner_default_value = context_value(462);
+        let outer_value = context_value(463);
+        let inner_value = context_value(464);
+        let outer_context = context_store.create_context(outer_default_value);
+        let inner_context = context_store.create_context(inner_default_value);
+        let mut arena = FiberArena::new();
+        let outer_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(465),
+            FiberMode::NO,
+        );
+        let inner_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(466),
+            FiberMode::NO,
+        );
+        let first_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(467),
+            FiberMode::NO,
+        );
+        let first_component = FiberTypeHandle::from_raw(468);
+        arena
+            .get_mut(first_current)
+            .unwrap()
+            .set_fiber_type(first_component);
+        let first_work_in_progress = arena
+            .create_work_in_progress(first_current, PropsHandle::from_raw(469))
+            .unwrap();
+        let second_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(470),
+            FiberMode::NO,
+        );
+        let second_component = FiberTypeHandle::from_raw(471);
+        arena
+            .get_mut(second_current)
+            .unwrap()
+            .set_fiber_type(second_component);
+        let second_work_in_progress = arena
+            .create_work_in_progress(second_current, PropsHandle::from_raw(472))
+            .unwrap();
+        arena
+            .set_children(
+                inner_provider,
+                &[first_work_in_progress, second_work_in_progress],
+            )
+            .unwrap();
+        arena
+            .set_children(outer_provider, &[inner_provider])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce {
+                context: outer_context,
+            },
+        );
+        registry.register(
+            second_component,
+            UseContextBehavior::ReadOnce {
+                context: inner_context,
+            },
+        );
+
+        let record = begin_work_nested_context_provider_two_provider_use_context_children(
+            &mut arena,
+            NestedContextProviderBeginWorkRequest::new(
+                outer_provider,
+                Lanes::DEFAULT,
+                outer_context,
+                outer_value,
+                inner_context,
+                inner_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.first_child(), first_work_in_progress);
+        assert_eq!(record.second_child(), second_work_in_progress);
+        assert_eq!(record.outer_context(), outer_context);
+        assert_eq!(record.inner_context(), inner_context);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.outer_pushed_stack_depth(), 1);
+        assert_eq!(record.inner_pushed_stack_depth(), 2);
+        assert_eq!(record.inner_restored_stack_depth(), 1);
+        assert_eq!(record.outer_restored_stack_depth(), 0);
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(
+            registry.calls()[0].context_state().unwrap().stack_depth(),
+            2
+        );
+        assert_eq!(
+            registry.calls()[1].context_state().unwrap().stack_depth(),
+            2
+        );
+
+        let first_read = record.first_child_context_read();
+        assert_eq!(first_read.fiber(), first_work_in_progress);
+        assert_eq!(first_read.context(), outer_context);
+        assert_eq!(first_read.default_value(), outer_default_value);
+        assert_eq!(first_read.value(), outer_value);
+        assert_eq!(first_read.active_provider_count(), 1);
+        let second_read = record.second_child_context_read();
+        assert_eq!(second_read.fiber(), second_work_in_progress);
+        assert_eq!(second_read.context(), inner_context);
+        assert_eq!(second_read.default_value(), inner_default_value);
+        assert_eq!(second_read.value(), inner_value);
+        assert_eq!(second_read.active_provider_count(), 1);
+        assert_eq!(registry.reads(), &[first_read, second_read]);
+        assert_eq!(
+            context_store.current_value(outer_context).unwrap(),
+            outer_default_value
+        );
+        assert_eq!(
+            context_store.current_value(inner_context).unwrap(),
+            inner_default_value
+        );
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(
+            context_store.active_provider_count(outer_context).unwrap(),
+            0
+        );
+        assert_eq!(
+            context_store.active_provider_count(inner_context).unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn sibling_context_provider_two_consumer_use_context_children_read_and_unwind_each_branch() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let first_default_value = context_value(490);
+        let second_default_value = context_value(491);
+        let first_value = context_value(492);
+        let second_value = context_value(493);
+        let first_context = context_store.create_context(first_default_value);
+        let second_context = context_store.create_context(second_default_value);
+        let mut arena = FiberArena::new();
+        let parent = arena.create_fiber(
+            FiberTag::HostRoot,
+            None,
+            PropsHandle::from_raw(494),
+            FiberMode::NO,
+        );
+        let first_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(495),
+            FiberMode::NO,
+        );
+        let second_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(496),
+            FiberMode::NO,
+        );
+        let first_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(497),
+            FiberMode::NO,
+        );
+        let first_component = FiberTypeHandle::from_raw(498);
+        arena
+            .get_mut(first_current)
+            .unwrap()
+            .set_fiber_type(first_component);
+        let first_work_in_progress = arena
+            .create_work_in_progress(first_current, PropsHandle::from_raw(499))
+            .unwrap();
+        let second_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(500),
+            FiberMode::NO,
+        );
+        let second_component = FiberTypeHandle::from_raw(501);
+        arena
+            .get_mut(second_current)
+            .unwrap()
+            .set_fiber_type(second_component);
+        let second_work_in_progress = arena
+            .create_work_in_progress(second_current, PropsHandle::from_raw(502))
+            .unwrap();
+        arena
+            .set_children(first_provider, &[first_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(second_provider, &[second_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(parent, &[first_provider, second_provider])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce {
+                context: first_context,
+            },
+        );
+        registry.register(
+            second_component,
+            UseContextBehavior::ReadOnce {
+                context: second_context,
+            },
+        );
+
+        let record = begin_work_sibling_context_provider_two_consumer_use_context_children(
+            &mut arena,
+            SiblingContextProviderBeginWorkRequest::new(
+                first_provider,
+                Lanes::DEFAULT,
+                first_context,
+                first_value,
+                second_context,
+                second_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.first_provider(), first_provider);
+        assert_eq!(record.second_provider(), second_provider);
+        assert_eq!(record.first_child(), first_work_in_progress);
+        assert_eq!(record.second_child(), second_work_in_progress);
+        assert_eq!(record.first_context(), first_context);
+        assert_eq!(record.second_context(), second_context);
+        assert_eq!(record.first_value(), first_value);
+        assert_eq!(record.second_value(), second_value);
+        assert!(record.first_provider_snapshot().is_root());
+        assert!(record.second_provider_snapshot().is_root());
+        assert!(record.first_provider_token().is_some());
+        assert!(record.second_provider_token().is_some());
+        assert_ne!(
+            record.first_provider_token(),
+            record.second_provider_token()
+        );
+        assert_eq!(record.first_pushed_stack_depth(), 1);
+        assert_eq!(record.first_restored_stack_depth(), 0);
+        assert_eq!(record.second_pushed_stack_depth(), 1);
+        assert_eq!(record.second_restored_stack_depth(), 0);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(registry.calls()[0].fiber(), first_work_in_progress);
+        assert_eq!(registry.calls()[1].fiber(), second_work_in_progress);
+        assert_eq!(
+            registry.calls()[0].context_state().unwrap().stack_depth(),
+            1
+        );
+        assert_eq!(
+            registry.calls()[1].context_state().unwrap().stack_depth(),
+            1
+        );
+
+        let first_read = record.first_child_context_read();
+        let second_read = record.second_child_context_read();
+        assert_eq!(registry.reads(), &[first_read, second_read]);
+        assert_eq!(first_read.context(), first_context);
+        assert_eq!(first_read.value(), first_value);
+        assert_eq!(first_read.active_provider_count(), 1);
+        assert_eq!(second_read.context(), second_context);
+        assert_eq!(second_read.value(), second_value);
+        assert_eq!(second_read.active_provider_count(), 1);
+        assert_eq!(
+            context_store.context_reads_for_record(record.first_child_render()),
+            &[first_read]
+        );
+        assert_eq!(
+            context_store.context_reads_for_record(record.second_child_render()),
+            &[second_read]
+        );
+        assert_eq!(
+            context_store.current_value(first_context).unwrap(),
+            first_default_value
+        );
+        assert_eq!(
+            context_store.current_value(second_context).unwrap(),
+            second_default_value
+        );
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(
+            context_store.active_provider_count(first_context).unwrap(),
+            0
+        );
+        assert_eq!(
+            context_store.active_provider_count(second_context).unwrap(),
+            0
+        );
+    }
+
+    #[test]
     fn nested_context_provider_two_consumer_use_context_rejects_non_exact_shapes_before_push() {
         let mut missing_store = FunctionComponentContextRenderStore::new();
         let missing_context = missing_store.create_context(context_value(470));
@@ -5614,6 +6611,131 @@ mod tests {
         assert_eq!(
             extra_store.current_value(extra_context).unwrap(),
             context_value(480)
+        );
+        assert_eq!(extra_store.stack_depth(), 0);
+    }
+
+    #[test]
+    fn sibling_context_provider_two_consumer_use_context_rejects_non_exact_shapes_before_push() {
+        let mut missing_store = FunctionComponentContextRenderStore::new();
+        let first_context = missing_store.create_context(context_value(503));
+        let second_context = missing_store.create_context(context_value(504));
+        let (mut missing_arena, _current, first_child, component) = function_component_pair();
+        let first_provider = missing_arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(505),
+            FiberMode::NO,
+        );
+        missing_arena
+            .set_children(first_provider, &[first_child])
+            .unwrap();
+        let mut missing_registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce {
+                context: first_context,
+            },
+        );
+
+        let missing_error = begin_work_sibling_context_provider_two_consumer_use_context_children(
+            &mut missing_arena,
+            SiblingContextProviderBeginWorkRequest::new(
+                first_provider,
+                Lanes::DEFAULT,
+                first_context,
+                context_value(506),
+                second_context,
+                context_value(507),
+            ),
+            &mut missing_store,
+            &mut missing_registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            missing_error,
+            SiblingContextProviderBeginWorkError::MissingSecondProvider { first_provider }
+        );
+        assert!(missing_registry.calls().is_empty());
+        assert_eq!(
+            missing_store.current_value(first_context).unwrap(),
+            context_value(503)
+        );
+        assert_eq!(
+            missing_store.current_value(second_context).unwrap(),
+            context_value(504)
+        );
+        assert_eq!(missing_store.stack_depth(), 0);
+
+        let mut extra_store = FunctionComponentContextRenderStore::new();
+        let first_context = extra_store.create_context(context_value(508));
+        let second_context = extra_store.create_context(context_value(509));
+        let mut extra_arena = FiberArena::new();
+        let parent = extra_arena.create_fiber(
+            FiberTag::HostRoot,
+            None,
+            PropsHandle::from_raw(510),
+            FiberMode::NO,
+        );
+        let first_provider = extra_arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(511),
+            FiberMode::NO,
+        );
+        let second_provider = extra_arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(512),
+            FiberMode::NO,
+        );
+        let third_provider = extra_arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(513),
+            FiberMode::NO,
+        );
+        extra_arena
+            .set_children(parent, &[first_provider, second_provider, third_provider])
+            .unwrap();
+        let mut extra_registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce {
+                context: first_context,
+            },
+        );
+
+        let extra_error = begin_work_sibling_context_provider_two_consumer_use_context_children(
+            &mut extra_arena,
+            SiblingContextProviderBeginWorkRequest::new(
+                first_provider,
+                Lanes::DEFAULT,
+                first_context,
+                context_value(514),
+                second_context,
+                context_value(515),
+            ),
+            &mut extra_store,
+            &mut extra_registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            extra_error,
+            SiblingContextProviderBeginWorkError::TooManyProviders {
+                first_provider,
+                second_provider,
+                sibling: third_provider,
+            }
+        );
+        assert!(extra_registry.calls().is_empty());
+        assert_eq!(
+            extra_store.current_value(first_context).unwrap(),
+            context_value(508)
+        );
+        assert_eq!(
+            extra_store.current_value(second_context).unwrap(),
+            context_value(509)
         );
         assert_eq!(extra_store.stack_depth(), 0);
     }
