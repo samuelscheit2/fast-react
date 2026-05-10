@@ -5319,6 +5319,522 @@ test('private resource hint stylesheet precedence diagnostic records style dedup
   );
 });
 
+test('private resource hint resource-map commit diagnostic records stylesheet preload and script rows only', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'resource-map-commit-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'resource-map-commit-adapter'
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: 'resource-map-commit-order'
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: 'resource-map-commit-stylesheet'
+    });
+  const commitGate =
+    resourceFormGate.createResourceHintResourceMapCommitGate({
+      requestIdPrefix: 'resource-map-commit'
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const records = [
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/style.css',
+      'style',
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: 'low',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'high'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style-dupe',
+        fetchPriority: 'high'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/script.js',
+      'script',
+      {
+        crossOrigin: undefined,
+        integrity: 'sha256-script-preload',
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('X', [
+      '/script.js',
+      {
+        crossOrigin: undefined,
+        integrity: 'sha256-script',
+        fetchPriority: 'high',
+        nonce: 'nonce-script'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/font.woff2',
+      'font',
+      {
+        crossOrigin: '',
+        integrity: undefined,
+        nonce: undefined,
+        type: 'font/woff2',
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ])
+  ];
+  const headRecord = gate.recordSingletonRequest('head', [
+    throwingProxy('resource map commit head props')
+  ]);
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    })
+  );
+
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'stylesheet',
+    'data-precedence': 'theme',
+    'data-fast-react-resource-key': 'style-main',
+    'data-fast-react-precedence-key': 'precedence-main'
+  });
+  appendFakeHeadChild(fakeDom, 'script', {
+    'data-fast-react-resource-key': 'script-main'
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'script-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[4].adapterAdmissionId,
+          resourceKind: 'script',
+          resourceKey: 'script-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: 'font',
+          resourceKey: 'font-main'
+        }
+      ]
+    }
+  );
+  const stylesheet = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const diagnostic = commitGate.recordResourceMapCommitDiagnostic(
+    order,
+    stylesheet,
+    {
+      explicitResourceMapCommitDiagnostic: true,
+      commitKind: 'deterministic-private-resource-map-commit',
+      commitId: 'resource-map-commit-plan',
+      targetKind: 'document-head',
+      hostTag: 'head'
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceHintResourceMapCommitGate();
+
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintResourceMapCommitRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintResourceMapCommitRecordPayload(
+      diagnostic
+    ),
+    diagnostic
+  );
+  assert.equal(diagnostic.resourceMapCommitId, 'resource-map-commit:1');
+  assert.equal(
+    diagnostic.resourceMapCommitStatus,
+    resourceFormGate.privateResourceHintResourceMapCommitStatus
+  );
+  assert.equal(
+    diagnostic.executionStatus,
+    resourceFormGate.privateResourceHintResourceMapCommitExecutionStatus
+  );
+  assert.equal(
+    diagnostic.compatibilityStatus,
+    resourceFormGate
+      .privateResourceHintResourceMapCommitCompatibilityBlockedStatus
+  );
+  assert.deepEqual(
+    diagnostic.sideEffects,
+    resourceFormGate.resourceHintResourceMapCommitSideEffects
+  );
+  assert.equal(
+    diagnostic.sideEffects.fakeResourceMapCommitDiagnosticInvoked,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.privateResourceMapCommitRecordsCreated,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadRead, false);
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
+  assert.equal(diagnostic.sideEffects.realResourceMapsCreated, false);
+  assert.equal(diagnostic.sideEffects.realResourceMapsMutated, false);
+  assert.equal(diagnostic.sideEffects.fakeResourceMapsCreated, false);
+  assert.equal(diagnostic.sideEffects.fakeResourceMapsMutated, false);
+  assert.equal(
+    diagnostic.sideEffects.stylesheetRecordOwnershipClaimed,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.preloadRecordStarted, false);
+  assert.equal(diagnostic.sideEffects.scriptRecordLoaded, false);
+  assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
+  assert.equal(diagnostic.sideEffects.resourceFetchStarted, false);
+  assert.equal(diagnostic.commitAdmission.rawResourceMapCaptured, false);
+  assert.equal(
+    diagnostic.commitAdmission.realResourceMapMutationAllowed,
+    false
+  );
+  assert.equal(
+    diagnostic.commitAdmission.fakeResourceMapMutationAllowed,
+    false
+  );
+  assert.equal(
+    diagnostic.commitAdmission.privateResourceMapRecordCreationAllowed,
+    true
+  );
+  assert.deepEqual(
+    diagnostic.acceptedContractIds,
+    ['preload', 'preinit-style', 'preinit-script']
+  );
+  assert.deepEqual(diagnostic.resourceMapCommitPlan, {
+    resourceMapKind:
+      'react-19.2.6-resource-map-commit-diagnostic',
+    targetKind: 'document-head',
+    hostTag: 'head',
+    privateResourceMapRecordCount: 6,
+    uniquePrivateResourceRecordCount: 5,
+    stylesheetRecordCount: 2,
+    preloadRecordCount: 3,
+    scriptRecordCount: 1,
+    dedupedRecordCount: 1,
+    wouldInsertRecordCount: 5,
+    realResourceMapsCreated: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsCreated: false,
+    fakeResourceMapsMutated: false,
+    hoistableStylesMapCreated: false,
+    hoistableStylesMapMutated: false,
+    hoistableScriptsMapCreated: false,
+    hoistableScriptsMapMutated: false,
+    preloadPropsMapCreated: false,
+    preloadPropsMapMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(
+    diagnostic.privateResourceMapRecords.map((row) => ({
+      recordKind: row.recordKind,
+      mapKind: row.mapKind,
+      contractId: row.contractId,
+      resourceKey: row.resourceKey,
+      precedenceKey: row.precedenceKey,
+      privateRecordCreated: row.privateRecordCreated,
+      realResourceMapMutated: row.realResourceMapMutated,
+      fakeResourceMapMutated: row.fakeResourceMapMutated,
+      fetchStarted: row.fetchStarted,
+      preloadStarted: row.preloadStarted,
+      loadEventSubscribed: row.loadEventSubscribed,
+      loadingStateMutated: row.loadingStateMutated
+    })),
+    [
+      {
+        recordKind: 'preload',
+        mapKind: 'preload-props',
+        contractId: 'preload',
+        resourceKey: 'style:style-main',
+        precedenceKey: null,
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'stylesheet',
+        mapKind: 'hoistable-styles',
+        contractId: 'preinit-style',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-main',
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'stylesheet',
+        mapKind: 'hoistable-styles',
+        contractId: 'preinit-style',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-main',
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'preload',
+        mapKind: 'preload-props',
+        contractId: 'preload',
+        resourceKey: 'script:script-main',
+        precedenceKey: null,
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'script',
+        mapKind: 'hoistable-scripts',
+        contractId: 'preinit-script',
+        resourceKey: 'script:script-main',
+        precedenceKey: null,
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      },
+      {
+        recordKind: 'preload',
+        mapKind: 'preload-props',
+        contractId: 'preload',
+        resourceKey: 'font:font-main',
+        precedenceKey: null,
+        privateRecordCreated: true,
+        realResourceMapMutated: false,
+        fakeResourceMapMutated: false,
+        fetchStarted: false,
+        preloadStarted: false,
+        loadEventSubscribed: false,
+        loadingStateMutated: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.stylesheetResourceMapRecords.length, 2);
+  assert.equal(diagnostic.preloadResourceMapRecords.length, 3);
+  assert.equal(diagnostic.scriptResourceMapRecords.length, 1);
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.status,
+    resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.precedenceInsertionApplied,
+    false
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.singletonOwnershipClaimed,
+    false
+  );
+  assert.equal(diagnostic.resourceLifecycleBoundary.fetchStarted, false);
+  assert.equal(diagnostic.resourceLifecycleBoundary.preloadStarted, false);
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.loadEventSubscribed,
+    false
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.loadStateMutated,
+    false
+  );
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(diagnostic.publicResourceBoundary.realDocumentMutated, false);
+  assert.equal(
+    diagnostic.publicHeadBoundary.publicSingletonBehavior,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintResourceMapCommitBlockedCapabilities
+  );
+  assert.equal(fakeDom.head.childNodes.length, 2);
+  assert.equal(JSON.stringify(diagnostic).includes('/style.css'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('/script.js'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('sha256-style'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('sha256-script'), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintResourceMapCommitGateId
+  );
+  assert.deepEqual(summary.acceptedRecordKinds, [
+    'stylesheet',
+    'preload',
+    'script'
+  ]);
+  assert.equal(summary.mutatesRealResourceMaps, false);
+  assert.equal(summary.mutatesFakeResourceMaps, false);
+  assert.equal(summary.claimsSingletonOwnership, false);
+  assert.equal(summary.startsFetchOrPreload, false);
+  assert.equal(summary.mutatesLoadState, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintResourceMapCommitBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintResourceMapCommitError(
+      diagnostic
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintResourceMapCommitGateErrorCode
+  );
+  assert.equal(error.exportName, 'resource-hint-resource-map-commit');
+  assert.equal(error.resourceMapCommitId, 'resource-map-commit:1');
+  assert.deepEqual(
+    error.blockedCapabilities,
+    resourceFormGate.resourceHintResourceMapCommitBlockedCapabilities
+  );
+
+  assert.throws(
+    () =>
+      commitGate.recordResourceMapCommitDiagnostic(order, stylesheet, {
+        explicitResourceMapCommitDiagnostic: true
+      }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintResourceMapCommitInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'resource-map commit gate admits exactly one diagnostic record'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintResourceMapCommitGate()
+        .recordResourceMapCommitDiagnostic(order, stylesheet, {
+          explicitResourceMapCommitDiagnostic: true,
+          resourceMap: throwingProxy('real resource map')
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintResourceMapCommitInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'resourceMap must not be passed to the resource-map commit gate'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintResourceMapCommitGate()
+        .recordResourceMapCommitDiagnostic({}, stylesheet, {
+          explicitResourceMapCommitDiagnostic: true
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintResourceMapCommitInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintResourceMapCommitError(
+        {}
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintResourceMapCommitInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -5980,6 +6496,21 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       stylesheetPrecedenceSingletonOrderRowsRecorded: false,
       stylesheetPrecedenceResourceMapCreated: false,
       stylesheetPrecedenceResourceMapMutated: false,
+      fakeResourceMapCommitDiagnosticInvoked: false,
+      privateResourceMapCommitRecordsCreated: false,
+      resourceMapCommitRowsRecorded: false,
+      stylesheetResourceMapCommitRowsRecorded: false,
+      preloadResourceMapCommitRowsRecorded: false,
+      scriptResourceMapCommitRowsRecorded: false,
+      realResourceMapsCreated: false,
+      realResourceMapsMutated: false,
+      fakeResourceMapsCreated: false,
+      fakeResourceMapsMutated: false,
+      stylesheetRecordOwnershipClaimed: false,
+      preloadRecordStarted: false,
+      scriptRecordLoaded: false,
+      resourceLoadStateMutated: false,
+      publicResourceMapCommitBehavior: false,
       resourceFetchStarted: false,
       realDocumentMutated: false,
       publicResourceHintDomInsertion: false,
@@ -5994,7 +6525,9 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       preloadPreinitOrderGate:
         resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate(),
       stylesheetPrecedenceGate:
-        resourceFormGate.describePrivateResourceHintStylesheetPrecedenceGate()
+        resourceFormGate.describePrivateResourceHintStylesheetPrecedenceGate(),
+      resourceMapCommitGate:
+        resourceFormGate.describePrivateResourceHintResourceMapCommitGate()
     },
     formActionResetDispatcherBoundary: {
       gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
@@ -6256,6 +6789,30 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       blockedRecord.sideEffects.stylesheetPrecedenceResourceMapMutated,
       false
     );
+    assert.equal(
+      blockedRecord.sideEffects.fakeResourceMapCommitDiagnosticInvoked,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.privateResourceMapCommitRecordsCreated,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.resourceMapCommitRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.realResourceMapsMutated,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.fakeResourceMapsMutated,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.publicResourceMapCommitBehavior,
+      false
+    );
     assert.equal(blockedRecord.sideEffects.headSingletonResolved, false);
     assert.equal(
       blockedRecord.sideEffects.publicHeadSingletonBehavior,
@@ -6351,6 +6908,34 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         adapterBoundary.stylesheetPrecedenceResourceMapMutated,
         false
       );
+      assert.equal(
+        adapterBoundary.fakeResourceMapCommitDiagnosticInvoked,
+        false
+      );
+      assert.equal(
+        adapterBoundary.privateResourceMapCommitRecordsCreated,
+        false
+      );
+      assert.equal(adapterBoundary.resourceMapCommitRowsRecorded, false);
+      assert.equal(
+        adapterBoundary.stylesheetResourceMapCommitRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.preloadResourceMapCommitRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.scriptResourceMapCommitRowsRecorded,
+        false
+      );
+      assert.equal(adapterBoundary.realResourceMapsMutated, false);
+      assert.equal(adapterBoundary.fakeResourceMapsMutated, false);
+      assert.equal(adapterBoundary.resourceLoadStateMutated, false);
+      assert.equal(
+        adapterBoundary.publicResourceMapCommitBehavior,
+        false
+      );
       assert.equal(adapterBoundary.resourceFetchStarted, false);
       assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
@@ -6377,6 +6962,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.deepEqual(
         adapterBoundary.stylesheetPrecedenceGate,
         resourceFormGate.describePrivateResourceHintStylesheetPrecedenceGate()
+      );
+      assert.deepEqual(
+        adapterBoundary.resourceMapCommitGate,
+        resourceFormGate.describePrivateResourceHintResourceMapCommitGate()
       );
     } else {
       assert.equal(

@@ -17,6 +17,7 @@ const resourceHintHeadBoundaryGateSchemaVersion = 1;
 const resourceHintHeadClearRetainGateSchemaVersion = 1;
 const resourceHintPreloadPreinitOrderGateSchemaVersion = 1;
 const resourceHintStylesheetPrecedenceGateSchemaVersion = 1;
+const resourceHintResourceMapCommitGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputValueTrackerFakeDomDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion = 1;
@@ -39,6 +40,8 @@ const privateResourceHintPreloadPreinitOrderRecordType =
   'fast.react_dom.private_resource_hint_preload_preinit_order_record';
 const privateResourceHintStylesheetPrecedenceRecordType =
   'fast.react_dom.private_resource_hint_stylesheet_precedence_record';
+const privateResourceHintResourceMapCommitRecordType =
+  'fast.react_dom.private_resource_hint_resource_map_commit_record';
 const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputValueTrackerFakeDomDiagnosticRecordType =
@@ -61,6 +64,8 @@ const privateResourceHintPreloadPreinitOrderGateId =
   'resource-hint-preload-preinit-dedupe-order-private-gate-1';
 const privateResourceHintStylesheetPrecedenceGateId =
   'resource-hint-stylesheet-precedence-private-gate-1';
+const privateResourceHintResourceMapCommitGateId =
+  'resource-hint-resource-map-commit-private-gate-1';
 const privateFormActionResetDispatcherGateId =
   'form-action-reset-private-dispatcher-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
@@ -113,6 +118,14 @@ const privateResourceHintStylesheetPrecedenceExecutionStatus =
   'diagnosed-private-resource-hint-fake-dom-stylesheet-precedence-order';
 const privateResourceHintStylesheetPrecedenceCompatibilityBlockedStatus =
   'blocked-private-resource-hint-stylesheet-precedence-compatibility';
+const privateResourceHintResourceMapCommitAdmissionRequiredStatus =
+  'blocked-private-resource-hint-resource-map-commit-admission-required';
+const privateResourceHintResourceMapCommitStatus =
+  'admitted-private-resource-hint-resource-map-commit-record';
+const privateResourceHintResourceMapCommitExecutionStatus =
+  'diagnosed-private-resource-hint-resource-map-commit-records';
+const privateResourceHintResourceMapCommitCompatibilityBlockedStatus =
+  'blocked-private-resource-hint-resource-map-commit-compatibility';
 const privateFormActionResetDispatcherStatus =
   'private-form-action-reset-dispatcher-metadata-only';
 const privateFormActionSubmissionIntentRecordedStatus =
@@ -173,6 +186,12 @@ const privateResourceHintStylesheetPrecedenceInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_PRECEDENCE_INVALID_RECORD';
 const privateResourceHintStylesheetPrecedenceInvalidAdmissionCode =
   'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_PRECEDENCE_INVALID_ADMISSION';
+const privateResourceHintResourceMapCommitGateErrorCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_RESOURCE_MAP_COMMIT_GATE';
+const privateResourceHintResourceMapCommitInvalidRecordCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_RESOURCE_MAP_COMMIT_INVALID_RECORD';
+const privateResourceHintResourceMapCommitInvalidAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_RESOURCE_MAP_COMMIT_INVALID_ADMISSION';
 const privateControlledInputValueTrackerGateErrorCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
 const privateControlledInputValueTrackerGateUnknownScenarioCode =
@@ -501,6 +520,46 @@ const resourceHintStylesheetPrecedenceSideEffects = freezeRecord({
   stylesheetPrecedenceResourceMapMutated: false
 });
 
+const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
+  ...resourceHintStylesheetPrecedenceBlockedSideEffects,
+  fakeResourceMapCommitDiagnosticInvoked: false,
+  privateResourceMapCommitRecordsCreated: false,
+  resourceMapCommitRowsRecorded: false,
+  stylesheetResourceMapCommitRowsRecorded: false,
+  preloadResourceMapCommitRowsRecorded: false,
+  scriptResourceMapCommitRowsRecorded: false,
+  realResourceMapsCreated: false,
+  realResourceMapsMutated: false,
+  fakeResourceMapsCreated: false,
+  fakeResourceMapsMutated: false,
+  stylesheetRecordOwnershipClaimed: false,
+  preloadRecordStarted: false,
+  scriptRecordLoaded: false,
+  resourceLoadStateMutated: false,
+  publicResourceMapCommitBehavior: false
+});
+
+const resourceHintResourceMapCommitSideEffects = freezeRecord({
+  ...resourceHintStylesheetPrecedenceBlockedSideEffects,
+  fakeHeadRead: false,
+  fakeHeadChildrenScanned: false,
+  fakeResourceMapCommitDiagnosticInvoked: true,
+  privateResourceMapCommitRecordsCreated: true,
+  resourceMapCommitRowsRecorded: true,
+  stylesheetResourceMapCommitRowsRecorded: true,
+  preloadResourceMapCommitRowsRecorded: true,
+  scriptResourceMapCommitRowsRecorded: true,
+  realResourceMapsCreated: false,
+  realResourceMapsMutated: false,
+  fakeResourceMapsCreated: false,
+  fakeResourceMapsMutated: false,
+  stylesheetRecordOwnershipClaimed: false,
+  preloadRecordStarted: false,
+  scriptRecordLoaded: false,
+  resourceLoadStateMutated: false,
+  publicResourceMapCommitBehavior: false
+});
+
 const controlledInputValueTrackerSideEffects = freezeRecord({
   controlsTracked: false,
   trackerAttached: false,
@@ -796,6 +855,34 @@ const resourceHintStylesheetPrecedenceMissingPrerequisites = freezeArray([
   )
 ]);
 
+const resourceHintResourceMapCommitMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-root-resource-map-storage',
+    'react-dom-resource',
+    'Root-owned stylesheet and script resource maps remain blocked.'
+  ),
+  prerequisite(
+    'no-preload-props-map-storage',
+    'react-dom-resource',
+    'Preload records are private diagnostics and do not populate preload maps.'
+  ),
+  prerequisite(
+    'no-resource-singleton-ownership',
+    'react-dom-resource',
+    'Resource ownership and head singleton coordination remain blocked.'
+  ),
+  prerequisite(
+    'no-resource-fetch-or-load-state',
+    'react-dom-resource',
+    'Resource fetch, load, error, and suspended commit state remain blocked.'
+  ),
+  prerequisite(
+    'no-public-resource-api-dispatch',
+    'react-dom-resource',
+    'Public resource hint APIs remain placeholders and do not reach commit.'
+  )
+]);
+
 const resourceHintHeadClearRetainBlockedCapabilities = freezeArray([
   blockedCapability(
     'head-singleton-release',
@@ -893,6 +980,29 @@ const resourceHintStylesheetPrecedenceBlockedCapabilities = freezeArray([
   blockedCapability(
     'public-resource-compatibility',
     'Public stylesheet resource compatibility remains unclaimed.'
+  )
+]);
+
+const resourceHintResourceMapCommitBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'root-resource-map-commit',
+    'No real root-owned stylesheet or script resource map is created or mutated.'
+  ),
+  blockedCapability(
+    'preload-map-commit',
+    'Preload rows are recorded as private diagnostics without mutating preload maps.'
+  ),
+  blockedCapability(
+    'resource-singleton-ownership',
+    'Resource ownership and singleton coordination are not acquired.'
+  ),
+  blockedCapability(
+    'resource-fetch-load-state',
+    'Fetch, load, error, and suspended commit state are not started or mutated.'
+  ),
+  blockedCapability(
+    'public-resource-compatibility',
+    'Public resource hint compatibility remains unclaimed.'
   )
 ]);
 
@@ -1168,6 +1278,27 @@ const resourceHintStylesheetPrecedenceContracts = freezeArray([
   )
 ]);
 
+const resourceHintResourceMapCommitContracts = freezeArray([
+  resourceHintResourceMapCommitContract(
+    'resource-map-commit-stylesheet',
+    'stylesheet',
+    'hoistable-styles',
+    'style'
+  ),
+  resourceHintResourceMapCommitContract(
+    'resource-map-commit-preload',
+    'preload',
+    'preload-props',
+    'preload'
+  ),
+  resourceHintResourceMapCommitContract(
+    'resource-map-commit-script',
+    'script',
+    'hoistable-scripts',
+    'script'
+  )
+]);
+
 const singletonContracts = freezeArray([
   singletonContract('html-singleton', 'html'),
   singletonContract('head-singleton', 'head'),
@@ -1395,6 +1526,7 @@ const resourceHintHeadBoundaryPayloads = new WeakMap();
 const resourceHintHeadClearRetainPayloads = new WeakMap();
 const resourceHintPreloadPreinitOrderPayloads = new WeakMap();
 const resourceHintStylesheetPrecedencePayloads = new WeakMap();
+const resourceHintResourceMapCommitPayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticStates = new WeakMap();
@@ -1661,6 +1793,29 @@ function createResourceHintStylesheetPrecedenceGate(options) {
   });
 }
 
+function createResourceHintResourceMapCommitGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'resource-hint-resource-map-commit'
+  );
+  gateState.resourceMapCommitConsumed = false;
+
+  return Object.freeze({
+    recordResourceMapCommitDiagnostic(
+      orderRecord,
+      stylesheetPrecedenceRecord,
+      diagnostic
+    ) {
+      return recordResourceHintResourceMapCommitWithGate(
+        gateState,
+        orderRecord,
+        stylesheetPrecedenceRecord,
+        diagnostic
+      );
+    }
+  });
+}
+
 function recordUnsupportedResourceHintRequest(requestName, args) {
   return defaultGate.recordResourceHintRequest(requestName, args);
 }
@@ -1852,6 +2007,14 @@ function isPrivateResourceHintStylesheetPrecedenceRecord(value) {
   return resourceHintStylesheetPrecedencePayloads.has(value);
 }
 
+function getPrivateResourceHintResourceMapCommitRecordPayload(record) {
+  return resourceHintResourceMapCommitPayloads.get(record) || null;
+}
+
+function isPrivateResourceHintResourceMapCommitRecord(value) {
+  return resourceHintResourceMapCommitPayloads.has(value);
+}
+
 function getPrivateControlledInputValueTrackerRecordPayload(record) {
   return controlledInputValueTrackerRecordPayloads.get(record) || null;
 }
@@ -1911,6 +2074,8 @@ function describeResourceFormActionInternalsGate() {
         resourceHintPreloadPreinitOrderContracts,
       resourceHintStylesheetPrecedence:
         resourceHintStylesheetPrecedenceContracts,
+      resourceHintResourceMapCommit:
+        resourceHintResourceMapCommitContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
       formActionResetDispatchers: formActionResetDispatcherContracts,
@@ -1922,6 +2087,8 @@ function describeResourceFormActionInternalsGate() {
     sideEffects: noSideEffects,
     resourceHintDispatcherMetadata:
       describePrivateResourceHintDispatcherMetadataGate(),
+    resourceHintResourceMapCommit:
+      describePrivateResourceHintResourceMapCommitGate(),
     formActionResetDispatcher:
       describePrivateFormActionResetDispatcherGate(),
     controlledInputValueTracker: describeControlledInputValueTrackerGate(),
@@ -2001,7 +2168,9 @@ function describePrivateResourceHintFakeDomAdapterGate() {
     missingPrerequisites: resourceHintFakeDomAdapterMissingPrerequisites,
     fakeDomInsertion: describePrivateResourceHintFakeDomInsertionGate(),
     preloadPreinitOrder:
-      describePrivateResourceHintPreloadPreinitOrderGate()
+      describePrivateResourceHintPreloadPreinitOrderGate(),
+    resourceMapCommit:
+      describePrivateResourceHintResourceMapCommitGate()
   });
 }
 
@@ -2168,6 +2337,46 @@ function describePrivateResourceHintStylesheetPrecedenceGate() {
     sideEffects: resourceHintStylesheetPrecedenceBlockedSideEffects,
     missingPrerequisites:
       resourceHintStylesheetPrecedenceMissingPrerequisites
+  });
+}
+
+function describePrivateResourceHintResourceMapCommitGate() {
+  return freezeRecord({
+    schemaVersion: resourceHintResourceMapCommitGateSchemaVersion,
+    gateId: privateResourceHintResourceMapCommitGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    admissionStatus:
+      privateResourceHintResourceMapCommitAdmissionRequiredStatus,
+    executionStatus: null,
+    compatibilityStatus:
+      privateResourceHintResourceMapCommitCompatibilityBlockedStatus,
+    acceptedOrderRecordType:
+      privateResourceHintPreloadPreinitOrderRecordType,
+    acceptedStylesheetPrecedenceRecordType:
+      privateResourceHintStylesheetPrecedenceRecordType,
+    acceptedRecordKinds: freezeArray(['stylesheet', 'preload', 'script']),
+    deterministicPrivateRecordsOnly: true,
+    recordsPrivateResourceMapRows: true,
+    recordsStylesheetRows: true,
+    recordsPreloadRows: true,
+    recordsScriptRows: true,
+    mutatesRealResourceMaps: false,
+    mutatesFakeResourceMaps: false,
+    mutatesFakeHead: false,
+    mutatesRealHead: false,
+    claimsSingletonOwnership: false,
+    startsFetchOrPreload: false,
+    mutatesLoadState: false,
+    rawValuesRetained: false,
+    publicResourceHintDomInsertion: false,
+    publicResourceMapCommitBehavior: false,
+    blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities,
+    contracts: resourceHintResourceMapCommitContracts,
+    sideEffects: resourceHintResourceMapCommitBlockedSideEffects,
+    missingPrerequisites:
+      resourceHintResourceMapCommitMissingPrerequisites
   });
 }
 
@@ -2543,6 +2752,31 @@ function createUnsupportedResourceHintStylesheetPrecedenceError(record) {
   error.compatibilityStatus = payload.compatibilityStatus;
   error.sourceOrderDiagnosticId = payload.sourceOrderDiagnosticId;
   error.sourceHeadRequestId = payload.sourceHeadRequestId;
+  error.blockedCapabilities = payload.blockedCapabilities;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedResourceHintResourceMapCommitError(record) {
+  const payload = assertPrivateResourceHintResourceMapCommitRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private resource hint resource-map commit gate records private diagnostics only.'
+  );
+
+  error.code = privateResourceHintResourceMapCommitGateErrorCode;
+  error.resourceMapCommitId = payload.resourceMapCommitId;
+  error.resourceMapCommitSequence = payload.resourceMapCommitSequence;
+  error.requestType = payload.requestType;
+  error.resourceMapCommitStatus = payload.resourceMapCommitStatus;
+  error.executionStatus = payload.executionStatus;
+  error.compatibilityStatus = payload.compatibilityStatus;
+  error.sourceOrderDiagnosticId = payload.sourceOrderDiagnosticId;
+  error.sourceStylesheetPrecedenceId =
+    payload.sourceStylesheetPrecedenceId;
   error.blockedCapabilities = payload.blockedCapabilities;
   error.sideEffects = payload.sideEffects;
 
@@ -3119,6 +3353,90 @@ function recordResourceHintStylesheetPrecedenceWithGate(
   });
 
   resourceHintStylesheetPrecedencePayloads.set(payload, payload);
+  return payload;
+}
+
+function recordResourceHintResourceMapCommitWithGate(
+  gateState,
+  orderRecord,
+  stylesheetPrecedenceRecord,
+  diagnostic
+) {
+  if (gateState.resourceMapCommitConsumed === true) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'resource-map commit gate admits exactly one diagnostic record'
+    );
+  }
+
+  const order =
+    assertPreloadPreinitOrderRecordForResourceMapCommit(orderRecord);
+  const stylesheetPrecedence =
+    assertStylesheetPrecedenceRecordForResourceMapCommit(
+      stylesheetPrecedenceRecord,
+      order
+    );
+  const commitAdmission =
+    normalizeResourceHintResourceMapCommitAdmission(diagnostic);
+  const commitPlan = createResourceHintResourceMapCommitPlan(
+    order,
+    stylesheetPrecedence
+  );
+  gateState.resourceMapCommitConsumed = true;
+
+  const resourceMapCommitSequence = gateState.nextRequestSequence++;
+  const resourceMapCommitId =
+    `${gateState.requestIdPrefix}:${resourceMapCommitSequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: resourceHintResourceMapCommitGateSchemaVersion,
+    $$typeof: privateResourceHintResourceMapCommitRecordType,
+    kind: 'FastReactDomPrivateResourceHintResourceMapCommitRecord',
+    gateId: privateResourceHintResourceMapCommitGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    resourceMapCommitId,
+    resourceMapCommitSequence,
+    sourceOrderDiagnosticId: order.orderDiagnosticId,
+    sourceOrderDiagnosticSequence: order.orderDiagnosticSequence,
+    sourceStylesheetPrecedenceId:
+      stylesheetPrecedence.stylesheetPrecedenceId,
+    sourceStylesheetPrecedenceSequence:
+      stylesheetPrecedence.stylesheetPrecedenceSequence,
+    requestType: 'resource-hint-resource-map-commit',
+    hostTag: 'head',
+    oracleKind: resourceHintOracleKind,
+    oracleSchemaVersion: 1,
+    acceptedContractIds: commitPlan.acceptedContractIds,
+    resourceMapCommitStatus: privateResourceHintResourceMapCommitStatus,
+    executionStatus: privateResourceHintResourceMapCommitExecutionStatus,
+    compatibilityStatus:
+      privateResourceHintResourceMapCommitCompatibilityBlockedStatus,
+    commitAdmission,
+    sourceOrderDiagnostic:
+      createResourceHintResourceMapCommitSourceOrder(order),
+    sourceStylesheetPrecedence:
+      createResourceHintResourceMapCommitSourceStylesheetPrecedence(
+        stylesheetPrecedence
+      ),
+    resourceMapCommitPlan: commitPlan.resourceMapCommitPlan,
+    privateResourceMapRecords: commitPlan.privateResourceMapRecords,
+    stylesheetResourceMapRecords: commitPlan.stylesheetResourceMapRecords,
+    preloadResourceMapRecords: commitPlan.preloadResourceMapRecords,
+    scriptResourceMapRecords: commitPlan.scriptResourceMapRecords,
+    stylesheetPrecedenceBoundary:
+      commitPlan.stylesheetPrecedenceBoundary,
+    resourceLifecycleBoundary:
+      createResourceMapCommitLifecycleBoundary(commitPlan),
+    publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
+    publicHeadBoundary: createPublicHeadSingletonBoundary(),
+    blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities,
+    sideEffects: resourceHintResourceMapCommitSideEffects,
+    missingPrerequisites:
+      resourceHintResourceMapCommitMissingPrerequisites
+  });
+
+  resourceHintResourceMapCommitPayloads.set(payload, payload);
   return payload;
 }
 
@@ -3865,6 +4183,22 @@ function assertPrivateResourceHintStylesheetPrecedenceRecord(record) {
   throw error;
 }
 
+function assertPrivateResourceHintResourceMapCommitRecord(record) {
+  const payload =
+    getPrivateResourceHintResourceMapCommitRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint resource-map commit record.'
+  );
+  error.name = 'FastReactDomResourceHintResourceMapCommitGateError';
+  error.code = privateResourceHintResourceMapCommitInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertResourceHintDispatcherMetadataRecordForFakeDomAdapter(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -4070,6 +4404,60 @@ function assertHeadSingletonRequestRecordForStylesheetPrecedence(record) {
   );
   error.name = 'FastReactDomResourceHintStylesheetPrecedenceGateError';
   error.code = privateResourceHintStylesheetPrecedenceInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertPreloadPreinitOrderRecordForResourceMapCommit(record) {
+  const payload =
+    getPrivateResourceHintPreloadPreinitOrderRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.orderStatus === privateResourceHintPreloadPreinitOrderStatus &&
+    payload.executionStatus ===
+      privateResourceHintPreloadPreinitOrderExecutionStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus &&
+    payload.publicResourceBoundary?.publicResourceHintCallsReachable === false
+  ) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM preload/preinit order record for the resource-map commit diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintResourceMapCommitGateError';
+  error.code = privateResourceHintResourceMapCommitInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertStylesheetPrecedenceRecordForResourceMapCommit(record, order) {
+  const payload =
+    getPrivateResourceHintStylesheetPrecedenceRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.stylesheetPrecedenceStatus ===
+      privateResourceHintStylesheetPrecedenceStatus &&
+    payload.executionStatus ===
+      privateResourceHintStylesheetPrecedenceExecutionStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintStylesheetPrecedenceCompatibilityBlockedStatus &&
+    payload.publicResourceBoundary?.publicResourceHintCallsReachable === false
+  ) {
+    if (payload.sourceOrderDiagnosticId !== order.orderDiagnosticId) {
+      throwInvalidResourceHintResourceMapCommitAdmission(
+        'stylesheet precedence record must reference the source order record'
+      );
+    }
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM stylesheet precedence record for the resource-map commit diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintResourceMapCommitGateError';
+  error.code = privateResourceHintResourceMapCommitInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -6615,6 +7003,421 @@ function createResourceHintStylesheetPrecedenceSourceHeadRequest(headRequest) {
   });
 }
 
+function normalizeResourceHintResourceMapCommitAdmission(diagnostic) {
+  if (diagnostic == null || typeof diagnostic !== 'object') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'resource-map commit admission metadata must be an object'
+    );
+  }
+
+  if (diagnostic.explicitResourceMapCommitDiagnostic !== true) {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'explicitResourceMapCommitDiagnostic must be true'
+    );
+  }
+
+  const commitKind = getAdmissionStringProperty(
+    diagnostic,
+    'commitKind',
+    'deterministic-private-resource-map-commit'
+  );
+  if (commitKind !== 'deterministic-private-resource-map-commit') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'commitKind must be deterministic-private-resource-map-commit'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    diagnostic,
+    'targetKind',
+    'document-head'
+  );
+  if (targetKind !== 'document-head') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'targetKind must be document-head'
+    );
+  }
+
+  const hostTag = getAdmissionStringProperty(diagnostic, 'hostTag', 'head');
+  if (hostTag !== 'head') {
+    throwInvalidResourceHintResourceMapCommitAdmission(
+      'hostTag must be head'
+    );
+  }
+
+  assertNoResourceMapCommitTargets(diagnostic);
+
+  return freezeRecord({
+    commitKind,
+    commitId: getAdmissionStringProperty(
+      diagnostic,
+      'commitId',
+      'anonymous-private-resource-map-commit'
+    ),
+    targetKind,
+    hostTag,
+    explicitResourceMapCommitDiagnostic: true,
+    deterministicPrivateRecordsOnly: true,
+    rawDocumentCaptured: false,
+    rawHeadCaptured: false,
+    rawResourceMapCaptured: false,
+    rawElementCaptured: false,
+    rawValuesRetained: false,
+    realResourceMapCreationAllowed: false,
+    realResourceMapMutationAllowed: false,
+    fakeResourceMapCreationAllowed: false,
+    fakeResourceMapMutationAllowed: false,
+    privateResourceMapRecordCreationAllowed: true,
+    privateResourceMapRecordMutationAllowed: false,
+    singletonOwnershipAllowed: false,
+    fetchOrPreloadAllowed: false,
+    loadStateMutationAllowed: false,
+    publicResourceHintDomInsertion: false,
+    publicResourceMapCommitBehavior: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertNoResourceMapCommitTargets(diagnostic) {
+  const blockedTargetFields = [
+    'document',
+    'fakeDocument',
+    'head',
+    'fakeHead',
+    'resourceRoot',
+    'resourceMap',
+    'realResourceMap',
+    'fakeResourceMap',
+    'stylesheetMap',
+    'scriptMap',
+    'preloadMap',
+    'preloadPropsMap'
+  ];
+
+  for (const field of blockedTargetFields) {
+    if (hasOwnProp(diagnostic, field)) {
+      throwInvalidResourceHintResourceMapCommitAdmission(
+        `${field} must not be passed to the resource-map commit gate`
+      );
+    }
+  }
+}
+
+function createResourceHintResourceMapCommitPlan(
+  order,
+  stylesheetPrecedence
+) {
+  const privateResourceMapRecords = freezeArray(
+    order.dedupeRows
+      .map((row, index) =>
+        createPrivateResourceMapCommitRecord(
+          row,
+          index,
+          stylesheetPrecedence
+        )
+      )
+      .filter((row) => row !== null)
+  );
+  const stylesheetResourceMapRecords = freezeArray(
+    privateResourceMapRecords.filter((row) => row.recordKind === 'stylesheet')
+  );
+  const preloadResourceMapRecords = freezeArray(
+    privateResourceMapRecords.filter((row) => row.recordKind === 'preload')
+  );
+  const scriptResourceMapRecords = freezeArray(
+    privateResourceMapRecords.filter((row) => row.recordKind === 'script')
+  );
+
+  return freezeRecord({
+    acceptedContractIds: freezeArray(
+      uniqueStrings(privateResourceMapRecords.map((row) => row.contractId))
+    ),
+    resourceMapCommitPlan:
+      createResourceMapCommitPlanSummary(privateResourceMapRecords),
+    privateResourceMapRecords,
+    stylesheetResourceMapRecords,
+    preloadResourceMapRecords,
+    scriptResourceMapRecords,
+    stylesheetPrecedenceBoundary:
+      createResourceMapCommitStylesheetPrecedenceBoundary(
+        stylesheetPrecedence
+      )
+  });
+}
+
+function createPrivateResourceMapCommitRecord(
+  row,
+  index,
+  stylesheetPrecedence
+) {
+  const recordKind = getResourceMapCommitRecordKind(row);
+  if (recordKind === null) {
+    return null;
+  }
+
+  const stylesheetRow =
+    recordKind === 'stylesheet'
+      ? findStylesheetDedupeRowForResourceMapCommit(
+          stylesheetPrecedence,
+          row
+        )
+      : null;
+
+  return freezeRecord({
+    rowId: `resource-map-commit-${index}`,
+    rowType: 'resource-map-commit',
+    recordKind,
+    mapKind: getResourceMapCommitMapKind(recordKind),
+    sourceDedupeRowId: row.rowId,
+    sourceStylesheetDedupeRowId:
+      stylesheetRow === null ? null : stylesheetRow.rowId,
+    inputIndex: row.inputIndex,
+    sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+    sourceRequestId: row.sourceRequestId,
+    sourceRequestType: row.sourceRequestType,
+    contractId: row.contractId,
+    privateDispatcherKey: row.privateDispatcherKey,
+    publicName: row.publicName,
+    resourceStage: row.resourceStage,
+    resourceKind: row.resourceKind,
+    resourceKey: row.resourceKey,
+    opaqueResourceKey: row.opaqueResourceKey,
+    precedenceKey: row.precedenceKey,
+    relationship: row.relationship,
+    dedupeAction: row.dedupeAction,
+    dedupeMatched: row.dedupeMatched,
+    matchedSourceAdapterAdmissionId: row.matchedSourceAdapterAdmissionId,
+    preloadSeenBefore: row.preloadSeenBefore,
+    preinitSeenBefore: row.preinitSeenBefore,
+    wouldInsertIntoHead: row.wouldInsertIntoHead,
+    privateRecordCreated: true,
+    privateRecordMutated: false,
+    realResourceMapCreated: false,
+    realResourceMapMutated: false,
+    fakeResourceMapCreated: false,
+    fakeResourceMapMutated: false,
+    preloadPropsAdopted: false,
+    stylesheetPrecedenceApplied: false,
+    singletonOwnershipClaimed: false,
+    resourceCountIncremented: false,
+    resourceInstanceCreated: false,
+    hostNodeInserted: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    loadEventSubscribed: false,
+    loadingStateMutated: false,
+    rawResourceKeyRetained: false,
+    rawPrecedenceValueRetained: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function findStylesheetDedupeRowForResourceMapCommit(
+  stylesheetPrecedence,
+  row
+) {
+  const stylesheetRow = stylesheetPrecedence.stylesheetDedupeRows.find(
+    (candidate) => candidate.sourceDedupeRowId === row.rowId
+  );
+  return stylesheetRow || null;
+}
+
+function getResourceMapCommitRecordKind(row) {
+  if (row.contractId === 'preinit-style') {
+    return 'stylesheet';
+  }
+  if (row.contractId === 'preinit-script') {
+    return 'script';
+  }
+  if (row.contractId === 'preload') {
+    return 'preload';
+  }
+  return null;
+}
+
+function getResourceMapCommitMapKind(recordKind) {
+  if (recordKind === 'stylesheet') {
+    return 'hoistable-styles';
+  }
+  if (recordKind === 'script') {
+    return 'hoistable-scripts';
+  }
+  return 'preload-props';
+}
+
+function createResourceMapCommitPlanSummary(privateResourceMapRecords) {
+  const uniquePrivateRecordKeys = new Set(
+    privateResourceMapRecords.map(
+      (row) => `${row.recordKind}:${row.resourceKey}`
+    )
+  );
+  const stylesheetRecordCount = privateResourceMapRecords.filter(
+    (row) => row.recordKind === 'stylesheet'
+  ).length;
+  const preloadRecordCount = privateResourceMapRecords.filter(
+    (row) => row.recordKind === 'preload'
+  ).length;
+  const scriptRecordCount = privateResourceMapRecords.filter(
+    (row) => row.recordKind === 'script'
+  ).length;
+
+  return freezeRecord({
+    resourceMapKind:
+      'react-19.2.6-resource-map-commit-diagnostic',
+    targetKind: 'document-head',
+    hostTag: 'head',
+    privateResourceMapRecordCount: privateResourceMapRecords.length,
+    uniquePrivateResourceRecordCount: uniquePrivateRecordKeys.size,
+    stylesheetRecordCount,
+    preloadRecordCount,
+    scriptRecordCount,
+    dedupedRecordCount: privateResourceMapRecords.filter(
+      (row) => row.wouldInsertIntoHead === false
+    ).length,
+    wouldInsertRecordCount: privateResourceMapRecords.filter(
+      (row) => row.wouldInsertIntoHead === true
+    ).length,
+    realResourceMapsCreated: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsCreated: false,
+    fakeResourceMapsMutated: false,
+    hoistableStylesMapCreated: false,
+    hoistableStylesMapMutated: false,
+    hoistableScriptsMapCreated: false,
+    hoistableScriptsMapMutated: false,
+    preloadPropsMapCreated: false,
+    preloadPropsMapMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceMapCommitStylesheetPrecedenceBoundary(
+  stylesheetPrecedence
+) {
+  return freezeRecord({
+    status: privateResourceHintHeadStylesheetPrecedenceBlockedStatus,
+    sourceStylesheetPrecedenceId:
+      stylesheetPrecedence.stylesheetPrecedenceId,
+    precedenceRowCount: stylesheetPrecedence.precedenceRows.length,
+    plannedStylesheetRowCount:
+      stylesheetPrecedence.plannedStylesheetOrder.rowCount,
+    observedStylesheetRowCount:
+      stylesheetPrecedence.observedStylesheetOrder.stylesheetRowCount,
+    headSingletonOrderRowCount:
+      stylesheetPrecedence.headSingletonOrderRows.length,
+    precedenceMapCreated: false,
+    precedenceQueryRun: false,
+    precedenceInsertionApplied: false,
+    singletonOrderingApplied: false,
+    publicStylesheetPrecedenceBehavior: false,
+    compatibilityClaimed: false,
+    blockedCapabilities:
+      resourceHintHeadStylesheetPrecedenceBlockedCapabilities
+  });
+}
+
+function createResourceMapCommitLifecycleBoundary(commitPlan) {
+  return freezeRecord({
+    resourceRecordCount:
+      commitPlan.resourceMapCommitPlan.privateResourceMapRecordCount,
+    stylesheetRecordCount:
+      commitPlan.resourceMapCommitPlan.stylesheetRecordCount,
+    preloadRecordCount: commitPlan.resourceMapCommitPlan.preloadRecordCount,
+    scriptRecordCount: commitPlan.resourceMapCommitPlan.scriptRecordCount,
+    singletonOwnershipClaimed: false,
+    resourceCountIncremented: false,
+    resourceInstanceCreated: false,
+    hostNodeInserted: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    loadEventSubscribed: false,
+    loadStateMutated: false,
+    suspendedCommitWaitStarted: false,
+    publicResourceApisReachable: false,
+    compatibilityClaimed: false,
+    blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities
+  });
+}
+
+function createResourceHintResourceMapCommitSourceOrder(order) {
+  return freezeRecord({
+    orderDiagnosticId: order.orderDiagnosticId,
+    orderDiagnosticSequence: order.orderDiagnosticSequence,
+    orderStatus: order.orderStatus,
+    executionStatus: order.executionStatus,
+    compatibilityStatus: order.compatibilityStatus,
+    sourceAdapterAdmissionIds: order.sourceAdapterAdmissionIds,
+    acceptedContractIds: order.acceptedContractIds,
+    dedupeRowCount: order.dedupeRows.length,
+    plannedHeadRowCount: order.plannedHeadInsertionOrder.rowCount,
+    resourceMapKind: order.resourceMapPlan.resourceMapKind,
+    uniqueResourceCount: order.resourceMapPlan.uniqueResourceCount,
+    preloadResourceCount: order.resourceMapPlan.preloadResourceCount,
+    preinitResourceCount: order.resourceMapPlan.preinitResourceCount,
+    resourceMapCreated: order.resourceMapPlan.resourceMapCreated,
+    resourceMapMutated: order.resourceMapPlan.resourceMapMutated,
+    publicResourceHintDomInsertion:
+      order.publicResourceBoundary.publicResourceHintCallsReachable,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceHintResourceMapCommitSourceStylesheetPrecedence(
+  stylesheetPrecedence
+) {
+  return freezeRecord({
+    stylesheetPrecedenceId:
+      stylesheetPrecedence.stylesheetPrecedenceId,
+    stylesheetPrecedenceSequence:
+      stylesheetPrecedence.stylesheetPrecedenceSequence,
+    stylesheetPrecedenceStatus:
+      stylesheetPrecedence.stylesheetPrecedenceStatus,
+    executionStatus: stylesheetPrecedence.executionStatus,
+    compatibilityStatus: stylesheetPrecedence.compatibilityStatus,
+    sourceOrderDiagnosticId:
+      stylesheetPrecedence.sourceOrderDiagnosticId,
+    stylesheetDedupeRowCount:
+      stylesheetPrecedence.stylesheetDedupeRows.length,
+    plannedStylesheetRowCount:
+      stylesheetPrecedence.plannedStylesheetOrder.rowCount,
+    observedStylesheetRowCount:
+      stylesheetPrecedence.observedStylesheetOrder.stylesheetRowCount,
+    stylesheetResourceMapKind:
+      stylesheetPrecedence.stylesheetResourceMapPlan.resourceMapKind,
+    uniqueStylesheetResourceCount:
+      stylesheetPrecedence.stylesheetResourceMapPlan
+        .uniqueStylesheetResourceCount,
+    stylesheetResourceMapCreated:
+      stylesheetPrecedence.stylesheetResourceMapPlan
+        .stylesheetResourceMapCreated,
+    stylesheetResourceMapMutated:
+      stylesheetPrecedence.stylesheetResourceMapPlan
+        .stylesheetResourceMapMutated,
+    headSingletonOrderingApplied:
+      stylesheetPrecedence.headSingletonOrderBoundary
+        .singletonOrderingApplied,
+    publicResourceHintDomInsertion:
+      stylesheetPrecedence.publicResourceBoundary
+        .publicResourceHintCallsReachable,
+    compatibilityClaimed: false
+  });
+}
+
+function uniqueStrings(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      result.push(value);
+    }
+  }
+  return result;
+}
+
 function getAdmissionStringProperty(record, key, fallback) {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : fallback;
@@ -7144,6 +7947,17 @@ function throwInvalidResourceHintStylesheetPrecedenceAdmission(reason) {
   );
   error.name = 'FastReactDomResourceHintStylesheetPrecedenceGateError';
   error.code = privateResourceHintStylesheetPrecedenceInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidResourceHintResourceMapCommitAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM resource hint resource-map commit admission: ${reason}.`
+  );
+  error.name = 'FastReactDomResourceHintResourceMapCommitGateError';
+  error.code = privateResourceHintResourceMapCommitInvalidAdmissionCode;
   error.compatibilityTarget = compatibilityTarget;
   error.reason = reason;
   throw error;
@@ -8177,6 +8991,25 @@ function resourceHintStylesheetPrecedenceContract(
   });
 }
 
+function resourceHintResourceMapCommitContract(
+  id,
+  recordKind,
+  mapKind,
+  resourceKind
+) {
+  return freezeRecord({
+    id,
+    recordKind,
+    mapKind,
+    resourceKind,
+    hostTag: 'head',
+    capability: 'react-dom-resource-map-commit-diagnostic',
+    oracleKind: resourceHintOracleKind,
+    deterministicPrivateRecordsOnly: true,
+    compatibilityClaimed: false
+  });
+}
+
 function singletonContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -8362,6 +9195,7 @@ module.exports = {
   createResourceHintHeadBoundaryGate,
   createResourceHintHeadClearRetainGate,
   createResourceHintPreloadPreinitOrderGate,
+  createResourceHintResourceMapCommitGate,
   createResourceHintStylesheetPrecedenceGate,
   createResourceFormActionInternalsGate,
   createUnsupportedFormActionResetDispatcherError,
@@ -8372,6 +9206,7 @@ module.exports = {
   createUnsupportedResourceHintHeadBoundaryError,
   createUnsupportedResourceHintHeadClearRetainError,
   createUnsupportedResourceHintPreloadPreinitOrderError,
+  createUnsupportedResourceHintResourceMapCommitError,
   createUnsupportedResourceHintStylesheetPrecedenceError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
@@ -8385,6 +9220,7 @@ module.exports = {
   describePrivateResourceHintHeadBoundaryGate,
   describePrivateResourceHintHeadClearRetainGate,
   describePrivateResourceHintPreloadPreinitOrderGate,
+  describePrivateResourceHintResourceMapCommitGate,
   describePrivateResourceHintStylesheetPrecedenceGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
@@ -8406,6 +9242,7 @@ module.exports = {
   getPrivateResourceHintHeadBoundaryRecordPayload,
   getPrivateResourceHintHeadClearRetainRecordPayload,
   getPrivateResourceHintPreloadPreinitOrderRecordPayload,
+  getPrivateResourceHintResourceMapCommitRecordPayload,
   getPrivateResourceHintStylesheetPrecedenceRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
@@ -8414,6 +9251,7 @@ module.exports = {
   isPrivateResourceHintHeadBoundaryRecord,
   isPrivateResourceHintHeadClearRetainRecord,
   isPrivateResourceHintPreloadPreinitOrderRecord,
+  isPrivateResourceHintResourceMapCommitRecord,
   isPrivateResourceHintStylesheetPrecedenceRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
@@ -8496,6 +9334,15 @@ module.exports = {
   privateResourceHintPreloadPreinitOrderInvalidRecordCode,
   privateResourceHintPreloadPreinitOrderRecordType,
   privateResourceHintPreloadPreinitOrderStatus,
+  privateResourceHintResourceMapCommitAdmissionRequiredStatus,
+  privateResourceHintResourceMapCommitCompatibilityBlockedStatus,
+  privateResourceHintResourceMapCommitExecutionStatus,
+  privateResourceHintResourceMapCommitGateErrorCode,
+  privateResourceHintResourceMapCommitGateId,
+  privateResourceHintResourceMapCommitInvalidAdmissionCode,
+  privateResourceHintResourceMapCommitInvalidRecordCode,
+  privateResourceHintResourceMapCommitRecordType,
+  privateResourceHintResourceMapCommitStatus,
   privateResourceHintStylesheetPrecedenceAdmissionRequiredStatus,
   privateResourceHintStylesheetPrecedenceCompatibilityBlockedStatus,
   privateResourceHintStylesheetPrecedenceExecutionStatus,
@@ -8549,6 +9396,12 @@ module.exports = {
   resourceHintPreloadPreinitOrderGateSchemaVersion,
   resourceHintPreloadPreinitOrderMissingPrerequisites,
   resourceHintPreloadPreinitOrderSideEffects,
+  resourceHintResourceMapCommitBlockedCapabilities,
+  resourceHintResourceMapCommitBlockedSideEffects,
+  resourceHintResourceMapCommitContracts,
+  resourceHintResourceMapCommitGateSchemaVersion,
+  resourceHintResourceMapCommitMissingPrerequisites,
+  resourceHintResourceMapCommitSideEffects,
   resourceHintStylesheetPrecedenceBlockedCapabilities,
   resourceHintStylesheetPrecedenceBlockedSideEffects,
   resourceHintStylesheetPrecedenceContracts,
