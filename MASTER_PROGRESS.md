@@ -290,9 +290,29 @@ sequencing belong in `MASTER_PLAN.md`.
   visible and deferred-hidden sync-flush coverage while preserving scheduling
   selection, callback invocation, public `flushSync`, DOM/test-renderer
   facades, and host mutation boundaries.
+- Worker 198 host work host-node store integration was merged, routing the
+  private test-only host complete-work skeleton's detached HostComponent and
+  HostText records through the reconciler-owned `HostNodeStore` boundary, with
+  creation-token scope validation and wrong-fiber/wrong-target coverage while
+  preserving the no container commit, no public renderer output, no DOM/native
+  adapter, and no root-scheduling-change boundaries.
+- Worker 199 root work-loop begin-work preflight was merged, adding a private
+  HostRoot child canary that validates the reciprocal HostRoot WIP/current
+  link, inspects only the first WIP child, delegates FunctionComponent children
+  through the accepted private `begin_work` handoff, and fails closed for
+  unsupported or unhandled child tags without full traversal, child
+  reconciliation, host complete work, commit effects, DOM/test-renderer
+  integration, or public hook facade wiring.
 
 ## Latest Accepted Verification
 
+- Workers 198 and 199 were verified on their integrated worktrees and again on
+  `main` with `cargo fmt --all --check`, focused `host_work`, `host_nodes`,
+  `root_work_loop`, and `begin_work` tests, full `fast-react-reconciler` tests
+  with 145 unit tests plus 1 compile-fail doctest on the combined `main`
+  result, reconciler clippy with warnings denied, and `git diff --check`;
+  merging current `main` into both worker branches produced no conflicts, and
+  both merge commits applied cleanly to `main`.
 - Workers 195 and 196 were verified on their integrated worktrees and again on
   `main` with `cargo fmt --all --check`, full
   `fast-react-test-renderer` tests with 32 unit tests and 0 doctests, full

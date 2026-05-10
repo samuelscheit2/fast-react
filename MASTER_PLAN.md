@@ -47,10 +47,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 - Worker 197: root commit passive pending handoff in
   `/Users/user/Developer/Developer/fast-react-worker-197-root-commit-passive-pending-handoff`.
-- Worker 198: host work host-node store integration in
-  `/Users/user/Developer/Developer/fast-react-worker-198-host-work-host-node-store-integration`.
-- Worker 199: root work-loop begin-work preflight in
-  `/Users/user/Developer/Developer/fast-react-worker-199-root-work-loop-begin-work-preflight`.
 - Worker 200: function component hook-list render state in
   `/Users/user/Developer/Developer/fast-react-worker-200-function-component-hook-list-render-state`.
 - Worker 201: DOM text-content oracle in
