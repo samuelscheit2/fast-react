@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 183: React transition facade in
-  `/Users/user/Developer/Developer/fast-react-worker-183-react-transition-facade`.
 - Worker 184: React memo element type guard in
   `/Users/user/Developer/Developer/fast-react-worker-184-react-memo-element-type-guard`.
 - Worker 185: DOM namespace context helper in
