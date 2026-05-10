@@ -238,9 +238,21 @@ sequencing belong in `MASTER_PLAN.md`.
   and proving current-switch, HostRoot state, and lane bookkeeping without host
   output, serialization, public `act`, JS facade, DOM/native behavior, or
   teardown output claims.
+- Worker 189 core portal record foundation was merged, adding a
+  renderer-agnostic `ReactPortalRecord` branded with `ReactSymbolTag::Portal`
+  plus normalized optional key, generic child, container-info, and
+  implementation handles, without JS `createPortal`, DOM behavior,
+  reconciliation, commit traversal, host config behavior, serialization, or
+  compatibility claims.
 
 ## Latest Accepted Verification
 
+- Worker 189 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused portal/element/symbol tests, full
+  `fast-react-core` tests with 122 unit tests and 0 doctests, core clippy with
+  warnings denied, and `git diff --check`; the
+  `crates/fast-react-core/src/lib.rs` merge conflict preserved accepted
+  context-stack exports and added `ReactPortalRecord`.
 - Worker 188 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, full `fast-react-test-renderer` tests with 29
   unit tests and 0 doctests, focused reconciler `root_commit` and

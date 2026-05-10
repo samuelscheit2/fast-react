@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 189: core portal record foundation in
-  `/Users/user/Developer/Developer/fast-react-worker-189-core-portal-record-foundation`.
 - Worker 190: native handle environment teardown in
   `/Users/user/Developer/Developer/fast-react-worker-190-native-handle-environment-teardown`.
 - Worker 191: root scheduler lane-selection integration in
