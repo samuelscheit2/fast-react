@@ -1789,6 +1789,15 @@ pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
     ["HostRoot", "HostComponent", "HostText"];
 pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE: [&str; 4] =
     ["HostRoot", "FunctionComponent", "HostComponent", "HostText"];
+pub const TEST_RENDERER_PRIVATE_TREE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE: [&str; 4] =
+    ["HostRoot", "HostText", "HostComponent", "HostText"];
+pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE: [&str; 5] = [
+    "HostRoot",
+    "FunctionComponent",
+    "HostText",
+    "HostComponent",
+    "HostText",
+];
 pub const TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE: &str = "CanaryFunctionComponent";
 pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.get-instance.private-class-root-canary";
@@ -3022,6 +3031,143 @@ impl TestRendererPrivateTreeNodeType {
             Self::Component => "component",
             Self::Host => "host",
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateTreeRenderedRoot {
+    Null,
+    Text(String),
+    HostComponent(TestRendererPrivateTreeRenderedHostComponent),
+    Array(Vec<TestRendererPrivateTreeRenderedRoot>),
+    FunctionComponent(Box<TestRendererPrivateTreeRenderedFunctionComponent>),
+}
+
+impl TestRendererPrivateTreeRenderedRoot {
+    #[must_use]
+    pub const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    #[must_use]
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Self::Text(text) => Some(text),
+            Self::Null | Self::HostComponent(_) | Self::Array(_) | Self::FunctionComponent(_) => {
+                None
+            }
+        }
+    }
+
+    #[must_use]
+    pub const fn as_host_component(&self) -> Option<&TestRendererPrivateTreeRenderedHostComponent> {
+        match self {
+            Self::HostComponent(component) => Some(component),
+            Self::Null | Self::Text(_) | Self::Array(_) | Self::FunctionComponent(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn as_array(&self) -> Option<&[TestRendererPrivateTreeRenderedRoot]> {
+        match self {
+            Self::Array(children) => Some(children),
+            Self::Null | Self::Text(_) | Self::HostComponent(_) | Self::FunctionComponent(_) => {
+                None
+            }
+        }
+    }
+
+    #[must_use]
+    pub const fn as_function_component(
+        &self,
+    ) -> Option<&TestRendererPrivateTreeRenderedFunctionComponent> {
+        match self {
+            Self::FunctionComponent(component) => Some(component),
+            Self::Null | Self::Text(_) | Self::HostComponent(_) | Self::Array(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeRenderedHostComponent {
+    node_type: TestRendererPrivateTreeNodeType,
+    element_type: TestElementType,
+    props: BTreeMap<String, String>,
+    instance_available: bool,
+    rendered: Vec<TestRendererPrivateTreeRenderedRoot>,
+}
+
+impl TestRendererPrivateTreeRenderedHostComponent {
+    #[must_use]
+    pub const fn node_type(&self) -> TestRendererPrivateTreeNodeType {
+        self.node_type
+    }
+
+    #[must_use]
+    pub fn element_type(&self) -> &TestElementType {
+        &self.element_type
+    }
+
+    #[must_use]
+    pub fn props(&self) -> &BTreeMap<String, String> {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn instance_available(&self) -> bool {
+        self.instance_available
+    }
+
+    #[must_use]
+    pub fn rendered(&self) -> &[TestRendererPrivateTreeRenderedRoot] {
+        &self.rendered
+    }
+
+    #[must_use]
+    pub fn rendered_child_count(&self) -> usize {
+        self.rendered.len()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeRenderedFunctionComponent {
+    node_type: TestRendererPrivateTreeNodeType,
+    component_type: &'static str,
+    props: TestProps,
+    instance_available: bool,
+    rendered: Box<TestRendererPrivateTreeRenderedRoot>,
+    wraps_committed_host_output: bool,
+}
+
+impl TestRendererPrivateTreeRenderedFunctionComponent {
+    #[must_use]
+    pub const fn node_type(&self) -> TestRendererPrivateTreeNodeType {
+        self.node_type
+    }
+
+    #[must_use]
+    pub const fn component_type(&self) -> &'static str {
+        self.component_type
+    }
+
+    #[must_use]
+    pub const fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn instance_available(&self) -> bool {
+        self.instance_available
+    }
+
+    #[must_use]
+    pub fn rendered(&self) -> &TestRendererPrivateTreeRenderedRoot {
+        self.rendered.as_ref()
+    }
+
+    #[must_use]
+    pub const fn wraps_committed_host_output(&self) -> bool {
+        self.wraps_committed_host_output
     }
 }
 
@@ -6066,6 +6212,31 @@ impl TestRendererRoot {
         Self::private_json_rendered_root_from_children(children)
     }
 
+    pub fn describe_private_to_tree_host_shape_from_snapshot_for_diagnostics(
+        snapshot: &TestContainerSnapshot,
+    ) -> TestRendererPrivateTreeRenderedRoot {
+        let children = Self::private_tree_rendered_children_from_snapshots(snapshot.children());
+        Self::private_tree_rendered_root_from_children(children)
+    }
+
+    pub fn describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics(
+        snapshot: &TestContainerSnapshot,
+    ) -> TestRendererPrivateTreeRenderedRoot {
+        let rendered =
+            Self::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics(snapshot);
+
+        TestRendererPrivateTreeRenderedRoot::FunctionComponent(Box::new(
+            TestRendererPrivateTreeRenderedFunctionComponent {
+                node_type: TestRendererPrivateTreeNodeType::Component,
+                component_type: TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE,
+                props: TestProps::new(),
+                instance_available: false,
+                rendered: Box::new(rendered),
+                wraps_committed_host_output: true,
+            },
+        ))
+    }
+
     fn private_json_rendered_root_from_children(
         mut children: Vec<TestRendererPrivateJsonRenderedRoot>,
     ) -> TestRendererPrivateJsonRenderedRoot {
@@ -6129,6 +6300,74 @@ impl TestRendererRoot {
             .filter(|(name, _)| name.as_str() != "children")
             .map(|(name, value)| (name.clone(), value.clone()))
             .collect()
+    }
+
+    fn private_tree_rendered_root_from_children(
+        mut children: Vec<TestRendererPrivateTreeRenderedRoot>,
+    ) -> TestRendererPrivateTreeRenderedRoot {
+        match children.len() {
+            0 => TestRendererPrivateTreeRenderedRoot::Null,
+            1 => children.remove(0),
+            _ => TestRendererPrivateTreeRenderedRoot::Array(children),
+        }
+    }
+
+    fn private_tree_rendered_children_from_snapshots(
+        snapshots: &[TestNodeSnapshot],
+    ) -> Vec<TestRendererPrivateTreeRenderedRoot> {
+        let mut rendered = Vec::new();
+        for snapshot in snapshots {
+            if let Some(child) = Self::private_tree_rendered_child_from_snapshot(snapshot) {
+                Self::push_private_tree_rendered_child(&mut rendered, child);
+            }
+        }
+        rendered
+    }
+
+    fn push_private_tree_rendered_child(
+        rendered: &mut Vec<TestRendererPrivateTreeRenderedRoot>,
+        child: TestRendererPrivateTreeRenderedRoot,
+    ) {
+        match child {
+            TestRendererPrivateTreeRenderedRoot::Array(children) => rendered.extend(children),
+            TestRendererPrivateTreeRenderedRoot::Null => {}
+            other @ (TestRendererPrivateTreeRenderedRoot::Text(_)
+            | TestRendererPrivateTreeRenderedRoot::HostComponent(_)
+            | TestRendererPrivateTreeRenderedRoot::FunctionComponent(_)) => rendered.push(other),
+        }
+    }
+
+    fn private_tree_rendered_child_from_snapshot(
+        snapshot: &TestNodeSnapshot,
+    ) -> Option<TestRendererPrivateTreeRenderedRoot> {
+        match snapshot {
+            TestNodeSnapshot::Text(text) => {
+                if text.is_hidden() {
+                    None
+                } else {
+                    Some(TestRendererPrivateTreeRenderedRoot::Text(
+                        text.text().to_owned(),
+                    ))
+                }
+            }
+            TestNodeSnapshot::Element(element) => {
+                if element.is_hidden() || element.is_detached() {
+                    return None;
+                }
+
+                Some(TestRendererPrivateTreeRenderedRoot::HostComponent(
+                    TestRendererPrivateTreeRenderedHostComponent {
+                        node_type: TestRendererPrivateTreeNodeType::Host,
+                        element_type: element.element_type().clone(),
+                        props: Self::private_json_props_without_children(element.props()),
+                        instance_available: false,
+                        rendered: Self::private_tree_rendered_children_from_snapshots(
+                            element.children(),
+                        ),
+                    },
+                ))
+            }
+        }
     }
 
     fn private_json_fiber_diagnostic(
@@ -7958,6 +8197,103 @@ mod tests {
             component.children().unwrap()[0].as_text(),
             Some("rendered child")
         );
+    }
+
+    #[test]
+    fn root_private_to_tree_shape_diagnostics_serialize_multiple_host_children_and_text_siblings() {
+        let snapshot = TestContainerSnapshot {
+            children: vec![
+                TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "first sibling".to_owned(),
+                    hidden: false,
+                }),
+                TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: element_type("span"),
+                    props: props(),
+                    hidden: false,
+                    detached: false,
+                    children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                        text: "second sibling".to_owned(),
+                        hidden: false,
+                    })],
+                }),
+            ],
+        };
+
+        let rendered =
+            TestRendererRoot::describe_private_to_tree_host_shape_from_snapshot_for_diagnostics(
+                &snapshot,
+            );
+        let children = rendered.as_array().unwrap();
+        let component = children[1].as_host_component().unwrap();
+
+        assert_eq!(
+            TEST_RENDERER_PRIVATE_TREE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
+            ["HostRoot", "HostText", "HostComponent", "HostText"]
+        );
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].as_text(), Some("first sibling"));
+        assert_eq!(component.node_type(), TestRendererPrivateTreeNodeType::Host);
+        assert_eq!(component.node_type().as_str(), "host");
+        assert_eq!(component.element_type().as_str(), "span");
+        assert!(component.props().is_empty());
+        assert!(!component.instance_available());
+        assert_eq!(component.rendered_child_count(), 1);
+        assert_eq!(component.rendered()[0].as_text(), Some("second sibling"));
+    }
+
+    #[test]
+    fn root_private_to_tree_shape_diagnostics_wrap_composite_above_multi_child_host_output() {
+        let snapshot = TestContainerSnapshot {
+            children: vec![
+                TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "first sibling".to_owned(),
+                    hidden: false,
+                }),
+                TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: element_type("span"),
+                    props: props(),
+                    hidden: false,
+                    detached: false,
+                    children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                        text: "second sibling".to_owned(),
+                        hidden: false,
+                    })],
+                }),
+            ],
+        };
+
+        let rendered = TestRendererRoot::describe_private_to_tree_composite_above_host_shape_from_snapshot_for_diagnostics(&snapshot);
+        let component = rendered.as_function_component().unwrap();
+        let rendered_children = component.rendered().as_array().unwrap();
+        let host_child = rendered_children[1].as_host_component().unwrap();
+
+        assert_eq!(
+            TEST_RENDERER_PRIVATE_TREE_COMPOSITE_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
+            [
+                "HostRoot",
+                "FunctionComponent",
+                "HostText",
+                "HostComponent",
+                "HostText"
+            ]
+        );
+        assert_eq!(
+            component.node_type(),
+            TestRendererPrivateTreeNodeType::Component
+        );
+        assert_eq!(component.node_type().as_str(), "component");
+        assert_eq!(
+            component.component_type(),
+            TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+        );
+        assert_eq!(component.props(), &TestProps::new());
+        assert!(!component.instance_available());
+        assert!(component.wraps_committed_host_output());
+        assert_eq!(rendered_children.len(), 2);
+        assert_eq!(rendered_children[0].as_text(), Some("first sibling"));
+        assert_eq!(host_child.element_type().as_str(), "span");
+        assert_eq!(host_child.rendered()[0].as_text(), Some("second sibling"));
     }
 
     #[test]
