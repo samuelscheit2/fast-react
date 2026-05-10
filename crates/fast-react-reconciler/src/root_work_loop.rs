@@ -44,7 +44,10 @@ use crate::{
     function_component::{
         FunctionComponentContextRenderStore, FunctionComponentSingleChildOutputResolver,
     },
-    host_work::{HostWorkError, mount_test_host_work},
+    host_work::{
+        HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
+        mount_test_host_work,
+    },
     test_support::{RecordingHost, TestHostTree},
 };
 
@@ -402,6 +405,8 @@ struct HostRootCompleteWorkHandoffRecord {
     host_root_work_in_progress: FiberId,
     root_child: Option<FiberId>,
     root_child_tag: Option<FiberTag>,
+    completed_child: Option<FiberId>,
+    completed_child_tag: Option<FiberTag>,
     render_lanes: Lanes,
     resulting_element: RootElementHandle,
     detached_instance_count: usize,
@@ -428,6 +433,16 @@ impl HostRootCompleteWorkHandoffRecord {
     #[must_use]
     const fn root_child_tag(self) -> Option<FiberTag> {
         self.root_child_tag
+    }
+
+    #[must_use]
+    const fn completed_child(self) -> Option<FiberId> {
+        self.completed_child
+    }
+
+    #[must_use]
+    const fn completed_child_tag(self) -> Option<FiberTag> {
+        self.completed_child_tag
     }
 
     #[must_use]
@@ -568,21 +583,48 @@ fn handoff_completed_host_root_render_to_test_complete_work(
     validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
 
     let host_work = mount_test_host_work(store, host, render, source)?;
+    host_root_complete_work_handoff_record_from_host_work(
+        store,
+        render,
+        render.resulting_element(),
+        &host_work,
+    )
+}
+
+#[cfg(test)]
+fn host_root_complete_work_handoff_record_from_host_work(
+    store: &FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    resulting_element: RootElementHandle,
+    host_work: &HostWorkResult,
+) -> Result<HostRootCompleteWorkHandoffRecord, HostRootCompleteWorkHandoffError> {
     let root_child = host_work.root_child();
-    let root_child_tag = root_child
-        .map(|fiber| store.fiber_arena().get(fiber).map(|node| node.tag()))
-        .transpose()?;
+    let root_child_tag = optional_fiber_tag(store, root_child)?;
+    let completed_child = host_work.completed_child();
+    let completed_child_tag = optional_fiber_tag(store, completed_child)?;
 
     Ok(HostRootCompleteWorkHandoffRecord {
         root: host_work.root(),
         host_root_work_in_progress: host_work.work_in_progress(),
         root_child,
         root_child_tag,
+        completed_child,
+        completed_child_tag,
         render_lanes: render.render_lanes(),
-        resulting_element: render.resulting_element(),
+        resulting_element,
         detached_instance_count: host_work.detached_instance_count(),
         detached_text_count: host_work.detached_text_count(),
     })
+}
+
+#[cfg(test)]
+fn optional_fiber_tag(
+    store: &FiberRootStore<RecordingHost>,
+    fiber: Option<FiberId>,
+) -> Result<Option<FiberTag>, HostRootCompleteWorkHandoffError> {
+    Ok(fiber
+        .map(|fiber| store.fiber_arena().get(fiber).map(|node| node.tag()))
+        .transpose()?)
 }
 
 #[cfg(test)]
@@ -683,6 +725,12 @@ enum HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
     },
+    UnexpectedFunctionComponentSibling {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        function_component: FiberId,
+        sibling: FiberId,
+    },
     CompletedChildTagMismatch {
         expected: FiberTag,
         actual: Option<FiberTag>,
@@ -705,6 +753,19 @@ impl Display for HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
                 root.raw(),
                 host_root_work_in_progress.slot().get()
             ),
+            Self::UnexpectedFunctionComponentSibling {
+                root,
+                host_root_work_in_progress,
+                function_component,
+                sibling,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has FunctionComponent child {} with sibling {}; private parent-topology canary admits only one child",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                function_component.slot().get(),
+                sibling.slot().get()
+            ),
             Self::CompletedChildTagMismatch { expected, actual } => write!(
                 formatter,
                 "private function-component single-child handoff resolved {:?}, but complete-work produced {:?}",
@@ -721,9 +782,9 @@ impl Error for HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
             Self::ChildPreflight(error) => Some(error.as_ref()),
             Self::BeginWork(error) => Some(error),
             Self::CompleteWork(error) => Some(error),
-            Self::MissingFunctionComponentChild { .. } | Self::CompletedChildTagMismatch { .. } => {
-                None
-            }
+            Self::MissingFunctionComponentChild { .. }
+            | Self::UnexpectedFunctionComponentSibling { .. }
+            | Self::CompletedChildTagMismatch { .. } => None,
         }
     }
 }
@@ -778,6 +839,22 @@ fn handoff_completed_function_component_single_child_to_test_complete_work(
             host_root_work_in_progress: render.work_in_progress(),
         },
     )?;
+    if validated.child_tag == Some(FiberTag::FunctionComponent)
+        && let Some(sibling) = store
+            .fiber_arena()
+            .get(function_component)
+            .map_err(HostRootChildBeginWorkPreflightError::from)?
+            .sibling()
+    {
+        return Err(
+            HostRootFunctionComponentSingleChildCompleteWorkHandoffError::UnexpectedFunctionComponentSibling {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                function_component,
+                sibling,
+            },
+        );
+    }
     let begin_work = begin_work_reconcile_function_component_single_child(
         store.fiber_arena_mut(),
         BeginWorkRequest::new(function_component, render.render_lanes()),
@@ -786,21 +863,26 @@ fn handoff_completed_function_component_single_child_to_test_complete_work(
     )?;
     let child_element = begin_work.single_child().child_element();
     let child_tag = begin_work.single_child().child_tag();
-    let child_render = HostRootRenderPhaseRecord {
-        resulting_element: child_element,
-        ..render
-    };
-    let complete_work = handoff_completed_host_root_render_to_test_complete_work(
+    let host_work = mount_test_function_component_single_host_child_work(
         store,
         host,
-        child_render,
+        render,
+        function_component,
+        child_element,
         source,
+    )
+    .map_err(HostRootCompleteWorkHandoffError::from)?;
+    let complete_work = host_root_complete_work_handoff_record_from_host_work(
+        store,
+        render,
+        child_element,
+        &host_work,
     )?;
-    if complete_work.root_child_tag() != Some(child_tag) {
+    if complete_work.completed_child_tag() != Some(child_tag) {
         return Err(
             HostRootFunctionComponentSingleChildCompleteWorkHandoffError::CompletedChildTagMismatch {
                 expected: child_tag,
-                actual: complete_work.root_child_tag(),
+                actual: complete_work.completed_child_tag(),
             },
         );
     }
@@ -2235,34 +2317,44 @@ mod tests {
         assert_eq!(record.complete_work().resulting_element(), child_element);
         assert_eq!(
             record.complete_work().root_child_tag(),
+            Some(FiberTag::FunctionComponent)
+        );
+        assert_eq!(
+            record.complete_work().completed_child_tag(),
             Some(FiberTag::HostComponent)
         );
         assert_eq!(record.complete_work().detached_instance_count(), 1);
         assert_eq!(record.complete_work().detached_text_count(), 1);
 
         let root_node = store.fiber_arena().get(render.work_in_progress()).unwrap();
-        let host_child = record.complete_work().root_child().unwrap();
-        assert_eq!(root_node.child(), Some(host_child));
+        assert_eq!(root_node.child(), Some(function_component));
+        let function_node = store.fiber_arena().get(function_component).unwrap();
+        let host_child = record.complete_work().completed_child().unwrap();
+        assert_eq!(
+            function_node.return_fiber(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(function_node.sibling(), None);
+        assert_eq!(function_node.child(), Some(host_child));
+        assert!(
+            function_node
+                .flags()
+                .contains_all(FiberFlags::PERFORMED_WORK)
+        );
+        assert!(
+            function_node
+                .subtree_flags()
+                .contains_all(FiberFlags::PLACEMENT)
+        );
         assert_eq!(
             store.fiber_arena().get(host_child).unwrap().tag(),
             FiberTag::HostComponent
         );
         assert_eq!(
-            store
-                .fiber_arena()
-                .get(function_component)
-                .unwrap()
-                .return_fiber(),
-            None
+            store.fiber_arena().get(host_child).unwrap().return_fiber(),
+            Some(function_component)
         );
-        assert!(
-            store
-                .fiber_arena()
-                .get(function_component)
-                .unwrap()
-                .flags()
-                .contains_all(FiberFlags::PERFORMED_WORK)
-        );
+        store.fiber_arena().validate_topology().unwrap();
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
@@ -2311,14 +2403,28 @@ mod tests {
         assert_eq!(record.child_tag(), FiberTag::HostText);
         assert_eq!(
             record.complete_work().root_child_tag(),
+            Some(FiberTag::FunctionComponent)
+        );
+        assert_eq!(
+            record.complete_work().completed_child_tag(),
             Some(FiberTag::HostText)
         );
         assert_eq!(record.complete_work().detached_instance_count(), 0);
         assert_eq!(record.complete_work().detached_text_count(), 1);
-        let host_child = record.complete_work().root_child().unwrap();
+        let root_node = store.fiber_arena().get(render.work_in_progress()).unwrap();
+        assert_eq!(root_node.child(), Some(function_component));
+        let function_node = store.fiber_arena().get(function_component).unwrap();
+        let host_child = record.complete_work().completed_child().unwrap();
+        assert_eq!(
+            function_node.return_fiber(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(function_node.child(), Some(host_child));
         let host_child_node = store.fiber_arena().get(host_child).unwrap();
         assert_eq!(host_child_node.tag(), FiberTag::HostText);
+        assert_eq!(host_child_node.return_fiber(), Some(function_component));
         assert!(host_child_node.state_node().is_some());
+        store.fiber_arena().validate_topology().unwrap();
         assert_eq!(
             host.operations(),
             vec!["root_host_context", "create_text_instance"]
@@ -2372,6 +2478,60 @@ mod tests {
             store.fiber_arena().get(function_component).unwrap().flags(),
             FiberFlags::NO
         );
+    }
+
+    #[test]
+    fn root_work_loop_function_component_parent_topology_handoff_fails_closed_for_sibling() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let child_element = source.insert_text("sibling blocked");
+        update_container(&mut store, root_id, RootElementHandle::from_raw(903), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (_current_child, function_component, component) =
+            attach_function_component_wip_child(&mut store, render.work_in_progress());
+        let sibling = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::NONE,
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[function_component, sibling])
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = TestHostTreeFunctionOutputResolver::new(&source);
+
+        let error = handoff_completed_function_component_single_child_to_test_complete_work(
+            &mut store,
+            &mut host,
+            render,
+            &source,
+            &mut registry,
+            &resolver,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootFunctionComponentSingleChildCompleteWorkHandoffError::UnexpectedFunctionComponentSibling {
+                root: root_id,
+                host_root_work_in_progress: render.work_in_progress(),
+                function_component,
+                sibling,
+            }
+        );
+        assert!(registry.calls().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        let function_node = store.fiber_arena().get(function_component).unwrap();
+        assert_eq!(
+            function_node.return_fiber(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(function_node.sibling(), Some(sibling));
+        assert_eq!(function_node.child(), None);
     }
 
     #[test]

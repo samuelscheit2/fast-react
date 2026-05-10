@@ -1,8 +1,10 @@
 //! Private begin-work handoff for function components.
 //!
-//! This is intentionally below the public work loop. It delegates only the
-//! accepted function-component render skeleton and does not reconcile children,
-//! complete host work, commit effects, mutate hosts, or switch roots.
+//! This is intentionally below the public work loop. The default handoff
+//! delegates only the accepted function-component render skeleton; the private
+//! single-child helper records one admitted HostComponent/HostText output for
+//! root-loop canaries. It does not implement broad reconciliation, complete
+//! host work, commit effects, mutate hosts, or switch roots.
 
 #![allow(dead_code)]
 
