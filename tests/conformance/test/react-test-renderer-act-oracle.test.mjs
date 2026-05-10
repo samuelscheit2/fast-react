@@ -207,6 +207,16 @@ const ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS = [
   "test-renderer-private-tojson-host-output-diagnostic",
   "test-renderer-private-testinstance-query-path"
 ];
+const ACT_SCHEDULER_CJS_ROOT_FLUSH_RECORD_IDS = [
+  ...ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS,
+  "test-renderer-private-getinstance-class-root-diagnostic"
+];
+
+function actSchedulerRootFlushRecordIds(entrypoint) {
+  return entrypoint.startsWith("react-test-renderer/cjs/")
+    ? ACT_SCHEDULER_CJS_ROOT_FLUSH_RECORD_IDS
+    : ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS;
+}
 const ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS = [
   "react-act-private-dispatcher-gate",
   "scheduler-react-act-queue-diagnostic-consumption",
@@ -1415,7 +1425,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.recognizedRootActFlushRecords.map((record) => record.id),
-    ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS
+    actSchedulerRootFlushRecordIds(entrypoint)
   );
   assert.deepEqual(
     gate.acceptedPrivateFlushPrerequisiteIds,

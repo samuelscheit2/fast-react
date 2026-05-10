@@ -1556,13 +1556,13 @@ mod root_bridge_requests {
         validator: &NativeRootBridgeRequestSequenceValidator,
         request: NativeRootBridgeRequestRecord,
     ) -> Result<(), NativeRootBridgeRequestError> {
-        if let Some(previous_request_id) = validator.last_request_id() {
-            if request.request_id() <= previous_request_id {
-                return Err(NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
-                    previous_request_id,
-                    request_id: request.request_id(),
-                });
-            }
+        if let Some(previous_request_id) = validator.last_request_id()
+            && request.request_id() <= previous_request_id
+        {
+            return Err(NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
+                previous_request_id,
+                request_id: request.request_id(),
+            });
         }
 
         if validator.root_retired() {
