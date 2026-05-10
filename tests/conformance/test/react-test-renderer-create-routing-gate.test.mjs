@@ -92,8 +92,20 @@ const privateRootCreatePreflightSymbol = Symbol.for(
 );
 const privateToJSONUpdateHostOutputRowId =
   "react-test-renderer-tojson-update-host-output-private-diagnostic";
+const privateToJSONNestedUpdateHostOutputRowId =
+  "react-test-renderer-tojson-nested-host-output-update-private-diagnostic";
+const privateToJSONSiblingTextHostOutputRowId =
+  "react-test-renderer-tojson-sibling-text-host-output-private-diagnostic";
 const privateToJSONUnmountHostOutputRowId =
   "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
+const privateToJSONUpdateHostOutputRowIds = [
+  privateToJSONUpdateHostOutputRowId,
+  privateToJSONNestedUpdateHostOutputRowId,
+  privateToJSONSiblingTextHostOutputRowId
+];
+const privateToJSONSerializationFacadeSymbol = Symbol.for(
+  "fast.react_test_renderer.private_tojson_serialization_facade"
+);
 const privateToJSONUpdateUnmountDependencyIds = [
   "react-test-renderer-update-route-private-diagnostic",
   "react-test-renderer-unmount-route-private-diagnostic",
@@ -1790,6 +1802,186 @@ test("react-test-renderer create routing gate does not load native bridge artifa
   assert.deepEqual(forbiddenLoads, []);
 });
 
+test("react-test-renderer cjs development private toJSON facade records nested update and sibling text rows", () => {
+  const moduleExports = loadFresh(
+    "packages/react-test-renderer/cjs/react-test-renderer.development.js"
+  );
+  const renderer = moduleExports.create(null);
+  const facade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
+
+  assert.equal(Object.isFrozen(facade), true);
+  assert.equal(
+    facade.privateNestedUpdateHostOutputRowId,
+    privateToJSONNestedUpdateHostOutputRowId
+  );
+  assert.equal(
+    facade.privateSiblingTextHostOutputRowId,
+    privateToJSONSiblingTextHostOutputRowId
+  );
+  assert.deepEqual(
+    facade.privateUpdateHostOutputRowIds,
+    privateToJSONUpdateHostOutputRowIds
+  );
+  assert.deepEqual(
+    facade.privateNestedUpdateSiblingTextHostOutputRows.map((row) => row.id),
+    [
+      privateToJSONNestedUpdateHostOutputRowId,
+      privateToJSONSiblingTextHostOutputRowId
+    ]
+  );
+  assert.equal(facade.mismatchedUpdateShapeRejection, true);
+  assert.equal(facade.publicSerializationAvailable, false);
+  assert.equal(facade.nativeExecution, false);
+
+  const nestedReport = privateToJSONReport({
+    rowId: privateToJSONNestedUpdateHostOutputRowId,
+    rowShape: "NestedHostText",
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "section"),
+      hostComponentNode(1, 0, [2, 3], "span"),
+      textNode(2, 1, "stable"),
+      textNode(3, 1, "inserted")
+    ]
+  });
+  assert.deepEqual(facade.serializeAcceptedHostOutputDiagnostic(nestedReport), {
+    type: "section",
+    props: {},
+    children: [
+      {
+        type: "span",
+        props: {},
+        children: ["stable", "inserted"]
+      }
+    ]
+  });
+  const nestedDiagnostic =
+    facade.createAcceptedHostOutputDiagnosticResult(nestedReport);
+  assert.equal(nestedDiagnostic.hostOutputShape, "NestedHostText");
+  assert.equal(
+    nestedDiagnostic.hostOutputRowId,
+    privateToJSONNestedUpdateHostOutputRowId
+  );
+  assert.equal(nestedDiagnostic.publicSerializationAvailable, false);
+  assert.equal(nestedDiagnostic.nativeExecution, false);
+
+  const siblingReport = privateToJSONReport({
+    rowId: privateToJSONSiblingTextHostOutputRowId,
+    rowShape: "SiblingText",
+    rootChildCount: 2,
+    rootNodeKind: "MultipleHostChildren",
+    nodes: [
+      textNode(0, null, "first sibling"),
+      hostComponentNode(1, null, [2], "span"),
+      textNode(2, 1, "second sibling")
+    ]
+  });
+  assert.deepEqual(facade.serializeAcceptedHostOutputDiagnostic(siblingReport), [
+    "first sibling",
+    {
+      type: "span",
+      props: {},
+      children: ["second sibling"]
+    }
+  ]);
+
+  const mismatchReport = privateToJSONReport({
+    rowId: privateToJSONNestedUpdateHostOutputRowId,
+    rowShape: "NestedHostText",
+    rootChildCount: 2,
+    rootNodeKind: "MultipleHostChildren",
+    nodes: [
+      textNode(0, null, "first sibling"),
+      hostComponentNode(1, null, [2], "span"),
+      textNode(2, 1, "second sibling")
+    ]
+  });
+  const mismatchError = captureThrown(() =>
+    facade.serializeAcceptedHostOutputDiagnostic(mismatchReport)
+  );
+  assert.equal(
+    mismatchError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.equal(
+    mismatchError.code,
+    "FAST_REACT_TEST_RENDERER_PRIVATE_TOJSON_SERIALIZATION"
+  );
+  assert.equal(mismatchError.publicSerializationAvailable, false);
+  assert.equal(mismatchError.nativeExecution, false);
+  assert.match(mismatchError.message, /row shape/u);
+});
+
+function privateToJSONReport({
+  rowId,
+  rowShape,
+  rootChildCount,
+  rootNodeKind,
+  nodes
+}) {
+  return {
+    diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind: "Update",
+    hostOutputSnapshotCurrent: true,
+    hostOutputRow: {
+      id: rowId,
+      status: "private-tojson-update-unmount-host-output-rows-public-tojson-blocked",
+      hostOutputUpdateKind: "Update",
+      hostOutputShape: rowShape,
+      currentRootChildCount: rootChildCount,
+      dependencyMetadata: {
+        acceptedPrivateDiagnosticDependencyIds:
+          privateToJSONUpdateUnmountDependencyIds,
+        serializationDiagnosticsAvailable: true,
+        hostOutputSnapshotFreshnessRequired: true,
+        staleSnapshotRejection: true,
+        mismatchedUpdateUnmountRecordRejection: true,
+        publicToJSONAvailable: false,
+        publicTestInstanceAvailable: false,
+        nativeExecutionAvailable: false,
+        compatibilityClaimed: false
+      }
+    },
+    rootChildCount,
+    rootNodeKind,
+    publicBlockers: {
+      jsonMethodBlocked: true,
+      treeMethodBlocked: true,
+      instanceWrapperBlocked: true,
+      jsFacadeRoutingBlocked: true,
+      publicActBlocked: true,
+      compatibilityClaimBlocked: true
+    },
+    nodes
+  };
+}
+
+function hostComponentNode(ordinal, parentOrdinal, childOrdinals, elementType) {
+  return {
+    ordinal,
+    nodeKind: "HostComponent",
+    parentOrdinal,
+    childOrdinals,
+    elementType,
+    props: {},
+    hidden: false,
+    detached: false
+  };
+}
+
+function textNode(ordinal, parentOrdinal, text) {
+  return {
+    ordinal,
+    nodeKind: "Text",
+    parentOrdinal,
+    childOrdinals: [],
+    text,
+    hidden: false,
+    detached: false
+  };
+}
+
 function loadFresh(relativePath) {
   const absolutePath = path.join(repoRoot, relativePath);
   const resolved = require.resolve(absolutePath);
@@ -2675,6 +2867,34 @@ function assertRustCanaryMetadata(metadata, label) {
       privateToJSONUpdateHostOutputRowId,
       label
     );
+    if (label === cjsDevelopmentEntrypoint) {
+      assert.equal(
+        metadata.privateJson.nestedUpdateHostOutputRowId,
+        privateToJSONNestedUpdateHostOutputRowId,
+        label
+      );
+      assert.equal(
+        metadata.privateJson.siblingTextHostOutputRowId,
+        privateToJSONSiblingTextHostOutputRowId,
+        label
+      );
+      assert.deepEqual(
+        metadata.privateJson.updateHostOutputRowIds,
+        privateToJSONUpdateHostOutputRowIds,
+        label
+      );
+      assert.deepEqual(metadata.privateJson.acceptedHostOutputRowShapes, [
+        "EmptyRoot",
+        "SingleHostText",
+        "NestedHostText",
+        "SiblingText"
+      ]);
+      assert.equal(
+        metadata.privateJson.mismatchedUpdateShapeRejection,
+        true,
+        label
+      );
+    }
     assert.equal(
       metadata.privateJson.unmountHostOutputRowId,
       privateToJSONUnmountHostOutputRowId,
