@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 186: DOM property payload helper in
-  `/Users/user/Developer/Developer/fast-react-worker-186-dom-property-payload-helper`.
 - Worker 187: host node store boundary in
   `/Users/user/Developer/Developer/fast-react-worker-187-host-node-store-boundary`.
 - Worker 188: test-renderer commit handoff canary in

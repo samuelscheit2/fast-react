@@ -221,9 +221,22 @@ sequencing belong in `MASTER_PLAN.md`.
   integration points, and namespace-aware host element creation while leaving
   public roots, mutation commits, hydration, events, resources, forms, and
   attributes unwired.
+- Worker 186 React DOM property payload helper was merged, adding a private
+  data-only ordinary host-attribute payload helper for ordered set/remove,
+  non-payload, and unsupported entries while keeping DOM mutation, public roots,
+  events, controlled forms, hydration, style, dangerous HTML, document resource
+  tags, and compatibility claims unwired.
 
 ## Latest Accepted Verification
 
+- Worker 186 was verified on its integrated worktree and again on `main` with
+  focused DOM property payload helper tests, React DOM resource-hint/source
+  prerequisite gates, the DOM namespace SVG oracle, smoke entrypoint checks,
+  `npm run check:js` covering the package-surface guard, benchmark gate,
+  workspace checks, native loader probes, and 467 conformance tests, plus
+  `git diff --check`; merging current `main` into the worker branch produced
+  no conflicts, and an initial disallowed `singleton` source token was renamed
+  before acceptance so the resource/singleton gate stays fail-closed.
 - Worker 185 was verified on its integrated worktree and again on `main` with
   focused React DOM namespace context helper tests, the existing DOM namespace
   SVG oracle test, smoke entrypoint checks, `npm run check:js` covering the
