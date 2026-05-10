@@ -45,17 +45,49 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. No active top-level workers are currently queued
-after accepting queue 413-442.
+Top-level cap: 30 workers. Queue 443-472 is assigned in isolated worktrees.
+
+| Worker | Focus |
+| --- | --- |
+| 443 | Root commit layout-effect handoff canary |
+| 444 | Ref cleanup-return execution gate |
+| 445 | Root error option callback records |
+| 446 | Context change propagation lane gate |
+| 447 | Function component `useCallback` private path |
+| 448 | Function component layout-effect metadata |
+| 449 | Passive effect scheduler flush gate |
+| 450 | Sync flush error recovery diagnostics |
+| 451 | Root callback invocation execution gate |
+| 452 | HostRoot fragment/array reconciliation canary |
+| 453 | DOM style and `dangerouslySetInnerHTML` mutation gate |
+| 454 | DOM text-content reset/update gate |
+| 455 | DOM event currentTarget bubbling gate |
+| 456 | DOM event stop-immediate-propagation gate |
+| 457 | DOM portal event owner-root gate |
+| 458 | Hydration replay queue drain-order gate |
+| 459 | Hydration text mismatch boundary gate |
+| 460 | Resource preload dedupe/order gate |
+| 461 | Form action reset dispatcher gate |
+| 462 | Controlled select/textarea restore gate |
+| 463 | TestInstance `findAll` private query gate |
+| 464 | Test renderer `getInstance` class diagnostic |
+| 465 | Test renderer error-boundary diagnostics |
+| 466 | Test renderer act passive-effect drain gate |
+| 467 | Native JSON transport error diagnostics |
+| 468 | Native handle-table sequence teardown gate |
+| 469 | Scheduler mock expired continuation gate |
+| 470 | Scheduler post-task priority diagnostics |
+| 471 | Package-surface private diagnostics audit |
+| 472 | Root update benchmark timing canaries |
 
 ## Near-Term Sequencing
 
-1. Clean up accepted queue 413-442 tmux sessions, worktrees, and merged local
-   branches before refilling the queue.
+1. Monitor queue 443-472 for completion and merge completed workers before
+   queuing more.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-3. Refill up to the 30 top-level worker cap with the next narrow
-   implementation or conformance checkpoints.
+3. After the queue drains, refill up to the 30 top-level worker cap with the
+   next narrow implementation or conformance checkpoints.
 
 ## Next Queue Candidates
 
