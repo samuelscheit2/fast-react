@@ -773,6 +773,204 @@ test('private hydration text mismatch diagnostics record expected actual and rec
   assert.deepEqual(document.__registrations, []);
 });
 
+test('private hydration recoverable error routing links mismatch rows to root options without callbacks', () => {
+  const publicRootErrorCalls = [];
+
+  function onUncaughtError(error) {
+    publicRootErrorCalls.push(['uncaught', error.message]);
+  }
+  function onCaughtError(error) {
+    publicRootErrorCalls.push(['caught', error.message]);
+  }
+  function onRecoverableError(error) {
+    publicRootErrorCalls.push(['recoverable', error.message]);
+  }
+
+  const scenario = createHydrationRecoverableRoutingScenario({
+    actualText: 'server title',
+    expectedText: 'client title',
+    label: 'recoverable-route',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-route-',
+      onCaughtError,
+      onRecoverableError,
+      onUncaughtError
+    }
+  });
+  const routing = scenario.bridge.createHydrationRecoverableErrorRouting(
+    scenario.hydrateRecord,
+    scenario.hydrateRecord.recoverableErrorMetadata,
+    scenario.replayMetadata,
+    {
+      mismatchLabels: ['title-text'],
+      rootOptions: scenario.hydrationOptions,
+      source: 'hydration-boundary-test-recoverable-routing'
+    }
+  );
+
+  assert.equal(
+    rootBridge.isPrivateRootHydrationRecoverableErrorRoutingRecord(routing),
+    true
+  );
+  assert.equal(
+    routing.$$typeof,
+    rootBridge.privateRootHydrationRecoverableErrorRoutingRecordType
+  );
+  assert.equal(
+    routing.routingStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED
+  );
+  assert.equal(routing.sourceRequestId, 'recoverable-route-request:1');
+  assert.equal(routing.hydrateId, 'recoverable-route-hydrate:1');
+  assert.equal(routing.rootRecordId, 'recoverable-route-boundary:1');
+  assert.equal(
+    routing.sourceTextMismatchDiagnosticKind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    routing.sourceRecoverableErrorMetadataKind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND
+  );
+  assert.equal(
+    routing.sourceHydrationReplayErrorMetadataKind,
+    'FastReactDomPrivateRootHydrationReplayErrorMetadataRecord'
+  );
+  assert.equal(routing.hydrationReplayErrorMetadataAccepted, true);
+  assert.equal(routing.textMismatchRowCount, 1);
+  assert.equal(routing.recoverableErrorMetadataCount, 1);
+  assert.equal(routing.rootErrorOptionCallbackRecordCount, 1);
+  assert.equal(routing.rootOptionsHandleStatus, 'matched-hydrate-root-options');
+  assert.equal(routing.rootErrorChannel, 'onRecoverableError');
+  assert.equal(routing.onUncaughtErrorConfigured, true);
+  assert.equal(routing.onCaughtErrorConfigured, true);
+  assert.equal(routing.onRecoverableErrorConfigured, true);
+  assert.equal(routing.recoverableErrorsQueued, false);
+  assert.equal(routing.willInvokeOnRecoverableError, false);
+  assert.equal(routing.publicOnRecoverableErrorInvoked, false);
+  assert.equal(routing.publicRootErrorCallbacksInvoked, false);
+  assert.equal(routing.rootErrorCallbackInvocationCount, 0);
+  assert.equal(routing.hydration, false);
+  assert.equal(routing.canHydrate, false);
+  assert.equal(routing.hydrationCompatibilityClaimed, false);
+  assert.equal(routing.domMutation, false);
+  assert.equal(routing.compatibilityClaimed, false);
+  assert.deepEqual(publicRootErrorCalls, []);
+  assert.deepEqual(
+    routing.rootErrorOptionCallbackRecords.map((record) => [
+      record.phase,
+      record.sourceLabel,
+      record.textMismatchRowId,
+      record.recoverableErrorMetadataId,
+      record.textMismatchReason,
+      record.expectedText,
+      record.actualText,
+      record.rootOptionCallbackConfigured,
+      record.onRecoverableErrorInvoked,
+      record.queuedRecoverableError
+    ]),
+    [
+      [
+        'hydration-recoverable-error',
+        'title-text',
+        'recoverable-route-boundary:1:text-mismatch:0',
+        'recoverable-route-boundary:1:recoverable-error:0',
+        'text-content-different',
+        'client title',
+        'server title',
+        true,
+        false,
+        false
+      ]
+    ]
+  );
+  assert.equal(
+    routing.rootErrorOptionCallbackRecords[0].errorMessage,
+    'Hydration failed because the server rendered text did not match the client.'
+  );
+  assert.equal(
+    routing.rootErrorOptionCallbackRecords[0].rootOptionCallbackKey,
+    'onRecoverableError'
+  );
+  assert.equal(
+    routing.rootErrorOptionCallbackRecords[0].rootOptionCallbackValueInfo.type,
+    'function'
+  );
+  assert.equal(
+    Object.hasOwn(routing.rootErrorOptionCallbackRecords[0], 'error'),
+    false
+  );
+
+  const payload =
+    rootBridge.getPrivateRootHydrationRecoverableErrorRoutingPayload(routing);
+  assert.equal(payload.hydrateRootRecord, scenario.hydrateRecord);
+  assert.equal(payload.hydrationOptions, scenario.hydrationOptions);
+  assert.equal(payload.rootOptions, scenario.hydrationOptions);
+  assert.equal(payload.recoverableErrorMetadata, scenario.hydrateRecord.recoverableErrorMetadata);
+  assert.equal(payload.hydrationReplayErrorMetadata, scenario.replayMetadata);
+  assert.equal(payload.mismatchRows[0], scenario.hydrateRecord.textMismatchDiagnostics.mismatchRows[0]);
+  assert.equal(payload.recoverableErrorRows[0], scenario.hydrateRecord.recoverableErrorMetadata.recoverableErrorRows[0]);
+  assert.equal(payload.rootErrorOptionCallbackRecords[0], routing.rootErrorOptionCallbackRecords[0]);
+  assert.deepEqual(scenario.container.__registrations, []);
+  assert.deepEqual(scenario.document.__registrations, []);
+
+  assert.throws(
+    () =>
+      scenario.bridge.createHydrationRecoverableErrorRouting(
+        scenario.hydrateRecord,
+        scenario.hydrateRecord.recoverableErrorMetadata,
+        scenario.replayMetadata,
+        {
+          rootOptions: {
+            onRecoverableError
+          }
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_ROUTING'
+    }
+  );
+  assert.throws(
+    () =>
+      scenario.bridge.createHydrationRecoverableErrorRouting(
+        scenario.hydrateRecord,
+        scenario.hydrateRecord.recoverableErrorMetadata,
+        scenario.replayMetadata,
+        {
+          rootErrorCallbackInvocationCount: 1,
+          rootOptions: scenario.hydrationOptions
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_ROUTING'
+    }
+  );
+
+  const noMismatch = createHydrationRecoverableRoutingScenario({
+    actualText: 'stable text',
+    expectedText: 'stable text',
+    label: 'recoverable-route-no-mismatch',
+    hydrationOptions: scenario.hydrationOptions
+  });
+  assert.equal(noMismatch.hydrateRecord.textMismatchDiagnostics.mismatchCount, 0);
+  assert.throws(
+    () =>
+      noMismatch.bridge.createHydrationRecoverableErrorRouting(
+        noMismatch.hydrateRecord,
+        noMismatch.hydrateRecord.recoverableErrorMetadata,
+        noMismatch.replayMetadata,
+        {
+          rootOptions: scenario.hydrationOptions
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_ROUTING'
+    }
+  );
+});
+
 test('private hydration replay queue drain-order diagnostics sort blocked targets by dehydrated metadata', () => {
   const document = createDocument('drain-order');
   const container = createElement('DIV', document);
@@ -2208,6 +2406,78 @@ function assertHydrationMarkerReplayQueueDiagnostics(record, expected) {
     diagnostics.eventTargetResolutionBlockedReason,
     pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
   );
+}
+
+function createHydrationRecoverableRoutingScenario({
+  actualText,
+  expectedText,
+  hydrationOptions,
+  label
+}) {
+  const document = createDocument(label);
+  const container = createElement('DIV', document);
+  const boundaryTarget = createElement('BUTTON', document);
+  boundaryTarget.parentNode = container;
+  container.childNodes = [
+    createComment('$'),
+    boundaryTarget,
+    createComment('/$'),
+    createText(actualText)
+  ];
+
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hydrateIdPrefix: `${label}-hydrate`,
+    hydrationRecordIdPrefix: `${label}-boundary`,
+    requestIdPrefix: `${label}-request`
+  });
+  const initialChildren = {
+    props: {
+      children: expectedText
+    },
+    type: 'App'
+  };
+  const hydrateRecord = bridge.createHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        'click',
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent('click', boundaryTarget)
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      hydrateRecord.hydrationBoundaryRecord,
+      dispatchRecord,
+      {
+        source: `${label}-replay-ownership`
+      }
+    );
+  const replayMetadata = bridge.createHydrationReplayErrorMetadata(
+    hydrateRecord,
+    ownershipDiagnostics,
+    {
+      replayTargetLabels: [`${label}-button`],
+      source: `${label}-replay-error-metadata`
+    }
+  );
+
+  return {
+    bridge,
+    container,
+    dispatchRecord,
+    document,
+    hydrateRecord,
+    hydrationOptions,
+    initialChildren,
+    ownershipDiagnostics,
+    replayMetadata
+  };
 }
 
 function createUnsupportedHydrateRootScenario(label) {

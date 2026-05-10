@@ -33,8 +33,12 @@ const {
   revertContainerRootMarkerMutation
 } = require('./root-markers.js');
 const {
+  HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
   HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
+  HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
+  HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
+  HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   createHydrationBoundaryGate,
   getPrivateHydrationBoundaryRecordPayload,
@@ -168,6 +172,8 @@ const privateRootEventListenerErrorRoutingRecordType =
   'fast.react_dom.private_root_event_listener_error_routing_record';
 const privateRootHydrationReplayErrorMetadataRecordType =
   'fast.react_dom.private_root_hydration_replay_error_metadata_record';
+const privateRootHydrationRecoverableErrorRoutingRecordType =
+  'fast.react_dom.private_root_hydration_recoverable_error_routing_record';
 const privateRootPublicFacadeAdapterType =
   'fast.react_dom.private_root_public_facade_adapter';
 const privateRootPublicFacadeRootType =
@@ -261,6 +267,8 @@ const ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED =
   'recorded-private-root-event-listener-error-routing';
 const ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED =
   'recorded-private-root-hydration-replay-error-metadata';
+const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED =
+  'recorded-private-root-hydration-recoverable-error-routing';
 const ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED =
   'accepted-private-root-error-option-callback-record';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
@@ -1327,6 +1335,78 @@ const ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_BLOCKED_CAPABILITIES =
         'React DOM hydration replay and root error callback compatibility are not claimed by this private record.'
     })
   ]);
+const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'hydration-text-mismatch-metadata',
+      accepted: true,
+      reason:
+        'The diagnostic consumes accepted private hydration text mismatch rows from the unsupported hydrateRoot boundary record.'
+    }),
+    freezeRecord({
+      id: 'hydration-recoverable-error-metadata',
+      accepted: true,
+      reason:
+        'Hydration text mismatch recoverable-error rows are preserved as metadata before queueRecoverableErrors or commit callbacks.'
+    }),
+    freezeRecord({
+      id: 'hydration-replay-error-metadata',
+      accepted: true,
+      reason:
+        'The route is associated with accepted private hydration replay error metadata for the same hydrateRoot request.'
+    }),
+    freezeRecord({
+      id: 'root-error-option-callback-metadata',
+      accepted: true,
+      reason:
+        'Hydrate root onUncaughtError, onCaughtError, and onRecoverableError options are preserved as metadata-only callback records.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-hydrate-root-execution',
+      blocked: true,
+      reason:
+        'The routing record consumes private hydrateRoot bridge metadata and does not execute public hydration roots.'
+    }),
+    freezeRecord({
+      id: 'hydration-compatibility',
+      blocked: true,
+      reason:
+        'Hydratable instances, text patching, Suspense hydration, and compatibility claims remain blocked.'
+    }),
+    freezeRecord({
+      id: 'recoverable-error-queueing',
+      blocked: true,
+      reason:
+        'Recoverable hydration errors are not queued into the reconciler by this private diagnostic.'
+    }),
+    freezeRecord({
+      id: 'root-error-update-scheduling',
+      blocked: true,
+      reason:
+        'Hydration mismatch recoverable errors are not scheduled as root error updates by this private record.'
+    }),
+    freezeRecord({
+      id: 'public-root-error-callback-invocation',
+      blocked: true,
+      reason:
+        'Root onRecoverableError is associated by metadata only and is never invoked.'
+    }),
+    freezeRecord({
+      id: 'dom-mutation',
+      blocked: true,
+      reason:
+        'The routing record does not patch text, clear boundaries, or mutate container children.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason:
+        'React DOM hydration mismatch recovery and root error callback compatibility are not claimed by this private record.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-facade-create-root-record',
@@ -1755,6 +1835,7 @@ const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
 const rootRefCallbackErrorRoutingPayloads = new WeakMap();
 const rootEventListenerErrorRoutingPayloads = new WeakMap();
 const rootHydrationReplayErrorMetadataPayloads = new WeakMap();
+const rootHydrationRecoverableErrorRoutingPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
 const rootPublicFacadePreflightPayloads = new WeakMap();
@@ -1977,6 +2058,20 @@ function createPrivateRootBridgeShell(options) {
         bridgeState,
         hydrateRootRecord,
         ownershipDiagnostics,
+        options
+      );
+    },
+    createHydrationRecoverableErrorRouting(
+      hydrateRootRecord,
+      recoverableErrorMetadata,
+      hydrationReplayErrorMetadata,
+      options
+    ) {
+      return createHydrationRecoverableErrorRoutingRecordWithBridge(
+        bridgeState,
+        hydrateRootRecord,
+        recoverableErrorMetadata,
+        hydrationReplayErrorMetadata,
         options
       );
     }
@@ -3752,6 +3847,21 @@ function createHydrationReplayErrorMetadataRecord(
   );
 }
 
+function createHydrationRecoverableErrorRoutingRecord(
+  hydrateRootRecord,
+  recoverableErrorMetadata,
+  hydrationReplayErrorMetadata,
+  options
+) {
+  return createHydrationRecoverableErrorRoutingRecordWithBridge(
+    null,
+    hydrateRootRecord,
+    recoverableErrorMetadata,
+    hydrationReplayErrorMetadata,
+    options
+  );
+}
+
 function applyPrivateRootHostOutputUpdate(record, options) {
   return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
 }
@@ -5105,6 +5215,14 @@ function getPrivateRootHydrationReplayErrorMetadataPayload(record) {
 
 function isPrivateRootHydrationReplayErrorMetadataRecord(value) {
   return rootHydrationReplayErrorMetadataPayloads.has(value);
+}
+
+function getPrivateRootHydrationRecoverableErrorRoutingPayload(record) {
+  return rootHydrationRecoverableErrorRoutingPayloads.get(record) || null;
+}
+
+function isPrivateRootHydrationRecoverableErrorRoutingRecord(value) {
+  return rootHydrationRecoverableErrorRoutingPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeAdapterPayload(adapter) {
@@ -7873,6 +7991,181 @@ function createHydrationReplayErrorMetadataRecordWithBridge(
       ownershipRows: ownershipValidation.ownershipRows,
       rootErrorCallbacks,
       rootErrorOptionCallbackRecords
+    })
+  );
+
+  return record;
+}
+
+function createHydrationRecoverableErrorRoutingRecordWithBridge(
+  bridgeState,
+  hydrateRootRecord,
+  recoverableErrorMetadata,
+  hydrationReplayErrorMetadata,
+  options
+) {
+  const requestValidation = validateHydrationReplayErrorMetadataRequest(
+    bridgeState,
+    hydrateRootRecord
+  );
+  const mismatchValidation =
+    validateHydrationRecoverableErrorRoutingMismatchMetadata(
+      requestValidation,
+      recoverableErrorMetadata
+    );
+  const replayMetadataValidation =
+    validateHydrationRecoverableErrorRoutingReplayMetadata(
+      requestValidation,
+      hydrationReplayErrorMetadata
+    );
+  const routingOptions =
+    normalizeHydrationRecoverableErrorRoutingOptions(options);
+  validateHydrationRecoverableErrorRoutingRootOptions(
+    requestValidation,
+    routingOptions
+  );
+  validateHydrationRecoverableErrorRoutingCallbackExecution(
+    mismatchValidation,
+    replayMetadataValidation,
+    routingOptions
+  );
+
+  const rootErrorCallbacks = describeRootErrorCallbacks(
+    requestValidation.hydrationOptions
+  );
+  const rootErrorOptionCallbackRecords = freezeArray(
+    mismatchValidation.recoverableErrorRows.map((recoverableErrorRow, index) =>
+      createHydrationRecoverableErrorOptionCallbackRecord({
+        index,
+        mismatchRow: mismatchValidation.mismatchRows[index],
+        recoverableErrorRow,
+        requestValidation,
+        rootErrorCallbacks,
+        routingOptions
+      })
+    )
+  );
+
+  const record = freezeRecord({
+    $$typeof: privateRootHydrationRecoverableErrorRoutingRecordType,
+    kind: 'FastReactDomPrivateRootHydrationRecoverableErrorRoutingRecord',
+    routingStatus: ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    source:
+      typeof routingOptions.source === 'string'
+        ? routingOptions.source
+        : 'private-root-hydration-recoverable-error-routing',
+    operation: 'hydration-recoverable-error-routing',
+    sourceRequestId: hydrateRootRecord.requestId,
+    sourceRequestSequence: hydrateRootRecord.requestSequence,
+    sourceRequestType: hydrateRootRecord.requestType,
+    sourceOperation: hydrateRootRecord.operation,
+    hydrateId: hydrateRootRecord.hydrateId,
+    rootId: hydrateRootRecord.rootId,
+    rootKind: hydrateRootRecord.rootKind,
+    rootTag: hydrateRootRecord.rootTag,
+    rootRecordId: requestValidation.rootRecordId,
+    sourceHydrationBoundaryKind:
+      requestValidation.hydrationBoundaryRecord.kind,
+    sourceHydrationBoundaryStatus:
+      requestValidation.hydrationBoundaryRecord.status,
+    sourceTextMismatchDiagnosticKind:
+      mismatchValidation.textMismatchDiagnostics.kind,
+    sourceTextMismatchDiagnosticStatus:
+      mismatchValidation.textMismatchDiagnostics.status,
+    sourceRecoverableErrorMetadataKind: recoverableErrorMetadata.kind,
+    sourceRecoverableErrorMetadataStatus: recoverableErrorMetadata.status,
+    sourceHydrationReplayErrorMetadataKind:
+      hydrationReplayErrorMetadata.kind,
+    sourceHydrationReplayErrorMetadataStatus:
+      hydrationReplayErrorMetadata.metadataStatus,
+    hydrationReplayErrorMetadataAccepted: true,
+    hydrationReplayErrorMetadataRecordCount:
+      hydrationReplayErrorMetadata.rootErrorOptionCallbackRecordCount,
+    replayOwnershipRowCount: hydrationReplayErrorMetadata.ownershipRowCount,
+    replayRootErrorOptionCallbackRecordCount:
+      hydrationReplayErrorMetadata.rootErrorOptionCallbackRecordCount,
+    rootOptionsHandleStatus: 'matched-hydrate-root-options',
+    rootOptionsInfo: describeBridgeValue(requestValidation.hydrationOptions),
+    rootErrorChannel: 'onRecoverableError',
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootErrorOptionCallbackRecordStatus:
+      ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+    rootErrorOptionCallbackRecordCount:
+      rootErrorOptionCallbackRecords.length,
+    rootErrorOptionCallbackRecords,
+    textMismatchRowCount: mismatchValidation.mismatchRows.length,
+    recoverableErrorMetadataCount:
+      mismatchValidation.recoverableErrorRows.length,
+    queuedRecoverableErrorCount: 0,
+    onRecoverableErrorInvocationCount: 0,
+    acceptedCapabilities:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    rootErrorUpdatesScheduled: false,
+    hydrationRequested: true,
+    hydration: false,
+    canHydrate: false,
+    hydrationCompatibilityClaimed: false,
+    hostInstanceHydrationAttempted: false,
+    textPatched: false,
+    boundaryCleared: false,
+    suspenseHydrationScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventsReplayed: false,
+    replayQueuesDrained: false,
+    recoverableErrorsQueued: false,
+    willQueueRecoverableErrors: false,
+    willInvokeOnRecoverableError: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    reportGlobalErrorInvoked: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    exposesErrorValue: false,
+    exposesHydrationTarget: false
+  });
+
+  rootHydrationRecoverableErrorRoutingPayloads.set(
+    record,
+    freezeRecord({
+      bridgeState: requestValidation.bridgeState,
+      container: requestValidation.container,
+      hydrateRootRecord,
+      hydrationBoundaryRecord: requestValidation.hydrationBoundaryRecord,
+      hydrationOptions: requestValidation.hydrationOptions,
+      hydrationReplayErrorMetadata,
+      hydrationReplayErrorMetadataPayload:
+        replayMetadataValidation.replayMetadataPayload,
+      initialChildren: requestValidation.initialChildren,
+      mismatchRows: mismatchValidation.mismatchRows,
+      options: routingOptions.rawOptions,
+      recoverableErrorMetadata,
+      recoverableErrorRows: mismatchValidation.recoverableErrorRows,
+      rootErrorCallbacks,
+      rootErrorOptionCallbackRecords,
+      rootOptions: requestValidation.hydrationOptions,
+      textMismatchDiagnostics: mismatchValidation.textMismatchDiagnostics
     })
   );
 
@@ -10969,6 +11262,360 @@ function normalizeHydrationReplayErrorMetadataOptions(options) {
   });
 }
 
+function validateHydrationRecoverableErrorRoutingMismatchMetadata(
+  requestValidation,
+  recoverableErrorMetadata
+) {
+  const hydrationBoundaryRecord = requestValidation.hydrationBoundaryRecord;
+  const textMismatchDiagnostics =
+    hydrationBoundaryRecord.textMismatchDiagnostics;
+  if (
+    !textMismatchDiagnostics ||
+    typeof textMismatchDiagnostics !== 'object' ||
+    textMismatchDiagnostics.kind !== HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND ||
+    textMismatchDiagnostics.blockedReason !==
+      HYDRATION_TEXT_MISMATCH_BLOCKED_REASON
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires accepted text mismatch diagnostics.'
+    );
+  }
+  if (
+    !recoverableErrorMetadata ||
+    typeof recoverableErrorMetadata !== 'object' ||
+    recoverableErrorMetadata.kind !==
+      HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND ||
+    recoverableErrorMetadata.blockedReason !==
+      HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires accepted recoverable error metadata.'
+    );
+  }
+  if (
+    recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    textMismatchDiagnostics.recoverableErrorMetadata !==
+      recoverableErrorMetadata ||
+    recoverableErrorMetadata.rootRecordId !== requestValidation.rootRecordId ||
+    textMismatchDiagnostics.rootRecordId !== requestValidation.rootRecordId
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error metadata must match the hydrateRoot boundary record.'
+    );
+  }
+  if (
+    textMismatchDiagnostics.recoverableErrorsQueued !== false ||
+    textMismatchDiagnostics.onRecoverableErrorInvoked !== false ||
+    recoverableErrorMetadata.recoverableErrorsQueued !== false ||
+    recoverableErrorMetadata.onRecoverableErrorInvoked !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing rejects metadata after callback execution.'
+    );
+  }
+
+  const mismatchRows = Array.isArray(textMismatchDiagnostics.mismatchRows)
+    ? textMismatchDiagnostics.mismatchRows
+    : [];
+  const recoverableErrorRows = Array.isArray(
+    recoverableErrorMetadata.recoverableErrorRows
+  )
+    ? recoverableErrorMetadata.recoverableErrorRows
+    : [];
+  if (
+    mismatchRows.length === 0 ||
+    recoverableErrorRows.length === 0 ||
+    mismatchRows.length !== textMismatchDiagnostics.mismatchCount ||
+    recoverableErrorRows.length !==
+      recoverableErrorMetadata.recoverableErrorMetadataCount ||
+    recoverableErrorRows.length !== mismatchRows.length
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires recorded text mismatch rows.'
+    );
+  }
+
+  for (let index = 0; index < mismatchRows.length; index++) {
+    validateHydrationRecoverableErrorRoutingMismatchRow(
+      mismatchRows[index],
+      recoverableErrorRows[index]
+    );
+  }
+
+  return {
+    mismatchRows: freezeArray(mismatchRows),
+    recoverableErrorRows: freezeArray(recoverableErrorRows),
+    textMismatchDiagnostics
+  };
+}
+
+function validateHydrationRecoverableErrorRoutingMismatchRow(
+  mismatchRow,
+  recoverableErrorRow
+) {
+  if (
+    !mismatchRow ||
+    typeof mismatchRow !== 'object' ||
+    typeof mismatchRow.rowId !== 'string' ||
+    mismatchRow.recoverable !== true ||
+    mismatchRow.canHydrate !== false ||
+    mismatchRow.hydrateTextInstanceCalled !== false ||
+    mismatchRow.willPatchText !== false ||
+    mismatchRow.domMutated !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires blocked text mismatch rows.'
+    );
+  }
+  if (
+    !recoverableErrorRow ||
+    typeof recoverableErrorRow !== 'object' ||
+    recoverableErrorRow.id !== mismatchRow.recoverableErrorMetadataId ||
+    recoverableErrorRow.textMismatchRowId !== mismatchRow.rowId ||
+    recoverableErrorRow.queuedRecoverableError !== false ||
+    recoverableErrorRow.onRecoverableErrorInvoked !== false ||
+    recoverableErrorRow.publicCallbackInvoked !== false ||
+    recoverableErrorRow.recoveredByClientRender !== false ||
+    recoverableErrorRow.surfacedToUI !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires unqueued recoverable mismatch rows.'
+    );
+  }
+}
+
+function validateHydrationRecoverableErrorRoutingReplayMetadata(
+  requestValidation,
+  hydrationReplayErrorMetadata
+) {
+  const replayMetadataPayload =
+    rootHydrationReplayErrorMetadataPayloads.get(
+      hydrationReplayErrorMetadata
+    );
+  if (
+    replayMetadataPayload === undefined ||
+    hydrationReplayErrorMetadata.$$typeof !==
+      privateRootHydrationReplayErrorMetadataRecordType ||
+    hydrationReplayErrorMetadata.metadataStatus !==
+      ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED ||
+    hydrationReplayErrorMetadata.compatibilityStatus !==
+      ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires accepted replay error metadata.'
+    );
+  }
+  if (
+    replayMetadataPayload.hydrateRootRecord !==
+      requestValidation.hydrateRootRecord ||
+    replayMetadataPayload.hydrationBoundaryRecord !==
+      requestValidation.hydrationBoundaryRecord ||
+    replayMetadataPayload.hydrationOptions !==
+      requestValidation.hydrationOptions ||
+    replayMetadataPayload.initialChildren !==
+      requestValidation.initialChildren ||
+    hydrationReplayErrorMetadata.rootRecordId !==
+      requestValidation.rootRecordId
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration replay error metadata must match the hydrateRoot boundary record.'
+    );
+  }
+  if (
+    hydrationReplayErrorMetadata.publicRootErrorCallbacksInvoked !== false ||
+    hydrationReplayErrorMetadata.rootErrorCallbackInvocationCount !== 0 ||
+    hydrationReplayErrorMetadata.rootErrorsReported !== false ||
+    hydrationReplayErrorMetadata.compatibilityClaimed !== false ||
+    hydrationReplayErrorMetadata.hydration !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing rejects replay metadata after callback execution.'
+    );
+  }
+
+  return {
+    replayMetadataPayload
+  };
+}
+
+function validateHydrationRecoverableErrorRoutingRootOptions(
+  requestValidation,
+  routingOptions
+) {
+  if (
+    routingOptions.hasRootOptions === true &&
+    routingOptions.rootOptions !== requestValidation.hydrationOptions
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing requires the current hydrateRoot options object.'
+    );
+  }
+}
+
+function validateHydrationRecoverableErrorRoutingCallbackExecution(
+  mismatchValidation,
+  replayMetadataValidation,
+  routingOptions
+) {
+  if (
+    routingOptions.onRecoverableErrorInvoked === true ||
+    routingOptions.publicCallbackInvoked === true ||
+    routingOptions.rootErrorCallbackInvocationCount !== 0
+  ) {
+    throwInvalidHydrationRecoverableErrorRouting(
+      'Hydration recoverable error routing rejects callback execution evidence.'
+    );
+  }
+
+  for (const recoverableErrorRow of mismatchValidation.recoverableErrorRows) {
+    if (
+      recoverableErrorRow.onRecoverableErrorInvoked !== false ||
+      recoverableErrorRow.publicCallbackInvoked !== false ||
+      recoverableErrorRow.queuedRecoverableError !== false
+    ) {
+      throwInvalidHydrationRecoverableErrorRouting(
+        'Hydration recoverable error rows must not have invoked callbacks.'
+      );
+    }
+  }
+
+  const replayCallbackRecords = Array.isArray(
+    replayMetadataValidation.replayMetadataPayload
+      .rootErrorOptionCallbackRecords
+  )
+    ? replayMetadataValidation.replayMetadataPayload
+        .rootErrorOptionCallbackRecords
+    : [];
+  for (const callbackRecord of replayCallbackRecords) {
+    if (
+      callbackRecord.rootErrorCallbacksInvoked !== false ||
+      callbackRecord.publicRootErrorCallbacksInvoked !== false ||
+      callbackRecord.rootErrorCallbackInvocationCount !== 0 ||
+      callbackRecord.queuedRecoverableError !== false
+    ) {
+      throwInvalidHydrationRecoverableErrorRouting(
+        'Hydration replay root option callback records must remain metadata-only.'
+      );
+    }
+  }
+}
+
+function createHydrationRecoverableErrorOptionCallbackRecord({
+  index,
+  mismatchRow,
+  recoverableErrorRow,
+  requestValidation,
+  rootErrorCallbacks,
+  routingOptions
+}) {
+  const sourceLabel =
+    routingOptions.mismatchLabels[index] === undefined
+      ? null
+      : routingOptions.mismatchLabels[index];
+
+  return freezeRecord({
+    kind:
+      'FastReactDomPrivateRootHydrationRecoverableErrorOptionCallbackRecord',
+    status: ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+    acceptedRootOptionCallbackRecord: true,
+    diagnosticOnly: true,
+    phase: 'hydration-recoverable-error',
+    hydrateId: requestValidation.hydrateRootRecord.hydrateId,
+    rootId: requestValidation.hydrateRootRecord.rootId,
+    rootKind: requestValidation.hydrateRootRecord.rootKind,
+    rootTag: requestValidation.hydrateRootRecord.rootTag,
+    rootRecordId: requestValidation.rootRecordId,
+    mismatchIndex: index,
+    sourceLabel,
+    textMismatchRowId: mismatchRow.rowId,
+    recoverableErrorMetadataId: recoverableErrorRow.id,
+    textMismatchReason: mismatchRow.reason,
+    expectedPath: mismatchRow.expectedPath,
+    actualPath: mismatchRow.actualPath,
+    expectedText: mismatchRow.expectedText,
+    actualText: mismatchRow.actualText,
+    normalizedExpectedText: mismatchRow.normalizedExpectedText,
+    normalizedActualText: mismatchRow.normalizedActualText,
+    exactTextMatches: mismatchRow.exactTextMatches,
+    normalizedTextMatches: mismatchRow.normalizedTextMatches,
+    errorName: recoverableErrorRow.errorName,
+    errorMessage: recoverableErrorRow.messageTemplate,
+    errorCategory: recoverableErrorRow.messageCategory,
+    errorInfo: recoverableErrorRow.errorInfo,
+    errorReported: false,
+    reportGlobalErrorInvoked: false,
+    rootOptionHandleStatus: 'matched-hydrate-root-options',
+    rootOptionCallbackKey: 'onRecoverableError',
+    rootOptionCallbackConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootOptionCallbackValueInfo:
+      rootErrorCallbacks.onRecoverableError.valueInfo,
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootErrorCallbacksInvoked: false,
+    publicRootErrorCallbacksInvoked: false,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    rootErrorUpdatesScheduled: false,
+    queuedRecoverableError: false,
+    recoverableErrorsQueued: false,
+    recoverableErrorCompatibilityClaimed: false,
+    publicErrorBoundariesEnabled: false,
+    publicRootBehaviorChanged: false,
+    compatibilityClaimed: false,
+    hydration: false,
+    canHydrate: false,
+    hydrateTextInstanceCalled: false,
+    textPatched: false,
+    domMutated: false,
+    exposesErrorValue: false,
+    exposesHydrationTarget: false
+  });
+}
+
+function normalizeHydrationRecoverableErrorRoutingOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const mismatchLabels = Array.isArray(normalizedOptions.mismatchLabels)
+    ? normalizedOptions.mismatchLabels.map((label) =>
+        typeof label === 'string' ? label : null
+      )
+    : [];
+  const hasRootOptions = Object.prototype.hasOwnProperty.call(
+    normalizedOptions,
+    'rootOptions'
+  );
+  const rootErrorCallbackInvocationCount =
+    typeof normalizedOptions.rootErrorCallbackInvocationCount === 'number'
+      ? normalizedOptions.rootErrorCallbackInvocationCount
+      : 0;
+
+  return freezeRecord({
+    rawOptions: options,
+    hasRootOptions,
+    mismatchLabels: freezeArray(mismatchLabels),
+    onRecoverableErrorInvoked:
+      normalizedOptions.onRecoverableErrorInvoked === true,
+    publicCallbackInvoked:
+      normalizedOptions.publicCallbackInvoked === true,
+    rootErrorCallbackInvocationCount,
+    rootOptions: hasRootOptions ? normalizedOptions.rootOptions : undefined,
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-root-hydration-recoverable-error-routing'
+  });
+}
+
 function normalizeEventListenerRootErrorRoutingOptions(options) {
   const normalizedOptions =
     options !== null &&
@@ -13056,6 +13703,13 @@ function throwInvalidHydrationReplayErrorMetadata(message) {
   throw error;
 }
 
+function throwInvalidHydrationRecoverableErrorRouting(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_ROUTING';
+  throw error;
+}
+
 function throwInvalidRootPublicFacadeAdapter(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
@@ -13251,6 +13905,9 @@ module.exports = {
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED,
+  ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED,
   ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED,
@@ -13364,6 +14021,7 @@ module.exports = {
   createPrivateRootHandle,
   createPrivateRootOwner,
   createEventListenerRootErrorRoutingRecord,
+  createHydrationRecoverableErrorRoutingRecord,
   createHydrationReplayErrorMetadataRecord,
   createRefCallbackRootErrorRoutingRecord,
   createRefCallbackHostOutputOrderingDiagnosticRecord,
@@ -13399,6 +14057,7 @@ module.exports = {
   getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootEventListenerErrorRoutingPayload,
+  getPrivateRootHydrationRecoverableErrorRoutingPayload,
   getPrivateRootHydrationReplayErrorMetadataPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
@@ -13431,6 +14090,7 @@ module.exports = {
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootEventListenerErrorRoutingRecord,
+  isPrivateRootHydrationRecoverableErrorRoutingRecord,
   isPrivateRootHydrationReplayErrorMetadataRecord,
   isPrivateRootRefCallbackErrorRoutingRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
@@ -13469,6 +14129,7 @@ module.exports = {
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
   privateRootEventListenerErrorRoutingRecordType,
+  privateRootHydrationRecoverableErrorRoutingRecordType,
   privateRootHydrationReplayErrorMetadataRecordType,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateRootRefCallbackErrorRoutingRecordType,
