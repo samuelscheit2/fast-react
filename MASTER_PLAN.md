@@ -47,6 +47,26 @@ Drive toward a minimal real root render/update/unmount path:
 
 - Worker 129: HostRoot render-phase foundation in
   `/Users/user/Developer/Developer/fast-react-worker-129-host-root-render-phase-foundation`.
+- Worker 130: minimal commit slice readiness refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-130-commit-readiness-refresh`.
+- Worker 131: sync flush and act integration refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-131-sync-flush-act-refresh`.
+- Worker 132: host component/text render and complete-work slice refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-132-host-complete-work-refresh`.
+- Worker 133: test-renderer root canary sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-133-test-renderer-root-refresh`.
+- Worker 134: DOM mutation adapter canary sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-134-dom-mutation-refresh`.
+- Worker 135: React DOM root facade bridge refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-135-react-dom-root-bridge-refresh`.
+- Worker 136: function component and hook vertical slice refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-136-function-hooks-refresh`.
+- Worker 137: root render conformance and benchmark gate refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-137-conformance-benchmark-refresh`.
+- Worker 138: root error/callback surface sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-138-root-error-callback-refresh`.
+- Worker 139: passive effects and ref lifecycle sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-139-passive-ref-refresh`.
 
 ## Near-Term Sequencing
 
@@ -54,7 +74,9 @@ Drive toward a minimal real root render/update/unmount path:
    scheduler callback identity validation.
 2. Keep worker 129 out of commit, host mutation, JS packages, React DOM,
    test-renderer facades, scheduler-native files, and smoke/conformance tests.
-3. After worker 129 is accepted, queue the minimal commit/root-current switch
+3. Keep workers 130-139 report-only with one progress file each; use them to
+   refine the next source slices without touching active implementation files.
+4. After worker 129 is accepted, queue the minimal commit/root-current switch
    slice or a sync-flush integration slice depending on the worker's risks.
 
 ## Next Queue Candidates
