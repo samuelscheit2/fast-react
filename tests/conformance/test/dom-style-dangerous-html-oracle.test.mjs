@@ -27,6 +27,18 @@ const repoRoot = path.resolve(
   "..",
   ".."
 );
+const {
+  createDangerousHtmlTextResetDiagnostic
+} = require(
+  path.join(
+    repoRoot,
+    "packages",
+    "react-dom",
+    "src",
+    "client",
+    "dom-property-operations.js"
+  )
+);
 const propertyPayload = require(
   path.join(
     repoRoot,
@@ -481,6 +493,77 @@ test("client mutation observations record dangerouslySetInnerHTML update and rem
   ]);
 });
 
+test("private dangerous HTML/text reset diagnostics keep oracle HTML transitions blocked", () => {
+  const updatePhase = clientPhase(
+    "default-node-development",
+    "dangerously-set-inner-html-update-and-removal",
+    "update"
+  );
+  const removePhase = clientPhase(
+    "default-node-development",
+    "dangerously-set-inner-html-update-and-removal",
+    "remove"
+  );
+  const updateDiagnostic = createDangerousHtmlTextResetDiagnostic(
+    "div",
+    {
+      dangerouslySetInnerHTML: { __html: "<span>Before</span>" }
+    },
+    {
+      dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+    }
+  );
+  const removeDiagnostic = createDangerousHtmlTextResetDiagnostic(
+    "div",
+    {
+      dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+    },
+    {
+      dangerouslySetInnerHTML: undefined,
+      children: "Managed child"
+    }
+  );
+
+  assert.equal(updateDiagnostic.previousHtml, "<span>Before</span>");
+  assert.equal(updateDiagnostic.nextHtml, "<em>After</em>");
+  assert.equal(updateDiagnostic.resetDecision.shouldResetTextContent, false);
+  assert.deepEqual(
+    updateDiagnostic.blockedMutationRows.map(blockedRowSummary),
+    updatePhase.mutations
+      .filter((mutation) => mutation.type === "setInnerHTML")
+      .map((mutation) => ({
+        mutation: "innerHTML",
+        value: mutation.value,
+        status: "blocked",
+        realDomMutation: false,
+        compatibilityClaimed: false
+      }))
+  );
+
+  assert.equal(removeDiagnostic.previousHtml, "<em>After</em>");
+  assert.equal(removeDiagnostic.nextText, "Managed child");
+  assert.equal(removeDiagnostic.nextHtml, null);
+  assert.equal(removeDiagnostic.resetDecision.shouldResetTextContent, false);
+  assert.deepEqual(
+    removeDiagnostic.blockedMutationRows.map(blockedRowSummary),
+    removePhase.mutations
+      .filter((mutation) => mutation.type === "setTextContent")
+      .map((mutation) => ({
+        mutation: "textContent",
+        value: mutation.value,
+        status: "blocked",
+        realDomMutation: false,
+        compatibilityClaimed: false
+      }))
+  );
+
+  for (const diagnostic of [updateDiagnostic, removeDiagnostic]) {
+    assert.equal(diagnostic.sideEffects.realDomInnerHTMLWritten, false);
+    assert.equal(diagnostic.sideEffects.publicCompatibilityEnabled, false);
+    assert.equal(diagnostic.compatibilityClaimed, false);
+  }
+});
+
 test("shape validation records server throws and client root errors", () => {
   const styleServer = serverPhase(
     "default-node-development",
@@ -626,4 +709,14 @@ function styleMutationType(row) {
     return "styleSetProperty";
   }
   return "stylePropertyAssignment";
+}
+
+function blockedRowSummary(row) {
+  return {
+    mutation: row.mutation,
+    value: row.value,
+    status: row.status,
+    realDomMutation: row.realDomMutation,
+    compatibilityClaimed: row.compatibilityClaimed
+  };
 }
