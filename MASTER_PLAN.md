@@ -50,14 +50,17 @@ Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 accepted and cleaned up. Workers 715-725 have also been accepted and cleaned
 up.
 
-No worker branches or worktrees are currently active.
+Worker 726 was launched from queue base commit `50d1dab` in an isolated
+`worker/<slug>` branch and worktree.
+
+- Worker 726: update-path test-renderer native serialization admission
+  consuming Worker 725 identity evidence.
 
 ## Near-Term Sequencing
 
-1. Select the next runtime queue from accepted Worker 725 evidence and
-   remaining private blockers only; keep public root, act, flushSync,
-   hooks/effects, test-renderer, and React DOM compatibility blocked until each
-   private gate is proven.
+1. Monitor Worker 726, accepting only scoped private update-native
+   serialization admission with public root, act, flushSync, hooks/effects,
+   test-renderer, and React DOM compatibility still blocked.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
@@ -66,12 +69,12 @@ No worker branches or worktrees are currently active.
 
 ## Next Queue Candidates
 
-- Extend Worker 723's finished-work identity admission pattern to update-path
-  native serialization diagnostics by consuming Worker 725's accepted update
-  identity evidence.
-- Decide whether unmount and multichild private diagnostics need distinct
-  finished-work identity evidence or should remain behind existing route /
+- Decide whether unmount private diagnostics need a distinct finished-work
+  identity adapter after Worker 726, or should remain behind existing route /
   host-output gates until broader serialization work starts.
+- Defer multichild/sibling serializer identity admission until the committed
+  fiber/report shape is narrow enough to prove without widening public
+  serialization.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.
