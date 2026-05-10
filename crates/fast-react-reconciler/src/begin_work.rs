@@ -19,19 +19,23 @@ use fast_react_core::{
     StateNodeHandle,
 };
 
-use crate::function_component::{
-    FunctionComponentContextConsumerInvoker, FunctionComponentContextReadRecord,
-    FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
-    FunctionComponentHookRenderResult, FunctionComponentHookRenderStore, FunctionComponentInvoker,
-    FunctionComponentOutputHandle, FunctionComponentRenderError, FunctionComponentRenderRecord,
-    FunctionComponentSingleChildOutputResolver, FunctionComponentSingleChildReconciliationError,
-    FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
-    FunctionComponentUseContextRenderRecord, FunctionComponentUseStateHookRenderRecord,
-    FunctionComponentUseStateRenderRecord, FunctionComponentUseStateRenderRequest,
-    reconcile_function_component_single_child_output, render_function_component,
-    render_function_component_with_context_reads,
-    render_function_component_with_required_use_context,
-    render_function_component_with_use_context, render_function_component_with_use_state,
+use crate::{
+    RootElementHandle,
+    function_component::{
+        FunctionComponentContextConsumerInvoker, FunctionComponentContextReadRecord,
+        FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
+        FunctionComponentHookRenderResult, FunctionComponentHookRenderStore,
+        FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
+        FunctionComponentRenderRecord, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentSingleChildReconciliationError,
+        FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
+        FunctionComponentUseContextRenderRecord, FunctionComponentUseStateHookRenderRecord,
+        FunctionComponentUseStateRenderRecord, FunctionComponentUseStateRenderRequest,
+        reconcile_function_component_single_child_output, render_function_component,
+        render_function_component_with_context_reads,
+        render_function_component_with_required_use_context,
+        render_function_component_with_use_context, render_function_component_with_use_state,
+    },
 };
 
 pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
@@ -412,6 +416,12 @@ pub(crate) struct ContextProviderUseContextBeginWorkRecord {
     child_begin_work: FunctionComponentUseContextBeginWorkRecord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUseContextSingleChildBeginWorkRecord {
+    begin_work: ContextProviderUseContextBeginWorkRecord,
+    single_child: FunctionComponentSingleChildReconciliationRecord,
+}
+
 impl ContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn provider(self) -> FiberId {
@@ -528,6 +538,88 @@ impl ContextProviderUseContextBeginWorkRecord {
     #[must_use]
     pub const fn child_context_read_count(self) -> usize {
         self.child_begin_work.context_read_count()
+    }
+}
+
+impl ContextProviderUseContextSingleChildBeginWorkRecord {
+    #[must_use]
+    pub const fn begin_work(self) -> ContextProviderUseContextBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    pub const fn single_child(self) -> FunctionComponentSingleChildReconciliationRecord {
+        self.single_child
+    }
+
+    #[must_use]
+    pub const fn provider(self) -> FiberId {
+        self.begin_work.provider()
+    }
+
+    #[must_use]
+    pub const fn child(self) -> FiberId {
+        self.begin_work.child()
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.begin_work.context()
+    }
+
+    #[must_use]
+    pub const fn value(self) -> ContextValueHandle {
+        self.begin_work.value()
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(self) -> ContextStackSnapshot {
+        self.begin_work.provider_snapshot()
+    }
+
+    #[must_use]
+    pub const fn pushed_stack_depth(self) -> usize {
+        self.begin_work.pushed_stack_depth()
+    }
+
+    #[must_use]
+    pub const fn restored_stack_depth(self) -> usize {
+        self.begin_work.restored_stack_depth()
+    }
+
+    #[must_use]
+    pub const fn child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.begin_work.child_begin_work()
+    }
+
+    #[must_use]
+    pub const fn child_render(self) -> FunctionComponentRenderRecord {
+        self.begin_work.child_render()
+    }
+
+    #[must_use]
+    pub const fn child_output(self) -> FunctionComponentOutputHandle {
+        self.begin_work.child_output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.begin_work.child_context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_read_count(self) -> usize {
+        self.begin_work.child_context_read_count()
+    }
+
+    #[must_use]
+    pub const fn child_element(self) -> RootElementHandle {
+        self.single_child.child_element()
+    }
+
+    #[must_use]
+    pub const fn child_tag(self) -> FiberTag {
+        self.single_child.child_tag()
     }
 }
 
@@ -1754,6 +1846,32 @@ pub(crate) fn begin_work_context_provider_use_context_child(
             },
         ),
     }
+}
+
+pub(crate) fn begin_work_context_provider_use_context_single_child(
+    arena: &mut FiberArena,
+    request: ContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+) -> Result<ContextProviderUseContextSingleChildBeginWorkRecord, ContextProviderBeginWorkError> {
+    let begin_work =
+        begin_work_context_provider_use_context_child(arena, request, context_store, invoker)?;
+    let single_child = reconcile_function_component_single_child_output(
+        arena,
+        begin_work.child_render(),
+        resolver,
+    )
+    .map_err(|error| ContextProviderBeginWorkError::ChildBeginWork {
+        provider: begin_work.provider(),
+        child: begin_work.child(),
+        error: Box::new(BeginWorkError::FunctionComponentSingleChild(error)),
+    })?;
+
+    Ok(ContextProviderUseContextSingleChildBeginWorkRecord {
+        begin_work,
+        single_child,
+    })
 }
 
 pub(crate) fn begin_work_nested_context_provider_child(
