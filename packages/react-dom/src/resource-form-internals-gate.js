@@ -8871,25 +8871,28 @@ function normalizeResourceMapCommitFakeHeadExecutionAdmission(
   const executionKind = getAdmissionStringProperty(
     fakeHeadExecution,
     'executionKind',
-    'deterministic-private-fake-head-preload-preinit-precedence'
+    'deterministic-private-fake-head-resource-dedupe-load-order'
   );
   if (
     executionKind !==
-    'deterministic-private-fake-head-preload-preinit-precedence'
+    'deterministic-private-fake-head-resource-dedupe-load-order'
   ) {
     throwInvalidResourceHintResourceMapCommitAdmission(
-      'executionKind must be deterministic-private-fake-head-preload-preinit-precedence'
+      'executionKind must be deterministic-private-fake-head-resource-dedupe-load-order'
     );
   }
 
   const executionPath = getAdmissionStringProperty(
     fakeHeadExecution,
     'executionPath',
-    'stylesheet-preload-preinit-precedence'
+    'preload-preinit-stylesheet-script-dedupe-load-order'
   );
-  if (executionPath !== 'stylesheet-preload-preinit-precedence') {
+  if (
+    executionPath !==
+    'preload-preinit-stylesheet-script-dedupe-load-order'
+  ) {
     throwInvalidResourceHintResourceMapCommitAdmission(
-      'executionPath must be stylesheet-preload-preinit-precedence'
+      'executionPath must be preload-preinit-stylesheet-script-dedupe-load-order'
     );
   }
 
@@ -10563,31 +10566,52 @@ function createResourceMapCommitPreloadPreinitFakeHeadExecution(
   const fakeDocument = fakeHeadExecutionTarget.fakeDocument;
   const fakeHead = fakeHeadExecutionTarget.fakeHead;
   const fakeHeadBeforeChildCount = fakeHead.childNodes.length;
-  const path = findPreloadPreinitStylesheetExecutionPath(
-    privateResourceMapRecords
+  const fakeHeadBeforeOrder =
+    createObservedPreloadPreinitFakeHeadOrder(fakeDocument, fakeHead);
+  const executionSourceRows = freezeArray(
+    privateResourceMapRecords.filter(
+      isPreloadPreinitFakeHeadExecutionResourceMapRow
+    )
   );
-  if (path === null) {
+  if (executionSourceRows.length === 0) {
     throwInvalidResourceHintResourceMapCommitAdmission(
-      'fake-head execution requires one stylesheet preload/preinit resource-map path'
+      'fake-head execution requires at least one preload/preinit resource-map row'
     );
   }
 
-  const rows = [];
-  rows.push(
-    executePreloadPreinitFakeHeadRow(
-      path.preloadRow,
-      fakeDocument,
-      fakeHead,
-      rows.length
+  const rows = freezeArray(
+    executionSourceRows.map((row, index) =>
+      executePreloadPreinitFakeHeadRow(row, fakeDocument, fakeHead, index)
     )
   );
-  rows.push(
-    executePreloadPreinitFakeHeadRow(
-      path.stylesheetRow,
-      fakeDocument,
-      fakeHead,
-      rows.length
-    )
+  const fakeHeadAfterOrder =
+    createObservedPreloadPreinitFakeHeadOrder(fakeDocument, fakeHead);
+  const stylesheetPreloadRows = rows.filter(
+    (row) => row.recordKind === 'preload' && row.resourceKind === 'style'
+  );
+  const stylesheetPreinitRows = rows.filter(
+    (row) => row.recordKind === 'stylesheet'
+  );
+  const classicScriptPreloadRows = rows.filter(
+    (row) =>
+      row.recordKind === 'preload' &&
+      row.resourceKind === 'script' &&
+      row.modulePreload !== true
+  );
+  const classicScriptPreinitRows = rows.filter(
+    (row) => row.classicScriptPreinit === true
+  );
+  const modulePreloadRows = rows.filter(
+    (row) => row.modulePreload === true
+  );
+  const moduleScriptPreinitRows = rows.filter(
+    (row) => row.moduleScript === true
+  );
+  const otherPreloadRows = rows.filter(
+    (row) =>
+      row.recordKind === 'preload' &&
+      row.resourceKind !== 'style' &&
+      row.resourceKind !== 'script'
   );
 
   return freezeRecord({
@@ -10606,11 +10630,19 @@ function createResourceMapCommitPreloadPreinitFakeHeadExecution(
     ),
     rowCount: rows.length,
     insertedElementCount: rows.length,
-    stylesheetPreloadRowCount: rows.filter(
-      (row) => row.recordKind === 'preload'
-    ).length,
-    stylesheetPreinitRowCount: rows.filter(
-      (row) => row.recordKind === 'stylesheet'
+    preloadRowCount: rows.filter((row) => row.recordKind === 'preload')
+      .length,
+    preinitRowCount: rows.filter((row) => row.resourceStage === 'preinit')
+      .length,
+    stylesheetPreloadRowCount: stylesheetPreloadRows.length,
+    stylesheetPreinitRowCount: stylesheetPreinitRows.length,
+    classicScriptPreloadRowCount: classicScriptPreloadRows.length,
+    classicScriptPreinitRowCount: classicScriptPreinitRows.length,
+    modulePreloadRowCount: modulePreloadRows.length,
+    moduleScriptPreinitRowCount: moduleScriptPreinitRows.length,
+    otherPreloadRowCount: otherPreloadRows.length,
+    skippedDedupedRecordCount: privateResourceMapRecords.filter(
+      (row) => row.wouldInsertIntoHead === false
     ).length,
     resourceKeys: freezeArray(uniqueStrings(rows.map((row) => row.resourceKey))),
     precedenceKeys: freezeArray(
@@ -10620,7 +10652,9 @@ function createResourceMapCommitPreloadPreinitFakeHeadExecution(
           .filter((precedenceKey) => precedenceKey !== null)
       )
     ),
-    rows: freezeArray(rows),
+    rows,
+    fakeHeadBeforeOrder,
+    fakeHeadAfterOrder,
     fakeHeadBeforeChildCount,
     fakeHeadAfterChildCount: fakeHead.childNodes.length,
     fakeDomCommitApplied: true,
@@ -10638,38 +10672,23 @@ function createResourceMapCommitPreloadPreinitFakeHeadExecution(
     publicResourceDispatchBlocked: true,
     publicResourceHintDomInsertion: false,
     publicResourceMapCommitBehavior: false,
+    publicScriptModuleResourceDispatch: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
 }
 
-function findPreloadPreinitStylesheetExecutionPath(
-  privateResourceMapRecords
-) {
-  for (const stylesheetRow of privateResourceMapRecords) {
-    if (
-      stylesheetRow.recordKind !== 'stylesheet' ||
-      stylesheetRow.contractId !== 'preinit-style' ||
-      stylesheetRow.precedenceKey === null
-    ) {
-      continue;
-    }
-
-    const preloadRow =
-      privateResourceMapRecords.find(
-        (row) =>
-          row.recordKind === 'preload' &&
-          row.contractId === 'preload' &&
-          row.resourceKind === 'style' &&
-          row.resourceKey === stylesheetRow.resourceKey &&
-          row.resourceMapOrderIndex < stylesheetRow.resourceMapOrderIndex
-      ) || null;
-    if (preloadRow !== null) {
-      return {preloadRow, stylesheetRow};
-    }
-  }
-
-  return null;
+function isPreloadPreinitFakeHeadExecutionResourceMapRow(row) {
+  return (
+    row.wouldInsertIntoHead === true &&
+    (row.recordKind === 'preload' ||
+      row.recordKind === 'stylesheet' ||
+      row.recordKind === 'script')
+  );
 }
 
 function executePreloadPreinitFakeHeadRow(
@@ -10707,6 +10726,13 @@ function executePreloadPreinitFakeHeadRow(
     mapKind: resourceMapRow.mapKind,
     resourceStage: resourceMapRow.resourceStage,
     resourceKind: resourceMapRow.resourceKind,
+    scriptKind: resourceMapRow.scriptKind,
+    modulePreload: resourceMapRow.modulePreload,
+    moduleScript: resourceMapRow.moduleScript,
+    classicScriptPreinit: resourceMapRow.classicScriptPreinit,
+    classicScriptPreload:
+      resourceMapRow.contractId === 'preload' &&
+      resourceMapRow.scriptKind === 'classic',
     resourceKey: resourceMapRow.resourceKey,
     opaqueResourceKey: resourceMapRow.opaqueResourceKey,
     resourceMapDedupeKey: resourceMapRow.resourceMapDedupeKey,
@@ -10719,10 +10745,8 @@ function executePreloadPreinitFakeHeadRow(
     preloadSeenBefore: resourceMapRow.preloadSeenBefore,
     preinitSeenBefore: resourceMapRow.preinitSeenBefore,
     fakeDomCommitOperation:
-      resourceMapRow.recordKind === 'stylesheet'
-        ? 'insert-stylesheet-preinit-with-precedence-fake-head'
-        : 'append-stylesheet-preload-link-fake-head',
-    elementTag: 'link',
+      getPreloadPreinitFakeHeadCommitOperation(resourceMapRow),
+    elementTag: element.elementTag,
     relationshipApplied: element.relationship,
     insertionMethod: insertion.insertionMethod,
     insertionIndex: insertion.insertionIndex,
@@ -10740,19 +10764,53 @@ function executePreloadPreinitFakeHeadRow(
     fakeResourceMapMutated: false,
     fetchStarted: false,
     preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
     loadEventSubscribed: false,
     errorEventSubscribed: false,
     loadingStateMutated: false,
     publicResourceDispatchBlocked: true,
     publicResourceHintDomInsertion: false,
     publicResourceMapCommitBehavior: false,
+    publicScriptModuleResourceDispatch: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
 }
 
+function getPreloadPreinitFakeHeadCommitOperation(resourceMapRow) {
+  if (resourceMapRow.recordKind === 'stylesheet') {
+    return 'insert-stylesheet-preinit-with-precedence-fake-head';
+  }
+  if (resourceMapRow.modulePreload === true) {
+    return 'append-modulepreload-link-fake-head';
+  }
+  if (resourceMapRow.moduleScript === true) {
+    return 'append-module-script-preinit-fake-head';
+  }
+  if (resourceMapRow.classicScriptPreinit === true) {
+    return 'append-classic-script-preinit-fake-head';
+  }
+  if (
+    resourceMapRow.recordKind === 'preload' &&
+    resourceMapRow.resourceKind === 'style'
+  ) {
+    return 'append-stylesheet-preload-link-fake-head';
+  }
+  if (
+    resourceMapRow.recordKind === 'preload' &&
+    resourceMapRow.resourceKind === 'script'
+  ) {
+    return 'append-classic-script-preload-link-fake-head';
+  }
+  return `append-${resourceMapRow.resourceKind}-preload-link-fake-head`;
+}
+
 function createPreloadPreinitFakeHeadElement(resourceMapRow, fakeDocument) {
-  const element = fakeDocument.createElement('link');
+  const elementTag = getPreloadPreinitFakeHeadElementTag(resourceMapRow);
+  const element = fakeDocument.createElement(elementTag);
   assertDeterministicPreloadPreinitFakeHeadElement(element, fakeDocument);
 
   const attributes = createPreloadPreinitFakeHeadAttributes(resourceMapRow);
@@ -10761,9 +10819,10 @@ function createPreloadPreinitFakeHeadElement(resourceMapRow, fakeDocument) {
   }
 
   return freezeRecord({
+    elementTag,
     element,
     relationship:
-      resourceMapRow.recordKind === 'stylesheet' ? 'stylesheet' : 'preload',
+      getPreloadPreinitFakeHeadRelationship(resourceMapRow),
     attributeNames: freezeArray(
       attributes.map((attribute) => attribute.name)
     ),
@@ -10777,6 +10836,23 @@ function createPreloadPreinitFakeHeadElement(resourceMapRow, fakeDocument) {
       )
     )
   });
+}
+
+function getPreloadPreinitFakeHeadElementTag(resourceMapRow) {
+  return resourceMapRow.recordKind === 'script' ? 'script' : 'link';
+}
+
+function getPreloadPreinitFakeHeadRelationship(resourceMapRow) {
+  if (resourceMapRow.recordKind === 'stylesheet') {
+    return 'stylesheet';
+  }
+  if (resourceMapRow.modulePreload === true) {
+    return 'modulepreload';
+  }
+  if (resourceMapRow.recordKind === 'script') {
+    return resourceMapRow.moduleScript === true ? 'module-script' : 'script';
+  }
+  return 'preload';
 }
 
 function assertDeterministicPreloadPreinitFakeHeadElement(
@@ -10797,11 +10873,33 @@ function assertDeterministicPreloadPreinitFakeHeadElement(
 }
 
 function createPreloadPreinitFakeHeadAttributes(resourceMapRow) {
+  if (resourceMapRow.recordKind === 'script') {
+    const attributes = [
+      insertionAttribute(
+        'src',
+        'redacted-dispatcher-string',
+        redactedResourceHintValue('src')
+      ),
+      insertionAttribute('async', 'boolean-attribute', 'true'),
+      insertionAttribute(
+        'data-fast-react-resource-key',
+        'opaque-resource-key',
+        resourceMapRow.opaqueResourceKey
+      )
+    ];
+    if (resourceMapRow.moduleScript === true) {
+      attributes.push(
+        insertionAttribute('type', 'script-kind', 'module')
+      );
+    }
+    return freezeArray(attributes);
+  }
+
   const attributes = [
     insertionAttribute(
       'rel',
       'relationship',
-      resourceMapRow.recordKind === 'stylesheet' ? 'stylesheet' : 'preload'
+      getPreloadPreinitFakeHeadRelationship(resourceMapRow)
     ),
     insertionAttribute(
       'href',
@@ -10815,9 +10913,7 @@ function createPreloadPreinitFakeHeadAttributes(resourceMapRow) {
     )
   ];
 
-  if (resourceMapRow.recordKind === 'preload') {
-    attributes.push(insertionAttribute('as', 'resource-kind', 'style'));
-  } else {
+  if (resourceMapRow.recordKind === 'stylesheet') {
     attributes.push(
       insertionAttribute(
         'data-precedence',
@@ -10831,6 +10927,10 @@ function createPreloadPreinitFakeHeadAttributes(resourceMapRow) {
         'opaque-precedence-key',
         resourceMapRow.precedenceKey
       )
+    );
+  } else if (resourceMapRow.modulePreload !== true) {
+    attributes.push(
+      insertionAttribute('as', 'resource-kind', resourceMapRow.resourceKind)
     );
   }
 

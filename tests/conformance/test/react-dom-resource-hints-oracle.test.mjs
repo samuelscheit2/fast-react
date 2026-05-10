@@ -1942,7 +1942,7 @@ test("private resource-map commit diagnostics execute fake-resource ordering onl
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
-test("private preload/preinit fake-head execution consumes resource-map metadata without public dispatch", () => {
+test("private preload/preinit fake-head execution consumes deduped resource order without public dispatch", () => {
   const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: "resource-conformance-fake-head-source"
   });
@@ -1986,6 +1986,61 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
         integrity: "sha256-style",
         fetchPriority: "high"
       }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/script.js",
+      "script",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script-preload",
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("X", [
+      "/script.js",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script",
+        fetchPriority: "high",
+        nonce: "nonce-script"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("m", [
+      "/module.mjs",
+      {
+        as: undefined,
+        crossOrigin: "",
+        integrity: "sha256-module-preload"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("M", [
+      "/module.mjs",
+      {
+        crossOrigin: "",
+        integrity: "sha256-module",
+        nonce: "nonce-module"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/font.woff2",
+      "font",
+      {
+        crossOrigin: "",
+        integrity: undefined,
+        nonce: undefined,
+        type: "font/woff2",
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
     ])
   ];
   const headRecord = dispatcherGate.recordSingletonRequest("head", [
@@ -2025,6 +2080,31 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
           resourceKind: "style",
           resourceKey: "style-main",
           precedenceKey: "precedence-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "script-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "script-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[4].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "module-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "module-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[6].adapterAdmissionId,
+          resourceKind: "font",
+          resourceKey: "font-main"
         }
       ]
     }
@@ -2045,7 +2125,7 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
       explicitResourceMapCommitDiagnostic: true,
       fakeHeadExecution: {
         explicitFakeHeadExecution: true,
-        executionId: "style-preload-preinit-fake-head",
+        executionId: "dedupe-load-order-fake-head",
         fakeDocument: fakeDom.document,
         fakeHead: fakeDom.head
       }
@@ -2057,30 +2137,169 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
     resourceFormGate.privateResourceHintPreloadPreinitFakeHeadExecutionStatus
   );
   assert.deepEqual(
+    {
+      rowCount: diagnostic.preloadPreinitFakeHeadExecution.rowCount,
+      preloadRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution.preloadRowCount,
+      preinitRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution.preinitRowCount,
+      stylesheetPreloadRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution
+          .stylesheetPreloadRowCount,
+      stylesheetPreinitRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution
+          .stylesheetPreinitRowCount,
+      classicScriptPreloadRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution
+          .classicScriptPreloadRowCount,
+      classicScriptPreinitRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution
+          .classicScriptPreinitRowCount,
+      modulePreloadRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution.modulePreloadRowCount,
+      moduleScriptPreinitRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution
+          .moduleScriptPreinitRowCount,
+      otherPreloadRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution.otherPreloadRowCount,
+      beforeRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution.fakeHeadBeforeOrder
+          .rowCount,
+      afterRowCount:
+        diagnostic.preloadPreinitFakeHeadExecution.fakeHeadAfterOrder
+          .rowCount
+    },
+    {
+      rowCount: 7,
+      preloadRowCount: 4,
+      preinitRowCount: 3,
+      stylesheetPreloadRowCount: 1,
+      stylesheetPreinitRowCount: 1,
+      classicScriptPreloadRowCount: 1,
+      classicScriptPreinitRowCount: 1,
+      modulePreloadRowCount: 1,
+      moduleScriptPreinitRowCount: 1,
+      otherPreloadRowCount: 1,
+      beforeRowCount: 2,
+      afterRowCount: 9
+    }
+  );
+  assert.deepEqual(
     diagnostic.preloadPreinitFakeHeadExecution.rows.map((row) => ({
       contractId: row.contractId,
       recordKind: row.recordKind,
+      resourceKind: row.resourceKind,
+      elementTag: row.elementTag,
+      relationshipApplied: row.relationshipApplied,
+      fakeDomCommitOperation: row.fakeDomCommitOperation,
       insertionMethod: row.insertionMethod,
       fakeDomCommitApplied: row.fakeDomCommitApplied,
       publicResourceHintDomInsertion: row.publicResourceHintDomInsertion,
-      publicResourceMapCommitBehavior: row.publicResourceMapCommitBehavior
+      publicResourceMapCommitBehavior: row.publicResourceMapCommitBehavior,
+      publicScriptModuleResourceDispatch:
+        row.publicScriptModuleResourceDispatch,
+      scriptExecutionStarted: row.scriptExecutionStarted
     })),
     [
       {
         contractId: "preload",
         recordKind: "preload",
+        resourceKind: "style",
+        elementTag: "link",
+        relationshipApplied: "preload",
+        fakeDomCommitOperation: "append-stylesheet-preload-link-fake-head",
         insertionMethod: "appendChild",
         fakeDomCommitApplied: true,
         publicResourceHintDomInsertion: false,
-        publicResourceMapCommitBehavior: false
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
       },
       {
         contractId: "preinit-style",
         recordKind: "stylesheet",
+        resourceKind: "style",
+        elementTag: "link",
+        relationshipApplied: "stylesheet",
+        fakeDomCommitOperation:
+          "insert-stylesheet-preinit-with-precedence-fake-head",
         insertionMethod: "insertBefore",
         fakeDomCommitApplied: true,
         publicResourceHintDomInsertion: false,
-        publicResourceMapCommitBehavior: false
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preload",
+        recordKind: "preload",
+        resourceKind: "script",
+        elementTag: "link",
+        relationshipApplied: "preload",
+        fakeDomCommitOperation:
+          "append-classic-script-preload-link-fake-head",
+        insertionMethod: "appendChild",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-script",
+        recordKind: "script",
+        resourceKind: "script",
+        elementTag: "script",
+        relationshipApplied: "script",
+        fakeDomCommitOperation: "append-classic-script-preinit-fake-head",
+        insertionMethod: "appendChild",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preload-module",
+        recordKind: "preload",
+        resourceKind: "script",
+        elementTag: "link",
+        relationshipApplied: "modulepreload",
+        fakeDomCommitOperation: "append-modulepreload-link-fake-head",
+        insertionMethod: "appendChild",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-module-script",
+        recordKind: "script",
+        resourceKind: "script",
+        elementTag: "script",
+        relationshipApplied: "module-script",
+        fakeDomCommitOperation: "append-module-script-preinit-fake-head",
+        insertionMethod: "appendChild",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preload",
+        recordKind: "preload",
+        resourceKind: "font",
+        elementTag: "link",
+        relationshipApplied: "preload",
+        fakeDomCommitOperation: "append-font-preload-link-fake-head",
+        insertionMethod: "appendChild",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
       }
     ]
   );
@@ -2089,6 +2308,7 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
       nodeName: node.nodeName,
       rel: node.attributes.rel || null,
       as: node.attributes.as || null,
+      type: node.attributes.type || null,
       resourceKey: node.attributes["data-fast-react-resource-key"] || null,
       precedenceKey:
         node.attributes["data-fast-react-precedence-key"] || null
@@ -2098,6 +2318,7 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
         nodeName: "LINK",
         rel: "stylesheet",
         as: null,
+        type: null,
         resourceKey: "existing-style",
         precedenceKey: "precedence-main"
       },
@@ -2105,6 +2326,7 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
         nodeName: "LINK",
         rel: "stylesheet",
         as: null,
+        type: null,
         resourceKey: "style-main",
         precedenceKey: "precedence-main"
       },
@@ -2112,6 +2334,7 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
         nodeName: "META",
         rel: null,
         as: null,
+        type: null,
         resourceKey: null,
         precedenceKey: null
       },
@@ -2119,7 +2342,48 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
         nodeName: "LINK",
         rel: "preload",
         as: "style",
+        type: null,
         resourceKey: "style-main",
+        precedenceKey: null
+      },
+      {
+        nodeName: "LINK",
+        rel: "preload",
+        as: "script",
+        type: null,
+        resourceKey: "script-main",
+        precedenceKey: null
+      },
+      {
+        nodeName: "SCRIPT",
+        rel: null,
+        as: null,
+        type: null,
+        resourceKey: "script-main",
+        precedenceKey: null
+      },
+      {
+        nodeName: "LINK",
+        rel: "modulepreload",
+        as: null,
+        type: null,
+        resourceKey: "module-main",
+        precedenceKey: null
+      },
+      {
+        nodeName: "SCRIPT",
+        rel: null,
+        as: null,
+        type: "module",
+        resourceKey: "module-main",
+        precedenceKey: null
+      },
+      {
+        nodeName: "LINK",
+        rel: "preload",
+        as: "font",
+        type: null,
+        resourceKey: "font-main",
         precedenceKey: null
       }
     ]
@@ -2128,10 +2392,19 @@ test("private preload/preinit fake-head execution consumes resource-map metadata
   assert.equal(diagnostic.resourceLifecycleBoundary.fakeDomCommitApplied, true);
   assert.equal(diagnostic.sideEffects.fakeHeadMutated, true);
   assert.equal(diagnostic.sideEffects.fakeResourceElementInserted, true);
+  assert.equal(
+    diagnostic.sideEffects.publicScriptModuleResourceDispatch,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(diagnostic.sideEffects.publicResourceHintDomInsertion, false);
   assert.equal(diagnostic.sideEffects.publicResourceMapCommitBehavior, false);
   assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("/script.js"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("/module.mjs"), false);
   assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-script"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("nonce-module"), false);
   assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
