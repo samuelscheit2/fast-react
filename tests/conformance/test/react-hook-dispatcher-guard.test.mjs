@@ -41,6 +41,10 @@ const statefulDefaultHooks = [
   ["useState", 1, [0]]
 ];
 
+const callbackDefaultHooks = [
+  ["useCallback", 2, ["callback", ["dep"]]]
+];
+
 const contextDefaultHooks = [
   ["useContext", 1, [{ $$typeof: Symbol.for("react.context") }]]
 ];
@@ -149,6 +153,7 @@ const invalidHookCallDefaultHooks = selectedDefaultHooks;
 
 const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
   ([hookName]) =>
+    !hasHookName(callbackDefaultHooks, hookName) &&
     !hasHookName(statefulDefaultHooks, hookName) &&
     !hasHookName(contextDefaultHooks, hookName) &&
     !hasHookName(effectDefaultHooks, hookName)
@@ -279,6 +284,38 @@ test("useState and useReducer fail closed without a marked private state-hook di
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateStateHookDispatcher(genericDispatcher),
+    false
+  );
+});
+
+test("useCallback fails closed without a marked private callback-hook dispatcher", () => {
+  const calls = [];
+  const genericDispatcher = {
+    useCallback(callback, deps) {
+      calls.push([callback, deps]);
+      return callback;
+    }
+  };
+  const callback = () => "callback";
+
+  hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
+
+  assertInvalidHookCall(
+    () => React.useCallback(callback, ["dep"]),
+    "useCallback"
+  );
+  assertInvalidHookCall(
+    () => ReactServer.useCallback(callback, ["dep"]),
+    "useCallback"
+  );
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateCallbackHookDispatcher(genericDispatcher),
+    "useCallback"
+  );
+
+  assert.deepEqual(calls, []);
+  assert.equal(
+    hookDispatcher.isPrivateCallbackHookDispatcher(genericDispatcher),
     false
   );
 });
@@ -428,6 +465,100 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
   assert.equal(React.markPrivateStateHookDispatcher, undefined);
 });
 
+test("private callback-hook dispatcher metadata names match accepted memo records", () => {
+  const metadata = hookDispatcher.privateCallbackHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.callback_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.exposesPublicHookImplementation, false);
+  assert.equal(metadata.rendererIntegration, false);
+  assert.equal(metadata.schedulesPublicJsUpdates, false);
+  assert.equal(metadata.executesCallback, false);
+  assert.deepEqual(metadata.hookNames, ["useCallback"]);
+  assert.deepEqual(metadata.renderRequestFields, ["callback", "dependencies"]);
+  assert.deepEqual(metadata.hookRecordFields, [
+    "hook",
+    "callback",
+    "dependencies"
+  ]);
+  assert.deepEqual(metadata.updateRecordFields, [
+    "hook",
+    "previousCallback",
+    "previousDependencies",
+    "requestedCallback",
+    "callback",
+    "dependencies",
+    "dependencyStatus"
+  ]);
+  assert.deepEqual(metadata.memoRecordFields, [
+    "hook",
+    "value",
+    "dependencies"
+  ]);
+  assert.deepEqual(metadata.memoUpdateRecordFields, [
+    "hook",
+    "previousValue",
+    "previousDependencies",
+    "requestedValue",
+    "value",
+    "dependencies",
+    "dependencyStatus"
+  ]);
+  assert.deepEqual(metadata.dependencyStatusNames, ["Changed", "Unchanged"]);
+  assert.deepEqual(metadata.acceptedReconcilerRecords, [
+    "FunctionComponentCallbackHandle",
+    "FunctionComponentUseCallbackRenderRequest",
+    "FunctionComponentCallbackHookRecord",
+    "FunctionComponentCallbackUpdateRecord",
+    "FunctionComponentUseCallbackHookRenderRecord",
+    "FunctionComponentUseCallbackRenderRecord",
+    "FunctionComponentMemoDependencyStatus",
+    "FunctionComponentMemoHookRecord",
+    "FunctionComponentMemoUpdateRecord"
+  ]);
+  assert.equal(
+    hookDispatcher.isPrivateCallbackHookDispatcherMetadata(metadata),
+    true
+  );
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(React.privateCallbackHookDispatcherMetadata, undefined);
+  assert.equal(React.markPrivateCallbackHookDispatcher, undefined);
+});
+
+test("private callback-hook dispatcher marker rejects dependency metadata drift", () => {
+  const dispatcher = {
+    useCallback() {
+      throw new Error("unreachable callback dispatch");
+    }
+  };
+  const driftedMetadata = {
+    ...hookDispatcher.privateCallbackHookDispatcherMetadata,
+    dependencyStatusNames: ["Changed"]
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateCallbackHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateCallbackHookDispatcher(
+        dispatcher,
+        driftedMetadata
+      ),
+    "useCallback"
+  );
+  assert.equal(hookDispatcher.isPrivateCallbackHookDispatcher(dispatcher), false);
+});
+
 test("private state-hook dispatcher marker rejects lane and update metadata drift", () => {
   const dispatcher = {
     useReducer() {
@@ -562,6 +693,55 @@ test("selected public React hooks forward to the installed dispatcher", () => {
       hookName,
       thisMatchesDispatcher: true
     }))
+  );
+});
+
+test("useCallback forwards only to a marked private callback-hook dispatcher", () => {
+  const calls = [];
+  const invokedCallbacks = [];
+  const metadata = hookDispatcher.privateCallbackHookDispatcherMetadata;
+  const dispatcher = hookDispatcher.markPrivateCallbackHookDispatcher(
+    {
+      useCallback(callback, deps, receivedMetadata) {
+        calls.push({
+          args: [callback, deps],
+          hookName: "useCallback",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return callback;
+      }
+    },
+    metadata
+  );
+  const callback = () => {
+    invokedCallbacks.push("called");
+    return "callback-result";
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assert.equal(React.useCallback(callback, ["dep"]), callback);
+  assert.equal(ReactServer.useCallback(callback, ["server-dep"]), callback);
+  assert.deepEqual(invokedCallbacks, []);
+  assert.deepEqual(calls, [
+    {
+      args: [callback, ["dep"]],
+      hookName: "useCallback",
+      metadata,
+      thisMatchesDispatcher: true
+    },
+    {
+      args: [callback, ["server-dep"]],
+      hookName: "useCallback",
+      metadata,
+      thisMatchesDispatcher: true
+    }
+  ]);
+  assert.equal(hookDispatcher.isPrivateCallbackHookDispatcher(dispatcher), true);
+  assert.equal(
+    hookDispatcher.getPrivateCallbackHookDispatcherMetadata(dispatcher),
+    metadata
   );
 });
 
@@ -755,7 +935,7 @@ test("effect hooks forward only to a marked private effect-hook dispatcher", () 
   assert.equal(hookDispatcher.isPrivateEffectHookDispatcher(dispatcher), true);
 });
 
-test("react-server hooks share the dispatcher guard with the default React entrypoint", () => {
+test("react-server hooks share the generic guard while useCallback stays private", () => {
   const calls = [];
   const dispatcher = {
     use(usable) {
@@ -778,11 +958,13 @@ test("react-server hooks share the dispatcher guard with the default React entry
   const create = () => "memo";
 
   assert.equal(ReactServer.use("usable"), "server-use");
-  assert.equal(ReactServer.useCallback(callback, ["dep"]), callback);
+  assertInvalidHookCall(
+    () => ReactServer.useCallback(callback, ["dep"]),
+    "useCallback"
+  );
   assert.equal(ReactServer.useMemo(create, ["dep"]), "memo");
   assert.deepEqual(calls, [
     ["use", "usable"],
-    ["useCallback", callback, ["dep"]],
     ["useMemo", create, ["dep"]]
   ]);
 });

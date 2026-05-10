@@ -56,6 +56,34 @@ impl FunctionComponentOutputHandle {
 
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct FunctionComponentCallbackHandle(u64);
+
+impl FunctionComponentCallbackHandle {
+    pub const NONE: Self = Self(0);
+
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+
+    #[must_use]
+    pub const fn is_some(self) -> bool {
+        self.0 != 0
+    }
+}
+
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct FunctionComponentStateActionHandle(u64);
 
 impl FunctionComponentStateActionHandle {
@@ -743,6 +771,83 @@ impl FunctionComponentMemoUpdateRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCallbackHookRecord {
+    hook: HookSlotId,
+    callback: FunctionComponentCallbackHandle,
+    dependencies: HookEffectDependencies,
+}
+
+impl FunctionComponentCallbackHookRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> FunctionComponentCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCallbackUpdateRecord {
+    hook: HookSlotId,
+    previous_callback: FunctionComponentCallbackHandle,
+    previous_dependencies: HookEffectDependencies,
+    requested_callback: FunctionComponentCallbackHandle,
+    callback: FunctionComponentCallbackHandle,
+    dependencies: HookEffectDependencies,
+    dependency_status: FunctionComponentMemoDependencyStatus,
+}
+
+impl FunctionComponentCallbackUpdateRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn previous_callback(self) -> FunctionComponentCallbackHandle {
+        self.previous_callback
+    }
+
+    #[must_use]
+    pub const fn previous_dependencies(self) -> HookEffectDependencies {
+        self.previous_dependencies
+    }
+
+    #[must_use]
+    pub const fn requested_callback(self) -> FunctionComponentCallbackHandle {
+        self.requested_callback
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> FunctionComponentCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> FunctionComponentMemoDependencyStatus {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn reused_previous_callback(self) -> bool {
+        self.dependency_status.reused_previous_value()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentRefHookRecord {
     hook: HookSlotId,
     ref_object: FunctionComponentRefObjectHandle,
@@ -872,6 +977,35 @@ impl FunctionComponentUseMemoRenderRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseCallbackRenderRequest {
+    callback: FunctionComponentCallbackHandle,
+    dependencies: HookEffectDependencies,
+}
+
+impl FunctionComponentUseCallbackRenderRequest {
+    #[must_use]
+    pub const fn new(
+        callback: FunctionComponentCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Self {
+        Self {
+            callback,
+            dependencies,
+        }
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> FunctionComponentCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentUseRefRenderRequest {
     initial_value: StateHandle,
 }
@@ -964,6 +1098,62 @@ impl FunctionComponentUseMemoHookRenderRecord {
 
     #[must_use]
     pub const fn update_record(self) -> Option<FunctionComponentMemoUpdateRecord> {
+        match self {
+            Self::Update(record) => Some(record),
+            Self::Mount(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentUseCallbackHookRenderRecord {
+    Mount(FunctionComponentCallbackHookRecord),
+    Update(FunctionComponentCallbackUpdateRecord),
+}
+
+impl FunctionComponentUseCallbackHookRenderRecord {
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentHookRenderPhase {
+        match self {
+            Self::Mount(_) => FunctionComponentHookRenderPhase::Mount,
+            Self::Update(_) => FunctionComponentHookRenderPhase::Update,
+        }
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        match self {
+            Self::Mount(record) => record.hook(),
+            Self::Update(record) => record.hook(),
+        }
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> FunctionComponentCallbackHandle {
+        match self {
+            Self::Mount(record) => record.callback(),
+            Self::Update(record) => record.callback(),
+        }
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        match self {
+            Self::Mount(record) => record.dependencies(),
+            Self::Update(record) => record.dependencies(),
+        }
+    }
+
+    #[must_use]
+    pub const fn mount_record(self) -> Option<FunctionComponentCallbackHookRecord> {
+        match self {
+            Self::Mount(record) => Some(record),
+            Self::Update(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn update_record(self) -> Option<FunctionComponentCallbackUpdateRecord> {
         match self {
             Self::Update(record) => Some(record),
             Self::Mount(_) => None,
@@ -2669,6 +2859,31 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub fn mount_callback_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        callback: FunctionComponentCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentCallbackHookRecord, FunctionComponentRenderError> {
+        let record =
+            self.mount_memo_hook(cursor, callback_to_memo_value(callback), dependencies)?;
+        Ok(callback_hook_record_from_memo(record))
+    }
+
+    pub fn update_callback_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        requested_callback: FunctionComponentCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentCallbackUpdateRecord, FunctionComponentRenderError> {
+        let record = self.update_memo_hook(
+            cursor,
+            callback_to_memo_value(requested_callback),
+            dependencies,
+        )?;
+        Ok(callback_update_record_from_memo(record))
+    }
+
     pub fn mount_ref_hook(
         &mut self,
         cursor: &mut FunctionComponentHookRenderCursor,
@@ -3102,6 +3317,17 @@ impl FunctionComponentHookRenderStore {
             value,
             dependencies,
         })
+    }
+
+    pub fn create_current_callback_hook(
+        &mut self,
+        fiber: FiberId,
+        callback: FunctionComponentCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentCallbackHookRecord, FunctionComponentRenderError> {
+        let record =
+            self.create_current_memo_hook(fiber, callback_to_memo_value(callback), dependencies)?;
+        Ok(callback_hook_record_from_memo(record))
     }
 
     pub fn create_current_ref_hook(
@@ -3938,6 +4164,38 @@ fn memo_dependency_status(
         FunctionComponentMemoDependencyStatus::Changed
     } else {
         FunctionComponentMemoDependencyStatus::Unchanged
+    }
+}
+
+fn callback_to_memo_value(callback: FunctionComponentCallbackHandle) -> StateHandle {
+    StateHandle::from_raw(callback.raw())
+}
+
+fn callback_from_memo_value(value: StateHandle) -> FunctionComponentCallbackHandle {
+    FunctionComponentCallbackHandle::from_raw(value.raw())
+}
+
+fn callback_hook_record_from_memo(
+    record: FunctionComponentMemoHookRecord,
+) -> FunctionComponentCallbackHookRecord {
+    FunctionComponentCallbackHookRecord {
+        hook: record.hook(),
+        callback: callback_from_memo_value(record.value()),
+        dependencies: record.dependencies(),
+    }
+}
+
+fn callback_update_record_from_memo(
+    record: FunctionComponentMemoUpdateRecord,
+) -> FunctionComponentCallbackUpdateRecord {
+    FunctionComponentCallbackUpdateRecord {
+        hook: record.hook(),
+        previous_callback: callback_from_memo_value(record.previous_value()),
+        previous_dependencies: record.previous_dependencies(),
+        requested_callback: callback_from_memo_value(record.requested_value()),
+        callback: callback_from_memo_value(record.value()),
+        dependencies: record.dependencies(),
+        dependency_status: record.dependency_status(),
     }
 }
 
@@ -5281,6 +5539,60 @@ impl FunctionComponentUseMemoUseRefRenderRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseCallbackRenderRecord {
+    render: FunctionComponentRenderRecord,
+    hook_result: FunctionComponentHookRenderResult,
+    callback_hook: FunctionComponentUseCallbackHookRenderRecord,
+}
+
+impl FunctionComponentUseCallbackRenderRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn hook_result(self) -> FunctionComponentHookRenderResult {
+        self.hook_result
+    }
+
+    #[must_use]
+    pub const fn callback_hook(self) -> FunctionComponentUseCallbackHookRenderRecord {
+        self.callback_hook
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn hook_state(self) -> FunctionComponentHookRenderState {
+        self.hook_result.state()
+    }
+
+    #[must_use]
+    pub const fn hook_traversal(self) -> HookListTraversalResult {
+        self.hook_result.traversal()
+    }
+}
+
 impl FunctionComponentUseContextRenderRecord {
     #[must_use]
     pub const fn render(self) -> FunctionComponentRenderRecord {
@@ -5483,6 +5795,67 @@ pub(crate) fn render_function_component_with_use_memo_and_ref(
         hook_result,
         memo_hook,
         ref_hook,
+    })
+}
+
+pub(crate) fn render_function_component_with_use_callback(
+    arena: &mut FiberArena,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    callback_request: FunctionComponentUseCallbackRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<FunctionComponentUseCallbackRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
+    request = request.with_hook_state(hook_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    let mut cursor = hook_store.begin_render_cursor(hook_state)?;
+    let callback_hook = match hook_state.phase() {
+        FunctionComponentHookRenderPhase::Mount => {
+            FunctionComponentUseCallbackHookRenderRecord::Mount(hook_store.mount_callback_hook(
+                &mut cursor,
+                callback_request.callback(),
+                callback_request.dependencies(),
+            )?)
+        }
+        FunctionComponentHookRenderPhase::Update => {
+            FunctionComponentUseCallbackHookRenderRecord::Update(hook_store.update_callback_hook(
+                &mut cursor,
+                callback_request.callback(),
+                callback_request.dependencies(),
+            )?)
+        }
+    };
+    let hook_result = hook_store.finish_render_cursor(cursor)?;
+
+    let output = invoker
+        .invoke_function_component(request)
+        .map_err(|error| FunctionComponentRenderError::Invocation {
+            fiber: request.fiber(),
+            component: request.component(),
+            error,
+        })?;
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    Ok(FunctionComponentUseCallbackRenderRecord {
+        render: FunctionComponentRenderRecord {
+            current: arena.get(work_in_progress)?.alternate(),
+            work_in_progress,
+            component: request.component(),
+            props: request.props(),
+            render_lanes: request.render_lanes(),
+            hook_state: request.hook_state(),
+            context_state: request.context_state(),
+            context_read_count: 0,
+            output,
+        },
+        hook_result,
+        callback_hook,
     })
 }
 
@@ -6053,6 +6426,10 @@ mod tests {
 
     fn callback(raw: u64) -> HookEffectCallbackHandle {
         HookEffectCallbackHandle::from_raw(raw)
+    }
+
+    fn component_callback(raw: u64) -> FunctionComponentCallbackHandle {
+        FunctionComponentCallbackHandle::from_raw(raw)
     }
 
     fn deps(raw: u64) -> HookEffectDependencies {
@@ -8241,7 +8618,204 @@ mod tests {
     }
 
     #[test]
-    fn private_use_memo_and_ref_updates_require_matching_hook_metadata() {
+    fn private_use_callback_render_path_mounts_callback_with_memo_payload() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let output = FunctionComponentOutputHandle::from_raw(82);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let callback_request =
+            FunctionComponentUseCallbackRenderRequest::new(component_callback(810), deps(8100));
+
+        let record = render_function_component_with_use_callback(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            callback_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let hook_state = record.hook_state();
+        let callback_hook = record.callback_hook();
+        let callback_mount = callback_hook.mount_record().unwrap();
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.output(), output);
+        assert_eq!(record.render().hook_state(), Some(hook_state));
+        assert_eq!(hook_state.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert_eq!(record.hook_traversal().traversed_count(), 1);
+        assert_eq!(
+            callback_hook.phase(),
+            FunctionComponentHookRenderPhase::Mount
+        );
+        assert_eq!(callback_hook.callback(), component_callback(810));
+        assert_eq!(callback_hook.dependencies(), deps(8100));
+        assert_eq!(callback_hook.hook(), callback_mount.hook());
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].hook_state(), Some(hook_state));
+
+        let hooks = hook_store
+            .hook_lists()
+            .ordered_hooks(hook_state.work_in_progress_list())
+            .unwrap();
+        assert_eq!(hooks, vec![callback_mount.hook()]);
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(callback_mount.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(810)
+        );
+    }
+
+    #[test]
+    fn private_use_callback_render_path_reuses_callback_when_deps_match() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_callback = hook_store
+            .create_current_callback_hook(current, component_callback(830), deps(8300))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(83)));
+        let callback_request =
+            FunctionComponentUseCallbackRenderRequest::new(component_callback(831), deps(8300));
+
+        let record = render_function_component_with_use_callback(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            callback_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let callback_update = record.callback_hook().update_record().unwrap();
+        assert_eq!(
+            record.hook_state().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(record.hook_traversal().traversed_count(), 1);
+        assert_ne!(callback_update.hook(), current_callback.hook());
+        assert_eq!(callback_update.previous_callback(), component_callback(830));
+        assert_eq!(callback_update.previous_dependencies(), deps(8300));
+        assert_eq!(
+            callback_update.requested_callback(),
+            component_callback(831)
+        );
+        assert_eq!(callback_update.callback(), component_callback(830));
+        assert_eq!(callback_update.dependencies(), deps(8300));
+        assert_eq!(
+            callback_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(callback_update.reused_previous_callback());
+        assert_eq!(record.callback_hook().callback(), component_callback(830));
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(callback_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(830)
+        );
+    }
+
+    #[test]
+    fn private_use_callback_render_path_records_changed_dependencies() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        hook_store
+            .create_current_callback_hook(current, component_callback(850), deps(8500))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(84)));
+        let callback_request =
+            FunctionComponentUseCallbackRenderRequest::new(component_callback(851), deps(8510));
+
+        let record = render_function_component_with_use_callback(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            callback_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let callback_update = record.callback_hook().update_record().unwrap();
+        assert_eq!(callback_update.previous_callback(), component_callback(850));
+        assert_eq!(callback_update.previous_dependencies(), deps(8500));
+        assert_eq!(
+            callback_update.requested_callback(),
+            component_callback(851)
+        );
+        assert_eq!(callback_update.callback(), component_callback(851));
+        assert_eq!(callback_update.dependencies(), deps(8510));
+        assert_eq!(
+            callback_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert!(!callback_update.reused_previous_callback());
+        assert_eq!(record.callback_hook().callback(), component_callback(851));
+        assert_eq!(
+            opaque_value(
+                hook_store
+                    .hook_lists()
+                    .hook(callback_update.hook())
+                    .unwrap()
+                    .payload()
+            ),
+            StateHandle::from_raw(851)
+        );
+    }
+
+    #[test]
+    fn private_use_callback_update_treats_missing_dependencies_as_always_changed() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        hook_store
+            .create_current_callback_hook(current, component_callback(870), deps(8700))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(85)));
+        let callback_request = FunctionComponentUseCallbackRenderRequest::new(
+            component_callback(871),
+            HookEffectDependencies::AlwaysRun,
+        );
+
+        let record = render_function_component_with_use_callback(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            callback_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let callback_update = record.callback_hook().update_record().unwrap();
+        assert_eq!(
+            callback_update.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert_eq!(callback_update.callback(), component_callback(871));
+        assert_eq!(
+            callback_update.dependencies(),
+            HookEffectDependencies::AlwaysRun
+        );
+        assert!(callback_update.dependencies().is_always_run());
+    }
+
+    #[test]
+    fn private_use_memo_callback_and_ref_updates_require_matching_hook_metadata() {
         let (mut arena, current, work_in_progress, component) = function_component_pair();
         let mut hook_store = FunctionComponentHookRenderStore::new();
         let current_list = hook_store.create_current_list(current);
@@ -8266,6 +8840,13 @@ mod tests {
 
         assert_eq!(
             hook_store.update_memo_hook(&mut cursor, StateHandle::from_raw(791), deps(7910)),
+            Err(FunctionComponentRenderError::MissingMemoHookRecord {
+                fiber: work_in_progress,
+                hook: opaque_hook,
+            })
+        );
+        assert_eq!(
+            hook_store.update_callback_hook(&mut cursor, component_callback(793), deps(7930)),
             Err(FunctionComponentRenderError::MissingMemoHookRecord {
                 fiber: work_in_progress,
                 hook: opaque_hook,
@@ -9688,6 +10269,7 @@ mod tests {
     fn function_component_render_propagates_unsupported_hooks_context_and_thrown_values() {
         let unsupported = [
             FunctionComponentInvocationError::unsupported_hook("useState"),
+            FunctionComponentInvocationError::unsupported_hook("useCallback"),
             FunctionComponentInvocationError::unsupported_hook("useMemo"),
             FunctionComponentInvocationError::unsupported_hook("useRef"),
             FunctionComponentInvocationError::unsupported_context(),

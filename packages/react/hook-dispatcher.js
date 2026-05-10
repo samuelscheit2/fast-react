@@ -19,6 +19,8 @@ const ReactSharedInternals = {
 const privateEffectHookDispatchers = new WeakSet();
 const privateStateHookDispatchers = new WeakSet();
 const privateStateHookDispatcherMetadataByDispatcher = new WeakMap();
+const privateCallbackHookDispatchers = new WeakSet();
+const privateCallbackHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateContextHookDispatchers = new WeakSet();
 
 const effectRegistrationFieldNames = Object.freeze([
@@ -237,6 +239,61 @@ const privateStateHookDispatcherMetadataArrayKeys = freezeArray([
   'acceptedReconcilerRecords'
 ]);
 
+const privateCallbackHookDispatcherMetadata = freezeRecord({
+  capability: 'fast-react.private.callback_hook_dispatcher',
+  compatibilityTarget: 'react@19.2.6',
+  compatibilityClaimed: false,
+  exposesPublicHookImplementation: false,
+  rendererIntegration: false,
+  schedulesPublicJsUpdates: false,
+  executesCallback: false,
+  hookNames: freezeArray(['useCallback']),
+  renderRequestFields: freezeArray(['callback', 'dependencies']),
+  hookRecordFields: freezeArray(['hook', 'callback', 'dependencies']),
+  updateRecordFields: freezeArray([
+    'hook',
+    'previousCallback',
+    'previousDependencies',
+    'requestedCallback',
+    'callback',
+    'dependencies',
+    'dependencyStatus'
+  ]),
+  memoRecordFields: freezeArray(['hook', 'value', 'dependencies']),
+  memoUpdateRecordFields: freezeArray([
+    'hook',
+    'previousValue',
+    'previousDependencies',
+    'requestedValue',
+    'value',
+    'dependencies',
+    'dependencyStatus'
+  ]),
+  dependencyStatusNames: freezeArray(['Changed', 'Unchanged']),
+  acceptedReconcilerRecords: freezeArray([
+    'FunctionComponentCallbackHandle',
+    'FunctionComponentUseCallbackRenderRequest',
+    'FunctionComponentCallbackHookRecord',
+    'FunctionComponentCallbackUpdateRecord',
+    'FunctionComponentUseCallbackHookRenderRecord',
+    'FunctionComponentUseCallbackRenderRecord',
+    'FunctionComponentMemoDependencyStatus',
+    'FunctionComponentMemoHookRecord',
+    'FunctionComponentMemoUpdateRecord'
+  ])
+});
+
+const privateCallbackHookDispatcherMetadataArrayKeys = freezeArray([
+  'hookNames',
+  'renderRequestFields',
+  'hookRecordFields',
+  'updateRecordFields',
+  'memoRecordFields',
+  'memoUpdateRecordFields',
+  'dependencyStatusNames',
+  'acceptedReconcilerRecords'
+]);
+
 const ReactCurrentDispatcher = {};
 
 Object.defineProperty(ReactCurrentDispatcher, 'current', {
@@ -333,6 +390,14 @@ function isPrivateStateHookDispatcher(dispatcher) {
   );
 }
 
+function isPrivateCallbackHookDispatcher(dispatcher) {
+  return (
+    isObjectLike(dispatcher) &&
+    privateCallbackHookDispatchers.has(dispatcher) &&
+    privateCallbackHookDispatcherMetadataByDispatcher.has(dispatcher)
+  );
+}
+
 function isPrivateContextHookDispatcher(dispatcher) {
   return isObjectLike(dispatcher) && privateContextHookDispatchers.has(dispatcher);
 }
@@ -353,6 +418,14 @@ function validatePrivateStateHookDispatcher(dispatcher, metadata) {
   }
 
   validatePrivateStateHookDispatcherMetadata(metadata);
+}
+
+function validatePrivateCallbackHookDispatcher(dispatcher, metadata) {
+  if (!isObjectLike(dispatcher) || typeof dispatcher.useCallback !== 'function') {
+    throw createInvalidHookCallError('useCallback');
+  }
+
+  validatePrivateCallbackHookDispatcherMetadata(metadata);
 }
 
 function validatePrivateContextHookDispatcher(dispatcher) {
@@ -379,6 +452,16 @@ function markPrivateStateHookDispatcher(dispatcher, metadata) {
   privateStateHookDispatcherMetadataByDispatcher.set(
     dispatcher,
     privateStateHookDispatcherMetadata
+  );
+  return dispatcher;
+}
+
+function markPrivateCallbackHookDispatcher(dispatcher, metadata) {
+  validatePrivateCallbackHookDispatcher(dispatcher, metadata);
+  privateCallbackHookDispatchers.add(dispatcher);
+  privateCallbackHookDispatcherMetadataByDispatcher.set(
+    dispatcher,
+    privateCallbackHookDispatcherMetadata
   );
   return dispatcher;
 }
@@ -446,6 +529,20 @@ function getPrivateStateDispatcherHook(dispatcher, hookName) {
   return hook;
 }
 
+function getPrivateCallbackDispatcherHook(dispatcher, hookName) {
+  if (hookName !== 'useCallback' || !isPrivateCallbackHookDispatcher(dispatcher)) {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  const hook = dispatcher[hookName];
+
+  if (typeof hook !== 'function') {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  return hook;
+}
+
 function getPrivateContextDispatcherHook(dispatcher, hookName) {
   if (!isPrivateContextHookDispatcher(dispatcher)) {
     throw createInvalidHookCallError(hookName);
@@ -461,6 +558,10 @@ function getPrivateContextDispatcherHook(dispatcher, hookName) {
 }
 
 function callDispatcherHook(hookName, args) {
+  if (hookName === 'useCallback') {
+    return callPrivateCallbackDispatcherHook(hookName, args);
+  }
+
   if (hookName === 'useReducer' || hookName === 'useState') {
     return callPrivateStateDispatcherHook(hookName, args);
   }
@@ -484,6 +585,15 @@ function callPrivateContextDispatcherHook(hookName, args) {
   return hook.apply(dispatcher, args);
 }
 
+function callPrivateCallbackDispatcherHook(hookName, args) {
+  const dispatcher = resolveDispatcher(hookName);
+  const hook = getPrivateCallbackDispatcherHook(dispatcher, hookName);
+  return hook.apply(
+    dispatcher,
+    createPrivateCallbackHookArgs(args, privateCallbackHookDispatcherMetadata)
+  );
+}
+
 function callPrivateEffectDispatcherHook(hookName, args) {
   const dispatcher = resolveDispatcher(hookName);
   const hook = getPrivateEffectDispatcherHook(dispatcher, hookName);
@@ -501,6 +611,20 @@ function createPrivateEffectHookArgs(args, metadata) {
   const privateArgs = Array.prototype.slice.call(args);
   privateArgs.push(metadata);
   return privateArgs;
+}
+
+function createPrivateCallbackHookArgs(args, metadata) {
+  const privateArgs = Array.prototype.slice.call(args);
+  privateArgs.push(metadata);
+  return privateArgs;
+}
+
+function getPrivateCallbackHookDispatcherMetadata(dispatcher) {
+  if (!isPrivateCallbackHookDispatcher(dispatcher)) {
+    return null;
+  }
+
+  return privateCallbackHookDispatcherMetadataByDispatcher.get(dispatcher);
 }
 
 function getPrivateStateHookDispatcherMetadata(dispatcher) {
@@ -539,9 +663,44 @@ function isPrivateStateHookDispatcherMetadata(metadata) {
   return true;
 }
 
+function isPrivateCallbackHookDispatcherMetadata(metadata) {
+  if (
+    !isObjectLike(metadata) ||
+    metadata.capability !== privateCallbackHookDispatcherMetadata.capability ||
+    metadata.compatibilityTarget !==
+      privateCallbackHookDispatcherMetadata.compatibilityTarget ||
+    metadata.compatibilityClaimed !== false ||
+    metadata.exposesPublicHookImplementation !== false ||
+    metadata.rendererIntegration !== false ||
+    metadata.schedulesPublicJsUpdates !== false ||
+    metadata.executesCallback !== false
+  ) {
+    return false;
+  }
+
+  for (const key of privateCallbackHookDispatcherMetadataArrayKeys) {
+    if (
+      !hasSameStringArray(
+        metadata[key],
+        privateCallbackHookDispatcherMetadata[key]
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function validatePrivateStateHookDispatcherMetadata(metadata) {
   if (!isPrivateStateHookDispatcherMetadata(metadata)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
+  }
+}
+
+function validatePrivateCallbackHookDispatcherMetadata(metadata) {
+  if (!isPrivateCallbackHookDispatcherMetadata(metadata)) {
+    throw createInvalidHookCallError('useCallback');
   }
 }
 
@@ -587,7 +746,7 @@ const use = defineHookFunctionShape(function (usable) {
 }, 1);
 
 const useCallback = defineHookFunctionShape(function (callback, deps) {
-  return callDispatcherHook('useCallback', arguments);
+  return callPrivateCallbackDispatcherHook('useCallback', arguments);
 }, 2);
 
 const useContext = defineHookFunctionShape(function (Context) {
@@ -630,6 +789,7 @@ module.exports = {
   ReactCurrentDispatcher,
   ReactSharedInternals,
   callDispatcherHook,
+  callPrivateCallbackDispatcherHook,
   callPrivateContextDispatcherHook,
   callPrivateEffectDispatcherHook,
   callPrivateStateDispatcherHook,
@@ -638,16 +798,21 @@ module.exports = {
   effectHookMetadataByHookName,
   effectHookNames,
   getEffectHookMetadata,
+  getPrivateCallbackHookDispatcherMetadata,
   getPrivateStateHookDispatcherMetadata,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
+  isPrivateCallbackHookDispatcher,
+  isPrivateCallbackHookDispatcherMetadata,
   isPrivateContextHookDispatcher,
   isPrivateEffectHookDispatcher,
   isPrivateStateHookDispatcher,
   isPrivateStateHookDispatcherMetadata,
+  markPrivateCallbackHookDispatcher,
   markPrivateContextHookDispatcher,
   markPrivateEffectHookDispatcher,
   markPrivateStateHookDispatcher,
+  privateCallbackHookDispatcherMetadata,
   privateStateHookDispatcherMetadata,
   resolveDispatcher,
   use,
