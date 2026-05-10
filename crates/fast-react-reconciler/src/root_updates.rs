@@ -407,6 +407,9 @@ pub enum RootUpdateError {
     FiberTopology(FiberTopologyError),
     UpdateQueue(UpdateQueueError),
     ConcurrentUpdate(ConcurrentUpdateError),
+    UnsupportedTransitionLane {
+        lane: Lane,
+    },
     UnknownPriorityLane {
         lane: Lane,
         source_priority: RootUpdateLaneSourcePriority,
@@ -452,6 +455,11 @@ impl Display for RootUpdateError {
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::UpdateQueue(error) => Display::fmt(error, formatter),
             Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
+            Self::UnsupportedTransitionLane { lane } => write!(
+                formatter,
+                "lane {} cannot be used for private transition update diagnostics",
+                lane.bits()
+            ),
             Self::UnknownPriorityLane {
                 lane,
                 source_priority,
@@ -536,7 +544,8 @@ impl Error for RootUpdateError {
             Self::FiberTopology(error) => Some(error),
             Self::UpdateQueue(error) => Some(error),
             Self::ConcurrentUpdate(error) => Some(error),
-            Self::UnknownPriorityLane { .. }
+            Self::UnsupportedTransitionLane { .. }
+            | Self::UnknownPriorityLane { .. }
             | Self::EmptyRoot { .. }
             | Self::StaleQueueEvidence { .. }
             | Self::StaleQueueSnapshot { .. }
@@ -603,6 +612,28 @@ pub fn update_container_sync<H: HostTypes>(
         RootUpdateLaneSourcePriority::ExplicitSync,
     )?;
     update_container_impl(store, root_id, current, lane_choice, element, callback)
+}
+
+pub(crate) fn update_container_transition_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    lane: Lane,
+    element: RootElementHandle,
+    callback: Option<RootUpdateCallbackHandle>,
+) -> Result<UpdateContainerResult, RootUpdateError> {
+    if !lane.is_transition() {
+        return Err(RootUpdateError::UnsupportedTransitionLane { lane });
+    }
+
+    let current = store.root(root_id)?.current();
+    update_container_impl(
+        store,
+        root_id,
+        current,
+        RootUpdateLaneChoiceRecord::transition_for_lane_for_canary(lane),
+        element,
+        callback,
+    )
 }
 
 fn update_container_impl<H: HostTypes>(
@@ -1201,13 +1232,11 @@ mod tests {
     #[test]
     fn root_updates_entangle_transition_update_but_do_not_schedule_work() {
         let (mut store, root_id, _host) = root_store();
-        let current = store.root(root_id).unwrap().current();
 
-        let result = update_container_impl(
+        let result = update_container_transition_for_canary(
             &mut store,
             root_id,
-            current,
-            RootUpdateLaneChoiceRecord::transition_for_lane_for_canary(Lane::TRANSITION_1),
+            Lane::TRANSITION_1,
             RootElementHandle::from_raw(1),
             None,
         )
@@ -1233,6 +1262,28 @@ mod tests {
                 .callback_node()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn root_updates_transition_lane_canary_rejects_non_transition_lanes() {
+        let (mut store, root_id, _host) = root_store();
+
+        for lane in [Lane::SYNC, Lane::DEFAULT, Lane::OFFSCREEN] {
+            let error = update_container_transition_for_canary(
+                &mut store,
+                root_id,
+                lane,
+                RootElementHandle::from_raw(1),
+                None,
+            )
+            .unwrap_err();
+
+            assert_eq!(error, RootUpdateError::UnsupportedTransitionLane { lane });
+            assert_eq!(
+                store.root(root_id).unwrap().lanes().pending_lanes(),
+                Lanes::NO
+            );
+        }
     }
 
     #[test]

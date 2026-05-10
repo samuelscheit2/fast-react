@@ -10,13 +10,14 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    EventPriority, FiberId, Lane, Lanes, RootLaneState, lanes_to_event_priority,
+    EventPriority, FiberId, Lane, Lanes, RootLaneState, UpdateQueueHandle, lanes_to_event_priority,
 };
 use fast_react_host_config::HostTypes;
 
 use crate::concurrent_updates::{mark_update_lane_from_fiber_to_root, root_for_updated_fiber};
 use crate::root_commit::{HostRootCommitRecord, PendingPassiveCommitHandoff};
 use crate::root_config::{RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord};
+use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
 use crate::scheduler_bridge::{
     SchedulerActContinuationRecord, SchedulerActContinuationStatus,
     SchedulerPassiveEffectsFlushRequest,
@@ -25,11 +26,13 @@ use crate::{
     ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootErrorCallbackHandle,
     RootRecoverableErrorCallbackHandle, RootRenderExitStatus, RootScheduleUpdateRecord,
-    RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
+    RootSchedulerCallbackHandle, RootTransitionEntanglementRecord, RootUpdateError,
+    RootUpdateLaneSourcePriority, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
     SchedulerCallbackRequest, SchedulerCallbackValidationRecord, SchedulerCancellationRecord,
     SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
-    SyncFlushExecutionContextRecord, commit_finished_host_root, render_host_root_for_lanes,
-    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
+    SyncFlushExecutionContextRecord, UpdateContainerResult, UpdateId, commit_finished_host_root,
+    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
+    validate_scheduled_host_root_callback,
 };
 
 pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
@@ -229,6 +232,10 @@ impl RootSchedulerState {
     pub(crate) fn set_is_flushing_work(&mut self, value: bool) {
         self.is_flushing_work = value;
     }
+
+    fn set_current_event_transition_lane(&mut self, lane: Lane) {
+        self.current_event_transition_lane = lane;
+    }
 }
 
 impl Default for RootSchedulerState {
@@ -299,6 +306,116 @@ impl ScheduledRootUpdateResult {
     #[must_use]
     pub const fn might_have_pending_sync_work(self) -> bool {
         self.might_have_pending_sync_work
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootTransitionLaneSchedulerRequestRecord {
+    root: FiberRootId,
+    fiber: FiberId,
+    update: UpdateId,
+    queue: UpdateQueueHandle,
+    lane: Lane,
+    event_priority: EventPriority,
+    pending_lanes_before_enqueue: Lanes,
+    pending_lanes_after_enqueue: Lanes,
+    selected_next_lanes: Lanes,
+    entangled_lanes: Lanes,
+    current_event_transition_lane_before: Lane,
+    current_event_transition_lane_after: Lane,
+    scheduled_root: ScheduledRootUpdateResult,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private transition lane scheduler diagnostics are reserved for root scheduler canaries"
+)]
+impl RootTransitionLaneSchedulerRequestRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.update
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn lane(self) -> Lane {
+        self.lane
+    }
+
+    #[must_use]
+    pub(crate) const fn event_priority(self) -> EventPriority {
+        self.event_priority
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before_enqueue(self) -> Lanes {
+        self.pending_lanes_before_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after_enqueue(self) -> Lanes {
+        self.pending_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_next_lanes(self) -> Lanes {
+        self.selected_next_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn entangled_lanes(self) -> Lanes {
+        self.entangled_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn current_event_transition_lane_before(self) -> Lane {
+        self.current_event_transition_lane_before
+    }
+
+    #[must_use]
+    pub(crate) const fn current_event_transition_lane_after(self) -> Lane {
+        self.current_event_transition_lane_after
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled_root(self) -> ScheduledRootUpdateResult {
+        self.scheduled_root
+    }
+
+    #[must_use]
+    pub(crate) const fn routed_to_private_root_scheduler(self) -> bool {
+        self.scheduled_root.root().raw() == self.root.raw()
+            && self.current_event_transition_lane_after.bits() == self.lane.bits()
+            && self.scheduled_root.might_have_pending_sync_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_execution_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_update_scheduling_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_compatibility_claimed(self) -> bool {
+        false
     }
 }
 
@@ -1435,6 +1552,7 @@ impl RootSyncFlushResult {
 pub enum RootSchedulerError {
     FiberRootStore(FiberRootStoreError),
     ConcurrentUpdate(ConcurrentUpdateError),
+    RootUpdate(RootUpdateError),
     RootWorkLoop(RootWorkLoopError),
     ScheduleRecordWrongFiber {
         root: FiberRootId,
@@ -1452,6 +1570,32 @@ pub enum RootSchedulerError {
         lane: Lane,
         pending_lanes: Lanes,
     },
+    TransitionSchedulerUnsupportedLane {
+        root: FiberRootId,
+        lane: Lane,
+        source_priority: RootUpdateLaneSourcePriority,
+        selected_lanes: Lanes,
+    },
+    TransitionSchedulerUnsupportedLaneSet {
+        root: FiberRootId,
+        lane: Lane,
+        selected_lanes: Lanes,
+    },
+    TransitionSchedulerMissingEntanglement {
+        root: FiberRootId,
+        lane: Lane,
+    },
+    TransitionSchedulerEntanglementMismatch {
+        root: FiberRootId,
+        lane: Lane,
+        queue: UpdateQueueHandle,
+        entanglement: RootTransitionEntanglementRecord,
+    },
+    TransitionSchedulerIncompatibleEventLane {
+        root: FiberRootId,
+        requested_lane: Lane,
+        current_event_transition_lane: Lane,
+    },
 }
 
 impl Display for RootSchedulerError {
@@ -1459,6 +1603,7 @@ impl Display for RootSchedulerError {
         match self {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
+            Self::RootUpdate(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::ScheduleRecordWrongFiber {
                 root,
@@ -1495,6 +1640,63 @@ impl Display for RootSchedulerError {
                 lane.bits(),
                 pending_lanes.bits()
             ),
+            Self::TransitionSchedulerUnsupportedLane {
+                root,
+                lane,
+                source_priority,
+                selected_lanes,
+            } => write!(
+                formatter,
+                "root {} transition scheduler diagnostics require transition lane metadata; got lane {} from {:?} with selected lanes {}",
+                root.raw(),
+                lane.bits(),
+                source_priority,
+                selected_lanes.bits()
+            ),
+            Self::TransitionSchedulerUnsupportedLaneSet {
+                root,
+                lane,
+                selected_lanes,
+            } => write!(
+                formatter,
+                "root {} transition scheduler diagnostics cannot route lane {} from selected lanes {}",
+                root.raw(),
+                lane.bits(),
+                selected_lanes.bits()
+            ),
+            Self::TransitionSchedulerMissingEntanglement { root, lane } => write!(
+                formatter,
+                "root {} transition scheduler diagnostics require entanglement evidence for lane {}",
+                root.raw(),
+                lane.bits()
+            ),
+            Self::TransitionSchedulerEntanglementMismatch {
+                root,
+                lane,
+                queue,
+                entanglement,
+            } => write!(
+                formatter,
+                "root {} transition scheduler diagnostics have incompatible entanglement for lane {} queue {}; entanglement root {} lane {} queue {} lanes {}",
+                root.raw(),
+                lane.bits(),
+                queue.raw(),
+                entanglement.root().raw(),
+                entanglement.lane().bits(),
+                entanglement.queue().raw(),
+                entanglement.entangled_lanes().bits()
+            ),
+            Self::TransitionSchedulerIncompatibleEventLane {
+                root,
+                requested_lane,
+                current_event_transition_lane,
+            } => write!(
+                formatter,
+                "root {} transition scheduler diagnostics requested lane {} but current event transition lane is {}",
+                root.raw(),
+                requested_lane.bits(),
+                current_event_transition_lane.bits()
+            ),
         }
     }
 }
@@ -1504,10 +1706,16 @@ impl Error for RootSchedulerError {
         match self {
             Self::FiberRootStore(error) => Some(error),
             Self::ConcurrentUpdate(error) => Some(error),
+            Self::RootUpdate(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
             Self::ScheduleRecordWrongFiber { .. }
             | Self::RescheduleRecordWrongRoot { .. }
-            | Self::RescheduleRecordMissingLane { .. } => None,
+            | Self::RescheduleRecordMissingLane { .. }
+            | Self::TransitionSchedulerUnsupportedLane { .. }
+            | Self::TransitionSchedulerUnsupportedLaneSet { .. }
+            | Self::TransitionSchedulerMissingEntanglement { .. }
+            | Self::TransitionSchedulerEntanglementMismatch { .. }
+            | Self::TransitionSchedulerIncompatibleEventLane { .. } => None,
         }
     }
 }
@@ -1521,6 +1729,12 @@ impl From<FiberRootStoreError> for RootSchedulerError {
 impl From<ConcurrentUpdateError> for RootSchedulerError {
     fn from(error: ConcurrentUpdateError) -> Self {
         Self::ConcurrentUpdate(error)
+    }
+}
+
+impl From<RootUpdateError> for RootSchedulerError {
+    fn from(error: RootUpdateError) -> Self {
+        Self::RootUpdate(error)
     }
 }
 
@@ -1572,6 +1786,76 @@ pub fn ensure_root_is_scheduled<H: HostTypes>(
 ) -> Result<ScheduledRootUpdateResult, RootSchedulerError> {
     validate_schedule_record(store, record)?;
     ensure_root_schedule_entry(store, record.root())
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private transition scheduler route is currently exercised by canary tests"
+)]
+pub(crate) fn record_transition_lane_scheduler_request_from_update_diagnostics_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    result: &UpdateContainerResult,
+) -> Result<RootTransitionLaneSchedulerRequestRecord, RootSchedulerError> {
+    validate_update_container_lane_diagnostics_for_canary(store, result)?;
+    validate_schedule_record(store, result.schedule())?;
+
+    let root = result.schedule().root();
+    let lane = result.lane();
+    let selected_next_lanes = result.selected_next_lanes();
+    if result.source_priority() != RootUpdateLaneSourcePriority::TransitionLane
+        || !lane.is_transition()
+    {
+        return Err(RootSchedulerError::TransitionSchedulerUnsupportedLane {
+            root,
+            lane,
+            source_priority: result.source_priority(),
+            selected_lanes: selected_next_lanes,
+        });
+    }
+
+    validate_transition_lane_scheduler_lanes_for_canary(root, lane, selected_next_lanes)?;
+
+    let entanglement = result
+        .entanglement()
+        .ok_or(RootSchedulerError::TransitionSchedulerMissingEntanglement { root, lane })?;
+    validate_transition_lane_scheduler_entanglement_for_canary(store, result, entanglement)?;
+
+    let current_event_transition_lane_before =
+        store.root_scheduler().current_event_transition_lane();
+    if current_event_transition_lane_before.is_non_empty()
+        && current_event_transition_lane_before != lane
+    {
+        return Err(
+            RootSchedulerError::TransitionSchedulerIncompatibleEventLane {
+                root,
+                requested_lane: lane,
+                current_event_transition_lane: current_event_transition_lane_before,
+            },
+        );
+    }
+
+    let scheduled_root = ensure_root_schedule_entry(store, root)?;
+    store
+        .root_scheduler_mut()
+        .set_current_event_transition_lane(lane);
+
+    Ok(RootTransitionLaneSchedulerRequestRecord {
+        root,
+        fiber: result.schedule().fiber(),
+        update: result.update(),
+        queue: result.queue(),
+        lane,
+        event_priority: result.event_priority(),
+        pending_lanes_before_enqueue: result.pending_lanes_before_enqueue(),
+        pending_lanes_after_enqueue: result.pending_lanes_after_enqueue(),
+        selected_next_lanes,
+        entangled_lanes: entanglement.entangled_lanes(),
+        current_event_transition_lane_before,
+        current_event_transition_lane_after: store.root_scheduler().current_event_transition_lane(),
+        scheduled_root,
+    })
 }
 
 #[allow(
@@ -2514,6 +2798,57 @@ fn validate_reschedule_record<H: HostTypes>(
     Ok(())
 }
 
+fn validate_transition_lane_scheduler_lanes_for_canary(
+    root: FiberRootId,
+    lane: Lane,
+    selected_lanes: Lanes,
+) -> Result<(), RootSchedulerError> {
+    if !lane.is_transition()
+        || selected_lanes.is_empty()
+        || !selected_lanes.contains_lane(lane)
+        || !selected_lanes.includes_only_transitions()
+    {
+        return Err(RootSchedulerError::TransitionSchedulerUnsupportedLaneSet {
+            root,
+            lane,
+            selected_lanes,
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_transition_lane_scheduler_entanglement_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    result: &UpdateContainerResult,
+    entanglement: RootTransitionEntanglementRecord,
+) -> Result<(), RootSchedulerError> {
+    let root = result.schedule().root();
+    let lane = result.lane();
+    let queue = result.queue();
+    let root_entangled_lanes = store.root(root)?.lanes().entangled_lanes();
+    let entangled_lanes = entanglement.entangled_lanes();
+
+    if entanglement.root() != root
+        || entanglement.queue() != queue
+        || entanglement.lane() != lane
+        || !entangled_lanes.contains_lane(lane)
+        || !entangled_lanes.includes_only_transitions()
+        || !root_entangled_lanes.contains_all(entangled_lanes)
+    {
+        return Err(
+            RootSchedulerError::TransitionSchedulerEntanglementMismatch {
+                root,
+                lane,
+                queue,
+                entanglement,
+            },
+        );
+    }
+
+    Ok(())
+}
+
 fn append_scheduled_root<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
@@ -2652,6 +2987,7 @@ mod tests {
     use super::*;
     use crate::RootOptions;
     use crate::root_config::PendingPassiveUnmountOrigin;
+    use crate::root_updates::update_container_transition_for_canary;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         RootElementHandle, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
@@ -2848,6 +3184,230 @@ mod tests {
         assert!(!store.root_scheduler().did_schedule_microtask());
         assert!(store.scheduler_bridge().microtask_requests().is_empty());
         assert_eq!(store.scheduler_bridge().act_queue_requests(), &[act_task]);
+    }
+
+    #[test]
+    fn root_scheduler_records_transition_lane_request_without_callback_execution() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let result = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(5661),
+            None,
+        )
+        .unwrap();
+
+        let record = record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            &mut store, &result,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.fiber(), current);
+        assert_eq!(record.update(), result.update());
+        assert_eq!(record.queue(), result.queue());
+        assert_eq!(record.lane(), Lane::TRANSITION_1);
+        assert_eq!(record.event_priority(), EventPriority::DEFAULT);
+        assert_eq!(record.pending_lanes_before_enqueue(), Lanes::NO);
+        assert_eq!(
+            record.pending_lanes_after_enqueue(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+        assert_eq!(
+            record.selected_next_lanes(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+        assert_eq!(record.entangled_lanes(), Lanes::from(Lane::TRANSITION_1));
+        assert_eq!(record.current_event_transition_lane_before(), Lane::NO);
+        assert_eq!(
+            record.current_event_transition_lane_after(),
+            Lane::TRANSITION_1
+        );
+        assert!(record.routed_to_private_root_scheduler());
+        assert!(record.callback_execution_blocked());
+        assert!(record.public_update_scheduling_blocked());
+        assert!(!record.public_scheduler_compatibility_claimed());
+
+        let scheduled = record.scheduled_root();
+        assert_eq!(scheduled.root(), root_id);
+        assert!(scheduled.inserted());
+        assert!(scheduled.microtask().is_some());
+        assert_eq!(scheduled.act_queue_task(), None);
+        assert!(scheduled.might_have_pending_sync_work());
+        assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert_eq!(
+            store.root_scheduler().current_event_transition_lane(),
+            Lane::TRANSITION_1
+        );
+        assert!(store.root_scheduler().did_schedule_microtask());
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+        assert_eq!(store.scheduler_bridge().microtask_requests().len(), 1);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_transition_lane_request_rejects_unsupported_lane_sets() {
+        let (mut store, root_id, _host) = root_store();
+        let default =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(5662), None).unwrap();
+
+        let default_error =
+            record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+                &mut store, &default,
+            )
+            .unwrap_err();
+        assert_eq!(
+            default_error,
+            RootSchedulerError::TransitionSchedulerUnsupportedLane {
+                root: root_id,
+                lane: Lane::DEFAULT,
+                source_priority: RootUpdateLaneSourcePriority::DefaultEventPriority,
+                selected_lanes: Lanes::DEFAULT,
+            }
+        );
+
+        let sync =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(5663), None)
+                .unwrap();
+        let sync_error =
+            record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+                &mut store, &sync,
+            )
+            .unwrap_err();
+        assert_eq!(
+            sync_error,
+            RootSchedulerError::TransitionSchedulerUnsupportedLane {
+                root: root_id,
+                lane: Lane::SYNC,
+                source_priority: RootUpdateLaneSourcePriority::ExplicitSync,
+                selected_lanes: Lanes::SYNC.merge(Lanes::DEFAULT),
+            }
+        );
+
+        for (lane, selected_lanes) in [
+            (Lane::DEFAULT, Lanes::DEFAULT),
+            (Lane::SYNC, Lanes::SYNC),
+            (Lane::OFFSCREEN, Lanes::OFFSCREEN),
+            (
+                Lane::TRANSITION_1,
+                Lanes::from(Lane::TRANSITION_1).merge(Lanes::OFFSCREEN),
+            ),
+        ] {
+            let error =
+                validate_transition_lane_scheduler_lanes_for_canary(root_id, lane, selected_lanes)
+                    .unwrap_err();
+            assert_eq!(
+                error,
+                RootSchedulerError::TransitionSchedulerUnsupportedLaneSet {
+                    root: root_id,
+                    lane,
+                    selected_lanes,
+                }
+            );
+        }
+
+        assert_eq!(store.root_scheduler().first_scheduled_root(), None);
+        assert_eq!(store.root_scheduler().last_scheduled_root(), None);
+        assert_eq!(
+            store.root_scheduler().current_event_transition_lane(),
+            Lane::NO
+        );
+        assert!(!store.root_scheduler().did_schedule_microtask());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+        assert!(store.scheduler_bridge().microtask_requests().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_transition_lane_request_rejects_stale_update_diagnostics() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let result = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(5664),
+            None,
+        )
+        .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::from(Lane::TRANSITION_1))
+                .unwrap();
+
+        let error = record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            &mut store, &result,
+        )
+        .unwrap_err();
+
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(
+            error,
+            RootSchedulerError::RootUpdate(RootUpdateError::StaleQueueEvidence {
+                root: root_id,
+                queue: result.queue(),
+                update: result.update(),
+                expected_pending_lanes: Lanes::from(Lane::TRANSITION_1),
+                actual_pending_lanes: Lanes::from(Lane::TRANSITION_1),
+            })
+        );
+        assert_eq!(store.root_scheduler().first_scheduled_root(), None);
+        assert_eq!(store.root_scheduler().last_scheduled_root(), None);
+        assert_eq!(
+            store.root_scheduler().current_event_transition_lane(),
+            Lane::NO
+        );
+        assert!(store.scheduler_bridge().microtask_requests().is_empty());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_transition_lane_request_rejects_incompatible_event_lane() {
+        let (mut store, root_id, _host) = root_store();
+        let result = update_container_transition_for_canary(
+            &mut store,
+            root_id,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(5665),
+            None,
+        )
+        .unwrap();
+        store
+            .root_scheduler_mut()
+            .set_current_event_transition_lane(Lane::TRANSITION_2);
+
+        let error = record_transition_lane_scheduler_request_from_update_diagnostics_for_canary(
+            &mut store, &result,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootSchedulerError::TransitionSchedulerIncompatibleEventLane {
+                root: root_id,
+                requested_lane: Lane::TRANSITION_1,
+                current_event_transition_lane: Lane::TRANSITION_2,
+            }
+        );
+        assert_eq!(store.root_scheduler().first_scheduled_root(), None);
+        assert_eq!(store.root_scheduler().last_scheduled_root(), None);
+        assert_eq!(
+            store.root_scheduler().current_event_transition_lane(),
+            Lane::TRANSITION_2
+        );
+        assert!(!store.root_scheduler().did_schedule_microtask());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+        assert!(store.scheduler_bridge().microtask_requests().is_empty());
     }
 
     #[test]
