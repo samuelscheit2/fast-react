@@ -9,7 +9,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::Lanes;
+use fast_react_core::{FiberId, Lanes, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
 use crate::root_commit::PendingPassiveCommitHandoff;
@@ -22,10 +22,218 @@ use crate::root_scheduler::{
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
-    HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootSyncFlushRecord,
-    RootUpdateCallbackSnapshot, RootWorkLoopError, commit_finished_host_root,
-    render_host_root_for_lanes,
+    HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootSchedulerCallbackHandle,
+    RootSchedulerError, RootSyncFlushRecord, RootUpdateCallbackSnapshot, RootWorkLoopError,
+    commit_finished_host_root, render_host_root_for_lanes,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[doc(hidden)]
+pub struct SyncFlushRootHostOutputCommitDiagnosticsForCanary {
+    root: FiberRootId,
+    order: usize,
+    callback_queue: UpdateQueueHandle,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    commit_pending_lanes: Lanes,
+    root_pending_lanes_after_commit: Lanes,
+    root_current_after_commit: FiberId,
+    committed_current: FiberId,
+    render_phase_work_after_commit: Option<FiberId>,
+    render_phase_lanes_after_commit: Lanes,
+    callback_node_after_commit: RootSchedulerCallbackHandle,
+    callback_priority_after_commit: RootCallbackPriority,
+    might_have_pending_sync_work: bool,
+    accepted_visible_callback_count: usize,
+    accepted_hidden_callback_count: usize,
+    accepted_deferred_hidden_callback_count: usize,
+    post_commit_visible_callback_count: usize,
+    post_commit_hidden_callback_count: usize,
+    post_commit_deferred_hidden_callback_count: usize,
+    mutation_record_count: usize,
+    mutation_apply_record_count: usize,
+    host_root_placement_apply_count: usize,
+}
+
+impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub const fn callback_queue(self) -> UpdateQueueHandle {
+        self.callback_queue
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes(self) -> Lanes {
+        self.commit_pending_lanes
+    }
+
+    #[must_use]
+    pub const fn root_pending_lanes_after_commit(self) -> Lanes {
+        self.root_pending_lanes_after_commit
+    }
+
+    #[must_use]
+    pub const fn root_current_after_commit(self) -> FiberId {
+        self.root_current_after_commit
+    }
+
+    #[must_use]
+    pub const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub const fn render_phase_work_after_commit(self) -> Option<FiberId> {
+        self.render_phase_work_after_commit
+    }
+
+    #[must_use]
+    pub const fn render_phase_lanes_after_commit(self) -> Lanes {
+        self.render_phase_lanes_after_commit
+    }
+
+    #[must_use]
+    pub const fn callback_node_after_commit(self) -> RootSchedulerCallbackHandle {
+        self.callback_node_after_commit
+    }
+
+    #[must_use]
+    pub const fn callback_priority_after_commit(self) -> RootCallbackPriority {
+        self.callback_priority_after_commit
+    }
+
+    #[must_use]
+    pub const fn might_have_pending_sync_work(self) -> bool {
+        self.might_have_pending_sync_work
+    }
+
+    #[must_use]
+    pub const fn accepted_visible_callback_count(self) -> usize {
+        self.accepted_visible_callback_count
+    }
+
+    #[must_use]
+    pub const fn accepted_hidden_callback_count(self) -> usize {
+        self.accepted_hidden_callback_count
+    }
+
+    #[must_use]
+    pub const fn accepted_deferred_hidden_callback_count(self) -> usize {
+        self.accepted_deferred_hidden_callback_count
+    }
+
+    #[must_use]
+    pub const fn accepted_callback_count(self) -> usize {
+        self.accepted_visible_callback_count
+            + self.accepted_hidden_callback_count
+            + self.accepted_deferred_hidden_callback_count
+    }
+
+    #[must_use]
+    pub const fn post_commit_visible_callback_count(self) -> usize {
+        self.post_commit_visible_callback_count
+    }
+
+    #[must_use]
+    pub const fn post_commit_hidden_callback_count(self) -> usize {
+        self.post_commit_hidden_callback_count
+    }
+
+    #[must_use]
+    pub const fn post_commit_deferred_hidden_callback_count(self) -> usize {
+        self.post_commit_deferred_hidden_callback_count
+    }
+
+    #[must_use]
+    pub const fn mutation_record_count(self) -> usize {
+        self.mutation_record_count
+    }
+
+    #[must_use]
+    pub const fn mutation_apply_record_count(self) -> usize {
+        self.mutation_apply_record_count
+    }
+
+    #[must_use]
+    pub const fn host_root_placement_apply_count(self) -> usize {
+        self.host_root_placement_apply_count
+    }
+
+    #[must_use]
+    pub fn committed_current_matches_root(self) -> bool {
+        self.root_current_after_commit == self.committed_current
+    }
+
+    #[must_use]
+    pub fn pending_lanes_match_root(self) -> bool {
+        self.root_pending_lanes_after_commit == self.commit_pending_lanes
+    }
+
+    #[must_use]
+    pub const fn render_phase_state_consumed(self) -> bool {
+        self.render_phase_work_after_commit.is_none()
+            && self.render_phase_lanes_after_commit.is_empty()
+    }
+
+    #[must_use]
+    pub fn callback_state_cleared(self) -> bool {
+        self.callback_node_after_commit.is_none()
+            && self.callback_priority_after_commit == RootCallbackPriority::NO
+    }
+
+    #[must_use]
+    pub const fn rendered_lanes_consumed_from_root(self) -> bool {
+        self.finished_lanes.contains_all(self.render_lanes)
+            && !self
+                .root_pending_lanes_after_commit
+                .contains_any(self.render_lanes)
+    }
+
+    #[must_use]
+    pub const fn visible_callback_state_drained(self) -> bool {
+        self.post_commit_visible_callback_count == 0 && self.post_commit_hidden_callback_count == 0
+    }
+
+    #[must_use]
+    pub const fn recorded_host_output_mutation_metadata(self) -> bool {
+        self.mutation_record_count > 0 && self.mutation_apply_record_count > 0
+    }
+
+    #[must_use]
+    pub fn commit_handoff_state_consumed(self) -> bool {
+        self.committed_current_matches_root()
+            && self.pending_lanes_match_root()
+            && self.render_phase_state_consumed()
+            && self.callback_state_cleared()
+            && self.rendered_lanes_consumed_from_root()
+            && self.visible_callback_state_drained()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
@@ -118,6 +326,63 @@ impl SyncFlushRootRecord {
         let committed = commit_render_phase(store, record.order(), record.render_phase())?;
         recompute_might_have_pending_sync_work(store)?;
         Ok(committed)
+    }
+
+    #[doc(hidden)]
+    pub fn commit_rendered_sync_flush_record_with_diagnostics_for_canary<H: HostTypes>(
+        store: &mut FiberRootStore<H>,
+        record: RootSyncFlushRecord,
+    ) -> Result<(Self, SyncFlushRootHostOutputCommitDiagnosticsForCanary), SyncFlushError> {
+        let committed = Self::commit_rendered_sync_flush_record(store, record)?;
+        let diagnostics = committed.host_output_commit_diagnostics_for_canary(store)?;
+        Ok((committed, diagnostics))
+    }
+
+    #[doc(hidden)]
+    pub fn host_output_commit_diagnostics_for_canary<H: HostTypes>(
+        &self,
+        store: &FiberRootStore<H>,
+    ) -> Result<SyncFlushRootHostOutputCommitDiagnosticsForCanary, SyncFlushError> {
+        let root = store.root(self.root)?;
+        let scheduling = root.scheduling();
+        let callback_queue = self.render_phase.work_in_progress_update_queue();
+        let post_commit_callbacks = store
+            .update_queues()
+            .peek_root_update_callback_records(callback_queue)
+            .map_err(RootCommitError::from)?;
+        let accepted_callbacks = self.root_update_callbacks();
+
+        Ok(SyncFlushRootHostOutputCommitDiagnosticsForCanary {
+            root: self.root,
+            order: self.order,
+            callback_queue,
+            render_lanes: self.render_lanes,
+            finished_lanes: self.commit.finished_lanes(),
+            remaining_lanes: self.commit.remaining_lanes(),
+            commit_pending_lanes: self.commit.pending_lanes(),
+            root_pending_lanes_after_commit: root.lanes().pending_lanes(),
+            root_current_after_commit: root.current(),
+            committed_current: self.commit.current(),
+            render_phase_work_after_commit: scheduling.work_in_progress(),
+            render_phase_lanes_after_commit: scheduling.work_in_progress_root_render_lanes(),
+            callback_node_after_commit: scheduling.callback_node(),
+            callback_priority_after_commit: scheduling.callback_priority(),
+            might_have_pending_sync_work: store.root_scheduler().might_have_pending_sync_work(),
+            accepted_visible_callback_count: accepted_callbacks.visible().len(),
+            accepted_hidden_callback_count: accepted_callbacks.hidden().len(),
+            accepted_deferred_hidden_callback_count: accepted_callbacks.deferred_hidden().len(),
+            post_commit_visible_callback_count: post_commit_callbacks.visible().len(),
+            post_commit_hidden_callback_count: post_commit_callbacks.hidden().len(),
+            post_commit_deferred_hidden_callback_count: post_commit_callbacks
+                .deferred_hidden()
+                .len(),
+            mutation_record_count: self.commit.mutation_log().len(),
+            mutation_apply_record_count: self.commit.mutation_apply_log().len(),
+            host_root_placement_apply_count: self
+                .commit
+                .host_root_placement_apply_diagnostics_for_canary()
+                .len(),
+        })
     }
 }
 
@@ -370,11 +635,15 @@ mod tests {
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         ExecutionContextState, RootElementHandle, RootOptions, RootSyncFlushExitStatus,
-        RootSyncFlushRecordStatus, ensure_root_is_scheduled, flush_sync_work_on_all_roots,
-        scheduled_roots, update_container, update_container_sync,
+        RootSyncFlushRecordStatus, TestRendererHostOutputCanaryFixture,
+        TestRendererHostOutputCanaryMutationKind, ensure_root_is_scheduled,
+        finish_test_renderer_host_output_canary_fibers, flush_sync_work_on_all_roots,
+        inspect_test_renderer_host_output_canary_commit,
+        prepare_test_renderer_host_output_canary_fibers, scheduled_roots, update_container,
+        update_container_sync,
     };
     use crate::{RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackVisibility};
-    use fast_react_core::{Lane, Lanes};
+    use fast_react_core::{FiberTag, Lane, Lanes};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -508,6 +777,166 @@ mod tests {
         assert!(callbacks.hidden().is_empty());
         assert!(callbacks.deferred_hidden().is_empty());
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_handoff_commits_already_renderable_host_output_canary_with_diagnostics() {
+        let (mut store, root_id, host) = root_store();
+        let sync_element = RootElementHandle::from_raw(800);
+        let default_element = RootElementHandle::from_raw(801);
+        let callback = RootUpdateCallbackHandle::from_raw(802);
+        let previous_current = store.root(root_id).unwrap().current();
+        let sync_update =
+            update_container_sync(&mut store, root_id, sync_element, Some(callback)).unwrap();
+        ensure_root_is_scheduled(&mut store, sync_update.schedule()).unwrap();
+        let default_update = update_container(&mut store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        assert_eq!(rendered.records().len(), 1);
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        assert_eq!(render_phase.root(), root_id);
+        assert_eq!(render_phase.render_lanes(), Lanes::SYNC);
+        assert_eq!(render_phase.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+
+        let fixture = TestRendererHostOutputCanaryFixture::new(810, 811, 812);
+        let prepared =
+            prepare_test_renderer_host_output_canary_fibers(&mut store, render_phase, fixture)
+                .unwrap();
+        let completed =
+            finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 813, 814).unwrap();
+
+        let (committed, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+
+        assert_eq!(committed.order(), 0);
+        assert_eq!(committed.root(), root_id);
+        assert_eq!(committed.render_lanes(), Lanes::SYNC);
+        assert_eq!(committed.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(committed.pending_lanes(), Lanes::DEFAULT);
+        assert!(committed.has_remaining_work());
+        assert_eq!(committed.commit().previous_current(), previous_current);
+        assert_eq!(committed.commit().current(), completed.host_root());
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            completed.host_root()
+        );
+        assert_eq!(current_host_root_element(&store, root_id), sync_element);
+        assert!(
+            !store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::SYNC)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+
+        let callbacks = committed.root_update_callbacks();
+        assert_eq!(
+            callbacks.queue(),
+            render_phase.work_in_progress_update_queue()
+        );
+        assert_eq!(callback_handles(callbacks.visible()), vec![callback]);
+        assert_eq!(callbacks.visible()[0].update(), sync_update.update());
+        assert!(callbacks.hidden().is_empty());
+        assert!(callbacks.deferred_hidden().is_empty());
+
+        let host_output = inspect_test_renderer_host_output_canary_commit(committed.commit());
+        assert_eq!(host_output.mutation_records().len(), 1);
+        assert!(host_output.deletion_lists().is_empty());
+        assert_eq!(
+            host_output.mutation_records()[0].kind(),
+            TestRendererHostOutputCanaryMutationKind::Placement
+        );
+        assert_eq!(
+            host_output.mutation_records()[0].fiber(),
+            completed.component()
+        );
+        assert_eq!(
+            host_output.mutation_records()[0].tag(),
+            FiberTag::HostComponent
+        );
+        assert_eq!(host_output.mutation_records()[0].state_node_raw(), 813);
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(completed.component())
+                .unwrap()
+                .child(),
+            Some(completed.text())
+        );
+
+        let placement_diagnostics = committed
+            .commit()
+            .host_root_placement_apply_diagnostics_for_canary();
+        assert_eq!(placement_diagnostics.len(), 1);
+        assert_eq!(placement_diagnostics[0].fiber(), completed.component());
+        assert_eq!(
+            placement_diagnostics[0].apply_kind(),
+            "append-placement-to-container"
+        );
+        assert_eq!(placement_diagnostics[0].sibling_status(), "append");
+
+        assert_eq!(diagnostics.root(), root_id);
+        assert_eq!(diagnostics.order(), 0);
+        assert_eq!(
+            diagnostics.callback_queue(),
+            render_phase.work_in_progress_update_queue()
+        );
+        assert_eq!(diagnostics.render_lanes(), Lanes::SYNC);
+        assert_eq!(diagnostics.finished_lanes(), Lanes::SYNC);
+        assert_eq!(diagnostics.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(diagnostics.commit_pending_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            diagnostics.root_pending_lanes_after_commit(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            diagnostics.root_current_after_commit(),
+            completed.host_root()
+        );
+        assert_eq!(diagnostics.committed_current(), completed.host_root());
+        assert_eq!(diagnostics.render_phase_work_after_commit(), None);
+        assert_eq!(diagnostics.render_phase_lanes_after_commit(), Lanes::NO);
+        assert_eq!(
+            diagnostics.callback_node_after_commit(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(
+            diagnostics.callback_priority_after_commit(),
+            RootCallbackPriority::NO
+        );
+        assert!(!diagnostics.might_have_pending_sync_work());
+        assert_eq!(diagnostics.accepted_visible_callback_count(), 1);
+        assert_eq!(diagnostics.accepted_hidden_callback_count(), 0);
+        assert_eq!(diagnostics.accepted_deferred_hidden_callback_count(), 0);
+        assert_eq!(diagnostics.accepted_callback_count(), 1);
+        assert_eq!(diagnostics.post_commit_visible_callback_count(), 0);
+        assert_eq!(diagnostics.post_commit_hidden_callback_count(), 0);
+        assert_eq!(diagnostics.post_commit_deferred_hidden_callback_count(), 0);
+        assert_eq!(diagnostics.mutation_record_count(), 1);
+        assert_eq!(diagnostics.mutation_apply_record_count(), 1);
+        assert_eq!(diagnostics.host_root_placement_apply_count(), 1);
+        assert!(diagnostics.recorded_host_output_mutation_metadata());
+        assert!(diagnostics.commit_handoff_state_consumed());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
