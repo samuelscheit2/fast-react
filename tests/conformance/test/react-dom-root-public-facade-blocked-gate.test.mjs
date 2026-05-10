@@ -72,11 +72,11 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
   assert.equal(gate.blockedPrivateBridgeRows.length, 8);
   assert.equal(
     gate.rootRenderGate.summary.privateHostOutputDiagnosticScenarioModeRowCount,
-    16
+    18
   );
   assert.equal(
     gate.rootRenderGate.summary.privateHostOutputBlockedScenarioModeRowCount,
-    4
+    2
   );
   assert.equal(
     gate.rootRenderGate.summary.privateHostOutputCompatibilityClaimed,

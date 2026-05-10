@@ -345,9 +345,9 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.equal(result.summary.privateBridgeBlockedScenarioModeRowCount, 2);
   assert.equal(
     result.summary.privateHostOutputDiagnosticScenarioModeRowCount,
-    16
+    18
   );
-  assert.equal(result.summary.privateHostOutputBlockedScenarioModeRowCount, 4);
+  assert.equal(result.summary.privateHostOutputBlockedScenarioModeRowCount, 2);
   assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
   assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
@@ -379,7 +379,8 @@ test("root render e2e conformance gate records private bridge request rows separ
       "render-null-clears-container",
       "root-unmount",
       "double-unmount",
-      "render-after-unmount"
+      "render-after-unmount",
+      "flush-sync-cross-root-render"
     ]
   );
 
@@ -466,7 +467,7 @@ test("root render e2e conformance gate records private bridge request rows separ
         )
       )
     ),
-    ["flush-sync-cross-root-render", "development-warning-boundaries"]
+    ["development-warning-boundaries"]
   );
 
   assert.equal(result.portalRootRenderGate.ok, true);
@@ -543,7 +544,7 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
     inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics();
 
   assert.equal(observations.loadError, null);
-  assert.equal(observations.rows.length, 16);
+  assert.equal(observations.rows.length, 18);
 
   for (const row of observations.rows) {
     assert.equal(row.status, "ok");
@@ -694,6 +695,44 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
     renderAfterUnmount.evidence.hostOutputEvidence
       .renderAfterUnmountMutationLog,
     []
+  );
+
+  const crossRoot = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "flush-sync-cross-root-render"
+  );
+  assert.equal(
+    crossRoot.evidence.hostOutputEvidence.firstRoot.containerTextContent,
+    "A"
+  );
+  assert.equal(
+    crossRoot.evidence.hostOutputEvidence.secondRoot.containerTextContent,
+    "B"
+  );
+  assert.deepEqual(
+    crossRoot.evidence.hostOutputEvidence.flushSyncEvidence.callbackEvents,
+    ["root.render:first", "root.render:second", "flushSyncWork"]
+  );
+  assert.equal(
+    crossRoot.evidence.hostOutputEvidence.flushSyncEvidence
+      .flushSyncWorkCallCount,
+    1
+  );
+  assert.equal(
+    crossRoot.evidence.hostOutputEvidence.flushSyncEvidence
+      .committedRootCountAfterFlush,
+    2
+  );
+  assert.equal(
+    crossRoot.evidence.hostOutputEvidence.flushSyncEvidence
+      .privateReconcilerDiagnostics.crossRootDiagnosticTestPresent,
+    true
+  );
+  assert.equal(
+    crossRoot.evidence.hostOutputEvidence.flushSyncEvidence
+      .publicFlushSyncCompatibilityClaimed,
+    false
   );
 });
 

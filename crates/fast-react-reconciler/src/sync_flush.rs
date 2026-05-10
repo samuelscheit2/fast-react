@@ -236,6 +236,104 @@ impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[doc(hidden)]
+pub struct SyncFlushCrossRootRenderDiagnosticsForCanary {
+    committed_root_order: Vec<FiberRootId>,
+    render_lanes_by_root: Vec<Lanes>,
+    remaining_lanes_by_root: Vec<Lanes>,
+    pending_lanes_by_root_after_commit: Vec<Lanes>,
+    applied_update_counts_by_root: Vec<usize>,
+    skipped_update_counts_by_root: Vec<usize>,
+    skipped_reentrant_flush: bool,
+    skipped_no_sync_work: bool,
+    might_have_pending_sync_work_after_flush: bool,
+    root_current_matches_commits: bool,
+    sync_lanes_consumed_from_roots: bool,
+}
+
+impl SyncFlushCrossRootRenderDiagnosticsForCanary {
+    #[must_use]
+    pub fn committed_root_order(&self) -> &[FiberRootId] {
+        &self.committed_root_order
+    }
+
+    #[must_use]
+    pub fn render_lanes_by_root(&self) -> &[Lanes] {
+        &self.render_lanes_by_root
+    }
+
+    #[must_use]
+    pub fn remaining_lanes_by_root(&self) -> &[Lanes] {
+        &self.remaining_lanes_by_root
+    }
+
+    #[must_use]
+    pub fn pending_lanes_by_root_after_commit(&self) -> &[Lanes] {
+        &self.pending_lanes_by_root_after_commit
+    }
+
+    #[must_use]
+    pub fn applied_update_counts_by_root(&self) -> &[usize] {
+        &self.applied_update_counts_by_root
+    }
+
+    #[must_use]
+    pub fn skipped_update_counts_by_root(&self) -> &[usize] {
+        &self.skipped_update_counts_by_root
+    }
+
+    #[must_use]
+    pub const fn skipped_reentrant_flush(&self) -> bool {
+        self.skipped_reentrant_flush
+    }
+
+    #[must_use]
+    pub const fn skipped_no_sync_work(&self) -> bool {
+        self.skipped_no_sync_work
+    }
+
+    #[must_use]
+    pub const fn might_have_pending_sync_work_after_flush(&self) -> bool {
+        self.might_have_pending_sync_work_after_flush
+    }
+
+    #[must_use]
+    pub const fn root_current_matches_commits(&self) -> bool {
+        self.root_current_matches_commits
+    }
+
+    #[must_use]
+    pub const fn sync_lanes_consumed_from_roots(&self) -> bool {
+        self.sync_lanes_consumed_from_roots
+    }
+
+    #[must_use]
+    pub fn proves_cross_root_sync_flush_scheduling(&self) -> bool {
+        self.committed_root_order.len() >= 2
+            && self.render_lanes_by_root.len() == self.committed_root_order.len()
+            && self.remaining_lanes_by_root.len() == self.committed_root_order.len()
+            && self.pending_lanes_by_root_after_commit.len() == self.committed_root_order.len()
+            && self
+                .render_lanes_by_root
+                .iter()
+                .all(|lanes| *lanes == Lanes::SYNC)
+            && self
+                .remaining_lanes_by_root
+                .iter()
+                .all(|lanes| lanes.is_empty())
+            && self
+                .pending_lanes_by_root_after_commit
+                .iter()
+                .all(|lanes| lanes.is_empty())
+            && !self.skipped_reentrant_flush
+            && !self.skipped_no_sync_work
+            && !self.might_have_pending_sync_work_after_flush
+            && self.root_current_matches_commits
+            && self.sync_lanes_consumed_from_roots
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
     order: usize,
     root: FiberRootId,
@@ -452,6 +550,55 @@ impl SyncFlushResult {
     #[must_use]
     pub fn did_flush_work(&self) -> bool {
         !self.records.is_empty()
+    }
+
+    #[doc(hidden)]
+    pub fn cross_root_render_diagnostics_for_canary<H: HostTypes>(
+        &self,
+        store: &FiberRootStore<H>,
+    ) -> Result<SyncFlushCrossRootRenderDiagnosticsForCanary, SyncFlushError> {
+        let mut committed_root_order = Vec::with_capacity(self.records.len());
+        let mut render_lanes_by_root = Vec::with_capacity(self.records.len());
+        let mut remaining_lanes_by_root = Vec::with_capacity(self.records.len());
+        let mut pending_lanes_by_root_after_commit = Vec::with_capacity(self.records.len());
+        let mut applied_update_counts_by_root = Vec::with_capacity(self.records.len());
+        let mut skipped_update_counts_by_root = Vec::with_capacity(self.records.len());
+        let mut root_current_matches_commits = true;
+        let mut sync_lanes_consumed_from_roots = true;
+
+        for record in &self.records {
+            let root = store.root(record.root())?;
+            let pending_lanes = root.lanes().pending_lanes();
+            committed_root_order.push(record.root());
+            render_lanes_by_root.push(record.render_lanes());
+            remaining_lanes_by_root.push(record.remaining_lanes());
+            pending_lanes_by_root_after_commit.push(pending_lanes);
+            applied_update_counts_by_root.push(record.applied_update_count());
+            skipped_update_counts_by_root.push(record.skipped_update_count());
+            root_current_matches_commits &= root.current() == record.commit().current()
+                && record.commit().current() == record.render_phase().finished_work();
+            sync_lanes_consumed_from_roots &= record
+                .commit()
+                .finished_lanes()
+                .contains_all(record.render_lanes())
+                && !pending_lanes.contains_any(record.render_lanes());
+        }
+
+        Ok(SyncFlushCrossRootRenderDiagnosticsForCanary {
+            committed_root_order,
+            render_lanes_by_root,
+            remaining_lanes_by_root,
+            pending_lanes_by_root_after_commit,
+            applied_update_counts_by_root,
+            skipped_update_counts_by_root,
+            skipped_reentrant_flush: self.skipped_reentrant_flush,
+            skipped_no_sync_work: self.skipped_no_sync_work,
+            might_have_pending_sync_work_after_flush: store
+                .root_scheduler()
+                .might_have_pending_sync_work(),
+            root_current_matches_commits,
+            sync_lanes_consumed_from_roots,
+        })
     }
 }
 
@@ -1367,6 +1514,55 @@ mod tests {
             current_host_root_element(&store, third),
             RootElementHandle::from_raw(30)
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_cross_root_render_diagnostics_prove_scheduled_private_flush() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let first = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first_element = RootElementHandle::from_raw(901);
+        let second_element = RootElementHandle::from_raw(902);
+
+        schedule_sync_update(&mut store, first, first_element);
+        schedule_sync_update(&mut store, second, second_element);
+
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+        let diagnostics = result
+            .cross_root_render_diagnostics_for_canary(&store)
+            .unwrap();
+
+        assert!(result.did_flush_work());
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(diagnostics.committed_root_order(), &[first, second]);
+        assert_eq!(
+            diagnostics.render_lanes_by_root(),
+            &[Lanes::SYNC, Lanes::SYNC]
+        );
+        assert_eq!(
+            diagnostics.remaining_lanes_by_root(),
+            &[Lanes::NO, Lanes::NO]
+        );
+        assert_eq!(
+            diagnostics.pending_lanes_by_root_after_commit(),
+            &[Lanes::NO, Lanes::NO]
+        );
+        assert_eq!(diagnostics.applied_update_counts_by_root(), &[1, 1]);
+        assert_eq!(diagnostics.skipped_update_counts_by_root(), &[0, 0]);
+        assert!(!diagnostics.skipped_reentrant_flush());
+        assert!(!diagnostics.skipped_no_sync_work());
+        assert!(!diagnostics.might_have_pending_sync_work_after_flush());
+        assert!(diagnostics.root_current_matches_commits());
+        assert!(diagnostics.sync_lanes_consumed_from_roots());
+        assert!(diagnostics.proves_cross_root_sync_flush_scheduling());
+        assert_eq!(current_host_root_element(&store, first), first_element);
+        assert_eq!(current_host_root_element(&store, second), second_element);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

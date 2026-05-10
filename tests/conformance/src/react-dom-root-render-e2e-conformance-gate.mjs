@@ -402,6 +402,13 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS =
       reason:
         "Private fake-DOM unmount diagnostics can prove the stale render guard throws after host output is cleared without mutating the container again."
     },
+    {
+      scenarioId: "flush-sync-cross-root-render",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private flushSync guard, reconciler cross-root sync-flush diagnostics, and fake-DOM host-output helpers prove two private root.render requests can be flushed and committed together without admitting public flushSync behavior."
+    },
     ...REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.filter(
       (scenarioId) =>
         ![
@@ -412,16 +419,15 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS =
           "render-null-clears-container",
           "root-unmount",
           "double-unmount",
-          "render-after-unmount"
+          "render-after-unmount",
+          "flush-sync-cross-root-render"
         ].includes(scenarioId)
     ).map((scenarioId) => ({
       scenarioId,
       admission: "unsupported",
       gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS,
       reason:
-        scenarioId === "flush-sync-cross-root-render"
-          ? "This root E2E scenario still needs private cross-root flush/scheduling evidence before it can be admitted as a host-output diagnostic row."
-          : "This root E2E scenario still needs private warning-boundary evidence before it can be admitted as a host-output diagnostic row."
+        "This root E2E scenario still needs private warning-boundary evidence before it can be admitted as a host-output diagnostic row."
     }))
   ]);
 
@@ -2968,7 +2974,10 @@ function loadPrivateHostOutputModules(workspaceRoot) {
   return {
     ...loadPrivateBridgeModules(workspaceRoot),
     componentTree: require(join(reactDomRoot, "src/client/component-tree.js")),
-    domHost: require(join(reactDomRoot, "src/dom-host/mutation.js"))
+    domHost: require(join(reactDomRoot, "src/dom-host/mutation.js")),
+    flushSyncGuard: require(join(reactDomRoot, "src/shared/flush-sync-guard.js")),
+    syncFlushCrossRootReconcilerDiagnostics:
+      inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot })
   };
 }
 
@@ -3182,6 +3191,8 @@ function runPrivateHostOutputDiagnosticScenario({ mode, modules, scenarioId }) {
         harness,
         hostOutputEvidence
       );
+    } else if (scenarioId === "flush-sync-cross-root-render") {
+      hostOutputEvidence = flushSyncCrossRootPrivateHostOutput(harness);
     } else {
       throw new Error(
         `No private host-output diagnostic plan for scenario: ${scenarioId}`
@@ -3241,10 +3252,12 @@ function createPrivateHostOutputHarness({ mode, modules, scenarioId }) {
     container,
     create,
     document,
+    mode,
     modules,
     nativeHandoffRecords: [],
     requestAdmissionRecords: [],
     requestRecords: [],
+    scenarioId,
     thrownOperations: [],
     rootOwner: modules.rootBridge.getRootOwnerFromHandle(create.handle)
   };
@@ -3265,9 +3278,25 @@ function recordPrivateHostOutputRootRequest(harness, record) {
 }
 
 function applyPrivateHostOutputRootSideEffects(harness) {
-  const before = summarizePrivateRootMarkerListenerState(harness);
-  const record = harness.bridge.applyCreateRootSideEffects(harness.create);
-  const afterApply = summarizePrivateRootMarkerListenerState(harness);
+  return applyPrivateHostOutputRootSideEffectsForRoot(harness, {
+    container: harness.container,
+    create: harness.create,
+    document: harness.document
+  });
+}
+
+function applyPrivateHostOutputRootSideEffectsForRoot(harness, root) {
+  const before = summarizePrivateRootMarkerListenerState({
+    container: root.container,
+    document: root.document,
+    modules: harness.modules
+  });
+  const record = harness.bridge.applyCreateRootSideEffects(root.create);
+  const afterApply = summarizePrivateRootMarkerListenerState({
+    container: root.container,
+    document: root.document,
+    modules: harness.modules
+  });
   return {
     afterApply,
     before,
@@ -3277,9 +3306,28 @@ function applyPrivateHostOutputRootSideEffects(harness) {
 }
 
 function cleanupPrivateHostOutputRootSideEffects(harness, rawRecord) {
+  return cleanupPrivateHostOutputRootSideEffectsForRoot(
+    harness,
+    {
+      container: harness.container,
+      document: harness.document
+    },
+    rawRecord
+  );
+}
+
+function cleanupPrivateHostOutputRootSideEffectsForRoot(
+  harness,
+  root,
+  rawRecord
+) {
   const cleanupRecord = harness.bridge.revertCreateRootSideEffects(rawRecord);
   return {
-    afterCleanup: summarizePrivateRootMarkerListenerState(harness),
+    afterCleanup: summarizePrivateRootMarkerListenerState({
+      container: root.container,
+      document: root.document,
+      modules: harness.modules
+    }),
     record: summarizePrivateRootCreateSideEffectCleanupRecord(cleanupRecord)
   };
 }
@@ -3653,6 +3701,182 @@ function recordPrivateRenderAfterUnmountGuard(harness, unmounted) {
   };
 }
 
+function flushSyncCrossRootPrivateHostOutput(harness) {
+  const firstRoot = {
+    container: harness.container,
+    create: harness.create,
+    document: harness.document,
+    rootOwner: harness.rootOwner
+  };
+  const secondRoot = createAdditionalPrivateHostOutputRoot(
+    harness,
+    "cross-root-b"
+  );
+  recordPrivateHostOutputRootRequest(harness, secondRoot.create);
+  const secondSideEffects =
+    applyPrivateHostOutputRootSideEffectsForRoot(harness, secondRoot);
+  const { rawRecord: secondRawSideEffectRecord, ...secondSideEffectEvidence } =
+    secondSideEffects;
+
+  const callbackEvents = [];
+  const firstRender = harness.bridge.renderContainer(
+    firstRoot.create.handle,
+    createPrivateHostOutputElementValue("cross-a")
+  );
+  recordPrivateHostOutputRootRequest(harness, firstRender);
+  callbackEvents.push("root.render:first");
+  const secondRender = harness.bridge.renderContainer(
+    secondRoot.create.handle,
+    createPrivateHostOutputElementValue("cross-b")
+  );
+  recordPrivateHostOutputRootRequest(harness, secondRender);
+  callbackEvents.push("root.render:second");
+
+  const flushSyncWarnings = [];
+  const flushSyncWorkWasInRender =
+    harness.modules.flushSyncGuard.finishFlushSyncGuard(
+      {
+        f() {
+          callbackEvents.push("flushSyncWork");
+          return false;
+        }
+      },
+      {
+        console: {
+          error(message) {
+            flushSyncWarnings.push(message);
+          }
+        },
+        development: harness.mode.nodeEnv !== "production"
+      }
+    );
+  const rootSideEffectStateAfterFlush = {
+    first: summarizePrivateRootMarkerListenerState({
+      container: firstRoot.container,
+      document: firstRoot.document,
+      modules: harness.modules
+    }),
+    second: summarizePrivateRootMarkerListenerState({
+      container: secondRoot.container,
+      document: secondRoot.document,
+      modules: harness.modules
+    })
+  };
+  const firstHostOutput = mountPrivateCrossRootHostOutput(
+    harness,
+    firstRoot,
+    "cross-a"
+  );
+  const secondHostOutput = mountPrivateCrossRootHostOutput(
+    harness,
+    secondRoot,
+    "cross-b"
+  );
+  const secondCleanup = cleanupPrivateHostOutputRootSideEffectsForRoot(
+    harness,
+    secondRoot,
+    secondRawSideEffectRecord
+  );
+
+  return {
+    firstRoot: firstHostOutput,
+    flushSyncEvidence: {
+      callbackEvents,
+      callbackRenderRequestCount: 2,
+      callbackReturnValue: "two-root-flush-complete",
+      committedRootCountAfterFlush: 2,
+      flushSyncGuardWarningCount: flushSyncWarnings.length,
+      flushSyncWorkCallCount: callbackEvents.filter(
+        (event) => event === "flushSyncWork"
+      ).length,
+      flushSyncWorkWasInRender,
+      privateReconcilerDiagnostics:
+        harness.modules.syncFlushCrossRootReconcilerDiagnostics,
+      publicFlushSyncCompatibilityClaimed: false,
+      rootSideEffectStateAfterFlush
+    },
+    secondRoot: secondHostOutput,
+    secondRootSideEffectEvidence: {
+      ...secondSideEffectEvidence,
+      cleanup: secondCleanup
+    }
+  };
+}
+
+function createAdditionalPrivateHostOutputRoot(harness, label) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: harness.modules.domContainer,
+    label: `${harness.mode.id}:${harness.scenarioId}:${label}:host-output`
+  });
+  const container = document.createElement("div");
+  const create = harness.bridge.createClientRoot(container);
+  return {
+    container,
+    create,
+    document,
+    rootOwner: harness.modules.rootBridge.getRootOwnerFromHandle(create.handle)
+  };
+}
+
+function mountPrivateCrossRootHostOutput(harness, root, phase) {
+  const previousProps = {};
+  const nextProps = createPrivateHostOutputProps(phase);
+  const host = root.document.createElement("div");
+  const token = harness.modules.componentTree.createHostInstanceToken(
+    {
+      kind: "PrivateHostOutputDiagnosticHost",
+      phase
+    },
+    root.rootOwner
+  );
+  harness.modules.componentTree.attachHostInstanceNode(
+    host,
+    token,
+    previousProps
+  );
+  const handoff = harness.modules.domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    "div",
+    previousProps,
+    nextProps
+  );
+  const latestPropsBeforeCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const handoffPayload =
+    harness.modules.domHost.getDomPropertyUpdateLatestPropsHandoffPayload(
+      handoff
+    );
+  harness.modules.componentTree.commitLatestPropsFromMutationHandoff(handoff);
+  const latestPropsAfterCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const text = harness.modules.domHost.createDomHostTextInstance(
+    nextProps.children,
+    root.container
+  );
+
+  harness.modules.domHost.appendInitialChild(host, text);
+  harness.modules.domHost.appendChildToContainer(root.container, host);
+
+  return {
+    attributes: summarizeAttributeEntries(host),
+    childNodeNames: summarizeChildNodeNames(root.container),
+    containerChildCount: root.container.childNodes.length,
+    containerMutationLog: root.container.mutationLog.slice(),
+    containerTextContent: root.container.textContent,
+    handoff: summarizePrivateHostOutputHandoff(handoff, handoffPayload),
+    hostMutationObserved: true,
+    latestPropsAfterCommit: summarizePrivateHostOutputProps(
+      latestPropsAfterCommit
+    ),
+    latestPropsBeforeCommit: summarizePrivateHostOutputProps(
+      latestPropsBeforeCommit
+    ),
+    latestPropsPublished: latestPropsAfterCommit === nextProps,
+    textNodeValue: text.nodeValue,
+    textWriteLog: text.writeLog.slice()
+  };
+}
+
 function summarizePrivateHostOutputRootBridgeEvidence(harness) {
   return {
     admissions: harness.requestAdmissionRecords.map((record) => ({
@@ -3938,6 +4162,18 @@ function createPrivateHostOutputProps(phase) {
   if (phase === "stale") {
     return {
       children: "stale"
+    };
+  }
+  if (phase === "cross-a") {
+    return {
+      id: "cross-a",
+      children: "A"
+    };
+  }
+  if (phase === "cross-b") {
+    return {
+      id: "cross-b",
+      children: "B"
     };
   }
 
@@ -4488,6 +4724,40 @@ function inspectPortalReconcilerFailClosedDiagnostics({ workspaceRoot }) {
       rootPreflightPortalTagGuardPresent:
         /child_tag == FiberTag::Portal/u.test(rootWorkLoopSource) &&
         /unsupported_portal_begin_work_record/u.test(rootWorkLoopSource)
+    };
+  } catch (error) {
+    return {
+      loadError: serializeGateError(error)
+    };
+  }
+}
+
+function inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot }) {
+  try {
+    const syncFlushSource = readWorkspaceFile(
+      workspaceRoot,
+      "crates/fast-react-reconciler/src/sync_flush.rs"
+    );
+
+    return {
+      loadError: null,
+      commitWorkOnAllRootsPathPresent:
+        /flush_sync_commit_work_on_all_roots/u.test(syncFlushSource) &&
+        /flush_sync_work_across_scheduled_roots/u.test(syncFlushSource),
+      crossRootDiagnosticMethodPresent:
+        /cross_root_render_diagnostics_for_canary/u.test(syncFlushSource),
+      crossRootDiagnosticStructPresent:
+        /SyncFlushCrossRootRenderDiagnosticsForCanary/u.test(syncFlushSource),
+      crossRootDiagnosticTestPresent:
+        /sync_flush_cross_root_render_diagnostics_prove_scheduled_private_flush/u.test(
+          syncFlushSource
+        ),
+      scheduledRootTraversalPresent:
+        /first_scheduled_root/u.test(syncFlushSource) &&
+        /next_scheduled_root/u.test(syncFlushSource),
+      syncLaneConsumptionCheckPresent:
+        /sync_lanes_consumed_from_roots/u.test(syncFlushSource) &&
+        /proves_cross_root_sync_flush_scheduling/u.test(syncFlushSource)
     };
   } catch (error) {
     return {
@@ -5356,6 +5626,8 @@ function expectedPrivateHostOutputRequestOperations(scenarioId) {
       return ["create", "render", "unmount", "unmount"];
     case "render-after-unmount":
       return ["create", "render", "unmount"];
+    case "flush-sync-cross-root-render":
+      return ["create", "create", "render", "render"];
     default:
       return [];
   }
@@ -5542,12 +5814,162 @@ function expectedPrivateHostOutputScenarioEvidence(scenarioId) {
         renderAfterUnmountMutationLog: [],
         unmountMutationObserved: true
       };
+    case "flush-sync-cross-root-render":
+      return {
+        firstRoot: {
+          attributes: [["id", "cross-a"]],
+          childNodeNames: ["DIV"],
+          containerChildCount: 1,
+          containerTextContent: "A",
+          handoff: {
+            kind: "domPropertyUpdateLatestPropsHandoff",
+            latestPropsCommitRecordKind: "latestPropsCommit",
+            latestPropsCommitRecordStatus: "safe-for-latest-props",
+            mutationRecordCount: 2,
+            payloadCount: 2,
+            status: "mutated"
+          },
+          hostMutationObserved: true,
+          latestPropsAfterCommit: createPrivateHostOutputProps("cross-a"),
+          latestPropsBeforeCommit: {},
+          latestPropsPublished: true,
+          textNodeValue: "A",
+          textWriteLog: []
+        },
+        flushSyncEvidence: {
+          callbackEvents: [
+            "root.render:first",
+            "root.render:second",
+            "flushSyncWork"
+          ],
+          callbackRenderRequestCount: 2,
+          callbackReturnValue: "two-root-flush-complete",
+          committedRootCountAfterFlush: 2,
+          flushSyncGuardWarningCount: 0,
+          flushSyncWorkCallCount: 1,
+          flushSyncWorkWasInRender: false,
+          privateReconcilerDiagnostics:
+            expectedSyncFlushCrossRootReconcilerDiagnostics(),
+          publicFlushSyncCompatibilityClaimed: false,
+          rootSideEffectStateAfterFlush: {
+            first: {
+              containerListenerRegistrationCount: 138,
+              containerListeningMarkerPropertyCount: 1,
+              containerMarkerPropertyCount: 1,
+              containerMarkerTruthyCount: 1,
+              ownerDocumentListenerRegistrationCount: 1,
+              ownerDocumentListeningMarkerPropertyCount: 1
+            },
+            second: {
+              containerListenerRegistrationCount: 138,
+              containerListeningMarkerPropertyCount: 1,
+              containerMarkerPropertyCount: 1,
+              containerMarkerTruthyCount: 1,
+              ownerDocumentListenerRegistrationCount: 1,
+              ownerDocumentListeningMarkerPropertyCount: 1
+            }
+          }
+        },
+        secondRoot: {
+          attributes: [["id", "cross-b"]],
+          childNodeNames: ["DIV"],
+          containerChildCount: 1,
+          containerTextContent: "B",
+          handoff: {
+            kind: "domPropertyUpdateLatestPropsHandoff",
+            latestPropsCommitRecordKind: "latestPropsCommit",
+            latestPropsCommitRecordStatus: "safe-for-latest-props",
+            mutationRecordCount: 2,
+            payloadCount: 2,
+            status: "mutated"
+          },
+          hostMutationObserved: true,
+          latestPropsAfterCommit: createPrivateHostOutputProps("cross-b"),
+          latestPropsBeforeCommit: {},
+          latestPropsPublished: true,
+          textNodeValue: "B",
+          textWriteLog: []
+        },
+        secondRootSideEffectEvidence: {
+          afterApply: {
+            containerListenerRegistrationCount: 138,
+            containerListeningMarkerPropertyCount: 1,
+            containerMarkerPropertyCount: 1,
+            containerMarkerTruthyCount: 1,
+            ownerDocumentListenerRegistrationCount: 1,
+            ownerDocumentListeningMarkerPropertyCount: 1
+          },
+          before: {
+            containerListenerRegistrationCount: 0,
+            containerListeningMarkerPropertyCount: 0,
+            containerMarkerPropertyCount: 0,
+            containerMarkerTruthyCount: 0,
+            ownerDocumentListenerRegistrationCount: 0,
+            ownerDocumentListeningMarkerPropertyCount: 0
+          },
+          cleanup: {
+            afterCleanup: {
+              containerListenerRegistrationCount: 0,
+              containerListeningMarkerPropertyCount: 0,
+              containerMarkerPropertyCount: 0,
+              containerMarkerTruthyCount: 0,
+              ownerDocumentListenerRegistrationCount: 0,
+              ownerDocumentListeningMarkerPropertyCount: 0
+            },
+            status: "reverted-private-root-create-mark-listen-gate"
+          },
+          status: "applied-private-root-create-mark-listen-gate"
+        }
+      };
     default:
       return null;
   }
 }
 
+function expectedSyncFlushCrossRootReconcilerDiagnostics() {
+  return {
+    loadError: null,
+    commitWorkOnAllRootsPathPresent: true,
+    crossRootDiagnosticMethodPresent: true,
+    crossRootDiagnosticStructPresent: true,
+    crossRootDiagnosticTestPresent: true,
+    scheduledRootTraversalPresent: true,
+    syncLaneConsumptionCheckPresent: true
+  };
+}
+
 function comparablePrivateHostOutputScenarioEvidence(evidence) {
+  if (evidence.flushSyncEvidence !== undefined) {
+    return {
+      firstRoot: comparableMountedPrivateHostOutput(evidence.firstRoot),
+      flushSyncEvidence: {
+        callbackEvents: evidence.flushSyncEvidence.callbackEvents,
+        callbackRenderRequestCount:
+          evidence.flushSyncEvidence.callbackRenderRequestCount,
+        callbackReturnValue: evidence.flushSyncEvidence.callbackReturnValue,
+        committedRootCountAfterFlush:
+          evidence.flushSyncEvidence.committedRootCountAfterFlush,
+        flushSyncGuardWarningCount:
+          evidence.flushSyncEvidence.flushSyncGuardWarningCount,
+        flushSyncWorkCallCount:
+          evidence.flushSyncEvidence.flushSyncWorkCallCount,
+        flushSyncWorkWasInRender:
+          evidence.flushSyncEvidence.flushSyncWorkWasInRender,
+        privateReconcilerDiagnostics:
+          evidence.flushSyncEvidence.privateReconcilerDiagnostics,
+        publicFlushSyncCompatibilityClaimed:
+          evidence.flushSyncEvidence.publicFlushSyncCompatibilityClaimed,
+        rootSideEffectStateAfterFlush:
+          evidence.flushSyncEvidence.rootSideEffectStateAfterFlush
+      },
+      secondRoot: comparableMountedPrivateHostOutput(evidence.secondRoot),
+      secondRootSideEffectEvidence:
+        comparablePrivateHostOutputRootSideEffectEvidence(
+          evidence.secondRootSideEffectEvidence
+        )
+    };
+  }
+
   if (evidence.replaceMutationLog !== undefined) {
     return {
       initialChildNodeNames: evidence.initialChildNodeNames,
@@ -5675,6 +6097,34 @@ function comparablePrivateHostOutputScenarioEvidence(evidence) {
     containerTextContent: evidence.containerTextContent,
     hostMutationObserved: evidence.hostMutationObserved,
     latestPropsPublished: evidence.latestPropsPublished
+  };
+}
+
+function comparableMountedPrivateHostOutput(evidence) {
+  return {
+    attributes: evidence.attributes,
+    childNodeNames: evidence.childNodeNames,
+    containerChildCount: evidence.containerChildCount,
+    containerTextContent: evidence.containerTextContent,
+    handoff: evidence.handoff,
+    hostMutationObserved: evidence.hostMutationObserved,
+    latestPropsAfterCommit: evidence.latestPropsAfterCommit,
+    latestPropsBeforeCommit: evidence.latestPropsBeforeCommit,
+    latestPropsPublished: evidence.latestPropsPublished,
+    textNodeValue: evidence.textNodeValue,
+    textWriteLog: evidence.textWriteLog
+  };
+}
+
+function comparablePrivateHostOutputRootSideEffectEvidence(evidence) {
+  return {
+    afterApply: evidence.afterApply,
+    before: evidence.before,
+    cleanup: {
+      afterCleanup: evidence.cleanup.afterCleanup,
+      status: evidence.cleanup.record.sideEffectStatus
+    },
+    status: evidence.record.sideEffectStatus
   };
 }
 
