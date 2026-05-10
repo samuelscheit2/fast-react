@@ -9,6 +9,17 @@ import {
   evaluateDomTextContentLocalGate
 } from "../src/dom-text-content-local-gate.mjs";
 import {
+  DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS,
+  DOM_TEXT_CONTENT_CONFORMANCE_GATE_ID,
+  DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS,
+  DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS,
+  DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS,
+  DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS,
+  evaluateDomTextContentConformanceGate,
+  runLocalDomTextContentShouldSetObservations,
+  runDomTextContentConformanceGate
+} from "../src/dom-text-content-conformance-gate.mjs";
+import {
   DOM_TEXT_CONTENT_ORACLE_ARTIFACT_PATH,
   DOM_TEXT_CONTENT_PROBE_MODES,
   DOM_TEXT_CONTENT_SUPPORTING_TARGETS,
@@ -123,6 +134,97 @@ test("DOM text-content local scenario admission is explicit and closed", () => {
       )
     );
   }
+});
+
+test("DOM text-content dual-run gate compares only admitted private helper rows", () => {
+  const gate = runDomTextContentConformanceGate({ checkedOracle: oracle });
+
+  assert.equal(gate.ok, true);
+  assert.equal(gate.gate.id, DOM_TEXT_CONTENT_CONFORMANCE_GATE_ID);
+  assert.equal(
+    gate.summary.admittedPrivateShouldSetRowCount,
+    DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS.length
+  );
+  assert.equal(
+    gate.summary.skippedUnsupportedPrivateShouldSetRowCount,
+    DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS.length
+  );
+  assert.equal(
+    gate.summary.skippedUnsupportedDomRenderRowCount,
+    DOM_TEXT_CONTENT_RENDER_SCENARIOS.length *
+      DOM_TEXT_CONTENT_PROBE_MODES.length *
+      2
+  );
+  assert.equal(gate.summary.failureCount, 0);
+  assert.equal(gate.summary.privateTextContentBehaviorCompared, true);
+  assert.equal(gate.summary.fullDomTextContentCompatibilityAdmitted, false);
+  assert.equal(gate.summary.compatibilityClaimed, false);
+  assert.deepEqual(
+    gate.admittedPrivateShouldSetRows.map((row) => row.scenarioId),
+    DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS
+  );
+  assert.ok(
+    gate.admittedPrivateShouldSetRows.every(
+      (row) =>
+        row.gateStatus === DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS
+    )
+  );
+  assert.deepEqual(
+    gate.skippedUnsupportedPrivateShouldSetRows.map((row) => row.scenarioId),
+    DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS.map(
+      (scenario) => scenario.scenarioId
+    )
+  );
+  assert.ok(
+    gate.skippedUnsupportedPrivateShouldSetRows.every(
+      (row) =>
+        row.gateStatus === DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS
+    )
+  );
+  assert.ok(
+    gate.skippedUnsupportedDomRenderRows.every(
+      (row) => row.gateStatus === DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS
+    )
+  );
+});
+
+test("DOM text-content dual-run gate fails closed on admitted private mismatches and premature claims", () => {
+  const localShouldSetTextContentObservations =
+    runLocalDomTextContentShouldSetObservations();
+  assert.equal(localShouldSetTextContentObservations.metadata.loaded, true);
+  const firstAdmittedObservation =
+    localShouldSetTextContentObservations.observations.find(
+      (observation) =>
+        observation.scenarioId ===
+        DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS[0]
+    );
+  assert.ok(firstAdmittedObservation);
+  firstAdmittedObservation.result.value = "wrong";
+
+  const mismatchGate = evaluateDomTextContentConformanceGate({
+    checkedOracle: oracle,
+    localShouldSetTextContentObservations
+  });
+  assert.equal(mismatchGate.ok, false);
+  assert.equal(
+    mismatchGate.failures[0].gateStatus,
+    "admitted-private-should-set-output-mismatch"
+  );
+
+  const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
+  prematureClaimOracle.conformanceClaims.compatibilityClaimed = true;
+  const prematureClaimGate = runDomTextContentConformanceGate({
+    checkedOracle: prematureClaimOracle
+  });
+
+  assert.equal(prematureClaimGate.ok, false);
+  assert.ok(
+    prematureClaimGate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "checked-oracle-claims-compatibilityClaimed-while-unsupported-rows-skipped"
+    )
+  );
 });
 
 test("shouldSetTextContent observations cover primitives, special tags, arrays, elements, and dangerous HTML", () => {
@@ -455,6 +557,24 @@ test("print DOM text-content oracle CLI emits the checked-in artifact", () => {
   );
 
   assert.equal(output, readCheckedDomTextContentOracleText());
+});
+
+test("DOM text-content conformance gate CLI reports the focused fail-closed gate", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["scripts/check-dom-text-content-conformance.mjs"],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8"
+    }
+  );
+
+  assert.match(output, /^DOM text-content conformance gate: PASS/u);
+  assert.match(output, /Gate: dom-text-content-dual-run-gate-1/u);
+  assert.match(
+    output,
+    /Skipped unsupported DOM render\/mutation rows: 40/u
+  );
 });
 
 test("print DOM text-content oracle markdown is readable", () => {
