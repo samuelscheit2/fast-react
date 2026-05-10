@@ -36,6 +36,9 @@ const componentTree = require(
 const refCallbackGate = require(
   path.join(repoRoot, "packages/react-dom/src/client/ref-callback-gate.js")
 );
+const rootBridge = require(
+  path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+);
 
 test("checked React DOM ref callback oracle artifact has expected schema and targets", () => {
   assert.equal(
@@ -627,6 +630,282 @@ test("private controlled DOM ref callback invocation gate records fake host call
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private root bridge ref ordering diagnostic proves update identity and unmount cleanup without public roots", () => {
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const container = createContainer("DIV");
+  const create = bridge.createClientRoot(container);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: {children: "initial"},
+    type: "div"
+  });
+  const updateRender = bridge.renderContainer(create.handle, {
+    props: {children: "updated"},
+    type: "div"
+  });
+  const unmount = bridge.unmountContainer(create.handle);
+  const rootOwner = rootBridge.getRootOwnerFromHandle(create.handle);
+  const hostOwner = {kind: "PrivateHostOutputRefDiagnosticHost"};
+  const node = createElement("DIV");
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const events = [];
+
+  function firstCleanup() {
+    events.push("first:cleanup");
+  }
+  function secondCleanup() {
+    events.push("second:cleanup");
+  }
+  function firstRef(value) {
+    events.push(`first:attach:${value.localName}`);
+    return firstCleanup;
+  }
+  function secondRef(value) {
+    events.push(`second:attach:${value.localName}`);
+    return secondCleanup;
+  }
+
+  const initialProps = {id: "message", ref: firstRef};
+  const updateProps = {id: "message", ref: secondRef};
+  componentTree.attachHostInstanceNode(node, token, initialProps);
+
+  const initialAttach = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "initial-finished-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "first-ref-handle"},
+    ref: firstRef,
+    sourceToken: "commit-token:first-attach"
+  });
+
+  const updateDetach = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "update-current-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "first-ref-handle"},
+    ref: firstRef,
+    refCleanup: firstCleanup,
+    expectedLatestRef: secondRef,
+    sourceToken: "deletion-token:first-cleanup",
+    detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
+  });
+  const updateAttach = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "update-finished-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "second-ref-handle"},
+    ref: secondRef,
+    sourceToken: "commit-token:second-attach"
+  });
+  const unmountDetach = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "unmount-current-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "second-ref-handle"},
+    ref: secondRef,
+    refCleanup: secondCleanup,
+    sourceToken: "deletion-token:second-cleanup",
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+
+  const diagnostic =
+    bridge.createRefCallbackHostOutputOrderingDiagnostic(
+      [create, initialRender, updateRender, unmount],
+      {
+        steps: [
+          {
+            hostOutputCanary: "initial-host-output",
+            label: "initial-ref-attach",
+            rootCommitRefMetadata: {
+              detach: [],
+              attach: [initialAttach]
+            }
+          },
+          {
+            hostOutputCanary: "update-host-output",
+            latestPropsUpdates: [
+              {
+                hostInstanceToken: token,
+                latestProps: updateProps
+              }
+            ],
+            label: "update-ref-change",
+            rootCommitRefMetadata: {
+              detach: [updateDetach],
+              attach: [updateAttach]
+            }
+          },
+          {
+            hostOutputCanary: "unmount-host-output",
+            label: "unmount-ref-cleanup",
+            rootCommitRefMetadata: {
+              detach: [unmountDetach],
+              attach: []
+            }
+          }
+        ]
+      }
+    );
+
+  assert.equal(
+    diagnostic.$$typeof,
+    rootBridge.privateRootRefCallbackHostOutputOrderingDiagnosticRecordType
+  );
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED
+  );
+  assert.equal(
+    rootBridge.isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.deepEqual(diagnostic.sourceOperations, [
+    "create",
+    "render",
+    "render",
+    "unmount"
+  ]);
+  assert.deepEqual(diagnostic.sourceRequestTypes, [
+    "createRoot",
+    "root.render",
+    "root.render",
+    "root.unmount"
+  ]);
+  assert.equal(diagnostic.updateRenderRequestCount, 1);
+  assert.equal(diagnostic.unmountRequestCount, 1);
+  assert.equal(diagnostic.updateBeforeUnmount, true);
+  assert.equal(diagnostic.refOrderingStepCount, 3);
+  assert.equal(diagnostic.refOrderingRecordCount, 4);
+  assert.equal(diagnostic.callbackIdentityChangedCount, 1);
+  assert.equal(diagnostic.callbackIdentityStableCount, 2);
+  assert.equal(diagnostic.callbackCleanupReturnCount, 2);
+  assert.equal(diagnostic.cleanupReturnMatchedCount, 2);
+  assert.equal(diagnostic.cleanupInvocationAttemptCount, 2);
+  assert.equal(diagnostic.callbackNullDetachAttemptCount, 0);
+  assert.equal(diagnostic.hostIdentityReusedAfterDetachCount, 1);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.domMutation, false);
+  assert.equal(diagnostic.rootErrorsReported, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.deepEqual(events, [
+    "first:attach:div",
+    "first:cleanup",
+    "second:attach:div",
+    "second:cleanup"
+  ]);
+
+  const diagnosticPayload =
+    rootBridge.getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload(
+      diagnostic
+    );
+  assert.equal(diagnosticPayload.rootRequestRecords[0], create);
+  assert.equal(diagnosticPayload.rootRequestRecords[2], updateRender);
+  assert.equal(diagnosticPayload.rootRequestRecords[3], unmount);
+  assert.equal(
+    diagnosticPayload.refOrderingSnapshot,
+    diagnostic.refOrderingSnapshot
+  );
+
+  const snapshot = diagnostic.refOrderingSnapshot;
+  assert.equal(
+    snapshot.$$typeof,
+    refCallbackGate
+      .privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType
+  );
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot(
+      snapshot
+    ),
+    true
+  );
+  assert.deepEqual(
+    snapshot.records.map((record) => [
+      record.sequence,
+      record.hostOutputCanary,
+      record.action,
+      record.callbackIdentityStatus,
+      record.hostIdentityStatus,
+      record.cleanupReturnMatchesPreviousAttach,
+      record.cleanupReturnInvoked,
+      record.callbackCleanupReturnRecorded
+    ]),
+    [
+      [
+        0,
+        "initial-host-output",
+        refCallbackGate.REF_ACTION_ATTACH,
+        "new-active-ref",
+        "new-host",
+        null,
+        false,
+        true
+      ],
+      [
+        1,
+        "update-host-output",
+        refCallbackGate.REF_ACTION_DETACH,
+        "matches-active-ref",
+        "matches-active-host",
+        true,
+        true,
+        false
+      ],
+      [
+        2,
+        "update-host-output",
+        refCallbackGate.REF_ACTION_ATTACH,
+        "changed-from-detached-ref",
+        "reused-from-detach",
+        null,
+        false,
+        true
+      ],
+      [
+        3,
+        "unmount-host-output",
+        refCallbackGate.REF_ACTION_DETACH,
+        "matches-active-ref",
+        "matches-active-host",
+        true,
+        true,
+        false
+      ]
+    ]
+  );
+
+  const updateAttachPayload =
+    refCallbackGate
+      .getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(
+        snapshot.records[2]
+      );
+  assert.equal(updateAttachPayload.metadata.ref, secondRef);
+  assert.equal(updateAttachPayload.detachedRefBeforeRecord.ref, firstRef);
+  assert.equal(
+    updateAttachPayload.controlledRecordPayload.cleanupReturn,
+    secondCleanup
+  );
+  for (const record of snapshot.records) {
+    assert.equal(Object.hasOwn(record, "ref"), false);
+    assert.equal(Object.hasOwn(record, "node"), false);
+    assert.equal(Object.hasOwn(record, "latestProps"), false);
+    assert.equal(record.publicRootsTouched, false);
+    assert.equal(record.compatibilityClaimed, false);
+  }
+
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("private controlled DOM ref callback invocation gate records errors without root reporting", () => {
   const rootOwner = {kind: "PrivateControlledErrorRoot"};
   const hostOwner = {kind: "PrivateControlledErrorHost"};
@@ -759,5 +1038,15 @@ function createElement(localName) {
     localName: localName.toLowerCase(),
     nodeType: 1,
     parentNode: null
+  };
+}
+
+function createContainer(nodeName) {
+  return {
+    __mutationLog: [],
+    addEventListener() {},
+    nodeName,
+    nodeType: 1,
+    ownerDocument: null
   };
 }

@@ -35,6 +35,7 @@ const {
   isPrivateHydrationBoundaryRecord
 } = require('./hydration-boundary-gate.js');
 const {hasListeningMarker} = require('../events/listener-registry.js');
+const refCallbackGate = require('./ref-callback-gate.js');
 const {
   ROOT_LISTENERS_REGISTERED,
   describePortalContainerListenerGuard,
@@ -97,6 +98,8 @@ const privateRootPortalFakeDomMountRecordType =
   'fast.react_dom.private_root_portal_fake_dom_mount_record';
 const privateRootHostOutputUpdateHandoffRecordType =
   'fast.react_dom.private_root_host_output_update_handoff_record';
+const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
+  'fast.react_dom.private_root_ref_callback_host_output_ordering_diagnostic_record';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -138,6 +141,8 @@ const ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED =
   'blocked-public-root-portal-mounting';
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-host-output-update';
+const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
+  'admitted-private-root-ref-callback-host-output-ordering-diagnostic';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -523,6 +528,44 @@ const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES = freezeArray([
     reason: 'React DOM root update compatibility remains unclaimed.'
   })
 ]);
+const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'public-root-execution',
+    blocked: true,
+    reason:
+      'The diagnostic consumes private bridge records and does not execute public React DOM roots.'
+  }),
+  freezeRecord({
+    id: 'reconciler-execution',
+    blocked: true,
+    reason:
+      'The diagnostic validates request metadata without running the reconciler.'
+  }),
+  freezeRecord({
+    id: 'dom-mutation-through-public-root',
+    blocked: true,
+    reason:
+      'Host-output evidence is private fake-DOM canary data, not public root DOM mutation.'
+  }),
+  freezeRecord({
+    id: 'object-ref-mutation',
+    blocked: true,
+    reason:
+      'Object ref writes remain outside this callback-ref ordering diagnostic.'
+  }),
+  freezeRecord({
+    id: 'root-error-propagation',
+    blocked: true,
+    reason:
+      'Ref callback errors are captured by the private gate and are not routed to root error callbacks.'
+  }),
+  freezeRecord({
+    id: 'compatibility-claims',
+    blocked: true,
+    reason:
+      'React DOM ref compatibility is not claimed by this private diagnostic.'
+  })
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -544,6 +587,7 @@ const rootUnmountHostOutputCleanupRecords = new WeakMap();
 const rootPortalFakeDomMountPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffRecords = new WeakMap();
+const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -663,6 +707,13 @@ function createPrivateRootBridgeShell(options) {
         record,
         options
       );
+    },
+    createRefCallbackHostOutputOrderingDiagnostic(rootRequestRecords, options) {
+      return createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
+        bridgeState,
+        rootRequestRecords,
+        options
+      );
     }
   });
 }
@@ -770,10 +821,20 @@ function createPortalFakeDomMountDiagnosticRecord(record, options) {
   );
 }
 
+function createRefCallbackHostOutputOrderingDiagnosticRecord(
+  rootRequestRecords,
+  options
+) {
+  return createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
+    null,
+    rootRequestRecords,
+    options
+  );
+}
+
 function applyPrivateRootHostOutputUpdate(record, options) {
   return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
 }
-
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
   if (bridgeState !== null && validation.bridgeState !== bridgeState) {
@@ -1671,6 +1732,16 @@ function getPrivateRootHostOutputUpdateHandoffPayload(record) {
 
 function isPrivateRootHostOutputUpdateHandoffRecord(value) {
   return rootHostOutputUpdateHandoffPayloads.has(value);
+}
+
+function getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload(record) {
+  return (
+    rootRefCallbackHostOutputOrderingDiagnosticPayloads.get(record) || null
+  );
+}
+
+function isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord(value) {
+  return rootRefCallbackHostOutputOrderingDiagnosticPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -2990,6 +3061,125 @@ function getFirstChild(parent) {
     : null;
 }
 
+function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
+  bridgeState,
+  rootRequestRecords,
+  options
+) {
+  const requestValidation =
+    validateRefCallbackHostOutputOrderingDiagnosticRequests(
+      bridgeState,
+      rootRequestRecords
+    );
+  const refOrderingSnapshot =
+    refCallbackGate.createRefCallbackHostOutputOrderingDiagnosticSnapshot(
+      options
+    );
+  const refOrderingPayload =
+    refCallbackGate.getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload(
+      refOrderingSnapshot
+    );
+
+  if (refOrderingPayload === null) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Expected a private React DOM ref callback host-output ordering diagnostic snapshot.'
+    );
+  }
+  if (
+    refOrderingSnapshot.updateCanaryStepCount < 1 ||
+    refOrderingSnapshot.unmountCanaryStepCount < 1
+  ) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Ref callback host-output ordering diagnostics require update and unmount canary steps.'
+    );
+  }
+
+  const rootBridgeState = requestValidation.bridgeState;
+  const updateBeforeUnmount =
+    requestValidation.lastUpdateRenderRequest.requestSequence <
+    requestValidation.firstUnmountRequest.requestSequence;
+  if (!updateBeforeUnmount) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Ref callback host-output ordering diagnostics require update render before unmount.'
+    );
+  }
+
+  const record = freezeRecord({
+    $$typeof: privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
+    kind:
+      'FastReactDomPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord',
+    diagnosticStatus:
+      ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    rootId: requestValidation.rootId,
+    rootKind: requestValidation.rootKind,
+    rootTag: requestValidation.rootTag,
+    sourceRequestCount: requestValidation.records.length,
+    sourceRequestIds: freezeArray(
+      requestValidation.records.map((requestRecord) => requestRecord.requestId)
+    ),
+    sourceRequestTypes: freezeArray(
+      requestValidation.records.map(
+        (requestRecord) => requestRecord.requestType
+      )
+    ),
+    sourceOperations: freezeArray(
+      requestValidation.records.map((requestRecord) => requestRecord.operation)
+    ),
+    sourceUpdateIds: freezeArray(
+      requestValidation.records.map(
+        (requestRecord) => requestRecord.updateId || null
+      )
+    ),
+    updateRenderRequestCount: requestValidation.updateRenderRequests.length,
+    unmountRequestCount: requestValidation.unmountRequests.length,
+    updateBeforeUnmount,
+    refOrderingStatus: refOrderingSnapshot.status,
+    refOrderingStepCount: refOrderingSnapshot.stepCount,
+    refOrderingRecordCount: refOrderingSnapshot.recordCount,
+    callbackIdentityStableCount:
+      refOrderingSnapshot.callbackIdentityStableCount,
+    callbackIdentityChangedCount:
+      refOrderingSnapshot.callbackIdentityChangedCount,
+    callbackIdentityMissingCount:
+      refOrderingSnapshot.callbackIdentityMissingCount,
+    callbackCleanupReturnCount: refOrderingSnapshot.callbackCleanupReturnCount,
+    cleanupReturnMatchedCount: refOrderingSnapshot.cleanupReturnMatchedCount,
+    cleanupInvocationAttemptCount:
+      refOrderingSnapshot.cleanupInvocationAttemptCount,
+    callbackNullDetachAttemptCount:
+      refOrderingSnapshot.callbackNullDetachAttemptCount,
+    hostIdentityReusedAfterDetachCount:
+      refOrderingSnapshot.hostIdentityReusedAfterDetachCount,
+    refOrderingSnapshot,
+    blockedCapabilities:
+      ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    objectRefsMutated: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false
+  });
+
+  rootRefCallbackHostOutputOrderingDiagnosticPayloads.set(record, {
+    bridgeState: rootBridgeState,
+    refOrderingPayload,
+    refOrderingSnapshot,
+    rootRequestRecords: requestValidation.records
+  });
+
+  return record;
+}
+
 function createNativeBridgeHandle(bridgeState, kind) {
   return freezeRecord({
     $$typeof: privateRootNativeBridgeHandleType,
@@ -3651,6 +3841,82 @@ function validatePortalFakeDomMountHandoffRecord(record) {
   };
 }
 
+function validateRefCallbackHostOutputOrderingDiagnosticRequests(
+  bridgeState,
+  rootRequestRecords
+) {
+  if (!Array.isArray(rootRequestRecords) || rootRequestRecords.length === 0) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Ref callback host-output ordering diagnostics require private root request records.'
+    );
+  }
+
+  const validations = rootRequestRecords.map((record) => ({
+    record,
+    validation: validateRootBridgeRequestRecord(record)
+  }));
+  const firstValidation = validations[0].validation;
+  if (bridgeState !== null && firstValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const rootId = validations[0].record.rootId;
+  const rootKind = validations[0].record.rootKind;
+  const rootTag = validations[0].record.rootTag;
+  const updateRenderRequests = [];
+  const unmountRequests = [];
+
+  for (const {record, validation} of validations) {
+    if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+      throwForeignRootBridgeRequest();
+    }
+    if (validation.bridgeState !== firstValidation.bridgeState) {
+      throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+        'Ref callback host-output ordering diagnostics require one private root bridge shell.'
+      );
+    }
+    if (
+      record.rootId !== rootId ||
+      record.rootKind !== rootKind ||
+      record.rootTag !== rootTag
+    ) {
+      throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+        'Ref callback host-output ordering diagnostics require one root identity.'
+      );
+    }
+
+    if (record.operation === 'render' && record.renderCount > 1) {
+      updateRenderRequests.push(record);
+    } else if (record.operation === 'unmount' && record.noOp === false) {
+      unmountRequests.push(record);
+    }
+  }
+
+  if (updateRenderRequests.length === 0) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Ref callback host-output ordering diagnostics require a private update render request.'
+    );
+  }
+  if (unmountRequests.length === 0) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Ref callback host-output ordering diagnostics require a private unmount request.'
+    );
+  }
+
+  return {
+    bridgeState: firstValidation.bridgeState,
+    firstUnmountRequest: unmountRequests[0],
+    lastUpdateRenderRequest:
+      updateRenderRequests[updateRenderRequests.length - 1],
+    records: validations.map(({record}) => record),
+    rootId,
+    rootKind,
+    rootTag,
+    unmountRequests,
+    updateRenderRequests
+  };
+}
+
 function assertPortalBoundaryStillBlocked(record) {
   if (
     record.nativeExecution !== false ||
@@ -3924,6 +4190,13 @@ function throwInvalidHostOutputUpdateHandoff(message) {
   throw error;
 }
 
+function throwInvalidRefCallbackHostOutputOrderingDiagnostic(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC';
+  throw error;
+}
+
 function describeCreateRootMarkerGuard(container, options) {
   const warningMessage = getCreateRootWarning(container, options);
   return freezeRecord({
@@ -4077,6 +4350,8 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED,
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
+  ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_BLOCKED_CAPABILITIES,
@@ -4109,6 +4384,7 @@ module.exports = {
   createPrivateRootBridgeShell,
   createPrivateRootHandle,
   createPrivateRootOwner,
+  createRefCallbackHostOutputOrderingDiagnosticRecord,
   createRootRenderRecord,
   createRootUnmountRecord,
   createRootUpdateRecord,
@@ -4122,6 +4398,7 @@ module.exports = {
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootPortalFakeDomMountPayload,
+  getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
   getPrivateRootUnmountHostOutputCleanupPayload,
   getRootOwnerFromHandle,
@@ -4133,6 +4410,7 @@ module.exports = {
   isPrivateRootPortalFakeDomMountRecord,
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootUnmountHostOutputCleanupRecord,
+  isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRootHandle,
   isPrivateRootOwner,
   privateRootAdmissionRecordType,
@@ -4148,6 +4426,7 @@ module.exports = {
   privateRootPortalCommitHandoffRecordType,
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
+  privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootHydrateRecordType,
