@@ -137,6 +137,52 @@ assert.equal(
   nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parserGateStatus
 );
 assert.equal(shapeGate.jsonTransportSmoke.parserGate.nativeExecution, false);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.batchGateStatus,
+  'validated-native-root-bridge-batched-json-transport-records'
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.lifecycleRows.map(
+    (row) => row.lifecycleTransition
+  ),
+  ['none->active', 'active->active', 'active->retired']
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.lifecycleRows.map(
+    (row) => row.status
+  ),
+  ['accepted', 'accepted', 'accepted']
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.errorRows.map(
+    (row) => row.id
+  ),
+  nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.batchedRecordGate
+    .jsonTransportBatchErrorCaseIds
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.errorRows.map(
+    (row) => row.code
+  ),
+  [
+    'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+    'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+    'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
+    'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
+    'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER'
+  ]
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.errorRows.every(
+    (row) =>
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.reactBehaviorError === false
+  ),
+  true
+);
 assert.deepEqual(
   shapeGate.jsonTransportSmoke.parserGate.deterministicParseErrors.map(
     (error) => error.code
