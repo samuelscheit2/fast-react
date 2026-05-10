@@ -39,6 +39,11 @@ const eventListener = require(path.join(
   'events',
   'react-dom-event-listener.js'
 ));
+const pluginEventSystem = require(path.join(
+  sourceRoot,
+  'events',
+  'plugin-event-system.js'
+));
 
 const resourceOracle = require(path.join(
   repoRoot,
@@ -4267,6 +4272,317 @@ test('private controlled restore queue write preflight records deterministic wri
   }
   assert.equal(Object.hasOwn(skippedDispatch.targetNode, '_valueTracker'), false);
   componentTree.detachHostInstanceToken(skippedDispatch.token);
+});
+
+test('private input/change controlled restore bridge records latest-props links only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'input-change-bridge'
+    });
+  const bridgeAdmission = {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-input-change-event-controlled-restore-bridge',
+    queueId: 'input-change-controlled-restore-bridge',
+    targetKind: 'controlled-input-change-event-restore-queue-bridge'
+  };
+  const rows = [
+    {
+      domEventName: 'input',
+      latestProps: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'text-input-change-bridge'
+    },
+    {
+      domEventName: 'click',
+      latestProps: {
+        type: 'checkbox',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'checkbox-input-change-bridge'
+    }
+  ];
+  const records = rows.map((row) => {
+    const dispatch = createControlledInputEventDispatch({
+      domEventName: row.domEventName,
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      value: 'browser-mutated'
+    });
+    const inputPreflight =
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        dispatch.dispatchRecord
+      );
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+    return {dispatch, inputPreflight, intent, row};
+  });
+  const writePreflight = gate.preflightRestoreQueueWrites(
+    records.map(({intent}) => intent),
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+      queueId: 'input-change-bridge-write-preflight',
+      targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+    }
+  );
+  const bridge = gate.recordInputChangeEventControlledRestoreBridge(
+    records[1].inputPreflight,
+    records[1].intent,
+    writePreflight,
+    bridgeAdmission
+  );
+
+  assert.equal(Object.isFrozen(bridge), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecord(
+      bridge
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecordPayload(
+      bridge
+    ),
+    bridge
+  );
+  assert.equal(
+    bridge.$$typeof,
+    controlledRestoreQueue
+      .privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType
+  );
+  assert.equal(
+    bridge.status,
+    controlledRestoreQueue
+      .controlledInputPostEventRestoreQueueInputChangeBridgeStatus
+  );
+  assert.equal(bridge.requestId, 'input-change-bridge:4');
+  assert.equal(
+    bridge.sourceInputChangePreflight.sourceRecordKind,
+    pluginEventSystem.INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND
+  );
+  assert.equal(
+    bridge.sourceInputChangePreflight.controlledRestoreBridgeEligible,
+    true
+  );
+  assert.equal(
+    bridge.sourceRestoreQueueRecord.requestId,
+    'input-change-bridge:2'
+  );
+  assert.equal(
+    bridge.sourceWritePreflight.matchedRowId,
+    'input-change-bridge:3:row:2'
+  );
+  assert.deepEqual(bridge.bridgeRows.map((row) => ({
+    rowId: row.rowId,
+    sourceRestoreRequestId: row.sourceRestoreRequestId,
+    sourceWriteIntentRowId: row.sourceWriteIntentRowId,
+    domEventName: row.domEventName,
+    inputType: row.inputType,
+    controlKind: row.controlKind,
+    acceptedRestoreKind: row.acceptedRestoreKind,
+    queueSlot: row.queueSlot,
+    queueSlotIndex: row.queueSlotIndex,
+    latestPropsEvidenceLinked: row.latestPropsEvidenceLinked,
+    latestPropsEvidenceMatch: row.latestPropsEvidenceMatch,
+    restoreWritePreflightFresh: row.restoreWritePreflightFresh,
+    eventDispatch: row.eventDispatch,
+    syntheticEventCreated: row.syntheticEventCreated,
+    valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+    restoreQueueWritten: row.restoreQueueWritten,
+    restoreQueueFlushed: row.restoreQueueFlushed,
+    hostWrapperInvoked: row.hostWrapperInvoked,
+    browserInputMutated: row.browserInputMutated
+  })), [
+    {
+      rowId: 'input-change-bridge:4:row:1',
+      sourceRestoreRequestId: 'input-change-bridge:2',
+      sourceWriteIntentRowId: 'input-change-bridge:3:row:2',
+      domEventName: 'click',
+      inputType: 'checkbox',
+      controlKind: 'checked',
+      acceptedRestoreKind: 'input-checkbox-checked',
+      queueSlot: 'restore-queue',
+      queueSlotIndex: 0,
+      latestPropsEvidenceLinked: true,
+      latestPropsEvidenceMatch: true,
+      restoreWritePreflightFresh: true,
+      eventDispatch: false,
+      syntheticEventCreated: false,
+      valueTrackerFieldWritten: false,
+      restoreQueueWritten: false,
+      restoreQueueFlushed: false,
+      hostWrapperInvoked: false,
+      browserInputMutated: false
+    }
+  ]);
+  assert.equal(
+    bridge.latestPropsEvidenceBridge.latestPropsEvidenceLinked,
+    true
+  );
+  assert.equal(
+    bridge.latestPropsEvidenceBridge.latestPropsEvidenceMatch,
+    true
+  );
+  assert.deepEqual(bridge.latestPropsEvidenceBridge.restorePropKeys, [
+    'checked',
+    'onChange',
+    'onClick',
+    'type'
+  ]);
+  assert.equal(bridge.postEventRestoreBoundary.restoreQueueWritten, false);
+  assert.equal(bridge.postEventRestoreBoundary.restoreQueueFlushed, false);
+  assert.equal(bridge.sideEffects.inputChangeEventExtractionPreflightAccepted, true);
+  assert.equal(bridge.sideEffects.inputChangeControlledRestoreBridgeRecorded, true);
+  assert.equal(bridge.sideEffects.inputChangeControlledRestoreBridgeRowsCreated, true);
+  assert.equal(bridge.sideEffects.latestPropsEvidenceAccepted, true);
+  assert.equal(bridge.sideEffects.restoreQueueWritten, false);
+  assert.equal(bridge.sideEffects.restoreQueueFlushed, false);
+  assert.equal(bridge.sideEffects.hostWrapperInvoked, false);
+  assert.equal(bridge.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(bridge.sideEffects.browserInputMutated, false);
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(
+    summary.recordsInputChangeEventControlledRestoreBridge,
+    true
+  );
+  assert.equal(
+    summary.inputChangeEventControlledRestoreBridge
+      .consumesChangeEventExtractionPreflight,
+    true
+  );
+  assert.equal(
+    summary.inputChangeEventControlledRestoreBridge
+      .consumesControlledRestoreLatestPropsEvidence,
+    true
+  );
+  assert.equal(
+    summary.inputChangeEventControlledRestoreBridge.restoreQueueWrites,
+    false
+  );
+  assert.equal(
+    summary.inputChangeEventControlledRestoreBridge.liveDomMutations,
+    false
+  );
+
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        {},
+        records[0].intent,
+        writePreflight,
+        bridgeAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      compatibilityTarget,
+      reason:
+        'expected a private input/change event extraction preflight record'
+    }
+  );
+
+  const unsupportedDispatch = createControlledInputEventDispatch({
+    domEventName: 'change',
+    latestProps: {
+      type: 'file',
+      value: 'ignored',
+      onChange() {}
+    },
+    nodeName: 'INPUT'
+  });
+  const unsupportedPreflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      unsupportedDispatch.dispatchRecord
+    );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        unsupportedPreflight,
+        records[0].intent,
+        writePreflight,
+        bridgeAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      compatibilityTarget,
+      reason: 'unsupported-input-change-target-or-event'
+    }
+  );
+
+  const staleDispatch = createControlledInputEventDispatch({
+    domEventName: 'input',
+    latestProps: {
+      type: 'text',
+      value: 'fresh',
+      onChange() {},
+      onInput() {}
+    },
+    nodeName: 'INPUT'
+  });
+  const stalePreflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      staleDispatch.dispatchRecord
+    );
+  const staleIntent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    staleDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-event-latest-props-post-event-restore-queue',
+      queueId: 'stale-input-change-bridge',
+      eventName: 'input',
+      targetKind: 'controlled-input-post-event-restore-queue'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreBridge(
+        stalePreflight,
+        staleIntent,
+        writePreflight,
+        bridgeAdmission
+      ),
+    {
+      code:
+        controlledRestoreQueue
+          .controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
+      compatibilityTarget,
+      reason: 'stale-restore-queue-preflight-source-missing'
+    }
+  );
+
+  for (const {dispatch} of records) {
+    assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+  assert.equal(Object.hasOwn(unsupportedDispatch.targetNode, '_valueTracker'), false);
+  assert.equal(Object.hasOwn(staleDispatch.targetNode, '_valueTracker'), false);
+  componentTree.detachHostInstanceToken(unsupportedDispatch.token);
+  componentTree.detachHostInstanceToken(staleDispatch.token);
 });
 
 test('private controlled restore queue write execution records mutation intent only', () => {

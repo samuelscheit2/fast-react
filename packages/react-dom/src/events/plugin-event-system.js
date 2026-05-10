@@ -1096,6 +1096,13 @@ function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
       targetMetadata,
       controlledMetadata
     );
+  const controlledRestoreQueuePreflightBridge =
+    createInputChangeEventPreflightControlledRestoreQueueBridge(
+      targetMetadata,
+      latestPropsEvidence,
+      controlledMetadata,
+      extractionMetadata
+    );
   const dispatchBehavior = createInputChangeEventPreflightDispatchBehavior(
     normalizedDispatchRecord,
     extractionMetadata
@@ -1114,6 +1121,7 @@ function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
     controlledMetadata,
     controlledMetadataAvailable:
       controlledMetadata.controlledMetadataAvailable,
+    controlledRestoreQueuePreflightBridge,
     defaultBehavior,
     defaultBehaviorChanged: false,
     dispatchBehavior,
@@ -1380,6 +1388,58 @@ function createInputChangeEventPreflightExtractionMetadata(
   });
 }
 
+function createInputChangeEventPreflightControlledRestoreQueueBridge(
+  targetMetadata,
+  latestPropsEvidence,
+  controlledMetadata,
+  extractionMetadata
+) {
+  const bridgeEligible =
+    extractionMetadata.targetEligible === true &&
+    latestPropsEvidence.accepted === true &&
+    controlledMetadata.controlled === true;
+
+  return Object.freeze({
+    status: bridgeEligible
+      ? 'blocked-before-controlled-restore-queue-preflight-bridge'
+      : 'blocked-unsupported-controlled-restore-queue-preflight-bridge',
+    blockedReason: INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE,
+    metadataOnly: true,
+    pluginName: CHANGE_EVENT_PLUGIN_NAME,
+    reactName: 'onChange',
+    reactEventType: 'change',
+    hostTag: targetMetadata.hostTag,
+    inputType: targetMetadata.inputType,
+    targetKind: targetMetadata.targetKind,
+    controlledPropName: controlledMetadata.controlledPropName,
+    controlled: controlledMetadata.controlled,
+    targetEligible: extractionMetadata.targetEligible,
+    latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+    controlledMetadataAvailable:
+      controlledMetadata.controlledMetadataAvailable,
+    controlledRestoreLatestPropsEvidenceRequired:
+      extractionMetadata.targetEligible,
+    controlledRestoreLatestPropsEvidenceAvailable:
+      controlledMetadata.controlledRestoreMetadataAvailable,
+    bridgeEligible,
+    bridgeRecordCreated: false,
+    bridgeRowsCreated: false,
+    restoreQueuePreflightRequiredIfValueChanged:
+      extractionMetadata.targetEligible,
+    restoreQueuePreflightRecorded: false,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    controlledStateRestoreScheduled: false,
+    controlledStateRestoreInvoked: false,
+    hostWrapperInvoked: false,
+    valueTrackerFieldWritten: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    rawLatestPropsRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createInputChangeEventPreflightDispatchBehavior(
   dispatchRecord,
   extractionMetadata
@@ -1424,10 +1484,12 @@ function createInputChangeEventPreflightSideEffects(
 ) {
   return Object.freeze({
     browserListenerInstallation: false,
+    browserInputMutated: false,
     compatibilityClaimed: false,
     controlledMetadataRead:
       controlledMetadata.controlledMetadataAvailable,
     controlledStateRestoreScheduled: false,
+    controlledRestoreQueuePreflightBridgeRecorded: false,
     defaultBehaviorChanged: false,
     dispatchQueueMutated: false,
     hostValueRead: false,

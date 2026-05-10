@@ -15,10 +15,15 @@ const {
   privateControlledInputValueTrackerFakeDomDiagnosticRecordType
 } = require('../resource-form-internals-gate.js');
 const {
+  CHANGE_EVENT_PLUGIN_NAME,
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
-  PLUGIN_EXTRACTION_BLOCKED_CODE
+  INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE,
+  INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
+  PLUGIN_EXTRACTION_BLOCKED_CODE,
+  PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
+  getInputChangeEventExtractionPreflightRecordPayload
 } = require('../events/plugin-event-system.js');
 
 const controlledInputPostEventRestoreQueueGateSchemaVersion = 1;
@@ -36,6 +41,10 @@ const privateControlledInputPostEventRestoreQueueWriteExecutionRowType =
   'fast.react_dom.private_controlled_input_post_event_restore_queue_write_execution_row';
 const privateControlledInputPostEventRestoreQueueFlushBlockerRecordType =
   'fast.react_dom.private_controlled_input_post_event_restore_queue_flush_blocker_record';
+const privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType =
+  'fast.react_dom.private_controlled_input_change_event_restore_queue_bridge_record';
+const privateControlledInputPostEventRestoreQueueInputChangeBridgeRowType =
+  'fast.react_dom.private_controlled_input_change_event_restore_queue_bridge_row';
 const controlledInputPostEventRestoreQueueStatus =
   'private-controlled-input-post-event-restore-queue-intent';
 const controlledInputPostEventRestoreQueueIntentRecordedStatus =
@@ -68,6 +77,10 @@ const controlledInputPostEventRestoreQueueWriteExecutionRowStatus =
   'recorded-private-controlled-input-post-event-restore-queue-write-execution-row';
 const controlledInputPostEventRestoreQueueFlushBlockerStatus =
   'private-controlled-input-post-event-restore-queue-flush-blocker';
+const controlledInputPostEventRestoreQueueInputChangeBridgeStatus =
+  'private-controlled-input-change-event-restore-queue-bridge';
+const controlledInputPostEventRestoreQueueInputChangeBridgeRowStatus =
+  'recorded-private-input-change-event-controlled-restore-latest-props-bridge-row';
 const controlledInputPostEventRestoreQueueInvalidEventCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_EVENT';
 const controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode =
@@ -80,6 +93,8 @@ const controlledInputPostEventRestoreQueueInvalidWriteExecutionCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_WRITE_EXECUTION';
 const controlledInputPostEventRestoreQueueInvalidFlushBlockerCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_FLUSH_BLOCKER';
+const controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_CHANGE_EVENT_RESTORE_QUEUE_INVALID_BRIDGE';
 const controlledInputPostEventRestoreQueueInvalidLatestPropsCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_LATEST_PROPS';
 const controlledInputPostEventRestoreQueueInvalidRecordCode =
@@ -106,14 +121,19 @@ const controlledInputPostEventRestoreQueueWriteExecutionPayloads =
   new WeakMap();
 const controlledInputPostEventRestoreQueueFlushBlockerPayloads =
   new WeakMap();
+const controlledInputPostEventRestoreQueueInputChangeBridgePayloads =
+  new WeakMap();
 const defaultControlledInputPostEventRestoreQueueGate =
   createControlledInputPostEventRestoreQueueGate();
 
 const controlledInputPostEventRestoreQueueNoSideEffects = freezeRecord({
   eventDispatchRecordAccepted: false,
   fakeDomTrackerObservationAccepted: false,
+  inputChangeEventExtractionPreflightAccepted: false,
   latestPropsEvidenceAccepted: false,
   latestPropsMetadataRead: false,
+  inputChangeControlledRestoreBridgeRecorded: false,
+  inputChangeControlledRestoreBridgeRowsCreated: false,
   postEventRestoreIntentRecorded: false,
   postEventRestoreIntentSkipped: false,
   fakeDomValueChangeObserved: false,
@@ -210,6 +230,20 @@ function createControlledInputPostEventRestoreQueueGate(options) {
         preflightRecord,
         admission
       );
+    },
+    recordInputChangeEventControlledRestoreBridge(
+      inputChangePreflightRecord,
+      restoreRecord,
+      writePreflightRecord,
+      admission
+    ) {
+      return recordControlledInputChangeEventRestoreQueueBridgeWithGate(
+        gateState,
+        inputChangePreflightRecord,
+        restoreRecord,
+        writePreflightRecord,
+        admission
+      );
     }
   });
 }
@@ -260,6 +294,21 @@ function recordControlledInputPostEventRestoreQueueFlushBlocker(
 ) {
   return defaultControlledInputPostEventRestoreQueueGate
     .recordRestoreQueueFlushBlocker(preflightRecord, admission);
+}
+
+function recordControlledInputChangeEventRestoreQueueBridge(
+  inputChangePreflightRecord,
+  restoreRecord,
+  writePreflightRecord,
+  admission
+) {
+  return defaultControlledInputPostEventRestoreQueueGate
+    .recordInputChangeEventControlledRestoreBridge(
+      inputChangePreflightRecord,
+      restoreRecord,
+      writePreflightRecord,
+      admission
+    );
 }
 
 function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate(
@@ -700,6 +749,108 @@ function recordControlledInputPostEventRestoreQueueFlushBlockerWithGate(
   return payload;
 }
 
+function recordControlledInputChangeEventRestoreQueueBridgeWithGate(
+  gateState,
+  inputChangePreflightRecord,
+  restoreRecord,
+  writePreflightRecord,
+  admission
+) {
+  const normalizedAdmission =
+    normalizeInputChangeEventRestoreQueueBridgeAdmission(admission);
+  const inputPreflight =
+    assertInputChangeEventExtractionPreflightForRestoreQueueBridge(
+      inputChangePreflightRecord
+    );
+  const sourceRestoreRecord =
+    assertPrivateControlledInputPostEventRestoreQueueRecord(restoreRecord);
+  const sourceWritePreflight =
+    assertInputChangeEventRestoreQueueBridgeWritePreflight(
+      writePreflightRecord
+    );
+  const sourceWriteRow =
+    findInputChangeEventRestoreQueueBridgeWriteIntentRow(
+      sourceWritePreflight,
+      sourceRestoreRecord
+    );
+  assertInputChangeEventRestoreQueueBridgeSources(
+    inputPreflight,
+    sourceRestoreRecord,
+    sourceWritePreflight,
+    sourceWriteRow
+  );
+
+  const requestSequence = gateState.nextRequestSequence++;
+  const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
+  const bridgeRows = freezeArray([
+    createInputChangeEventRestoreQueueBridgeRow(
+      requestId,
+      requestSequence,
+      inputPreflight,
+      sourceRestoreRecord,
+      sourceWritePreflight,
+      sourceWriteRow
+    )
+  ]);
+  const payload = freezeRecord({
+    schemaVersion: controlledInputPostEventRestoreQueueGateSchemaVersion,
+    $$typeof:
+      privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
+    kind:
+      'FastReactDomPrivateControlledInputChangeEventRestoreQueueBridgeRecord',
+    gateId: controlledInputPostEventRestoreQueueGateId,
+    compatibilityTarget,
+    status: controlledInputPostEventRestoreQueueInputChangeBridgeStatus,
+    unsupportedCode: unimplementedCode,
+    requestId,
+    requestSequence,
+    queueKind: normalizedAdmission.queueKind,
+    queueId: normalizedAdmission.queueId,
+    admission: normalizedAdmission,
+    acceptedInputChangePreflightRecordKind:
+      INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
+    acceptedRestoreQueueRecordType:
+      privateControlledInputPostEventRestoreQueueRecordType,
+    acceptedWritePreflightRecordType:
+      privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
+    acceptedWriteIntentRowType:
+      privateControlledInputPostEventRestoreQueueWriteIntentRowType,
+    sourceInputChangePreflight:
+      createInputChangeEventPreflightBridgeSourceSummary(inputPreflight),
+    sourceRestoreQueueRecord:
+      createInputChangeEventRestoreQueueBridgeRestoreSummary(
+        sourceRestoreRecord
+      ),
+    sourceWritePreflight:
+      createInputChangeEventRestoreQueueBridgeWritePreflightSummary(
+        sourceWritePreflight,
+        sourceWriteRow
+      ),
+    bridgeRows,
+    latestPropsEvidenceBridge:
+      createInputChangeEventRestoreQueueLatestPropsEvidenceBridge(
+        inputPreflight,
+        sourceRestoreRecord,
+        sourceWriteRow
+      ),
+    postEventRestoreBoundary:
+      createInputChangeEventRestoreQueueBridgeBoundary(
+        sourceWritePreflight,
+        bridgeRows
+      ),
+    publicControlledBehaviorBoundary: createPublicControlledBehaviorBoundary(),
+    sideEffects: createInputChangeEventRestoreQueueBridgeSideEffects(
+      bridgeRows
+    )
+  });
+
+  controlledInputPostEventRestoreQueueInputChangeBridgePayloads.set(
+    payload,
+    payload
+  );
+  return payload;
+}
+
 function describeControlledInputPostEventRestoreQueueGate() {
   return freezeRecord({
     schemaVersion: controlledInputPostEventRestoreQueueGateSchemaVersion,
@@ -724,6 +875,7 @@ function describeControlledInputPostEventRestoreQueueGate() {
     recordsRestoreQueueWritePreflight: true,
     recordsRestoreQueueWriteExecution: true,
     recordsRestoreQueueFlushBlocker: true,
+    recordsInputChangeEventControlledRestoreBridge: true,
     acceptedRestoreMetadataKinds:
       controlledInputPostEventRestoreQueueAcceptedRestoreMetadataKinds,
     acceptedWritePreflightSourceRecordType:
@@ -751,6 +903,8 @@ function describeControlledInputPostEventRestoreQueueGate() {
       createPostEventRestoreQueueWriteExecutionSummary(),
     restoreQueueFlushBlocker:
       createPostEventRestoreQueueFlushBlockerSummary(),
+    inputChangeEventControlledRestoreBridge:
+      createInputChangeEventRestoreQueueBridgeSummary(),
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawLatestPropsRetained: false,
@@ -799,6 +953,16 @@ function getPrivateControlledInputPostEventRestoreQueueFlushBlockerRecordPayload
   );
 }
 
+function getPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecordPayload(
+  record
+) {
+  return (
+    controlledInputPostEventRestoreQueueInputChangeBridgePayloads.get(
+      record
+    ) || null
+  );
+}
+
 function isPrivateControlledInputPostEventRestoreQueueRecord(record) {
   return (
     getPrivateControlledInputPostEventRestoreQueueRecordPayload(record) !== null
@@ -830,6 +994,16 @@ function isPrivateControlledInputPostEventRestoreQueueFlushBlockerRecord(
 ) {
   return (
     getPrivateControlledInputPostEventRestoreQueueFlushBlockerRecordPayload(
+      record
+    ) !== null
+  );
+}
+
+function isPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecord(
+  record
+) {
+  return (
+    getPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecordPayload(
       record
     ) !== null
   );
@@ -2234,6 +2408,37 @@ function createPostEventRestoreQueueFlushBlockerSummary() {
   });
 }
 
+function createInputChangeEventRestoreQueueBridgeSummary() {
+  return freezeRecord({
+    status: controlledInputPostEventRestoreQueueInputChangeBridgeStatus,
+    metadataOnly: true,
+    acceptedInputChangePreflightRecordKind:
+      INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
+    acceptedRestoreQueueRecordType:
+      privateControlledInputPostEventRestoreQueueRecordType,
+    acceptedWritePreflightRecordType:
+      privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
+    bridgeRecordType:
+      privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
+    bridgeRowType:
+      privateControlledInputPostEventRestoreQueueInputChangeBridgeRowType,
+    consumesChangeEventExtractionPreflight: true,
+    consumesControlledRestoreLatestPropsEvidence: true,
+    consumesWritePreflightMetadata: true,
+    rejectsUnsupportedInputTypes: true,
+    rejectsStaleWritePreflightMetadata: true,
+    recordsLatestPropsEvidenceBridgeRows: true,
+    eventDispatches: false,
+    syntheticEventCreation: false,
+    valueTrackerWrites: false,
+    restoreQueueWrites: false,
+    restoreQueueFlushes: false,
+    hostWrapperInvocations: false,
+    liveDomMutations: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPostEventRestoreQueueWriteExecutionSourceRows(sourceRows) {
   return freezeArray(
     sourceRows.map((row) =>
@@ -2723,6 +2928,306 @@ function createPostEventRestoreQueueFlushBlockerSideEffects(
   });
 }
 
+function createInputChangeEventPreflightBridgeSourceSummary(
+  inputPreflight
+) {
+  return freezeRecord({
+    sourceRecordKind: inputPreflight.kind,
+    sourceRecordStatus: inputPreflight.status,
+    blockedReason: inputPreflight.blockedReason,
+    pluginName: inputPreflight.pluginName,
+    reactName: inputPreflight.reactName,
+    reactEventType: inputPreflight.reactEventType,
+    domEventName: inputPreflight.domEventName,
+    nativeEventType: inputPreflight.nativeEventType,
+    eventSystemFlags: inputPreflight.eventSystemFlags,
+    hostTag: inputPreflight.targetTag,
+    inputType: inputPreflight.targetType,
+    targetKind: inputPreflight.targetMetadata.targetKind,
+    targetEligible: inputPreflight.extractionMetadata.targetEligible,
+    controlledPropName:
+      inputPreflight.controlledMetadata.controlledPropName,
+    controlled: inputPreflight.controlledMetadata.controlled,
+    latestPropsEvidenceAccepted:
+      inputPreflight.latestPropsEvidence.accepted,
+    latestPropsPropKeys:
+      normalizeBridgePropKeys(inputPreflight.latestPropsEvidence.propKeys),
+    controlledRestoreBridgeEligible:
+      inputPreflight.controlledRestoreQueuePreflightBridge.bridgeEligible,
+    bridgeRecordCreatedBeforeLink:
+      inputPreflight.controlledRestoreQueuePreflightBridge.bridgeRecordCreated,
+    restoreQueuePreflightRecordedBeforeLink:
+      inputPreflight.controlledRestoreQueuePreflightBridge
+        .restoreQueuePreflightRecorded,
+    eventDispatch: inputPreflight.eventDispatch,
+    syntheticEventCount: inputPreflight.syntheticEventCount,
+    listenerInvocationCount: inputPreflight.listenerInvocationCount,
+    restoreQueueWritten: inputPreflight.sideEffects.postEventRestoreQueueWritten,
+    valueTrackerFieldWritten:
+      inputPreflight.sideEffects.valueTrackerFieldWritten,
+    browserInputMutated: inputPreflight.sideEffects.browserInputMutated,
+    compatibilityClaimed: inputPreflight.compatibilityClaimed
+  });
+}
+
+function createInputChangeEventRestoreQueueBridgeRestoreSummary(
+  restoreRecord
+) {
+  return freezeRecord({
+    sourceRecordType:
+      privateControlledInputPostEventRestoreQueueRecordType,
+    sourceRecordKind: restoreRecord.kind,
+    sourceRecordStatus: restoreRecord.status,
+    sourceKind:
+      restoreRecord.sourceKind || restoreRecord.restoreIntent.source,
+    requestId: restoreRecord.requestId,
+    requestSequence: restoreRecord.requestSequence,
+    domEventName: restoreRecord.domEventName,
+    nativeEventType: restoreRecord.nativeEventType,
+    hostTag: restoreRecord.hostTag,
+    inputType: restoreRecord.inputType,
+    controlKind: restoreRecord.controlKind,
+    controlledPropName: restoreRecord.controlledPropName,
+    trackedField: restoreRecord.trackedField,
+    acceptedRestoreKind:
+      restoreRecord.restoreQueueOrdering.acceptedRestoreKind,
+    latestPropsEvidenceAccepted:
+      restoreRecord.latestPropsEvidence.accepted,
+    latestPropsPropKeys:
+      normalizeBridgePropKeys(restoreRecord.latestPropsEvidence.propKeys),
+    eventDispatchRecordAccepted:
+      restoreRecord.restoreIntent.eventDispatchRecordAccepted,
+    eventPluginDispatchPerformed:
+      restoreRecord.restoreIntent.eventPluginDispatchPerformed,
+    restoreIntentRecorded: restoreRecord.restoreIntent.intentRecorded,
+    restoreQueueWritten: restoreRecord.restoreIntent.restoreQueueWritten,
+    restoreQueueFlushed: restoreRecord.restoreIntent.restoreFlushed,
+    controlledStateRestoreInvoked:
+      restoreRecord.restoreIntent.controlledStateRestoreInvoked,
+    hostWrapperInvoked: restoreRecord.sideEffects.hostWrapperInvoked,
+    valueTrackerFieldWritten:
+      restoreRecord.sideEffects.valueTrackerFieldWritten,
+    browserInputMutated: restoreRecord.sideEffects.browserInputMutated,
+    compatibilityClaimed: restoreRecord.sideEffects.compatibilityClaimed
+  });
+}
+
+function createInputChangeEventRestoreQueueBridgeWritePreflightSummary(
+  writePreflight,
+  writeRow
+) {
+  return freezeRecord({
+    sourceRecordType:
+      privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
+    sourceRecordKind: writePreflight.kind,
+    sourceRecordStatus: writePreflight.status,
+    requestId: writePreflight.requestId,
+    requestSequence: writePreflight.requestSequence,
+    acceptedRecordCount: writePreflight.acceptedRecordCount,
+    sourceRequestIds: writePreflight.sourceRequestIds,
+    matchedSourceRequestId: writeRow.sourceRequestId,
+    matchedRowId: writeRow.rowId,
+    matchedRowSequence: writeRow.rowSequence,
+    matchedQueueSlot: writeRow.queueSlot,
+    matchedAcceptedRestoreKind: writeRow.acceptedRestoreKind,
+    restoreQueueWritten: writePreflight.writePlan.restoreQueueWritten,
+    restoreQueueFlushed: writePreflight.writePlan.restoreQueueFlushed,
+    hostWrapperInvoked: writePreflight.writePlan.hostWrapperInvoked,
+    valueTrackerFieldWritten:
+      writePreflight.sideEffects.valueTrackerFieldWritten,
+    browserInputMutated: writePreflight.sideEffects.browserInputMutated,
+    compatibilityClaimed: writePreflight.sideEffects.compatibilityClaimed
+  });
+}
+
+function createInputChangeEventRestoreQueueLatestPropsEvidenceBridge(
+  inputPreflight,
+  restoreRecord,
+  writeRow
+) {
+  const inputPropKeys = normalizeBridgePropKeys(
+    inputPreflight.latestPropsEvidence.propKeys
+  );
+  const restorePropKeys = normalizeBridgePropKeys(
+    restoreRecord.latestPropsEvidence.propKeys
+  );
+
+  return freezeRecord({
+    status:
+      'linked-input-change-extraction-to-controlled-restore-latest-props-evidence',
+    metadataOnly: true,
+    sourceInputChangePreflightRecordKind: inputPreflight.kind,
+    sourceRestoreQueueRecordType:
+      privateControlledInputPostEventRestoreQueueRecordType,
+    sourceWritePreflightRecordType:
+      privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
+    sourceRestoreRequestId: restoreRecord.requestId,
+    sourceWritePreflightRequestId: writeRow.preflightRequestId,
+    sourceWriteIntentRowId: writeRow.rowId,
+    latestPropsEvidenceLinked: true,
+    latestPropsEvidenceMatch: bridgeArraysEqual(
+      inputPropKeys,
+      restorePropKeys
+    ),
+    inputLatestPropsEvidenceAccepted:
+      inputPreflight.latestPropsEvidence.accepted,
+    restoreLatestPropsEvidenceAccepted:
+      restoreRecord.latestPropsEvidence.accepted,
+    inputLatestPropsStatus:
+      inputPreflight.latestPropsEvidence.latestPropsStatus,
+    restoreLatestPropsStatus:
+      restoreRecord.latestPropsEvidence.latestPropsStatus,
+    inputPropKeys,
+    restorePropKeys,
+    latestPropsExposed: false,
+    rawLatestPropsRetained: false,
+    eventDispatch: false,
+    syntheticEventCreated: false,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    valueTrackerFieldWritten: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createInputChangeEventRestoreQueueBridgeRow(
+  bridgeRequestId,
+  bridgeRequestSequence,
+  inputPreflight,
+  restoreRecord,
+  writePreflight,
+  writeRow
+) {
+  const inputPropKeys = normalizeBridgePropKeys(
+    inputPreflight.latestPropsEvidence.propKeys
+  );
+  const restorePropKeys = normalizeBridgePropKeys(
+    restoreRecord.latestPropsEvidence.propKeys
+  );
+
+  return freezeRecord({
+    $$typeof:
+      privateControlledInputPostEventRestoreQueueInputChangeBridgeRowType,
+    kind:
+      'FastReactDomPrivateControlledInputChangeEventRestoreQueueBridgeRow',
+    status:
+      controlledInputPostEventRestoreQueueInputChangeBridgeRowStatus,
+    bridgeRequestId,
+    bridgeRequestSequence,
+    rowId: `${bridgeRequestId}:row:1`,
+    rowSequence: 1,
+    sourceInputChangePreflightRecordKind: inputPreflight.kind,
+    sourceInputChangePreflightStatus: inputPreflight.status,
+    sourceInputChangePreflightBlockedReason:
+      inputPreflight.blockedReason,
+    sourceRestoreRequestId: restoreRecord.requestId,
+    sourceRestoreRequestSequence: restoreRecord.requestSequence,
+    sourceRestoreStatus: restoreRecord.status,
+    sourceWritePreflightRequestId: writePreflight.requestId,
+    sourceWritePreflightRequestSequence: writePreflight.requestSequence,
+    sourceWritePreflightStatus: writePreflight.status,
+    sourceWriteIntentRowId: writeRow.rowId,
+    sourceWriteIntentRowSequence: writeRow.rowSequence,
+    sourceWriteIntentRowStatus: writeRow.status,
+    domEventName: inputPreflight.domEventName,
+    nativeEventType: inputPreflight.nativeEventType,
+    pluginName: inputPreflight.pluginName,
+    reactName: inputPreflight.reactName,
+    reactEventType: inputPreflight.reactEventType,
+    hostTag: restoreRecord.hostTag,
+    inputType: restoreRecord.inputType,
+    controlKind: restoreRecord.controlKind,
+    trackedField: restoreRecord.trackedField,
+    controlledPropName: restoreRecord.controlledPropName,
+    acceptedRestoreKind: writeRow.acceptedRestoreKind,
+    hostWrapperOperation: writeRow.hostWrapperOperation,
+    queueSlot: writeRow.queueSlot,
+    queueSlotIndex: writeRow.queueSlotIndex,
+    latestPropsEvidenceLinked: true,
+    latestPropsEvidenceMatch: bridgeArraysEqual(
+      inputPropKeys,
+      restorePropKeys
+    ),
+    inputLatestPropsEvidenceAccepted:
+      inputPreflight.latestPropsEvidence.accepted,
+    restoreLatestPropsEvidenceAccepted:
+      restoreRecord.latestPropsEvidence.accepted,
+    inputLatestPropsPropKeys: inputPropKeys,
+    restoreLatestPropsPropKeys: restorePropKeys,
+    targetMetadataMatches: true,
+    restoreWritePreflightFresh: true,
+    inputChangeExtractionPreflightAccepted: true,
+    controlledRestoreIntentAccepted: true,
+    restoreQueueWritePreflightAccepted: true,
+    restoreQueueWriteIntentRowAccepted: true,
+    eventDispatch: false,
+    syntheticEventCreated: false,
+    syntheticEventDispatched: false,
+    dispatchQueueMutated: false,
+    listenerInvocationCount: 0,
+    valueChangeCheckPerformed: false,
+    valueTrackerUpdated: false,
+    valueTrackerFieldWritten: false,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    controlledStateRestoreScheduled: false,
+    controlledStateRestoreInvoked: false,
+    hostWrapperInvoked: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawLatestPropsRetained: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createInputChangeEventRestoreQueueBridgeBoundary(
+  writePreflight,
+  bridgeRows
+) {
+  return freezeRecord({
+    status:
+      'blocked-input-change-event-controlled-restore-queue-bridge',
+    restoreQueueGateStatus:
+      controlledInputPostEventRestoreQueueInputChangeBridgeStatus,
+    sourceWritePreflightRequestId: writePreflight.requestId,
+    bridgeRowsRecorded: bridgeRows.length,
+    latestPropsEvidenceLinked: bridgeRows.length > 0,
+    restoreQueueWritePreflightAccepted: true,
+    eventDispatch: false,
+    syntheticEventCreated: false,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    controlledStateRestoreInvoked: false,
+    hostWrapperInvoked: false,
+    valueTrackerFieldWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createInputChangeEventRestoreQueueBridgeSideEffects(bridgeRows) {
+  return freezeRecord({
+    ...controlledInputPostEventRestoreQueueNoSideEffects,
+    inputChangeEventExtractionPreflightAccepted: bridgeRows.length > 0,
+    sourceRestoreQueueWritePreflightAccepted: bridgeRows.length > 0,
+    sourceRestoreQueueWriteIntentRowsAccepted: bridgeRows.length > 0,
+    latestPropsEvidenceAccepted: bridgeRows.length > 0,
+    latestPropsMetadataRead: bridgeRows.length > 0,
+    inputChangeControlledRestoreBridgeRecorded: true,
+    inputChangeControlledRestoreBridgeRowsCreated: bridgeRows.length > 0,
+    restoreQueueWriteIntentRowCount: bridgeRows.length,
+    restoreQueueWriteOrderRecorded: bridgeRows.length > 0,
+    restoreQueueFlushOrderRecorded: bridgeRows.length > 0,
+    hostWrapperRestoreOrderRecorded: bridgeRows.length > 0
+  });
+}
+
 function createPostEventRestoreQueueRestoreTargetMutation(
   writeExecutionRows
 ) {
@@ -3170,6 +3675,76 @@ function createPublicControlledBehaviorBoundary() {
   });
 }
 
+function normalizeInputChangeEventRestoreQueueBridgeAdmission(admission) {
+  if (admission == null || typeof admission !== 'object') {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'admission metadata must be an object'
+    );
+  }
+
+  if (admission.explicitAdmission !== true) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'explicitAdmission must be true'
+    );
+  }
+
+  const queueKind = getAdmissionStringProperty(
+    admission,
+    'queueKind',
+    'deterministic-input-change-event-controlled-restore-bridge'
+  );
+  if (
+    queueKind !==
+    'deterministic-input-change-event-controlled-restore-bridge'
+  ) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'queueKind must be deterministic-input-change-event-controlled-restore-bridge'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    admission,
+    'targetKind',
+    'controlled-input-change-event-restore-queue-bridge'
+  );
+  if (targetKind !== 'controlled-input-change-event-restore-queue-bridge') {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'targetKind must be controlled-input-change-event-restore-queue-bridge'
+    );
+  }
+
+  return freezeRecord({
+    queueKind,
+    queueId: getAdmissionStringProperty(
+      admission,
+      'queueId',
+      'anonymous-input-change-controlled-restore-bridge'
+    ),
+    targetKind,
+    explicitAdmission: true,
+    deterministicMetadataOnly: true,
+    acceptedInputChangePreflightRecordKind:
+      INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
+    acceptedRestoreQueueRecordType:
+      privateControlledInputPostEventRestoreQueueRecordType,
+    acceptedWritePreflightRecordType:
+      privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
+    recordsLatestPropsEvidenceBridgeRows: true,
+    eventDispatchAllowed: false,
+    syntheticEventCreationAllowed: false,
+    valueTrackerFieldWriteAllowed: false,
+    restoreQueueWriteAllowed: false,
+    restoreFlushAllowed: false,
+    hostWrapperInvocationAllowed: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawLatestPropsRetained: false,
+    realDomNodeAccepted: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
 function normalizePostEventRestoreQueueAdmission(admission) {
   if (admission == null || typeof admission !== 'object') {
     throwInvalidAdmission('admission metadata must be an object');
@@ -3490,6 +4065,250 @@ function normalizePostEventRestoreQueueWritePreflightRecords(records) {
       return sourceRecord;
     })
   );
+}
+
+function assertInputChangeEventExtractionPreflightForRestoreQueueBridge(
+  record
+) {
+  const payload =
+    getInputChangeEventExtractionPreflightRecordPayload(record);
+  if (payload === null) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'expected a private input/change event extraction preflight record'
+    );
+  }
+
+  const rejectionReason =
+    getInputChangeEventExtractionPreflightBridgeRejectionReason(record);
+  if (rejectionReason !== null) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      rejectionReason,
+      record
+    );
+  }
+
+  return record;
+}
+
+function getInputChangeEventExtractionPreflightBridgeRejectionReason(record) {
+  if (
+    record.kind !== INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND ||
+    record.status !== PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS ||
+    record.blockedReason !==
+      INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE ||
+    record.pluginName !== CHANGE_EVENT_PLUGIN_NAME ||
+    record.reactName !== 'onChange' ||
+    record.reactEventType !== 'change'
+  ) {
+    return 'input-change-preflight-record-not-accepted';
+  }
+  if (
+    !isObjectLike(record.targetMetadata) ||
+    record.targetMetadata.supportedTarget !== true ||
+    record.targetMetadata.supportedEventType !== true ||
+    isAcceptedInputChangeEventRestoreQueueBridgeTarget(record) !== true
+  ) {
+    return 'unsupported-input-change-target-or-event';
+  }
+  if (
+    !isObjectLike(record.latestPropsEvidence) ||
+    record.latestPropsEvidence.accepted !== true ||
+    !isObjectLike(record.controlledMetadata) ||
+    record.controlledMetadata.controlledMetadataAvailable !== true ||
+    record.controlledMetadata.controlled !== true
+  ) {
+    return 'input-change-latest-props-evidence-not-accepted';
+  }
+  if (
+    !isObjectLike(record.extractionMetadata) ||
+    record.extractionMetadata.targetEligible !== true ||
+    record.extractionMetadata.syntheticEventCreated !== false ||
+    record.extractionMetadata.enqueueStateRestoreScheduled !== false ||
+    record.extractionMetadata.valueTrackerUpdated !== false
+  ) {
+    return 'input-change-extraction-preflight-not-blocked';
+  }
+  if (
+    !isObjectLike(record.controlledRestoreQueuePreflightBridge) ||
+    record.controlledRestoreQueuePreflightBridge.bridgeEligible !== true ||
+    record.controlledRestoreQueuePreflightBridge.bridgeRecordCreated !==
+      false ||
+    record.controlledRestoreQueuePreflightBridge.restoreQueueWritten !==
+      false ||
+    record.controlledRestoreQueuePreflightBridge.restoreQueueFlushed !==
+      false
+  ) {
+    return 'input-change-controlled-restore-bridge-metadata-not-accepted';
+  }
+  if (
+    record.eventDispatch !== false ||
+    record.willInvokeListeners !== false ||
+    record.syntheticEventCount !== 0 ||
+    !isObjectLike(record.dispatchBehavior) ||
+    record.dispatchBehavior.eventDispatch !== false ||
+    record.dispatchBehavior.syntheticEventDispatch !== false ||
+    record.dispatchBehavior.dispatchQueueMutated !== false ||
+    !isObjectLike(record.sideEffects) ||
+    record.sideEffects.controlledStateRestoreScheduled !== false ||
+    record.sideEffects.postEventRestoreQueueWritten !== false ||
+    record.sideEffects.valueTrackerFieldWritten !== false ||
+    record.sideEffects.hostValueWritten !== false ||
+    record.sideEffects.browserInputMutated !== false ||
+    record.sideEffects.compatibilityClaimed !== false
+  ) {
+    return 'input-change-preflight-already-has-side-effects';
+  }
+
+  return null;
+}
+
+function isAcceptedInputChangeEventRestoreQueueBridgeTarget(record) {
+  return (
+    record.targetTag === 'input' &&
+    ((record.targetType === 'text' &&
+      record.controlledMetadata.controlledPropName === 'value') ||
+      (record.targetType === 'checkbox' &&
+        record.controlledMetadata.controlledPropName === 'checked'))
+  );
+}
+
+function assertInputChangeEventRestoreQueueBridgeWritePreflight(record) {
+  const preflightRecord =
+    getPrivateControlledInputPostEventRestoreQueueWritePreflightRecordPayload(
+      record
+    );
+  if (preflightRecord === null) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'expected a private controlled restore queue write preflight record'
+    );
+  }
+
+  const rejectionReason =
+    getPostEventRestoreQueueFlushBlockerRejectionReason(preflightRecord);
+  if (rejectionReason !== null) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      rejectionReason,
+      preflightRecord
+    );
+  }
+
+  return preflightRecord;
+}
+
+function findInputChangeEventRestoreQueueBridgeWriteIntentRow(
+  writePreflight,
+  restoreRecord
+) {
+  const row = writePreflight.writeIntentRows.find(
+    (candidate) => candidate.sourceRequestId === restoreRecord.requestId
+  );
+
+  if (row === undefined) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      'stale-restore-queue-preflight-source-missing',
+      writePreflight
+    );
+  }
+
+  return row;
+}
+
+function assertInputChangeEventRestoreQueueBridgeSources(
+  inputPreflight,
+  restoreRecord,
+  writePreflight,
+  writeRow
+) {
+  const rejectionReason =
+    getInputChangeEventRestoreQueueBridgeRejectionReason(
+      inputPreflight,
+      restoreRecord,
+      writePreflight,
+      writeRow
+    );
+
+  if (rejectionReason !== null) {
+    throwInputChangeEventRestoreQueueBridgeError(
+      rejectionReason,
+      restoreRecord
+    );
+  }
+}
+
+function getInputChangeEventRestoreQueueBridgeRejectionReason(
+  inputPreflight,
+  restoreRecord,
+  writePreflight,
+  writeRow
+) {
+  const restoreSourceKind =
+    restoreRecord.sourceKind || restoreRecord.restoreIntent?.source;
+
+  if (
+    restoreSourceKind !==
+      'private-event-dispatch-latest-props-evidence' ||
+    restoreRecord.status !==
+      controlledInputPostEventRestoreQueueIntentRecordedStatus ||
+    !isObjectLike(restoreRecord.restoreIntent) ||
+    restoreRecord.restoreIntent.eventDispatchRecordAccepted !== true ||
+    restoreRecord.restoreIntent.eventPluginDispatchPerformed !== false ||
+    restoreRecord.restoreIntent.intentRecorded !== true ||
+    restoreRecord.restoreIntent.restoreQueueWritten !== false ||
+    restoreRecord.restoreIntent.restoreFlushed !== false ||
+    restoreRecord.restoreIntent.controlledStateRestoreInvoked !== false
+  ) {
+    return 'controlled-restore-intent-not-accepted';
+  }
+  if (
+    !isObjectLike(restoreRecord.latestPropsEvidence) ||
+    restoreRecord.latestPropsEvidence.accepted !== true
+  ) {
+    return 'controlled-restore-latest-props-evidence-not-accepted';
+  }
+  if (
+    inputPreflight.domEventName !== restoreRecord.domEventName ||
+    inputPreflight.nativeEventType !== restoreRecord.nativeEventType ||
+    inputPreflight.targetTag !== restoreRecord.hostTag ||
+    inputPreflight.targetType !== restoreRecord.inputType ||
+    inputPreflight.controlledMetadata.controlledPropName !==
+      restoreRecord.controlledPropName
+  ) {
+    return 'input-change-restore-target-mismatch';
+  }
+  if (
+    (inputPreflight.controlledMetadata.controlledPropName === 'value'
+      ? 'value'
+      : 'checked') !== restoreRecord.controlKind
+  ) {
+    return 'input-change-restore-control-kind-mismatch';
+  }
+  if (
+    bridgeArraysEqual(
+      normalizeBridgePropKeys(inputPreflight.latestPropsEvidence.propKeys),
+      normalizeBridgePropKeys(restoreRecord.latestPropsEvidence.propKeys)
+    ) !== true
+  ) {
+    return 'input-change-restore-latest-props-evidence-mismatch';
+  }
+  if (
+    writeRow.preflightRequestId !== writePreflight.requestId ||
+    writeRow.sourceRequestId !== restoreRecord.requestId ||
+    writeRow.hostTag !== restoreRecord.hostTag ||
+    writeRow.inputType !== restoreRecord.inputType ||
+    writeRow.controlKind !== restoreRecord.controlKind ||
+    writeRow.controlledPropName !== restoreRecord.controlledPropName ||
+    writeRow.acceptedRestoreKind !==
+      restoreRecord.restoreQueueOrdering.acceptedRestoreKind ||
+    writeRow.restoreQueueWritten !== false ||
+    writeRow.restoreQueueFlushed !== false ||
+    writeRow.hostWrapperInvoked !== false ||
+    writeRow.valueTrackerFieldWritten !== false ||
+    writeRow.browserInputMutated !== false
+  ) {
+    return 'stale-restore-queue-preflight-row-mismatch';
+  }
+
+  return null;
 }
 
 function assertPrivateControlledInputPostEventRestoreQueueWritePreflightRecordForExecution(
@@ -3897,6 +4716,36 @@ function describeLatestProps(props) {
     propKeys: freezeArray(propKeys),
     controlledPropSummary: summarizeControlledProps(props)
   });
+}
+
+function normalizeBridgePropKeys(propKeys) {
+  if (!Array.isArray(propKeys)) {
+    return freezeArray([]);
+  }
+
+  return freezeArray(
+    propKeys
+      .filter((propKey) => typeof propKey === 'string')
+      .slice()
+      .sort()
+  );
+}
+
+function bridgeArraysEqual(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right)) {
+    return false;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function summarizeControlledProps(props) {
@@ -4368,6 +5217,30 @@ function throwPostEventRestoreQueueFlushBlockerError(reason, record) {
   throw error;
 }
 
+function throwInputChangeEventRestoreQueueBridgeError(reason, record) {
+  const error = new Error(
+    `Invalid private React DOM input/change event controlled restore queue bridge: ${reason}.`
+  );
+  error.name = 'FastReactDomControlledInputPostEventRestoreQueueGateError';
+  error.code =
+    controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  if (record !== undefined) {
+    error.sourceRequestId = record.requestId || null;
+    error.sourceRequestSequence = record.requestSequence || null;
+    error.sourceStatus = record.status || null;
+    error.hostTag = record.hostTag || record.targetTag || null;
+    error.inputType = record.inputType || record.targetType || null;
+    error.controlKind = record.controlKind || null;
+    error.acceptedRestoreKind =
+      record.restoreQueueOrdering?.acceptedRestoreKind ||
+      record.acceptedRestoreKind ||
+      null;
+  }
+  throw error;
+}
+
 function createGateState(options) {
   const prefix =
     options && typeof options.requestIdPrefix === 'string'
@@ -4406,6 +5279,7 @@ module.exports = {
   controlledInputPostEventRestoreQueueInvalidEventCode,
   controlledInputPostEventRestoreQueueInvalidFlushBlockerCode,
   controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode,
+  controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
   controlledInputPostEventRestoreQueueInvalidLatestPropsCode,
   controlledInputPostEventRestoreQueueInvalidRecordCode,
   controlledInputPostEventRestoreQueueInvalidWriteExecutionCode,
@@ -4418,6 +5292,8 @@ module.exports = {
   controlledInputPostEventRestoreQueueRadioSiblingPropsLookupRecordedStatus,
   controlledInputPostEventRestoreQueueRadioSiblingPropsLookupSkippedStatus,
   controlledInputPostEventRestoreQueueFlushBlockerStatus,
+  controlledInputPostEventRestoreQueueInputChangeBridgeRowStatus,
+  controlledInputPostEventRestoreQueueInputChangeBridgeStatus,
   controlledInputPostEventRestoreQueueStatus,
   controlledInputPostEventRestoreQueueWriteExecutionRowStatus,
   controlledInputPostEventRestoreQueueWriteExecutionStatus,
@@ -4428,14 +5304,18 @@ module.exports = {
   createUnsupportedControlledInputPostEventRestoreQueueError,
   describeControlledInputPostEventRestoreQueueGate,
   getPrivateControlledInputPostEventRestoreQueueFlushBlockerRecordPayload,
+  getPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueWriteExecutionRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueWritePreflightRecordPayload,
   isPrivateControlledInputPostEventRestoreQueueFlushBlockerRecord,
+  isPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecord,
   isPrivateControlledInputPostEventRestoreQueueRecord,
   isPrivateControlledInputPostEventRestoreQueueWriteExecutionRecord,
   isPrivateControlledInputPostEventRestoreQueueWritePreflightRecord,
   privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
+  privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
+  privateControlledInputPostEventRestoreQueueInputChangeBridgeRowType,
   privateControlledInputPostEventRestoreQueueRecordType,
   privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
   privateControlledInputPostEventRestoreQueueWriteExecutionRowType,
@@ -4444,6 +5324,7 @@ module.exports = {
   preflightControlledInputPostEventRestoreQueueWrites,
   recordControlledInputPostEventRestoreQueueFlushBlocker,
   recordControlledInputPostEventRestoreQueueWriteExecution,
+  recordControlledInputChangeEventRestoreQueueBridge,
   recordControlledInputPostEventRestoreIntentFromEventLatestProps,
   recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatestProps
 };

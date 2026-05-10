@@ -381,6 +381,18 @@ test("private input/change extraction preflight records target and controlled me
       preflight.extractionMetadata.enqueueStateRestoreScheduled,
       false
     );
+    assert.equal(
+      preflight.controlledRestoreQueuePreflightBridge.bridgeEligible,
+      true
+    );
+    assert.equal(
+      preflight.controlledRestoreQueuePreflightBridge.bridgeRecordCreated,
+      false
+    );
+    assert.equal(
+      preflight.controlledRestoreQueuePreflightBridge.restoreQueueWritten,
+      false
+    );
     assert.equal(preflight.dispatchBehavior.eventDispatch, false);
     assert.equal(preflight.dispatchBehavior.syntheticEventDispatch, false);
     assert.equal(preflight.dispatchBehavior.dispatchQueueMutated, false);
@@ -388,6 +400,11 @@ test("private input/change extraction preflight records target and controlled me
     assert.equal(preflight.defaultBehavior.defaultBehaviorChanged, false);
     assert.equal(preflight.sideEffects.browserListenerInstallation, false);
     assert.equal(preflight.sideEffects.controlledStateRestoreScheduled, false);
+    assert.equal(
+      preflight.sideEffects.controlledRestoreQueuePreflightBridgeRecorded,
+      false
+    );
+    assert.equal(preflight.sideEffects.browserInputMutated, false);
     assert.equal(preflight.browserDomEventCompatibilityClaimed, false);
     assert.equal(preflight.compatibilityClaimed, false);
     assert.equal(Object.hasOwn(preflight, "nativeEvent"), false);

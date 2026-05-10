@@ -34,6 +34,9 @@ const componentTree = require(
 const eventListener = require(
   "../../../packages/react-dom/src/events/react-dom-event-listener.js"
 );
+const pluginEventSystem = require(
+  "../../../packages/react-dom/src/events/plugin-event-system.js"
+);
 
 const oracle = readCheckedDomControlledInputOracle();
 
@@ -785,6 +788,126 @@ test("private controlled restore queue write preflight records intent rows witho
     assert.equal(Object.hasOwn(dispatch.targetNode, "_valueTracker"), false);
     componentTree.detachHostInstanceToken(dispatch.token);
   }
+});
+
+test("private input/change controlled restore bridge links latest props without live writes", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-input-change-bridge"
+    });
+  const eventDispatch = createPrivateControlledEventDispatch({
+    domEventName: "input",
+    latestProps: {
+      type: "text",
+      value: "alpha",
+      onChange() {},
+      onInput() {}
+    },
+    nodeName: "INPUT",
+    value: "browser-mutated"
+  });
+  const inputPreflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      eventDispatch.dispatchRecord
+    );
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    eventDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-event-latest-props-post-event-restore-queue",
+      queueId: "oracle-input-change-bridge-restore",
+      eventName: "input",
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+  const writePreflight = gate.preflightRestoreQueueWrites([intent], {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-write-preflight",
+    queueId: "oracle-input-change-bridge-write-preflight",
+    targetKind: "controlled-input-post-event-restore-queue-write-preflight"
+  });
+  const bridge = gate.recordInputChangeEventControlledRestoreBridge(
+    inputPreflight,
+    intent,
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-input-change-event-controlled-restore-bridge",
+      queueId: "oracle-input-change-controlled-restore-bridge",
+      targetKind: "controlled-input-change-event-restore-queue-bridge"
+    }
+  );
+
+  assert.equal(
+    bridge.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueInputChangeBridgeStatus
+  );
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecord(
+      bridge
+    ),
+    true
+  );
+  assert.equal(bridge.requestId, "controlled-oracle-input-change-bridge:3");
+  assert.equal(
+    bridge.latestPropsEvidenceBridge.latestPropsEvidenceLinked,
+    true
+  );
+  assert.equal(
+    bridge.latestPropsEvidenceBridge.latestPropsEvidenceMatch,
+    true
+  );
+  assert.deepEqual(
+    bridge.bridgeRows.map((row) => ({
+      sourceRestoreRequestId: row.sourceRestoreRequestId,
+      sourceWriteIntentRowId: row.sourceWriteIntentRowId,
+      domEventName: row.domEventName,
+      hostTag: row.hostTag,
+      inputType: row.inputType,
+      controlKind: row.controlKind,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      queueSlot: row.queueSlot,
+      eventDispatch: row.eventDispatch,
+      syntheticEventCreated: row.syntheticEventCreated,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        sourceRestoreRequestId: "controlled-oracle-input-change-bridge:1",
+        sourceWriteIntentRowId:
+          "controlled-oracle-input-change-bridge:2:row:1",
+        domEventName: "input",
+        hostTag: "input",
+        inputType: "text",
+        controlKind: "value",
+        acceptedRestoreKind: "input-text-value",
+        queueSlot: "restore-target",
+        eventDispatch: false,
+        syntheticEventCreated: false,
+        valueTrackerFieldWritten: false,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.equal(bridge.sideEffects.inputChangeControlledRestoreBridgeRecorded, true);
+  assert.equal(bridge.sideEffects.restoreQueueWritten, false);
+  assert.equal(bridge.sideEffects.restoreQueueFlushed, false);
+  assert.equal(bridge.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(bridge.sideEffects.browserInputMutated, false);
+  assert.equal(Object.hasOwn(eventDispatch.targetNode, "_valueTracker"), false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
 test("private controlled restore queue write execution records deterministic mutation intent", () => {
