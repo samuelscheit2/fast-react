@@ -247,6 +247,75 @@ const hydrationEventReplayBlockerContracts = freezeArray([
   )
 ]);
 
+const hydrationMarkerReplayTargetContractIds = freezeArray([
+  'activity-start',
+  'suspense-completed-start',
+  'suspense-pending-start',
+  'suspense-queued-start',
+  'suspense-client-rendered-start',
+  'form-state-matching',
+  'form-state-not-matching'
+]);
+
+const hydrationMarkerReplayQueueContracts = freezeArray([
+  replayQueueContract(
+    'explicit-hydration-targets',
+    'queuedExplicitHydrationTargets',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Priority-sorted explicit hydration targets are not queued.'
+  ),
+  replayQueueContract(
+    'continuous-focus',
+    'queuedFocus',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Focus replay keeps only the latest blocked continuous event in React DOM.'
+  ),
+  replayQueueContract(
+    'continuous-drag',
+    'queuedDrag',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Drag replay keeps only the latest blocked continuous event in React DOM.'
+  ),
+  replayQueueContract(
+    'continuous-mouse',
+    'queuedMouse',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Mouse replay keeps only the latest blocked continuous event in React DOM.'
+  ),
+  replayQueueContract(
+    'continuous-pointers',
+    'queuedPointers',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Pointer replay keeps one latest blocked event per pointer id in React DOM.'
+  ),
+  replayQueueContract(
+    'continuous-pointer-captures',
+    'queuedPointerCaptures',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Pointer capture replay keeps one latest blocked event per pointer id in React DOM.'
+  ),
+  replayQueueContract(
+    'change-event-targets',
+    'queuedChangeEventTargets',
+    'react-dom-events',
+    EVENT_DISPATCH_BLOCKED_CODE,
+    'Change-event replay targets are not queued or dispatched.'
+  ),
+  replayQueueContract(
+    'form-replaying-queue',
+    '$$reactFormReplay',
+    'react-dom-events',
+    HYDRATION_REPLAY_BLOCKED_CODE,
+    'Server-form action replay queues are not scheduled or drained.'
+  )
+]);
+
 const hydrationBoundaryRecordPayloads = new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
@@ -362,10 +431,17 @@ function createUnsupportedHydrateRootRecordWithGate(
   const listenerGuard = describeRootListenerGuard(container, {
     action: 'defer-listen-to-all-supported-events-for-hydrate-root'
   });
+  const replayQueueDiagnostics = createHydrationMarkerReplayQueueDiagnostics({
+    listenerGuard,
+    markerDiagnostics,
+    markerGuard,
+    markerParserEvidence
+  });
   const eventReplayBlockers = createHydrationEventReplayBlockers({
     listenerGuard,
     markerDiagnostics,
-    markerParserEvidence
+    markerParserEvidence,
+    replayQueueDiagnostics
   });
   const record = freezeRecord({
     $$typeof: privateHydrationBoundaryRecordType,
@@ -386,6 +462,7 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerDiagnostics,
     markerParserEvidence,
     markerEvidence,
+    replayQueueDiagnostics,
     eventReplayBlockers,
     canHydrate: false,
     publicRootCreated: false,
@@ -526,10 +603,121 @@ function createHydrationMarkerParserEvidence(markerDiagnostics) {
   });
 }
 
+function createHydrationMarkerReplayQueueDiagnostics({
+  listenerGuard,
+  markerDiagnostics,
+  markerGuard,
+  markerParserEvidence
+}) {
+  const replayTargetCandidates =
+    createHydrationMarkerReplayTargetCandidates(markerDiagnostics);
+  return freezeRecord({
+    kind: 'FastReactDomHydrationMarkerReplayQueueDiagnostics',
+    status: 'blocked-before-hydration-marker-replay-queues',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    rootBridgeStateSource: 'private-root-marker-and-listener-guards',
+    markerGuardAction: markerGuard.action,
+    listenerGuardAction: listenerGuard.action,
+    rootMarkerState: describeRootMarkerReplayQueueState(markerGuard),
+    rootListenerState: describeRootListenerReplayQueueState(listenerGuard),
+    markerParserEvidenceAccepted:
+      markerParserEvidence.status ===
+      'accepted-marker-parser-evidence-recorded',
+    acceptedMarkerCount: markerDiagnostics.acceptedMarkerCount,
+    markerReplayTargetCandidateCount: replayTargetCandidates.length,
+    markerReplayTargetCandidates: replayTargetCandidates,
+    queueContractCount: hydrationMarkerReplayQueueContracts.length,
+    queueContracts: hydrationMarkerReplayQueueContracts,
+    queueMutationAllowed: false,
+    hydrationReplaySupported: false,
+    eventReplaySupported: false,
+    eventsReplayed: false,
+    hasScheduledReplayAttempt: false,
+    explicitHydrationTargetsQueued: false,
+    queuedExplicitHydrationTargetCount: 0,
+    discreteEventReplayQueued: false,
+    queuedDiscreteEventCount: 0,
+    continuousEventReplayQueued: false,
+    queuedContinuousEventCount: 0,
+    changeEventTargetsQueued: false,
+    queuedChangeEventTargetCount: 0,
+    formReplayQueued: false,
+    queuedFormActionCount: 0,
+    replayQueueBlockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  });
+}
+
+function describeRootMarkerReplayQueueState(markerGuard) {
+  return freezeRecord({
+    sourceGuardAccepted: true,
+    action: markerGuard.action,
+    hasLegacyRootMarker: markerGuard.hasLegacyRootMarker,
+    isContainerMarkedAsRoot: markerGuard.isContainerMarkedAsRoot,
+    rootMarkerSnapshot: markerGuard.rootMarkerSnapshot,
+    rootMarkerPropertyCount: markerGuard.rootMarkerSnapshot.propertyCount,
+    rootMarkerTruthyCount: markerGuard.rootMarkerSnapshot.truthyCount,
+    warningType: markerGuard.warning === null ? null : markerGuard.warning.type
+  });
+}
+
+function describeRootListenerReplayQueueState(listenerGuard) {
+  return freezeRecord({
+    sourceGuardAccepted: true,
+    action: listenerGuard.action,
+    canInstallRootListeners: listenerGuard.canInstallRootListeners,
+    hasRootListeningMarker: listenerGuard.hasRootListeningMarker,
+    ownerDocumentCanInstallSelectionChange:
+      listenerGuard.ownerDocumentCanInstallSelectionChange,
+    ownerDocumentHasSelectionChangeMarker:
+      listenerGuard.ownerDocumentHasSelectionChangeMarker,
+    ownerDocumentInfo: listenerGuard.ownerDocumentInfo,
+    rootEventTargetInfo: listenerGuard.rootEventTargetInfo
+  });
+}
+
+function createHydrationMarkerReplayTargetCandidates(markerDiagnostics) {
+  return freezeArray(
+    markerDiagnostics.markers
+      .filter((marker) =>
+        hydrationMarkerReplayTargetContractIds.includes(marker.contractId)
+      )
+      .map((marker) =>
+        freezeRecord({
+          area: marker.area,
+          blockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+          contractId: marker.contractId,
+          kind: marker.kind,
+          path: marker.path,
+          queued: false,
+          queueEligible: false,
+          replayTargetKind: getHydrationMarkerReplayTargetKind(marker.contractId)
+        })
+      )
+  );
+}
+
+function getHydrationMarkerReplayTargetKind(contractId) {
+  if (contractId.startsWith('activity-')) {
+    return 'activity-boundary';
+  }
+  if (contractId.startsWith('suspense-')) {
+    return 'suspense-boundary';
+  }
+  if (contractId.startsWith('form-state-')) {
+    return 'form-state';
+  }
+  return 'unknown';
+}
+
 function createHydrationEventReplayBlockers({
   listenerGuard,
   markerDiagnostics,
-  markerParserEvidence
+  markerParserEvidence,
+  replayQueueDiagnostics
 }) {
   return freezeRecord({
     kind: 'FastReactDomHydrationEventReplayBlockers',
@@ -551,7 +739,19 @@ function createHydrationEventReplayBlockers({
     markerParserEvidenceAccepted:
       markerParserEvidence.status ===
       'accepted-marker-parser-evidence-recorded',
+    replayQueueDiagnostics,
+    replayQueueDiagnosticsAccepted:
+      replayQueueDiagnostics.status ===
+      'blocked-before-hydration-marker-replay-queues',
     acceptedMarkerCount: markerDiagnostics.acceptedMarkerCount,
+    markerReplayTargetCandidateCount:
+      replayQueueDiagnostics.markerReplayTargetCandidateCount,
+    queuedExplicitHydrationTargetCount:
+      replayQueueDiagnostics.queuedExplicitHydrationTargetCount,
+    queuedContinuousEventCount:
+      replayQueueDiagnostics.queuedContinuousEventCount,
+    queuedDiscreteEventCount: replayQueueDiagnostics.queuedDiscreteEventCount,
+    queuedFormActionCount: replayQueueDiagnostics.queuedFormActionCount,
     canInstallRootListeners: listenerGuard.canInstallRootListeners,
     hasRootListeningMarker: listenerGuard.hasRootListeningMarker,
     blockerCount: hydrationEventReplayBlockerContracts.length,
@@ -632,6 +832,18 @@ function replayBlocker(id, owner, blockedReason, reason) {
     blockedReason,
     id,
     owner,
+    reason
+  });
+}
+
+function replayQueueContract(id, queueName, owner, blockedReason, reason) {
+  return freezeRecord({
+    blocked: true,
+    blockedReason,
+    id,
+    owner,
+    queueName,
+    queuedCount: 0,
     reason
   });
 }
@@ -751,6 +963,7 @@ module.exports = {
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
   hydrationEventReplayBlockerContracts,
+  hydrationMarkerReplayQueueContracts,
   inspectHydrationContainerMarkers,
   isPrivateHydrationBoundaryRecord,
   privateHydrationBoundaryRecordType,

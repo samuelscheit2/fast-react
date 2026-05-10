@@ -103,6 +103,23 @@ test("React DOM hydration marker oracle keeps compatibility claims false", () =>
   );
 });
 
+test("React DOM hydration marker oracle leaves replay queues diagnostic-only", () => {
+  assert.equal(oracle.conformanceClaims.fastReactHydrationCompatible, false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+  assert.equal(
+    oracle.fastReactContracts.find(
+      (contract) => contract.id === "no-hydration-implementation-claimed"
+    ).contract.includes("event replay"),
+    true
+  );
+  assert.equal(
+    oracle.extractedEvidence.inlineRuntimeMutations.formReplaying.snippets.some(
+      (snippet) => snippet.snippet === "$$reactFormReplay" && snippet.present
+    ),
+    true
+  );
+});
+
 test("React DOM hydration marker oracle captures accepted worker inputs and pinned source files", () => {
   assert.deepEqual(
     oracle.workerInputs.map((input) => input.id),

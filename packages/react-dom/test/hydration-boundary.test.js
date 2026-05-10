@@ -103,7 +103,16 @@ test('unsupported hydrateRoot records bridge hydration parser evidence with root
   assertHydrationEventReplayBlockers(first.record.eventReplayBlockers, {
     acceptedMarkerCount: 2,
     canInstallRootListeners: true,
-    hasRootListeningMarker: true
+    hasRootListeningMarker: true,
+    markerReplayTargetCandidateCount: 1
+  });
+  assertHydrationMarkerReplayQueueDiagnostics(first.record, {
+    acceptedMarkerCount: 2,
+    hasRootListeningMarker: true,
+    isContainerMarkedAsRoot: true,
+    markerReplayTargetCandidateCount: 1,
+    ownerDocumentHasSelectionChangeMarker: false,
+    warningType: 'duplicate-create-root'
   });
 
   assert.deepEqual(first.record.markerGuard, {
@@ -217,10 +226,23 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
     first.record.eventReplayBlockers,
     first.record.hydrationBoundaryRecord.eventReplayBlockers
   );
+  assert.equal(
+    first.record.replayQueueDiagnostics,
+    first.record.hydrationBoundaryRecord.replayQueueDiagnostics
+  );
   assertHydrationEventReplayBlockers(first.record.eventReplayBlockers, {
     acceptedMarkerCount: 2,
     canInstallRootListeners: true,
-    hasRootListeningMarker: true
+    hasRootListeningMarker: true,
+    markerReplayTargetCandidateCount: 1
+  });
+  assertHydrationMarkerReplayQueueDiagnostics(first.record, {
+    acceptedMarkerCount: 2,
+    hasRootListeningMarker: true,
+    isContainerMarkedAsRoot: true,
+    markerReplayTargetCandidateCount: 1,
+    ownerDocumentHasSelectionChangeMarker: false,
+    warningType: 'duplicate-create-root'
   });
 
   assert.deepEqual(
@@ -243,6 +265,7 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
       markerParserEvidence: first.admission.markerParserEvidence,
       markerEvidence: first.admission.markerEvidence,
       operation: first.admission.operation,
+      replayQueueDiagnostics: first.admission.replayQueueDiagnostics,
       transition: first.admission.lifecyclePrerequisites.lifecycleTransition
     },
     {
@@ -255,6 +278,7 @@ test('private root bridge hydrateRoot requests preserve hydration marker evidenc
       markerParserEvidence: first.record.markerParserEvidence,
       markerEvidence: first.record.markerEvidence,
       operation: 'hydrate',
+      replayQueueDiagnostics: first.record.replayQueueDiagnostics,
       transition: 'none->unsupported-hydration'
     }
   );
@@ -363,7 +387,20 @@ function assertHydrationEventReplayBlockers(blockers, expected) {
     pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
   );
   assert.equal(blockers.markerParserEvidenceAccepted, true);
+  assert.equal(blockers.replayQueueDiagnosticsAccepted, true);
+  assert.equal(
+    blockers.replayQueueDiagnostics.kind,
+    'FastReactDomHydrationMarkerReplayQueueDiagnostics'
+  );
   assert.equal(blockers.acceptedMarkerCount, expected.acceptedMarkerCount);
+  assert.equal(
+    blockers.markerReplayTargetCandidateCount,
+    expected.markerReplayTargetCandidateCount
+  );
+  assert.equal(blockers.queuedExplicitHydrationTargetCount, 0);
+  assert.equal(blockers.queuedContinuousEventCount, 0);
+  assert.equal(blockers.queuedDiscreteEventCount, 0);
+  assert.equal(blockers.queuedFormActionCount, 0);
   assert.equal(
     blockers.canInstallRootListeners,
     expected.canInstallRootListeners
@@ -387,6 +424,127 @@ function assertHydrationEventReplayBlockers(blockers, expected) {
       'no-continuous-event-replay-queues',
       'no-dispatch-replay-route'
     ]
+  );
+}
+
+function assertHydrationMarkerReplayQueueDiagnostics(record, expected) {
+  const diagnostics = record.replayQueueDiagnostics;
+  assert.equal(Object.isFrozen(diagnostics), true);
+  assert.equal(
+    diagnostics.kind,
+    'FastReactDomHydrationMarkerReplayQueueDiagnostics'
+  );
+  assert.equal(
+    diagnostics.status,
+    'blocked-before-hydration-marker-replay-queues'
+  );
+  assert.equal(diagnostics.diagnosticOnly, true);
+  assert.equal(diagnostics.readOnly, true);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(
+    diagnostics.rootBridgeStateSource,
+    'private-root-marker-and-listener-guards'
+  );
+  assert.equal(diagnostics.markerGuardAction, record.markerGuard.action);
+  assert.equal(diagnostics.listenerGuardAction, record.listenerGuard.action);
+  assert.equal(diagnostics.rootMarkerState.sourceGuardAccepted, true);
+  assert.equal(diagnostics.rootMarkerState.action, record.markerGuard.action);
+  assert.equal(
+    diagnostics.rootMarkerState.rootMarkerSnapshot,
+    record.markerGuard.rootMarkerSnapshot
+  );
+  assert.equal(
+    diagnostics.rootMarkerState.isContainerMarkedAsRoot,
+    expected.isContainerMarkedAsRoot
+  );
+  assert.equal(diagnostics.rootMarkerState.warningType, expected.warningType);
+  assert.equal(diagnostics.rootMarkerState.rootMarkerPropertyCount, 1);
+  assert.equal(diagnostics.rootMarkerState.rootMarkerTruthyCount, 1);
+
+  assert.equal(diagnostics.rootListenerState.sourceGuardAccepted, true);
+  assert.equal(diagnostics.rootListenerState.action, record.listenerGuard.action);
+  assert.equal(
+    diagnostics.rootListenerState.rootEventTargetInfo,
+    record.listenerGuard.rootEventTargetInfo
+  );
+  assert.equal(
+    diagnostics.rootListenerState.ownerDocumentInfo,
+    record.listenerGuard.ownerDocumentInfo
+  );
+  assert.equal(
+    diagnostics.rootListenerState.hasRootListeningMarker,
+    expected.hasRootListeningMarker
+  );
+  assert.equal(
+    diagnostics.rootListenerState.ownerDocumentHasSelectionChangeMarker,
+    expected.ownerDocumentHasSelectionChangeMarker
+  );
+
+  assert.equal(diagnostics.markerParserEvidenceAccepted, true);
+  assert.equal(diagnostics.acceptedMarkerCount, expected.acceptedMarkerCount);
+  assert.equal(
+    diagnostics.markerReplayTargetCandidateCount,
+    expected.markerReplayTargetCandidateCount
+  );
+  assert.deepEqual(diagnostics.markerReplayTargetCandidates, [
+    {
+      area: 'Suspense boundary',
+      blockedReason: pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE,
+      contractId: 'suspense-completed-start',
+      kind: 'comment',
+      path: 'container.childNodes[0]',
+      queued: false,
+      queueEligible: false,
+      replayTargetKind: 'suspense-boundary'
+    }
+  ]);
+  assert.equal(
+    diagnostics.queueContractCount,
+    hydrationGate.hydrationMarkerReplayQueueContracts.length
+  );
+  assert.equal(
+    diagnostics.queueContracts,
+    hydrationGate.hydrationMarkerReplayQueueContracts
+  );
+  assert.deepEqual(
+    diagnostics.queueContracts.map((queue) => queue.queueName),
+    [
+      'queuedExplicitHydrationTargets',
+      'queuedFocus',
+      'queuedDrag',
+      'queuedMouse',
+      'queuedPointers',
+      'queuedPointerCaptures',
+      'queuedChangeEventTargets',
+      '$$reactFormReplay'
+    ]
+  );
+  assert.equal(diagnostics.queueMutationAllowed, false);
+  assert.equal(diagnostics.hydrationReplaySupported, false);
+  assert.equal(diagnostics.eventReplaySupported, false);
+  assert.equal(diagnostics.eventsReplayed, false);
+  assert.equal(diagnostics.hasScheduledReplayAttempt, false);
+  assert.equal(diagnostics.explicitHydrationTargetsQueued, false);
+  assert.equal(diagnostics.queuedExplicitHydrationTargetCount, 0);
+  assert.equal(diagnostics.discreteEventReplayQueued, false);
+  assert.equal(diagnostics.queuedDiscreteEventCount, 0);
+  assert.equal(diagnostics.continuousEventReplayQueued, false);
+  assert.equal(diagnostics.queuedContinuousEventCount, 0);
+  assert.equal(diagnostics.changeEventTargetsQueued, false);
+  assert.equal(diagnostics.queuedChangeEventTargetCount, 0);
+  assert.equal(diagnostics.formReplayQueued, false);
+  assert.equal(diagnostics.queuedFormActionCount, 0);
+  assert.equal(
+    diagnostics.replayQueueBlockedReason,
+    pluginEventSystem.HYDRATION_REPLAY_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.eventDispatchBlockedReason,
+    pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(
+    diagnostics.eventTargetResolutionBlockedReason,
+    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
   );
 }
 
