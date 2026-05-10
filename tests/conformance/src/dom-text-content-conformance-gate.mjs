@@ -56,11 +56,17 @@ export const DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET = {
 export const DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS =
   "matched-react-dom-19.2.6-private-should-set-text-content";
 
+export const DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_ADMISSION_KIND =
+  "private-should-set-text-content-row";
+
 export const DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS =
   "skipped-unsupported-private-text-content-slice";
 
 export const DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS =
   "matched-react-dom-19.2.6-private-host-text-commit-row";
+
+export const DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_ADMISSION_KIND =
+  "private-fake-dom-host-text-commit-row";
 
 export const DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS =
   "skipped-unsupported-dom-mutation-root-path";
@@ -229,9 +235,12 @@ export const DOM_TEXT_CONTENT_CONFORMANCE_GATE = {
   unsupportedDomRenderPaths: {
     gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS,
     publicRootsCompared: false,
+    publicRootCompatibilityClaimed: false,
     serverSerializationCompared: false,
+    serverRenderingCompatibilityClaimed: false,
     clientMutationCompared: false,
     hydrationCompared: false,
+    hydrationCompatibilityClaimed: false,
     compatibilityClaimed: false
   }
 };
@@ -298,6 +307,7 @@ export function evaluateDomTextContentConformanceGate({
     localHostTextObservations,
     failures
   });
+  validateBlockedPublicDomAdmission({ localChecks, failures });
 
   if (!localChecks.privateShouldSetTextContentHelperPresent) {
     failures.push({
@@ -352,7 +362,11 @@ export function evaluateDomTextContentConformanceGate({
         if (firstDifferencePath === null) {
           admittedPrivateShouldSetRows.push({
             scenarioId: scenario.id,
-            gateStatus: DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS
+            admissionKind: DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_ADMISSION_KIND,
+            gateStatus: DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS,
+            checkedResult: checkedObservation.result,
+            localResult: localObservation.result,
+            firstDifferencePath: null
           });
         } else {
           failures.push({
@@ -449,7 +463,20 @@ export function evaluateDomTextContentConformanceGate({
             rowId: admittedRow.rowId,
             scenarioId: admittedRow.scenarioId,
             phaseId: admittedRow.phaseId,
-            gateStatus: DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS
+            admissionKind:
+              DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_ADMISSION_KIND,
+            gateStatus: DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS,
+            oracleExtractor: admittedRow.oracleExtractor,
+            localProbe: admittedRow.localProbe,
+            coverage: admittedRow.coverage,
+            reason: admittedRow.reason,
+            reactOracleResult: checkedRow.result,
+            localResult: localObservation.result,
+            firstDifferencePath: null,
+            publicRootCompatibilityClaimed: false,
+            serverRenderingCompatibilityClaimed: false,
+            hydrationCompatibilityClaimed: false,
+            compatibilityClaimed: false
           });
         } else {
           failures.push({
@@ -562,6 +589,9 @@ export function evaluateDomTextContentConformanceGate({
         skippedUnsupportedPrivateShouldSetRows.length === 0 &&
         skippedUnsupportedPrivateHostTextCommitScenarioRows.length === 0 &&
         skippedUnsupportedDomRenderRows.length === 0,
+      publicRootCompatibilityClaimed: false,
+      serverRenderingCompatibilityClaimed: false,
+      hydrationCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
   };
@@ -646,6 +676,7 @@ export function formatDomTextContentConformanceGateResult(result) {
     `Skipped unsupported private shouldSetTextContent rows: ${result.summary.skippedUnsupportedPrivateShouldSetRowCount}`,
     `Skipped unsupported private HostText/text-content scenarios: ${result.summary.skippedUnsupportedPrivateHostTextCommitScenarioCount}`,
     `Skipped unsupported DOM render/mutation rows: ${result.summary.skippedUnsupportedDomRenderRowCount}`,
+    `Public root compatibility claimed: ${result.summary.publicRootCompatibilityClaimed}`,
     `Failures: ${result.summary.failureCount}`
   ];
 
@@ -770,11 +801,22 @@ function validateHostTextCommitAdmissionMetadata({
   const admittedRowIds = DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS.map(
     (row) => row.rowId
   );
+  const admittedRowIdSet = new Set();
+  const admittedScenarioIds = new Set();
   const supportedRowIds =
     localHostTextObservations.metadata.gateMetadata?.supportedFakeDomRowIds ??
     [];
 
   for (const admittedRow of DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS) {
+    if (admittedRowIdSet.has(admittedRow.rowId)) {
+      failures.push({
+        rowId: admittedRow.rowId,
+        gateStatus: "duplicate-admitted-private-host-text-commit-row"
+      });
+    }
+    admittedRowIdSet.add(admittedRow.rowId);
+    admittedScenarioIds.add(admittedRow.scenarioId);
+
     if (!knownRenderScenarioIds.has(admittedRow.scenarioId)) {
       failures.push({
         rowId: admittedRow.rowId,
@@ -789,6 +831,37 @@ function validateHostTextCommitAdmissionMetadata({
         gateStatus: "unknown-admitted-private-host-text-commit-row"
       });
     }
+
+    for (const fieldName of [
+      "phaseId",
+      "oracleExtractor",
+      "localProbe",
+      "reason"
+    ]) {
+      if (
+        typeof admittedRow[fieldName] !== "string" ||
+        admittedRow[fieldName].length === 0
+      ) {
+        failures.push({
+          rowId: admittedRow.rowId,
+          gateStatus: `admitted-private-host-text-commit-missing-${fieldName}`
+        });
+      }
+    }
+
+    if (
+      !Array.isArray(admittedRow.coverage) ||
+      admittedRow.coverage.length === 0 ||
+      admittedRow.coverage.some(
+        (coverageEntry) =>
+          typeof coverageEntry !== "string" || coverageEntry.length === 0
+      )
+    ) {
+      failures.push({
+        rowId: admittedRow.rowId,
+        gateStatus: "admitted-private-host-text-commit-missing-coverage"
+      });
+    }
   }
 
   for (const scenario of DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_HOST_TEXT_COMMIT_SCENARIOS) {
@@ -796,6 +869,18 @@ function validateHostTextCommitAdmissionMetadata({
       failures.push({
         scenarioId: scenario.scenarioId,
         gateStatus: "unknown-unsupported-private-host-text-commit-scenario"
+      });
+    }
+    if (admittedScenarioIds.has(scenario.scenarioId)) {
+      failures.push({
+        scenarioId: scenario.scenarioId,
+        gateStatus: "private-host-text-commit-scenario-admission-conflict"
+      });
+    }
+    if (typeof scenario.reason !== "string" || scenario.reason.length === 0) {
+      failures.push({
+        scenarioId: scenario.scenarioId,
+        gateStatus: "unsupported-private-host-text-commit-missing-reason"
       });
     }
   }
@@ -827,6 +912,23 @@ function validateHostTextCommitAdmissionMetadata({
         value: gateMetadata?.[key] ?? null
       });
     }
+  }
+}
+
+function validateBlockedPublicDomAdmission({ localChecks, failures }) {
+  if (localChecks.publicReactDomClientRootStillUnsupported !== true) {
+    failures.push({
+      gateStatus: "local-public-react-dom-root-not-blocked-during-private-gate",
+      value: localChecks.publicReactDomClientRootStillUnsupported ?? null
+    });
+  }
+
+  if (localChecks.publicReactDomClientRootRenderPathPresent !== false) {
+    failures.push({
+      gateStatus:
+        "local-public-react-dom-root-render-path-present-during-private-gate",
+      value: localChecks.publicReactDomClientRootRenderPathPresent ?? null
+    });
   }
 }
 
