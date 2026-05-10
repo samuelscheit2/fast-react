@@ -5,6 +5,7 @@
 //! development freezing are binding/conformance concerns and fail loudly here.
 
 mod compatibility;
+mod context_stack;
 mod element;
 mod event_priority;
 mod fiber;
@@ -27,6 +28,10 @@ pub use compatibility::{
     COMPATIBILITY_TARGETS, PackageCompatibilityTarget, REACT_COMPATIBILITY_TARGET,
     REACT_DOM_COMPATIBILITY_TARGET, REACT_DOM_PACKAGE_TARGET, REACT_PACKAGE_TARGET,
     TYPES_REACT_COMPATIBILITY_TARGET, TYPES_REACT_PACKAGE_TARGET,
+};
+pub use context_stack::{
+    ContextFrameId, ContextHandle, ContextSlot, ContextStack, ContextStackError,
+    ContextStackSnapshot, ContextValueHandle,
 };
 pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
 pub use event_priority::{
