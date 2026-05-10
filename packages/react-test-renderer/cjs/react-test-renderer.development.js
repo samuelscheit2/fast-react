@@ -601,18 +601,27 @@ const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   'fast.react_test_renderer.private_test_instance_wrapper_record'
 );
 const privateTestInstanceEmptyProps = Object.freeze({});
-const privateTestInstanceTextChildRecord = Object.freeze({
-  id: 'react-test-renderer-private-test-instance-host-text-child',
+const privateTestInstanceHostRootProps = null;
+const privateTestInstanceRootTextChildRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-root-host-text-child',
   kind: 'ReactTestInstancePrivateTextChildRecord',
   fiberTag: 'HostText',
   source: 'TestRendererCommittedFiberTreeInspection::host_text',
-  text: 'hello',
+  text: 'first sibling',
   publicObject: false
 });
-const privateTestInstanceChildren = Object.freeze([
-  privateTestInstanceTextChildRecord
-]);
+const privateTestInstanceNestedTextChildRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-nested-host-text-child',
+  kind: 'ReactTestInstancePrivateTextChildRecord',
+  fiberTag: 'HostText',
+  source: 'TestRendererCommittedFiberTreeInspection::host_text',
+  text: 'second sibling',
+  publicObject: false
+});
 const privateTestInstanceHostComponentType = 'span';
+const privateTestInstanceHostComponentChildren = Object.freeze([
+  privateTestInstanceNestedTextChildRecord
+]);
 const privateTestInstanceHostRootInspectionRecord = Object.freeze({
   id: 'react-test-renderer-private-test-instance-inspection-host-root',
   kind: 'TestRendererCommittedFiberNodeInspection',
@@ -621,11 +630,36 @@ const privateTestInstanceHostRootInspectionRecord = Object.freeze({
   index: 0,
   parentRecord: null,
   childRecord:
-    'react-test-renderer-private-test-instance-inspection-host-component',
+    'react-test-renderer-private-test-instance-inspection-root-host-text',
+  childRecords: Object.freeze([
+    'react-test-renderer-private-test-instance-inspection-root-host-text',
+    'react-test-renderer-private-test-instance-inspection-host-component'
+  ]),
   siblingRecord: null,
   path: Object.freeze(['HostRoot']),
+  wrapperEligible: true,
+  wrapperEligibilityReason:
+    'ReactTestRenderer.js materializes HostRoot when root has multiple children',
+  queryCandidate: true,
+  rootChildCount: 2,
+  publicObject: false
+});
+const privateTestInstanceRootTextInspectionRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-inspection-root-host-text',
+  kind: 'TestRendererCommittedFiberNodeInspection',
+  source: 'TestRendererCommittedFiberTreeInspection::host_text',
+  fiberTag: 'HostText',
+  index: 0,
+  parentRecord:
+    'react-test-renderer-private-test-instance-inspection-host-root',
+  childRecord: null,
+  siblingRecord:
+    'react-test-renderer-private-test-instance-inspection-host-component',
+  path: Object.freeze(['HostRoot', 'HostText[0]']),
   wrapperEligible: false,
   queryCandidate: false,
+  text: privateTestInstanceRootTextChildRecord.text,
+  skippedByQueryTraversal: true,
   publicObject: false
 });
 const privateTestInstanceHostComponentInspectionRecord = Object.freeze({
@@ -633,12 +667,12 @@ const privateTestInstanceHostComponentInspectionRecord = Object.freeze({
   kind: 'TestRendererCommittedFiberNodeInspection',
   source: 'TestRendererCommittedFiberTreeInspection::host_component',
   fiberTag: 'HostComponent',
-  index: 0,
+  index: 1,
   parentRecord:
     'react-test-renderer-private-test-instance-inspection-host-root',
   childRecord: 'react-test-renderer-private-test-instance-inspection-host-text',
   siblingRecord: null,
-  path: Object.freeze(['HostRoot', 'HostComponent']),
+  path: Object.freeze(['HostRoot', 'HostComponent[1]']),
   wrapperEligible: true,
   queryCandidate: true,
   elementTypeSource:
@@ -658,32 +692,66 @@ const privateTestInstanceHostTextInspectionRecord = Object.freeze({
     'react-test-renderer-private-test-instance-inspection-host-component',
   childRecord: null,
   siblingRecord: null,
-  path: Object.freeze(['HostRoot', 'HostComponent', 'HostText']),
+  path: Object.freeze(['HostRoot', 'HostComponent[1]', 'HostText']),
   wrapperEligible: false,
   queryCandidate: false,
-  text: privateTestInstanceTextChildRecord.text,
+  text: privateTestInstanceNestedTextChildRecord.text,
   skippedByQueryTraversal: true,
   publicObject: false
 });
 const privateTestInstanceAcceptedInspectionRecords = Object.freeze([
   privateTestInstanceHostRootInspectionRecord,
+  privateTestInstanceRootTextInspectionRecord,
   privateTestInstanceHostComponentInspectionRecord,
   privateTestInstanceHostTextInspectionRecord
 ]);
 const privateTestInstanceQueryPath = Object.freeze([
+  privateTestInstanceHostRootInspectionRecord,
+  privateTestInstanceHostComponentInspectionRecord
+]);
+const privateTestInstanceHostComponentQueryPath = Object.freeze([
   privateTestInstanceHostComponentInspectionRecord
 ]);
 const privateTestInstanceSkippedQueryRecords = Object.freeze([
+  privateTestInstanceRootTextInspectionRecord,
   privateTestInstanceHostTextInspectionRecord
 ]);
+const privateTestInstanceMultiChildHostTreeMetadata = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-multi-child-host-tree',
+  status: 'private-multi-child-query-metadata-ready-public-root-blocked',
+  acceptedWorker: 'worker-350-root-work-loop-complete-work-multiple-child-handoff',
+  acceptedRustModule: 'host_work/root_work_loop',
+  acceptedRustApis: Object.freeze([
+    'mount_test_host_sibling_work',
+    'handoff_completed_host_root_render_to_test_complete_work_for_siblings'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'host_work_mounts_multiple_host_root_siblings_under_host_root_wip',
+    'root_work_loop_hands_multiple_host_siblings_to_test_complete_work',
+    'root_work_loop_multiple_sibling_handoff_preserves_fragment_portal_suspense_blockers'
+  ]),
+  rootChildCount: 2,
+  completedChildCount: 2,
+  queryCandidateCount: privateTestInstanceQueryPath.length,
+  skippedTextRecordCount: privateTestInstanceSkippedQueryRecords.length,
+  rootWrapperMaterializedForPrivateMetadata: true,
+  publicRootAccessAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
 const privateTestInstanceQueryTraversalMetadata = Object.freeze({
   id: 'react-test-renderer-private-test-instance-query-traversal-metadata',
   source: 'ReactTestRenderer.js ReactTestInstance.findAll',
   traversalOrder: 'self-then-descendants',
-  rootCandidateCount: 1,
+  rootChildCount: privateTestInstanceMultiChildHostTreeMetadata.rootChildCount,
+  rootCandidateCount: privateTestInstanceQueryPath.length,
   acceptedCandidateCount: privateTestInstanceQueryPath.length,
   skippedTextChildCount: privateTestInstanceSkippedQueryRecords.length,
   textChildrenSkipped: true,
+  rootWrapperMaterializedForPrivateMetadata: true,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodsAvailable: false,
   predicateExecution: false,
   nativeBridgeAvailable: false,
@@ -706,10 +774,35 @@ const privateTestInstanceFiberInspectionMetadata = Object.freeze({
     'committed_fiber_inspection_rejects_empty_current_host_root'
   ]),
   committedShape: Object.freeze(['HostRoot', 'HostComponent', 'HostText']),
+  privateQueryShape: Object.freeze([
+    'HostRoot',
+    'HostText',
+    'HostComponent',
+    'HostText'
+  ]),
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   exposesHostNodes: false,
   mutatesFibers: false
 });
-const privateTestInstanceTypeQueryRecord = Object.freeze({
+const privateTestInstanceHostRootTypeQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-host-root-type-query',
+  query: 'type',
+  source: 'TestRendererCommittedFiberNodeInspection::element_type',
+  fiberTag: 'HostRoot',
+  value: null,
+  deterministic: true,
+  publicQueryMethodAvailable: false
+});
+const privateTestInstanceHostRootPropsQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-host-root-props-query',
+  query: 'props',
+  source: 'TestRendererCommittedFiberNodeInspection::memoized_props',
+  fiberTag: 'HostRoot',
+  value: privateTestInstanceHostRootProps,
+  deterministic: true,
+  publicQueryMethodAvailable: false
+});
+const privateTestInstanceHostComponentTypeQueryRecord = Object.freeze({
   id: 'react-test-renderer-private-test-instance-type-query',
   query: 'type',
   source: 'TestRendererCommittedFiberNodeInspection::element_type',
@@ -718,7 +811,7 @@ const privateTestInstanceTypeQueryRecord = Object.freeze({
   deterministic: true,
   publicQueryMethodAvailable: false
 });
-const privateTestInstancePropsQueryRecord = Object.freeze({
+const privateTestInstanceHostComponentPropsQueryRecord = Object.freeze({
   id: 'react-test-renderer-private-test-instance-props-query',
   query: 'props',
   source: 'TestRendererCommittedFiberNodeInspection::memoized_props',
@@ -727,29 +820,58 @@ const privateTestInstancePropsQueryRecord = Object.freeze({
   deterministic: true,
   publicQueryMethodAvailable: false
 });
-const privateTestInstanceChildrenQueryRecord = Object.freeze({
+const privateTestInstanceHostComponentChildrenQueryRecord = Object.freeze({
   id: 'react-test-renderer-private-test-instance-children-query',
   query: 'children',
   source: 'TestRendererCommittedFiberTreeInspection::host_text',
   fiberTag: 'HostComponent',
-  value: privateTestInstanceChildren,
+  value: privateTestInstanceHostComponentChildren,
+  deterministic: true,
+  publicQueryMethodAvailable: false
+});
+const privateTestInstanceHostComponentRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-host-component-record',
+  kind: 'ReactTestInstancePrivateRecord',
+  source: 'TestRendererCommittedFiberTreeInspection::host_component',
+  fiberTag: 'HostComponent',
+  inspectionRecord: privateTestInstanceHostComponentInspectionRecord,
+  publicObject: false,
+  type: privateTestInstanceHostComponentTypeQueryRecord.value,
+  props: privateTestInstanceHostComponentPropsQueryRecord.value,
+  children: privateTestInstanceHostComponentChildrenQueryRecord.value,
+  queryRecords: Object.freeze({
+    type: privateTestInstanceHostComponentTypeQueryRecord,
+    props: privateTestInstanceHostComponentPropsQueryRecord,
+    children: privateTestInstanceHostComponentChildrenQueryRecord
+  })
+});
+const privateTestInstanceHostRootChildren = Object.freeze([
+  privateTestInstanceRootTextChildRecord,
+  privateTestInstanceHostComponentRecord
+]);
+const privateTestInstanceHostRootChildrenQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-host-root-children-query',
+  query: 'children',
+  source: 'ReactTestRenderer.js getChildren(HostRoot)',
+  fiberTag: 'HostRoot',
+  value: privateTestInstanceHostRootChildren,
   deterministic: true,
   publicQueryMethodAvailable: false
 });
 const privateTestInstanceRootRecord = Object.freeze({
   id: 'react-test-renderer-private-test-instance-root-record',
   kind: 'ReactTestInstancePrivateRecord',
-  source: 'TestRendererCommittedFiberTreeInspection::host_component',
-  fiberTag: 'HostComponent',
-  inspectionRecord: privateTestInstanceHostComponentInspectionRecord,
+  source: 'ReactTestRenderer.js create().root multi-child HostRoot branch',
+  fiberTag: 'HostRoot',
+  inspectionRecord: privateTestInstanceHostRootInspectionRecord,
   publicObject: false,
-  type: privateTestInstanceTypeQueryRecord.value,
-  props: privateTestInstancePropsQueryRecord.value,
-  children: privateTestInstanceChildrenQueryRecord.value,
+  type: privateTestInstanceHostRootTypeQueryRecord.value,
+  props: privateTestInstanceHostRootPropsQueryRecord.value,
+  children: privateTestInstanceHostRootChildrenQueryRecord.value,
   queryRecords: Object.freeze({
-    type: privateTestInstanceTypeQueryRecord,
-    props: privateTestInstancePropsQueryRecord,
-    children: privateTestInstanceChildrenQueryRecord
+    type: privateTestInstanceHostRootTypeQueryRecord,
+    props: privateTestInstanceHostRootPropsQueryRecord,
+    children: privateTestInstanceHostRootChildrenQueryRecord
   })
 });
 const privateTestInstanceFindAllQueryRecord = Object.freeze({
@@ -766,6 +888,7 @@ const privateTestInstanceFindAllQueryRecord = Object.freeze({
   expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
   candidateRecords: privateTestInstanceQueryPath,
   skippedRecords: privateTestInstanceSkippedQueryRecords,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodAvailable: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -786,6 +909,7 @@ const privateTestInstanceFindQueryRecord = Object.freeze({
   expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
   candidateRecords: privateTestInstanceQueryPath,
   skippedRecords: privateTestInstanceSkippedQueryRecords,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodAvailable: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -803,11 +927,13 @@ const privateTestInstanceFindAllByTypeQueryRecord = Object.freeze({
   effectiveDeep: true,
   criteria: Object.freeze({
     kind: 'type',
-    value: privateTestInstanceTypeQueryRecord.value
+    value: privateTestInstanceHostComponentTypeQueryRecord.value
   }),
-  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
-  candidateRecords: privateTestInstanceQueryPath,
+  expectedCanaryMatchCount: privateTestInstanceHostComponentQueryPath.length,
+  candidateRecords: privateTestInstanceHostComponentQueryPath,
+  traversedCandidateRecords: privateTestInstanceQueryPath,
   skippedRecords: privateTestInstanceSkippedQueryRecords,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodAvailable: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -825,9 +951,11 @@ const privateTestInstanceFindByTypeQueryRecord = Object.freeze({
   expectOne: true,
   effectiveDeep: false,
   criteria: privateTestInstanceFindAllByTypeQueryRecord.criteria,
-  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
-  candidateRecords: privateTestInstanceQueryPath,
+  expectedCanaryMatchCount: privateTestInstanceHostComponentQueryPath.length,
+  candidateRecords: privateTestInstanceHostComponentQueryPath,
+  traversedCandidateRecords: privateTestInstanceQueryPath,
   skippedRecords: privateTestInstanceSkippedQueryRecords,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodAvailable: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -845,11 +973,13 @@ const privateTestInstanceFindAllByPropsQueryRecord = Object.freeze({
   effectiveDeep: true,
   criteria: Object.freeze({
     kind: 'props',
-    value: privateTestInstancePropsQueryRecord.value
+    value: privateTestInstanceHostComponentPropsQueryRecord.value
   }),
-  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
-  candidateRecords: privateTestInstanceQueryPath,
+  expectedCanaryMatchCount: privateTestInstanceHostComponentQueryPath.length,
+  candidateRecords: privateTestInstanceHostComponentQueryPath,
+  traversedCandidateRecords: privateTestInstanceQueryPath,
   skippedRecords: privateTestInstanceSkippedQueryRecords,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodAvailable: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -867,9 +997,11 @@ const privateTestInstanceFindByPropsQueryRecord = Object.freeze({
   expectOne: true,
   effectiveDeep: false,
   criteria: privateTestInstanceFindAllByPropsQueryRecord.criteria,
-  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
-  candidateRecords: privateTestInstanceQueryPath,
+  expectedCanaryMatchCount: privateTestInstanceHostComponentQueryPath.length,
+  candidateRecords: privateTestInstanceHostComponentQueryPath,
+  traversedCandidateRecords: privateTestInstanceQueryPath,
   skippedRecords: privateTestInstanceSkippedQueryRecords,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   publicQueryMethodAvailable: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -888,7 +1020,7 @@ const privateTestInstanceRootQueryRecord = Object.freeze({
   query: 'root',
   status: 'private-record-ready-public-root-blocked',
   publicSurface: 'create().root',
-  source: 'TestRendererCommittedFiberTreeInspection::host_component',
+  source: 'ReactTestRenderer.js create().root multi-child HostRoot branch',
   deterministic: true,
   publicAccessAvailable: false,
   result: privateTestInstanceRootRecord
@@ -906,15 +1038,20 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   nativeExecution: false,
   compatibilityClaimed: false,
   fiberInspection: privateTestInstanceFiberInspectionMetadata,
+  multiChildHostTree: privateTestInstanceMultiChildHostTreeMetadata,
   acceptedInspectionRecords: privateTestInstanceAcceptedInspectionRecords,
   queryTraversal: privateTestInstanceQueryTraversalMetadata,
   queryPath: privateTestInstanceQueryPath,
+  hostComponentQueryPath: privateTestInstanceHostComponentQueryPath,
   rootQueryRecord: privateTestInstanceRootQueryRecord,
   queryRecords: Object.freeze({
     root: privateTestInstanceRootQueryRecord,
-    type: privateTestInstanceTypeQueryRecord,
-    props: privateTestInstancePropsQueryRecord,
-    children: privateTestInstanceChildrenQueryRecord
+    type: privateTestInstanceHostRootTypeQueryRecord,
+    props: privateTestInstanceHostRootPropsQueryRecord,
+    children: privateTestInstanceHostRootChildrenQueryRecord,
+    hostComponentType: privateTestInstanceHostComponentTypeQueryRecord,
+    hostComponentProps: privateTestInstanceHostComponentPropsQueryRecord,
+    hostComponentChildren: privateTestInstanceHostComponentChildrenQueryRecord
   }),
   queryMethodRecords: privateTestInstanceQueryMethodRecords
 });
