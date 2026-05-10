@@ -106,6 +106,31 @@ const DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA = Object.freeze({
   ])
 });
 
+const DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA = Object.freeze({
+  gateVersion: 1,
+  target: 'packages/react-dom/src/dom-host/mutation.js',
+  privateRootRenderBridge: 'renderPrivateRootHostOutput',
+  privateHostComponentCreationBridge: 'createDomHostElementInstance',
+  privateHostTextCreationBridge: 'createDomHostTextInstance',
+  privateMutationBridge:
+    'commitDomPropertyUpdateForLatestProps/appendInitialChild/appendChildToContainer',
+  acceptedRustMetadata:
+    'fast-react-reconciler.root-work-loop.finished-work-handoff',
+  fakeDomOnly: true,
+  publicRootsCompared: false,
+  serverRenderingCompared: false,
+  hydrationCompared: false,
+  browserDomCompared: false,
+  compatibilityClaimed: false,
+  supportedFakeDomRowIds: Object.freeze([
+    'root-render-host-component-create',
+    'root-render-host-text-create',
+    'root-render-host-text-append',
+    'root-render-container-append',
+    'root-render-latest-props-publish'
+  ])
+});
+
 function appendInitialChild(parentInstance, child) {
   return appendChild(parentInstance, child);
 }
@@ -1897,6 +1922,7 @@ function applyStylePayloadEntry(instance, entry) {
 
 module.exports = {
   DOM_HOST_TEXT_COMMIT_GATE_METADATA,
+  DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
   DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA,
   DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
   CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,

@@ -630,6 +630,243 @@ test('private initial host output handoff applies and cleans fake-DOM host nodes
   assert.equal(container.childNodes.length, 0);
 });
 
+test('private root render host-output consumes accepted Rust metadata and renders fake DOM only', () => {
+  const document = createDocument('private-root-render-host-output');
+  const container = createElement('DIV', document);
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-root-render-host-output-public')
+  );
+  const element = {
+    props: {
+      children: 'accepted rust host output',
+      className: 'root-render-card',
+      id: 'root-render-host',
+      onClick() {
+        return 'not-invoked';
+      },
+      title: 'Private root render'
+    },
+    type: 'article'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: 'root-render-admission',
+    initialHostOutputIdPrefix: 'root-render-initial',
+    requestIdPrefix: 'root-render-request',
+    rootIdPrefix: 'root-render-root',
+    rootRenderHostOutputIdPrefix: 'root-render-host-output',
+    sideEffectIdPrefix: 'root-render-side-effect',
+    updateIdPrefix: 'root-render-update'
+  });
+  const create = bridge.createClientRoot(container);
+  const metadata = createRootWorkLoopFinishedWorkMetadata({
+    rootId: create.rootId,
+    rootTag: create.rootTag,
+    renderUpdateId: 'root-render-update:1',
+    hostType: 'article',
+    textContent: 'accepted rust host output'
+  });
+
+  const record = bridge.renderRootHostOutput(create, element, {
+    rootWorkLoopFinishedWorkMetadata: metadata
+  });
+  const hidden = rootBridge.getPrivateRootRenderHostOutputPayload(record);
+  const finishedWork = record.rootWorkLoopFinishedWorkRecord;
+  const finishedWorkPayload =
+    rootBridge.getPrivateRootRenderHostOutputFinishedWorkPayload(
+      finishedWork
+    );
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    record.$$typeof,
+    rootBridge.privateRootRenderHostOutputRecordType
+  );
+  assert.equal(record.kind, 'FastReactDomPrivateRootRenderHostOutputRecord');
+  assert.equal(record.operation, 'private-root-render-host-output');
+  assert.equal(
+    record.renderStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_APPLIED
+  );
+  assert.equal(record.renderId, 'root-render-host-output:1');
+  assert.equal(record.rootId, create.rootId);
+  assert.equal(record.createRequestId, 'root-render-request:1');
+  assert.equal(record.renderRequestId, 'root-render-request:2');
+  assert.equal(record.renderUpdateId, 'root-render-update:1');
+  assert.equal(record.hostOutputHandoffId, 'root-render-initial:1');
+  assert.equal(
+    record.hostOutputHandoffStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_APPLIED
+  );
+  assert.equal(
+    record.rootWorkLoopFinishedWorkStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED
+  );
+  assert.equal(
+    record.rootWorkLoopFinishedWorkHandoffId,
+    'root-render-update:1:root-render-host-output-finished-work'
+  );
+  assert.equal(record.rootWorkLoopFinishedWorkConsumed, true);
+  assert.equal(record.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(record.hostType, 'article');
+  assert.equal(record.hostOutputShape, 'host-component');
+  assert.deepEqual(record.childTags, ['HostComponent', 'HostText']);
+  assert.equal(record.textContent, 'accepted rust host output');
+  assert.equal(
+    record.domHostMutationGateMetadata,
+    domHost.DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA
+  );
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'private-create-root-record',
+      'private-root-render-record',
+      'root-marker-setup-cleanup',
+      'root-listener-setup-cleanup',
+      'create-render-admission',
+      'root-work-loop-finished-work-handoff',
+      'fake-dom-host-output-mutation',
+      'component-tree-host-instance-map',
+      'latest-props-publication'
+    ]
+  );
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(record.privateRootRender, true);
+  assert.equal(record.privateFacadeRoot, false);
+  assert.equal(record.rustHostOutputMetadataAccepted, true);
+  assert.equal(record.publicCreateRootEnabled, false);
+  assert.equal(record.publicRootCreated, false);
+  assert.equal(record.publicRootObjectExposed, false);
+  assert.equal(record.publicRootExecution, false);
+  assert.equal(record.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.rootScheduled, false);
+  assert.equal(record.fakeDomMutation, true);
+  assert.equal(record.domMutation, true);
+  assert.equal(record.browserDomMutation, false);
+  assert.equal(record.markerWrites, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.setupMarkerWrites, true);
+  assert.equal(record.setupListenerInstallation, true);
+  assert.equal(record.cleanupCompleted, true);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.refEffects, false);
+  assert.equal(record.compatibilityClaimed, false);
+  assert.equal(rootBridge.isPrivateRootRenderHostOutputRecord(record), true);
+  assert.equal(rootBridge.isPrivateRootRenderHostOutputRecord({}), false);
+  assert.equal(rootBridge.getPrivateRootRenderHostOutputPayload({}), null);
+
+  assert.equal(
+    finishedWork.$$typeof,
+    rootBridge.privateRootRenderHostOutputFinishedWorkRecordType
+  );
+  assert.equal(
+    finishedWork.handoffStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED
+  );
+  assert.equal(finishedWork.metadataSource, metadata.source);
+  assert.equal(finishedWork.metadataStatus, metadata.status);
+  assert.equal(finishedWork.renderUpdateId, 'root-render-update:1');
+  assert.equal(finishedWork.rootChildTag, 'HostComponent');
+  assert.equal(finishedWork.completedChildTag, 'HostComponent');
+  assert.equal(finishedWork.hostTextChildTag, 'HostText');
+  assert.equal(finishedWork.publicRootRenderingBlocked, true);
+  assert.equal(finishedWork.publicRootExecution, false);
+  assert.equal(finishedWork.reconcilerExecution, false);
+  assert.equal(finishedWork.compatibilityClaimed, false);
+  assert.equal(
+    finishedWork.domHostMutationGateMetadata,
+    domHost.DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA
+  );
+  assert.equal(
+    rootBridge.isPrivateRootRenderHostOutputFinishedWorkRecord(
+      finishedWork
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootRenderHostOutputFinishedWorkRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootRenderHostOutputFinishedWorkPayload({}),
+    null
+  );
+  assert.equal(finishedWorkPayload.renderRecord, hidden.renderRecord);
+  assert.equal(finishedWorkPayload.hostOutputHandoff, hidden.hostOutputHandoff);
+  assert.equal(finishedWorkPayload.metadata, metadata);
+
+  assert.equal(hidden.createRecord, create);
+  assert.equal(hidden.renderRecord.requestType, 'root.render');
+  assert.equal(hidden.renderRecord.updateId, 'root-render-update:1');
+  assert.equal(hidden.hostOutputHandoff.handoffId, 'root-render-initial:1');
+  assert.equal(hidden.hostOutputPayload.hostNode, container.firstChild);
+  assert.equal(hidden.rootWorkLoopFinishedWorkRecord, finishedWork);
+  assert.equal(hidden.rootWorkLoopFinishedWorkPayload, finishedWorkPayload);
+  assert.equal(hidden.sideEffectCleanup.sideEffectId, hidden.sideEffectRecord.sideEffectId);
+
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, 'ARTICLE');
+  assert.equal(container.firstChild.textContent, 'accepted rust host output');
+  assert.equal(container.textContent, 'accepted rust host output');
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ['class', 'root-render-card'],
+    ['id', 'root-render-host'],
+    ['title', 'Private root render']
+  ]);
+  assert.equal(
+    componentTree.getRootOwnerFromNode(container.firstChild),
+    create.owner
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(container.firstChild),
+    element.props
+  );
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+
+  assert.throws(
+    () =>
+      bridge.renderRootHostOutput(create, element, {
+        rootWorkLoopFinishedWorkMetadata: metadata
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_RENDER_HOST_OUTPUT',
+      message: /unrendered private root/
+    }
+  );
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+
+  const serialized = JSON.stringify(record);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('not-invoked'), false);
+
+  bridge.cleanupInitialRenderHostOutput(hidden.hostOutputHandoff);
+  assert.equal(container.childNodes.length, 0);
+});
+
 test('private initial host output handoff validates admission and rolls back unsupported children', () => {
   const document = createDocument('private-initial-host-output-validation');
   const container = createElement('DIV', document);

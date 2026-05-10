@@ -98,6 +98,7 @@ const {
   commitDomPropertyUpdateForLatestProps,
   createDomHostElementInstance,
   createDomHostTextInstance,
+  DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
   getClearContainerForRootUnmountRecordPayload,
   getDomPropertyUpdateLatestPropsHandoffPayload,
   isClearContainerForRootUnmountRecord,
@@ -222,6 +223,10 @@ const privateRootPublicFacadeHostOutputRenderRecordType =
   'fast.react_dom.private_root_public_facade_host_output_render_record';
 const privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType =
   'fast.react_dom.private_root_public_facade_root_work_loop_finished_work_record';
+const privateRootRenderHostOutputRecordType =
+  'fast.react_dom.private_root_render_host_output_record';
+const privateRootRenderHostOutputFinishedWorkRecordType =
+  'fast.react_dom.private_root_render_host_output_finished_work_record';
 const privateRootPublicFacadeHostOutputUpdateRecordType =
   'fast.react_dom.private_root_public_facade_host_output_update_record';
 const privateRootPublicFacadeNestedHostOutputUpdateRecordType =
@@ -321,6 +326,10 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED =
   'applied-private-root-public-facade-host-output-render-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED =
   'accepted-private-root-public-facade-root-work-loop-finished-work';
+const ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_APPLIED =
+  'applied-private-root-render-host-output';
+const ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED =
+  'accepted-private-root-render-host-output-finished-work';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED =
@@ -1788,6 +1797,112 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES =
       reason: 'React DOM public root compatibility remains unclaimed.'
     })
   ]);
+const ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'private-create-root-record',
+      accepted: true,
+      reason:
+        'The private render starts from a bridge-owned createRoot request record.'
+    }),
+    freezeRecord({
+      id: 'private-root-render-record',
+      accepted: true,
+      reason:
+        'The private render creates a bridge-owned root.render request record without exposing a public root object.'
+    }),
+    freezeRecord({
+      id: 'root-marker-setup-cleanup',
+      accepted: true,
+      reason:
+        'The reversible private root marker gate was applied for admission and then cleaned up.'
+    }),
+    freezeRecord({
+      id: 'root-listener-setup-cleanup',
+      accepted: true,
+      reason:
+        'The reversible private root listener gate was applied for admission and then cleaned up.'
+    }),
+    freezeRecord({
+      id: 'create-render-admission',
+      accepted: true,
+      reason:
+        'The private create/render admission record validated marker and listener prerequisites before host output.'
+    }),
+    freezeRecord({
+      id: 'root-work-loop-finished-work-handoff',
+      accepted: true,
+      reason:
+        'Accepted Rust root work-loop finished-work metadata matched the admitted HostComponent/HostText host-output shape.'
+    }),
+    freezeRecord({
+      id: 'fake-dom-host-output-mutation',
+      accepted: true,
+      reason:
+        'The HostComponent and HostText tree was rendered through the private fake-DOM mutation adapter only.'
+    }),
+    freezeRecord({
+      id: 'component-tree-host-instance-map',
+      accepted: true,
+      reason:
+        'HostComponent and HostText fake nodes were attached to private component-tree host instance tokens.'
+    }),
+    freezeRecord({
+      id: 'latest-props-publication',
+      accepted: true,
+      reason:
+        'Latest props were published only after the private fake-DOM mutation handoff was accepted.'
+    })
+  ]);
+const ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The private render does not enable public React DOM createRoot or root.render execution.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason:
+        'Accepted Rust metadata is consumed as evidence, but no native call is executed by this bridge.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler scheduling, render, complete-work, or commit traversal is executed by this bridge.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-compatibility',
+      blocked: true,
+      reason:
+        'Only deterministic fake-DOM host nodes are admitted by this private render.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'hydrateRoot and hydration replay records are rejected by this render evidence.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason:
+        'Synthetic event extraction, dispatch, and listener invocation remain blocked.'
+    }),
+    freezeRecord({
+      id: 'refs',
+      blocked: true,
+      reason: 'Ref attach/detach effects are not admitted by this render evidence.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM public root render compatibility remains unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED_CAPABILITIES =
   freezeArray([
     freezeRecord({
@@ -2246,6 +2361,8 @@ const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
 const rootPublicFacadeRootWorkLoopFinishedWorkPayloads = new WeakMap();
+const rootRenderHostOutputPayloads = new WeakMap();
+const rootRenderHostOutputFinishedWorkPayloads = new WeakMap();
 const rootPublicFacadeHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeNestedHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeHostOutputUnmountCleanupPayloads = new WeakMap();
@@ -2317,6 +2434,14 @@ function createPrivateRootBridgeShell(options) {
       return applyPrivateInitialRenderHostOutputWithBridge(
         bridgeState,
         admissionRecord
+      );
+    },
+    renderRootHostOutput(createRecord, element, options) {
+      return renderPrivateRootHostOutputWithBridge(
+        bridgeState,
+        createRecord,
+        element,
+        options
       );
     },
     cleanupInitialRenderHostOutput(handoffRecord) {
@@ -3427,6 +3552,241 @@ function renderPrivateRootPublicFacadeNativeHandoffFromPayload(
     payload,
     hostOutputRenderRecord
   );
+}
+
+function renderPrivateRootHostOutput(createRecord, element, options) {
+  return renderPrivateRootHostOutputWithBridge(
+    null,
+    createRecord,
+    element,
+    options
+  );
+}
+
+function renderPrivateRootHostOutputWithBridge(
+  bridgeState,
+  createRecord,
+  element,
+  options
+) {
+  const createValidation = validateRootBridgeRequestRecord(createRecord);
+  if (createValidation.operation !== 'create') {
+    throwInvalidRootRenderHostOutput(
+      'Private root host-output render requires a createRoot request record.'
+    );
+  }
+  if (bridgeState !== null && createValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const handleState = createValidation.rootHandleState;
+  if (
+    handleState.lifecycleStatus !== ROOT_LIFECYCLE_CREATED ||
+    handleState.renderCount !== 0
+  ) {
+    throwInvalidRootRenderHostOutput(
+      'Private root host-output render requires an unrendered private root.'
+    );
+  }
+  assertNoActiveCreateRootSideEffectsForRootRenderHostOutput(createRecord);
+
+  const normalizedInitial = normalizeInitialHostOutputElement(element);
+  const rootWorkLoopMetadata = getPrivateRootRenderHostOutputMetadata(options);
+  const callback = getPrivateRootRenderHostOutputCallback(options);
+  const sideEffectOptions =
+    getPrivateRootRenderHostOutputSideEffectOptions(options);
+  const rootBridgeState = createValidation.bridgeState;
+  let sideEffectRecord = null;
+  let renderRecord = null;
+  let admissionRecord = null;
+  let hostOutputHandoff = null;
+  let hostOutputPayload = null;
+  let rootWorkLoopFinishedWorkRecord = null;
+  let sideEffectCleanup = null;
+
+  try {
+    sideEffectRecord = applyPrivateCreateRootSideEffectsWithBridge(
+      rootBridgeState,
+      createRecord,
+      sideEffectOptions
+    );
+    renderRecord = createRootUpdateRecordWithBridge(
+      rootBridgeState,
+      createRecord.handle,
+      'render',
+      false,
+      element,
+      callback
+    );
+    normalizePrivateRootRenderHostOutputRootWorkLoopMetadata(
+      rootWorkLoopMetadata,
+      {
+        createRecord,
+        hostOutputHandoff: null,
+        normalizedInitial,
+        renderRecord
+      }
+    );
+    admissionRecord = admitPrivateCreateRenderPathWithBridge(
+      rootBridgeState,
+      createRecord,
+      sideEffectRecord,
+      renderRecord
+    );
+    hostOutputHandoff = applyPrivateInitialRenderHostOutputWithBridge(
+      rootBridgeState,
+      admissionRecord
+    );
+    hostOutputPayload =
+      rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
+    if (hostOutputPayload === undefined) {
+      throwInvalidRootRenderHostOutput(
+        'Private root host-output render requires an applied initial host-output handoff.'
+      );
+    }
+    rootWorkLoopFinishedWorkRecord =
+      createPrivateRootRenderHostOutputFinishedWorkRecord({
+        createRecord,
+        hostOutputHandoff,
+        hostOutputPayload,
+        metadata: rootWorkLoopMetadata,
+        normalizedInitial,
+        renderRecord
+      });
+    sideEffectCleanup = revertPrivateCreateRootSideEffectsWithBridge(
+      rootBridgeState,
+      sideEffectRecord
+    );
+  } catch (error) {
+    cleanupRootRenderHostOutputAfterFailure({
+      bridgeState: rootBridgeState,
+      error,
+      hostOutputHandoff,
+      sideEffectRecord
+    });
+    throw error;
+  }
+
+  const sequence = rootBridgeState.nextRootRenderHostOutputSequence++;
+  const renderId = `${rootBridgeState.rootRenderHostOutputIdPrefix}:${sequence}`;
+  const record = freezeRecord({
+    $$typeof: privateRootRenderHostOutputRecordType,
+    kind: 'FastReactDomPrivateRootRenderHostOutputRecord',
+    operation: 'private-root-render-host-output',
+    entrypoint: 'react-dom/client',
+    renderId,
+    renderSequence: sequence,
+    renderStatus: ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_APPLIED,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    createRequestId: createRecord.requestId,
+    createRequestSequence: createRecord.requestSequence,
+    createRequestType: createRecord.requestType,
+    renderRequestId: renderRecord.requestId,
+    renderRequestSequence: renderRecord.requestSequence,
+    renderRequestType: renderRecord.requestType,
+    renderUpdateId: renderRecord.updateId,
+    renderLifecycleStatusBefore: renderRecord.lifecycleStatusBefore,
+    renderLifecycleStatusAfter: renderRecord.lifecycleStatusAfter,
+    sideEffectId: sideEffectRecord.sideEffectId,
+    sideEffectSequence: sideEffectRecord.sideEffectSequence,
+    setupSideEffectStatus: sideEffectRecord.sideEffectStatus,
+    cleanupSideEffectStatus: sideEffectCleanup.sideEffectStatus,
+    markerStatus: sideEffectRecord.markerRecord.markerStatus,
+    markerCleanupStatus: sideEffectCleanup.markerCleanup.markerStatus,
+    listenerRegistrationStatus:
+      sideEffectRecord.listenerRegistration.registrationStatus,
+    listenerCleanupStatus:
+      sideEffectCleanup.listenerCleanup.registrationStatus,
+    admissionId: admissionRecord.admissionId,
+    admissionSequence: admissionRecord.admissionSequence,
+    admissionStatus: admissionRecord.admissionStatus,
+    hostOutputHandoffId: hostOutputHandoff.handoffId,
+    hostOutputHandoffSequence: hostOutputHandoff.handoffSequence,
+    hostOutputHandoffStatus: hostOutputHandoff.handoffStatus,
+    hostType: hostOutputHandoff.hostType,
+    hostOutputShape: hostOutputHandoff.hostOutputShape,
+    hostComponentCount: hostOutputHandoff.hostComponentCount,
+    hostTextCount: hostOutputHandoff.hostTextCount,
+    rootChildTag: hostOutputHandoff.rootChildTag,
+    completedChildTag: hostOutputHandoff.completedChildTag,
+    childTags: hostOutputHandoff.childTags,
+    hostNodeInfo: hostOutputHandoff.hostNodeInfo,
+    textNodeInfo: hostOutputHandoff.textNodeInfo,
+    containerChildCount: hostOutputHandoff.containerChildCount,
+    hostChildCount: hostOutputHandoff.hostChildCount,
+    textContent: hostOutputHandoff.textContent,
+    domHostMutationGateMetadata:
+      DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
+    rootWorkLoopFinishedWorkHandoffId:
+      rootWorkLoopFinishedWorkRecord.handoffId,
+    rootWorkLoopFinishedWorkStatus:
+      rootWorkLoopFinishedWorkRecord.handoffStatus,
+    rootWorkLoopFinishedWorkRecord,
+    rootWorkLoopFinishedWorkMetadata:
+      rootWorkLoopFinishedWorkRecord.metadataEvidence,
+    rootWorkLoopFinishedWorkRootChildTag:
+      rootWorkLoopFinishedWorkRecord.rootChildTag,
+    rootWorkLoopFinishedWorkHostTextChildTag:
+      rootWorkLoopFinishedWorkRecord.hostTextChildTag,
+    rootWorkLoopFinishedWorkConsumed:
+      rootWorkLoopFinishedWorkRecord.consumedFinishedWorkRecord,
+    rootWorkLoopPublicRootRenderingBlocked:
+      rootWorkLoopFinishedWorkRecord.publicRootRenderingBlocked,
+    acceptedCapabilities:
+      ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+    privateRootRender: true,
+    privateFacadeRoot: false,
+    rustHostOutputMetadataAccepted: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    setupMarkerWrites: true,
+    setupListenerInstallation: true,
+    cleanupCompleted: true,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false,
+    cleanupRequired: true
+  });
+
+  rootRenderHostOutputPayloads.set(record, {
+    admissionRecord,
+    callback,
+    container: handleState.container,
+    createRecord,
+    domHostMutationGateMetadata:
+      DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
+    element,
+    hostOutputHandoff,
+    hostOutputPayload,
+    renderRecord,
+    rootHandle: createRecord.handle,
+    rootWorkLoopFinishedWorkPayload:
+      rootRenderHostOutputFinishedWorkPayloads.get(
+        rootWorkLoopFinishedWorkRecord
+      ),
+    rootWorkLoopFinishedWorkRecord,
+    sideEffectCleanup,
+    sideEffectRecord
+  });
+  return record;
 }
 
 function renderPrivateRootPublicFacadeHostOutputFromPayload(
@@ -6896,6 +7256,22 @@ function getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(record) {
 
 function isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord(value) {
   return rootPublicFacadeRootWorkLoopFinishedWorkPayloads.has(value);
+}
+
+function getPrivateRootRenderHostOutputPayload(record) {
+  return rootRenderHostOutputPayloads.get(record) || null;
+}
+
+function isPrivateRootRenderHostOutputRecord(value) {
+  return rootRenderHostOutputPayloads.has(value);
+}
+
+function getPrivateRootRenderHostOutputFinishedWorkPayload(record) {
+  return rootRenderHostOutputFinishedWorkPayloads.get(record) || null;
+}
+
+function isPrivateRootRenderHostOutputFinishedWorkRecord(value) {
+  return rootRenderHostOutputFinishedWorkPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeHostOutputUpdatePayload(record) {
@@ -10858,6 +11234,10 @@ function createBridgeState(options) {
       options && options.rootRenderNativeHandoffIdPrefix,
       'root-render-native-handoff'
     ),
+    rootRenderHostOutputIdPrefix: getIdPrefix(
+      options && options.rootRenderHostOutputIdPrefix,
+      'root-render-host-output'
+    ),
     publicFacadeHostOutputUpdateIdPrefix: getIdPrefix(
       options && options.publicFacadeHostOutputUpdateIdPrefix,
       'public-facade-host-output-update'
@@ -10911,6 +11291,7 @@ function createBridgeState(options) {
     nextPublicFacadePreflightSequence: 1,
     nextPublicFacadeHostOutputRenderSequence: 1,
     nextRootRenderNativeHandoffSequence: 1,
+    nextRootRenderHostOutputSequence: 1,
     nextPublicFacadeHostOutputUpdateSequence: 1,
     nextPublicFacadeNestedHostOutputUpdateSequence: 1,
     nextPublicFacadeHostOutputUnmountCleanupSequence: 1,
@@ -15350,6 +15731,21 @@ function assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
   }
 }
 
+function assertNoActiveCreateRootSideEffectsForRootRenderHostOutput(
+  createRecord
+) {
+  const existing = rootCreateSideEffectRecords.get(createRecord);
+  if (existing === undefined) {
+    return;
+  }
+  const existingPayload = rootCreateSideEffectPayloads.get(existing);
+  if (existingPayload && existingPayload.active) {
+    throwInvalidRootRenderHostOutput(
+      'Cannot render private root host output while createRoot side effects are already active.'
+    );
+  }
+}
+
 function assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputUpdate(
   createRecord
 ) {
@@ -15549,6 +15945,63 @@ function getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options) {
   };
 }
 
+function getPrivateRootRenderHostOutputMetadata(options) {
+  if (!options || typeof options !== 'object') {
+    throwInvalidRootRenderHostOutput(
+      'Private root host-output render requires accepted root work-loop finished-work metadata.'
+    );
+  }
+  const option = getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options);
+  if (option.found) {
+    return option.value;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'acceptedRootWorkLoopFinishedWorkMetadata'
+    )
+  ) {
+    return options.acceptedRootWorkLoopFinishedWorkMetadata;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rustRootWorkLoopFinishedWorkMetadata'
+    )
+  ) {
+    return options.rustRootWorkLoopFinishedWorkMetadata;
+  }
+  throwInvalidRootRenderHostOutput(
+    'Private root host-output render requires accepted root work-loop finished-work metadata.'
+  );
+}
+
+function getPrivateRootRenderHostOutputCallback(options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'callback')
+  ) {
+    return options.callback;
+  }
+  return undefined;
+}
+
+function getPrivateRootRenderHostOutputSideEffectOptions(options) {
+  if (!options || typeof options !== 'object') {
+    return undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(options, 'sideEffectOptions')) {
+    return options.sideEffectOptions;
+  }
+  if (Object.prototype.hasOwnProperty.call(options, 'listenerOptions')) {
+    return {
+      listenerOptions: options.listenerOptions
+    };
+  }
+  return undefined;
+}
+
 function createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
   createRecord,
   hostOutputHandoff,
@@ -15705,6 +16158,98 @@ function createPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord({
   });
 
   rootPublicFacadeRootWorkLoopFinishedWorkPayloads.set(record, {
+    createRecord,
+    hostOutputHandoff,
+    hostOutputPayload,
+    metadata,
+    normalizedMetadata: normalized,
+    renderRecord,
+    sourceRecord: renderRecord
+  });
+  return record;
+}
+
+function createPrivateRootRenderHostOutputFinishedWorkRecord({
+  createRecord,
+  hostOutputHandoff,
+  hostOutputPayload,
+  metadata,
+  normalizedInitial,
+  renderRecord
+}) {
+  const normalized =
+    normalizePrivateRootRenderHostOutputRootWorkLoopMetadata(metadata, {
+      createRecord,
+      hostOutputHandoff,
+      normalizedInitial,
+      renderRecord
+    });
+  const handoffId =
+    `${renderRecord.updateId}:root-render-host-output-finished-work`;
+  const record = freezeRecord({
+    $$typeof: privateRootRenderHostOutputFinishedWorkRecordType,
+    kind: 'FastReactDomPrivateRootRenderHostOutputFinishedWorkRecord',
+    operation: 'private-root-render-host-output-finished-work',
+    handoffId,
+    handoffStatus:
+      ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED,
+    metadataSource: normalized.source,
+    metadataStatus: normalized.status,
+    metadataRevision: normalized.revision,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    renderRequestId: renderRecord.requestId,
+    renderRequestSequence: renderRecord.requestSequence,
+    renderRequestType: renderRecord.requestType,
+    renderUpdateId: renderRecord.updateId,
+    hostType: hostOutputHandoff.hostType,
+    textContent: hostOutputHandoff.textContent,
+    rootChildTag: normalized.rootChildTag,
+    completedChildTag: normalized.completedChildTag,
+    hostTextChildTag: normalized.hostTextChildTag,
+    childTags: normalized.childTags,
+    renderLanes: normalized.renderLanes,
+    finishedLanes: normalized.finishedLanes,
+    remainingLanes: normalized.remainingLanes,
+    hostOutputShape: normalized.hostOutputShape,
+    hostComponentCount: normalized.hostComponentCount,
+    hostTextCount: normalized.hostTextCount,
+    recordsFinishedWork: true,
+    pendingWorkMatchesFinishedWork: true,
+    consumedFinishedWorkRecord: true,
+    commitOrderAfterPendingRecord: true,
+    finishedWorkAfterCommit: null,
+    finishedLanesAfterCommit: normalized.finishedLanesAfterCommit,
+    renderPhaseWorkAfterCommit: null,
+    mutationExecutionBlocked: true,
+    publicRootRenderingBlocked: true,
+    effectsRefsAndHydrationBlocked: true,
+    placementApplyKind: normalized.placementApplyKind,
+    placementTag: normalized.placementTag,
+    placementSiblingStatus: normalized.placementSiblingStatus,
+    metadataEvidence: normalized.publicRecord,
+    domHostMutationGateMetadata:
+      DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
+    privateRootRender: true,
+    privateFacadeRoot: false,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: false,
+    domMutation: false,
+    browserDomMutation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootRenderHostOutputFinishedWorkPayloads.set(record, {
     createRecord,
     hostOutputHandoff,
     hostOutputPayload,
@@ -16104,6 +16649,38 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     source,
     status
   };
+}
+
+function normalizePrivateRootRenderHostOutputRootWorkLoopMetadata(
+  metadata,
+  expected
+) {
+  try {
+    return normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
+      metadata,
+      expected
+    );
+  } catch (error) {
+    if (
+      error &&
+      error.code ===
+        'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER'
+    ) {
+      throwInvalidRootRenderHostOutput(
+        String(error.message)
+          .replace(
+            /Public-facade host-output render/g,
+            'Private root host-output render'
+          )
+          .replace(
+            /private public-facade host-output render/g,
+            'private root host-output render'
+          )
+          .replace(/private public-facade root/g, 'private root')
+      );
+    }
+    throw error;
+  }
 }
 
 function getFirstRootWorkLoopMetadataValue(metadata, paths) {
@@ -16709,6 +17286,41 @@ function cleanupPublicFacadeHostOutputRenderAfterFailure({
   }
 }
 
+function cleanupRootRenderHostOutputAfterFailure({
+  bridgeState,
+  error,
+  hostOutputHandoff,
+  sideEffectRecord
+}) {
+  if (hostOutputHandoff !== null) {
+    try {
+      cleanupPrivateInitialRenderHostOutputWithBridge(
+        bridgeState,
+        hostOutputHandoff
+      );
+    } catch (cleanupError) {
+      error.hostOutputCleanupError = {
+        code: cleanupError.code || null,
+        message: cleanupError.message
+      };
+    }
+  }
+
+  if (sideEffectRecord !== null) {
+    try {
+      revertPrivateCreateRootSideEffectsWithBridge(
+        bridgeState,
+        sideEffectRecord
+      );
+    } catch (cleanupError) {
+      error.sideEffectCleanupError = {
+        code: cleanupError.code || null,
+        message: cleanupError.message
+      };
+    }
+  }
+}
+
 function validatePrivateRootRenderNativeHandoff(
   rootPayload,
   hostOutputRenderRecord
@@ -17121,6 +17733,12 @@ function throwInvalidRootRenderNativeHandoff(message) {
   throw error;
 }
 
+function throwInvalidRootRenderHostOutput(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_RENDER_HOST_OUTPUT';
+  throw error;
+}
+
 function describeCreateRootMarkerGuard(container, options) {
   const warningMessage = getCreateRootWarning(container, options);
   return freezeRecord({
@@ -17442,6 +18060,10 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED,
+  ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_APPLIED,
+  ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_FINISHED_WORK_ACCEPTED,
   ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED,
   ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_ROOT_RENDER_NATIVE_HANDOFF_BLOCKED_CAPABILITIES,
@@ -17546,6 +18168,8 @@ module.exports = {
   getPrivateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateRootPublicFacadeHostOutputRenderPayload,
   getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload,
+  getPrivateRootRenderHostOutputPayload,
+  getPrivateRootRenderHostOutputFinishedWorkPayload,
   getPrivateRootPublicFacadeHostOutputUpdatePayload,
   getPrivateRootPublicFacadeNestedHostOutputUpdatePayload,
   getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload,
@@ -17584,6 +18208,8 @@ module.exports = {
   isPrivateRootPublicFacadeMarkerListenerPreflightRecord,
   isPrivateRootPublicFacadeHostOutputRenderRecord,
   isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord,
+  isPrivateRootRenderHostOutputRecord,
+  isPrivateRootRenderHostOutputFinishedWorkRecord,
   isPrivateRootPublicFacadeHostOutputUpdateRecord,
   isPrivateRootPublicFacadeNestedHostOutputUpdateRecord,
   isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord,
@@ -17626,6 +18252,8 @@ module.exports = {
   privateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateRootPublicFacadeHostOutputRenderRecordType,
   privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType,
+  privateRootRenderHostOutputRecordType,
+  privateRootRenderHostOutputFinishedWorkRecordType,
   privateRootPublicFacadeHostOutputUpdateRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
@@ -17655,6 +18283,7 @@ module.exports = {
   privateRootOwnerType,
   privateRootUpdateRecordType,
   preflightPrivateRootPublicFacadeMarkerListenerSetup,
+  renderPrivateRootHostOutput,
   renderPrivateRootPublicFacadeHostOutput,
   renderPrivateRootPublicFacadeNativeHandoff,
   updatePrivateRootPublicFacadeHostOutput,
