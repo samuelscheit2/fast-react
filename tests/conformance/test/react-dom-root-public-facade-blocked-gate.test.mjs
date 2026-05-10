@@ -597,6 +597,146 @@ test("React DOM client private facade preflights marker/listener setup and clean
   );
 });
 
+test("React DOM client private facade host-output update routes through private fake DOM only", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-host-output-update",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const initialElement = {
+    props: {
+      children: "initial facade output",
+      className: "facade-initial",
+      id: "facade-host",
+      "data-phase": "initial"
+    },
+    type: "main"
+  };
+  const nextElement = {
+    props: {
+      children: "updated facade output",
+      className: "facade-updated",
+      id: "facade-host",
+      "data-phase": "updated"
+    },
+    type: "main"
+  };
+  const adapter = descriptor.value({
+    hostOutputUpdateIdPrefix: "facade-conformance-update-handoff",
+    publicFacadeHostOutputRenderIdPrefix: "facade-conformance-render",
+    publicFacadeHostOutputUpdateIdPrefix: "facade-conformance-update",
+    requestIdPrefix: "facade-conformance-request",
+    rootIdPrefix: "facade-conformance-root",
+    updateIdPrefix: "facade-conformance-update-id"
+  });
+  const root = adapter.createRoot(container);
+  const initial = adapter.renderHostOutput(root, initialElement);
+  const update = adapter.updateHostOutput(root, nextElement);
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(update);
+
+  assert.equal(
+    update.$$typeof,
+    rootBridge.privateRootPublicFacadeHostOutputUpdateRecordType
+  );
+  assert.equal(
+    update.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(update.diagnosticId, "facade-conformance-update:1");
+  assert.equal(update.updateRequestType, "root.render");
+  assert.equal(update.updateUpdateId, "facade-conformance-update-id:2");
+  assert.equal(
+    update.updateLifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    update.hostOutputUpdateHandoffId,
+    "facade-conformance-update-handoff:1"
+  );
+  assert.deepEqual(
+    update.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-initial-host-output-render",
+      "public-facade-root-render-update-record",
+      "host-output-update-handoff",
+      "fake-dom-property-update",
+      "property-payload-evidence",
+      "fake-dom-text-update",
+      "latest-props-after-mutation",
+      "attribute-payload-rows"
+    ]
+  );
+  assert.equal(update.privateFacadeRoot, true);
+  assert.equal(update.publicCreateRootEnabled, false);
+  assert.equal(update.publicRootExecution, false);
+  assert.equal(update.publicRootCompatibilitySurface, false);
+  assert.equal(update.nativeExecution, false);
+  assert.equal(update.reconcilerExecution, false);
+  assert.equal(update.browserDomMutation, false);
+  assert.equal(update.markerWrites, false);
+  assert.equal(update.listenerInstallation, false);
+  assert.equal(update.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeHostOutputUpdateRecord(update),
+    true
+  );
+  assert.deepEqual(
+    adapter.getRootRequestRecords(root).map((record) => record.requestType),
+    ["createRoot", "root.render", "root.render"]
+  );
+  assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [initial]);
+  assert.deepEqual(adapter.getRootHostOutputUpdateDiagnostics(root), [update]);
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(hidden.updateRecord).element,
+    nextElement
+  );
+  assert.equal(
+    hidden.hostOutputUpdateHandoff.updateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.textContent, "updated facade output");
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ["class", "facade-updated"],
+    ["data-phase", "updated"],
+    ["id", "facade-host"]
+  ]);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+
+  hidden.bridge.cleanupInitialRenderHostOutput(
+    hidden.hostOutputRenderPayload.hostOutputHandoff
+  );
+  assert.equal(container.childNodes.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+});
+
 test("React DOM client private facade unmount cleanup stays private and non-compatible", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")
@@ -1337,26 +1477,31 @@ function createPrivateGateTextNode(text, ownerDocument, domContainer) {
     nodeType: domContainer.TEXT_NODE,
     ownerDocument
   });
-  let textValue = String(text);
+  target.writeLog = [];
+  target.textContent = text;
   Object.defineProperties(target, {
     data: {
       configurable: true,
       enumerable: true,
       get() {
-        return textValue;
+        return this.textContent;
       },
       set(value) {
-        textValue = String(value);
+        const textValue = String(value);
+        this.writeLog.push(["data", textValue]);
+        this.textContent = textValue;
       }
     },
     nodeValue: {
       configurable: true,
       enumerable: true,
       get() {
-        return textValue;
+        return this.textContent;
       },
       set(value) {
-        textValue = String(value);
+        const textValue = String(value);
+        this.writeLog.push(["nodeValue", textValue]);
+        this.textContent = textValue;
       }
     }
   });
@@ -1370,6 +1515,7 @@ function createPrivateGateEventTarget(fields) {
     attributes: new Map(),
     childNodes: [],
     __mutationLog: [],
+    mutationLog: [],
     __registrations: [],
     parentNode: null,
     addEventListener(type, listener, options) {
@@ -1395,6 +1541,7 @@ function createPrivateGateEventTarget(fields) {
       this.childNodes.push(child);
       child.parentNode = this;
       this.__mutationLog.push({ child, type: "appendChild" });
+      this.mutationLog.push(["appendChild", child.nodeName]);
       return child;
     },
     insertBefore(child, beforeChild) {
@@ -1406,6 +1553,11 @@ function createPrivateGateEventTarget(fields) {
       this.childNodes.splice(index, 0, child);
       child.parentNode = this;
       this.__mutationLog.push({ beforeChild, child, type: "insertBefore" });
+      this.mutationLog.push([
+        "insertBefore",
+        child.nodeName,
+        beforeChild.nodeName
+      ]);
       return child;
     },
     removeChild(child) {
@@ -1414,6 +1566,7 @@ function createPrivateGateEventTarget(fields) {
       }
       detachPrivateGateChild(child);
       this.__mutationLog.push({ child, type: "removeChild" });
+      this.mutationLog.push(["removeChild", child.nodeName]);
       return child;
     },
     setAttribute(name, value) {
@@ -1452,8 +1605,9 @@ function createPrivateGateEventTarget(fields) {
       for (const child of [...this.childNodes]) {
         detachPrivateGateChild(child);
       }
-      textContent = value;
+      textContent = String(value);
       this.__mutationLog.push({ type: "textContent", value });
+      this.mutationLog.push(["textContent", textContent]);
     }
   });
   Object.defineProperties(target, {
@@ -1489,4 +1643,10 @@ function detachPrivateGateChild(child) {
     siblings.splice(index, 1);
   }
   child.parentNode = null;
+}
+
+function attributeEntries(node) {
+  return [...node.attributes.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }
