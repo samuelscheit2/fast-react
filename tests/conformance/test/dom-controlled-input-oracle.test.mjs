@@ -339,15 +339,16 @@ test("private controlled radio post-event restore queue records group intent wit
     controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
       requestIdPrefix: "controlled-oracle-radio-restore"
     });
+  const latestProps = {
+    type: "radio",
+    name: "choice",
+    checked: true,
+    onChange() {},
+    onClick() {}
+  };
   const eventDispatch = createPrivateControlledEventDispatch({
     domEventName: "click",
-    latestProps: {
-      type: "radio",
-      name: "choice",
-      checked: true,
-      onChange() {},
-      onClick() {}
-    },
+    latestProps,
     nodeName: "INPUT"
   });
   const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
@@ -358,7 +359,29 @@ test("private controlled radio post-event restore queue records group intent wit
         "deterministic-event-latest-props-post-event-restore-queue",
       queueId: "controlled-oracle-radio-restore-queue",
       eventName: "click",
-      targetKind: "controlled-input-post-event-restore-queue"
+      targetKind: "controlled-input-post-event-restore-queue",
+      radioGroupFormKey: "form:choice",
+      radioGroupSiblingProps: [
+        {
+          formKey: "form:choice",
+          props: {
+            type: "radio",
+            name: "choice",
+            checked: false,
+            defaultChecked: false,
+            onChange() {}
+          }
+        },
+        {
+          formKey: "form:other",
+          props: {
+            type: "radio",
+            name: "choice",
+            checked: false,
+            onChange() {}
+          }
+        }
+      ]
     }
   );
 
@@ -407,6 +430,15 @@ test("private controlled radio post-event restore queue records group intent wit
       siblingLatestPropsLookupPerformed:
         record.siblingLatestPropsLookupPerformed,
       siblingInputRestorePerformed: record.siblingInputRestorePerformed,
+      siblingPropsLookupStatus: record.siblingPropsLookup.status,
+      siblingPropsCandidateCount: record.siblingPropsLookup.candidateCount,
+      acceptedSameNameSameFormCount:
+        record.siblingPropsLookup.acceptedSameNameSameFormCount,
+      siblingPropsLiveLookupPerformed:
+        record.siblingPropsLookup.livePropsLookupPerformed,
+      siblingPropsFormTraversalPerformed:
+        record.siblingPropsLookup.formTraversalPerformed,
+      siblingPropsWrapperExecuted: record.siblingPropsLookup.wrapperExecuted,
       valueTrackerRefreshed: record.valueTrackerRefreshed,
       realDomQueried: record.realDomQueried,
       rawGroupNodesCaptured: record.rawGroupNodesCaptured,
@@ -425,6 +457,13 @@ test("private controlled radio post-event restore queue records group intent wit
         groupLookupPerformed: false,
         siblingLatestPropsLookupPerformed: false,
         siblingInputRestorePerformed: false,
+        siblingPropsLookupStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsLookupRecordedStatus,
+        siblingPropsCandidateCount: 2,
+        acceptedSameNameSameFormCount: 1,
+        siblingPropsLiveLookupPerformed: false,
+        siblingPropsFormTraversalPerformed: false,
+        siblingPropsWrapperExecuted: false,
         valueTrackerRefreshed: false,
         realDomQueried: false,
         rawGroupNodesCaptured: false,
@@ -433,9 +472,59 @@ test("private controlled radio post-event restore queue records group intent wit
       }
     ]
   );
+  assert.deepEqual(
+    intent.radioGroupSiblingPropsLookup.records.map((record) => ({
+      status: record.status,
+      sameName: record.sameName,
+      sameForm: record.sameForm,
+      skipReason: record.skipReason,
+      siblingWouldReceiveRestore: record.siblingWouldReceiveRestore,
+      siblingLatestPropsLookupPerformed:
+        record.siblingLatestPropsLookupPerformed,
+      formTraversalPerformed: record.formTraversalPerformed,
+      wrapperExecuted: record.wrapperExecuted,
+      realDomQueried: record.realDomQueried,
+      rawLatestPropsRetained: record.rawLatestPropsRetained,
+      compatibilityClaimed: record.compatibilityClaimed
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus,
+        sameName: true,
+        sameForm: true,
+        skipReason: null,
+        siblingWouldReceiveRestore: true,
+        siblingLatestPropsLookupPerformed: false,
+        formTraversalPerformed: false,
+        wrapperExecuted: false,
+        realDomQueried: false,
+        rawLatestPropsRetained: false,
+        compatibilityClaimed: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus,
+        sameName: true,
+        sameForm: false,
+        skipReason: "sibling-radio-form-does-not-match",
+        siblingWouldReceiveRestore: false,
+        siblingLatestPropsLookupPerformed: false,
+        formTraversalPerformed: false,
+        wrapperExecuted: false,
+        realDomQueried: false,
+        rawLatestPropsRetained: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
   assert.equal(intent.sideEffects.radioGroupRestoreIntentRecorded, true);
+  assert.equal(intent.sideEffects.radioGroupSiblingMetadataRead, true);
+  assert.equal(intent.sideEffects.radioGroupSiblingPropsEvidenceAccepted, true);
   assert.equal(intent.sideEffects.radioGroupLookupPerformed, false);
   assert.equal(intent.sideEffects.radioGroupMembersEnumerated, false);
+  assert.equal(intent.sideEffects.radioGroupLivePropsLookupPerformed, false);
+  assert.equal(intent.sideEffects.radioGroupFormTraversalPerformed, false);
   assert.equal(intent.sideEffects.radioGroupValueTrackerRefreshed, false);
   assert.equal(intent.sideEffects.hostValueRead, false);
   assert.equal(intent.sideEffects.hostValueWritten, false);
