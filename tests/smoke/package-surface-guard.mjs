@@ -106,7 +106,8 @@ const exactPrivatePublicFileGuards = {
     'src/shared/create-portal.js',
     'src/shared/flush-sync-guard.js',
     'src/shared/form-actions.js',
-    'src/test-utils-act-gate.js'
+    'src/test-utils-act-gate.js',
+    'test/hydration-private.test.js'
   ],
   'react-test-renderer': [
     'cjs/react-test-renderer-private-routes.development.js',
