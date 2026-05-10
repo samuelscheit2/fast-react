@@ -202,10 +202,11 @@ export function inspectSchedulerPostTaskPriorityDiagnostics({
       const schedulingPostFlushEvents = shim.takeEvents();
 
       const cancellationNode = Scheduler.unstable_scheduleCallback(
-        Scheduler.unstable_NormalPriority,
+        Scheduler.unstable_LowPriority,
         () => {
           throw new Error("cancelled post-task callback should not run");
-        }
+        },
+        { delay: 13 }
       );
       const cancellationScheduleEvents = shim.takeEvents();
       const cancellationBeforeCancel =
