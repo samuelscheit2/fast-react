@@ -1,6 +1,10 @@
 'use strict';
 
 const {assertValidContainer, describeContainer} = require('./dom-container.js');
+const {
+  inspectHydrationContainerMarkers:
+    inspectHydrationContainerMarkersWithContracts
+} = require('./hydration-marker-parser.js');
 
 const HYDRATION_MARKER_ORACLE_KIND =
   'react-19.2.6-react-dom-hydration-marker-oracle';
@@ -162,9 +166,14 @@ const unsupportedHydrationPrerequisites = freezeArray([
     'Hydratable cursor state, mismatch queues, and dehydrated boundary records are not wired.'
   ),
   prerequisite(
-    'no-dom-marker-parser',
+    'no-hydration-root-scheduling',
+    'reconciler',
+    'The special initial hydration update and root scheduling path are not implemented.'
+  ),
+  prerequisite(
+    'no-hydration-marker-consumption',
     'react-dom-client',
-    'Fizz marker matching is not implemented in the DOM client helper layer.'
+    'Fizz marker parsing is diagnostic-only and is not wired to hydration root claiming.'
   ),
   prerequisite(
     'no-boundary-dom-operations',
@@ -190,6 +199,9 @@ function createHydrationBoundaryGate(options) {
   const gateState = createGateState(options);
 
   return Object.freeze({
+    inspectContainerMarkers(container) {
+      return inspectHydrationContainerMarkers(container, gateState);
+    },
     recordUnsupportedHydrateRoot(container, initialChildren, hydrationOptions) {
       return createUnsupportedHydrateRootRecordWithGate(
         gateState,
@@ -219,6 +231,13 @@ function getPrivateHydrationBoundaryRecordPayload(record) {
 
 function isPrivateHydrationBoundaryRecord(value) {
   return hydrationBoundaryRecordPayloads.has(value);
+}
+
+function inspectHydrationContainerMarkers(container, options) {
+  return inspectHydrationContainerMarkersWithContracts(container, {
+    markerContracts: acceptedHydrationMarkerContracts,
+    validationOptions: options && options.validationOptions
+  });
 }
 
 function assertAcceptedHydrationMarkerOracle(oracle) {
@@ -271,6 +290,10 @@ function createUnsupportedHydrateRootRecordWithGate(
   hydrationOptions
 ) {
   assertValidContainer(container, gateState.validationOptions);
+  const markerDiagnostics = inspectHydrationContainerMarkers(
+    container,
+    gateState
+  );
 
   const sequence = gateState.nextRecordSequence++;
   const recordId = `${gateState.recordIdPrefix}:${sequence}`;
@@ -288,12 +311,15 @@ function createUnsupportedHydrateRootRecordWithGate(
     optionsInfo: describeHydrationValue(hydrationOptions),
     oracleInfo: gateState.markerOracleInfo,
     blockedOn: unsupportedHydrationPrerequisites,
+    markerDiagnostics,
     canHydrate: false,
     publicRootCreated: false,
     containerMarked: false,
     listenersAttached: false,
     domMutated: false,
-    eventsReplayed: false
+    eventsReplayed: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false
   });
 
   hydrationBoundaryRecordPayloads.set(record, {
@@ -501,6 +527,7 @@ module.exports = {
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
+  inspectHydrationContainerMarkers,
   isPrivateHydrationBoundaryRecord,
   privateHydrationBoundaryRecordType,
   unsupportedHydrationPrerequisites
