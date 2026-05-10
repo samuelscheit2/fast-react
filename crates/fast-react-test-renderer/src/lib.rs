@@ -4710,9 +4710,13 @@ pub struct TestRendererPrivateActPassiveEffectDrainDiagnostics {
     consumes_pending_passive_flush_metadata: bool,
     consumes_accepted_scheduler_flush_metadata: bool,
     private_scheduler_flush_request_metadata_consumed: bool,
+    consumes_accepted_native_update_execution: bool,
+    private_update_native_bridge_admission: Option<TestRendererUpdateNativeBridgeAdmission>,
+    host_output_produced_from_native_update: bool,
     executes_passive_effects: bool,
     invokes_effect_callbacks: bool,
     invokes_act_callback: bool,
+    public_update_compatibility_claimed: bool,
     public_act_compatibility_claimed: bool,
     compatibility_claimed: bool,
 }
@@ -4759,6 +4763,23 @@ impl TestRendererPrivateActPassiveEffectDrainDiagnostics {
     }
 
     #[must_use]
+    pub const fn consumes_accepted_native_update_execution(&self) -> bool {
+        self.consumes_accepted_native_update_execution
+    }
+
+    #[must_use]
+    pub const fn private_update_native_bridge_admission(
+        &self,
+    ) -> Option<TestRendererUpdateNativeBridgeAdmission> {
+        self.private_update_native_bridge_admission
+    }
+
+    #[must_use]
+    pub const fn host_output_produced_from_native_update(&self) -> bool {
+        self.host_output_produced_from_native_update
+    }
+
+    #[must_use]
     pub const fn executes_passive_effects(&self) -> bool {
         self.executes_passive_effects
     }
@@ -4771,6 +4792,11 @@ impl TestRendererPrivateActPassiveEffectDrainDiagnostics {
     #[must_use]
     pub const fn invokes_act_callback(&self) -> bool {
         self.invokes_act_callback
+    }
+
+    #[must_use]
+    pub const fn public_update_compatibility_claimed(&self) -> bool {
+        self.public_update_compatibility_claimed
     }
 
     #[must_use]
@@ -8781,9 +8807,48 @@ impl TestRendererRoot {
             consumes_pending_passive_flush_metadata: true,
             consumes_accepted_scheduler_flush_metadata: true,
             private_scheduler_flush_request_metadata_consumed: true,
+            consumes_accepted_native_update_execution: false,
+            private_update_native_bridge_admission: None,
+            host_output_produced_from_native_update: false,
             executes_passive_effects: false,
             invokes_effect_callbacks: false,
             invokes_act_callback: false,
+            public_update_compatibility_claimed: false,
+            public_act_compatibility_claimed: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    #[must_use]
+    pub fn consume_private_act_update_native_execution_and_pending_passive_flush_metadata_for_canary(
+        &self,
+        admission: TestRendererUpdateNativeBridgeAdmission,
+        metadata: TestRendererPrivateActPendingPassiveFlushMetadata,
+    ) -> TestRendererPrivateActPassiveEffectDrainDiagnostics {
+        TestRendererPrivateActPassiveEffectDrainDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_STATUS,
+            accepted_reconciler_records:
+                TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_ACCEPTED_RECORDS,
+            metadata,
+            metadata_root_matches_renderer_root: metadata.root() == self.root_id
+                && admission.root() == self.root_id,
+            consumes_pending_passive_flush_metadata: true,
+            consumes_accepted_scheduler_flush_metadata: true,
+            private_scheduler_flush_request_metadata_consumed: true,
+            consumes_accepted_native_update_execution: admission.update_route_admission_accepted()
+                && admission.lifecycle_evidence_accepted()
+                && admission.root_work_loop_handoff_accepted()
+                && admission.host_output_handoff_accepted()
+                && admission.rust_execution_from_js()
+                && admission.reconciler_execution_from_js(),
+            private_update_native_bridge_admission: Some(admission),
+            host_output_produced_from_native_update: admission.host_output_handoff_accepted()
+                && admission.text_update_apply_recorded(),
+            executes_passive_effects: false,
+            invokes_effect_callbacks: false,
+            invokes_act_callback: false,
+            public_update_compatibility_claimed: false,
             public_act_compatibility_claimed: false,
             compatibility_claimed: false,
         }
@@ -18378,6 +18443,9 @@ mod tests {
         assert!(diagnostics.consumes_pending_passive_flush_metadata());
         assert!(diagnostics.consumes_accepted_scheduler_flush_metadata());
         assert!(diagnostics.private_scheduler_flush_request_metadata_consumed());
+        assert!(!diagnostics.consumes_accepted_native_update_execution());
+        assert_eq!(diagnostics.private_update_native_bridge_admission(), None);
+        assert!(!diagnostics.host_output_produced_from_native_update());
         assert_eq!(metadata.finished_work(), finished_work);
         assert_eq!(metadata.pending_unmount_count(), 1);
         assert_eq!(metadata.pending_mount_count(), 2);
@@ -18387,6 +18455,70 @@ mod tests {
         assert!(!diagnostics.executes_passive_effects());
         assert!(!diagnostics.invokes_effect_callbacks());
         assert!(!diagnostics.invokes_act_callback());
+        assert!(!diagnostics.public_update_compatibility_claimed());
+        assert!(!diagnostics.public_act_compatibility_claimed());
+        assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_act_passive_effect_drain_consumes_native_update_execution_metadata() {
+        let initial_props = props().with_attribute("data-state", "old");
+        let updated_props = props().with_attribute("data-state", "new");
+        let mut root = TestRendererRoot::create_host_component_with_props_and_text_for_canary(
+            "span",
+            initial_props,
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let (_outcome, updated, admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                updated_props,
+                "goodbye",
+            )
+            .unwrap();
+        let finished_work = updated.commit().current();
+        let metadata = TestRendererPrivateActPendingPassiveFlushMetadata::new_for_canary(
+            root.root_id(),
+            TestRendererFiberHandleDiagnostics {
+                arena_id: finished_work.arena_id().get(),
+                slot: finished_work.slot().get(),
+                generation: finished_work.generation().get(),
+            },
+            0,
+            1,
+        );
+
+        let diagnostics = root
+            .consume_private_act_update_native_execution_and_pending_passive_flush_metadata_for_canary(
+                admission,
+                metadata,
+            );
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME
+        );
+        assert_eq!(diagnostics.metadata(), metadata);
+        assert!(diagnostics.metadata_root_matches_renderer_root());
+        assert!(diagnostics.consumes_pending_passive_flush_metadata());
+        assert!(diagnostics.consumes_accepted_scheduler_flush_metadata());
+        assert!(diagnostics.private_scheduler_flush_request_metadata_consumed());
+        assert!(diagnostics.consumes_accepted_native_update_execution());
+        assert_eq!(
+            diagnostics.private_update_native_bridge_admission(),
+            Some(admission)
+        );
+        assert!(diagnostics.host_output_produced_from_native_update());
+        assert!(!diagnostics.executes_passive_effects());
+        assert!(!diagnostics.invokes_effect_callbacks());
+        assert!(!diagnostics.invokes_act_callback());
+        assert!(!diagnostics.public_update_compatibility_claimed());
         assert!(!diagnostics.public_act_compatibility_claimed());
         assert!(!diagnostics.compatibility_claimed());
     }
