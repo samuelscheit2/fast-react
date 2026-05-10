@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 722
+
+- Worker 722 added the static private-admission ledger for Workers 715-721.
+  The accepted gate classifies Worker 715 clippy maintenance and Worker 716's
+  previous-ledger audit as skip/meta rows, and records Workers 717-721 as
+  accepted private diagnostics with durable worker-progress evidence tokens.
+- The ledger keeps public blockers false across root render/update/unmount,
+  `act`, `flushSync`, hooks/effects, test-renderer serialization/root/
+  `TestInstance`/native bridge, browser DOM, text-content/dangerousHTML,
+  hydration, events, refs, resources, forms, controlled inputs, and Scheduler.
+- Worker 722 was accepted after independent audit and verification with focused
+  private-admission tests, conformance workspace tests, package-surface guard,
+  import-entrypoint smoke, full `npm run check`, conflict-marker scanning, and
+  `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. This is static conformance evidence only and does not execute the
+  underlying private runtime paths.
+
 ### Worker 720
 
 - Worker 720 added the private react-test-renderer serialization finished-work

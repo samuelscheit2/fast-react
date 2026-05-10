@@ -48,18 +48,17 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
 accepted and cleaned up. Workers 715-721 have also been accepted and cleaned
-up.
+up. Worker 722 has also been accepted and cleaned up.
 
-Workers 722-723 were launched from queue base commit `bf5440e` in isolated
-`worker/<slug>` branches and worktrees.
+Worker 723 remains active from queue base commit `bf5440e` in an isolated
+`worker/<slug>` branch and worktree.
 
-- Worker 722: package/private-admission ledger for Workers 715-721.
 - Worker 723: test-renderer native serialization identity gate consuming
   Worker 720 evidence.
 
 ## Near-Term Sequencing
 
-1. Monitor workers 722 and 723, accepting only scoped private evidence with
+1. Monitor worker 723, accepting only scoped private evidence with
    public package behavior and compatibility claims still blocked.
 2. Select later work from accepted private blockers only; keep public root,
    act, flushSync, hooks/effects, test-renderer, and React DOM compatibility
@@ -72,14 +71,11 @@ Workers 722-723 were launched from queue base commit `bf5440e` in isolated
 
 ## Next Queue Candidates
 
-- Private test-renderer native bridge consumption of Worker 720's finished-work
-  identity gate, without widening public `toJSON`, `toTree`, `.root`, or
-  `TestInstance` behavior.
-- Private package/admission ledger coverage for Workers 715-721 so accepted
-  hidden capabilities remain closed by default at package boundaries.
+- Select the next queue after Worker 723 finishes, based on its accepted
+  evidence and remaining private blockers.
 - Additional private root/test-renderer bridge gates that require accepted
-  `finished_work` / `finished_lanes` handoff before any serialization or native
-  bridge execution.
+  `finished_work` / `finished_lanes` handoff before any wider serialization or
+  native bridge execution.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `flushSync`, public Scheduler timing, public hydration,
