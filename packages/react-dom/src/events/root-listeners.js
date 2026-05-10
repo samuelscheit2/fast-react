@@ -13,14 +13,19 @@ const {
   getListenerSetKey,
   markTargetAsListening
 } = require('./listener-registry.js');
+const {
+  createEventListenerWrapperWithPriority
+} = require('./react-dom-event-listener.js');
 
 const IS_CAPTURE_PHASE = 1 << 2;
 const IS_NON_DELEGATED = 1 << 1;
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
-  const listener = function reactDomRootListenerShell() {
-    return undefined;
-  };
+  const listener = createEventListenerWrapperWithPriority(
+    target,
+    domEventName,
+    eventSystemFlags
+  );
 
   Object.defineProperties(listener, {
     __FAST_REACT_DOM_EVENT_SHELL__: {
