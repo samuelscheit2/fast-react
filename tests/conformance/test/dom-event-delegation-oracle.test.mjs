@@ -36,6 +36,12 @@ const componentTree = require(
 const domContainer = require(
   path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
 );
+const hydrationGate = require(
+  path.join(
+    repoRoot,
+    "packages/react-dom/src/client/hydration-boundary-gate.js"
+  )
+);
 const eventListener = require(
   path.join(
     repoRoot,
@@ -415,6 +421,75 @@ test("private input/change extraction preflight records target and controlled me
   }
 });
 
+test("private hydration replay target-dispatch link records dispatch path blockers without widening the oracle", () => {
+  const fixture = createPrivateHydrationReplayTargetDispatchLinkFixture();
+  const diagnostic = fixture.diagnostic;
+
+  assert.equal(
+    diagnostic.kind,
+    pluginEventSystem.HYDRATION_REPLAY_TARGET_DISPATCH_LINK_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    diagnostic.status,
+    pluginEventSystem.PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS
+  );
+  assert.equal(diagnostic.browserDomEventCompatibilityClaimed, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(diagnostic.publicRootBehaviorChanged, false);
+  assert.equal(diagnostic.eventReplaySupported, false);
+  assert.equal(diagnostic.hydrationReplaySupported, false);
+  assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.publicDispatchEnabled, false);
+  assert.equal(diagnostic.queueMutationAllowed, false);
+  assert.equal(diagnostic.replayQueuesDrained, false);
+  assert.equal(diagnostic.willDispatch, false);
+  assert.equal(diagnostic.willHydrate, false);
+  assert.equal(diagnostic.willReplay, false);
+  assert.deepEqual(
+    [
+      diagnostic.domEventName,
+      diagnostic.queueName,
+      diagnostic.hydratableEventTargetLookupStatus,
+      diagnostic.rootOwnershipStatus,
+      diagnostic.dehydratedBoundaryOwnerId,
+      diagnostic.ownerBoundaryKind,
+      diagnostic.targetPath,
+      diagnostic.targetDispatchPathStatus,
+      diagnostic.eventPathEntryCount
+    ],
+    [
+      "click",
+      "discrete-hydration-replay-attempt",
+      "blocked-on-dehydrated-boundary",
+      "owned-by-dehydrated-root",
+      "hydration-conformance-link:1:boundary:0",
+      "suspense-boundary",
+      "container.childNodes[1]",
+      "no-mounted-host-instance",
+      0
+    ]
+  );
+  assert.deepEqual(
+    [
+      diagnostic.dispatchBlockerMetadata.blockedReason,
+      diagnostic.dispatchBlockerMetadata.targetResolutionStatus,
+      diagnostic.dispatchBlockerMetadata.hydrationReplayQueued,
+      diagnostic.dispatchBlockerMetadata.publicDispatchEnabled,
+      diagnostic.dispatchBlockerMetadata.willInvokeListeners
+    ],
+    [
+      pluginEventSystem.EVENT_DISPATCH_BLOCKED_CODE,
+      "blocked",
+      false,
+      false,
+      false
+    ]
+  );
+  assert.equal(fixture.dispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(fixture.container.__registrations, []);
+  assert.deepEqual(fixture.document.__registrations, []);
+});
+
 test("synthetic event shape records target/currentTarget and post-dispatch currentTarget reset", () => {
   for (const mode of DOM_EVENT_DELEGATION_PROBE_MODES) {
     const observation = findDomEventDelegationDispatch(
@@ -669,6 +744,60 @@ function createPrivateInputChangeDelegationDispatch(options) {
   };
 }
 
+function createPrivateHydrationReplayTargetDispatchLinkFixture() {
+  const document = createFakeDocument("hydration-link-conformance");
+  const container = createFakeElement("DIV", document);
+  const target = createFakeElement("BUTTON", document);
+  appendFakeChild(container, createFakeComment("$"));
+  appendFakeChild(container, target);
+  appendFakeChild(container, createFakeComment("/$"));
+
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    recordIdPrefix: "hydration-conformance-link"
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    {
+      props: {
+        children: "link"
+      },
+      type: "App"
+    },
+    {
+      identifierPrefix: "hydration-link-conformance-"
+    }
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "click",
+        rootListeners.IS_CAPTURE_PHASE
+      ),
+      {
+        target,
+        type: "click"
+      }
+    );
+  const diagnostic =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      record,
+      dispatchRecord,
+      {
+        source: "dom-event-delegation-conformance-hydration-link"
+      }
+    );
+
+  return {
+    container,
+    diagnostic,
+    dispatchRecord,
+    document,
+    record,
+    target
+  };
+}
+
 function createFakeDocument(label) {
   const document = createFakeEventTarget({
     label,
@@ -702,6 +831,14 @@ function createFakeEventTarget(fields) {
     addEventListener(type, listener, options) {
       this.__registrations.push({ listener, options, type });
     }
+  };
+}
+
+function createFakeComment(data) {
+  return {
+    data,
+    nodeType: domContainer.COMMENT_NODE,
+    parentNode: null
   };
 }
 

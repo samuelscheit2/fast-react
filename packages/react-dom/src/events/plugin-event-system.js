@@ -80,6 +80,10 @@ const HYDRATION_DEHYDRATED_BOUNDARY_OWNER_RECORD_KIND =
   'FastReactDomHydrationDehydratedBoundaryOwnerRecord';
 const HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND =
   'FastReactDomHydrationHydratableEventTargetLookupRecord';
+const HYDRATION_REPLAY_TARGET_DISPATCH_LINK_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationReplayTargetDispatchLinkDiagnostic';
+const HYDRATION_REPLAY_TARGET_DISPATCH_LINK_EVENT_PATH_ENTRY_RECORD_KIND =
+  'FastReactDomHydrationReplayTargetDispatchLinkEventPathEntryRecord';
 
 const EVENT_DISPATCH_BLOCKED_CODE = 'FAST_REACT_DOM_EVENT_DISPATCH_BLOCKED';
 const PLUGIN_EXTRACTION_BLOCKED_CODE =
@@ -120,6 +124,8 @@ const INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PORTAL_EVENT_OWNER_ROOT_GATE';
 const INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE =
   'FAST_REACT_DOM_INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE';
+const INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE =
+  'FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK';
 const PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS =
   'admitted-private-fake-dom-event-dispatch-metadata';
 const PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS =
@@ -148,6 +154,8 @@ const PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS =
   'controlled-private-focus-blur-event-blocker-gate';
 const PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS =
   'controlled-private-input-change-event-extraction-preflight';
+const PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS =
+  'controlled-private-hydration-replay-target-dispatch-link';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const CHANGE_EVENT_PLUGIN_NAME = 'change-event-plugin';
@@ -315,7 +323,10 @@ const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
 const portalEventOwnerRootGateRecordPayloads = new WeakMap();
 const focusBlurEventBlockerGateRecordPayloads = new WeakMap();
+const hydrationReplayEventQueueDiagnosticPayloads = new WeakMap();
 const hydrationDehydratedTargetResolutionDiagnosticPayloads =
+  new WeakMap();
+const hydrationReplayTargetDispatchLinkDiagnosticPayloads =
   new WeakMap();
 
 function isObjectLike(value) {
@@ -4818,7 +4829,7 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
       }
     );
 
-  return Object.freeze({
+  const record = Object.freeze({
     kind: HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
     status:
       blockedEventReplayTargets.length === 0
@@ -4873,6 +4884,436 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
     drainOrder: replayQueueDrainOrderDiagnostics.drainOrder,
     blockedEventReplayTargets
   });
+
+  hydrationReplayEventQueueDiagnosticPayloads.set(
+    record,
+    Object.freeze({
+      blockedEventReplayTargets,
+      dehydratedTargetResolutionDiagnostics,
+      dispatchRecords: normalizedDispatchRecords,
+      hydratableEventTargetLookups,
+      markerReplayTargetCandidates,
+      replayQueueDrainOrderDiagnostics
+    })
+  );
+
+  return record;
+}
+
+function createHydrationReplayTargetDispatchLinkDiagnostic(
+  eventReplayQueueDiagnostics,
+  dispatchRecord,
+  options
+) {
+  const normalizedQueueDiagnostics =
+    assertHydrationReplayEventQueueDiagnostic(eventReplayQueueDiagnostics);
+  const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  const queuePayload =
+    hydrationReplayEventQueueDiagnosticPayloads.get(
+      normalizedQueueDiagnostics
+    );
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const targetDispatchPathRecord =
+    normalizedOptions.targetDispatchPathRecord === undefined
+      ? normalizedDispatchRecord.targetDispatchPathRecord
+      : normalizedOptions.targetDispatchPathRecord;
+  const normalizedDispatchPathRecord =
+    assertHydrationReplayTargetDispatchPathRecord(
+      targetDispatchPathRecord,
+      normalizedDispatchRecord
+    );
+
+  assertHydrationReplayTargetDispatchLinkDispatchBlocked(
+    normalizedDispatchRecord
+  );
+
+  const replayQueueEntry =
+    resolveHydrationReplayTargetDispatchLinkEntry(
+      normalizedQueueDiagnostics,
+      queuePayload,
+      normalizedDispatchRecord,
+      normalizedOptions
+    );
+  const hydratableEventTargetLookup =
+    resolveHydrationReplayTargetDispatchLinkLookup(
+      queuePayload,
+      replayQueueEntry
+    );
+
+  assertHydrationReplayTargetDispatchLinkOwnership(
+    replayQueueEntry,
+    hydratableEventTargetLookup
+  );
+
+  const eventPathEntries =
+    createHydrationReplayTargetDispatchLinkEventPathEntries(
+      normalizedDispatchPathRecord
+    );
+  const dispatchBlockerMetadata =
+    createHydrationReplayTargetDispatchBlockerMetadata(
+      normalizedDispatchRecord
+    );
+  const record = Object.freeze({
+    kind: HYDRATION_REPLAY_TARGET_DISPATCH_LINK_DIAGNOSTIC_KIND,
+    status: PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS,
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-hydration-replay-target-dispatch-link',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    hostInstanceHydrationAttempted: false,
+    hasScheduledReplayAttempt: false,
+    queueMutationAllowed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
+    eventsReplayed: false,
+    eventDispatch: false,
+    willDispatchEvents: false,
+    willHydrateHostInstances: false,
+    willDispatch: false,
+    willHydrate: false,
+    willReplay: false,
+    queued: false,
+    replayQueueDrained: false,
+    publicDispatchEnabled: false,
+    blockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    eventReplayQueueDiagnostics: normalizedQueueDiagnostics,
+    eventReplayQueueDiagnosticsAccepted: true,
+    targetResolutionDiagnosticsAccepted:
+      normalizedQueueDiagnostics.targetResolutionDiagnosticsAccepted === true,
+    replayQueueEntry,
+    replayQueueEntryStatus: replayQueueEntry.status,
+    inputOrder: replayQueueEntry.inputOrder,
+    replayQueueOrder: replayQueueEntry.replayQueueOrder,
+    prioritySortKey: replayQueueEntry.prioritySortKey,
+    domEventName: replayQueueEntry.domEventName,
+    nativeEventType: replayQueueEntry.nativeEventType,
+    queueCategory: replayQueueEntry.queueCategory,
+    queueName: replayQueueEntry.queueName,
+    queuePolicy: replayQueueEntry.queuePolicy,
+    replayableEvent: replayQueueEntry.replayableEvent,
+    hydratableEventTargetLookup,
+    hydratableEventTargetLookupStatus: hydratableEventTargetLookup.status,
+    rootOwnershipStatus: hydratableEventTargetLookup.rootOwnershipStatus,
+    dehydratedRootOwnerStatus:
+      hydratableEventTargetLookup.dehydratedRootOwnerStatus,
+    dehydratedBoundaryOwner:
+      hydratableEventTargetLookup.dehydratedBoundaryOwner,
+    dehydratedBoundaryOwnerId:
+      hydratableEventTargetLookup.dehydratedBoundaryOwnerId,
+    dehydratedBoundaryOwnerStatus:
+      hydratableEventTargetLookup.dehydratedBoundaryOwnerStatus,
+    ownerBoundaryKind: hydratableEventTargetLookup.blockedOnKind,
+    ownerBoundaryStatus: hydratableEventTargetLookup.blockedOnStatus,
+    targetPath: hydratableEventTargetLookup.targetPath,
+    targetPathStatus: hydratableEventTargetLookup.targetPathStatus,
+    targetNodeInfo: hydratableEventTargetLookup.targetNodeInfo,
+    targetContainerInfo: hydratableEventTargetLookup.targetContainerInfo,
+    targetContainerMatchesRoot:
+      hydratableEventTargetLookup.targetContainerMatchesRoot,
+    targetWithinRootContainer:
+      hydratableEventTargetLookup.targetWithinRootContainer,
+    targetDispatchPathRecord: normalizedDispatchPathRecord,
+    targetDispatchPathStatus: normalizedDispatchPathRecord.status,
+    targetDispatchPathLength: normalizedDispatchPathRecord.length,
+    targetHostInstanceStatus:
+      normalizedDispatchPathRecord.targetHostInstanceStatus,
+    targetInst: normalizedDispatchPathRecord.targetInst,
+    targetInstStatus: normalizedDispatchPathRecord.targetInstStatus,
+    eventPathEntryCount: eventPathEntries.length,
+    eventPathEntries,
+    eventPathStatus: normalizedDispatchPathRecord.status,
+    dispatchBlockerMetadata,
+    dispatchStatus: normalizedDispatchRecord.status,
+    dispatchQueueStatus: normalizedDispatchRecord.dispatchQueue.status,
+    dispatchQueueLength: normalizedDispatchRecord.dispatchQueue.length,
+    dispatchQueueListenerCount:
+      normalizedDispatchRecord.dispatchQueue.listenerCount,
+    extractionStatus: normalizedDispatchRecord.extractionRecord.status,
+    extractionBlockedReason:
+      normalizedDispatchRecord.extractionRecord.blockedReason,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'not-created',
+    listenerInvocationCount: 0,
+    willInvokeListeners: false
+  });
+
+  hydrationReplayTargetDispatchLinkDiagnosticPayloads.set(
+    record,
+    Object.freeze({
+      dispatchRecord: normalizedDispatchRecord,
+      eventReplayQueueDiagnostics: normalizedQueueDiagnostics,
+      hydratableEventTargetLookup,
+      replayQueueEntry,
+      targetDispatchPathRecord: normalizedDispatchPathRecord
+    })
+  );
+
+  return record;
+}
+
+function assertHydrationReplayEventQueueDiagnostic(record) {
+  if (
+    !isObjectLike(record) ||
+    record.kind !== HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND ||
+    !hydrationReplayEventQueueDiagnosticPayloads.has(record)
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics require a private hydration replay event queue diagnostic.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  return record;
+}
+
+function assertHydrationReplayTargetDispatchPathRecord(
+  targetDispatchPathRecord,
+  dispatchRecord
+) {
+  if (
+    !isObjectLike(targetDispatchPathRecord) ||
+    targetDispatchPathRecord.kind !== EVENT_TARGET_DISPATCH_PATH_RECORD_KIND ||
+    !Array.isArray(targetDispatchPathRecord.entries)
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics require a private event target dispatch path record.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  if (targetDispatchPathRecord !== dispatchRecord.targetDispatchPathRecord) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics reject foreign event target dispatch path records.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  return targetDispatchPathRecord;
+}
+
+function assertHydrationReplayTargetDispatchLinkDispatchBlocked(
+  dispatchRecord
+) {
+  if (
+    dispatchRecord.blockedReason !== EVENT_DISPATCH_BLOCKED_CODE ||
+    dispatchRecord.targetResolutionStatus !== 'blocked' ||
+    dispatchRecord.targetResolutionBlockedReason !==
+      EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics require blocked private dispatch target resolution.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+}
+
+function resolveHydrationReplayTargetDispatchLinkEntry(
+  eventReplayQueueDiagnostics,
+  queuePayload,
+  dispatchRecord,
+  options
+) {
+  const blockedEventReplayTargets =
+    queuePayload.blockedEventReplayTargets || [];
+  let replayQueueEntry = null;
+
+  if (options.replayQueueEntry !== undefined) {
+    replayQueueEntry = isObjectLike(options.replayQueueEntry)
+      ? options.replayQueueEntry
+      : null;
+    if (!blockedEventReplayTargets.includes(replayQueueEntry)) {
+      throw createPluginEventSystemError(
+        'Hydration replay target-dispatch link diagnostics reject stale replay queue entries.',
+        INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+      );
+    }
+  } else {
+    const inputOrder = normalizeNonNegativeInteger(
+      options.inputOrder,
+      0,
+      'inputOrder'
+    );
+    replayQueueEntry =
+      blockedEventReplayTargets.find(
+        (entry) => entry.inputOrder === inputOrder
+      ) || null;
+    if (replayQueueEntry === null) {
+      throw createPluginEventSystemError(
+        'Hydration replay target-dispatch link diagnostics require a blocked replay queue entry.',
+        INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+      );
+    }
+  }
+
+  const sourceDispatchRecord =
+    queuePayload.dispatchRecords[replayQueueEntry.inputOrder] || null;
+  if (sourceDispatchRecord !== dispatchRecord) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics require the dispatch record that produced the replay queue entry.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  if (
+    eventReplayQueueDiagnostics.blockedEventReplayTargets[
+      replayQueueEntry.replayQueueOrder
+    ] !== replayQueueEntry
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics reject stale replay queue ordering metadata.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  return replayQueueEntry;
+}
+
+function resolveHydrationReplayTargetDispatchLinkLookup(
+  queuePayload,
+  replayQueueEntry
+) {
+  const hydratableEventTargetLookup =
+    queuePayload.hydratableEventTargetLookups[replayQueueEntry.inputOrder] ||
+    null;
+
+  if (
+    !isObjectLike(hydratableEventTargetLookup) ||
+    hydratableEventTargetLookup.kind !==
+      HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics require a hydratable event target lookup record.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  if (
+    hydratableEventTargetLookup.targetPath !== replayQueueEntry.targetPath ||
+    hydratableEventTargetLookup.blockedOnStatus !==
+      replayQueueEntry.blockedOnStatus ||
+    hydratableEventTargetLookup.dehydratedBoundaryOwnerId !==
+      replayQueueEntry.dehydratedBoundaryOwnerId
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics reject stale hydratable target lookup metadata.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+
+  return hydratableEventTargetLookup;
+}
+
+function assertHydrationReplayTargetDispatchLinkOwnership(
+  replayQueueEntry,
+  hydratableEventTargetLookup
+) {
+  const hasBoundaryOwner =
+    isObjectLike(hydratableEventTargetLookup.dehydratedBoundaryOwner) &&
+    typeof hydratableEventTargetLookup.dehydratedBoundaryOwnerId ===
+      'string' &&
+    hydratableEventTargetLookup.dehydratedBoundaryOwnerId !== '';
+
+  if (
+    hydratableEventTargetLookup.rootOwnershipStatus !==
+      'owned-by-dehydrated-root' ||
+    replayQueueEntry.rootOwnershipStatus !== 'owned-by-dehydrated-root' ||
+    !hasBoundaryOwner
+  ) {
+    throw createPluginEventSystemError(
+      'Hydration replay target-dispatch link diagnostics require retained dehydrated boundary ownership.',
+      INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE
+    );
+  }
+}
+
+function createHydrationReplayTargetDispatchLinkEventPathEntries(
+  targetDispatchPathRecord
+) {
+  return Object.freeze(
+    targetDispatchPathRecord.entries.map((entry) =>
+      Object.freeze({
+        kind: HYDRATION_REPLAY_TARGET_DISPATCH_LINK_EVENT_PATH_ENTRY_RECORD_KIND,
+        index: entry.index,
+        componentTreeStatus: entry.componentTreeStatus,
+        isDirectEventTarget: entry.isDirectEventTarget,
+        isTargetHostInstance: entry.isTargetHostInstance,
+        latestPropsStatus: entry.latestPropsStatus,
+        nodeType: entry.nodeType,
+        rootOwnerMatchesDispatchPathRoot:
+          entry.rootOwner === targetDispatchPathRecord.rootOwner,
+        targetHostInstanceStatus: entry.targetHostInstanceStatus
+      })
+    )
+  );
+}
+
+function createHydrationReplayTargetDispatchBlockerMetadata(
+  dispatchRecord
+) {
+  const hydrationReplay = dispatchRecord.hydrationReplay;
+  const controlledStateRestore = dispatchRecord.controlledStateRestore;
+
+  return Object.freeze({
+    kind: 'FastReactDomHydrationReplayTargetDispatchBlockerMetadata',
+    status: 'blocked-private-event-dispatch-path-link-recorded',
+    admissionStatus: dispatchRecord.admissionStatus,
+    blockedReason: dispatchRecord.blockedReason,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    dispatchStatus: dispatchRecord.status,
+    dispatcherName: dispatchRecord.dispatcherName,
+    eventDispatch: false,
+    publicDispatchEnabled: false,
+    domEventName: dispatchRecord.domEventName,
+    nativeEventType: dispatchRecord.nativeEventType,
+    eventSystemFlags: dispatchRecord.eventSystemFlags,
+    inCapturePhase: dispatchRecord.inCapturePhase,
+    dispatchQueueStatus: dispatchRecord.dispatchQueue.status,
+    dispatchQueueLength: dispatchRecord.dispatchQueue.length,
+    dispatchQueueListenerCount: dispatchRecord.dispatchQueue.listenerCount,
+    extractionStatus: dispatchRecord.extractionRecord.status,
+    extractionBlockedReason: dispatchRecord.extractionRecord.blockedReason,
+    targetDispatchPathStatus: dispatchRecord.targetDispatchPathStatus,
+    targetDispatchPathLength: dispatchRecord.targetDispatchPathLength,
+    targetHostInstanceStatus: dispatchRecord.targetHostInstanceStatus,
+    targetInstStatus: dispatchRecord.targetInstStatus,
+    targetListenerFound: dispatchRecord.targetListenerFound,
+    targetListenerLookupCount: dispatchRecord.targetListenerLookupCount,
+    targetListenerLookupStatus: dispatchRecord.targetListenerLookupStatus,
+    targetResolutionStatus: dispatchRecord.targetResolutionStatus,
+    targetResolutionBlockedReason: dispatchRecord.targetResolutionBlockedReason,
+    hydrationReplayStatus: hydrationReplay.status,
+    hydrationReplayQueued: hydrationReplay.queued,
+    hydrationReplayBlockedReason: hydrationReplay.blockedReason,
+    controlledStateRestoreStatus: controlledStateRestore.status,
+    controlledStateRestoreScheduled: controlledStateRestore.scheduled,
+    controlledStateRestoreBlockedReason: controlledStateRestore.blockedReason,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'not-created',
+    listenerInvocationCount: 0,
+    willInvokeListeners: false
+  });
+}
+
+function getHydrationReplayTargetDispatchLinkDiagnosticPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return (
+    hydrationReplayTargetDispatchLinkDiagnosticPayloads.get(record) ||
+    null
+  );
 }
 
 function normalizeHydrationReplayDispatchRecords(dispatchRecords) {
@@ -6188,6 +6629,8 @@ module.exports = {
   HYDRATION_DEHYDRATED_ROOT_OWNER_RECORD_KIND,
   HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND,
   HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND,
+  HYDRATION_REPLAY_TARGET_DISPATCH_LINK_DIAGNOSTIC_KIND,
+  HYDRATION_REPLAY_TARGET_DISPATCH_LINK_EVENT_PATH_ENTRY_RECORD_KIND,
   HYDRATION_REPLAY_BLOCKED_CODE,
   HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND,
   INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE,
@@ -6196,6 +6639,7 @@ module.exports = {
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
   INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE,
+  INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE,
   INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE,
   LISTENER_ERROR_ROUTING_BLOCKED_CODE,
   NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED_CODE,
@@ -6214,6 +6658,7 @@ module.exports = {
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
   PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS,
+  PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS,
   PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
@@ -6230,6 +6675,7 @@ module.exports = {
   createEventTypeDispatchCanaryRecord,
   createFocusBlurEventBlockerGateFromDispatchRecords,
   createHydrationDehydratedTargetResolutionDiagnostic,
+  createHydrationReplayTargetDispatchLinkDiagnostic,
   createInputChangeEventExtractionPreflightRecord,
   createHydrationReplayEventQueueDiagnostic,
   createPortalEventOwnerRootGateRecord,
@@ -6245,6 +6691,7 @@ module.exports = {
   getDispatchQueueEntryRecordPayload,
   getDispatchQueueInvocationCanaryRecordPayload,
   getEventTypeDispatchCanaryRecordPayload,
+  getHydrationReplayTargetDispatchLinkDiagnosticPayload,
   getFocusBlurEventBlockerGateRecordPayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,

@@ -25,7 +25,9 @@ const {
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_BLOCKED_CODE,
   createHydrationDehydratedTargetResolutionDiagnostic,
-  createHydrationReplayEventQueueDiagnostic
+  createHydrationReplayEventQueueDiagnostic,
+  createHydrationReplayTargetDispatchLinkDiagnostic:
+    createPluginHydrationReplayTargetDispatchLinkDiagnostic
 } = require('../events/plugin-event-system.js');
 const resourceFormInternalsGate = require('../resource-form-internals-gate.js');
 
@@ -517,6 +519,39 @@ function createHydrationReplayOwnershipGateDiagnostic(
     rootTag: record.rootTag,
     source
   });
+}
+
+function createHydrationReplayTargetDispatchLinkDiagnostic(
+  hydrationBoundaryRecord,
+  dispatchRecord,
+  options
+) {
+  const record = assertPrivateHydrationBoundaryRecord(
+    hydrationBoundaryRecord
+  );
+  const normalizedOptions =
+    options && typeof options === 'object' ? options : {};
+  const source =
+    typeof normalizedOptions.source === 'string'
+      ? normalizedOptions.source
+      : 'private-hydration-replay-target-dispatch-link';
+  const eventReplayQueueDiagnostics =
+    createHydrationReplayEventQueueDiagnostic(dispatchRecord, {
+      dehydratedTargetResolution: record.targetResolutionDiagnostics,
+      markerReplayTargetCandidates:
+        record.replayQueueDiagnostics.markerReplayTargetCandidates,
+      source
+    });
+
+  return createPluginHydrationReplayTargetDispatchLinkDiagnostic(
+    eventReplayQueueDiagnostics,
+    dispatchRecord,
+    {
+      inputOrder: 0,
+      source,
+      targetDispatchPathRecord: normalizedOptions.targetDispatchPathRecord
+    }
+  );
 }
 
 function inspectHydrationContainerMarkers(container, options) {
@@ -1968,6 +2003,7 @@ module.exports = {
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
   createHydrationReplayOwnershipGateDiagnostic,
+  createHydrationReplayTargetDispatchLinkDiagnostic,
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
