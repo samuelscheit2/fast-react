@@ -20,7 +20,7 @@ use crate::begin_work::{
     ContextProviderUseContextOpenScopeBeginWorkRecord, UnsupportedOffscreenChildShapeKind,
     UnsupportedOffscreenChildShapeRecord, UnsupportedOffscreenVisibility,
     UnsupportedOffscreenVisibilityChildTraversalBlocker,
-    UnsupportedOffscreenVisibilityTransitionRecord,
+    UnsupportedOffscreenVisibilityTransitionKind, UnsupportedOffscreenVisibilityTransitionRecord,
     unsupported_offscreen_visibility_transition_record,
 };
 use crate::function_component::FunctionComponentContextRenderStore;
@@ -425,6 +425,202 @@ impl OffscreenVisibilityTransitionCompleteWorkBlockerRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OffscreenRevealCommitMetadataStatus {
+    AcceptedHiddenToVisibleReveal,
+}
+
+impl OffscreenRevealCommitMetadataStatus {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AcceptedHiddenToVisibleReveal => "accepted-hidden-to-visible-reveal",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OffscreenRevealCommitMetadataRecord {
+    offscreen: FiberId,
+    child: FiberId,
+    child_tag: FiberTag,
+    committed_lanes: Lanes,
+    transition: UnsupportedOffscreenVisibilityTransitionRecord,
+    subtree_flag_bubbling_intent: OffscreenVisibilitySubtreeFlagBubblingIntent,
+    status: OffscreenRevealCommitMetadataStatus,
+    suspensey_commit_flag: FiberFlags,
+    candidate_subtree_flags: FiberFlags,
+    child_may_suspend_commit: bool,
+    would_accumulate_newly_visible_suspensey_commit: bool,
+    would_unhide_host_children: bool,
+    visibility_effect_required: bool,
+    visibility_flag_set: bool,
+    host_visibility_mutation_blocked: bool,
+    passive_visibility_effects_blocked: bool,
+    public_compatibility_blocked: bool,
+    feature: &'static str,
+}
+
+impl OffscreenRevealCommitMetadataRecord {
+    #[must_use]
+    pub const fn offscreen(&self) -> FiberId {
+        self.offscreen
+    }
+
+    #[must_use]
+    pub const fn child(&self) -> FiberId {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn child_tag(&self) -> FiberTag {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub const fn committed_lanes(&self) -> Lanes {
+        self.committed_lanes
+    }
+
+    #[must_use]
+    pub const fn transition(&self) -> &UnsupportedOffscreenVisibilityTransitionRecord {
+        &self.transition
+    }
+
+    #[must_use]
+    pub const fn subtree_flag_bubbling_intent(
+        &self,
+    ) -> OffscreenVisibilitySubtreeFlagBubblingIntent {
+        self.subtree_flag_bubbling_intent
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> OffscreenRevealCommitMetadataStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn suspensey_commit_flag(&self) -> FiberFlags {
+        self.suspensey_commit_flag
+    }
+
+    #[must_use]
+    pub const fn candidate_subtree_flags(&self) -> FiberFlags {
+        self.candidate_subtree_flags
+    }
+
+    #[must_use]
+    pub const fn child_may_suspend_commit(&self) -> bool {
+        self.child_may_suspend_commit
+    }
+
+    #[must_use]
+    pub const fn would_accumulate_newly_visible_suspensey_commit(&self) -> bool {
+        self.would_accumulate_newly_visible_suspensey_commit
+    }
+
+    #[must_use]
+    pub const fn would_unhide_host_children(&self) -> bool {
+        self.would_unhide_host_children
+    }
+
+    #[must_use]
+    pub const fn visibility_effect_required(&self) -> bool {
+        self.visibility_effect_required
+    }
+
+    #[must_use]
+    pub const fn visibility_flag_set(&self) -> bool {
+        self.visibility_flag_set
+    }
+
+    #[must_use]
+    pub const fn host_visibility_mutation_blocked(&self) -> bool {
+        self.host_visibility_mutation_blocked
+    }
+
+    #[must_use]
+    pub const fn passive_visibility_effects_blocked(&self) -> bool {
+        self.passive_visibility_effects_blocked
+    }
+
+    #[must_use]
+    pub const fn public_compatibility_blocked(&self) -> bool {
+        self.public_compatibility_blocked
+    }
+
+    #[must_use]
+    pub const fn feature(&self) -> &'static str {
+        self.feature
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OffscreenRevealCommitMetadataError {
+    UnsupportedVisibilityTransition {
+        offscreen: FiberId,
+        transition: UnsupportedOffscreenVisibilityTransitionKind,
+    },
+    UnsupportedSubtreeBubblingIntent {
+        offscreen: FiberId,
+        intent: OffscreenVisibilitySubtreeFlagBubblingIntent,
+    },
+    MissingOffscreenChild {
+        offscreen: FiberId,
+    },
+    UnsupportedOffscreenChild {
+        offscreen: FiberId,
+        child: FiberId,
+        child_tag: FiberTag,
+        child_sibling: Option<FiberId>,
+        child_sibling_tag: Option<FiberTag>,
+    },
+}
+
+impl Display for OffscreenRevealCommitMetadataError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedVisibilityTransition {
+                offscreen,
+                transition,
+            } => write!(
+                formatter,
+                "Offscreen fiber {} cannot accept private reveal commit metadata for {} transition",
+                offscreen.slot().get(),
+                transition.as_str()
+            ),
+            Self::UnsupportedSubtreeBubblingIntent { offscreen, intent } => write!(
+                formatter,
+                "Offscreen fiber {} cannot accept private reveal commit metadata with {} bubbling intent",
+                offscreen.slot().get(),
+                intent.as_str()
+            ),
+            Self::MissingOffscreenChild { offscreen } => write!(
+                formatter,
+                "Offscreen fiber {} cannot accept private reveal commit metadata without a child",
+                offscreen.slot().get()
+            ),
+            Self::UnsupportedOffscreenChild {
+                offscreen,
+                child,
+                child_tag,
+                child_sibling,
+                child_sibling_tag,
+            } => write!(
+                formatter,
+                "Offscreen fiber {} cannot accept private reveal commit metadata for child {} ({:?}) with sibling {:?} ({:?})",
+                offscreen.slot().get(),
+                child.slot().get(),
+                child_tag,
+                child_sibling.map(|fiber| fiber.slot().get()),
+                child_sibling_tag
+            ),
+        }
+    }
+}
+
+impl Error for OffscreenRevealCommitMetadataError {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum OffscreenVisibilityTransitionCompleteWorkBlockerError {
     FiberTopology(FiberTopologyError),
@@ -692,6 +888,81 @@ pub(crate) fn complete_offscreen_visibility_transition_blocker_for_test(
         host_mutation_blocked: true,
         public_compatibility_blocked: true,
         feature: OFFSCREEN_UNSUPPORTED_FEATURE,
+    })
+}
+
+pub(crate) fn offscreen_reveal_commit_metadata_for_test(
+    complete_work: &OffscreenVisibilityTransitionCompleteWorkBlockerRecord,
+    committed_lanes: Lanes,
+) -> Result<OffscreenRevealCommitMetadataRecord, OffscreenRevealCommitMetadataError> {
+    let transition = complete_work.transition();
+    if !transition.is_hidden_to_visible_reveal() {
+        return Err(
+            OffscreenRevealCommitMetadataError::UnsupportedVisibilityTransition {
+                offscreen: complete_work.offscreen(),
+                transition: transition.transition(),
+            },
+        );
+    }
+
+    let intent = complete_work.subtree_flag_bubbling_intent();
+    if intent != OffscreenVisibilitySubtreeFlagBubblingIntent::BubbleVisibleSubtree {
+        return Err(
+            OffscreenRevealCommitMetadataError::UnsupportedSubtreeBubblingIntent {
+                offscreen: complete_work.offscreen(),
+                intent,
+            },
+        );
+    }
+
+    let child =
+        complete_work
+            .child()
+            .ok_or(OffscreenRevealCommitMetadataError::MissingOffscreenChild {
+                offscreen: complete_work.offscreen(),
+            })?;
+    let child_tag = complete_work.child_tag().ok_or(
+        OffscreenRevealCommitMetadataError::MissingOffscreenChild {
+            offscreen: complete_work.offscreen(),
+        },
+    )?;
+    if !matches!(child_tag, FiberTag::HostComponent | FiberTag::HostText)
+        || complete_work.child_sibling().is_some()
+    {
+        return Err(
+            OffscreenRevealCommitMetadataError::UnsupportedOffscreenChild {
+                offscreen: complete_work.offscreen(),
+                child,
+                child_tag,
+                child_sibling: complete_work.child_sibling(),
+                child_sibling_tag: complete_work.child_sibling_tag(),
+            },
+        );
+    }
+
+    let candidate_subtree_flags = complete_work.candidate_subtree_flags();
+    let child_may_suspend_commit =
+        candidate_subtree_flags.contains_any(FiberFlags::MAY_SUSPEND_COMMIT);
+
+    Ok(OffscreenRevealCommitMetadataRecord {
+        offscreen: complete_work.offscreen(),
+        child,
+        child_tag,
+        committed_lanes,
+        transition: transition.clone(),
+        subtree_flag_bubbling_intent: intent,
+        status: OffscreenRevealCommitMetadataStatus::AcceptedHiddenToVisibleReveal,
+        suspensey_commit_flag: FiberFlags::MAY_SUSPEND_COMMIT,
+        candidate_subtree_flags,
+        child_may_suspend_commit,
+        would_accumulate_newly_visible_suspensey_commit: child_may_suspend_commit,
+        would_unhide_host_children: true,
+        visibility_effect_required: complete_work.would_schedule_visibility_effect(),
+        visibility_flag_set: complete_work.flags().contains_any(FiberFlags::VISIBILITY),
+        host_visibility_mutation_blocked: complete_work.host_mutation_blocked(),
+        passive_visibility_effects_blocked: true,
+        public_compatibility_blocked: complete_work.public_compatibility_blocked(),
+        feature: complete_work.feature(),
     })
 }
 
@@ -1169,6 +1440,10 @@ mod tests {
                 work_in_progress_child_lanes,
                 false,
             );
+        arena
+            .get_mut(first_child)
+            .unwrap()
+            .merge_flags(FiberFlags::MAY_SUSPEND_COMMIT);
         let begin_work_record =
             offscreen_begin_work_visibility_record(&mut arena, work_in_progress, render_lanes);
 
@@ -1259,7 +1534,7 @@ mod tests {
         assert!(
             record
                 .candidate_subtree_flags()
-                .contains_all(FiberFlags::PLACEMENT)
+                .contains_all(FiberFlags::PLACEMENT | FiberFlags::MAY_SUSPEND_COMMIT)
         );
         assert!(record.would_schedule_visibility_effect());
         assert!(!record.would_schedule_visibility_for_subtree_mutation());
@@ -1286,6 +1561,45 @@ mod tests {
                 .flags()
                 .contains_all(FiberFlags::PLACEMENT)
         );
+        let reveal = offscreen_reveal_commit_metadata_for_test(&record, render_lanes).unwrap();
+        assert_eq!(reveal.offscreen(), work_in_progress);
+        assert_eq!(reveal.child(), first_child);
+        assert_eq!(reveal.child_tag(), FiberTag::HostComponent);
+        assert_eq!(reveal.committed_lanes(), render_lanes);
+        assert_eq!(
+            reveal.transition().transition(),
+            UnsupportedOffscreenVisibilityTransitionKind::HiddenToVisible
+        );
+        assert_eq!(
+            reveal.subtree_flag_bubbling_intent(),
+            OffscreenVisibilitySubtreeFlagBubblingIntent::BubbleVisibleSubtree
+        );
+        assert_eq!(
+            reveal.status(),
+            OffscreenRevealCommitMetadataStatus::AcceptedHiddenToVisibleReveal
+        );
+        assert_eq!(
+            reveal.status().as_str(),
+            "accepted-hidden-to-visible-reveal"
+        );
+        assert_eq!(
+            reveal.suspensey_commit_flag(),
+            FiberFlags::MAY_SUSPEND_COMMIT
+        );
+        assert!(
+            reveal
+                .candidate_subtree_flags()
+                .contains_all(FiberFlags::PLACEMENT | FiberFlags::MAY_SUSPEND_COMMIT)
+        );
+        assert!(reveal.child_may_suspend_commit());
+        assert!(reveal.would_accumulate_newly_visible_suspensey_commit());
+        assert!(reveal.would_unhide_host_children());
+        assert!(reveal.visibility_effect_required());
+        assert!(!reveal.visibility_flag_set());
+        assert!(reveal.host_visibility_mutation_blocked());
+        assert!(reveal.passive_visibility_effects_blocked());
+        assert!(reveal.public_compatibility_blocked());
+        assert_eq!(reveal.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
 
         let render_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
         let previous_lanes = Lanes::SYNC;
@@ -1409,6 +1723,15 @@ mod tests {
                 .unwrap()
                 .flags()
                 .contains_all(FiberFlags::PLACEMENT)
+        );
+        assert_eq!(
+            offscreen_reveal_commit_metadata_for_test(&record, render_lanes),
+            Err(
+                OffscreenRevealCommitMetadataError::UnsupportedVisibilityTransition {
+                    offscreen: work_in_progress,
+                    transition: UnsupportedOffscreenVisibilityTransitionKind::VisibleToHidden,
+                },
+            )
         );
     }
 
