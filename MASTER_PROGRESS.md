@@ -70,6 +70,17 @@ sequencing belong in `MASTER_PLAN.md`.
   gates plus workspace checks; React DOM root bridge, event, resource, package,
   and conformance checks; scheduler mock/act checks; conflict-marker scanning;
   and `git diff --check`.
+- Workers 612 and 617 were accepted, completing queue 595-624. The final batch
+  added private test-renderer unmount native-bridge admission that consumes Rust
+  deletion commit handoff evidence, and React DOM input/change controlled
+  restore execution for an admitted fake-DOM text input path while keeping
+  public unmount and controlled-input compatibility blocked.
+- The final queue 595-624 batch was verified after merge with
+  `cargo fmt --all --check`, focused `fast-react-test-renderer` unmount tests,
+  test-renderer create-routing conformance and workspace checks, focused React
+  DOM event/resource/controlled-input conformance checks, the full React DOM
+  package test set, `npm run check --workspace @fast-react/react-dom`,
+  conflict-marker scanning, and `git diff --check`.
 
 ### Queue 565-594
 

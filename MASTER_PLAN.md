@@ -45,23 +45,20 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Replacement queue 595-624 is active in `fr-*` tmux
-sessions from isolated `worker/<slug>` branches and worktrees.
-
-- Accepted so far: 595-611, 613-616, 618-624.
-- 612: remaining React test-renderer unmount private native-bridge admission
-  gate.
-- 617: remaining React DOM input/change controlled-restore execution gate.
+Top-level cap: 30 workers. No top-level `fr-*` worker sessions are active after
+accepting and cleaning queue 595-624.
 
 ## Near-Term Sequencing
 
-1. Monitor workers 595-624 and classify completions from tmux pane state,
-   worker reports, worktree status, and verification evidence.
-2. Before queueing further replacements, merge and clean all completed accepted
+1. Queue the next replacement batch from current `main`, using independent
+   scopes so up to 30 workers can run concurrently.
+2. Monitor live workers and classify completions from tmux pane state, worker
+   reports, worktree status, and verification evidence.
+3. Before queueing further replacements, merge and clean all completed accepted
    work already available so replacement capacity starts from current `main`.
-3. Accept overlapping implementation work when scopes are different enough;
+4. Accept overlapping implementation work when scopes are different enough;
    resolve merge conflicts on `main` after merge attempts.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
