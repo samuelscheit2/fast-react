@@ -17,6 +17,8 @@ const CONTROLLED_VALUE_TRACKER_GATE_STATUS =
   'private-controlled-value-tracker-metadata-only';
 const CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS =
   resourceFormInternalsGate.controlledInputValueTrackerFakeDomDiagnosticStatus;
+const CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS =
+  resourceFormInternalsGate.controlledInputPrivateRestoreQueueDiagnosticStatus;
 const CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS =
   resourceFormInternalsGate.controlledInputPrivateWrapperGateStatus;
 
@@ -794,6 +796,7 @@ function getStyleMutationTarget(styleName) {
 module.exports = {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,

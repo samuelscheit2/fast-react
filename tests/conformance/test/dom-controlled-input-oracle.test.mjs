@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 import { DOM_CONTROLLED_INPUT_SCENARIOS } from "../src/dom-controlled-input-scenarios.mjs";
@@ -19,6 +20,11 @@ import {
 import {
   assertFastReactControlledFormUnsupportedGate
 } from "../src/dom-controlled-input-unsupported-gates.mjs";
+
+const require = createRequire(import.meta.url);
+const resourceFormGate = require(
+  "../../../packages/react-dom/src/resource-form-internals-gate.js"
+);
 
 const oracle = readCheckedDomControlledInputOracle();
 
@@ -79,6 +85,90 @@ test("DOM controlled input oracle keeps Fast React compatibility claims false", 
 
 test("Fast React controlled form behavior stays unsupported until DOM adapters exist", () => {
   assertFastReactControlledFormUnsupportedGate(oracle);
+});
+
+test("private controlled restore queue diagnostic records fake-DOM intent without compatibility claims", () => {
+  const gate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: "controlled-oracle-restore"
+  });
+  const fakeInput = createPrivateControlledInputFakeDomTarget({
+    value: "alpha"
+  });
+  const descriptorBefore = Object.getOwnPropertyDescriptor(fakeInput, "value");
+  const install = gate.installFakeDomTracker(
+    {
+      scenarioId: "input-text-controlled-value-update",
+      phaseId: "update",
+      hostTag: "input",
+      inputType: "text",
+      props: {
+        type: "text",
+        value: "alpha",
+        onChange() {}
+      }
+    },
+    {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "controlled-input-value-tracker",
+      fakeTarget: fakeInput
+    }
+  );
+
+  fakeInput.value = "beta";
+  const observation = gate.observeFakeDomTracker(install);
+  const intent = gate.recordPostEventRestoreIntentFromFakeDomObservation(
+    observation,
+    {
+      explicitAdmission: true,
+      queueKind: "deterministic-fake-dom-post-event-restore-queue",
+      queueId: "controlled-oracle-restore-queue",
+      eventName: "input",
+      targetKind: "controlled-input-restore-queue"
+    }
+  );
+
+  assert.equal(
+    intent.status,
+    resourceFormGate.controlledInputPrivateRestoreQueueIntentRecordedStatus
+  );
+  assert.equal(intent.restoreIntent.sourceChanged, true);
+  assert.equal(intent.restoreIntent.intentRecorded, true);
+  assert.equal(intent.restoreIntent.restoreTargetWouldBeQueued, true);
+  assert.equal(intent.restoreIntent.latestPropsLookupRequired, true);
+  assert.equal(intent.restoreIntent.latestPropsLookupPerformed, false);
+  assert.equal(intent.restoreIntent.eventPluginDispatchRequired, true);
+  assert.equal(intent.restoreIntent.eventPluginDispatchPerformed, false);
+  assert.equal(intent.restoreIntent.restoreQueueWritten, false);
+  assert.equal(intent.restoreIntent.restoreStateIfNeededInvoked, false);
+  assert.equal(intent.restoreIntent.restoreControlledStateInvoked, false);
+  assert.equal(intent.restoreIntent.restoreFlushed, false);
+  assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
+  assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
+  assert.equal(intent.sideEffects.postEventRestoreQueued, false);
+  assert.equal(intent.sideEffects.changeEventsObserved, false);
+  assert.equal(intent.sideEffects.propertyDescriptorInstalled, false);
+  assert.equal(intent.sideEffects.latestPropsLookup, false);
+  assert.equal(intent.sideEffects.eventPluginDispatch, false);
+  assert.equal(intent.sideEffects.restoreQueueWritten, false);
+  assert.equal(intent.sideEffects.publicControlledBehaviorEnabled, false);
+  assert.equal(intent.sideEffects.compatibilityClaimed, false);
+  assert.equal(
+    intent.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(Object.hasOwn(fakeInput, "_valueTracker"), false);
+  assert.equal(descriptorBefore.get, undefined);
+  assert.equal(descriptorBefore.set, undefined);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(fakeInput, "value").get,
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(fakeInput, "value").set,
+    undefined
+  );
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
 test("DOM controlled input oracle covers every scenario in every probe mode", () => {
@@ -584,4 +674,11 @@ function assertNoProductionWarnings(kind) {
       ? oracle.serverSerializationObservations["default-node-production"]
       : oracle.clientFormStateObservations["default-node-production"];
   assert.deepEqual(warningMatrix(observations), {});
+}
+
+function createPrivateControlledInputFakeDomTarget(fields) {
+  return {
+    [resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker]: true,
+    ...fields
+  };
 }
