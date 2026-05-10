@@ -7,7 +7,9 @@ const {
 } = require('./dom-container.js');
 const {
   inspectHydrationContainerMarkers:
-    inspectHydrationContainerMarkersWithContracts
+    inspectHydrationContainerMarkersWithContracts,
+  readHydrationTextNodeValue,
+  resolveHydrationContainerNodePath
 } = require('./hydration-marker-parser.js');
 const {
   duplicateCreateRootWarning,
@@ -49,6 +51,8 @@ const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND =
   'FastReactDomHydrationTextMismatchRecoverableErrorMetadata';
 const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_RECORD_KIND =
   'FastReactDomHydrationTextMismatchRecoverableErrorRoutingExecutionRecord';
+const HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND =
+  'FastReactDomHydrationTextNodeClaimPatchExecutionRecord';
 const HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayOwnershipGateDiagnostic';
 const HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND =
@@ -71,6 +75,8 @@ const INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION';
 const INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION';
+const INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE =
+  'FAST_REACT_DOM_INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION';
 const privateHydrationReplayOwnershipGateId =
   'hydration-replay-ownership-private-gate-1';
 const privateHydrationTargetClaimingGateId =
@@ -91,6 +97,12 @@ const privateHydrationTextMismatchRecoverableErrorRoutingExecutionStatus =
   'executed-private-hydration-text-mismatch-recoverable-error-routing';
 const privateHydrationTextMismatchRecoverableErrorRoutingMetadataId =
   'hydration-text-mismatch-recoverable-error-routing';
+const privateHydrationTextNodeClaimPatchExecutionGateId =
+  'hydration-text-node-claim-patch-execution-private-gate-1';
+const privateHydrationTextNodeClaimPatchExecutionStatus =
+  'executed-private-hydration-text-node-claim-patch';
+const privateHydrationTextNodeClaimPatchMetadataId =
+  'hydration-text-node-claim-patch';
 
 const privateHydrationBoundaryRecordType =
   'fast.react_dom.unsupported_hydration_boundary_record';
@@ -490,6 +502,7 @@ const hydrationClaimedReplayTargetDispatchExecutionPayloads =
   new WeakMap();
 const hydrationTextMismatchRecoverableErrorRoutingExecutionPayloads =
   new WeakMap();
+const hydrationTextNodeClaimPatchExecutionPayloads = new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
 function createHydrationBoundaryGate(options) {
@@ -537,6 +550,17 @@ function createHydrationBoundaryGate(options) {
       options
     ) {
       return createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
+        hydrationBoundaryRecord,
+        acceptedBoundaryMetadataDiagnostics,
+        options
+      );
+    },
+    createHydrationTextNodeClaimPatchExecutionRecord(
+      hydrationBoundaryRecord,
+      acceptedBoundaryMetadataDiagnostics,
+      options
+    ) {
+      return createHydrationTextNodeClaimPatchExecutionRecord(
         hydrationBoundaryRecord,
         acceptedBoundaryMetadataDiagnostics,
         options
@@ -1297,6 +1321,174 @@ function isPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
   );
 }
 
+function createHydrationTextNodeClaimPatchExecutionRecord(
+  hydrationBoundaryRecord,
+  acceptedBoundaryMetadataDiagnostics,
+  options
+) {
+  const executionOptions =
+    normalizeHydrationTextNodeClaimPatchExecutionOptions(options);
+  const validation = validateHydrationTextNodeClaimPatchExecution(
+    hydrationBoundaryRecord,
+    acceptedBoundaryMetadataDiagnostics,
+    executionOptions
+  );
+  const patchResult = applyHydrationTextNodeClaimPatch(
+    validation.claimedTextNode,
+    validation.mismatchRow.expectedText
+  );
+  if (patchResult.patchApplied !== true) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution could not patch the fake text node.'
+    );
+  }
+
+  const executionRecord = freezeRecord({
+    kind: HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND,
+    gateId: privateHydrationTextNodeClaimPatchExecutionGateId,
+    metadataId: privateHydrationTextNodeClaimPatchMetadataId,
+    status: privateHydrationTextNodeClaimPatchExecutionStatus,
+    executionStatus: privateHydrationTextNodeClaimPatchExecutionStatus,
+    source: executionOptions.source,
+    operation: 'hydration-text-node-claim-patch-execution',
+    privateExecution: true,
+    diagnosticOnly: false,
+    readOnly: false,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicHydrateRootSupported: false,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    hydrationRequested: true,
+    hydration: false,
+    canHydrate: false,
+    hydrationCompatibilityClaimed: false,
+    hostInstanceHydrationAttempted: false,
+    hydrateTextInstanceCalled: false,
+    diffHydratedTextForDevWarningsCalled: false,
+    boundaryCleared: false,
+    suspenseHydrationScheduled: false,
+    domMutation: false,
+    browserDomMutated: false,
+    fakeDomOnly: true,
+    fakeDomMutation: true,
+    fakeTextNodeClaimed: true,
+    fakeTextNodePatched: true,
+    textNodeClaimRecorded: true,
+    textNodeClaimExecuted: true,
+    textPatchAdmitted: true,
+    textPatchApplied: true,
+    textPatched: true,
+    markerWrites: false,
+    listenerInstallation: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    eventsReplayed: false,
+    replayQueuesDrained: false,
+    recoverableErrorsQueued: false,
+    willQueueRecoverableErrors: false,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    blockedReason: HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
+    rootRecordId: validation.hydrationBoundaryRecord.recordId,
+    rootKind: validation.hydrationBoundaryRecord.rootKind,
+    rootTag: validation.hydrationBoundaryRecord.rootTag,
+    acceptedBoundaryMetadataConsumed: true,
+    acceptedBoundaryMetadataDiagnostics:
+      validation.acceptedBoundaryMetadataDiagnostics,
+    acceptedBoundaryMetadataId:
+      validation.acceptedBoundaryMetadataRow.metadataId,
+    acceptedBoundaryMetadataRow: validation.acceptedBoundaryMetadataRow,
+    sourceTextMismatchDiagnosticKind:
+      validation.textMismatchDiagnostics.kind,
+    sourceTextMismatchDiagnosticStatus:
+      validation.textMismatchDiagnostics.status,
+    sourceRecoverableErrorMetadataKind:
+      validation.recoverableErrorMetadata.kind,
+    sourceRecoverableErrorMetadataStatus:
+      validation.recoverableErrorMetadata.status,
+    recoverableErrorMetadata: validation.recoverableErrorMetadata,
+    recoverableErrorMetadataAccepted: true,
+    textMismatchRowCount: validation.mismatchRows.length,
+    patchedTextMismatchRowCount: 1,
+    textMismatchRow: validation.mismatchRow,
+    textMismatchRowId: validation.mismatchRow.rowId,
+    textMismatchReason: validation.mismatchRow.reason,
+    expectedPath: validation.mismatchRow.expectedPath,
+    actualPath: validation.mismatchRow.actualPath,
+    expectedText: validation.mismatchRow.expectedText,
+    actualTextBefore: patchResult.actualTextBefore,
+    actualTextAfter: patchResult.actualTextAfter,
+    normalizedExpectedText:
+      validation.mismatchRow.normalizedExpectedText,
+    normalizedActualTextBefore: patchResult.normalizedActualTextBefore,
+    normalizedActualTextAfter: patchResult.normalizedActualTextAfter,
+    exactTextMatchesBefore:
+      patchResult.actualTextBefore === validation.mismatchRow.expectedText,
+    exactTextMatchesAfter:
+      patchResult.actualTextAfter === validation.mismatchRow.expectedText,
+    normalizedTextMatchesBefore:
+      patchResult.normalizedActualTextBefore ===
+      validation.mismatchRow.normalizedExpectedText,
+    normalizedTextMatchesAfter:
+      patchResult.normalizedActualTextAfter ===
+      validation.mismatchRow.normalizedExpectedText,
+    claimedTextNodeInfo: validation.claimedTextNodeInfo,
+    claimedTextNodePath: validation.claimedTextNodeResolution.path,
+    claimedTextNodePathStatus: validation.claimedTextNodeResolution.status,
+    claimedTextNodeParentPath: validation.claimedTextNodeResolution.parentPath,
+    claimedTextNodeIndex: validation.claimedTextNodeResolution.index,
+    claimedTextNodeSegmentCount:
+      validation.claimedTextNodeResolution.segmentCount,
+    fakeTextNodeMarkerAccepted: validation.fakeTextNodeMarkerAccepted,
+    fakeTextNodeConstructorName:
+      validation.fakeTextNodeConstructorName,
+    patchWriteProperty: patchResult.patchWriteProperty,
+    patchWriteCount: patchResult.patchWriteCount,
+    patchWrites: patchResult.patchWrites,
+    claimLabel: executionOptions.claimLabel
+  });
+
+  hydrationTextNodeClaimPatchExecutionPayloads.set(
+    executionRecord,
+    freezeRecord({
+      acceptedBoundaryMetadataDiagnostics:
+        validation.acceptedBoundaryMetadataDiagnostics,
+      acceptedBoundaryMetadataRow: validation.acceptedBoundaryMetadataRow,
+      claimedTextNode: validation.claimedTextNode,
+      claimedTextNodeResolution: validation.claimedTextNodeResolution,
+      container: validation.container,
+      hydrationBoundaryRecord: validation.hydrationBoundaryRecord,
+      hydrationOptions: validation.hydrationOptions,
+      initialChildren: validation.initialChildren,
+      mismatchRow: validation.mismatchRow,
+      options: executionOptions.rawOptions,
+      patchResult,
+      recoverableErrorMetadata: validation.recoverableErrorMetadata,
+      textMismatchDiagnostics: validation.textMismatchDiagnostics
+    })
+  );
+
+  return executionRecord;
+}
+
+function getPrivateHydrationTextNodeClaimPatchExecutionPayload(record) {
+  return hydrationTextNodeClaimPatchExecutionPayloads.get(record) || null;
+}
+
+function isPrivateHydrationTextNodeClaimPatchExecutionRecord(value) {
+  return hydrationTextNodeClaimPatchExecutionPayloads.has(value);
+}
+
 function assertHydrationClaimedReplayTargetDispatchExecutionClaim(
   targetClaimingDiagnostic
 ) {
@@ -1578,6 +1770,412 @@ function throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
   const error = new Error(message);
   error.code =
     INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE;
+  throw error;
+}
+
+function normalizeHydrationTextNodeClaimPatchExecutionOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const hasHydrationOptions = Object.prototype.hasOwnProperty.call(
+    normalizedOptions,
+    'hydrationOptions'
+  );
+
+  return freezeRecord({
+    enableTextNodeClaimPatchExecution:
+      normalizedOptions.enableTextNodeClaimPatchExecution === true,
+    claimLabel:
+      typeof normalizedOptions.claimLabel === 'string'
+        ? normalizedOptions.claimLabel
+        : null,
+    hasHydrationOptions,
+    hydrationOptions: hasHydrationOptions
+      ? normalizedOptions.hydrationOptions
+      : undefined,
+    mismatchRow: normalizedOptions.mismatchRow,
+    rawOptions: options,
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-hydration-text-node-claim-patch-execution'
+  });
+}
+
+function validateHydrationTextNodeClaimPatchExecution(
+  hydrationBoundaryRecord,
+  acceptedBoundaryMetadataDiagnostics,
+  executionOptions
+) {
+  const record = assertPrivateHydrationBoundaryRecord(
+    hydrationBoundaryRecord
+  );
+  const payload = getPrivateHydrationBoundaryRecordPayload(record);
+  if (executionOptions.enableTextNodeClaimPatchExecution !== true) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires the explicit private execution gate.'
+    );
+  }
+  if (
+    executionOptions.hasHydrationOptions === true &&
+    executionOptions.hydrationOptions !== payload.hydrationOptions
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires the current hydrateRoot options object.'
+    );
+  }
+
+  const acceptedBoundaryMetadataRow =
+    validateHydrationTextNodeClaimPatchAcceptedBoundaryMetadata(
+      record,
+      acceptedBoundaryMetadataDiagnostics
+    );
+  const textMismatchDiagnostics = record.textMismatchDiagnostics;
+  const recoverableErrorMetadata = record.recoverableErrorMetadata;
+  validateHydrationTextNodeClaimPatchMismatchMetadata(
+    record,
+    textMismatchDiagnostics,
+    recoverableErrorMetadata
+  );
+
+  const mismatchRows = Array.isArray(textMismatchDiagnostics.mismatchRows)
+    ? textMismatchDiagnostics.mismatchRows
+    : [];
+  const mismatchRow = resolveHydrationTextNodeClaimPatchMismatchRow(
+    mismatchRows,
+    executionOptions.mismatchRow
+  );
+  const claimedTextNodeResolution = resolveHydrationContainerNodePath(
+    payload.container,
+    mismatchRow.actualPath
+  );
+  const claimedTextNode =
+    claimedTextNodeResolution === null
+      ? null
+      : claimedTextNodeResolution.node;
+  validateHydrationTextNodeClaimPatchTarget(
+    mismatchRow,
+    claimedTextNodeResolution,
+    claimedTextNode
+  );
+
+  return {
+    acceptedBoundaryMetadataDiagnostics,
+    acceptedBoundaryMetadataRow,
+    claimedTextNode,
+    claimedTextNodeInfo: freezeRecord({
+      nodeName:
+        claimedTextNode && claimedTextNode.nodeName
+          ? String(claimedTextNode.nodeName)
+          : null,
+      nodeType:
+        claimedTextNode && typeof claimedTextNode.nodeType === 'number'
+          ? claimedTextNode.nodeType
+          : null
+    }),
+    claimedTextNodeResolution,
+    container: payload.container,
+    fakeTextNodeConstructorName:
+      getHydrationTextNodeConstructorName(claimedTextNode),
+    fakeTextNodeMarkerAccepted:
+      isPrivateFakeHydrationTextNode(claimedTextNode),
+    hydrationBoundaryRecord: record,
+    hydrationOptions: payload.hydrationOptions,
+    initialChildren: payload.initialChildren,
+    mismatchRow,
+    mismatchRows: freezeArray(mismatchRows),
+    recoverableErrorMetadata,
+    textMismatchDiagnostics
+  };
+}
+
+function validateHydrationTextNodeClaimPatchAcceptedBoundaryMetadata(
+  hydrationBoundaryRecord,
+  acceptedBoundaryMetadataDiagnostics
+) {
+  if (
+    acceptedBoundaryMetadataDiagnostics !==
+      hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics ||
+    !acceptedBoundaryMetadataDiagnostics ||
+    typeof acceptedBoundaryMetadataDiagnostics !== 'object' ||
+    acceptedBoundaryMetadataDiagnostics.kind !==
+      HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND ||
+    acceptedBoundaryMetadataDiagnostics.gateId !==
+      privateHydrationBoundaryAcceptedMetadataGateId ||
+    acceptedBoundaryMetadataDiagnostics.status !==
+      privateHydrationBoundaryAcceptedMetadataStatus ||
+    acceptedBoundaryMetadataDiagnostics.rootRecordId !==
+      hydrationBoundaryRecord.recordId ||
+    acceptedBoundaryMetadataDiagnostics.compatibilityClaimed !== false ||
+    acceptedBoundaryMetadataDiagnostics.publicHydrationCompatibilityClaimed !==
+      false ||
+    acceptedBoundaryMetadataDiagnostics
+      .publicHydrationReplayCompatibilityClaimed !== false ||
+    acceptedBoundaryMetadataDiagnostics.publicRootRenderCompatibilityClaimed !==
+      false
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires accepted boundary metadata for the same hydration record.'
+    );
+  }
+
+  const metadataRows = Array.isArray(
+    acceptedBoundaryMetadataDiagnostics.metadataRows
+  )
+    ? acceptedBoundaryMetadataDiagnostics.metadataRows
+    : [];
+  const acceptedBoundaryMetadataRow =
+    metadataRows.find(
+      (row) =>
+        row.metadataId ===
+        privateHydrationTextMismatchRecoverableErrorRoutingMetadataId
+    ) || null;
+
+  if (
+    acceptedBoundaryMetadataRow === null ||
+    acceptedBoundaryMetadataRow.category !== 'hydration' ||
+    acceptedBoundaryMetadataRow.gateId !==
+      privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId ||
+    acceptedBoundaryMetadataRow.recordType !==
+      HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND ||
+    acceptedBoundaryMetadataRow.acceptedStatus !==
+      'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded' ||
+    acceptedBoundaryMetadataRow.blockedReason !==
+      HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON ||
+    acceptedBoundaryMetadataRow.metadataRecognized !== true ||
+    acceptedBoundaryMetadataRow.compatibilityClaimed !== false ||
+    acceptedBoundaryMetadataRow.publicHydrationCompatibilityClaimed !==
+      false ||
+    acceptedBoundaryMetadataRow.promotesHydration !== false ||
+    acceptedBoundaryMetadataRow.promotesRootRender !== false
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires accepted text mismatch boundary metadata.'
+    );
+  }
+
+  return acceptedBoundaryMetadataRow;
+}
+
+function validateHydrationTextNodeClaimPatchMismatchMetadata(
+  hydrationBoundaryRecord,
+  textMismatchDiagnostics,
+  recoverableErrorMetadata
+) {
+  if (
+    !textMismatchDiagnostics ||
+    typeof textMismatchDiagnostics !== 'object' ||
+    textMismatchDiagnostics.kind !== HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND ||
+    textMismatchDiagnostics.status !==
+      'blocked-hydration-text-mismatches-recorded' ||
+    textMismatchDiagnostics.blockedReason !==
+      HYDRATION_TEXT_MISMATCH_BLOCKED_REASON ||
+    textMismatchDiagnostics.recoverableErrorsQueued !== false ||
+    textMismatchDiagnostics.onRecoverableErrorInvoked !== false ||
+    textMismatchDiagnostics.publicRootCreated !== false ||
+    textMismatchDiagnostics.domMutated !== false ||
+    textMismatchDiagnostics.textPatched !== false ||
+    textMismatchDiagnostics.boundaryCleared !== false
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires accepted blocked text mismatch diagnostics.'
+    );
+  }
+  if (
+    !recoverableErrorMetadata ||
+    typeof recoverableErrorMetadata !== 'object' ||
+    recoverableErrorMetadata.kind !==
+      HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND ||
+    recoverableErrorMetadata.status !==
+      'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded' ||
+    recoverableErrorMetadata.blockedReason !==
+      HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON ||
+    recoverableErrorMetadata.recoverableErrorsQueued !== false ||
+    recoverableErrorMetadata.onRecoverableErrorInvoked !== false ||
+    recoverableErrorMetadata.publicRootCreated !== false ||
+    recoverableErrorMetadata.hydratingPublicRoot !== false ||
+    recoverableErrorMetadata.domMutated !== false
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires blocked recoverable-error metadata.'
+    );
+  }
+  if (
+    recoverableErrorMetadata !==
+      hydrationBoundaryRecord.recoverableErrorMetadata ||
+    textMismatchDiagnostics !==
+      hydrationBoundaryRecord.textMismatchDiagnostics ||
+    textMismatchDiagnostics.recoverableErrorMetadata !==
+      recoverableErrorMetadata ||
+    recoverableErrorMetadata.rootRecordId !==
+      hydrationBoundaryRecord.recordId ||
+    textMismatchDiagnostics.rootRecordId !== hydrationBoundaryRecord.recordId
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch metadata must match the hydration boundary record.'
+    );
+  }
+}
+
+function resolveHydrationTextNodeClaimPatchMismatchRow(
+  mismatchRows,
+  requestedMismatchRow
+) {
+  const row =
+    requestedMismatchRow === undefined
+      ? mismatchRows.find(isHydrationTextNodeClaimPatchableMismatchRow) ||
+        null
+      : requestedMismatchRow;
+
+  if (
+    row === null ||
+    !mismatchRows.includes(row) ||
+    !isHydrationTextNodeClaimPatchableMismatchRow(row)
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires one patchable text-content mismatch row.'
+    );
+  }
+
+  return row;
+}
+
+function isHydrationTextNodeClaimPatchableMismatchRow(row) {
+  return (
+    row &&
+    typeof row === 'object' &&
+    typeof row.rowId === 'string' &&
+    row.status === 'blocked-before-hydrate-text-instance' &&
+    row.reason === 'text-content-different' &&
+    typeof row.actualPath === 'string' &&
+    typeof row.expectedText === 'string' &&
+    typeof row.actualText === 'string' &&
+    row.recoverable === true &&
+    row.canHydrate === false &&
+    row.hydrateTextInstanceCalled === false &&
+    row.willPatchText === false &&
+    row.domMutated === false
+  );
+}
+
+function validateHydrationTextNodeClaimPatchTarget(
+  mismatchRow,
+  claimedTextNodeResolution,
+  claimedTextNode
+) {
+  if (
+    claimedTextNodeResolution === null ||
+    claimedTextNodeResolution.status !== 'resolved' ||
+    claimedTextNodeResolution.path !== mismatchRow.actualPath ||
+    !claimedTextNode ||
+    typeof claimedTextNode !== 'object' ||
+    claimedTextNode.nodeType !== TEXT_NODE ||
+    readHydrationTextNodeValue(claimedTextNode) !==
+      mismatchRow.actualText ||
+    !isPrivateFakeHydrationTextNode(claimedTextNode)
+  ) {
+    throwInvalidHydrationTextNodeClaimPatchExecution(
+      'Hydration text node claim patch execution requires the recorded fake text node target.'
+    );
+  }
+}
+
+function isPrivateFakeHydrationTextNode(node) {
+  if (!node || typeof node !== 'object') {
+    return false;
+  }
+  if (node.__fastReactFakeHydrationTextNode === true) {
+    return true;
+  }
+
+  const constructorName = getHydrationTextNodeConstructorName(node);
+  return (
+    constructorName === 'PrivateHostOutputText' ||
+    Array.isArray(node.writeLog)
+  );
+}
+
+function getHydrationTextNodeConstructorName(node) {
+  return node &&
+    typeof node === 'object' &&
+    node.constructor &&
+    typeof node.constructor.name === 'string'
+    ? node.constructor.name
+    : null;
+}
+
+function applyHydrationTextNodeClaimPatch(node, expectedText) {
+  const actualTextBefore = readHydrationTextNodeValue(node);
+  const patchWriteProperty = resolveHydrationTextNodePatchWriteProperty(
+    node
+  );
+  node[patchWriteProperty] = expectedText;
+  const actualTextAfter = readHydrationTextNodeValue(node);
+
+  return freezeRecord({
+    actualTextBefore,
+    actualTextAfter,
+    normalizedActualTextBefore: normalizeHydrationText(actualTextBefore),
+    normalizedActualTextAfter: normalizeHydrationText(actualTextAfter),
+    patchApplied: actualTextAfter === expectedText,
+    patchWriteCount: 1,
+    patchWriteProperty,
+    patchWrites: freezeArray([
+      freezeRecord({
+        property: patchWriteProperty,
+        text: expectedText
+      })
+    ])
+  });
+}
+
+function resolveHydrationTextNodePatchWriteProperty(node) {
+  for (const property of ['nodeValue', 'data', 'textContent']) {
+    if (canAssignHydrationTextNodeProperty(node, property)) {
+      return property;
+    }
+  }
+
+  throwInvalidHydrationTextNodeClaimPatchExecution(
+    'Hydration text node claim patch execution requires a writable fake text node value property.'
+  );
+}
+
+function canAssignHydrationTextNodeProperty(node, property) {
+  if (!(property in node)) {
+    return false;
+  }
+
+  const descriptor = findHydrationPropertyDescriptor(node, property);
+  if (descriptor === null) {
+    return Object.isExtensible(node);
+  }
+  if (typeof descriptor.set === 'function') {
+    return true;
+  }
+  if (descriptor.writable === true) {
+    return true;
+  }
+  return typeof node[property] === 'string';
+}
+
+function findHydrationPropertyDescriptor(node, property) {
+  let current = node;
+  while (current !== null) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, property);
+    if (descriptor !== undefined) {
+      return descriptor;
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  return null;
+}
+
+function throwInvalidHydrationTextNodeClaimPatchExecution(message) {
+  const error = new Error(message);
+  error.code = INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE;
   throw error;
 }
 
@@ -3534,10 +4132,12 @@ module.exports = {
   HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_RECORD_KIND,
+  HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND,
   INVALID_HYDRATION_BOUNDARY_RECORD_CODE,
   INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE,
   INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE,
   INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE,
+  INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   acceptedHydrationBoundaryMetadataContracts,
   acceptedHydrationMarkerContracts,
@@ -3546,12 +4146,14 @@ module.exports = {
   createHydrationReplayOwnershipGateDiagnostic,
   createHydrationReplayTargetDispatchLinkDiagnostic,
   createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord,
+  createHydrationTextNodeClaimPatchExecutionRecord,
   createHydrationTargetClaimingDiagnostic,
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
   getPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionPayload,
+  getPrivateHydrationTextNodeClaimPatchExecutionPayload,
   getPrivateHydrationTargetClaimingDiagnosticPayload,
   hydrationBoundaryAcceptedMetadataBlockers,
   hydrationEventReplayBlockerContracts,
@@ -3560,6 +4162,7 @@ module.exports = {
   isPrivateHydrationBoundaryRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
   isPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionRecord,
+  isPrivateHydrationTextNodeClaimPatchExecutionRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
   privateHydrationBoundaryAcceptedMetadataGateId,
   privateHydrationBoundaryAcceptedMetadataStatus,
@@ -3572,5 +4175,8 @@ module.exports = {
   privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId,
   privateHydrationTextMismatchRecoverableErrorRoutingExecutionStatus,
   privateHydrationTextMismatchRecoverableErrorRoutingMetadataId,
+  privateHydrationTextNodeClaimPatchExecutionGateId,
+  privateHydrationTextNodeClaimPatchExecutionStatus,
+  privateHydrationTextNodeClaimPatchMetadataId,
   unsupportedHydrationPrerequisites
 };

@@ -3,6 +3,7 @@
 const {
   COMMENT_NODE,
   ELEMENT_NODE,
+  TEXT_NODE,
   assertValidContainer,
   describeContainer
 } = require('./dom-container.js');
@@ -56,6 +57,53 @@ function inspectHydrationContainerMarkers(container, options) {
     markers: freezeArray(state.markerRows),
     unrecognizedMarkers: freezeArray(state.unrecognizedMarkerRows),
     summaryByContract: freezeArray(createSummaryByContract(state))
+  });
+}
+
+function resolveHydrationContainerNodePath(container, path, options) {
+  assertValidContainer(container, options && options.validationOptions);
+
+  const segments = parseHydrationContainerChildPath(path);
+  if (segments === null) {
+    return null;
+  }
+
+  let node = container;
+  let parentNode = null;
+  let parentPath = null;
+  let resolvedPath = 'container';
+  for (let index = 0; index < segments.length; index++) {
+    const childIndex = segments[index];
+    const childNodes = readChildNodes(node);
+    parentNode = node;
+    parentPath = resolvedPath;
+    resolvedPath = `${resolvedPath}.childNodes[${childIndex}]`;
+    node = childNodes[childIndex] || null;
+    if (node === null || typeof node !== 'object') {
+      return freezeRecord({
+        path,
+        resolvedPath,
+        status: 'missing-node',
+        node: null,
+        nodeInfo: null,
+        parentNode,
+        parentPath,
+        index: childIndex,
+        segmentCount: segments.length
+      });
+    }
+  }
+
+  return freezeRecord({
+    path,
+    resolvedPath,
+    status: resolvedPath === path ? 'resolved' : 'resolved-path-mismatch',
+    node,
+    nodeInfo: createNodeInfo(node),
+    parentNode,
+    parentPath,
+    index: segments[segments.length - 1],
+    segmentCount: segments.length
   });
 }
 
@@ -566,8 +614,44 @@ function readCommentData(node) {
   return null;
 }
 
+function readHydrationTextNodeValue(node) {
+  if (readNodeType(node) !== TEXT_NODE) {
+    return null;
+  }
+
+  if (typeof node.nodeValue === 'string') {
+    return node.nodeValue;
+  }
+  if (typeof node.data === 'string') {
+    return node.data;
+  }
+  if (typeof node.textContent === 'string') {
+    return node.textContent;
+  }
+  return '';
+}
+
 function readNodeType(node) {
   return node && typeof node.nodeType === 'number' ? node.nodeType : null;
+}
+
+function parseHydrationContainerChildPath(path) {
+  if (typeof path !== 'string' || !path.startsWith('container')) {
+    return null;
+  }
+
+  const segments = [];
+  let cursor = 'container'.length;
+  while (cursor < path.length) {
+    const match = /^\.childNodes\[(\d+)\]/u.exec(path.slice(cursor));
+    if (match === null) {
+      return null;
+    }
+    segments.push(Number(match[1]));
+    cursor += match[0].length;
+  }
+
+  return segments.length === 0 ? null : segments;
 }
 
 function looksLikeHydrationCommentData(commentData) {
@@ -611,5 +695,7 @@ function freezeRecord(record) {
 module.exports = {
   HYDRATION_MARKER_DIAGNOSTIC_KIND,
   HYDRATION_MARKER_DIAGNOSTIC_STATUS,
-  inspectHydrationContainerMarkers
+  inspectHydrationContainerMarkers,
+  readHydrationTextNodeValue,
+  resolveHydrationContainerNodePath
 };
