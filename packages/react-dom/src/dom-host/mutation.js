@@ -332,14 +332,17 @@ function applyDomPropertyPayloadForLatestProps(instance, payload, latestProps) {
     );
   }
 
-  const entries = payload.map((entry, index) =>
-    normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
-  );
-  const rollbackRecords =
-    createLatestPropsSafeDomPropertyPayloadRollbackRecords(instance, entries);
+  let entries = null;
+  let rollbackRecords = null;
   let rollbackLimit = 0;
 
   try {
+    entries = payload.map((entry, index) =>
+      normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
+    );
+    rollbackRecords =
+      createLatestPropsSafeDomPropertyPayloadRollbackRecords(instance, entries);
+
     for (let index = 0; index < entries.length; index += 1) {
       rollbackLimit = index + 1;
       applyLatestPropsSafeDomPropertyPayloadEntry(instance, entries[index]);
@@ -365,15 +368,28 @@ function applyDomPropertyPayloadForLatestProps(instance, payload, latestProps) {
       rollbackRecords
     );
   } catch (error) {
+    let rollbackApplied = false;
+    let rollbackError = null;
     try {
-      rollbackLatestPropsSafeDomPropertyPayloadEntries(
-        instance,
-        rollbackRecords,
-        rollbackLimit
-      );
-    } catch (rollbackError) {
+      if (rollbackRecords !== null && rollbackLimit > 0) {
+        rollbackLatestPropsSafeDomPropertyPayloadEntries(
+          instance,
+          rollbackRecords,
+          rollbackLimit
+        );
+        rollbackApplied = true;
+      }
+    } catch (caughtRollbackError) {
       // Preserve the original private mutation failure for callers.
+      rollbackError = caughtRollbackError;
     }
+    attachLatestPropsPropertyRollbackEvidence(error, {
+      entries,
+      rollbackApplied,
+      rollbackError,
+      rollbackLimit,
+      rollbackRecords
+    });
     throw error;
   }
 }
@@ -977,6 +993,46 @@ function rollbackDomPropertyPayloadMutationRecords(records) {
     payload.rollbackRecords.length
   );
   return payload.rollbackRecordCount;
+}
+
+function attachLatestPropsPropertyRollbackEvidence(error, options) {
+  if (!isWeakMapKey(error)) {
+    return;
+  }
+
+  const rollbackRecords = options.rollbackRecords;
+  const rollbackError = options.rollbackError;
+  error.domPropertyRollbackEvidence = Object.freeze({
+    kind: 'FastReactDomLatestPropsPropertyRollbackEvidence',
+    mutation: 'propertyUpdate',
+    latestPropsPublished: false,
+    normalizedEntryCount: options.entries === null ? 0 : options.entries.length,
+    mutationAttempted: options.rollbackLimit > 0,
+    appliedMutationCount: options.rollbackLimit,
+    rollbackSupported: true,
+    rollbackAttempted: rollbackRecords !== null && options.rollbackLimit > 0,
+    rollbackApplied: options.rollbackApplied,
+    rollbackRecordCount:
+      rollbackRecords === null ? 0 : rollbackRecords.filter(Boolean).length,
+    unsupportedPropertyPayloadRejected:
+      isUnsupportedPropertyPayloadError(error),
+    rollbackError:
+      rollbackError === null
+        ? null
+        : Object.freeze({
+            code: rollbackError.code || null,
+            message: rollbackError.message
+          })
+  });
+}
+
+function isUnsupportedPropertyPayloadError(error) {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    (error.code === 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY' ||
+      error.code === 'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY')
+  );
 }
 
 function createDomPropertyPayloadRollbackRecords(instance, entries) {
