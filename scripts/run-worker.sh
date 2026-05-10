@@ -36,18 +36,52 @@ fi
 
 log_file="$progress_dir/${worker_id}.codex.log"
 exit_file="$progress_dir/${worker_id}.exitcode"
+codex_command_mode="interactive-tui"
+script_command_mode="script -q -F"
+start_timestamp=""
+
+timestamp_utc() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z'
+}
+
+write_ledger_fields() {
+  local prefix="$1"
+  local event="$2"
+  local exit_status="${3:-}"
+  local end_timestamp="${4:-}"
+
+  printf '%sevent=%s\n' "$prefix" "$event"
+  printf '%sworker_id=%s\n' "$prefix" "$worker_id"
+  printf '%sprompt_file=%s\n' "$prefix" "$prompt_file"
+  printf '%slog_file=%s\n' "$prefix" "$log_file"
+  printf '%sexit_file=%s\n' "$prefix" "$exit_file"
+  printf '%sstart_timestamp=%s\n' "$prefix" "$start_timestamp"
+  if [ -n "$end_timestamp" ]; then
+    printf '%send_timestamp=%s\n' "$prefix" "$end_timestamp"
+  fi
+  printf '%scodex_command_mode=%s\n' "$prefix" "$codex_command_mode"
+  printf '%sscript_command_mode=%s\n' "$prefix" "$script_command_mode"
+  if [ -n "$exit_status" ]; then
+    printf '%sexit_code=%s\n' "$prefix" "$exit_status"
+  fi
+}
 
 record_exit_code() {
   local status="$?"
-  local timestamp
+  local end_timestamp
 
   set +e
   trap - EXIT
 
-  timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date)"
-  printf '%s\n' "$status" > "$exit_file"
-  printf '\n[run-worker] %s worker=%s exit=%s log=%s exit_file=%s\n' \
-    "$timestamp" "$worker_id" "$status" "$log_file" "$exit_file" >> "$log_file" 2>/dev/null || true
+  end_timestamp="$(timestamp_utc)"
+  {
+    printf '%s\n' "$status"
+    write_ledger_fields "" "end" "$status" "$end_timestamp"
+  } > "$exit_file"
+  {
+    printf '\n'
+    write_ledger_fields "[run-worker] " "end" "$status" "$end_timestamp"
+  } >> "$log_file" 2>/dev/null || true
 
   if [ "$status" -eq 0 ]; then
     printf 'run-worker: worker %s exited with status 0; log: %s; exit-code: %s\n' \
@@ -64,6 +98,8 @@ mkdir -p "$progress_dir"
 cd "$repo_root"
 trap record_exit_code EXIT
 rm -f -- "$log_file" "$exit_file"
+start_timestamp="$(timestamp_utc)"
+write_ledger_fields "[run-worker] " "start" >> "$log_file"
 
 [ -f "$prompt_file" ] || die 2 "missing prompt file: $prompt_file"
 [ -r "$prompt_file" ] || die 2 "prompt file is not readable: $prompt_file"

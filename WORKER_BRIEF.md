@@ -34,6 +34,10 @@ for published package behavior and exact runtime output.
 - Work only on your assigned objective and write scope.
 - Record progress in `worker-progress/<worker-id>.md`.
 - You are running as a real Codex process in a tmux worker session.
+- Worker launch artifacts come from the single `scripts/run-worker.sh` path:
+  `.codex.log` and `.exitcode` record the worker id, prompt file, log file,
+  exit-code file, start/end timestamps, and Codex command mode. The first line
+  of `.exitcode` is the numeric process status.
 - You may spawn managed Codex subagents, explorers, nested agents, or parallel
   agent tools inside this worker when useful for hypothesis testing or
   verification. Summarize delegated checks that affect your conclusions.
