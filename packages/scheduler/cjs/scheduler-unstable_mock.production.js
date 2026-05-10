@@ -32,6 +32,35 @@ var isFlushing = false;
 var needsPaint = false;
 var shouldYieldForPaint = false;
 var disableYieldValue = false;
+var isPrivateActQueueDraining = false;
+var privateActQueueFlushDiagnosticsExport =
+  '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
+var privateActQueueTestQueueKind =
+  'fast-react.react.private-act-queue-test-queue';
+var privateActQueueTestTaskKind =
+  'fast-react.react.private-act-queue-test-task';
+var privateActQueueTestQueueVersion = 1;
+var privateActQueueTestQueueBrand = Symbol.for(
+  'fast-react.react.private-act-queue-test-queue'
+);
+var privateActQueueTestTaskBrand = Symbol.for(
+  'fast-react.react.private-act-queue-test-task'
+);
+var reactCompatibilityTarget = 'react@19.2.6';
+var schedulerCompatibilityTarget = 'scheduler@0.27.0';
+var acceptedActQueueRecordKinds = Object.freeze([
+  'SchedulerActQueueRequest',
+  'SchedulerActScopeBoundaryRecord',
+  'SyncFlushActContinuationRecord'
+]);
+var acceptedActQueueTaskKinds = Object.freeze([
+  'RootSchedule',
+  'SchedulerCallback'
+]);
+var acceptedActQueueContinuationStatuses = Object.freeze([
+  'NoContinuation',
+  'PendingContinuation'
+]);
 
 function push(heap, node) {
   var index = heap.length;
@@ -225,6 +254,249 @@ function setFunctionName(fn, name) {
     value: name
   });
   return fn;
+}
+
+function isObjectLike(value) {
+  return (
+    (typeof value === 'object' && value !== null) ||
+    typeof value === 'function'
+  );
+}
+
+function includesString(value, expectedValues) {
+  return typeof value === 'string' && expectedValues.indexOf(value) !== -1;
+}
+
+function getRejectedPrivateActQueueTaskReason(task, index) {
+  if (!isObjectLike(task)) {
+    return 'record-' + index + '-not-object';
+  }
+  if (task[privateActQueueTestTaskBrand] !== true) {
+    return 'record-' + index + '-missing-internal-brand';
+  }
+  if (task.kind !== privateActQueueTestTaskKind) {
+    return 'record-' + index + '-kind';
+  }
+  if (task.version !== privateActQueueTestQueueVersion) {
+    return 'record-' + index + '-version';
+  }
+  if (task.compatibilityTarget !== reactCompatibilityTarget) {
+    return 'record-' + index + '-react-target';
+  }
+  if (task.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return 'record-' + index + '-scheduler-target';
+  }
+  if (!includesString(task.recordKind, acceptedActQueueRecordKinds)) {
+    return 'record-' + index + '-record-kind';
+  }
+  if (!includesString(task.taskKind, acceptedActQueueTaskKinds)) {
+    return 'record-' + index + '-task-kind';
+  }
+  if (
+    !includesString(
+      task.continuationStatus,
+      acceptedActQueueContinuationStatuses
+    )
+  ) {
+    return 'record-' + index + '-continuation-status';
+  }
+  if (typeof task.label !== 'string') {
+    return 'record-' + index + '-label';
+  }
+  if (
+    task.publicCompatibilityClaimed !== false ||
+    task.publicSchedulerTimingCompatibilityClaimed !== false ||
+    task.publicReactActCompatibilityClaimed !== false
+  ) {
+    return 'record-' + index + '-public-claim';
+  }
+  if (task.executesQueuedWork !== false || task.executesEffects !== false) {
+    return 'record-' + index + '-execution-claim';
+  }
+  return null;
+}
+
+function getRejectedPrivateActQueueReason(queue) {
+  if (!isObjectLike(queue)) {
+    return 'queue-not-object';
+  }
+  if (queue[privateActQueueTestQueueBrand] !== true) {
+    return 'queue-missing-internal-brand';
+  }
+  if (queue.kind !== privateActQueueTestQueueKind) {
+    return 'queue-kind';
+  }
+  if (queue.version !== privateActQueueTestQueueVersion) {
+    return 'queue-version';
+  }
+  if (queue.compatibilityTarget !== reactCompatibilityTarget) {
+    return 'queue-react-target';
+  }
+  if (queue.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return 'queue-scheduler-target';
+  }
+  if (
+    queue.publicCompatibilityClaimed !== false ||
+    queue.publicSchedulerTimingCompatibilityClaimed !== false ||
+    queue.publicReactActCompatibilityClaimed !== false
+  ) {
+    return 'queue-public-claim';
+  }
+  if (
+    queue.queueFlushingReady !== false ||
+    queue.privateTestQueueFlushDiagnosticsReady !== true ||
+    queue.drainsAcceptedInternalTestQueues !== true
+  ) {
+    return 'queue-drain-policy';
+  }
+  if (queue.executesQueuedWork !== false || queue.executesEffects !== false) {
+    return 'queue-execution-claim';
+  }
+  if (!Array.isArray(queue.records)) {
+    return 'queue-records-not-array';
+  }
+
+  for (var i = 0; i < queue.records.length; i++) {
+    var rejectedTaskReason = getRejectedPrivateActQueueTaskReason(
+      queue.records[i],
+      i
+    );
+    if (rejectedTaskReason !== null) {
+      return rejectedTaskReason;
+    }
+  }
+  return null;
+}
+
+function createPrivateActQueueFlushError(reason) {
+  var error = new Error(
+    '[fast-react] scheduler/unstable_mock private act queue flush ' +
+      'diagnostics rejected an unsupported queue: ' +
+      reason +
+      '. Only branded internal test queues from the React private act ' +
+      'dispatcher gate may be drained.'
+  );
+  error.name = 'FastReactSchedulerPrivateActQueueFlushError';
+  error.code = 'FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_REJECTED';
+  error.entrypoint = 'scheduler/unstable_mock';
+  error.compatibilityTarget = schedulerCompatibilityTarget;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  return error;
+}
+
+function describeAcceptedInternalActQueue(queue) {
+  var rejectionReason = getRejectedPrivateActQueueReason(queue);
+  var pendingCount =
+    isObjectLike(queue) && Array.isArray(queue.records)
+      ? queue.records.length
+      : 0;
+  return Object.freeze({
+    status:
+      rejectionReason === null
+        ? 'accepted-internal-test-queue'
+        : 'rejected-internal-test-queue',
+    accepted: rejectionReason === null,
+    rejectionReason: rejectionReason,
+    queueKind: isObjectLike(queue) ? queue.kind : null,
+    pendingCount: pendingCount,
+    drainsAcceptedInternalTestQueues: rejectionReason === null,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function summarizePrivateActQueueTask(task, index) {
+  return Object.freeze({
+    index: index,
+    label: task.label,
+    recordKind: task.recordKind,
+    taskKind: task.taskKind,
+    continuationStatus: task.continuationStatus,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function drainAcceptedInternalActQueue(queue) {
+  var rejectionReason = getRejectedPrivateActQueueReason(queue);
+  if (rejectionReason !== null) {
+    throw createPrivateActQueueFlushError(rejectionReason);
+  }
+  if (isPrivateActQueueDraining) {
+    throw createPrivateActQueueFlushError('already-draining');
+  }
+
+  var pendingBefore = queue.records.length;
+  var mockSchedulerPendingBefore = scheduledCallback !== null;
+  var mockSchedulerNowBefore = currentMockTime;
+  var drainedRecords = [];
+
+  isPrivateActQueueDraining = true;
+  try {
+    while (queue.records.length > 0) {
+      drainedRecords.push(
+        summarizePrivateActQueueTask(
+          queue.records.shift(),
+          drainedRecords.length
+        )
+      );
+    }
+
+    return Object.freeze({
+      status: 'drained-accepted-internal-test-queue',
+      accepted: true,
+      queueKind: queue.kind,
+      pendingBefore: pendingBefore,
+      drainedCount: drainedRecords.length,
+      remainingCount: queue.records.length,
+      drainedRecords: Object.freeze(drainedRecords),
+      mockSchedulerPendingWorkBefore: mockSchedulerPendingBefore,
+      mockSchedulerPendingWorkAfter: scheduledCallback !== null,
+      mockSchedulerNowBefore: mockSchedulerNowBefore,
+      mockSchedulerNowAfter: currentMockTime,
+      drainsPublicSchedulerTaskQueue: false,
+      drainsPublicReactActQueue: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      executesQueuedWork: false,
+      executesEffects: false
+    });
+  } finally {
+    isPrivateActQueueDraining = false;
+  }
+}
+
+var privateActQueueFlushDiagnostics = Object.freeze({
+  status: 'private-scheduler-act-queue-flush-diagnostics',
+  exportName: privateActQueueFlushDiagnosticsExport,
+  queueKind: privateActQueueTestQueueKind,
+  taskKind: privateActQueueTestTaskKind,
+  queueVersion: privateActQueueTestQueueVersion,
+  compatibilityTarget: schedulerCompatibilityTarget,
+  reactCompatibilityTarget: reactCompatibilityTarget,
+  acceptedRecordKinds: acceptedActQueueRecordKinds,
+  acceptedTaskKinds: acceptedActQueueTaskKinds,
+  acceptedContinuationStatuses: acceptedActQueueContinuationStatuses,
+  drainsAcceptedInternalTestQueues: true,
+  drainsPublicSchedulerTaskQueue: false,
+  drainsPublicReactActQueue: false,
+  publicSchedulerTimingCompatibilityClaimed: false,
+  publicReactActCompatibilityClaimed: false,
+  executesQueuedWork: false,
+  executesEffects: false,
+  describeAcceptedInternalActQueue: describeAcceptedInternalActQueue,
+  drainAcceptedInternalActQueue: drainAcceptedInternalActQueue
+});
+
+function attachPrivateActQueueFlushDiagnostics(fn) {
+  Object.defineProperty(fn, privateActQueueFlushDiagnosticsExport, {
+    value: privateActQueueFlushDiagnostics
+  });
 }
 
 var getCurrentTime = setFunctionName(function () {
@@ -535,6 +807,12 @@ var unstable_wrapCallback = setFunctionName(function (callback) {
     }
   };
 }, '');
+
+attachPrivateActQueueFlushDiagnostics(unstable_flushAll);
+attachPrivateActQueueFlushDiagnostics(unstable_flushAllWithoutAsserting);
+attachPrivateActQueueFlushDiagnostics(unstable_flushExpired);
+attachPrivateActQueueFlushDiagnostics(unstable_flushNumberOfYields);
+attachPrivateActQueueFlushDiagnostics(unstable_flushUntilNextPaint);
 
 exports.log = log;
 exports.reset = reset;

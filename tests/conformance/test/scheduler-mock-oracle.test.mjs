@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   SCHEDULER_MOCK_FAST_REACT_TARGET,
@@ -21,6 +24,23 @@ import {
 } from "../src/scheduler-mock-oracle.mjs";
 
 const oracle = readCheckedSchedulerMockOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const privateActQueueFlushDiagnosticsExport =
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+const schedulerMockWorkspaceEntrypoint = "packages/scheduler/unstable_mock.js";
+const schedulerMockWorkspaceEntrypoints = [
+  schedulerMockWorkspaceEntrypoint,
+  "packages/scheduler/cjs/scheduler-unstable_mock.development.js",
+  "packages/scheduler/cjs/scheduler-unstable_mock.production.js"
+];
+const privateActDispatcherGateModule =
+  "packages/react/private-act-dispatcher-gate.js";
 
 const EXPECTED_MOCK_EXPORT_KEYS = [
   "log",
@@ -288,6 +308,196 @@ test("scheduler mock oracle exposes react-test-renderer flush helper metadata fr
       assert.equal(schedulerDescriptor.writable, true, key);
       assert.deepEqual(schedulerDescriptor.value, expectedValue, key);
       assert.deepEqual(fastReactDescriptor, schedulerDescriptor, key);
+    }
+  }
+});
+
+test("scheduler mock private act queue diagnostics drain only accepted internal test queues", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    assert.equal(
+      Object.keys(Scheduler).includes(privateActQueueFlushDiagnosticsExport),
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      Reflect.ownKeys(Scheduler).includes(privateActQueueFlushDiagnosticsExport),
+      false,
+      nodeEnv
+    );
+
+    const diagnostics =
+      Scheduler.unstable_flushAllWithoutAsserting[
+        privateActQueueFlushDiagnosticsExport
+      ];
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    for (const [key] of REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA) {
+      assert.equal(
+        Scheduler[key][privateActQueueFlushDiagnosticsExport],
+        diagnostics,
+        `${nodeEnv}:${key}`
+      );
+      assert.equal(
+        Object.getOwnPropertyDescriptor(
+          Scheduler[key],
+          privateActQueueFlushDiagnosticsExport
+        ).enumerable,
+        false,
+        `${nodeEnv}:${key}`
+      );
+    }
+
+    Scheduler.reset();
+    const scheduledEvents = [];
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        scheduledEvents.push("mock-scheduler-callback");
+      }
+    );
+
+    const queue = reactGate.createInternalActQueueTestQueue([
+      reactGate.createInternalActQueueTestTask({
+        label: "root-schedule",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "RootSchedule"
+      }),
+      reactGate.createInternalActQueueTestTask({
+        label: "scheduler-callback",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "PendingContinuation"
+      })
+    ]);
+    assert.equal(reactGate.isAcceptedInternalActQueueTestQueue(queue), true);
+
+    assert.deepEqual(
+      diagnostics.describeAcceptedInternalActQueue(queue),
+      {
+        status: "accepted-internal-test-queue",
+        accepted: true,
+        rejectionReason: null,
+        queueKind: reactGate.internalTestQueueKind,
+        pendingCount: 2,
+        drainsAcceptedInternalTestQueues: true,
+        drainsPublicSchedulerTaskQueue: false,
+        drainsPublicReactActQueue: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false,
+        executesQueuedWork: false,
+        executesEffects: false
+      },
+      nodeEnv
+    );
+
+    const report = diagnostics.drainAcceptedInternalActQueue(queue);
+    assert.equal(report.status, "drained-accepted-internal-test-queue");
+    assert.equal(report.pendingBefore, 2);
+    assert.equal(report.drainedCount, 2);
+    assert.equal(report.remainingCount, 0);
+    assert.deepEqual(
+      report.drainedRecords.map((record) => [
+        record.index,
+        record.label,
+        record.recordKind,
+        record.taskKind,
+        record.continuationStatus,
+        record.executesQueuedWork,
+        record.executesEffects
+      ]),
+      [
+        [
+          0,
+          "root-schedule",
+          "SchedulerActQueueRequest",
+          "RootSchedule",
+          "NoContinuation",
+          false,
+          false
+        ],
+        [
+          1,
+          "scheduler-callback",
+          "SchedulerActQueueRequest",
+          "SchedulerCallback",
+          "PendingContinuation",
+          false,
+          false
+        ]
+      ],
+      nodeEnv
+    );
+    assert.equal(report.mockSchedulerPendingWorkBefore, true, nodeEnv);
+    assert.equal(report.mockSchedulerPendingWorkAfter, true, nodeEnv);
+    assert.equal(report.mockSchedulerNowBefore, 0, nodeEnv);
+    assert.equal(report.mockSchedulerNowAfter, 0, nodeEnv);
+    assert.equal(report.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(report.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(
+      report.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(report.publicReactActCompatibilityClaimed, false, nodeEnv);
+    assert.equal(report.executesQueuedWork, false, nodeEnv);
+    assert.equal(report.executesEffects, false, nodeEnv);
+    assert.equal(queue.records.length, 0, nodeEnv);
+    assert.deepEqual(scheduledEvents, [], nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    assert.equal(Scheduler.unstable_flushAllWithoutAsserting(), true, nodeEnv);
+    assert.deepEqual(scheduledEvents, ["mock-scheduler-callback"], nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), false, nodeEnv);
+
+    for (const rejectedQueue of [
+      [],
+      reactGate.createActQueueMetadata(),
+      {
+        id: 1,
+        callback() {},
+        priorityLevel: Scheduler.unstable_NormalPriority,
+        startTime: 0,
+        expirationTime: 5000,
+        sortIndex: 5000
+      },
+      {
+        kind: reactGate.internalTestQueueKind,
+        version: reactGate.internalTestQueueVersion,
+        compatibilityTarget: "react@19.2.6",
+        schedulerCompatibilityTarget: "scheduler@0.27.0",
+        records: []
+      }
+    ]) {
+      assert.equal(
+        diagnostics.describeAcceptedInternalActQueue(rejectedQueue).accepted,
+        false,
+        nodeEnv
+      );
+      assert.throws(
+        () => diagnostics.drainAcceptedInternalActQueue(rejectedQueue),
+        (error) => {
+          assert.equal(
+            error.name,
+            "FastReactSchedulerPrivateActQueueFlushError"
+          );
+          assert.equal(
+            error.code,
+            "FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_REJECTED"
+          );
+          assert.equal(error.entrypoint, "scheduler/unstable_mock");
+          assert.equal(error.compatibilityTarget, "scheduler@0.27.0");
+          assert.equal(
+            error.publicSchedulerTimingCompatibilityClaimed,
+            false
+          );
+          assert.equal(error.publicReactActCompatibilityClaimed, false);
+          return true;
+        },
+        nodeEnv
+      );
     }
   }
 });
@@ -614,4 +824,79 @@ function descriptorFor(descriptors, key) {
     throw new Error(`Missing descriptor for ${key}`);
   }
   return entry.descriptor;
+}
+
+function loadFreshWorkspaceModule(relativeModulePath) {
+  const modulePath = path.join(repoRoot, relativeModulePath);
+  const resolved = require.resolve(modulePath);
+  delete require.cache[resolved];
+  return require(resolved);
+}
+
+function loadFreshSchedulerMock(nodeEnv) {
+  const previousNodeEnv = process.env.NODE_ENV;
+
+  for (const relativeModulePath of schedulerMockWorkspaceEntrypoints) {
+    const resolved = require.resolve(path.join(repoRoot, relativeModulePath));
+    delete require.cache[resolved];
+  }
+
+  process.env.NODE_ENV = nodeEnv;
+  try {
+    return require(path.join(repoRoot, schedulerMockWorkspaceEntrypoint));
+  } finally {
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
+}
+
+function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
+  assert.equal(
+    diagnostics.status,
+    "private-scheduler-act-queue-flush-diagnostics",
+    label
+  );
+  assert.equal(diagnostics.exportName, privateActQueueFlushDiagnosticsExport);
+  assert.equal(
+    diagnostics.queueKind,
+    "fast-react.react.private-act-queue-test-queue",
+    label
+  );
+  assert.equal(
+    diagnostics.taskKind,
+    "fast-react.react.private-act-queue-test-task",
+    label
+  );
+  assert.equal(diagnostics.queueVersion, 1, label);
+  assert.equal(diagnostics.compatibilityTarget, "scheduler@0.27.0", label);
+  assert.equal(diagnostics.reactCompatibilityTarget, "react@19.2.6", label);
+  assert.deepEqual(diagnostics.acceptedRecordKinds, [
+    "SchedulerActQueueRequest",
+    "SchedulerActScopeBoundaryRecord",
+    "SyncFlushActContinuationRecord"
+  ]);
+  assert.deepEqual(diagnostics.acceptedTaskKinds, [
+    "RootSchedule",
+    "SchedulerCallback"
+  ]);
+  assert.deepEqual(diagnostics.acceptedContinuationStatuses, [
+    "NoContinuation",
+    "PendingContinuation"
+  ]);
+  assert.equal(diagnostics.drainsAcceptedInternalTestQueues, true, label);
+  assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false, label);
+  assert.equal(diagnostics.drainsPublicReactActQueue, false, label);
+  assert.equal(
+    diagnostics.publicSchedulerTimingCompatibilityClaimed,
+    false,
+    label
+  );
+  assert.equal(diagnostics.publicReactActCompatibilityClaimed, false, label);
+  assert.equal(diagnostics.executesQueuedWork, false, label);
+  assert.equal(diagnostics.executesEffects, false, label);
+  assert.equal(typeof diagnostics.describeAcceptedInternalActQueue, "function");
+  assert.equal(typeof diagnostics.drainAcceptedInternalActQueue, "function");
 }
