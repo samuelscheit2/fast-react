@@ -1151,6 +1151,51 @@ mod tests {
         );
     }
 
+    #[test]
+    fn root_update_queue_records_pending_callback_order_without_invoking_callbacks() {
+        let mut store = UpdateQueueStore::new();
+        let queue = store.initialize_host_root_queue(state(0));
+        let default_update = update_with_element(&mut store, Lane::DEFAULT, 1);
+        let sync_update = update_with_element(&mut store, Lane::SYNC, 2);
+        let default_callback = RootUpdateCallbackHandle::from_raw(56701);
+        let sync_callback = RootUpdateCallbackHandle::from_raw(56702);
+        store
+            .update_mut(default_update)
+            .unwrap()
+            .set_callback(default_callback);
+        store
+            .update_mut(sync_update)
+            .unwrap()
+            .set_callback(sync_callback);
+
+        store.append_pending_update(queue, default_update).unwrap();
+        store.append_pending_update(queue, sync_update).unwrap();
+
+        let pending = store.pending_updates(queue).unwrap();
+        assert_eq!(pending, vec![default_update, sync_update]);
+        assert_eq!(
+            pending
+                .iter()
+                .map(|update| store.update(*update).unwrap().lane())
+                .collect::<Vec<_>>(),
+            vec![Lanes::DEFAULT, Lanes::SYNC]
+        );
+        assert_eq!(
+            pending
+                .iter()
+                .map(|update| store.update(*update).unwrap().callback())
+                .collect::<Vec<_>>(),
+            vec![default_callback, sync_callback]
+        );
+        assert!(store.queue(queue).unwrap().callbacks().is_empty());
+        assert!(
+            store
+                .peek_root_update_callback_records(queue)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
     fn update_with_element(store: &mut UpdateQueueStore, lane: Lane, element: u64) -> UpdateId {
         let update = store.create_update(lane);
         store
