@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fast-react.local/schemas/benchmark-manifest.schema.json",
+  "title": "Fast React benchmark manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "manifestId",
+    "description",
+    "timingDataPolicy",
+    "requiredScenarioIds",
+    "conformanceGates",
+    "scenarios"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "fast-react-benchmark-manifest"
+    },
+    "manifestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timingDataPolicy": {
+      "const": "diagnostic-until-compatible"
+    },
+    "requiredScenarioIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "conformanceGates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/conformanceGate"
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "$defs": {
+    "compatibilityStatus": {
+      "enum": [
+        "blocked-by-conformance",
+        "oracle-only",
+        "unsupported-placeholder",
+        "known-mismatch",
+        "matched-but-compatibility-not-claimed",
+        "green"
+      ]
+    },
+    "timingStatus": {
+      "enum": [
+        "not-collected",
+        "blocked-by-conformance",
+        "diagnostic-only",
+        "compared-not-compatible",
+        "comparable",
+        "noise-bound",
+        "regression",
+        "improvement"
+      ]
+    },
+    "conformanceGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "artifact", "requiredClaims"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requiredClaims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "compatibilityClaimed",
+              "fastReactBehaviorCompatible",
+              "fullDualRunOracleExists"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "area",
+        "entrypoints",
+        "conformanceGateIds",
+        "compatibilityStatus",
+        "timingStatus",
+        "timingDataPolicy",
+        "blockedReason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entrypoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "conformanceGateIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "compatibilityStatus": {
+          "$ref": "#/$defs/compatibilityStatus"
+        },
+        "timingStatus": {
+          "$ref": "#/$defs/timingStatus"
+        },
+        "timingDataPolicy": {
+          "const": "diagnostic-until-compatible"
+        },
+        "blockedReason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

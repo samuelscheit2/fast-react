@@ -15,12 +15,14 @@ use fast_react_host_config::HostTypes;
 use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootScheduleUpdateRecord,
-    RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerCallbackRequest,
-    SchedulerCallbackValidationRecord, SchedulerCancellationRecord, SchedulerMicrotaskKind,
-    SchedulerMicrotaskRequest, SchedulerPriority, SyncFlushExecutionContextRecord,
-    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
-    validate_scheduled_host_root_callback,
+    RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
+    SchedulerCallbackRequest, SchedulerCallbackValidationRecord, SchedulerCancellationRecord,
+    SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
+    SyncFlushExecutionContextRecord, render_host_root_for_lanes,
+    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
+
+pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootSchedulerState {
@@ -94,6 +96,10 @@ impl RootSchedulerState {
         self.did_schedule_microtask = true;
     }
 
+    pub(crate) fn mark_act_microtask_scheduled(&mut self) {
+        self.did_schedule_microtask_act = true;
+    }
+
     pub(crate) fn reset_microtask_scheduled(&mut self) {
         self.did_schedule_microtask = false;
         self.did_schedule_microtask_act = false;
@@ -119,6 +125,7 @@ pub struct ScheduledRootUpdateResult {
     root: FiberRootId,
     inserted: bool,
     microtask: Option<SchedulerMicrotaskRequest>,
+    act_queue_task: Option<SchedulerActQueueRequest>,
     might_have_pending_sync_work: bool,
 }
 
@@ -136,6 +143,11 @@ impl ScheduledRootUpdateResult {
     #[must_use]
     pub const fn microtask(self) -> Option<SchedulerMicrotaskRequest> {
         self.microtask
+    }
+
+    #[must_use]
+    pub const fn act_queue_task(self) -> Option<SchedulerActQueueRequest> {
+        self.act_queue_task
     }
 
     #[must_use]
@@ -161,6 +173,7 @@ pub struct RootTaskScheduleRecord {
     callback_node: RootSchedulerCallbackHandle,
     scheduler_priority: Option<SchedulerPriority>,
     scheduled_callback: Option<SchedulerCallbackRequest>,
+    scheduled_act_queue_task: Option<SchedulerActQueueRequest>,
     canceled_callback: Option<SchedulerCancellationRecord>,
 }
 
@@ -198,6 +211,11 @@ impl RootTaskScheduleRecord {
     #[must_use]
     pub const fn scheduled_callback(self) -> Option<SchedulerCallbackRequest> {
         self.scheduled_callback
+    }
+
+    #[must_use]
+    pub const fn scheduled_act_queue_task(self) -> Option<SchedulerActQueueRequest> {
+        self.scheduled_act_queue_task
     }
 
     #[must_use]
@@ -449,12 +467,13 @@ pub fn ensure_root_is_scheduled<H: HostTypes>(
         .root_scheduler_mut()
         .set_might_have_pending_sync_work(true);
 
-    let microtask = ensure_schedule_microtask_is_scheduled(store);
+    let (microtask, act_queue_task) = ensure_schedule_microtask_is_scheduled(store);
 
     Ok(ScheduledRootUpdateResult {
         root: root_id,
         inserted,
         microtask,
+        act_queue_task,
         might_have_pending_sync_work: store.root_scheduler().might_have_pending_sync_work(),
     })
 }
@@ -533,6 +552,7 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
             callback_node: RootSchedulerCallbackHandle::NONE,
             scheduler_priority: None,
             scheduled_callback: None,
+            scheduled_act_queue_task: None,
             canceled_callback,
         });
     }
@@ -554,14 +574,19 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
             callback_node: RootSchedulerCallbackHandle::NONE,
             scheduler_priority: None,
             scheduled_callback: None,
+            scheduled_act_queue_task: None,
             canceled_callback,
         });
     }
 
     let new_callback_priority = RootCallbackPriority::new(next_lanes.highest_priority_lane());
     let existing_callback_priority = store.root(root_id)?.scheduling().callback_priority();
+    let act_queue_active = store.scheduler_bridge().is_act_queue_active();
 
-    if new_callback_priority == existing_callback_priority && existing_callback_node.is_some() {
+    if new_callback_priority == existing_callback_priority
+        && existing_callback_node.is_some()
+        && (!act_queue_active || SchedulerBridge::is_fake_act_callback_node(existing_callback_node))
+    {
         return Ok(RootTaskScheduleRecord {
             root: root_id,
             next_lanes,
@@ -570,6 +595,7 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
             callback_node: existing_callback_node,
             scheduler_priority: Some(scheduler_priority_for_lanes(next_lanes)),
             scheduled_callback: None,
+            scheduled_act_queue_task: None,
             canceled_callback: None,
         });
     }
@@ -578,6 +604,31 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
         .scheduler_bridge_mut()
         .cancel_callback(existing_callback_node);
     let scheduler_priority = scheduler_priority_for_lanes(next_lanes);
+
+    if act_queue_active {
+        let scheduled_act_queue_task = store.scheduler_bridge_mut().schedule_act_callback(
+            root_id,
+            scheduler_priority,
+            new_callback_priority,
+        );
+        store
+            .root_mut(root_id)?
+            .scheduling_mut()
+            .set_callback(scheduled_act_queue_task.node(), new_callback_priority);
+
+        return Ok(RootTaskScheduleRecord {
+            root: root_id,
+            next_lanes,
+            outcome: RootTaskScheduleOutcome::Scheduled,
+            callback_priority: new_callback_priority,
+            callback_node: scheduled_act_queue_task.node(),
+            scheduler_priority: Some(scheduler_priority),
+            scheduled_callback: None,
+            scheduled_act_queue_task: Some(scheduled_act_queue_task),
+            canceled_callback,
+        });
+    }
+
     let scheduled_callback = store.scheduler_bridge_mut().schedule_callback(
         root_id,
         scheduler_priority,
@@ -596,6 +647,7 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
         callback_node: scheduled_callback.node(),
         scheduler_priority: Some(scheduler_priority),
         scheduled_callback: Some(scheduled_callback),
+        scheduled_act_queue_task: None,
         canceled_callback,
     })
 }
@@ -677,8 +729,7 @@ pub fn collect_sync_flush_plan<H: HostTypes>(
         let mut sync_roots = Vec::new();
         let mut root = store.root_scheduler().first_scheduled_root();
         while let Some(root_id) = root {
-            let next_lanes = next_lanes_for_root(store, root_id)?;
-            if next_lanes.includes_sync_lane() {
+            if sync_flush_lanes_for_root(store, root_id)?.is_non_empty() {
                 sync_roots.push(root_id);
             }
             root = store.root(root_id)?.scheduling().next_scheduled_root();
@@ -693,6 +744,32 @@ pub fn collect_sync_flush_plan<H: HostTypes>(
         skipped_no_sync_work: false,
         sync_roots,
     })
+}
+
+pub(crate) fn sync_flush_lanes_for_root<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<Lanes, RootSchedulerError> {
+    Ok(next_lanes_for_root(store, root_id)?.intersect(SYNC_FLUSH_LANES))
+}
+
+pub(crate) fn recompute_might_have_pending_sync_work<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+) -> Result<bool, RootSchedulerError> {
+    let mut has_pending_sync_work = false;
+    let mut root = store.root_scheduler().first_scheduled_root();
+    while let Some(root_id) = root {
+        if sync_flush_lanes_for_root(store, root_id)?.is_non_empty() {
+            has_pending_sync_work = true;
+            break;
+        }
+        root = store.root(root_id)?.scheduling().next_scheduled_root();
+    }
+
+    store
+        .root_scheduler_mut()
+        .set_might_have_pending_sync_work(has_pending_sync_work);
+    Ok(has_pending_sync_work)
 }
 
 /// Prepare all currently scheduled sync roots for a later commit handoff.
@@ -740,9 +817,9 @@ pub fn flush_sync_work_on_all_roots<H: HostTypes>(
 
         while let Some(root_id) = root {
             let next_root = store.root(root_id)?.scheduling().next_scheduled_root();
-            let next_lanes = next_lanes_for_root(store, root_id)?;
+            let next_lanes = sync_flush_lanes_for_root(store, root_id)?;
 
-            if next_lanes.includes_sync_lane() {
+            if next_lanes.is_non_empty() {
                 let render_phase = render_host_root_for_lanes(store, root_id, next_lanes)?;
                 records.push(RootSyncFlushRecord {
                     order: records.len(),
@@ -822,16 +899,38 @@ fn append_scheduled_root<H: HostTypes>(
 
 fn ensure_schedule_microtask_is_scheduled<H: HostTypes>(
     store: &mut FiberRootStore<H>,
-) -> Option<SchedulerMicrotaskRequest> {
+) -> (
+    Option<SchedulerMicrotaskRequest>,
+    Option<SchedulerActQueueRequest>,
+) {
+    if store.scheduler_bridge().is_act_queue_active() {
+        if store.root_scheduler().did_schedule_microtask_act() {
+            return (None, None);
+        }
+
+        store.root_scheduler_mut().mark_act_microtask_scheduled();
+        return (
+            None,
+            Some(
+                store
+                    .scheduler_bridge_mut()
+                    .request_act_root_schedule_task(),
+            ),
+        );
+    }
+
     if store.root_scheduler().did_schedule_microtask() {
-        return None;
+        return (None, None);
     }
 
     store.root_scheduler_mut().mark_microtask_scheduled();
-    Some(
-        store
-            .scheduler_bridge_mut()
-            .request_microtask(SchedulerMicrotaskKind::RootSchedule),
+    (
+        Some(
+            store
+                .scheduler_bridge_mut()
+                .request_microtask(SchedulerMicrotaskKind::RootSchedule),
+        ),
+        None,
     )
 }
 
@@ -858,7 +957,9 @@ mod tests {
     use super::*;
     use crate::RootOptions;
     use crate::test_support::{FakeContainer, RecordingHost};
-    use crate::{RootElementHandle, update_container, update_container_sync};
+    use crate::{
+        RootElementHandle, SchedulerActQueueTaskKind, update_container, update_container_sync,
+    };
     use fast_react_core::{Lanes, RootFinishedLanes};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
@@ -877,6 +978,10 @@ mod tests {
         let result =
             update_container(store, root_id, RootElementHandle::from_raw(1), None).unwrap();
         ensure_root_is_scheduled(store, result.schedule()).unwrap()
+    }
+
+    fn activate_act_queue(store: &mut FiberRootStore<RecordingHost>) {
+        store.scheduler_bridge_mut().set_act_queue_active(true);
     }
 
     fn scheduled_callback_request(
@@ -915,7 +1020,9 @@ mod tests {
         assert_eq!(store.root_scheduler().first_scheduled_root(), Some(root_id));
         assert_eq!(store.root_scheduler().last_scheduled_root(), Some(root_id));
         assert!(store.root_scheduler().did_schedule_microtask());
+        assert!(!store.root_scheduler().did_schedule_microtask_act());
         assert_eq!(store.scheduler_bridge().microtask_requests().len(), 1);
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
     }
 
     #[test]
@@ -930,6 +1037,25 @@ mod tests {
         assert_eq!(second.microtask(), None);
         assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
         assert_eq!(store.scheduler_bridge().microtask_requests().len(), 1);
+    }
+
+    #[test]
+    fn root_scheduler_routes_root_schedule_tasks_to_act_queue() {
+        let (mut store, root_id, _host) = root_store();
+        activate_act_queue(&mut store);
+
+        let first = schedule_default_update(&mut store, root_id);
+        let second = schedule_default_update(&mut store, root_id);
+
+        let act_task = first.act_queue_task().unwrap();
+        assert_eq!(first.microtask(), None);
+        assert_eq!(second.act_queue_task(), None);
+        assert_eq!(act_task.kind(), SchedulerActQueueTaskKind::RootSchedule);
+        assert_eq!(act_task.node(), RootSchedulerCallbackHandle::NONE);
+        assert!(store.root_scheduler().did_schedule_microtask_act());
+        assert!(!store.root_scheduler().did_schedule_microtask());
+        assert!(store.scheduler_bridge().microtask_requests().is_empty());
+        assert_eq!(store.scheduler_bridge().act_queue_requests(), &[act_task]);
     }
 
     #[test]
@@ -1023,6 +1149,55 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().scheduling().callback_node(),
             store.scheduler_bridge().callback_requests()[0].node()
+        );
+        assert!(processed.records()[0].scheduled_act_queue_task().is_none());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_non_sync_lane_routes_callback_to_act_queue() {
+        let (mut store, root_id, _host) = root_store();
+        activate_act_queue(&mut store);
+        schedule_default_update(&mut store, root_id);
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+
+        let act_callback = processed.records()[0].scheduled_act_queue_task().unwrap();
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::Scheduled
+        );
+        assert_eq!(
+            processed.records()[0].callback_node(),
+            SchedulerBridge::fake_act_callback_node()
+        );
+        assert_eq!(
+            act_callback.kind(),
+            SchedulerActQueueTaskKind::RenderCallback
+        );
+        assert_eq!(act_callback.root(), Some(root_id));
+        assert_eq!(
+            act_callback.scheduler_priority(),
+            Some(SchedulerPriority::Normal)
+        );
+        assert_eq!(
+            act_callback.node(),
+            SchedulerBridge::fake_act_callback_node()
+        );
+        assert!(processed.records()[0].scheduled_callback().is_none());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            SchedulerBridge::fake_act_callback_node()
+        );
+        assert_eq!(store.scheduler_bridge().act_queue_requests().len(), 2);
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests()[0].kind(),
+            SchedulerActQueueTaskKind::RootSchedule
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests()[1],
+            act_callback
         );
     }
 
@@ -1138,6 +1313,54 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_act_queue_cancels_real_callback_before_rerouting() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let original_node = store.root(root_id).unwrap().scheduling().callback_node();
+
+        activate_act_queue(&mut store);
+        schedule_default_update(&mut store, root_id);
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+
+        let record = processed.records()[0];
+        assert_eq!(record.outcome(), RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(record.canceled_callback().unwrap().node(), original_node);
+        assert!(record.scheduled_callback().is_none());
+        assert!(record.scheduled_act_queue_task().is_some());
+        assert_eq!(store.scheduler_bridge().callback_requests().len(), 1);
+        assert_eq!(store.scheduler_bridge().cancellation_records().len(), 1);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            SchedulerBridge::fake_act_callback_node()
+        );
+    }
+
+    #[test]
+    fn root_scheduler_canceling_fake_act_callback_is_noop() {
+        let (mut store, root_id, _host) = root_store();
+        activate_act_queue(&mut store);
+        schedule_default_update(&mut store, root_id);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+
+        let sync_result =
+            update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
+        ensure_root_is_scheduled(&mut store, sync_result.schedule()).unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::Sync
+        );
+        assert_eq!(processed.records()[0].canceled_callback(), None);
+        assert!(store.scheduler_bridge().cancellation_records().is_empty());
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+    }
+
+    #[test]
     fn root_scheduler_priority_change_cancels_stale_callback_and_replaces_after_sync_clears() {
         let (mut store, root_id, _host) = root_store();
         schedule_default_update(&mut store, root_id);
@@ -1200,6 +1423,21 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_act_routing_has_no_render_commit_or_host_mutation_side_effects() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        activate_act_queue(&mut store);
+
+        schedule_default_update(&mut store, root_id);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+    }
+
+    #[test]
     fn root_scheduler_sync_flush_plan_uses_fast_path_and_reentry_guard() {
         let (mut store, root_id, _host) = root_store();
 
@@ -1224,6 +1462,38 @@ mod tests {
 
         assert!(reentrant_plan.skipped_reentrant_flush());
         assert!(reentrant_plan.sync_roots().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_lanes_filter_non_sync_lanes_and_recompute_flag() {
+        let (mut store, root_id, _host) = root_store();
+        let sync_result =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(1), None)
+                .unwrap();
+        ensure_root_is_scheduled(&mut store, sync_result.schedule()).unwrap();
+        schedule_default_update(&mut store, root_id);
+
+        let sync_lanes = sync_flush_lanes_for_root(&store, root_id).unwrap();
+
+        assert_eq!(sync_lanes, Lanes::SYNC);
+        assert!(
+            !sync_lanes.contains_lane(Lane::DEFAULT),
+            "default work must stay out of the sync flush lane set"
+        );
+
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_finished(RootFinishedLanes::new(Lanes::SYNC, Lanes::DEFAULT));
+        let still_has_sync = recompute_might_have_pending_sync_work(&mut store).unwrap();
+
+        assert!(!still_has_sync);
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
     }
 
     #[test]
