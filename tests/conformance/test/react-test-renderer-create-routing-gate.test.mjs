@@ -4,6 +4,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import {
+  readCheckedReactTestRendererErrorSurfaceOracle
+} from "../src/react-test-renderer-error-surface-oracle.mjs";
+import {
+  evaluateReactTestRendererErrorSurfaceLocalGate
+} from "../src/react-test-renderer-serialization-local-gate.mjs";
+
 const require = createRequire(import.meta.url);
 const Module = require("node:module");
 const repoRoot = path.resolve(
@@ -52,6 +59,11 @@ const rootLifecycleUnmountScheduled = "UnmountScheduled";
 const rootUpdateOutcomeScheduled = "Scheduled";
 const rootUpdateOutcomeIgnoredAfterUnmount = "IgnoredAfterUnmount";
 const rootUpdateOutcomeAlreadyUnmountScheduled = "AlreadyUnmountScheduled";
+const errorSurfacePrivateRoutingRowIds = [
+  "react-test-renderer-create-routing-private-diagnostic",
+  "react-test-renderer-update-route-private-diagnostic",
+  "react-test-renderer-unmount-route-private-diagnostic"
+];
 const expectedPrivateRoutes = [
   {
     acceptedRustApis: [
@@ -648,6 +660,44 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
       entry.entrypoint
     );
   }
+});
+
+test("react-test-renderer create routing gate feeds only private error diagnostic rows", () => {
+  const gate = evaluateReactTestRendererErrorSurfaceLocalGate({
+    oracle: readCheckedReactTestRendererErrorSurfaceOracle()
+  });
+
+  assert.deepEqual(
+    gate.privateDiagnosticRows
+      .filter(
+        (row) =>
+          row.area === "create routing" ||
+          row.area === "root update" ||
+          row.area === "root unmount"
+      )
+      .map((row) => row.id),
+    errorSurfacePrivateRoutingRowIds
+  );
+  assert.deepEqual(gate.admittedPublicScenarios, []);
+  assert.equal(gate.localChecks.createRoutingGatePresent, true);
+  assert.equal(gate.localChecks.updatePrivateRoutePresent, true);
+  assert.equal(gate.localChecks.unmountPrivateRoutePresent, true);
+  assert.equal(gate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked, true);
+  assert.equal(gate.localChecks.publicCreateUpdateUnmountErrorSurfaceReady, false);
+
+  const invalidCreateUpdateScenario = gate.publicScenarioAdmissions.find(
+    (scenario) => scenario.scenarioId === "invalid-create-update-inputs"
+  );
+  assert.notEqual(invalidCreateUpdateScenario, undefined);
+  assert.equal(
+    invalidCreateUpdateScenario.status,
+    "blocked-public-react-test-renderer-error-surface-compatibility"
+  );
+  assert.equal(invalidCreateUpdateScenario.publicComparisonBlocked, true);
+  assert.equal(
+    invalidCreateUpdateScenario.admittedForFastReactComparison,
+    false
+  );
 });
 
 test("react-test-renderer TestInstance query and serialization surfaces stay public fail-closed", () => {

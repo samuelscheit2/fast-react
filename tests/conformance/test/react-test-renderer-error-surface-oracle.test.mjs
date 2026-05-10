@@ -17,6 +17,15 @@ import {
   readCheckedReactTestRendererErrorSurfaceOracle,
   readCheckedReactTestRendererErrorSurfaceOracleText
 } from "../src/react-test-renderer-error-surface-oracle.mjs";
+import {
+  REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_GATE_STATUS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_PUBLIC_SCENARIO_ADMISSIONS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROW_STATUS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_COMPATIBILITY_STATUS,
+  REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS,
+  evaluateReactTestRendererErrorSurfaceLocalGate
+} from "../src/react-test-renderer-serialization-local-gate.mjs";
 
 const oracle = readCheckedReactTestRendererErrorSurfaceOracle();
 const DEFAULT_MODE = "default-node-development";
@@ -107,6 +116,97 @@ test("React test renderer error surface oracle keeps Fast React compatibility cl
     productionBehavior: false,
     fastReactComparison: false
   });
+});
+
+test("React test renderer error surface local gate admits only private diagnostics", () => {
+  const gate = evaluateReactTestRendererErrorSurfaceLocalGate({ oracle });
+
+  assert.equal(gate.status, REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_GATE_STATUS);
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.deepEqual(
+    gate.privateDiagnosticRows.map((row) => row.id),
+    REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROWS.map(
+      (row) => row.id
+    )
+  );
+
+  for (const row of gate.privateDiagnosticRows) {
+    assert.equal(row.rowKind, "private-diagnostic");
+    assert.equal(
+      row.status,
+      REACT_TEST_RENDERER_ERROR_SURFACE_PRIVATE_DIAGNOSTIC_ROW_STATUS
+    );
+    assert.equal(row.admittedForPrivateDiagnostics, true);
+    assert.equal(row.publicComparisonBlocked, true);
+    assert.equal(row.admittedForFastReactComparison, false);
+    assert.equal(row.compatibilityClaimed, false);
+  }
+
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.deepEqual(
+    gate.publicCompatibilityBlockers,
+    REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS.map(
+      (requirement) => requirement.id
+    )
+  );
+  assert.deepEqual(gate.admittedPublicScenarios, []);
+  assert.deepEqual(gate.violations, []);
+  assert.deepEqual(
+    gate.publicScenarioAdmissions,
+    REACT_TEST_RENDERER_ERROR_SURFACE_LOCAL_PUBLIC_SCENARIO_ADMISSIONS
+  );
+
+  for (const scenario of gate.publicScenarioAdmissions) {
+    assert.equal(
+      scenario.status,
+      REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_COMPATIBILITY_STATUS
+    );
+    assert.equal(scenario.rowKind, "public-error-surface");
+    assert.equal(scenario.publicComparisonBlocked, true);
+    assert.equal(scenario.admittedForFastReactComparison, false);
+    assert.equal(scenario.compatibilityClaimed, false);
+  }
+
+  assert.equal(gate.localChecks.createRoutingGatePresent, true);
+  assert.equal(gate.localChecks.updatePrivateRoutePresent, true);
+  assert.equal(gate.localChecks.unmountPrivateRoutePresent, true);
+  assert.equal(gate.localChecks.privateJsonDiagnosticsPresent, true);
+  assert.equal(gate.localChecks.committedFiberInspectionPresent, true);
+  assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
+  assert.equal(
+    gate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked,
+    true
+  );
+  assert.equal(gate.localChecks.publicSerializationErrorSurfaceBlocked, true);
+  assert.equal(gate.localChecks.publicTestInstanceErrorSurfaceBlocked, true);
+  assert.equal(gate.localChecks.publicActErrorSurfaceBlocked, true);
+  assert.equal(gate.localChecks.publicSchedulerErrorSurfaceBlocked, true);
+  assert.equal(gate.localChecks.publicShallowErrorSurfaceBlocked, true);
+});
+
+test("React test renderer error surface local gate rejects public compatibility claims", () => {
+  const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
+  prematureClaimOracle.conformanceClaims.compatibilityClaimed = true;
+
+  const gate = evaluateReactTestRendererErrorSurfaceLocalGate({
+    oracle: prematureClaimOracle
+  });
+
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.deepEqual(
+    gate.violations.map((violation) => violation.id),
+    ["error-surface-compatibility-claimed-before-public-support"]
+  );
+  assert.deepEqual(
+    gate.violations[0].blockers,
+    REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS.map(
+      (requirement) => requirement.id
+    )
+  );
 });
 
 test("React test renderer error surface oracle covers every scenario in every probe mode", () => {
