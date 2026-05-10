@@ -124,6 +124,10 @@ const privateToJSONUpdateHostOutputRowIds = [
 const privateToJSONSerializationFacadeSymbol = Symbol.for(
   "fast.react_test_renderer.private_tojson_serialization_facade"
 );
+const privateToJSONNativeExecutionDiagnosticName =
+  "fast-react-test-renderer.tojson.private-native-execution-evidence";
+const privateToJSONNativeExecutionStatus =
+  "private-tojson-native-execution-records-consumed-public-tojson-blocked";
 const privateToJSONUpdateUnmountDependencyIds = [
   "react-test-renderer-update-route-private-diagnostic",
   "react-test-renderer-unmount-route-private-diagnostic",
@@ -1665,6 +1669,215 @@ test("react-test-renderer private root request bridge can call a private Rust ex
   }
 });
 
+test("react-test-renderer CJS development private toJSON facade consumes accepted native execution records", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create({ type: "initial" });
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const updateError = captureThrown(() =>
+    renderer.update({ type: "updated" })
+  );
+  const unmountError = captureThrown(() => renderer.unmount());
+  const facade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
+  const executor = (handoff) => {
+    const request =
+      handoff.requestSequence === 1
+        ? createRequest
+        : handoff.requestSequence === 2
+          ? updateError.rootRequest
+          : unmountError.rootRequest;
+    return request.operation === "unmount"
+      ? {
+          ...createRustUnmountNativeBridgeAdmissionEvidence(request),
+          nativeAddonLoaded: false,
+          nativeExecution: false,
+          rustExecution: true
+        }
+      : {
+          rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+          nativeAddonLoaded: false,
+          nativeExecution: false,
+          rustExecution: true
+        };
+  };
+
+  const createResult = bridge.executeRootRequest(createRequest, executor);
+  const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
+  const unmountResult = bridge.executeRootRequest(
+    unmountError.rootRequest,
+    executor
+  );
+
+  assert.equal(facade.privateNativeExecutionEvidenceAvailable, true);
+  assert.equal(
+    facade.privateNativeExecutionDiagnosticName,
+    privateToJSONNativeExecutionDiagnosticName
+  );
+  assert.equal(
+    facade.privateNativeExecutionStatus,
+    privateToJSONNativeExecutionStatus
+  );
+  assert.deepEqual(facade.acceptedNativeExecutionOperations, [
+    "create",
+    "update",
+    "unmount"
+  ]);
+  assert.equal(
+    typeof facade.createAcceptedNativeExecutionDiagnosticResult,
+    "function"
+  );
+  assert.equal(
+    typeof facade.canCreateAcceptedNativeExecutionDiagnosticResult,
+    "function"
+  );
+
+  const createEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Create",
+        rowId: null,
+        rowShape: null,
+        rootChildCount: 1,
+        rootNodeKind: "HostComponent",
+        nodes: [
+          hostComponentNode(0, null, [1], "span"),
+          textNode(1, 0, "hello")
+        ]
+      })
+    );
+  assert.equal(createEvidence.diagnosticName, privateToJSONNativeExecutionDiagnosticName);
+  assert.equal(createEvidence.status, privateToJSONNativeExecutionStatus);
+  assert.equal(createEvidence.operation, "create");
+  assert.equal(createEvidence.hostOutputUpdateKind, "Create");
+  assert.equal(createEvidence.hostOutputShape, "SingleHostText");
+  assert.equal(createEvidence.hostOutputRowId, null);
+  assert.equal(createEvidence.sourceNodeCount, 2);
+  assert.equal(createEvidence.rootChildCount, 1);
+  assert.deepEqual(createEvidence.result, {
+    type: "span",
+    props: {},
+    children: ["hello"]
+  });
+  assert.equal(createEvidence.consumesAcceptedNativeExecutionRecord, true);
+  assert.equal(createEvidence.consumesAcceptedNativeCreateExecutionRecord, true);
+  assert.equal(createEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
+  assert.equal(createEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
+  assert.equal(createEvidence.consumesPrivateToJSONEvidence, true);
+  assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
+  assert.equal(createEvidence.minimalTreeShape, true);
+  assert.equal(createEvidence.publicSerializationAvailable, false);
+  assert.equal(createEvidence.publicRouteAvailable, false);
+  assert.equal(createEvidence.nativeBridgeAvailable, false);
+  assert.equal(createEvidence.nativeExecution, false);
+  assert.equal(createEvidence.compatibilityClaimed, false);
+
+  const updateEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONUpdateHostOutputRowId,
+        rowShape: "SingleHostText",
+        rootChildCount: 1,
+        rootNodeKind: "HostComponent",
+        nodes: [
+          hostComponentNode(0, null, [1], "span"),
+          textNode(1, 0, "goodbye")
+        ]
+      })
+    );
+  assert.equal(updateEvidence.operation, "update");
+  assert.equal(updateEvidence.hostOutputUpdateKind, "Update");
+  assert.equal(updateEvidence.hostOutputRowId, privateToJSONUpdateHostOutputRowId);
+  assert.equal(updateEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
+  assert.equal(updateEvidence.consumesAcceptedNativeUpdateExecutionRecord, true);
+  assert.equal(updateEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
+  assert.equal(updateEvidence.consumesAcceptedHostOutputRow, true);
+  assert.deepEqual(updateEvidence.result, {
+    type: "span",
+    props: {},
+    children: ["goodbye"]
+  });
+
+  const unmountEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      unmountResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        rootNodeKind: "EmptyRoot",
+        nodes: []
+      })
+    );
+  assert.equal(unmountEvidence.operation, "unmount");
+  assert.equal(unmountEvidence.hostOutputUpdateKind, "Unmount");
+  assert.equal(unmountEvidence.hostOutputShape, "EmptyRoot");
+  assert.equal(
+    unmountEvidence.hostOutputRowId,
+    privateToJSONUnmountHostOutputRowId
+  );
+  assert.equal(unmountEvidence.sourceNodeCount, 0);
+  assert.equal(unmountEvidence.rootChildCount, 0);
+  assert.equal(unmountEvidence.result, null);
+  assert.equal(unmountEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
+  assert.equal(unmountEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
+  assert.equal(unmountEvidence.consumesAcceptedNativeUnmountExecutionRecord, true);
+  assert.equal(unmountEvidence.consumesAcceptedHostOutputRow, true);
+  assert.equal(unmountEvidence.publicSerializationAvailable, false);
+  assert.equal(unmountEvidence.nativeExecution, false);
+  assert.equal(unmountEvidence.compatibilityClaimed, false);
+
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Create",
+        rowId: null,
+        rowShape: null,
+        rootChildCount: 1,
+        rootNodeKind: "HostComponent",
+        nodes: [
+          hostComponentNode(0, null, [1], "span"),
+          textNode(1, 0, "wrong")
+        ]
+      })
+    ),
+    false
+  );
+  const mismatchError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Create",
+        rowId: null,
+        rowShape: null,
+        rootChildCount: 1,
+        rootNodeKind: "HostComponent",
+        nodes: [
+          hostComponentNode(0, null, [1], "span"),
+          textNode(1, 0, "wrong")
+        ]
+      })
+    )
+  );
+  assert.equal(
+    mismatchError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.equal(mismatchError.publicSerializationAvailable, false);
+  assert.equal(mismatchError.nativeExecution, false);
+  assert.match(mismatchError.message, /Update toJSON evidence/u);
+});
+
 test("react-test-renderer development private error-boundary diagnostics follow update requests", () => {
   const entry = entrypoints.find(
     (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
@@ -2447,6 +2660,7 @@ test("react-test-renderer cjs development private toJSON facade records nested u
 });
 
 function privateToJSONReport({
+  hostOutputUpdateKind = "Update",
   rowId,
   rowShape,
   rootChildCount,
@@ -2455,27 +2669,32 @@ function privateToJSONReport({
 }) {
   return {
     diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
-    hostOutputUpdateKind: "Update",
+    hostOutputUpdateKind,
     hostOutputSnapshotCurrent: true,
-    hostOutputRow: {
-      id: rowId,
-      status: "private-tojson-update-unmount-host-output-rows-public-tojson-blocked",
-      hostOutputUpdateKind: "Update",
-      hostOutputShape: rowShape,
-      currentRootChildCount: rootChildCount,
-      dependencyMetadata: {
-        acceptedPrivateDiagnosticDependencyIds:
-          privateToJSONUpdateUnmountDependencyIds,
-        serializationDiagnosticsAvailable: true,
-        hostOutputSnapshotFreshnessRequired: true,
-        staleSnapshotRejection: true,
-        mismatchedUpdateUnmountRecordRejection: true,
-        publicToJSONAvailable: false,
-        publicTestInstanceAvailable: false,
-        nativeExecutionAvailable: false,
-        compatibilityClaimed: false
-      }
-    },
+    ...(rowId === null
+      ? {}
+      : {
+          hostOutputRow: {
+            id: rowId,
+            status:
+              "private-tojson-update-unmount-host-output-rows-public-tojson-blocked",
+            hostOutputUpdateKind,
+            hostOutputShape: rowShape,
+            currentRootChildCount: rootChildCount,
+            dependencyMetadata: {
+              acceptedPrivateDiagnosticDependencyIds:
+                privateToJSONUpdateUnmountDependencyIds,
+              serializationDiagnosticsAvailable: true,
+              hostOutputSnapshotFreshnessRequired: true,
+              staleSnapshotRejection: true,
+              mismatchedUpdateUnmountRecordRejection: true,
+              publicToJSONAvailable: false,
+              publicTestInstanceAvailable: false,
+              nativeExecutionAvailable: false,
+              compatibilityClaimed: false
+            }
+          }
+        }),
     rootChildCount,
     rootNodeKind,
     publicBlockers: {

@@ -2612,6 +2612,10 @@ pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-json-canary";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.private-facade-result";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.private-native-execution-evidence";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_STATUS: &str =
+    "private-tojson-native-execution-records-consumed-public-tojson-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
@@ -5116,6 +5120,162 @@ impl TestRendererPrivateToJsonFacadeResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonNativeExecutionEvidence {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    host_output_row: Option<TestRendererPrivateToJsonHostOutputRow>,
+    rendered_root: TestRendererPrivateJsonRenderedRoot,
+    source_node_count: usize,
+    root_child_count: usize,
+    consumes_accepted_native_create_execution_record: bool,
+    consumes_accepted_native_update_execution_record: bool,
+    consumes_accepted_native_unmount_execution_record: bool,
+    consumes_private_to_json_evidence: bool,
+    consumes_accepted_host_output_row: bool,
+    minimal_tree_shape: bool,
+    public_to_json_available: bool,
+    public_serialization_available: bool,
+    public_route_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateToJsonNativeExecutionEvidence {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(&self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(&self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(&self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(&self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(&self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
+    pub const fn host_output_row(&self) -> Option<TestRendererPrivateToJsonHostOutputRow> {
+        self.host_output_row
+    }
+
+    #[must_use]
+    pub const fn rendered_root(&self) -> &TestRendererPrivateJsonRenderedRoot {
+        &self.rendered_root
+    }
+
+    #[must_use]
+    pub const fn source_node_count(&self) -> usize {
+        self.source_node_count
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_create_execution_record(&self) -> bool {
+        self.consumes_accepted_native_create_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_update_execution_record(&self) -> bool {
+        self.consumes_accepted_native_update_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_unmount_execution_record(&self) -> bool {
+        self.consumes_accepted_native_unmount_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_private_to_json_evidence(&self) -> bool {
+        self.consumes_private_to_json_evidence
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_host_output_row(&self) -> bool {
+        self.consumes_accepted_host_output_row
+    }
+
+    #[must_use]
+    pub const fn minimal_tree_shape(&self) -> bool {
+        self.minimal_tree_shape
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(&self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(&self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_route_available(&self) -> bool {
+        self.public_route_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(&self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(&self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateJsonSerializationReport {
     diagnostic_name: &'static str,
     gate: TestRendererSerializationGateReport,
@@ -6803,6 +6963,10 @@ pub enum TestRendererPrivateJsonSerializationError {
         expected: TestRendererPrivateToJsonHostOutputShape,
         actual: TestRendererPrivateToJsonHostOutputShape,
     },
+    NativeExecutionRecordMismatch {
+        operation: &'static str,
+        reason: &'static str,
+    },
     UnmountSnapshotNotEmpty {
         actual: usize,
     },
@@ -6872,6 +7036,10 @@ impl Display for TestRendererPrivateJsonSerializationError {
                 "private JSON serialization canary row '{row_id}' expected {} host output shape, found {}",
                 expected.as_str(),
                 actual.as_str()
+            ),
+            Self::NativeExecutionRecordMismatch { operation, reason } => write!(
+                formatter,
+                "private toJSON native execution evidence rejected {operation} execution record: {reason}",
             ),
             Self::UnmountSnapshotNotEmpty { actual } => write!(
                 formatter,
@@ -8729,6 +8897,90 @@ impl TestRendererRoot {
         Self::private_to_json_facade_result_from_report(&report)
     }
 
+    pub fn describe_private_to_json_after_create_native_execution_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+        execution: TestRendererPrivateCreateRouteAdmissionDiagnostics,
+    ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
+        self.validate_private_to_json_create_native_execution_record_for_canary(execution)?;
+        let result = self.describe_private_to_json_facade_result_for_canary(output)?;
+
+        self.private_to_json_native_execution_evidence_from_facade_result(
+            "create",
+            "create().toJSON",
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID,
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS,
+            true,
+            false,
+            false,
+            &result,
+        )
+    }
+
+    pub fn describe_private_to_json_after_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
+        self.validate_private_to_json_update_native_execution_record_for_canary(execution)?;
+        let result = self.describe_private_to_json_facade_result_after_update_for_canary(output)?;
+
+        self.private_to_json_native_execution_evidence_from_facade_result(
+            "update",
+            "create().update -> create().toJSON",
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+            false,
+            true,
+            false,
+            &result,
+        )
+    }
+
+    pub fn describe_private_to_json_after_unmount_native_execution_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
+        self.validate_private_to_json_unmount_native_execution_record_for_canary(execution)?;
+        let row = self.describe_private_to_json_host_output_unmount_row_for_canary(output)?;
+        let rendered_root = Self::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(
+            output.snapshot(),
+        );
+        let minimal_tree_shape = rendered_root.is_null()
+            && row.host_output_shape() == TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            && row.current_root_child_count() == 0;
+
+        Ok(TestRendererPrivateToJsonNativeExecutionEvidence {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_STATUS,
+            root: self.root_id,
+            operation: "unmount",
+            public_surface: "create().unmount -> create().toJSON",
+            source_execution_record_id:
+                TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            source_execution_status: TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS,
+            host_output_update_kind: TestRendererRootUpdateKind::Unmount,
+            host_output_shape: row.host_output_shape(),
+            host_output_row: Some(row),
+            rendered_root,
+            source_node_count: 0,
+            root_child_count: output.snapshot().children().len(),
+            consumes_accepted_native_create_execution_record: false,
+            consumes_accepted_native_update_execution_record: false,
+            consumes_accepted_native_unmount_execution_record: true,
+            consumes_private_to_json_evidence: true,
+            consumes_accepted_host_output_row: true,
+            minimal_tree_shape,
+            public_to_json_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
     pub fn describe_private_tree_metadata_for_canary(
         &self,
         output: &TestRendererCommittedHostOutput,
@@ -9117,6 +9369,233 @@ impl TestRendererRoot {
             public_serialization_available: false,
             compatibility_claimed: false,
         })
+    }
+
+    fn private_to_json_native_execution_evidence_from_facade_result(
+        &self,
+        operation: &'static str,
+        public_surface: &'static str,
+        source_execution_record_id: &'static str,
+        source_execution_status: &'static str,
+        consumes_create: bool,
+        consumes_update: bool,
+        consumes_unmount: bool,
+        result: &TestRendererPrivateToJsonFacadeResult,
+    ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
+        let minimal_tree_shape = Self::private_to_json_result_is_minimal_host_text(result);
+        if !minimal_tree_shape {
+            return Err(
+                TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                    operation,
+                    reason: "minimal-host-component-with-text-shape-missing",
+                }
+                .into(),
+            );
+        }
+
+        Ok(TestRendererPrivateToJsonNativeExecutionEvidence {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_STATUS,
+            root: self.root_id,
+            operation,
+            public_surface,
+            source_execution_record_id,
+            source_execution_status,
+            host_output_update_kind: result.host_output_update_kind(),
+            host_output_shape: result.host_output_shape(),
+            host_output_row: result.host_output_row(),
+            rendered_root: result.rendered_root().clone(),
+            source_node_count: result.source_node_count(),
+            root_child_count: 1,
+            consumes_accepted_native_create_execution_record: consumes_create,
+            consumes_accepted_native_update_execution_record: consumes_update,
+            consumes_accepted_native_unmount_execution_record: consumes_unmount,
+            consumes_private_to_json_evidence: true,
+            consumes_accepted_host_output_row: result.host_output_row().is_some(),
+            minimal_tree_shape,
+            public_to_json_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    fn private_to_json_result_is_minimal_host_text(
+        result: &TestRendererPrivateToJsonFacadeResult,
+    ) -> bool {
+        let Some(component) = result.rendered_root().as_host_component() else {
+            return false;
+        };
+        let Some(children) = component.children() else {
+            return false;
+        };
+        result.source_node_count() == 2
+            && result.child_count() == 1
+            && component.child_count() == 1
+            && children.len() == 1
+            && children[0].as_text().is_some()
+    }
+
+    fn validate_private_to_json_create_native_execution_record_for_canary(
+        &self,
+        execution: TestRendererPrivateCreateRouteAdmissionDiagnostics,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.record_id() != TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID {
+            return self
+                .private_to_json_native_execution_record_error("create", "record-id-mismatch");
+        }
+        if execution.status() != TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS {
+            return self.private_to_json_native_execution_record_error("create", "status-mismatch");
+        }
+        if execution.operation() != "create"
+            || execution.public_surface() != "create()"
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Create
+            || execution.rust_outcome() != "Scheduled"
+        {
+            return self
+                .private_to_json_native_execution_record_error("create", "route-metadata-stale");
+        }
+        if !execution.consumes_accepted_rust_root_create_execution_evidence()
+            || !execution.consumes_accepted_rust_root_create_preflight_diagnostics()
+            || !execution.consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata()
+        {
+            return self.private_to_json_native_execution_record_error(
+                "create",
+                "accepted-rust-create-evidence-missing",
+            );
+        }
+        if execution.public_renderer_root_created()
+            || execution.public_root_available()
+            || execution.public_create_behavior_available()
+            || execution.public_serialization_available()
+            || execution.native_addon_loaded()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+            || execution.rust_execution_from_js()
+            || execution.reconciler_execution_from_js()
+            || execution.host_output_produced_from_js()
+            || execution.compatibility_claimed()
+        {
+            return self.private_to_json_native_execution_record_error(
+                "create",
+                "public-or-native-compatibility-claim",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_to_json_update_native_execution_record_for_canary(
+        &self,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID {
+            return self
+                .private_to_json_native_execution_record_error("update", "record-id-mismatch");
+        }
+        if execution.status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS {
+            return self.private_to_json_native_execution_record_error("update", "status-mismatch");
+        }
+        if execution.root() != self.root_id
+            || execution.public_surface() != "create().update"
+            || execution.request_api() != "TestRendererRoot::update"
+            || execution.source_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+            || execution.source_diagnostic_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+            || execution.lifecycle() != TestRendererRootLifecycle::Active
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || execution.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return self
+                .private_to_json_native_execution_record_error("update", "route-metadata-stale");
+        }
+        if !execution.consumes_accepted_host_root_update_queue_metadata()
+            || !execution.consumes_accepted_root_work_loop_metadata()
+            || !execution.consumes_accepted_host_output_metadata()
+        {
+            return self.private_to_json_native_execution_record_error(
+                "update",
+                "accepted-update-evidence-missing",
+            );
+        }
+        if execution.public_root_update_available()
+            || execution.public_serialization_available()
+            || execution.native_execution_available()
+            || execution.compatibility_claimed()
+        {
+            return self.private_to_json_native_execution_record_error(
+                "update",
+                "public-or-native-compatibility-claim",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_to_json_unmount_native_execution_record_for_canary(
+        &self,
+        execution: TestRendererUnmountNativeBridgeAdmission,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        {
+            return self
+                .private_to_json_native_execution_record_error("unmount", "record-id-mismatch");
+        }
+        if execution.status() != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS {
+            return self
+                .private_to_json_native_execution_record_error("unmount", "status-mismatch");
+        }
+        if execution.root() != self.root_id
+            || execution.route_dependency_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+            || execution.deletion_commit_handoff_id()
+                != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+            || execution.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
+            || !execution.scheduled_element_is_none()
+        {
+            return self
+                .private_to_json_native_execution_record_error("unmount", "route-metadata-stale");
+        }
+        if !execution.deletion_commit_handoff_accepted()
+            || !execution.lifecycle_evidence_accepted()
+            || !execution.cleanup_blockers_accepted()
+        {
+            return self.private_to_json_native_execution_record_error(
+                "unmount",
+                "accepted-unmount-evidence-missing",
+            );
+        }
+        if execution.public_unmount_compatibility_claimed()
+            || execution.public_host_teardown_compatibility_claimed()
+            || execution.act_flushing_claimed()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+        {
+            return self.private_to_json_native_execution_record_error(
+                "unmount",
+                "public-or-native-compatibility-claim",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn private_to_json_native_execution_record_error<T>(
+        &self,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Result<T, TestRendererRootError> {
+        Err(
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation,
+                reason,
+            }
+            .into(),
+        )
     }
 
     pub fn render_and_commit_host_output_for_canary(
@@ -12733,6 +13212,225 @@ mod tests {
         assert!(result.public_blockers().all_blocked());
         assert!(!result.public_serialization_available());
         assert!(!result.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let create_input =
+            TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+                root_element(1),
+                "span",
+            );
+        let create_preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            create_input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let create_admission =
+            TestRendererRoot::describe_private_create_route_admission_for_canary(
+                Some(create_preflight),
+                Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+            )
+            .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let create_evidence = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+            )
+            .unwrap();
+
+        assert_eq!(
+            create_evidence.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            create_evidence.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_NATIVE_EXECUTION_STATUS
+        );
+        assert_eq!(create_evidence.root(), root.root_id());
+        assert_eq!(create_evidence.operation(), "create");
+        assert_eq!(create_evidence.public_surface(), "create().toJSON");
+        assert_eq!(
+            create_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            create_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(
+            create_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText
+        );
+        assert!(create_evidence.host_output_row().is_none());
+        assert!(
+            create_evidence
+                .rendered_root()
+                .as_host_component()
+                .is_some()
+        );
+        assert_eq!(create_evidence.source_node_count(), 2);
+        assert_eq!(create_evidence.root_child_count(), 1);
+        assert!(create_evidence.consumes_accepted_native_create_execution_record());
+        assert!(!create_evidence.consumes_accepted_native_update_execution_record());
+        assert!(!create_evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(create_evidence.consumes_private_to_json_evidence());
+        assert!(create_evidence.minimal_tree_shape());
+        assert!(!create_evidence.public_to_json_available());
+        assert!(!create_evidence.public_serialization_available());
+        assert!(!create_evidence.public_route_available());
+        assert!(!create_evidence.native_bridge_available());
+        assert!(!create_evidence.native_execution_available());
+        assert!(!create_evidence.compatibility_claimed());
+
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let update_admission = root
+            .describe_private_update_route_admission_for_canary(&updated)
+            .unwrap();
+
+        let update_evidence = root
+            .describe_private_to_json_after_update_native_execution_for_canary(
+                &updated,
+                update_admission,
+            )
+            .unwrap();
+
+        assert_eq!(update_evidence.operation(), "update");
+        assert_eq!(
+            update_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            update_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            update_evidence.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID
+        );
+        assert!(!update_evidence.consumes_accepted_native_create_execution_record());
+        assert!(update_evidence.consumes_accepted_native_update_execution_record());
+        assert!(!update_evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(update_evidence.consumes_accepted_host_output_row());
+        assert!(update_evidence.minimal_tree_shape());
+        let updated_rendered_root = update_evidence.rendered_root().as_host_component().unwrap();
+        assert_eq!(
+            updated_rendered_root.children().unwrap()[0].as_text(),
+            Some("goodbye")
+        );
+        assert!(!update_evidence.public_serialization_available());
+        assert!(!update_evidence.compatibility_claimed());
+
+        let unmount_outcome = root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let unmount_handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        let unmount_admission = root
+            .describe_private_unmount_native_bridge_admission_for_canary(
+                &unmount_outcome,
+                Some(&unmount_handoff),
+            )
+            .unwrap();
+
+        let unmount_evidence = root
+            .describe_private_to_json_after_unmount_native_execution_for_canary(
+                &unmounted,
+                unmount_admission,
+            )
+            .unwrap();
+
+        assert_eq!(unmount_evidence.operation(), "unmount");
+        assert_eq!(
+            unmount_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            unmount_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(
+            unmount_evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+        );
+        assert_eq!(
+            unmount_evidence.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+        );
+        assert!(unmount_evidence.rendered_root().is_null());
+        assert_eq!(unmount_evidence.source_node_count(), 0);
+        assert_eq!(unmount_evidence.root_child_count(), 0);
+        assert!(!unmount_evidence.consumes_accepted_native_create_execution_record());
+        assert!(!unmount_evidence.consumes_accepted_native_update_execution_record());
+        assert!(unmount_evidence.consumes_accepted_native_unmount_execution_record());
+        assert!(unmount_evidence.consumes_accepted_host_output_row());
+        assert!(unmount_evidence.minimal_tree_shape());
+        assert!(!unmount_evidence.public_to_json_available());
+        assert!(!unmount_evidence.native_bridge_available());
+        assert!(!unmount_evidence.native_execution_available());
+        assert!(!unmount_evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_native_execution_evidence_rejects_stale_update_record() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut update_admission = root
+            .describe_private_update_route_admission_for_canary(&updated)
+            .unwrap();
+        update_admission.host_output_update_kind = TestRendererRootUpdateKind::Create;
+
+        let error = root
+            .describe_private_to_json_after_update_native_execution_for_canary(
+                &updated,
+                update_admission,
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "route-metadata-stale"
+            }
+        ));
     }
 
     #[test]

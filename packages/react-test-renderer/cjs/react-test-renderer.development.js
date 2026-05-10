@@ -2136,6 +2136,17 @@ const privateToJSONFacadeResultDiagnosticName =
   'fast-react-test-renderer.tojson.private-facade-result';
 const privateToJSONFacadeResultStatus =
   'private-tojson-facade-result-backed-by-rust-host-output-public-blocked';
+const privateToJSONNativeExecutionDiagnosticName =
+  'fast-react-test-renderer.tojson.private-native-execution-evidence';
+const privateToJSONNativeExecutionStatus =
+  'private-tojson-native-execution-records-consumed-public-tojson-blocked';
+const privateToJSONNativeExecutionRecordKind =
+  'FastReactTestRendererPrivateRootExecutionResult';
+const privateToJSONNativeExecutionAcceptedOperations = Object.freeze([
+  'create',
+  'update',
+  'unmount'
+]);
 const privateToJSONUpdateHostOutputRowId =
   'react-test-renderer-tojson-update-host-output-private-diagnostic';
 const privateToJSONNestedUpdateHostOutputRowId =
@@ -2246,6 +2257,14 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateSerializationStatus: privateToJSONSerializationStatus,
   privateDiagnosticResultAvailable: true,
   privateDiagnosticResultStatus: privateToJSONFacadeResultStatus,
+  privateNativeExecutionEvidenceAvailable: true,
+  privateNativeExecutionDiagnosticName:
+    privateToJSONNativeExecutionDiagnosticName,
+  privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
+  acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+  acceptedNativeExecutionOperations:
+    privateToJSONNativeExecutionAcceptedOperations,
+  consumesAcceptedNativeCreateUpdateUnmountExecutionRecords: true,
   acceptedRustPrivateJsonDiagnostics: true,
   acceptedRustPrivateToJSONFacadeResult: true,
   privateUpdateUnmountHostOutputRows:
@@ -2343,6 +2362,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'worker-540-test-renderer-tojson-update-unmount-refresh',
   nestedUpdateRefreshWorker:
     'worker-577-test-renderer-nested-tojson-update-refresh',
+  nativeExecutionEvidenceWorker:
+    'worker-639-test-renderer-tojson-after-native-execution',
   blockedPublicSurfaces: Object.freeze([
     'create().toJSON',
     'create().toTree',
@@ -3950,6 +3971,16 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     unmountHostOutputRowId: privateToJSONUnmountHostOutputRowId,
     updateUnmountDependencyMetadata:
       privateToJSONUpdateUnmountDependencyMetadata,
+    nativeExecutionEvidenceDiagnosticName:
+      privateToJSONNativeExecutionDiagnosticName,
+    nativeExecutionEvidenceStatus: privateToJSONNativeExecutionStatus,
+    nativeExecutionEvidenceRecordKind:
+      privateToJSONNativeExecutionRecordKind,
+    acceptedNativeExecutionOperations:
+      privateToJSONNativeExecutionAcceptedOperations,
+    consumesAcceptedNativeCreateUpdateUnmountExecutionRecords: true,
+    nativeExecutionEvidenceWorker:
+      'worker-639-test-renderer-tojson-after-native-execution',
     hostShapeApi:
       'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
     acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update', 'Unmount']),
@@ -10366,6 +10397,13 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateHostOutputShapes: privateToJSONHostOutputShapes,
     privateUpdateUnmountDependencyMetadata:
       privateToJSONUpdateUnmountDependencyMetadata,
+    privateNativeExecutionEvidenceAvailable: true,
+    privateNativeExecutionDiagnosticName:
+      privateToJSONNativeExecutionDiagnosticName,
+    privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
+    acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+    acceptedNativeExecutionOperations:
+      privateToJSONNativeExecutionAcceptedOperations,
     mismatchedUpdateUnmountRecordRejection: true,
     mismatchedUpdateShapeRejection: true,
     publicSerializationAvailable: false,
@@ -10394,6 +10432,25 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     },
     createAcceptedHostOutputDiagnosticResult(report) {
       return createPrivateToJSONHostOutputDiagnosticResult(report);
+    },
+    canCreateAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+      try {
+        createPrivateToJSONNativeExecutionDiagnosticResult(
+          rootRequest,
+          executionRecord,
+          report
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+      return createPrivateToJSONNativeExecutionDiagnosticResult(
+        rootRequest,
+        executionRecord,
+        report
+      );
     }
   });
 }
@@ -12035,6 +12092,226 @@ function createPrivateToJSONHostOutputDiagnosticResult(report) {
   });
 }
 
+function createPrivateToJSONNativeExecutionDiagnosticResult(
+  rootRequest,
+  executionRecord,
+  report
+) {
+  const execution = consumeAcceptedToJSONNativeExecutionRecord(
+    rootRequest,
+    executionRecord
+  );
+  const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
+  const expectedHostOutputUpdateKind =
+    hostOutputUpdateKindForRootExecutionOperation(execution.operation);
+
+  if (diagnostic.hostOutputUpdateKind !== expectedHostOutputUpdateKind) {
+    throwPrivateToJSONSerializationError(
+      `Expected private native ${execution.operation} execution to consume ${expectedHostOutputUpdateKind} toJSON evidence.`
+    );
+  }
+  if (!isMinimalToJSONNativeExecutionShape(diagnostic)) {
+    throwPrivateToJSONSerializationError(
+      'Expected private native execution toJSON evidence to describe the minimal host tree.'
+    );
+  }
+
+  const diagnosticResult =
+    createPrivateToJSONHostOutputDiagnosticResult(report);
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-tojson-after-native-execution-result',
+    diagnosticName: privateToJSONNativeExecutionDiagnosticName,
+    status: privateToJSONNativeExecutionStatus,
+    entrypoint,
+    publicSurface: 'create().toJSON',
+    sourceDiagnostic: privateToJSONAcceptedDiagnosticName,
+    sourceDiagnosticResult: privateToJSONFacadeResultDiagnosticName,
+    acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+    rootRequest,
+    rootExecutionResult: execution,
+    operation: execution.operation,
+    requestId: execution.requestId,
+    requestSequence: execution.requestSequence,
+    rootId: execution.request.rootId,
+    hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
+    hostOutputShape: diagnostic.hostOutputShape,
+    hostOutputRowId:
+      diagnostic.hostOutputRow === null ? null : diagnostic.hostOutputRow.id,
+    hostOutputRow: diagnostic.hostOutputRow,
+    hostOutputSnapshotCurrent: true,
+    sourceNodeCount: diagnostic.sourceNodeCount,
+    rootChildCount: diagnostic.rootChildCount,
+    result: diagnostic.result,
+    diagnosticResult,
+    consumesAcceptedNativeExecutionRecord: true,
+    consumesAcceptedNativeCreateExecutionRecord:
+      execution.operation === 'create',
+    consumesAcceptedNativeUpdateExecutionRecord:
+      execution.operation === 'update',
+    consumesAcceptedNativeUnmountExecutionRecord:
+      execution.operation === 'unmount',
+    consumesAcceptedRustLifecycleDiagnostic: true,
+    consumesPrivateToJSONEvidence: true,
+    consumesAcceptedHostOutputRow: diagnostic.hostOutputRow !== null,
+    minimalTreeShape: true,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function consumeAcceptedToJSONNativeExecutionRecord(
+  rootRequest,
+  executionRecord
+) {
+  try {
+    return consumeAcceptedToJSONNativeExecutionRecordImpl(
+      rootRequest,
+      executionRecord
+    );
+  } catch (error) {
+    if (
+      error &&
+      error.name === 'FastReactTestRendererPrivateRootRequestError'
+    ) {
+      throwPrivateToJSONSerializationError(error.message);
+    }
+    throw error;
+  }
+}
+
+function consumeAcceptedToJSONNativeExecutionRecordImpl(
+  rootRequest,
+  executionRecord
+) {
+  if (!isRootRequestRecord(rootRequest)) {
+    throwPrivateToJSONSerializationError(
+      'Expected a private root request for native toJSON evidence.'
+    );
+  }
+  if (executionRecord === null || typeof executionRecord !== 'object') {
+    throwPrivateToJSONSerializationError(
+      'Expected an accepted private native root execution result.'
+    );
+  }
+  if (
+    executionRecord.kind !== undefined &&
+    executionRecord.kind !== privateToJSONNativeExecutionRecordKind
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected a FastReactTestRendererPrivateRootExecutionResult record.'
+    );
+  }
+  if (
+    executionRecord.status !== undefined &&
+    executionRecord.status !== 'accepted-private-test-renderer-root-execution-result'
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected an accepted private root execution result status.'
+    );
+  }
+
+  const request = readDiagnosticField(executionRecord, ['request']);
+  if (!isRootRequestRecord(request)) {
+    throwPrivateToJSONSerializationError(
+      'Expected native execution result to carry a private root request.'
+    );
+  }
+  if (
+    request.rootHandle !== rootRequest.rootHandle ||
+    request.rootId !== rootRequest.rootId
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected native execution result to belong to the renderer root.'
+    );
+  }
+  if (
+    !privateToJSONNativeExecutionAcceptedOperations.includes(
+      request.operation
+    )
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected native execution result operation to be create, update, or unmount.'
+    );
+  }
+
+  const consumed = executionRecord;
+  if (
+    consumed.request !== request ||
+    consumed.operation !== request.operation ||
+    consumed.rustOutcome !== request.rustOutcome ||
+    consumed.privateRootRequestExecution !== true ||
+    consumed.rustRootExecutionBridgeStatus !==
+      'admitted-private-test-renderer-native-root-execution-bridge' ||
+    consumed.rustRootExecutionBoundaryCalled !== true
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected accepted private native root execution evidence.'
+    );
+  }
+  if (consumed.scheduled !== true) {
+    throwPrivateToJSONSerializationError(
+      'Expected private native toJSON evidence to consume a scheduled root execution.'
+    );
+  }
+  if (
+    consumed.serializationAvailable !== false ||
+    consumed.publicRouteAvailable !== false ||
+    consumed.publicCreateUpdateUnmountBehaviorAvailable !== false ||
+    consumed.compatibilityClaimed !== false
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Private native toJSON evidence cannot claim public serialization compatibility.'
+    );
+  }
+
+  return consumed;
+}
+
+function hostOutputUpdateKindForRootExecutionOperation(operation) {
+  switch (operation) {
+    case 'create':
+      return 'Create';
+    case 'update':
+      return 'Update';
+    case 'unmount':
+      return 'Unmount';
+  }
+  throwPrivateToJSONSerializationError(
+    'Expected native execution operation to be create, update, or unmount.'
+  );
+}
+
+function isMinimalToJSONNativeExecutionShape(diagnostic) {
+  if (diagnostic.hostOutputUpdateKind === 'Unmount') {
+    return (
+      diagnostic.hostOutputShape === 'EmptyRoot' &&
+      diagnostic.rootChildCount === 0 &&
+      diagnostic.sourceNodeCount === 0 &&
+      diagnostic.result === null
+    );
+  }
+  if (
+    diagnostic.hostOutputShape !== 'SingleHostText' ||
+    diagnostic.rootChildCount !== 1 ||
+    diagnostic.sourceNodeCount !== 2
+  ) {
+    return false;
+  }
+  const result = diagnostic.result;
+  return (
+    result !== null &&
+    typeof result === 'object' &&
+    !Array.isArray(result) &&
+    Array.isArray(result.children) &&
+    result.children.length === 1 &&
+    typeof result.children[0] === 'string'
+  );
+}
+
 function validatePrivateToJSONHostOutputDiagnostic(report) {
   assertPrivateToJSONRecord(report, 'report');
   assertPrivateToJSONStringField(
@@ -12105,6 +12382,7 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
     hostOutputShape,
     hostOutputRow,
     result,
+    rootChildCount,
     sourceNodeCount: diagnosticNodes.length
   };
 }
