@@ -2819,6 +2819,11 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
   validatesUpdateRootRequestIdentity: true,
+  updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
+    'worker-726-test-renderer-update-native-serialization-identity-admission',
+  updateNativeExecutionRequiresFinishedWorkIdentity: true,
+  rejectsStaleUpdateFinishedWorkIdentity: true,
+  rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
   privateFinishedWorkIdentityStatus:
@@ -2845,6 +2850,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   ]),
   nativeExecutionAcceptedRustTests: Object.freeze([
     'root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records',
+    'root_private_to_json_update_native_execution_requires_finished_work_identity_gate',
     'root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row',
     'root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row',
     'root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch',
@@ -2951,6 +2957,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_update_host_output_row_rejects_mismatched_row_kind',
     'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_to_json_update_native_execution_requires_finished_work_identity_gate',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
@@ -3177,6 +3184,11 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
   validatesUpdateRootRequestIdentity: true,
+  updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
+    'worker-726-test-renderer-update-native-serialization-identity-admission',
+  updateNativeExecutionRequiresFinishedWorkIdentity: true,
+  rejectsStaleUpdateFinishedWorkIdentity: true,
+  rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
   privateFinishedWorkIdentityStatus:
@@ -3230,6 +3242,7 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
+    'root_private_to_tree_update_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_native_execution_evidence_records_composite_host_shape',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
@@ -14393,6 +14406,11 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
     validatesUpdateRootRequestIdentity: true,
+    updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
+      toJSONPrivateSerializationFacadeGate.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    updateNativeExecutionRequiresFinishedWorkIdentity: true,
+    rejectsStaleUpdateFinishedWorkIdentity: true,
+    rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
     privateFinishedWorkIdentityStatus:
@@ -14560,6 +14578,11 @@ function createPrivateToTreeFacade(rootRequest) {
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
     validatesUpdateRootRequestIdentity: true,
+    updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
+      toTreePrivateFacadeGate.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    updateNativeExecutionRequiresFinishedWorkIdentity: true,
+    rejectsStaleUpdateFinishedWorkIdentity: true,
+    rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
     privateFinishedWorkIdentityStatus:
@@ -15640,13 +15663,14 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
     executionRecord
   );
   const finishedWorkIdentity =
-    execution.operation === 'create'
+    execution.operation === 'create' || execution.operation === 'update'
       ? createPrivateSerializationFinishedWorkIdentityGateResult(
           rootRequest,
           'create().toTree',
           privateToTreeAcceptedDiagnosticName,
           finishedWorkIdentityEvidence,
-          report
+          report,
+          execution.request
         )
       : null;
   const diagnostic = validatePrivateToTreeNativeExecutionDiagnostic(report);
@@ -16508,13 +16532,14 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     executionRecord
   );
   const finishedWorkIdentity =
-    execution.operation === 'create'
+    execution.operation === 'create' || execution.operation === 'update'
       ? createPrivateSerializationFinishedWorkIdentityGateResult(
           rootRequest,
           'create().toJSON',
           privateToJSONAcceptedDiagnosticName,
           finishedWorkIdentityEvidence,
-          report
+          report,
+          execution.request
         )
       : null;
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
@@ -16524,6 +16549,14 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
   if (diagnostic.hostOutputUpdateKind !== expectedHostOutputUpdateKind) {
     throwPrivateToJSONSerializationError(
       `Expected private native ${execution.operation} execution to consume ${expectedHostOutputUpdateKind} toJSON evidence.`
+    );
+  }
+  if (
+    execution.operation === 'update' &&
+    !isMinimalToJSONNativeExecutionShape(diagnostic)
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Expected private native update toJSON finished-work identity admission to consume the minimal single-host-text update evidence.'
     );
   }
   const acceptedShape =

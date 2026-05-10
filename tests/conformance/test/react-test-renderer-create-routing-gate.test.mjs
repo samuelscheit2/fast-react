@@ -2286,7 +2286,6 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
       type: "span"
     })
   );
-  const unmountError = captureThrown(() => renderer.unmount());
   const facade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
   const executor = (handoff) => {
     const request =
@@ -2321,10 +2320,6 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
 
   const createResult = bridge.executeRootRequest(createRequest, executor);
   const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
-  const unmountResult = bridge.executeRootRequest(
-    unmountError.rootRequest,
-    executor
-  );
 
   assert.equal(facade.privateNativeExecutionEvidenceAvailable, true);
   assert.equal(
@@ -2346,6 +2341,19 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(
     facade.updatePropSerializationWorker,
     "worker-671-test-renderer-root-update-serialization-props"
+  );
+  assert.equal(
+    facade.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    "worker-726-test-renderer-update-native-serialization-identity-admission"
+  );
+  assert.equal(
+    facade.updateNativeExecutionRequiresFinishedWorkIdentity,
+    true
+  );
+  assert.equal(facade.rejectsStaleUpdateFinishedWorkIdentity, true);
+  assert.equal(
+    facade.rejectsMultichildUpdateNativeExecutionIdentityAdmission,
+    true
   );
   assert.deepEqual(facade.acceptedNativeExecutionOperations, [
     "create",
@@ -2383,6 +2391,7 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   ]);
   assert.deepEqual(facade.nativeExecutionAcceptedRustTests, [
     "root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records",
+    "root_private_to_json_update_native_execution_requires_finished_work_identity_gate",
     "root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row",
     "root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row",
     "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
@@ -2538,26 +2547,65 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
   assert.match(sourceReportError.message, /serialization source report/u);
 
+  const updateJSONReport = privateToJSONReport({
+    hostOutputUpdateKind: "Update",
+    rowId: privateToJSONUpdateHostOutputRowId,
+    rowShape: "SingleHostText",
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "span", {
+        "data-state": "new"
+      }),
+      textNode(1, 0, "goodbye")
+    ]
+  });
+  const updateJSONIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: updateError.rootRequest,
+    publicSurface: "create().toJSON",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    consumesPrivateToJSONEvidence: true,
+    consumesPrivateToTreeEvidence: false,
+    hostOutputUpdateKind: "Update"
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      updateJSONReport
+    ),
+    false
+  );
+  const updateMissingIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      updateJSONReport
+    )
+  );
+  assert.equal(
+    updateMissingIdentityError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    updateMissingIdentityError.message,
+    /finished-work identity evidence/u
+  );
+  assert.equal(updateMissingIdentityError.nativeExecution, false);
+
   const updateEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       updateResult,
-      privateToJSONReport({
-        hostOutputUpdateKind: "Update",
-        rowId: privateToJSONUpdateHostOutputRowId,
-        rowShape: "SingleHostText",
-        rootChildCount: 1,
-        rootNodeKind: "HostComponent",
-        nodes: [
-          hostComponentNode(0, null, [1], "span", {
-            "data-state": "new"
-          }),
-          textNode(1, 0, "goodbye")
-        ]
-      })
+      updateJSONReport,
+      updateJSONIdentity
     );
   assert.equal(updateEvidence.operation, "update");
   assert.equal(updateEvidence.hostOutputUpdateKind, "Update");
   assert.equal(updateEvidence.hostOutputRowId, privateToJSONUpdateHostOutputRowId);
+  assert.equal(updateEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(
+    updateEvidence.finishedWorkIdentity.rootRequestId,
+    updateError.rootRequest.requestId
+  );
   assert.equal(updateEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
   assert.equal(updateEvidence.consumesAcceptedNativeUpdateExecutionRecord, true);
   assert.equal(updateEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
@@ -2571,53 +2619,111 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     children: ["goodbye"]
   });
 
-  const nestedUpdateEvidence =
+  const nestedUpdateReport = privateToJSONReport({
+    hostOutputUpdateKind: "Update",
+    rowId: privateToJSONNestedUpdateHostOutputRowId,
+    rowShape: "NestedHostText",
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "section"),
+      hostComponentNode(1, 0, [2, 3], "span"),
+      textNode(2, 1, "stable"),
+      textNode(3, 1, "inserted")
+    ]
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      nestedUpdateReport,
+      updateJSONIdentity
+    ),
+    false
+  );
+  const nestedUpdateAdmissionError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      nestedUpdateReport,
+      updateJSONIdentity
+    )
+  );
+  assert.equal(
+    nestedUpdateAdmissionError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    nestedUpdateAdmissionError.message,
+    /minimal single-host-text update evidence/u
+  );
+
+  const siblingTextUpdateReport = privateToJSONReport({
+    hostOutputUpdateKind: "Update",
+    rowId: privateToJSONSiblingTextHostOutputRowId,
+    rowShape: "SiblingText",
+    rootChildCount: 2,
+    rootNodeKind: "MultipleHostChildren",
+    nodes: [
+      textNode(0, null, "first sibling"),
+      hostComponentNode(1, null, [2], "span"),
+      textNode(2, 1, "second sibling")
+    ]
+  });
+  const siblingTextAdmissionError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      siblingTextUpdateReport,
+      updateJSONIdentity
+    )
+  );
+  assert.equal(
+    siblingTextAdmissionError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    siblingTextAdmissionError.message,
+    /minimal single-host-text update evidence/u
+  );
+
+  const wrongUpdateKindReport = privateToJSONReport({
+    hostOutputUpdateKind: "Create",
+    rowId: null,
+    rowShape: null,
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "span"),
+      textNode(1, 0, "wrong")
+    ]
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      wrongUpdateKindReport,
+      updateJSONIdentity
+    ),
+    false
+  );
+  const mismatchError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      wrongUpdateKindReport,
+      updateJSONIdentity
+    )
+  );
+  assert.equal(
+    mismatchError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.equal(mismatchError.publicSerializationAvailable, false);
+  assert.equal(mismatchError.nativeExecution, false);
+  assert.match(mismatchError.message, /source report update kind/u);
+
+  const rowShapeMismatchError = captureThrown(() =>
     facade.createAcceptedNativeExecutionDiagnosticResult(
       updateResult,
       privateToJSONReport({
         hostOutputUpdateKind: "Update",
         rowId: privateToJSONNestedUpdateHostOutputRowId,
-        rowShape: "NestedHostText",
-        rootChildCount: 1,
-        rootNodeKind: "HostComponent",
-        nodes: [
-          hostComponentNode(0, null, [1], "section"),
-          hostComponentNode(1, 0, [2, 3], "span"),
-          textNode(2, 1, "stable"),
-          textNode(3, 1, "inserted")
-        ]
-      })
-    );
-  assert.equal(nestedUpdateEvidence.operation, "update");
-  assert.equal(nestedUpdateEvidence.hostOutputShape, "NestedHostText");
-  assert.equal(
-    nestedUpdateEvidence.hostOutputRowId,
-    privateToJSONNestedUpdateHostOutputRowId
-  );
-  assert.equal(nestedUpdateEvidence.sourceNodeCount, 4);
-  assert.equal(nestedUpdateEvidence.rootChildCount, 1);
-  assert.equal(nestedUpdateEvidence.minimalTreeShape, false);
-  assert.equal(nestedUpdateEvidence.acceptedHostOutputRowShape, true);
-  assert.equal(nestedUpdateEvidence.nestedHostOutputRowShape, true);
-  assert.equal(nestedUpdateEvidence.siblingTextHostOutputRowShape, false);
-  assert.deepEqual(nestedUpdateEvidence.result, {
-    type: "section",
-    props: {},
-    children: [
-      {
-        type: "span",
-        props: {},
-        children: ["stable", "inserted"]
-      }
-    ]
-  });
-
-  const siblingTextUpdateEvidence =
-    facade.createAcceptedNativeExecutionDiagnosticResult(
-      updateResult,
-      privateToJSONReport({
-        hostOutputUpdateKind: "Update",
-        rowId: privateToJSONSiblingTextHostOutputRowId,
         rowShape: "SiblingText",
         rootChildCount: 2,
         rootNodeKind: "MultipleHostChildren",
@@ -2626,28 +2732,44 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
           hostComponentNode(1, null, [2], "span"),
           textNode(2, 1, "second sibling")
         ]
-      })
-    );
-  assert.equal(siblingTextUpdateEvidence.operation, "update");
-  assert.equal(siblingTextUpdateEvidence.hostOutputShape, "SiblingText");
-  assert.equal(
-    siblingTextUpdateEvidence.hostOutputRowId,
-    privateToJSONSiblingTextHostOutputRowId
+      }),
+      updateJSONIdentity
+    )
   );
-  assert.equal(siblingTextUpdateEvidence.sourceNodeCount, 3);
-  assert.equal(siblingTextUpdateEvidence.rootChildCount, 2);
-  assert.equal(siblingTextUpdateEvidence.minimalTreeShape, false);
-  assert.equal(siblingTextUpdateEvidence.acceptedHostOutputRowShape, true);
-  assert.equal(siblingTextUpdateEvidence.nestedHostOutputRowShape, false);
-  assert.equal(siblingTextUpdateEvidence.siblingTextHostOutputRowShape, true);
-  assert.deepEqual(siblingTextUpdateEvidence.result, [
-    "first sibling",
-    {
-      type: "span",
-      props: {},
-      children: ["second sibling"]
-    }
-  ]);
+  assert.equal(
+    rowShapeMismatchError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    rowShapeMismatchError.message,
+    /row shape to be NestedHostText/u
+  );
+
+  const laterUpdateError = captureThrown(() =>
+    renderer.update({
+      props: { "data-state": "later", children: "later" },
+      type: "span"
+    })
+  );
+  assert.equal(
+    bridge.getRendererRootRequests(renderer).at(-1),
+    laterUpdateError.rootRequest
+  );
+  const staleUpdateIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      updateJSONReport,
+      updateJSONIdentity
+    )
+  );
+  assert.equal(
+    staleUpdateIdentityError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    staleUpdateIdentityError.message,
+    /request sequence is stale/u
+  );
 
   assert.equal(
     captureThrown(() => renderer.toJSON()).name,
@@ -2658,6 +2780,11 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     "FastReactTestRendererUnimplementedError"
   );
 
+  const unmountError = captureThrown(() => renderer.unmount());
+  const unmountResult = bridge.executeRootRequest(
+    unmountError.rootRequest,
+    executor
+  );
   const unmountEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       unmountResult,
@@ -2687,73 +2814,6 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(unmountEvidence.publicSerializationAvailable, false);
   assert.equal(unmountEvidence.nativeExecution, false);
   assert.equal(unmountEvidence.compatibilityClaimed, false);
-
-  assert.equal(
-    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
-      updateResult,
-      privateToJSONReport({
-        hostOutputUpdateKind: "Create",
-        rowId: null,
-        rowShape: null,
-        rootChildCount: 1,
-        rootNodeKind: "HostComponent",
-        nodes: [
-          hostComponentNode(0, null, [1], "span"),
-          textNode(1, 0, "wrong")
-        ]
-      })
-    ),
-    false
-  );
-  const mismatchError = captureThrown(() =>
-    facade.createAcceptedNativeExecutionDiagnosticResult(
-      updateResult,
-      privateToJSONReport({
-        hostOutputUpdateKind: "Create",
-        rowId: null,
-        rowShape: null,
-        rootChildCount: 1,
-        rootNodeKind: "HostComponent",
-        nodes: [
-          hostComponentNode(0, null, [1], "span"),
-          textNode(1, 0, "wrong")
-        ]
-      })
-    )
-  );
-  assert.equal(
-    mismatchError.name,
-    "FastReactTestRendererPrivateToJSONSerializationError"
-  );
-  assert.equal(mismatchError.publicSerializationAvailable, false);
-  assert.equal(mismatchError.nativeExecution, false);
-  assert.match(mismatchError.message, /Update toJSON evidence/u);
-
-  const rowShapeMismatchError = captureThrown(() =>
-    facade.createAcceptedNativeExecutionDiagnosticResult(
-      updateResult,
-      privateToJSONReport({
-        hostOutputUpdateKind: "Update",
-        rowId: privateToJSONNestedUpdateHostOutputRowId,
-        rowShape: "SiblingText",
-        rootChildCount: 2,
-        rootNodeKind: "MultipleHostChildren",
-        nodes: [
-          textNode(0, null, "first sibling"),
-          hostComponentNode(1, null, [2], "span"),
-          textNode(2, 1, "second sibling")
-        ]
-      })
-    )
-  );
-  assert.equal(
-    rowShapeMismatchError.name,
-    "FastReactTestRendererPrivateToJSONSerializationError"
-  );
-  assert.match(
-    rowShapeMismatchError.message,
-    /row shape to be NestedHostText/u
-  );
 });
 
 test("react-test-renderer CJS development private toTree facade consumes accepted native execution records", () => {
@@ -2779,7 +2839,6 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   const updateError = captureThrown(() =>
     renderer.update({ props: { children: "goodbye" }, type: "span" })
   );
-  const unmountError = captureThrown(() => renderer.unmount());
   const facade = renderer.toTree[privateToTreeFacadeSymbol];
   const executor = (handoff) => {
     const request =
@@ -2814,10 +2873,6 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
 
   const createResult = bridge.executeRootRequest(createRequest, executor);
   const updateResult = bridge.executeRootRequest(updateError.rootRequest, executor);
-  const unmountResult = bridge.executeRootRequest(
-    unmountError.rootRequest,
-    executor
-  );
 
   assert.equal(facade.privateNativeExecutionEvidenceAvailable, true);
   assert.equal(
@@ -2841,6 +2896,19 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(
     facade.nativeExecutionCompositeWorker,
     "worker-698-test-renderer-totree-composite-native-execution"
+  );
+  assert.equal(
+    facade.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    "worker-726-test-renderer-update-native-serialization-identity-admission"
+  );
+  assert.equal(
+    facade.updateNativeExecutionRequiresFinishedWorkIdentity,
+    true
+  );
+  assert.equal(facade.rejectsStaleUpdateFinishedWorkIdentity, true);
+  assert.equal(
+    facade.rejectsMultichildUpdateNativeExecutionIdentityAdmission,
+    true
   );
   assert.deepEqual(facade.acceptedNativeExecutionOperations, [
     "create",
@@ -2954,21 +3022,58 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     /diagnostic identity is not accepted/u
   );
 
+  const updateTreeReport = privateToTreeReport({
+    hostOutputUpdateKind: "Update",
+    rowId: privateToJSONUpdateHostOutputRowId,
+    rowShape: "SingleHostText",
+    rootChildCount: 1,
+    text: "goodbye",
+    compositeNativeExecution: true
+  });
+  const updateTreeIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: updateError.rootRequest,
+    publicSurface: "create().toTree",
+    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    consumesPrivateToJSONEvidence: false,
+    consumesPrivateToTreeEvidence: true,
+    hostOutputUpdateKind: "Update"
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      updateTreeReport
+    ),
+    false
+  );
+  const updateMissingIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      updateTreeReport
+    )
+  );
+  assert.equal(
+    updateMissingIdentityError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  assert.match(
+    updateMissingIdentityError.message,
+    /finished-work identity evidence/u
+  );
+
   const updateEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       updateResult,
-      privateToTreeReport({
-        hostOutputUpdateKind: "Update",
-        rowId: privateToJSONUpdateHostOutputRowId,
-        rowShape: "SingleHostText",
-        rootChildCount: 1,
-        text: "goodbye",
-        compositeNativeExecution: true
-      })
+      updateTreeReport,
+      updateTreeIdentity
     );
   assert.equal(updateEvidence.operation, "update");
   assert.equal(updateEvidence.hostOutputUpdateKind, "Update");
   assert.equal(updateEvidence.hostOutputRowId, privateToJSONUpdateHostOutputRowId);
+  assert.equal(updateEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(
+    updateEvidence.finishedWorkIdentity.rootRequestId,
+    updateError.rootRequest.requestId
+  );
   assert.equal(updateEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
   assert.equal(updateEvidence.consumesAcceptedNativeUpdateExecutionRecord, true);
   assert.equal(updateEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
@@ -2976,6 +3081,42 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(updateEvidence.functionComponentAboveHostOutputShape, true);
   assert.equal(updateEvidence.result.rendered.rendered[0], "goodbye");
 
+  const wrongTreeUpdateKindReport = privateToTreeReport({
+    hostOutputUpdateKind: "Create",
+    rowId: null,
+    rowShape: null,
+    rootChildCount: 1,
+    text: "wrong",
+    compositeNativeExecution: true
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      wrongTreeUpdateKindReport,
+      updateTreeIdentity
+    ),
+    false
+  );
+  const mismatchError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      wrongTreeUpdateKindReport,
+      updateTreeIdentity
+    )
+  );
+  assert.equal(
+    mismatchError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  assert.equal(mismatchError.publicTreeAvailable, false);
+  assert.equal(mismatchError.nativeExecution, false);
+  assert.match(mismatchError.message, /source report update kind/u);
+
+  const unmountError = captureThrown(() => renderer.unmount());
+  const unmountResult = bridge.executeRootRequest(
+    unmountError.rootRequest,
+    executor
+  );
   const unmountEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       unmountResult,
@@ -3005,41 +3146,6 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(unmountEvidence.publicTreeAvailable, false);
   assert.equal(unmountEvidence.nativeExecution, false);
   assert.equal(unmountEvidence.compatibilityClaimed, false);
-
-  assert.equal(
-    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
-      updateResult,
-      privateToTreeReport({
-        hostOutputUpdateKind: "Create",
-        rowId: null,
-        rowShape: null,
-        rootChildCount: 1,
-        text: "wrong",
-        compositeNativeExecution: true
-      })
-    ),
-    false
-  );
-  const mismatchError = captureThrown(() =>
-    facade.createAcceptedNativeExecutionDiagnosticResult(
-      updateResult,
-      privateToTreeReport({
-        hostOutputUpdateKind: "Create",
-        rowId: null,
-        rowShape: null,
-        rootChildCount: 1,
-        text: "wrong",
-        compositeNativeExecution: true
-      })
-    )
-  );
-  assert.equal(
-    mismatchError.name,
-    "FastReactTestRendererPrivateToTreeMetadataError"
-  );
-  assert.equal(mismatchError.publicTreeAvailable, false);
-  assert.equal(mismatchError.nativeExecution, false);
-  assert.match(mismatchError.message, /Update toTree evidence/u);
 
   assert.throws(() => renderer.toTree(), {
     code: "FAST_REACT_UNIMPLEMENTED",
@@ -9605,6 +9711,7 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     ...(nativeToTreeEvidence
       ? [
           "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records",
+          "root_private_to_tree_update_native_execution_requires_finished_work_identity_gate",
           ...(developmentCompositeToTreeEvidence
             ? [
                 "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
