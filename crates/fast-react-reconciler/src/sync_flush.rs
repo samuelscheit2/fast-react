@@ -13,7 +13,8 @@ use fast_react_core::Lanes;
 use fast_react_host_config::HostTypes;
 
 use crate::root_scheduler::{
-    recompute_might_have_pending_sync_work, sync_flush_act_continuation_lanes_for_root,
+    SyncFlushActPostPassiveContinuationGateRecord, recompute_might_have_pending_sync_work,
+    sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
     sync_flush_lanes_for_root,
 };
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
@@ -32,6 +33,7 @@ pub struct SyncFlushRootRecord {
     render_phase: HostRootRenderPhaseRecord,
     commit: HostRootCommitRecord,
     act_continuation: Option<SchedulerActContinuationRecord>,
+    act_post_passive_continuation_gate: Option<SyncFlushActPostPassiveContinuationGateRecord>,
 }
 
 impl SyncFlushRootRecord {
@@ -261,6 +263,10 @@ fn commit_render_phase<H: HostTypes>(
             commit.remaining_lanes(),
             continuation_lanes,
         );
+    let act_post_passive_continuation_gate = sync_flush_act_post_passive_continuation_gate(
+        act_continuation,
+        commit.pending_passive_handoff(),
+    );
     Ok(SyncFlushRootRecord {
         order,
         root: render_phase.root(),
@@ -268,6 +274,7 @@ fn commit_render_phase<H: HostTypes>(
         render_phase,
         commit,
         act_continuation,
+        act_post_passive_continuation_gate,
     })
 }
 
@@ -434,6 +441,7 @@ mod tests {
 
         assert_eq!(committed.remaining_lanes(), Lanes::NO);
         assert_eq!(committed.act_continuation, None);
+        assert_eq!(committed.act_post_passive_continuation_gate, None);
         assert!(
             store
                 .scheduler_bridge()
@@ -489,6 +497,65 @@ mod tests {
     }
 
     #[test]
+    fn sync_flush_handoff_records_post_passive_act_gate_without_flushing_effects() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(700));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let render_phase = rendered.records()[0].render_phase();
+        let finished_work = render_phase.finished_work();
+        store.scheduler_bridge_mut().enter_act_scope();
+        let mount_order = {
+            let scheduling = store.root_mut(root_id).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(root_id, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(finished_work, Lanes::SYNC)
+                .unwrap()
+        };
+
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+
+        let continuation = committed.act_continuation.unwrap();
+        assert_eq!(
+            continuation.status(),
+            SchedulerActContinuationStatus::NoContinuation
+        );
+        let gate = committed.act_post_passive_continuation_gate.unwrap();
+        assert_eq!(gate.root(), root_id);
+        assert_eq!(gate.sync_flush_order(), committed.order());
+        assert_eq!(gate.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(gate.remaining_lanes(), Lanes::NO);
+        assert_eq!(gate.continuation_lanes(), Lanes::NO);
+        assert_eq!(gate.pending_passive_finished_work(), finished_work);
+        assert_eq!(gate.pending_passive_lanes(), Lanes::SYNC);
+        assert_eq!(gate.pending_passive_unmount_count(), 0);
+        assert_eq!(gate.pending_passive_mount_count(), 1);
+        assert_eq!(gate.pending_passive_record_count(), 1);
+        assert_eq!(gate.act_scope_depth(), 1);
+        assert!(!gate.nested_act_scope());
+
+        let handoff = committed.commit().pending_passive_handoff().unwrap();
+        assert_eq!(handoff.pending_mount_count(), 1);
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+        assert_eq!(pending_passive.finished_work(), Some(finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_mounts().len(), 1);
+        assert_eq!(pending_passive.passive_mounts()[0].order(), mount_order);
+        assert_eq!(
+            store.scheduler_bridge().act_continuation_records(),
+            &[continuation]
+        );
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn sync_flush_handoff_records_active_act_boundary_without_pending_continuation() {
         let (mut store, root_id, host) = root_store();
         store.scheduler_bridge_mut().enter_act_scope();
@@ -517,6 +584,7 @@ mod tests {
             store.scheduler_bridge().act_continuation_records(),
             &[continuation]
         );
+        assert_eq!(committed.act_post_passive_continuation_gate, None);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -552,6 +620,7 @@ mod tests {
         assert!(!pending_passive.has_effects());
         assert!(pending_passive.passive_unmounts().is_empty());
         assert!(pending_passive.passive_mounts().is_empty());
+        assert_eq!(committed.act_post_passive_continuation_gate, None);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
