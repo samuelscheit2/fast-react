@@ -7,6 +7,8 @@
 //! records reuse that same validation boundary instead of creating a public ref
 //! capability. The metadata records root/fiber ownership plus phase and target;
 //! it never exposes raw fibers or DOM nodes.
+//! Cleanup-return execution gate records reuse those commit/deletion instance
+//! scopes so cleanup handles stay private to renderer-owned test gates.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
