@@ -19,12 +19,13 @@ use crate::root_commit::PendingPassiveCommitHandoff;
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
     ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
-    HostRootRenderPhaseRecord, RootCallbackPriority, RootScheduleUpdateRecord,
-    RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
-    SchedulerCallbackRequest, SchedulerCallbackValidationRecord, SchedulerCancellationRecord,
-    SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
-    SyncFlushExecutionContextRecord, render_host_root_for_lanes,
-    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
+    HostRootRenderPhaseRecord, RootCallbackPriority, RootErrorCallbackHandle,
+    RootRecoverableErrorCallbackHandle, RootScheduleUpdateRecord, RootSchedulerCallbackHandle,
+    RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge, SchedulerCallbackRequest,
+    SchedulerCallbackValidationRecord, SchedulerCancellationRecord, SchedulerMicrotaskKind,
+    SchedulerMicrotaskRequest, SchedulerPriority, SyncFlushExecutionContextRecord,
+    render_host_root_for_lanes, render_host_root_via_scheduler_callback,
+    validate_scheduled_host_root_callback,
 };
 
 pub(crate) const SYNC_FLUSH_LANES: Lanes = Lanes::SYNC_HYDRATION.merge(Lanes::SYNC);
@@ -601,6 +602,95 @@ impl SyncFlushPostPassiveContinuationRootRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncFlushPostPassiveRootErrorPropagationStatus {
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncFlushPostPassiveRootErrorPropagationBlocker {
+    PassiveEffectErrorCapture,
+    RootErrorUpdateScheduling,
+    RootErrorCallbackInvocation,
+    PublicActErrorAggregation,
+}
+
+pub(crate) const SYNC_FLUSH_POST_PASSIVE_ROOT_ERROR_PROPAGATION_BLOCKERS:
+    [SyncFlushPostPassiveRootErrorPropagationBlocker; 4] = [
+    SyncFlushPostPassiveRootErrorPropagationBlocker::PassiveEffectErrorCapture,
+    SyncFlushPostPassiveRootErrorPropagationBlocker::RootErrorUpdateScheduling,
+    SyncFlushPostPassiveRootErrorPropagationBlocker::RootErrorCallbackInvocation,
+    SyncFlushPostPassiveRootErrorPropagationBlocker::PublicActErrorAggregation,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushPostPassiveRootErrorPropagationRecord {
+    root: FiberRootId,
+    on_uncaught_error: RootErrorCallbackHandle,
+    on_caught_error: RootErrorCallbackHandle,
+    on_recoverable_error: RootRecoverableErrorCallbackHandle,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private post-passive root-error blocker metadata for future passive workers"
+)]
+impl SyncFlushPostPassiveRootErrorPropagationRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
+        self.on_uncaught_error
+    }
+
+    #[must_use]
+    pub(crate) const fn on_caught_error(self) -> RootErrorCallbackHandle {
+        self.on_caught_error
+    }
+
+    #[must_use]
+    pub(crate) const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
+        self.on_recoverable_error
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> SyncFlushPostPassiveRootErrorPropagationStatus {
+        SyncFlushPostPassiveRootErrorPropagationStatus::Blocked
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(
+        self,
+    ) -> &'static [SyncFlushPostPassiveRootErrorPropagationBlocker; 4] {
+        &SYNC_FLUSH_POST_PASSIVE_ROOT_ERROR_PROPAGATION_BLOCKERS
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_update_scheduled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_error_aggregation_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(self) -> bool {
+        self.on_uncaught_error.is_some()
+            || self.on_caught_error.is_some()
+            || self.on_recoverable_error.is_some()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SyncFlushPostPassiveContinuationExecutionGateRecord {
     pending_passive_root: FiberRootId,
@@ -610,6 +700,7 @@ pub(crate) struct SyncFlushPostPassiveContinuationExecutionGateRecord {
     pending_passive_mount_count: usize,
     execution_context: SyncFlushExecutionContextRecord,
     exit_status: RootSyncFlushExitStatus,
+    root_error_propagation: SyncFlushPostPassiveRootErrorPropagationRecord,
     continuation_roots: Vec<SyncFlushPostPassiveContinuationRootRecord>,
 }
 
@@ -656,6 +747,13 @@ impl SyncFlushPostPassiveContinuationExecutionGateRecord {
     #[must_use]
     pub(crate) const fn exit_status(&self) -> RootSyncFlushExitStatus {
         self.exit_status
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_propagation(
+        &self,
+    ) -> SyncFlushPostPassiveRootErrorPropagationRecord {
+        self.root_error_propagation
     }
 
     #[must_use]
@@ -1283,12 +1381,17 @@ pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
         return Ok(None);
     };
 
+    let root_error_propagation = sync_flush_post_passive_root_error_propagation_record(
+        store,
+        pending_passive_handoff.root(),
+    )?;
     let execution_context_record = execution_context.sync_flush_record();
     if !execution_context_record.can_enter_sync_flush() {
         return Ok(Some(sync_flush_post_passive_continuation_gate_record(
             pending_passive_handoff,
             execution_context_record,
             RootSyncFlushExitStatus::BlockedByExecutionContext,
+            root_error_propagation,
             Vec::new(),
         )));
     }
@@ -1298,6 +1401,7 @@ pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
             pending_passive_handoff,
             execution_context_record,
             RootSyncFlushExitStatus::SkippedReentrantFlush,
+            root_error_propagation,
             Vec::new(),
         )));
     }
@@ -1307,6 +1411,7 @@ pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
             pending_passive_handoff,
             execution_context_record,
             RootSyncFlushExitStatus::SkippedNoPendingSyncWork,
+            root_error_propagation,
             Vec::new(),
         )));
     }
@@ -1320,6 +1425,7 @@ pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
         pending_passive_handoff,
         execution_context_record,
         RootSyncFlushExitStatus::Completed,
+        root_error_propagation,
         continuation_roots,
     )))
 }
@@ -1345,10 +1451,24 @@ fn collect_sync_flush_post_passive_continuation_roots<H: HostTypes>(
     Ok(records)
 }
 
+fn sync_flush_post_passive_root_error_propagation_record<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<SyncFlushPostPassiveRootErrorPropagationRecord, RootSchedulerError> {
+    let root = store.root(root_id)?;
+    Ok(SyncFlushPostPassiveRootErrorPropagationRecord {
+        root: root_id,
+        on_uncaught_error: root.options().on_uncaught_error(),
+        on_caught_error: root.options().on_caught_error(),
+        on_recoverable_error: root.options().on_recoverable_error(),
+    })
+}
+
 fn sync_flush_post_passive_continuation_gate_record(
     pending_passive_handoff: PendingPassiveCommitHandoff,
     execution_context: SyncFlushExecutionContextRecord,
     exit_status: RootSyncFlushExitStatus,
+    root_error_propagation: SyncFlushPostPassiveRootErrorPropagationRecord,
     continuation_roots: Vec<SyncFlushPostPassiveContinuationRootRecord>,
 ) -> SyncFlushPostPassiveContinuationExecutionGateRecord {
     SyncFlushPostPassiveContinuationExecutionGateRecord {
@@ -1359,6 +1479,7 @@ fn sync_flush_post_passive_continuation_gate_record(
         pending_passive_mount_count: pending_passive_handoff.pending_mount_count(),
         execution_context,
         exit_status,
+        root_error_propagation,
         continuation_roots,
     }
 }
@@ -1629,7 +1750,8 @@ mod tests {
     use crate::RootOptions;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        RootElementHandle, SchedulerActQueueTaskKind, commit_finished_host_root, update_container,
+        RootElementHandle, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
+        SchedulerActQueueTaskKind, commit_finished_host_root, update_container,
         update_container_sync,
     };
     use fast_react_core::{
@@ -2748,7 +2870,13 @@ mod tests {
         let mut store = FiberRootStore::<RecordingHost>::new();
         let host = RecordingHost::default();
         let passive_root = store
-            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .create_client_root(
+                FakeContainer::new(1),
+                RootOptions::new()
+                    .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(951))
+                    .with_on_caught_error(RootErrorCallbackHandle::from_raw(952))
+                    .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(953)),
+            )
             .unwrap();
         let continuation_root = store
             .create_client_root(FakeContainer::new(2), RootOptions::new())
@@ -2797,6 +2925,32 @@ mod tests {
         assert_eq!(gate.pending_passive_unmount_count(), 0);
         assert_eq!(gate.pending_passive_mount_count(), 1);
         assert_eq!(gate.pending_passive_record_count(), 1);
+        let root_error = gate.root_error_propagation();
+        assert_eq!(root_error.root(), passive_root);
+        assert_eq!(
+            root_error.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(951)
+        );
+        assert_eq!(
+            root_error.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(952)
+        );
+        assert_eq!(
+            root_error.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(953)
+        );
+        assert_eq!(
+            root_error.status(),
+            SyncFlushPostPassiveRootErrorPropagationStatus::Blocked
+        );
+        assert_eq!(
+            root_error.blockers(),
+            &SYNC_FLUSH_POST_PASSIVE_ROOT_ERROR_PROPAGATION_BLOCKERS
+        );
+        assert!(root_error.has_configured_error_callback());
+        assert!(!root_error.root_error_update_scheduled());
+        assert!(!root_error.root_error_callbacks_invoked());
+        assert!(!root_error.public_act_error_aggregation_enabled());
         assert!(gate.should_execute_follow_up_sync_flush());
         assert!(gate.did_find_continuation_roots());
         assert_eq!(gate.continuation_roots().len(), 1);
