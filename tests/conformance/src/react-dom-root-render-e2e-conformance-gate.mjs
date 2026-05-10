@@ -7,6 +7,9 @@ import {
   readCheckedReactDomClientRootOracle
 } from "./react-dom-client-root-oracle.mjs";
 import {
+  readCheckedReactDomHydrationMarkerOracle
+} from "./react-dom-hydration-marker-oracle.mjs";
+import {
   REACT_DOM_CLIENT_ROOT_SCENARIO_IDS
 } from "./react-dom-client-root-scenarios.mjs";
 import {
@@ -165,6 +168,15 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       privateActPassiveEvidence: "separate"
     }),
     Object.freeze({
+      id: "public-root-render-private-react-dom-metadata-compatibility",
+      publicApi:
+        "private React DOM host-output/event/resource/form/controlled metadata through public roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateReactDomMetadataEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
       admission: "blocked",
@@ -177,6 +189,38 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       admission: "blocked",
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false
+    }),
+    Object.freeze({
+      id: "public-event-dispatch",
+      publicApi: "Synthetic event dispatch through public roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateEventEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-resource-hints",
+      publicApi: "React DOM resource hints through public roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateResourceEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-form-actions",
+      publicApi: "React DOM form actions through public roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateFormEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-controlled-inputs",
+      publicApi: "controlled form inputs through public roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateControlledInputEvidence: "separate"
     }),
     Object.freeze({
       id: "public-compatibility-claim",
@@ -245,6 +289,100 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS =
 
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_BLOCKED_STATUS =
   "blocked-private-root-act-passive-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_GATE_ID =
+  "root-render-private-react-dom-metadata-diagnostic-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS =
+  "accepted-private-root-react-dom-metadata-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS =
+  Object.freeze([
+    Object.freeze({
+      metadataId: "worker-486-public-facade-host-output",
+      workerId: "486",
+      category: "host-output",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-root-public-facade-host-output-render",
+      reason:
+        "Worker 486 accepted only the private react-dom/client facade host-output diagnostic backed by bridge records and fake-DOM mutation evidence."
+    }),
+    Object.freeze({
+      metadataId: "worker-487-event-prevent-default",
+      workerId: "487",
+      category: "event",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-root-host-output-event-prevent-default",
+      reason:
+        "Worker 487 accepted only private root host-output click canary preventDefault/defaultPrevented metadata without browser listener dispatch compatibility."
+    }),
+    Object.freeze({
+      metadataId: "worker-488-event-listener-error-routing",
+      workerId: "488",
+      category: "event",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-root-event-listener-error-routing",
+      reason:
+        "Worker 488 accepted only private listener error-route metadata flowing into root option callback records without invoking public callbacks or global reporting."
+    }),
+    Object.freeze({
+      metadataId: "worker-489-hydration-event-replay-ownership",
+      workerId: "489",
+      category: "hydration-event",
+      scenarioId: "create-root-no-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-hydration-replay-ownership",
+      reason:
+        "Worker 489 accepted only private hydration replay ownership rows that retain blocked target ownership through diagnostic drain ordering."
+    }),
+    Object.freeze({
+      metadataId: "worker-490-controlled-checkable-restore",
+      workerId: "490",
+      category: "controlled",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-controlled-checkable-restore-metadata",
+      reason:
+        "Worker 490 accepted only checkbox/radio controlled restore metadata and radio group intent rows without live DOM control mutation."
+    }),
+    Object.freeze({
+      metadataId: "worker-491-resource-stylesheet-precedence",
+      workerId: "491",
+      category: "resource",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-resource-stylesheet-precedence",
+      reason:
+        "Worker 491 accepted only redacted private stylesheet precedence, dedupe, fake-head order, and resource-map planning diagnostics."
+    }),
+    Object.freeze({
+      metadataId: "worker-492-form-submit-reset-metadata",
+      workerId: "492",
+      category: "form",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-form-submit-reset-metadata",
+      reason:
+        "Worker 492 accepted only primitive submit/requestSubmit action metadata and reset dispatcher ordering diagnostics without inspecting or mutating real forms."
+    })
+  ]);
 
 export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID =
   "react-dom-portal-root-render-blocked-gate-1";
@@ -567,6 +705,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
       inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics({
         workspaceRoot
       }),
+    privateReactDomMetadataDiagnostics:
+      inspectReactDomRootRenderE2EPrivateReactDomMetadataDiagnostics({
+        workspaceRoot
+      }),
     portalRootRenderObservations: inspectReactDomPortalRootRenderBlockedBoundary({
       workspaceRoot
     })
@@ -608,6 +750,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics(),
   privateActPassiveDiagnostics =
     inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics(),
+  privateReactDomMetadataDiagnostics =
+    inspectReactDomRootRenderE2EPrivateReactDomMetadataDiagnostics(),
   portalRootRenderObservations =
     inspectReactDomPortalRootRenderBlockedBoundary()
 }) {
@@ -624,6 +768,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   const privateCrossRootSchedulingBlockedRows = [];
   const privateActPassiveDiagnosticRows = [];
   const privateActPassiveBlockedRows = [];
+  const privateReactDomMetadataDiagnosticRows = [];
   const behaviorByScenario = new Map(
     REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR.map((behavior) => [
       behavior.scenarioId,
@@ -685,6 +830,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       row
     ])
   );
+  const privateReactDomMetadataAdmissionById = new Map(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.map(
+      (admission) => [admission.metadataId, admission]
+    )
+  );
+  const privateReactDomMetadataObservationByRow = new Map(
+    (privateReactDomMetadataDiagnostics.rows ?? []).map((row) => [
+      formatMetadataModeKey(row),
+      row
+    ])
+  );
 
   validateOracleShape({
     checkedOracle,
@@ -713,6 +869,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   });
   validatePrivateActPassiveAdmissionMetadata({
     privateActPassiveAdmissionByScenario,
+    failures
+  });
+  validatePrivateReactDomMetadataAdmissionMetadata({
+    privateReactDomMetadataAdmissionById,
     failures
   });
 
@@ -744,6 +904,12 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     failures.push({
       gateStatus: "private-root-act-passive-diagnostic-load-failed",
       error: privateActPassiveDiagnostics.loadError
+    });
+  }
+  if (privateReactDomMetadataDiagnostics.loadError) {
+    failures.push({
+      gateStatus: "private-root-react-dom-metadata-diagnostic-load-failed",
+      error: privateReactDomMetadataDiagnostics.loadError
     });
   }
 
@@ -1232,6 +1398,73 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     }
   }
 
+  for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+    for (const privateAdmission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS) {
+      const context = {
+        category: privateAdmission.category,
+        metadataId: privateAdmission.metadataId,
+        modeId: mode.id,
+        scenarioId: privateAdmission.scenarioId,
+        workerId: privateAdmission.workerId
+      };
+
+      if (
+        privateAdmission.admission !== "private-react-dom-metadata-diagnostic"
+      ) {
+        failures.push({
+          ...context,
+          gateStatus: "unknown-private-root-react-dom-metadata-admission",
+          admission: privateAdmission.admission
+        });
+        continue;
+      }
+
+      const privateObservation = privateReactDomMetadataObservationByRow.get(
+        formatMetadataModeKey(context)
+      );
+
+      if (!privateObservation) {
+        failures.push({
+          ...context,
+          gateStatus: "missing-private-root-react-dom-metadata-diagnostic"
+        });
+        continue;
+      }
+
+      const validationFailure =
+        validatePrivateReactDomMetadataDiagnosticObservation({
+          admission: privateAdmission,
+          observation: privateObservation
+        });
+
+      if (validationFailure === null) {
+        privateReactDomMetadataDiagnosticRows.push({
+          ...context,
+          gateStatus: privateAdmission.gateStatus,
+          oracleRowAccepted: true,
+          publicFacadeGateStatus:
+            REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS,
+          publicRootCompatibilitySurface: false,
+          comparedToReactDomOracle: false,
+          compatibilityClaimed: false,
+          publicRootRenderCompatibilityClaimed: false,
+          publicHydrationCompatibilityClaimed: false,
+          publicEventCompatibilityClaimed: false,
+          publicResourceCompatibilityClaimed: false,
+          publicFormCompatibilityClaimed: false,
+          publicControlledInputCompatibilityClaimed: false,
+          evidenceKind: privateObservation.evidence.evidenceKind,
+          metadataEvidence: privateObservation.evidence.metadataEvidence
+        });
+      } else {
+        failures.push({
+          ...context,
+          ...validationFailure
+        });
+      }
+    }
+  }
+
   if (blocked.length > 0) {
     rejectCompatibilityClaimsWhileBlocked({
       checkedOracle,
@@ -1336,6 +1569,22 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       publicPassiveEffectCompatibilityClaimed: false,
       compatibilityClaimed: false
     },
+    privateReactDomMetadataGate: {
+      id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_GATE_ID,
+      localEntrypoint:
+        "packages/react-dom private root bridge, event, hydration, resource, form, and controlled metadata diagnostics",
+      admittedPrivateReactDomMetadataIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.map(
+          (admission) => admission.metadataId
+        ),
+      compatibilityClaimed: false,
+      publicRootRenderCompatibilityClaimed: false,
+      publicHydrationCompatibilityClaimed: false,
+      publicEventCompatibilityClaimed: false,
+      publicResourceCompatibilityClaimed: false,
+      publicFormCompatibilityClaimed: false,
+      publicControlledInputCompatibilityClaimed: false
+    },
     privateHostOutputDiagnosticScenarioModeRows:
       privateHostOutputDiagnosticRows,
     privateHostOutputBlockedScenarioModeRows: privateHostOutputBlockedRows,
@@ -1350,6 +1599,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateActPassiveDiagnosticScenarioModeRows:
       privateActPassiveDiagnosticRows,
     privateActPassiveBlockedScenarioModeRows: privateActPassiveBlockedRows,
+    privateReactDomMetadataDiagnosticRows:
+      privateReactDomMetadataDiagnosticRows,
     portalRootRenderGate,
     portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
     portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
@@ -1377,6 +1628,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateActPassiveDiagnosticRows.length,
       privateActPassiveBlockedScenarioModeRowCount:
         privateActPassiveBlockedRows.length,
+      privateReactDomMetadataDiagnosticRowCount:
+        privateReactDomMetadataDiagnosticRows.length,
       portalRootRenderPrerequisiteRowCount:
         portalRootRenderGate.summary.prerequisiteRowCount,
       portalRootRenderBlockedRowCount:
@@ -1400,6 +1653,13 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed: false,
       privateActPassivePublicRootRenderCompatibilityClaimed: false,
       privateActPassivePublicPassiveEffectCompatibilityClaimed: false,
+      privateReactDomMetadataCompatibilityClaimed: false,
+      privateReactDomMetadataPublicRootRenderCompatibilityClaimed: false,
+      privateReactDomMetadataPublicHydrationCompatibilityClaimed: false,
+      privateReactDomMetadataPublicEventCompatibilityClaimed: false,
+      privateReactDomMetadataPublicResourceCompatibilityClaimed: false,
+      privateReactDomMetadataPublicFormCompatibilityClaimed: false,
+      privateReactDomMetadataPublicControlledInputCompatibilityClaimed: false,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -1580,6 +1840,7 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Private cross-root scheduling diagnostic rows blocked: ${result.summary.privateCrossRootSchedulingBlockedScenarioModeRowCount}`,
     `Private act/passive diagnostic rows admitted: ${result.summary.privateActPassiveDiagnosticScenarioModeRowCount}`,
     `Private act/passive diagnostic rows blocked: ${result.summary.privateActPassiveBlockedScenarioModeRowCount}`,
+    `Private React DOM metadata diagnostic rows admitted: ${result.summary.privateReactDomMetadataDiagnosticRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
     `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
@@ -1613,6 +1874,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateActPassiveDiagnosticScenarioModeRows.length > 0) {
     lines.push(
       "Private act/passive diagnostics use accepted metadata and source evidence only; public React act, React DOM test-utils act, passive effects, and public root compatibility remain blocked."
+    );
+  }
+  if (result.privateReactDomMetadataDiagnosticRows.length > 0) {
+    lines.push(
+      "Private React DOM metadata diagnostics consume accepted host-output, event, hydration, resource, form, and controlled evidence only; all matching public compatibility surfaces remain blocked."
     );
   }
   if (result.portalRootRenderBlockedRows.length > 0) {
@@ -1678,6 +1944,10 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateActPassiveBlockedScenarioModeRowCount ?? 0
     }`,
+    `Root-render private React DOM metadata diagnostic rows admitted: ${
+      result.rootRenderGate?.summary
+        .privateReactDomMetadataDiagnosticRowCount ?? 0
+    }`,
     `Root-render portal rows blocked: ${
       result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0
     }`,
@@ -1724,6 +1994,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private act/passive diagnostics remain metadata evidence only and do not unblock public act, passive effect, or public root compatibility."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary
+      .privateReactDomMetadataDiagnosticRowCount ?? 0) > 0
+  ) {
+    lines.push(
+      "Private React DOM metadata diagnostics remain private evidence only and do not unblock public root, hydration, event, resource, form, or controlled-input compatibility."
     );
   }
   if ((result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0) > 0) {
@@ -1990,6 +2268,37 @@ export function inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics({
             mode,
             modules,
             scenarioId: admission.scenarioId
+          })
+        );
+      }
+    }
+
+    return {
+      loadError: null,
+      rows
+    };
+  } catch (error) {
+    return {
+      loadError: describePrivateBridgeError(error),
+      rows: []
+    };
+  }
+}
+
+export function inspectReactDomRootRenderE2EPrivateReactDomMetadataDiagnostics({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const modules = loadPrivateReactDomMetadataModules(workspaceRoot);
+    const rows = [];
+
+    for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+      for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS) {
+        rows.push(
+          runPrivateReactDomMetadataDiagnostic({
+            admission,
+            mode,
+            modules
           })
         );
       }
@@ -2371,6 +2680,10 @@ function validateRootRenderGatePrerequisites({
     failures
   });
   validateRootRenderPrivateActPassiveBlockers({
+    rootRenderGateResult,
+    failures
+  });
+  validateRootRenderPrivateReactDomMetadataBlockers({
     rootRenderGateResult,
     failures
   });
@@ -2976,6 +3289,137 @@ function validateRootRenderPrivateActPassiveBlockers({
   }
 }
 
+function validateRootRenderPrivateReactDomMetadataBlockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const admittedMetadataIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.map(
+      (admission) => admission.metadataId
+    );
+  const expectedRows =
+    admittedMetadataIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderGateResult.summary
+      .privateReactDomMetadataDiagnosticRowCount !== expectedRows
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-react-dom-metadata-row-count-mismatch",
+      actual:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataDiagnosticRowCount ?? null,
+      expected: expectedRows
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary.privateReactDomMetadataCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateReactDomMetadataPublicRootRenderCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateReactDomMetadataPublicHydrationCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateReactDomMetadataPublicEventCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateReactDomMetadataPublicResourceCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateReactDomMetadataPublicFormCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateReactDomMetadataPublicControlledInputCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.privateReactDomMetadataGate?.compatibilityClaimed !==
+      false ||
+    rootRenderGateResult.privateReactDomMetadataGate
+      ?.publicRootRenderCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateReactDomMetadataGate
+      ?.publicHydrationCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateReactDomMetadataGate
+      ?.publicEventCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateReactDomMetadataGate
+      ?.publicResourceCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateReactDomMetadataGate
+      ?.publicFormCompatibilityClaimed !== false ||
+    rootRenderGateResult.privateReactDomMetadataGate
+      ?.publicControlledInputCompatibilityClaimed !== false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-react-dom-metadata-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary.privateReactDomMetadataCompatibilityClaimed ??
+        null,
+      summaryPublicRootClaim:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataPublicRootRenderCompatibilityClaimed ?? null,
+      summaryPublicHydrationClaim:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataPublicHydrationCompatibilityClaimed ?? null,
+      summaryPublicEventClaim:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataPublicEventCompatibilityClaimed ?? null,
+      summaryPublicResourceClaim:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataPublicResourceCompatibilityClaimed ?? null,
+      summaryPublicFormClaim:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataPublicFormCompatibilityClaimed ?? null,
+      summaryPublicControlledClaim:
+        rootRenderGateResult.summary
+          .privateReactDomMetadataPublicControlledInputCompatibilityClaimed ??
+        null
+    });
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privateReactDomMetadataGate
+        ?.admittedPrivateReactDomMetadataIds ?? [],
+      admittedMetadataIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-react-dom-metadata-admission-set-mismatch",
+      admitted:
+        rootRenderGateResult.privateReactDomMetadataGate
+          ?.admittedPrivateReactDomMetadataIds ?? null
+    });
+  }
+
+  for (const row of rootRenderGateResult.privateReactDomMetadataDiagnosticRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.publicRootRenderCompatibilityClaimed !== false ||
+      row.publicHydrationCompatibilityClaimed !== false ||
+      row.publicEventCompatibilityClaimed !== false ||
+      row.publicResourceCompatibilityClaimed !== false ||
+      row.publicFormCompatibilityClaimed !== false ||
+      row.publicControlledInputCompatibilityClaimed !== false
+    ) {
+      failures.push({
+        metadataId: row.metadataId,
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus: "root-render-private-react-dom-metadata-row-not-private",
+        row
+      });
+    }
+  }
+}
+
 function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
   if (!rootRenderGateResult) {
     return;
@@ -3264,6 +3708,15 @@ function validatePublicFacadeBoundary({
     privateActPassiveEvidence: "separate"
   });
 
+  blockedPublicFacadeRows.push({
+    id: "public-root-render-private-react-dom-metadata-compatibility",
+    gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    reason:
+      "Private React DOM metadata rows remain separate from public root, hydration, event, resource, form, and controlled-input compatibility while public roots are placeholders.",
+    compatibilityClaimed: false,
+    privateReactDomMetadataEvidence: "separate"
+  });
+
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
   const hydrateRootSideEffects = localPublicFacadeBoundary.hydrateRoot.sideEffects;
   if (
@@ -3285,6 +3738,30 @@ function validatePublicFacadeBoundary({
       listenerRegistrationCount:
         createRootSideEffects.listenerRegistrationCount +
         hydrateRootSideEffects.listenerRegistrationCount
+    });
+    blockedPublicFacadeRows.push({
+      id: "public-event-dispatch",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateEventEvidence: "separate"
+    });
+    blockedPublicFacadeRows.push({
+      id: "public-resource-hints",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateResourceEvidence: "separate"
+    });
+    blockedPublicFacadeRows.push({
+      id: "public-form-actions",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateFormEvidence: "separate"
+    });
+    blockedPublicFacadeRows.push({
+      id: "public-controlled-inputs",
+      gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateControlledInputEvidence: "separate"
     });
   } else {
     failures.push({
@@ -4177,6 +4654,33 @@ function loadPrivateActPassiveModules(workspaceRoot) {
   };
 }
 
+function loadPrivateReactDomMetadataModules(workspaceRoot) {
+  const reactDomRoot = join(workspaceRoot, "packages/react-dom");
+  return {
+    ...loadPrivateHostOutputModules(workspaceRoot),
+    controlledRestoreQueue: require(
+      join(reactDomRoot, "src/client/controlled-restore-queue.js")
+    ),
+    eventListener: require(
+      join(reactDomRoot, "src/events/react-dom-event-listener.js")
+    ),
+    eventSystemFlags: require(
+      join(reactDomRoot, "src/events/event-system-flags.js")
+    ),
+    hydrationGate: require(
+      join(reactDomRoot, "src/client/hydration-boundary-gate.js")
+    ),
+    hydrationMarkerOracle: readCheckedReactDomHydrationMarkerOracle(),
+    pluginEventSystem: require(
+      join(reactDomRoot, "src/events/plugin-event-system.js")
+    ),
+    propertyPayload: require(join(reactDomRoot, "src/dom-host/property-payload.js")),
+    reactDomClient: require(join(reactDomRoot, "client.js")),
+    resourceFormGate: require(join(reactDomRoot, "src/resource-form-gates.js")),
+    rootListeners: require(join(reactDomRoot, "src/events/root-listeners.js"))
+  };
+}
+
 function runPrivateBridgeRequestScenario({ mode, modules, scenarioId }) {
   try {
     const plan = getPrivateBridgeRequestPlan(scenarioId);
@@ -4622,6 +5126,827 @@ function runPrivateActPassiveDiagnosticScenario({ mode, modules, scenarioId }) {
       error: describePrivateBridgeError(error)
     };
   }
+}
+
+function runPrivateReactDomMetadataDiagnostic({ admission, mode, modules }) {
+  try {
+    let metadataEvidence;
+
+    switch (admission.metadataId) {
+      case "worker-486-public-facade-host-output":
+        metadataEvidence = runPrivateReactDomMetadataHostOutputDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      case "worker-487-event-prevent-default":
+        metadataEvidence = runPrivateReactDomMetadataPreventDefaultDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      case "worker-488-event-listener-error-routing":
+        metadataEvidence = runPrivateReactDomMetadataEventErrorDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      case "worker-489-hydration-event-replay-ownership":
+        metadataEvidence = runPrivateReactDomMetadataHydrationReplayDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      case "worker-490-controlled-checkable-restore":
+        metadataEvidence = runPrivateReactDomMetadataControlledDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      case "worker-491-resource-stylesheet-precedence":
+        metadataEvidence = runPrivateReactDomMetadataResourceDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      case "worker-492-form-submit-reset-metadata":
+        metadataEvidence = runPrivateReactDomMetadataFormDiagnostic({
+          admission,
+          mode,
+          modules
+        });
+        break;
+      default:
+        throw new Error(
+          `No private React DOM metadata diagnostic plan for ${admission.metadataId}.`
+        );
+    }
+
+    return {
+      metadataId: admission.metadataId,
+      modeId: mode.id,
+      status: "ok",
+      evidence: {
+        ...privateReactDomMetadataCommonEvidence(admission),
+        evidenceKind: admission.evidenceKind,
+        metadataEvidence
+      }
+    };
+  } catch (error) {
+    return {
+      metadataId: admission.metadataId,
+      modeId: mode.id,
+      status: "throws",
+      error: describePrivateBridgeError(error)
+    };
+  }
+}
+
+function privateReactDomMetadataCommonEvidence(admission) {
+  return {
+    category: admission.category,
+    compatibilityClaimed: false,
+    comparedToReactDomOracle: false,
+    publicControlledInputCompatibilityClaimed: false,
+    publicEventCompatibilityClaimed: false,
+    publicFormCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicResourceCompatibilityClaimed: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
+    scenarioId: admission.scenarioId,
+    workerId: admission.workerId
+  };
+}
+
+function runPrivateReactDomMetadataHostOutputDiagnostic({ mode, modules }) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-host-output`
+  });
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    modules.reactDomClient.createRoot,
+    modules.rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: "metadata-host-admission",
+    initialHostOutputIdPrefix: "metadata-host-output",
+    publicFacadeHostOutputRenderIdPrefix: "metadata-host-render",
+    requestIdPrefix: "metadata-host-request",
+    rootIdPrefix: "metadata-host-root",
+    sideEffectIdPrefix: "metadata-host-side-effect",
+    updateIdPrefix: "metadata-host-update"
+  });
+  const root = adapter.createRoot(container);
+  const element = {
+    props: {
+      children: "facade host output",
+      id: "facade-host",
+      title: "Private facade host"
+    },
+    type: "main"
+  };
+  const diagnostic = adapter.renderHostOutput(root, element);
+  const payload =
+    modules.rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      diagnostic
+    );
+  const hostOutputPayload =
+    modules.rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      payload.hostOutputHandoff
+    );
+  const latestPropsPublished =
+    modules.componentTree.getLatestPropsFromNode(hostOutputPayload.hostNode) ===
+    element.props;
+  const cleanup = payload.bridge.cleanupInitialRenderHostOutput(
+    payload.hostOutputHandoff
+  );
+
+  return {
+    acceptedCapabilities: diagnostic.acceptedCapabilities.map(
+      (capability) => capability.id
+    ),
+    blockedCapabilities: diagnostic.blockedCapabilities.map(
+      (capability) => capability.id
+    ),
+    browserDomMutation: diagnostic.browserDomMutation,
+    cleanupSideEffectStatus: diagnostic.cleanupSideEffectStatus,
+    compatibilityClaimed: diagnostic.compatibilityClaimed,
+    containerChildCount: diagnostic.containerChildCount,
+    diagnosticStatus: diagnostic.diagnosticStatus,
+    eventDispatch: diagnostic.eventDispatch,
+    fakeDomMutation: diagnostic.fakeDomMutation,
+    hostOutputCleanupStatus: cleanup.cleanupStatus,
+    hostOutputHandoffStatus: diagnostic.hostOutputHandoffStatus,
+    latestPropsPublished,
+    publicRootCompatibilitySurface: diagnostic.publicRootCompatibilitySurface,
+    publicRootExecution: diagnostic.publicRootExecution,
+    setupSideEffectStatus: diagnostic.setupSideEffectStatus,
+    textContent: diagnostic.textContent
+  };
+}
+
+function runPrivateReactDomMetadataPreventDefaultDiagnostic({
+  mode,
+  modules
+}) {
+  const calls = [];
+  const harness = createPrivateMetadataHostOutputClickHarness({
+    element: {
+      props: {
+        children: "default-prevented target",
+        onClick(event) {
+          calls.push({
+            defaultPrevented: event.defaultPrevented,
+            phase: "bubble"
+          });
+        },
+        onClickCapture(event) {
+          event.preventDefault();
+          calls.push({
+            defaultPrevented: event.defaultPrevented,
+            phase: "capture"
+          });
+        }
+      },
+      type: "button"
+    },
+    label: `${mode.id}:metadata-event-default`,
+    modules
+  });
+
+  try {
+    const targetRecord =
+      modules.componentTree.createPrivateRootHostOutputEventTargetRecord(
+        harness.hostOutputPayload
+      );
+    const clickRecord =
+      modules.rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+        harness.sideEffects.listenerRegistration,
+        targetRecord,
+        {
+          enableDefaultPreventedDiagnostics: true
+        }
+      );
+    const clickPayload =
+      modules.rootListeners.getPrivateRootHostOutputClickDispatchCanaryPayload(
+        clickRecord
+      );
+
+    return {
+      callPhases: calls.map((call) => call.phase),
+      defaultPrevented: clickRecord.defaultPrevented,
+      defaultPreventedDiagnosticStatus:
+        clickRecord.defaultPreventedDiagnosticStatus,
+      defaultPreventedDiagnostics:
+        clickRecord.defaultPreventedDiagnostics.length,
+      hostNodeListenerRegistrationCount:
+        harness.hostOutputPayload.hostNode.__registrations.length,
+      listenerInvocationCount: clickRecord.listenerInvocationCount,
+      nativeDefaultPreventedAfterDispatch:
+        clickRecord.nativeDefaultPreventedAfterDispatch,
+      nativeEventPreventDefaultCallCount:
+        clickPayload.nativeEvent.preventDefaultCallCount,
+      preventDefaultCallCount: clickRecord.preventDefaultCallCount,
+      publicDispatchEnabled: clickRecord.publicDispatchEnabled,
+      syntheticEventCount: clickRecord.syntheticEventCount
+    };
+  } finally {
+    harness.cleanup();
+  }
+}
+
+function runPrivateReactDomMetadataEventErrorDiagnostic({ mode, modules }) {
+  const publicRootErrorCalls = [];
+  const listenerCalls = [];
+  const thrown = new Error("root-render metadata listener boom");
+  thrown.code = "ROOT_RENDER_METADATA_LISTENER_ERROR";
+  const harness = createPrivateMetadataHostOutputClickHarness({
+    element: {
+      props: {
+        children: "listener error target",
+        onClick() {
+          listenerCalls.push("bubble");
+        },
+        onClickCapture() {
+          listenerCalls.push("capture");
+          throw thrown;
+        }
+      },
+      type: "button"
+    },
+    label: `${mode.id}:metadata-event-error`,
+    modules,
+    rootOptions: {
+      onCaughtError(error) {
+        publicRootErrorCalls.push(["caught", error.message]);
+      },
+      onRecoverableError(error) {
+        publicRootErrorCalls.push(["recoverable", error.message]);
+      },
+      onUncaughtError(error) {
+        publicRootErrorCalls.push(["uncaught", error.message]);
+      }
+    }
+  });
+
+  try {
+    const clickRecord =
+      modules.rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+        harness.sideEffects.listenerRegistration,
+        harness.hostOutputPayload,
+        {
+          enableListenerErrorRoutingDiagnostics: true
+        }
+      );
+    const routing = harness.bridge.createEventListenerRootErrorRouting(
+      [harness.create, harness.render],
+      clickRecord,
+      {
+        routeLabels: ["root-render-metadata-listener-error"]
+      }
+    );
+    const payload =
+      modules.rootBridge.getPrivateRootEventListenerErrorRoutingPayload(
+        routing
+      );
+
+    return {
+      callbackRecordCount: routing.rootErrorOptionCallbackRecordCount,
+      compatibilityClaimed: routing.compatibilityClaimed,
+      eventDispatch: routing.eventDispatch,
+      eventListenerErrorsReported: routing.eventListenerErrorsReported,
+      listenerErrorCount: routing.listenerErrorCount,
+      listenerErrorRouteCount: routing.listenerErrorRouteCount,
+      listenerPhases: listenerCalls,
+      payloadRouteMatches:
+        payload.listenerErrorRoutes[0] === clickRecord.listenerErrorRoutes[0],
+      publicDispatchEnabled: routing.publicDispatchEnabled,
+      publicRootErrorCallbackCalls: publicRootErrorCalls.length,
+      publicRootErrorCallbacksInvoked:
+        routing.publicRootErrorCallbacksInvoked,
+      reportGlobalErrorInvoked: routing.reportGlobalErrorInvoked,
+      rootErrorCallbackInvocationCount:
+        routing.rootErrorCallbackInvocationCount,
+      rootErrorOptionCallbackRecordStatus:
+        routing.rootErrorOptionCallbackRecordStatus,
+      rootErrorUpdatesScheduled: routing.rootErrorUpdatesScheduled,
+      routingStatus: routing.routingStatus
+    };
+  } finally {
+    harness.cleanup();
+  }
+}
+
+function runPrivateReactDomMetadataHydrationReplayDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-hydration`
+  });
+  const container = document.createElement("div");
+  const firstBoundaryTarget = document.createElement("button");
+  const rootTarget = document.createElement("input");
+  const secondBoundaryTarget = document.createElement("a");
+  firstBoundaryTarget.parentNode = container;
+  rootTarget.parentNode = container;
+  secondBoundaryTarget.parentNode = container;
+  container.childNodes = [
+    { data: "$", nodeType: modules.domContainer.COMMENT_NODE },
+    firstBoundaryTarget,
+    { data: "/$", nodeType: modules.domContainer.COMMENT_NODE },
+    rootTarget,
+    { data: "$", nodeType: modules.domContainer.COMMENT_NODE },
+    secondBoundaryTarget,
+    { data: "/$", nodeType: modules.domContainer.COMMENT_NODE }
+  ];
+  const gate = modules.hydrationGate.createHydrationBoundaryGate({
+    markerOracle: modules.hydrationMarkerOracle,
+    recordIdPrefix: "metadata-hydration"
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    { props: { children: "blocked hydration" }, type: "App" },
+    { identifierPrefix: "metadata-" }
+  );
+  const secondBoundaryWrapper =
+    modules.eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "mouseover",
+      0
+    );
+  const rootWrapper =
+    modules.eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "change",
+      modules.eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const firstBoundaryWrapper =
+    modules.eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "click",
+      modules.eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const secondBoundaryRecord =
+    modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      secondBoundaryWrapper,
+      createPrivateMetadataNativeEvent("mouseover", secondBoundaryTarget)
+    );
+  const rootRecord =
+    modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      rootWrapper,
+      createPrivateMetadataNativeEvent("change", rootTarget)
+    );
+  const firstBoundaryRecord =
+    modules.pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      firstBoundaryWrapper,
+      createPrivateMetadataNativeEvent("click", firstBoundaryTarget)
+    );
+  const diagnostics =
+    modules.hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      record,
+      [secondBoundaryRecord, rootRecord, firstBoundaryRecord],
+      {
+        source: "root-render-private-react-dom-metadata-gate"
+      }
+    );
+
+  return {
+    compatibilityClaimed: diagnostics.compatibilityClaimed,
+    dehydratedBoundaryOwnershipRequiredCount:
+      diagnostics.dehydratedBoundaryOwnershipRequiredCount,
+    dehydratedBoundaryOwnershipRetainedCount:
+      diagnostics.dehydratedBoundaryOwnershipRetainedCount,
+    diagnosticKind: diagnostics.kind,
+    eventReplaySupported: diagnostics.eventReplaySupported,
+    ownershipRetainedCount: diagnostics.ownershipRetainedCount,
+    ownershipRowCount: diagnostics.ownershipRowCount,
+    ownershipRowsReplayFlags: diagnostics.ownershipRows.map((row) => ({
+      compatibilityClaimed: row.compatibilityClaimed,
+      publicRootBehaviorChanged: row.publicRootBehaviorChanged,
+      willDispatch: row.willDispatch,
+      willDrainReplayQueues: row.willDrainReplayQueues,
+      willHydrate: row.willHydrate,
+      willReplay: row.willReplay
+    })),
+    ownershipRetainedThroughDrainOrder:
+      diagnostics.ownershipRetainedThroughDrainOrder,
+    rootOwnershipRetainedCount: diagnostics.rootOwnershipRetainedCount,
+    status: diagnostics.status
+  };
+}
+
+function runPrivateReactDomMetadataControlledDiagnostic({ mode, modules }) {
+  const radioProps = {
+    checked: true,
+    name: "choice",
+    onChange() {},
+    type: "radio"
+  };
+  const controlledEntries = modules.propertyPayload.diffDomPropertyPayload(
+    "input",
+    {},
+    radioProps
+  );
+  const checkedEntry = controlledEntries.find(
+    (entry) => entry.propName === "checked"
+  );
+  const propertyMetadata =
+    checkedEntry.controlledFormBoundary.checkableRestoreMetadata;
+  const queueGate =
+    modules.controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "metadata-controlled-restore"
+    });
+  const dispatch = createPrivateControlledInputEventDispatch({
+    domEventName: "click",
+    latestProps: {
+      ...radioProps,
+      onClick() {}
+    },
+    modules,
+    nodeName: "INPUT"
+  });
+  const intent = queueGate.recordPostEventRestoreIntentFromEventLatestProps(
+    dispatch.dispatchRecord,
+    {
+      eventName: "click",
+      explicitAdmission: true,
+      queueId: `${mode.id}:metadata-radio-restore`,
+      queueKind: "deterministic-event-latest-props-post-event-restore-queue",
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+  modules.componentTree.detachHostInstanceToken(dispatch.token);
+
+  return {
+    propertyPayloadKind: checkedEntry.kind,
+    propertyPrivateWrapperStatus:
+      checkedEntry.controlledFormBoundary.privateWrapperGateStatus,
+    propertyRadioGroupLookupPerformed:
+      propertyMetadata.radioGroupLookupPerformed,
+    propertyRadioGroupRestoreRequired:
+      propertyMetadata.radioGroupRestoreRequired,
+    propertyRadioValueTrackerRefreshed:
+      propertyMetadata.radioValueTrackerRefreshed,
+    propertyStatus: propertyMetadata.status,
+    queueCompatibilityClaimed: intent.sideEffects.compatibilityClaimed,
+    queueGroupIntentStatus: intent.groupIntentRecords[0].status,
+    queueRadioGroupLookupPerformed:
+      intent.sideEffects.radioGroupLookupPerformed,
+    queueRadioGroupRestoreIntentRecorded:
+      intent.sideEffects.radioGroupRestoreIntentRecorded,
+    queueRadioGroupRestoreRequired:
+      intent.checkableRestoreMetadata.radioGroupRestoreRequired,
+    queueRadioValueTrackerRefreshed:
+      intent.sideEffects.radioGroupValueTrackerRefreshed,
+    queueRestoreQueued:
+      intent.postEventRestoreBoundary?.restoreQueued ??
+      intent.restoreIntent?.restoreQueued ??
+      false,
+    queueStatus: intent.status
+  };
+}
+
+function runPrivateReactDomMetadataResourceDiagnostic({ mode, modules }) {
+  const gate = modules.resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: `${mode.id}:metadata-resource-source`
+  });
+  const adapterGate =
+    modules.resourceFormGate.createResourceHintFakeDomAdapterGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-adapter`
+    });
+  const orderGate =
+    modules.resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-order`
+    });
+  const stylesheetGate =
+    modules.resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: `${mode.id}:metadata-resource-stylesheet`
+    });
+  const fakeDom = createPrivateMetadataResourceDom();
+  const records = [
+    gate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style-dupe",
+        fetchPriority: "high"
+      }
+    ])
+  ];
+  const headRecord = gate.recordSingletonRequest("head", [
+    { title: "metadata-head" }
+  ]);
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      adapterKind: "deterministic-fake-dom",
+      explicitAdmission: true,
+      targetKind: "document-head"
+    })
+  );
+  appendPrivateMetadataResourceHeadChild(fakeDom, "link", {
+    "data-fast-react-precedence-key": "precedence-main",
+    "data-fast-react-resource-key": "style-main",
+    "data-precedence": "theme",
+    rel: "stylesheet"
+  });
+  appendPrivateMetadataResourceHeadChild(fakeDom, "style", {
+    "data-fast-react-precedence-key": "precedence-main",
+    "data-fast-react-resource-key": "inline-main",
+    "data-precedence": "theme"
+  });
+  appendPrivateMetadataResourceHeadChild(fakeDom, "meta", {
+    name: "description"
+  });
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(admissions, {
+    explicitOrderDiagnostic: true,
+    fakeDocument: fakeDom.document,
+    fakeHead: fakeDom.head,
+    resourceDescriptors: [
+      {
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[0].adapterAdmissionId
+      },
+      {
+        precedenceKey: "precedence-main",
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[1].adapterAdmissionId
+      },
+      {
+        precedenceKey: "precedence-main",
+        resourceKey: "style-main",
+        resourceKind: "style",
+        sourceAdapterAdmissionId: admissions[2].adapterAdmissionId
+      }
+    ]
+  });
+  const diagnostic = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      hostTag: "head",
+      precedenceId: "metadata-stylesheet-precedence",
+      precedenceKind: "deterministic-fake-dom-stylesheet-precedence-order",
+      targetKind: "document-head"
+    }
+  );
+
+  return {
+    compatibilityClaimed:
+      diagnostic.headSingletonOrderBoundary.compatibilityClaimed !== false ||
+      diagnostic.stylesheetResourceMapPlan.compatibilityClaimed !== false,
+    dedupeRowCount: diagnostic.stylesheetDedupeRows.length,
+    executionStatus: diagnostic.executionStatus,
+    fakeHeadMutated: diagnostic.sideEffects.fakeHeadMutated,
+    headSingletonResolved:
+      diagnostic.headSingletonOrderBoundary.headSingletonResolved,
+    observedStylesheetRowCount:
+      diagnostic.headSingletonOrderBoundary.observedStylesheetRowCount,
+    plannedStylesheetRowCount:
+      diagnostic.headSingletonOrderBoundary.plannedStylesheetRowCount,
+    publicResourceHintDomInsertion:
+      diagnostic.sideEffects.publicResourceHintDomInsertion,
+    realDocumentMutated: diagnostic.sideEffects.realDocumentMutated,
+    resourceMapCreated:
+      diagnostic.stylesheetResourceMapPlan.stylesheetResourceMapCreated,
+    resourceMapMutated:
+      diagnostic.stylesheetResourceMapPlan.stylesheetResourceMapMutated,
+    status: diagnostic.stylesheetPrecedenceStatus
+  };
+}
+
+function runPrivateReactDomMetadataFormDiagnostic({ mode, modules }) {
+  const gate = modules.resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: `${mode.id}:metadata-form`
+  });
+  const submit = gate.recordSubmissionIntent({
+    actionKind: "function",
+    actionSource: "form",
+    defaultPrevented: false,
+    eventName: "submit",
+    explicitIntent: true,
+    formActionKind: "function",
+    submissionTrigger: "submit",
+    submitControlKind: "none",
+    submitterActionKind: "none",
+    transitionScheduled: false
+  });
+  const requestSubmit = gate.recordSubmissionIntent({
+    actionKind: "function",
+    actionSource: "submit-control",
+    defaultPrevented: false,
+    eventName: "submit",
+    explicitIntent: true,
+    formActionKind: "string",
+    submissionTrigger: "requestSubmit",
+    submitControlKind: "input",
+    submitterActionKind: "function",
+    transitionScheduled: false
+  });
+  const reset = gate.recordResetIntent({
+    dispatcherKey: "r",
+    explicitIntent: true,
+    formOwnership: "react-owned",
+    resetSource: "action-completion",
+    transitionContext: "action"
+  });
+
+  return {
+    actionCompletionRequestsResetBeforeActionInvocation:
+      reset.intent.resetDispatcherOrdering
+        .actionCompletionRequestsResetBeforeActionInvocation,
+    actionInvoked: submit.sideEffects.actionInvoked,
+    formDataConstructed: requestSubmit.sideEffects.formDataConstructed,
+    formResetCommitted: reset.sideEffects.formResetCommitted,
+    previousDispatcherCalled:
+      reset.intent.resetDispatcherOrdering.previousDispatcherCalled,
+    realFormInspected: requestSubmit.intent.realFormInspected,
+    requestSubmitWouldDispatchSubmitEvent:
+      requestSubmit.intent.actionMetadata.requestSubmitWouldDispatchSubmitEvent,
+    resetStateQueued: reset.intent.resetDispatcherOrdering.resetStateQueued,
+    resetStatus: reset.status,
+    submitRequestSubmitActionMetadataRecorded:
+      requestSubmit.sideEffects.submitRequestSubmitActionMetadataRecorded,
+    submitStatus: submit.status,
+    submitterActionOverridesFormAction:
+      requestSubmit.intent.actionMetadata.submitterActionOverridesFormAction,
+    submitterValueWouldBeIncludedInFormData:
+      requestSubmit.intent.actionMetadata
+        .submitterValueWouldBeIncludedInFormData
+  };
+}
+
+function createPrivateMetadataHostOutputClickHarness({
+  element,
+  label,
+  modules,
+  rootOptions = undefined
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label
+  });
+  const container = document.createElement("div");
+  const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: `${label}:admission`,
+    initialHostOutputIdPrefix: `${label}:output`,
+    sideEffectIdPrefix: `${label}:side-effect`
+  });
+  const create = bridge.createClientRoot(container, rootOptions);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(create, sideEffects, render);
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    modules.rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  let cleaned = false;
+
+  return {
+    bridge,
+    container,
+    create,
+    document,
+    handoff,
+    hostOutputPayload,
+    render,
+    sideEffects,
+    cleanup() {
+      if (!cleaned) {
+        bridge.cleanupInitialRenderHostOutput(handoff);
+        bridge.revertCreateRootSideEffects(sideEffects);
+        cleaned = true;
+      }
+    }
+  };
+}
+
+function createPrivateControlledInputEventDispatch({
+  domEventName,
+  latestProps,
+  modules,
+  nodeName
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `metadata-controlled:${domEventName}`
+  });
+  const container = document.createElement("div");
+  const targetNode = document.createElement(nodeName);
+  targetNode.parentNode = container;
+  const token = modules.componentTree.createHostInstanceToken(
+    { kind: "ControlledMetadataHost" },
+    { kind: "ControlledMetadataRoot" }
+  );
+  modules.componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    latestProps
+  );
+  const wrapperRecord =
+    modules.eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      domEventName,
+      0
+    );
+
+  return {
+    container,
+    dispatchRecord: modules.eventListener.dispatchEvent(
+      wrapperRecord,
+      createPrivateMetadataNativeEvent(domEventName, targetNode)
+    ),
+    document,
+    targetNode,
+    token
+  };
+}
+
+function createPrivateMetadataNativeEvent(type, target) {
+  return {
+    target,
+    type
+  };
+}
+
+function createPrivateMetadataResourceDom() {
+  const document = {
+    __fastReactFakeResourceDocument: true,
+    createElement(tagName) {
+      return {
+        __fastReactFakeResourceElement: true,
+        attributes: {},
+        nodeName: tagName.toUpperCase(),
+        ownerDocument: document,
+        parentNode: null,
+        setAttribute(name, value) {
+          this.attributes[name] = String(value);
+        }
+      };
+    }
+  };
+  const head = {
+    __fastReactFakeResourceHead: true,
+    childNodes: [],
+    ownerDocument: document,
+    appendChild(child) {
+      this.childNodes.push(child);
+      child.parentNode = this;
+      return child;
+    }
+  };
+  document.head = head;
+  return {
+    document,
+    head
+  };
+}
+
+function appendPrivateMetadataResourceHeadChild(fakeDom, tagName, attributes) {
+  const element = fakeDom.document.createElement(tagName);
+  for (const [name, value] of Object.entries(attributes)) {
+    element.setAttribute(name, value);
+  }
+  fakeDom.head.appendChild(element);
+  return element;
 }
 
 function summarizePrivateActEvidence({
@@ -7757,6 +9082,337 @@ function expectedPrivateWarningUpdateBoundaryRecord(operation, requestType) {
   };
 }
 
+function validatePrivateReactDomMetadataDiagnosticObservation({
+  admission,
+  observation
+}) {
+  if (observation.status !== "ok") {
+    return {
+      gateStatus: "private-root-react-dom-metadata-diagnostic-failed",
+      status: observation.status,
+      error: observation.error ?? null
+    };
+  }
+
+  const evidence = observation.evidence;
+  const commonExpectation = {
+    category: admission.category,
+    compatibilityClaimed: false,
+    comparedToReactDomOracle: false,
+    evidenceKind: admission.evidenceKind,
+    publicControlledInputCompatibilityClaimed: false,
+    publicEventCompatibilityClaimed: false,
+    publicFormCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicResourceCompatibilityClaimed: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
+    scenarioId: admission.scenarioId,
+    workerId: admission.workerId
+  };
+  const commonActual = {
+    category: evidence.category,
+    compatibilityClaimed: evidence.compatibilityClaimed,
+    comparedToReactDomOracle: evidence.comparedToReactDomOracle,
+    evidenceKind: evidence.evidenceKind,
+    publicControlledInputCompatibilityClaimed:
+      evidence.publicControlledInputCompatibilityClaimed,
+    publicEventCompatibilityClaimed:
+      evidence.publicEventCompatibilityClaimed,
+    publicFormCompatibilityClaimed: evidence.publicFormCompatibilityClaimed,
+    publicHydrationCompatibilityClaimed:
+      evidence.publicHydrationCompatibilityClaimed,
+    publicResourceCompatibilityClaimed:
+      evidence.publicResourceCompatibilityClaimed,
+    publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+    publicRootRenderCompatibilityClaimed:
+      evidence.publicRootRenderCompatibilityClaimed,
+    scenarioId: evidence.scenarioId,
+    workerId: evidence.workerId
+  };
+  const commonDifference = findFirstDifferencePath(
+    commonExpectation,
+    commonActual
+  );
+  if (commonDifference !== null) {
+    return {
+      gateStatus: "private-root-react-dom-metadata-common-evidence-mismatch",
+      firstDifferencePath: commonDifference
+    };
+  }
+
+  const expected = expectedPrivateReactDomMetadataEvidence(
+    admission.metadataId
+  );
+  const actual = comparablePrivateReactDomMetadataEvidence(
+    admission.metadataId,
+    evidence.metadataEvidence
+  );
+  const evidenceDifference = findFirstDifferencePath(expected, actual);
+  if (evidenceDifference !== null) {
+    return {
+      gateStatus: "private-root-react-dom-metadata-evidence-mismatch",
+      firstDifferencePath: evidenceDifference
+    };
+  }
+
+  return null;
+}
+
+function expectedPrivateReactDomMetadataEvidence(metadataId) {
+  switch (metadataId) {
+    case "worker-486-public-facade-host-output":
+      return {
+        browserDomMutation: false,
+        cleanupSideEffectStatus:
+          "reverted-private-root-create-mark-listen-gate",
+        compatibilityClaimed: false,
+        containerChildCount: 1,
+        diagnosticStatus:
+          "applied-private-root-public-facade-host-output-render-diagnostic",
+        eventDispatch: false,
+        fakeDomMutation: true,
+        hostOutputCleanupStatus: "cleaned-private-root-initial-host-output",
+        hostOutputHandoffStatus: "applied-private-root-initial-host-output",
+        latestPropsPublished: true,
+        publicRootCompatibilitySurface: false,
+        publicRootExecution: false,
+        setupSideEffectStatus: "applied-private-root-create-mark-listen-gate",
+        textContent: "facade host output"
+      };
+    case "worker-487-event-prevent-default":
+      return {
+        defaultPrevented: true,
+        defaultPreventedDiagnosticStatus:
+          "controlled-private-default-prevented-diagnostic",
+        defaultPreventedDiagnostics: 1,
+        hostNodeListenerRegistrationCount: 0,
+        listenerInvocationCount: 2,
+        nativeDefaultPreventedAfterDispatch: true,
+        nativeEventPreventDefaultCallCount: 1,
+        preventDefaultCallCount: 1,
+        publicDispatchEnabled: false,
+        syntheticEventCount: 0
+      };
+    case "worker-488-event-listener-error-routing":
+      return {
+        callbackRecordCount: 1,
+        compatibilityClaimed: false,
+        eventDispatch: false,
+        eventListenerErrorsReported: false,
+        listenerErrorCount: 1,
+        listenerErrorRouteCount: 1,
+        payloadRouteMatches: true,
+        publicDispatchEnabled: false,
+        publicRootErrorCallbackCalls: 0,
+        publicRootErrorCallbacksInvoked: false,
+        reportGlobalErrorInvoked: false,
+        rootErrorCallbackInvocationCount: 0,
+        rootErrorOptionCallbackRecordStatus:
+          "accepted-private-root-error-option-callback-record",
+        rootErrorUpdatesScheduled: false,
+        routingStatus: "recorded-private-root-event-listener-error-routing"
+      };
+    case "worker-489-hydration-event-replay-ownership":
+      return {
+        compatibilityClaimed: false,
+        dehydratedBoundaryOwnershipRequiredCount: 2,
+        dehydratedBoundaryOwnershipRetainedCount: 2,
+        diagnosticKind: "FastReactDomHydrationReplayOwnershipGateDiagnostic",
+        eventReplaySupported: false,
+        ownershipRetainedCount: 3,
+        ownershipRetainedThroughDrainOrder: true,
+        ownershipRowCount: 3,
+        rootOwnershipRetainedCount: 3,
+        status: "blocked-replay-ownership-retained-through-drain-order"
+      };
+    case "worker-490-controlled-checkable-restore":
+      return {
+        propertyRadioGroupLookupPerformed: false,
+        propertyRadioGroupRestoreRequired: true,
+        propertyRadioValueTrackerRefreshed: false,
+        propertyStatus: "private-controlled-checkable-input-restore-metadata",
+        queueCompatibilityClaimed: false,
+        queueRadioGroupLookupPerformed: false,
+        queueRadioGroupRestoreIntentRecorded: true,
+        queueRadioGroupRestoreRequired: true,
+        queueRadioValueTrackerRefreshed: false,
+        queueRestoreQueued: false,
+        queueStatus:
+          "recorded-private-controlled-input-post-event-restore-intent"
+      };
+    case "worker-491-resource-stylesheet-precedence":
+      return {
+        compatibilityClaimed: false,
+        dedupeRowCount: 3,
+        executionStatus:
+          "diagnosed-private-resource-hint-fake-dom-stylesheet-precedence-order",
+        fakeHeadMutated: false,
+        headSingletonResolved: false,
+        observedStylesheetRowCount: 2,
+        plannedStylesheetRowCount: 1,
+        publicResourceHintDomInsertion: false,
+        realDocumentMutated: false,
+        resourceMapCreated: false,
+        resourceMapMutated: false,
+        status: "admitted-private-resource-hint-stylesheet-precedence-record"
+      };
+    case "worker-492-form-submit-reset-metadata":
+      return {
+        actionCompletionRequestsResetBeforeActionInvocation: true,
+        actionInvoked: false,
+        formDataConstructed: false,
+        formResetCommitted: false,
+        previousDispatcherCalled: false,
+        realFormInspected: false,
+        requestSubmitWouldDispatchSubmitEvent: true,
+        resetStateQueued: false,
+        resetStatus: "recorded-private-form-action-reset-intent",
+        submitRequestSubmitActionMetadataRecorded: true,
+        submitStatus: "recorded-private-form-action-submission-intent",
+        submitterActionOverridesFormAction: true,
+        submitterValueWouldBeIncludedInFormData: false
+      };
+    default:
+      return null;
+  }
+}
+
+function comparablePrivateReactDomMetadataEvidence(metadataId, evidence) {
+  switch (metadataId) {
+    case "worker-486-public-facade-host-output":
+      return {
+        browserDomMutation: evidence.browserDomMutation,
+        cleanupSideEffectStatus: evidence.cleanupSideEffectStatus,
+        compatibilityClaimed: evidence.compatibilityClaimed,
+        containerChildCount: evidence.containerChildCount,
+        diagnosticStatus: evidence.diagnosticStatus,
+        eventDispatch: evidence.eventDispatch,
+        fakeDomMutation: evidence.fakeDomMutation,
+        hostOutputCleanupStatus: evidence.hostOutputCleanupStatus,
+        hostOutputHandoffStatus: evidence.hostOutputHandoffStatus,
+        latestPropsPublished: evidence.latestPropsPublished,
+        publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+        publicRootExecution: evidence.publicRootExecution,
+        setupSideEffectStatus: evidence.setupSideEffectStatus,
+        textContent: evidence.textContent
+      };
+    case "worker-487-event-prevent-default":
+      return {
+        defaultPrevented: evidence.defaultPrevented,
+        defaultPreventedDiagnosticStatus:
+          evidence.defaultPreventedDiagnosticStatus,
+        defaultPreventedDiagnostics: evidence.defaultPreventedDiagnostics,
+        hostNodeListenerRegistrationCount:
+          evidence.hostNodeListenerRegistrationCount,
+        listenerInvocationCount: evidence.listenerInvocationCount,
+        nativeDefaultPreventedAfterDispatch:
+          evidence.nativeDefaultPreventedAfterDispatch,
+        nativeEventPreventDefaultCallCount:
+          evidence.nativeEventPreventDefaultCallCount,
+        preventDefaultCallCount: evidence.preventDefaultCallCount,
+        publicDispatchEnabled: evidence.publicDispatchEnabled,
+        syntheticEventCount: evidence.syntheticEventCount
+      };
+    case "worker-488-event-listener-error-routing":
+      return {
+        callbackRecordCount: evidence.callbackRecordCount,
+        compatibilityClaimed: evidence.compatibilityClaimed,
+        eventDispatch: evidence.eventDispatch,
+        eventListenerErrorsReported: evidence.eventListenerErrorsReported,
+        listenerErrorCount: evidence.listenerErrorCount,
+        listenerErrorRouteCount: evidence.listenerErrorRouteCount,
+        payloadRouteMatches: evidence.payloadRouteMatches,
+        publicDispatchEnabled: evidence.publicDispatchEnabled,
+        publicRootErrorCallbackCalls: evidence.publicRootErrorCallbackCalls,
+        publicRootErrorCallbacksInvoked:
+          evidence.publicRootErrorCallbacksInvoked,
+        reportGlobalErrorInvoked: evidence.reportGlobalErrorInvoked,
+        rootErrorCallbackInvocationCount:
+          evidence.rootErrorCallbackInvocationCount,
+        rootErrorOptionCallbackRecordStatus:
+          evidence.rootErrorOptionCallbackRecordStatus,
+        rootErrorUpdatesScheduled: evidence.rootErrorUpdatesScheduled,
+        routingStatus: evidence.routingStatus
+      };
+    case "worker-489-hydration-event-replay-ownership":
+      return {
+        compatibilityClaimed: evidence.compatibilityClaimed,
+        dehydratedBoundaryOwnershipRequiredCount:
+          evidence.dehydratedBoundaryOwnershipRequiredCount,
+        dehydratedBoundaryOwnershipRetainedCount:
+          evidence.dehydratedBoundaryOwnershipRetainedCount,
+        diagnosticKind: evidence.diagnosticKind,
+        eventReplaySupported: evidence.eventReplaySupported,
+        ownershipRetainedCount: evidence.ownershipRetainedCount,
+        ownershipRetainedThroughDrainOrder:
+          evidence.ownershipRetainedThroughDrainOrder,
+        ownershipRowCount: evidence.ownershipRowCount,
+        rootOwnershipRetainedCount: evidence.rootOwnershipRetainedCount,
+        status: evidence.status
+      };
+    case "worker-490-controlled-checkable-restore":
+      return {
+        propertyRadioGroupLookupPerformed:
+          evidence.propertyRadioGroupLookupPerformed,
+        propertyRadioGroupRestoreRequired:
+          evidence.propertyRadioGroupRestoreRequired,
+        propertyRadioValueTrackerRefreshed:
+          evidence.propertyRadioValueTrackerRefreshed,
+        propertyStatus: evidence.propertyStatus,
+        queueCompatibilityClaimed: evidence.queueCompatibilityClaimed,
+        queueRadioGroupLookupPerformed: evidence.queueRadioGroupLookupPerformed,
+        queueRadioGroupRestoreIntentRecorded:
+          evidence.queueRadioGroupRestoreIntentRecorded,
+        queueRadioGroupRestoreRequired:
+          evidence.queueRadioGroupRestoreRequired,
+        queueRadioValueTrackerRefreshed:
+          evidence.queueRadioValueTrackerRefreshed,
+        queueRestoreQueued: evidence.queueRestoreQueued,
+        queueStatus: evidence.queueStatus
+      };
+    case "worker-491-resource-stylesheet-precedence":
+      return {
+        compatibilityClaimed: evidence.compatibilityClaimed,
+        dedupeRowCount: evidence.dedupeRowCount,
+        executionStatus: evidence.executionStatus,
+        fakeHeadMutated: evidence.fakeHeadMutated,
+        headSingletonResolved: evidence.headSingletonResolved,
+        observedStylesheetRowCount: evidence.observedStylesheetRowCount,
+        plannedStylesheetRowCount: evidence.plannedStylesheetRowCount,
+        publicResourceHintDomInsertion:
+          evidence.publicResourceHintDomInsertion,
+        realDocumentMutated: evidence.realDocumentMutated,
+        resourceMapCreated: evidence.resourceMapCreated,
+        resourceMapMutated: evidence.resourceMapMutated,
+        status: evidence.status
+      };
+    case "worker-492-form-submit-reset-metadata":
+      return {
+        actionCompletionRequestsResetBeforeActionInvocation:
+          evidence.actionCompletionRequestsResetBeforeActionInvocation,
+        actionInvoked: evidence.actionInvoked,
+        formDataConstructed: evidence.formDataConstructed,
+        formResetCommitted: evidence.formResetCommitted,
+        previousDispatcherCalled: evidence.previousDispatcherCalled,
+        realFormInspected: evidence.realFormInspected,
+        requestSubmitWouldDispatchSubmitEvent:
+          evidence.requestSubmitWouldDispatchSubmitEvent,
+        resetStateQueued: evidence.resetStateQueued,
+        resetStatus: evidence.resetStatus,
+        submitRequestSubmitActionMetadataRecorded:
+          evidence.submitRequestSubmitActionMetadataRecorded,
+        submitStatus: evidence.submitStatus,
+        submitterActionOverridesFormAction:
+          evidence.submitterActionOverridesFormAction,
+        submitterValueWouldBeIncludedInFormData:
+          evidence.submitterValueWouldBeIncludedInFormData
+      };
+    default:
+      return null;
+  }
+}
+
 function validatePrivateHostOutputDiagnosticObservation({
   observation,
   scenarioId
@@ -9008,6 +10664,48 @@ function validatePrivateActPassiveAdmissionMetadata({
   }
 }
 
+function validatePrivateReactDomMetadataAdmissionMetadata({
+  privateReactDomMetadataAdmissionById,
+  failures
+}) {
+  for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS) {
+    if (!privateReactDomMetadataAdmissionById.has(admission.metadataId)) {
+      failures.push({
+        metadataId: admission.metadataId,
+        gateStatus: "missing-private-root-react-dom-metadata-admission"
+      });
+    }
+  }
+
+  for (const [metadataId, admission] of privateReactDomMetadataAdmissionById) {
+    if (
+      !REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.some(
+        (candidate) => candidate.metadataId === metadataId
+      )
+    ) {
+      failures.push({
+        metadataId,
+        gateStatus:
+          "unknown-private-root-react-dom-metadata-admission-id"
+      });
+    }
+
+    if (
+      admission.admission !== "private-react-dom-metadata-diagnostic" ||
+      admission.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS ||
+      typeof admission.evidenceKind !== "string" ||
+      !REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.includes(admission.scenarioId)
+    ) {
+      failures.push({
+        metadataId,
+        gateStatus: "invalid-private-root-react-dom-metadata-admission",
+        admission
+      });
+    }
+  }
+}
+
 function validateOracleShape({ checkedOracle, currentOracle, failures }) {
   for (const [label, oracle] of [
     ["checked", checkedOracle],
@@ -9128,6 +10826,10 @@ function formatScenarioModeKey({ modeId, scenarioId }) {
   return `${modeId}:${scenarioId}`;
 }
 
+function formatMetadataModeKey({ metadataId, modeId }) {
+  return `${modeId}:${metadataId}`;
+}
+
 function sum(values, getValue) {
   return values.reduce((total, value) => total + getValue(value), 0);
 }
@@ -9136,9 +10838,14 @@ function formatGateFailure(failure) {
   const location =
     failure.modeId && failure.scenarioId
       ? `${failure.modeId}:${failure.scenarioId}`
+      : failure.modeId && failure.metadataId
+        ? `${failure.modeId}:${failure.metadataId}`
       : "gate";
   const details = Object.entries(failure)
-    .filter(([key]) => !["modeId", "scenarioId", "gateStatus"].includes(key))
+    .filter(
+      ([key]) =>
+        !["metadataId", "modeId", "scenarioId", "gateStatus"].includes(key)
+    )
     .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
     .join(" ");
   return details
