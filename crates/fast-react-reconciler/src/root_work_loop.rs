@@ -2,8 +2,10 @@
 //!
 //! This module validates scheduled callback identity and processes HostRoot
 //! updates into a work-in-progress HostRoot fiber. It deliberately stops before
-//! child reconciliation, commit, host mutation, passive effects, sync flushing,
-//! or switching `root.current`.
+//! public child reconciliation, host mutation, passive effects, sync flushing,
+//! or public render behavior. Test-only diagnostics can bridge a private
+//! HostComponent/HostText complete-work fixture into the accepted HostRoot
+//! commit handoff.
 
 #![cfg_attr(
     not(test),
@@ -37,16 +39,19 @@ use crate::{
 };
 #[cfg(test)]
 use crate::{
+    HostRootCommitRecord, RootCommitError,
     begin_work::{
         ContextProviderBeginWorkError, ContextProviderBeginWorkRecord,
         ContextProviderBeginWorkRequest, FunctionComponentSingleChildBeginWorkRecord,
         begin_work_context_provider_child, begin_work_reconcile_function_component_single_child,
     },
+    commit_finished_host_root,
     function_component::FunctionComponentSingleChildOutputResolver,
     host_work::{
         HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
         mount_test_host_sibling_work, mount_test_host_work,
     },
+    root_commit::HostRootPlacementApplyDiagnosticForCanary,
     test_support::{RecordingHost, TestHostTree},
 };
 
@@ -659,6 +664,95 @@ impl From<HostWorkError> for HostRootCompleteWorkHandoffError {
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootCompleteWorkCommitHandoffRecord {
+    complete_work: HostRootCompleteWorkHandoffRecord,
+    commit: HostRootCommitRecord,
+    placement_apply_diagnostics: Vec<HostRootPlacementApplyDiagnosticForCanary>,
+    host_operation_count_after_complete_work: usize,
+    host_operation_count_after_commit: usize,
+}
+
+#[cfg(test)]
+impl HostRootCompleteWorkCommitHandoffRecord {
+    #[must_use]
+    const fn complete_work(&self) -> HostRootCompleteWorkHandoffRecord {
+        self.complete_work
+    }
+
+    #[must_use]
+    const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    fn placement_apply_diagnostics(&self) -> &[HostRootPlacementApplyDiagnosticForCanary] {
+        &self.placement_apply_diagnostics
+    }
+
+    #[must_use]
+    const fn host_operation_count_after_complete_work(&self) -> usize {
+        self.host_operation_count_after_complete_work
+    }
+
+    #[must_use]
+    const fn host_operation_count_after_commit(&self) -> usize {
+        self.host_operation_count_after_commit
+    }
+
+    #[must_use]
+    const fn host_operations_unchanged_by_commit(&self) -> bool {
+        self.host_operation_count_after_complete_work == self.host_operation_count_after_commit
+    }
+
+    #[must_use]
+    const fn public_render_blocked(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootCompleteWorkCommitHandoffError {
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    Commit(RootCommitError),
+}
+
+#[cfg(test)]
+impl Display for HostRootCompleteWorkCommitHandoffError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::Commit(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootCompleteWorkCommitHandoffError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CompleteWork(error) => Some(error),
+            Self::Commit(error) => Some(error),
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError> for HostRootCompleteWorkCommitHandoffError {
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<RootCommitError> for HostRootCompleteWorkCommitHandoffError {
+    fn from(error: RootCommitError) -> Self {
+        Self::Commit(error)
+    }
+}
+
+#[cfg(test)]
 fn handoff_completed_host_root_render_to_test_complete_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -675,6 +769,29 @@ fn handoff_completed_host_root_render_to_test_complete_work(
         render.resulting_element(),
         &host_work,
     )
+}
+
+#[cfg(test)]
+fn handoff_completed_host_root_render_to_test_complete_work_and_commit(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+) -> Result<HostRootCompleteWorkCommitHandoffRecord, HostRootCompleteWorkCommitHandoffError> {
+    let complete_work =
+        handoff_completed_host_root_render_to_test_complete_work(store, host, render, source)?;
+    let host_operation_count_after_complete_work = host.operations().len();
+    let commit = commit_finished_host_root(store, render)?;
+    let host_operation_count_after_commit = host.operations().len();
+    let placement_apply_diagnostics = commit.host_root_placement_apply_diagnostics_for_canary();
+
+    Ok(HostRootCompleteWorkCommitHandoffRecord {
+        complete_work,
+        commit,
+        placement_apply_diagnostics,
+        host_operation_count_after_complete_work,
+        host_operation_count_after_commit,
+    })
 }
 
 #[cfg(test)]
@@ -1855,11 +1972,11 @@ mod tests {
         VIEW_TRANSITION_UNSUPPORTED_FEATURE,
     };
     use crate::{
-        HostRootHydrationState, PendingChildrenHandle, PendingCommitHandle, RootContextHandle,
-        RootElementHandle, RootHydrationCallbacksHandle, RootKind, RootOptions,
-        RootSchedulerCallbackExecutionStatus, RootSuspenseBoundarySetHandle,
-        RootTaskScheduleOutcome, RootTransitionCallbacksHandle, SchedulerCallbackRequest,
-        ensure_root_is_scheduled, execute_scheduled_root_callback,
+        HostRootHydrationState, MUTATION_RENDER_PLACEHOLDER_FEATURE, PendingChildrenHandle,
+        PendingCommitHandle, ReconcilerError, RootContextHandle, RootElementHandle,
+        RootHydrationCallbacksHandle, RootKind, RootOptions, RootSchedulerCallbackExecutionStatus,
+        RootSuspenseBoundarySetHandle, RootTaskScheduleOutcome, RootTransitionCallbacksHandle,
+        SchedulerCallbackRequest, ensure_root_is_scheduled, execute_scheduled_root_callback,
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
@@ -3660,7 +3777,7 @@ mod tests {
                 .subtree_flags()
                 .contains_all(FiberFlags::PLACEMENT)
         );
-        assert_eq!(root_node.child_lanes(), Lanes::DEFAULT);
+        assert_eq!(root_node.child_lanes(), Lanes::NO);
         let child_node = store.fiber_arena().get(child).unwrap();
         assert_eq!(child_node.tag(), FiberTag::HostComponent);
         assert!(child_node.state_node().is_some());
@@ -3736,6 +3853,153 @@ mod tests {
     }
 
     #[test]
+    fn root_work_loop_complete_work_handoff_commits_host_component_tree_with_diagnostics() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("section", "commit handoff");
+        let public_error = crate::render_mutation_placeholder(&mut host).unwrap_err();
+        assert_eq!(
+            public_error,
+            ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, element, None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let record = handoff_completed_host_root_render_to_test_complete_work_and_commit(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap();
+
+        let complete_work = record.complete_work();
+        assert_eq!(complete_work.root(), root_id);
+        assert_eq!(
+            complete_work.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(
+            complete_work.root_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(
+            complete_work.completed_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(complete_work.detached_instance_count(), 1);
+        assert_eq!(complete_work.detached_text_count(), 1);
+
+        let commit = record.commit();
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.previous_current(), current);
+        assert_eq!(commit.current(), render.work_in_progress());
+        assert_eq!(commit.finished_work(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(commit.mutation_log().len(), 1);
+        assert_eq!(commit.mutation_apply_log().len(), 1);
+        assert!(commit.root_update_callbacks().is_empty());
+        assert!(commit.host_node_deletion_cleanup_log().is_empty());
+        assert!(record.host_operations_unchanged_by_commit());
+        assert_eq!(
+            record.host_operation_count_after_complete_work(),
+            record.host_operation_count_after_commit()
+        );
+        assert!(record.public_render_blocked());
+
+        let diagnostics = record.placement_apply_diagnostics();
+        assert_eq!(diagnostics.len(), 1);
+        let diagnostic = diagnostics[0];
+        let component = complete_work.root_child().unwrap();
+        let component_state_node = store.fiber_arena().get(component).unwrap().state_node();
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(diagnostic.host_root(), render.work_in_progress());
+        assert_eq!(diagnostic.fiber(), component);
+        assert_eq!(diagnostic.tag(), FiberTag::HostComponent);
+        assert_eq!(diagnostic.tag_name(), "HostComponent");
+        assert_eq!(diagnostic.state_node(), component_state_node);
+        assert_eq!(diagnostic.apply_kind(), "append-placement-to-container");
+        assert_eq!(diagnostic.sibling_status(), "append");
+        assert_eq!(diagnostic.sibling(), None);
+        assert!(!diagnostic.can_insert_before());
+
+        let committed_root = store.root(root_id).unwrap();
+        assert_eq!(committed_root.current(), render.work_in_progress());
+        assert_eq!(committed_root.finished_work(), None);
+        assert_eq!(committed_root.finished_lanes(), Lanes::NO);
+        assert_eq!(committed_root.scheduling().work_in_progress(), None);
+        assert_eq!(
+            committed_root.scheduling().render_exit_status(),
+            RootRenderExitStatus::NoWork
+        );
+        assert_eq!(store.fiber_arena().get(current).unwrap().child(), None);
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(render.work_in_progress())
+                .unwrap()
+                .child(),
+            Some(component)
+        );
+
+        let public_error_after_private_commit =
+            crate::render_mutation_placeholder(&mut host).unwrap_err();
+        assert_eq!(
+            public_error_after_private_commit,
+            ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
+        );
+        assert_eq!(
+            host.operations().len(),
+            record.host_operation_count_after_commit()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_complete_work_commit_handoff_records_root_text_diagnostic() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_text("root text commit");
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, element, None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let record = handoff_completed_host_root_render_to_test_complete_work_and_commit(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap();
+
+        let complete_work = record.complete_work();
+        assert_eq!(complete_work.root_child_tag(), Some(FiberTag::HostText));
+        assert_eq!(
+            complete_work.completed_child_tag(),
+            Some(FiberTag::HostText)
+        );
+        assert_eq!(complete_work.detached_instance_count(), 0);
+        assert_eq!(complete_work.detached_text_count(), 1);
+        assert_eq!(record.commit().previous_current(), current);
+        assert_eq!(record.commit().current(), render.work_in_progress());
+        assert_eq!(record.commit().mutation_log().len(), 1);
+        assert_eq!(record.commit().mutation_apply_log().len(), 1);
+        assert!(record.host_operations_unchanged_by_commit());
+
+        let text = complete_work.root_child().unwrap();
+        let text_state_node = store.fiber_arena().get(text).unwrap().state_node();
+        let diagnostics = record.placement_apply_diagnostics();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].fiber(), text);
+        assert_eq!(diagnostics[0].tag(), FiberTag::HostText);
+        assert_eq!(diagnostics[0].tag_name(), "HostText");
+        assert_eq!(diagnostics[0].state_node(), text_state_node);
+        assert_eq!(diagnostics[0].apply_kind(), "append-placement-to-container");
+        assert_eq!(diagnostics[0].sibling_status(), "append");
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.work_in_progress()
+        );
+    }
+
+    #[test]
     fn root_work_loop_hands_multiple_host_siblings_to_test_complete_work() {
         let (mut store, root_id, mut host) = root_store();
         let mut source = TestHostTree::new();
@@ -3782,7 +4046,7 @@ mod tests {
                 .subtree_flags()
                 .contains_all(FiberFlags::PLACEMENT)
         );
-        assert_eq!(root_node.child_lanes(), Lanes::DEFAULT);
+        assert_eq!(root_node.child_lanes(), Lanes::NO);
 
         let first_node = store.fiber_arena().get(first).unwrap();
         let second_node = store.fiber_arena().get(second).unwrap();
