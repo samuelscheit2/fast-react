@@ -4664,6 +4664,496 @@ test('private resource hint preload/preinit order diagnostic records dedupe and 
   );
 });
 
+test('private resource hint stylesheet precedence diagnostic records style dedupe and head order only', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'stylesheet-precedence-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'stylesheet-precedence-adapter'
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: 'stylesheet-precedence-order'
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: 'stylesheet-precedence'
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const records = [
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/style.css',
+      'style',
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: 'low',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'high'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style-dupe',
+        fetchPriority: 'high'
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/font.woff2',
+      'font',
+      {
+        crossOrigin: '',
+        integrity: undefined,
+        nonce: undefined,
+        type: 'font/woff2',
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ])
+  ];
+  const headRecord = gate.recordSingletonRequest('head', [
+    throwingProxy('stylesheet precedence head props')
+  ]);
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    })
+  );
+
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'stylesheet',
+    'data-precedence': 'theme',
+    'data-fast-react-resource-key': 'style-main',
+    'data-fast-react-precedence-key': 'precedence-main'
+  });
+  appendFakeHeadChild(fakeDom, 'style', {
+    'data-precedence': 'theme',
+    'data-fast-react-resource-key': 'inline-main',
+    'data-fast-react-precedence-key': 'precedence-main'
+  });
+  appendFakeHeadChild(fakeDom, 'meta', {
+    name: 'description'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'preload',
+    as: 'style',
+    'data-fast-react-resource-key': 'style-main'
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: 'font',
+          resourceKey: 'font-main'
+        }
+      ]
+    }
+  );
+  const diagnostic = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      precedenceKind: 'deterministic-fake-dom-stylesheet-precedence-order',
+      precedenceId: 'stylesheet-precedence-order',
+      targetKind: 'document-head',
+      hostTag: 'head',
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceHintStylesheetPrecedenceGate();
+
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintStylesheetPrecedenceRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintStylesheetPrecedenceRecordPayload(
+      diagnostic
+    ),
+    diagnostic
+  );
+  assert.equal(diagnostic.stylesheetPrecedenceId, 'stylesheet-precedence:1');
+  assert.equal(
+    diagnostic.stylesheetPrecedenceStatus,
+    resourceFormGate.privateResourceHintStylesheetPrecedenceStatus
+  );
+  assert.equal(
+    diagnostic.executionStatus,
+    resourceFormGate.privateResourceHintStylesheetPrecedenceExecutionStatus
+  );
+  assert.deepEqual(
+    diagnostic.sideEffects,
+    resourceFormGate.resourceHintStylesheetPrecedenceSideEffects
+  );
+  assert.equal(
+    diagnostic.sideEffects.fakeStylesheetPrecedenceDiagnosticInvoked,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetPrecedenceDedupeRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetPrecedenceInsertionRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetPrecedenceSingletonOrderRowsRecorded,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
+  assert.equal(diagnostic.sideEffects.realDocumentMutated, false);
+  assert.equal(diagnostic.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(diagnostic.precedenceAdmission.rawDocumentCaptured, false);
+  assert.equal(diagnostic.precedenceAdmission.rawHeadCaptured, false);
+  assert.equal(
+    diagnostic.precedenceAdmission.stylesheetResourceMapCreationAllowed,
+    false
+  );
+  assert.equal(
+    diagnostic.precedenceAdmission.headSingletonOrderingAllowed,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetDedupeRows.map((row) => ({
+      contractId: row.contractId,
+      resourceStage: row.resourceStage,
+      resourceKey: row.resourceKey,
+      precedenceKey: row.precedenceKey,
+      dedupeAction: row.dedupeAction,
+      wouldInsertIntoHead: row.wouldInsertIntoHead
+    })),
+    [
+      {
+        contractId: 'preload',
+        resourceStage: 'preload',
+        resourceKey: 'style:style-main',
+        precedenceKey: null,
+        dedupeAction: 'insert-preload',
+        wouldInsertIntoHead: true
+      },
+      {
+        contractId: 'preinit-style',
+        resourceStage: 'preinit',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-main',
+        dedupeAction: 'preinit-adopts-preload',
+        wouldInsertIntoHead: true
+      },
+      {
+        contractId: 'preinit-style',
+        resourceStage: 'preinit',
+        resourceKey: 'style:style-main',
+        precedenceKey: 'precedence-main',
+        dedupeAction: 'dedupe-preinit',
+        wouldInsertIntoHead: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.precedenceRows.map((row) => ({
+      precedenceKey: row.precedenceKey,
+      plannedStylesheetCount: row.plannedStylesheetCount,
+      observedStylesheetCount: row.observedStylesheetCount,
+      firstObservedHeadIndex: row.firstObservedHeadIndex,
+      orderingApplied: row.orderingApplied,
+      precedenceMapCreated: row.precedenceMapCreated
+    })),
+    [
+      {
+        precedenceKey: 'precedence-main',
+        plannedStylesheetCount: 1,
+        observedStylesheetCount: 2,
+        firstObservedHeadIndex: 0,
+        orderingApplied: false,
+        precedenceMapCreated: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.plannedStylesheetOrder.rows.map((row) => ({
+      plannedStylesheetIndex: row.plannedStylesheetIndex,
+      inputIndex: row.inputIndex,
+      contractId: row.contractId,
+      precedenceKey: row.precedenceKey,
+      insertionApplied: row.insertionApplied
+    })),
+    [
+      {
+        plannedStylesheetIndex: 0,
+        inputIndex: 1,
+        contractId: 'preinit-style',
+        precedenceKey: 'precedence-main',
+        insertionApplied: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.observedStylesheetOrder.rows.map((row) => ({
+      childIndex: row.childIndex,
+      nodeName: row.nodeName,
+      relationship: row.relationship,
+      resourceKey: row.resourceKey,
+      precedenceKey: row.precedenceKey,
+      stylesheetPrecedenceCandidate: row.stylesheetPrecedenceCandidate,
+      clearRetainDecision: row.clearRetainDecision,
+      orderMutated: row.orderMutated
+    })),
+    [
+      {
+        childIndex: 0,
+        nodeName: 'LINK',
+        relationship: 'stylesheet',
+        resourceKey: 'style-main',
+        precedenceKey: 'precedence-main',
+        stylesheetPrecedenceCandidate: true,
+        clearRetainDecision: 'retain',
+        orderMutated: false
+      },
+      {
+        childIndex: 1,
+        nodeName: 'STYLE',
+        relationship: null,
+        resourceKey: 'inline-main',
+        precedenceKey: 'precedence-main',
+        stylesheetPrecedenceCandidate: true,
+        clearRetainDecision: 'retain',
+        orderMutated: false
+      },
+      {
+        childIndex: 2,
+        nodeName: 'META',
+        relationship: null,
+        resourceKey: null,
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        clearRetainDecision: 'clear',
+        orderMutated: false
+      },
+      {
+        childIndex: 3,
+        nodeName: 'LINK',
+        relationship: 'preload',
+        resourceKey: 'style-main',
+        precedenceKey: null,
+        stylesheetPrecedenceCandidate: false,
+        clearRetainDecision: 'clear',
+        orderMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.headSingletonOrderBoundary,
+    {
+      rowId: 'head-singleton-stylesheet-order',
+      rowType: 'host-singleton',
+      hostTag: 'head',
+      sourceHeadRequestId: headRecord.requestId,
+      sourceOrderDiagnosticId: order.orderDiagnosticId,
+      headContractId: 'head-singleton',
+      plannedStylesheetRowCount: 1,
+      observedStylesheetRowCount: 2,
+      retainedChildCount: 2,
+      clearableChildCount: 2,
+      clearHeadWouldRun: true,
+      clearHeadWouldRetainStylesheets: true,
+      releaseSingletonWouldRun: true,
+      headSingletonResolved: false,
+      headSingletonAcquired: false,
+      headSingletonReleased: false,
+      headChildrenCleared: false,
+      singletonOrderingApplied: false,
+      publicHeadSingletonBehavior: false,
+      rawValuesRetained: false,
+      compatibilityClaimed: false,
+      blockedCapabilities:
+        resourceFormGate.resourceHintStylesheetPrecedenceBlockedCapabilities
+    }
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetResourceMapPlan,
+    {
+      resourceMapKind:
+        'react-19.2.6-stylesheet-precedence-resource-map-diagnostic',
+      stylesheetResourceMapCreated: false,
+      stylesheetResourceMapMutated: false,
+      inputRowCount: 3,
+      uniqueStylesheetResourceCount: 1,
+      preloadStyleResourceCount: 1,
+      preinitStyleResourceCount: 2,
+      dedupedStyleRowCount: 1,
+      rawValuesRetained: false,
+      compatibilityClaimed: false
+    }
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.status,
+    resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.stylesheetPrecedenceRowsObserved,
+    true
+  );
+  assert.equal(diagnostic.stylesheetPrecedenceBoundary.stylesheetRowCount, 1);
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.observedStylesheetRowCount,
+    2
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetPrecedenceBlockedCapabilities
+  );
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(
+    diagnostic.publicHeadBoundary.publicSingletonBehavior,
+    false
+  );
+  assert.equal(fakeDom.head.childNodes.length, 4);
+  assert.equal(JSON.stringify(diagnostic).includes('/style.css'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('sha256-style'), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintStylesheetPrecedenceGateId
+  );
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(
+    summary.admissionStatus,
+    resourceFormGate
+      .privateResourceHintStylesheetPrecedenceAdmissionRequiredStatus
+  );
+  assert.equal(summary.recordsStylesheetDedupeRows, true);
+  assert.equal(summary.recordsStylesheetInsertionRows, true);
+  assert.equal(summary.recordsHeadSingletonOrderRows, true);
+  assert.deepEqual(
+    summary.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetPrecedenceBlockedCapabilities
+  );
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintStylesheetPrecedenceBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintStylesheetPrecedenceError(
+      diagnostic
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintStylesheetPrecedenceGateErrorCode
+  );
+  assert.equal(error.exportName, 'resource-hint-stylesheet-precedence-order');
+  assert.equal(error.stylesheetPrecedenceId, 'stylesheet-precedence:1');
+  assert.deepEqual(
+    error.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetPrecedenceBlockedCapabilities
+  );
+
+  assert.throws(
+    () =>
+      stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+        order,
+        headRecord,
+        {
+          explicitStylesheetPrecedenceDiagnostic: true,
+          fakeDocument: fakeDom.document,
+          fakeHead: fakeDom.head
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetPrecedenceInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'stylesheet precedence gate admits exactly one diagnostic record'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintStylesheetPrecedenceGate()
+        .recordStylesheetPrecedenceDiagnostic(order, {}, {
+          explicitStylesheetPrecedenceDiagnostic: true,
+          fakeDocument: fakeDom.document,
+          fakeHead: fakeDom.head
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetPrecedenceInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintStylesheetPrecedenceError(
+        {}
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetPrecedenceInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -5319,6 +5809,12 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       preloadPreinitResourceMapCreated: false,
       preloadPreinitResourceMapMutated: false,
       publicPreloadPreinitDedupeBehavior: false,
+      fakeStylesheetPrecedenceDiagnosticInvoked: false,
+      stylesheetPrecedenceDedupeRowsRecorded: false,
+      stylesheetPrecedenceInsertionRowsRecorded: false,
+      stylesheetPrecedenceSingletonOrderRowsRecorded: false,
+      stylesheetPrecedenceResourceMapCreated: false,
+      stylesheetPrecedenceResourceMapMutated: false,
       resourceFetchStarted: false,
       realDocumentMutated: false,
       publicResourceHintDomInsertion: false,
@@ -5331,7 +5827,9 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       headClearRetainGate:
         resourceFormGate.describePrivateResourceHintHeadClearRetainGate(),
       preloadPreinitOrderGate:
-        resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate()
+        resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate(),
+      stylesheetPrecedenceGate:
+        resourceFormGate.describePrivateResourceHintStylesheetPrecedenceGate()
     },
     formActionResetDispatcherBoundary: {
       gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
@@ -5567,6 +6065,30 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       blockedRecord.sideEffects.publicPreloadPreinitDedupeBehavior,
       false
     );
+    assert.equal(
+      blockedRecord.sideEffects.fakeStylesheetPrecedenceDiagnosticInvoked,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetPrecedenceDedupeRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetPrecedenceInsertionRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetPrecedenceSingletonOrderRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetPrecedenceResourceMapCreated,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetPrecedenceResourceMapMutated,
+      false
+    );
     assert.equal(blockedRecord.sideEffects.headSingletonResolved, false);
     assert.equal(
       blockedRecord.sideEffects.publicHeadSingletonBehavior,
@@ -5638,6 +6160,30 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         adapterBoundary.publicPreloadPreinitDedupeBehavior,
         false
       );
+      assert.equal(
+        adapterBoundary.fakeStylesheetPrecedenceDiagnosticInvoked,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetPrecedenceDedupeRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetPrecedenceInsertionRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetPrecedenceSingletonOrderRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetPrecedenceResourceMapCreated,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetPrecedenceResourceMapMutated,
+        false
+      );
       assert.equal(adapterBoundary.resourceFetchStarted, false);
       assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
@@ -5660,6 +6206,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.deepEqual(
         adapterBoundary.preloadPreinitOrderGate,
         resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate()
+      );
+      assert.deepEqual(
+        adapterBoundary.stylesheetPrecedenceGate,
+        resourceFormGate.describePrivateResourceHintStylesheetPrecedenceGate()
       );
     } else {
       assert.equal(
