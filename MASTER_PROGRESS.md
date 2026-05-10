@@ -128,9 +128,18 @@ sequencing belong in `MASTER_PLAN.md`.
   while preserving inert root creation and avoiding render error capture,
   callback invocation, DOM packages, native handle tables, or test-renderer
   public error surfaces.
+- Worker 162 benchmark manifest gate was merged, adding a fail-closed
+  `tests/benchmarks` manifest/result schema checker, blocked initial root,
+  test-renderer, and DOM benchmark manifests, and a `check:benchmarks` script
+  wired into `check:js` so timing claims stay diagnostic until referenced
+  conformance artifacts are green.
 
 ## Latest Accepted Verification
 
+- Worker 162 was verified on its integrated worktree and again on `main` with
+  `npm run check:benchmarks` covering 3 manifests, 40 scenarios, and 6
+  focused node tests, `npm run check:js` with 427 conformance tests, and
+  `git diff --check`.
 - Worker 161 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused root-config, fiber-root, and fiber-store
   tests, full `fast-react-reconciler` tests with 95 unit tests plus 1 doctest,
