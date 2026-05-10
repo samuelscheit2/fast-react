@@ -390,7 +390,9 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
+    "sync-flush-post-passive-continuation-execution-gate",
     "passive-effects-flush-metadata",
+    "passive-effect-callback-handle-metadata",
     "react-dom-private-root-bridge-records",
     "react-dom-private-flush-sync-guard"
   ]);

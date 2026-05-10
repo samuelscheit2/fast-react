@@ -236,6 +236,10 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     gate.status,
     "blocked-public-test-utils-act-private-routing"
   );
+  assert.equal(
+    gate.id,
+    "react-dom-test-utils-act-private-routing-gate-2"
+  );
   assert.equal(gate.entrypoint, "react-dom/test-utils");
   assert.equal(gate.compatibilityTarget, "react-dom@19.2.6");
   assert.equal(gate.publicActStatus, "unsupported-public-test-utils-act-placeholder");
@@ -250,7 +254,9 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
+    "sync-flush-post-passive-continuation-execution-gate",
     "passive-effects-flush-metadata",
+    "passive-effect-callback-handle-metadata",
     "react-dom-private-root-bridge-records",
     "react-dom-private-flush-sync-guard"
   ]);
@@ -316,6 +322,65 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "SyncFlushRootRecord.act_continuation",
     "SyncFlushRootRecord.act_post_passive_continuation_gate"
   ]);
+  assert.deepEqual(gate.syncFlushPostPassiveContinuationExecution, {
+    status:
+      "private-sync-flush-post-passive-continuation-execution-gate-record-only",
+    records: [
+      "SyncFlushPostPassiveContinuationExecutionGateRecord",
+      "SyncFlushPostPassiveContinuationRootRecord",
+      "sync_flush_post_passive_continuation_execution_gate",
+      "observe_sync_flush_post_passive_continuation_execution_gate_after_commit",
+      "SyncFlushRootRecord.post_passive_continuation_execution_gate"
+    ],
+    observesPendingPassiveHandoff: true,
+    collectsContinuationRoots: true,
+    consumesPendingPassive: false,
+    rendersContinuationRoots: false,
+    commitsContinuationRoots: false,
+    executesSyncFlush: false,
+    executesPassiveEffects: false,
+    invokesCallbacks: false
+  });
+  assert.deepEqual(gate.passiveEffects, {
+    status: "metadata-only-passive-flush-without-callback-execution",
+    records: [
+      "PendingPassiveCommitHandoff",
+      "PassiveEffectsFlushResult",
+      "PassiveEffectFlushRecord",
+      "FunctionComponentPendingPassiveCommitHandoff",
+      "FunctionComponentPendingPassiveEffectPhaseCommitRecord"
+    ],
+    consumesPendingPassiveMetadata: true,
+    discoversCommittedFiberEffects: false,
+    executesPassiveEffects: false,
+    invokesCreateCallbacks: false,
+    invokesDestroyCallbacks: false
+  });
+  assert.deepEqual(gate.passiveEffectCallbackHandles, {
+    status: "data-only-passive-effect-callback-handles-without-invocation",
+    records: [
+      "FunctionComponentPendingPassiveEffectCommitRecord.create",
+      "FunctionComponentPendingPassiveEffectCommitRecord.destroy",
+      "FunctionComponentPendingPassiveEffectPhaseCommitRecord.create",
+      "FunctionComponentPendingPassiveEffectPhaseCommitRecord.destroy",
+      "PassiveEffectFlushEffectRecord.create_callback",
+      "PassiveEffectFlushEffectRecord.destroy_callback",
+      "PassiveEffectFlushRecord.create_callback",
+      "PassiveEffectFlushRecord.destroy_callback",
+      "PassiveEffectFlushRecord.create_callback_invoked",
+      "PassiveEffectFlushRecord.destroy_callback_invoked"
+    ],
+    phaseRules: [
+      "unmount-phase-carries-destroy-handle-without-create-handle",
+      "mount-phase-carries-create-handle-without-destroy-handle",
+      "callback-invoked-accessors-return-false"
+    ],
+    carriesCreateCallbackHandles: true,
+    carriesDestroyCallbackHandles: true,
+    invokesCreateCallbacks: false,
+    invokesDestroyCallbacks: false,
+    effectCallbackExecutionReady: false
+  });
   assert.deepEqual(gate.reactDomRootBridge.records, [
     "FastReactDomPrivateRootCreateRecord",
     "FastReactDomPrivateRootUpdateRecord",
