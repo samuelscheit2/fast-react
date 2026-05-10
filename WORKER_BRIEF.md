@@ -26,18 +26,13 @@ for published package behavior and exact runtime output.
 
 ## Worker Rules
 
-- First action: use `create_goal` for your assigned objective before
-  research, file reads, implementation, or verification.
-- After goal setup, call `get_goal` if available and record active
-  status/objective in your progress report. If unavailable, state that
-  explicitly.
 - Work only on your assigned objective and write scope.
 - Record progress in `worker-progress/<worker-id>.md`.
-- You are running as a real Codex process in a tmux worker session.
-- Worker launch artifacts come from the single `scripts/run-worker.sh` path:
-  `.codex.log` and `.exitcode` record the worker id, prompt file, log file,
-  exit-code file, start/end timestamps, and Codex command mode. The first line
-  of `.exitcode` is the numeric process status.
+- You are running as a managed Codex subagent launched by the orchestrator.
+- The orchestrator monitors your lifecycle through subagent status, progress
+  messages, and your `worker-progress/<worker-id>.md` report. There is no tmux
+  pane, `.codex.log`, `.exitcode`, or numeric process status for subagent
+  workers.
 - You may spawn managed Codex subagents, explorers, nested agents, or parallel
   agent tools inside this worker when useful for hypothesis testing or
   verification. Summarize delegated checks that affect your conclusions.

@@ -11,7 +11,7 @@ The orchestrator goal is continuous. Do not call
 
 ## Operating Rules
 
-- Use `gpt-5.5` with xhigh reasoning and `--yolo` for Codex workers.
+- Use `gpt-5.5` with xhigh reasoning for top-level worker subagents.
 - Question assumptions and change direction when evidence shows a better path.
 - Find root causes; do not patch symptoms.
 - Breaking changes are allowed when they enable a sound architecture.
@@ -20,45 +20,29 @@ The orchestrator goal is continuous. Do not call
 
 ## Worker Model
 
-- Top-level workers are real Codex subprocesses launched in tmux, usually from
-  isolated git worktrees.
-- Keep at most 30 concurrent top-level tmux worker sessions.
+- Top-level workers are managed Codex subagents launched with the
+  `spawn_agent` tool, usually from isolated git worktrees.
+- Launch implementation workers with `agent_type: "worker"`, `goal: true`,
+  `fork_turns: "none"`, `model: "gpt-5.5"`, and
+  `reasoning_effort: "xhigh"`. Put the full worker prompt in `message`.
+- Keep at most 30 concurrent top-level worker subagents.
 - Workers may spawn their own managed subagents, explorers, or nested agents.
-  Nested agents do not count against the 30 top-level worker limit and may push
-  total process count above 30.
+  Nested agents do not count against the 30 top-level worker limit.
 - Workers read `WORKER_BRIEF.md`, not this file.
 - Worker prompts must include all context needed to work independently, explicit
   write scope, verification expectations, and non-overlap boundaries.
-- Prefer interactive Codex TUI workers wrapped with `script -q -F "$log_file"
-  codex --yolo --no-alt-screen ... "$prompt_text"` so tmux panes remain
-  inspectable and logs are captured.
-- Use `scripts/run-worker.sh` as the single worker launcher. Its `.codex.log`
-  and `.exitcode` artifacts record worker id, prompt file, log file, exit-code
-  file, start/end timestamps, and Codex command mode; the `.exitcode` first
-  line remains the numeric process status.
-- Load prompt markdown into a shell variable or otherwise quote it so literal
-  backticks, `$()`, and paths in worker prompts are passed to Codex as text.
-  Never inline `$(cat prompt.md)` or unquoted prompt text in a way that lets the
-  shell execute markdown code spans before Codex starts.
-- Use `tmux capture-pane -pt <session>` to inspect live status such as
-  `Pursuing goal` or `Goal achieved`.
-- Classify worker liveness from the current pane state first. If a pane shows
-  active `Working` or `Pursuing goal`, stale `usage limit` text in scrollback is
-  not a stop signal. Treat usage-limit text as actionable only when the Codex
-  process is actually idle, blocked at a prompt, or exited.
-
-## Goal Policy
-
-- Worker prompts and continuation prompts must require `create_goal` as the
-  first worker action, before research, file reads,
-  implementation, or verification.
-- Workers must call `get_goal` after setup and record active goal
-  status/objective in their report, or explicitly say the goal tools were
-  unavailable.
-- Treat missing worker goal evidence as an audit risk before accepting work.
-- Workers may use `create_goal` again for worker-internal subtasks.
-- Workers should call `update_goal(status: "complete")` only after the whole
-  assigned worker task is complete.
+- Use `task_name` as the stable subagent id. It must use lowercase letters,
+  digits, and underscores; map it to the hyphenated
+  `worker-progress/<worker-id>.md` filename in the worker prompt when needed.
+- Monitor workers with `list_agents` and `wait_agent`. Send clarifications or
+  continuation prompts with `followup_task`, and clean up completed workers with
+  `close_agent`.
+- Require workers to keep durable evidence in
+  `worker-progress/<worker-id>.md`. Subagent status messages are useful for
+  live monitoring, but they are not a replacement for the progress report.
+- There is no numeric process exit code or tmux pane for subagents. Treat the
+  agent status, final report, worktree status, changed files, and verification
+  evidence as the acceptance record.
 
 ## Planning And Progress Docs
 
@@ -85,16 +69,16 @@ The orchestrator goal is continuous. Do not call
 
 ## Merge And Cleanup
 
-- Before accepting a worker, inspect its tmux pane, worktree status, changed
-  files, report, verification commands, and risks.
+- Before accepting a worker, inspect its subagent status, worktree status,
+  changed files, report, verification commands, and risks.
 - Accept only scoped, intentional changes. Do not revert user changes.
 - Regenerable artifacts such as `node_modules/`, `target/`, and root
   `Cargo.lock` do not need removal merely because they exist. Remove or
   document them only if stale, ambiguous, user-owned, or diff-polluting.
-- After accepting and merging a worker, close its tmux session and remove or
-  prune the worktree unless it is needed for immediate follow-up.
-- Regularly check for stale tmux sessions, leftover worker processes,
-  abandoned worktrees, ignored build output, and untracked files.
+- After accepting and merging a worker, close its subagent and remove or prune
+  the worktree unless it is needed for immediate follow-up.
+- Regularly check for stale subagents, leftover worker processes, abandoned
+  worktrees, ignored build output, and untracked files.
 
 ## Reference Sources
 
