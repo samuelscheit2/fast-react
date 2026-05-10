@@ -20,6 +20,7 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
   evaluateReactDomRootPublicFacadeBlockedGate,
   inspectReactDomPrivateRootBridgeBoundary,
@@ -57,7 +58,7 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     gate.blockedPublicFacadeRows.map((row) => row.id),
     REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS.map((row) => row.id)
   );
-  assert.equal(gate.blockedPrivateBridgeRows.length, 4);
+  assert.equal(gate.blockedPrivateBridgeRows.length, 8);
 });
 
 test("React DOM public root facade scenario admission is explicit and non-compatible", () => {
@@ -104,6 +105,79 @@ test("React DOM public root facade inspection records current placeholder bounda
   assert.equal(publicBoundary.hydrateRoot.sideEffects.mutationCount, 0);
   assert.equal(publicBoundary.hydrateRoot.sideEffects.listenerRegistrationCount, 0);
   assert.equal(publicBoundary.hydrateRoot.sideEffects.containerMarker.propertyCount, 0);
+
+  for (const operation of [
+    publicBoundary.publicRootLifecycle.renderInitial,
+    publicBoundary.publicRootLifecycle.renderUpdate,
+    publicBoundary.publicRootLifecycle.unmount
+  ]) {
+    assert.equal(operation.status, "throws");
+    assert.equal(operation.thrown.code, "FAST_REACT_UNIMPLEMENTED");
+    assert.equal(operation.thrown.exportName, "createRoot");
+    assert.equal(operation.blockedAt, "createRoot");
+    assert.equal(operation.rootObjectCreated, false);
+    assert.equal(operation.lifecycleOperationAttempted, false);
+    assert.equal(operation.compatibilityClaimed, false);
+    assert.equal(operation.sideEffects.mutationCount, 0);
+    assert.equal(operation.sideEffects.listenerRegistrationCount, 0);
+    assert.equal(operation.sideEffects.containerMarker.propertyCount, 0);
+  }
+});
+
+test("React DOM public root facade update and unmount rows stay blocked apart from private request metadata", () => {
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle
+  });
+
+  const lifecycleRows = gate.blockedPublicFacadeRows.filter((row) =>
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.some(
+      (expected) => expected.id === row.id
+    )
+  );
+  assert.deepEqual(
+    lifecycleRows.map((row) => row.id),
+    REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS.map((row) => row.id)
+  );
+  for (const row of lifecycleRows) {
+    assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
+    assert.equal(row.blockedAt, "createRoot");
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.listenerRegistrationCount, 0);
+    assert.equal(row.mutationCount, 0);
+    assert.equal(row.privateBridgeEvidence, "separate");
+  }
+  assert.ok(
+    gate.blockedPublicFacadeRows.every((row) => !row.id.startsWith("private-"))
+  );
+
+  const privateBoundary = gate.privateRootBridgeBoundary;
+  assert.equal(
+    privateBoundary.admissions.render.admissionStatus,
+    "admitted-private-root-bridge-request-record"
+  );
+  assert.equal(
+    privateBoundary.admissions.render.executionStatus,
+    "blocked-private-root-bridge-execution"
+  );
+  assert.equal(
+    privateBoundary.admissions.unmount.admissionStatus,
+    "admitted-private-root-bridge-request-record"
+  );
+  assert.equal(privateBoundary.admissions.unmount.domMutation, false);
+  assert.equal(privateBoundary.admissions.unmount.listenerInstallation, false);
+  assert.equal(privateBoundary.admissions.unmount.compatibilityClaimed, false);
+  assert.ok(
+    gate.blockedPrivateBridgeRows.some(
+      (row) => row.id === "private-root-render-admission"
+    )
+  );
+  assert.ok(
+    gate.blockedPrivateBridgeRows.some(
+      (row) => row.id === "private-root-unmount-admission"
+    )
+  );
 });
 
 test("React DOM public root facade gate rejects premature public createRoot behavior", () => {
@@ -146,6 +220,7 @@ test("React DOM public root facade gate rejects premature public createRoot beha
 test("React DOM public root facade gate rejects private bridge side effects or compatibility claims", () => {
   const privateBoundary = clone(inspectReactDomPrivateRootBridgeBoundary());
   privateBoundary.create.nativeExecution = true;
+  privateBoundary.admissions.unmount.compatibilityClaimed = true;
   privateBoundary.sideEffects.listenerRegistrationCount = 1;
 
   const claimedClientRootOracle = clone(clientRootOracle);
@@ -170,6 +245,13 @@ test("React DOM public root facade gate rejects private bridge side effects or c
     gate.failures.some(
       (failure) =>
         failure.gateStatus === "private-root-bridge-produced-public-side-effects"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "private-root-bridge-admission-row-not-record-only"
     )
   );
   assert.ok(
@@ -204,6 +286,50 @@ test("React DOM private root bridge inspection stays record-only", () => {
     privateBoundary.renderAfterUnmount.thrown.code,
     "FAST_REACT_DOM_UNMOUNTED_ROOT"
   );
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(privateBoundary.admissions).map(([key, admission]) => [
+        key,
+        {
+          admissionStatus: admission.admissionStatus,
+          compatibilityClaimed: admission.compatibilityClaimed,
+          executionStatus: admission.executionStatus,
+          operation: admission.operation,
+          transition: admission.lifecyclePrerequisites.lifecycleTransition
+        }
+      ])
+    ),
+    {
+      create: {
+        admissionStatus: "admitted-private-root-bridge-request-record",
+        compatibilityClaimed: false,
+        executionStatus: "blocked-private-root-bridge-execution",
+        operation: "create",
+        transition: "none->created"
+      },
+      render: {
+        admissionStatus: "admitted-private-root-bridge-request-record",
+        compatibilityClaimed: false,
+        executionStatus: "blocked-private-root-bridge-execution",
+        operation: "render",
+        transition: "created->rendered"
+      },
+      unmount: {
+        admissionStatus: "admitted-private-root-bridge-request-record",
+        compatibilityClaimed: false,
+        executionStatus: "blocked-private-root-bridge-execution",
+        operation: "unmount",
+        transition: "rendered->unmounted"
+      },
+      secondUnmount: {
+        admissionStatus: "admitted-private-root-bridge-request-record",
+        compatibilityClaimed: false,
+        executionStatus: "blocked-private-root-bridge-execution",
+        operation: "unmount",
+        transition: "unmounted->unmounted"
+      }
+    }
+  );
   assert.equal(privateBoundary.sideEffects.mutationCount, 0);
   assert.equal(privateBoundary.sideEffects.listenerRegistrationCount, 0);
 
@@ -217,6 +343,7 @@ test("React DOM private root bridge inspection stays record-only", () => {
     new Set(gate.blockedPrivateBridgeRows.map((row) => row.gateStatus)),
     new Set([REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS])
   );
+  assert.equal(gate.blockedPrivateBridgeRows.length, 8);
 });
 
 function clone(value) {
