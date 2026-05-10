@@ -2,6 +2,8 @@
 
 const ENTRY_SET_ATTRIBUTE = 'setAttribute';
 const ENTRY_REMOVE_ATTRIBUTE = 'removeAttribute';
+const ENTRY_SET_PROPERTY = 'setProperty';
+const ENTRY_REMOVE_PROPERTY = 'removeProperty';
 const ENTRY_SET_STYLE = 'setStyle';
 const ENTRY_REMOVE_STYLE = 'removeStyle';
 const ENTRY_SET_INNER_HTML = 'setInnerHTML';
@@ -668,6 +670,16 @@ function isAttributeNameSafe(attributeName) {
   return validAttributeNamePattern.test(attributeName);
 }
 
+function isOrdinaryPropertyPayloadEntry(entry) {
+  return (
+    isObjectLike(entry) &&
+    (entry.kind === ENTRY_SET_ATTRIBUTE ||
+      entry.kind === ENTRY_REMOVE_ATTRIBUTE ||
+      entry.kind === ENTRY_SET_PROPERTY ||
+      entry.kind === ENTRY_REMOVE_PROPERTY)
+  );
+}
+
 function isNullishStyleValue(value) {
   return value == null;
 }
@@ -700,12 +712,15 @@ function getStyleMutationTarget(styleName) {
 module.exports = {
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_REMOVE_PROPERTY,
   ENTRY_REMOVE_STYLE,
   ENTRY_SET_ATTRIBUTE,
   ENTRY_SET_INNER_HTML,
+  ENTRY_SET_PROPERTY,
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
   diffDomPropertyPayload,
   isAttributeNameSafe,
-  isEventLikeProp
+  isEventLikeProp,
+  isOrdinaryPropertyPayloadEntry
 };

@@ -1,5 +1,40 @@
 'use strict';
 
+const {
+  ENTRY_NON_PAYLOAD,
+  ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_REMOVE_PROPERTY,
+  ENTRY_REMOVE_STYLE,
+  ENTRY_SET_ATTRIBUTE,
+  ENTRY_SET_INNER_HTML,
+  ENTRY_SET_PROPERTY,
+  ENTRY_SET_STYLE,
+  ENTRY_UNSUPPORTED,
+  isAttributeNameSafe,
+  isEventLikeProp,
+  isOrdinaryPropertyPayloadEntry
+} = require('./property-payload.js');
+
+const blockedPayloadEntryKinds = new Set([
+  ENTRY_REMOVE_STYLE,
+  ENTRY_SET_STYLE,
+  ENTRY_SET_INNER_HTML,
+  ENTRY_NON_PAYLOAD,
+  ENTRY_UNSUPPORTED
+]);
+
+const unsafePropertyNames = new Set([
+  '__proto__',
+  'constructor',
+  'innerHTML',
+  'outerHTML',
+  'prototype',
+  'style',
+  'textContent'
+]);
+
+const propertyNamePattern = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
 function createDomHostMutationError(code, message) {
   const error = new Error(message);
   error.code = code;
@@ -77,6 +112,26 @@ function setTextContent(instance, text) {
   setNodeTextContent(instance, text, 'setTextContent');
 }
 
+function applyDomPropertyPayload(instance, payload) {
+  assertDomLikeObject(instance, 'applyDomPropertyPayload', 'parent');
+  if (!Array.isArray(payload)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD',
+      'Cannot apply a DOM property payload that is not an array.'
+    );
+  }
+
+  const entries = payload.map((entry, index) =>
+    normalizePropertyPayloadEntry(instance, entry, index)
+  );
+
+  for (const entry of entries) {
+    applyNormalizedPropertyPayloadEntry(instance, entry);
+  }
+
+  return entries.map(createAppliedPropertyPayloadRecord);
+}
+
 function assertAppendParent(parent, operation) {
   assertDomLikeObject(parent, operation, 'parent');
   if (typeof parent.appendChild !== 'function') {
@@ -105,6 +160,190 @@ function assertRemoveParent(parent, operation) {
       `Cannot ${operation} on a parent without removeChild.`
     );
   }
+}
+
+function normalizePropertyPayloadEntry(instance, entry, index) {
+  if (!isOrdinaryPropertyPayloadEntry(entry)) {
+    throw createUnsupportedPayloadEntryError(entry, index);
+  }
+
+  switch (entry.kind) {
+    case ENTRY_SET_ATTRIBUTE:
+      return normalizeSetAttributePayloadEntry(instance, entry, index);
+    case ENTRY_REMOVE_ATTRIBUTE:
+      return normalizeRemoveAttributePayloadEntry(instance, entry, index);
+    case ENTRY_SET_PROPERTY:
+      return normalizeSetPropertyPayloadEntry(instance, entry, index);
+    case ENTRY_REMOVE_PROPERTY:
+      return normalizeRemovePropertyPayloadEntry(instance, entry, index);
+    default:
+      throw createUnsupportedPayloadEntryError(entry, index);
+  }
+}
+
+function normalizeSetAttributePayloadEntry(instance, entry, index) {
+  assertAttributePayloadTarget(instance, 'setAttribute');
+  const attributeName = normalizePayloadAttributeName(entry, index);
+  if (typeof entry.value !== 'string') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ENTRY',
+      `Cannot apply setAttribute payload entry ${index} without a string value.`
+    );
+  }
+
+  return {
+    kind: ENTRY_SET_ATTRIBUTE,
+    attributeName,
+    value: entry.value
+  };
+}
+
+function normalizeRemoveAttributePayloadEntry(instance, entry, index) {
+  assertAttributePayloadTarget(instance, 'removeAttribute');
+  return {
+    kind: ENTRY_REMOVE_ATTRIBUTE,
+    attributeName: normalizePayloadAttributeName(entry, index)
+  };
+}
+
+function normalizeSetPropertyPayloadEntry(instance, entry, index) {
+  const propertyName = normalizePayloadPropertyName(entry, index);
+  assertPropertyPayloadTarget(instance, propertyName);
+  assertSafePropertyPayloadValue(entry.value, index);
+
+  return {
+    kind: ENTRY_SET_PROPERTY,
+    propertyName,
+    value: entry.value
+  };
+}
+
+function normalizeRemovePropertyPayloadEntry(instance, entry, index) {
+  const propertyName = normalizePayloadPropertyName(entry, index);
+  assertPropertyPayloadTarget(instance, propertyName);
+
+  return {
+    kind: ENTRY_REMOVE_PROPERTY,
+    propertyName,
+    value: null
+  };
+}
+
+function normalizePayloadAttributeName(entry, index) {
+  const attributeName = entry.attributeName;
+  if (
+    typeof attributeName !== 'string' ||
+    attributeName === '' ||
+    !isAttributeNameSafe(attributeName)
+  ) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ENTRY',
+      `Cannot apply payload entry ${index} with an unsafe attribute name.`
+    );
+  }
+
+  return attributeName;
+}
+
+function normalizePayloadPropertyName(entry, index) {
+  const propertyName = entry.propertyName;
+  if (!isSafePayloadPropertyName(propertyName)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ENTRY',
+      `Cannot apply payload entry ${index} with an unsafe property name.`
+    );
+  }
+
+  return propertyName;
+}
+
+function isSafePayloadPropertyName(propertyName) {
+  return (
+    typeof propertyName === 'string' &&
+    propertyNamePattern.test(propertyName) &&
+    !unsafePropertyNames.has(propertyName) &&
+    propertyName[0] !== '_' &&
+    !isEventLikeProp(propertyName)
+  );
+}
+
+function assertAttributePayloadTarget(instance, methodName) {
+  if (typeof instance[methodName] !== 'function') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_TARGET',
+      `Cannot apply a DOM property payload on a node without ${methodName}.`
+    );
+  }
+}
+
+function assertPropertyPayloadTarget(instance, propertyName) {
+  if (!(propertyName in instance)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_TARGET',
+      'Cannot apply a DOM property payload to a missing target property.'
+    );
+  }
+}
+
+function assertSafePropertyPayloadValue(value, index) {
+  if (typeof value === 'function' || typeof value === 'symbol') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ENTRY',
+      `Cannot apply setProperty payload entry ${index} with a callback or symbol value.`
+    );
+  }
+}
+
+function createUnsupportedPayloadEntryError(entry, index) {
+  const kind = entry && typeof entry === 'object' ? entry.kind : undefined;
+  const code =
+    kind !== undefined && blockedPayloadEntryKinds.has(kind)
+      ? 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+      : 'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY';
+  return createDomHostMutationError(
+    code,
+    `Cannot apply unsupported DOM property payload entry ${index}.`
+  );
+}
+
+function applyNormalizedPropertyPayloadEntry(instance, entry) {
+  switch (entry.kind) {
+    case ENTRY_SET_ATTRIBUTE:
+      instance.setAttribute(entry.attributeName, entry.value);
+      return;
+    case ENTRY_REMOVE_ATTRIBUTE:
+      instance.removeAttribute(entry.attributeName);
+      return;
+    case ENTRY_SET_PROPERTY:
+      instance[entry.propertyName] = entry.value;
+      return;
+    case ENTRY_REMOVE_PROPERTY:
+      instance[entry.propertyName] = null;
+      return;
+  }
+}
+
+function createAppliedPropertyPayloadRecord(entry) {
+  if (entry.kind === ENTRY_SET_ATTRIBUTE) {
+    return {
+      kind: entry.kind,
+      attributeName: entry.attributeName,
+      value: entry.value
+    };
+  }
+
+  if (entry.kind === ENTRY_REMOVE_ATTRIBUTE) {
+    return {
+      kind: entry.kind,
+      attributeName: entry.attributeName
+    };
+  }
+
+  return {
+    kind: entry.kind,
+    propertyName: entry.propertyName,
+    value: entry.value
+  };
 }
 
 function assertChildNode(child, operation) {
@@ -240,6 +479,7 @@ module.exports = {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
+  applyDomPropertyPayload,
   clearContainer,
   commitTextUpdate,
   createDomHostMutationError,
