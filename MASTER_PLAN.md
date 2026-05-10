@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 149: HostRoot current-switch commit in
-  `/Users/user/Developer/Developer/fast-react-worker-149-host-root-current-switch-commit`.
 - Worker 150: sync flush execution context in
   `/Users/user/Developer/Developer/fast-react-worker-150-sync-flush-execution-context`.
 - Worker 151: HostComponent/HostText complete-work skeleton in
@@ -79,18 +77,12 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-164-scheduler-regression-tests`.
 - Worker 165: package surface guard in
   `/Users/user/Developer/Developer/fast-react-worker-165-package-surface-guard`.
-- Worker 166: native bridge handle table in
-  `/Users/user/Developer/Developer/fast-react-worker-166-native-bridge-handle-table`.
 - Worker 167: React DOM private root bridge in
   `/Users/user/Developer/Developer/fast-react-worker-167-react-dom-private-root-bridge`.
 - Worker 168: DOM component tree map shell in
   `/Users/user/Developer/Developer/fast-react-worker-168-dom-component-tree-map-shell`.
 - Worker 169: hydration boundary skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-169-hydration-boundary-skeleton`.
-- Worker 170: DOM event priority shell in
-  `/Users/user/Developer/Developer/fast-react-worker-170-dom-event-priority-shell`.
-- Worker 171: DOM root marker/listener guard in
-  `/Users/user/Developer/Developer/fast-react-worker-171-dom-root-marker-listener-guard`.
 - Worker 172: resource/form unsupported gates in
   `/Users/user/Developer/Developer/fast-react-worker-172-resource-form-unsupported-gates`.
 - Worker 173: passive pending state in
@@ -101,8 +93,6 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-175-suspense-offscreen-fail-closed`.
 - Worker 176: act queue routing skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-176-act-queue-routing-skeleton`.
-- Worker 177: React DOM flushSync private guard in
-  `/Users/user/Developer/Developer/fast-react-worker-177-react-dom-flush-sync-private-guard`.
 - Worker 178: test-renderer serialization gate in
   `/Users/user/Developer/Developer/fast-react-worker-178-test-renderer-serialization-gate`.
 
@@ -111,9 +101,8 @@ Drive toward a minimal real root render/update/unmount path:
 1. Keep the implementation queue at 30 top-level workers or fewer.
 2. Accept code workers opportunistically, resolving conflicts after the fact
    rather than serializing all implementation behind one commit path.
-3. Prioritize worker 149 if multiple accepted branches contend for root commit
-   ownership, then fold scheduler, host complete-work, and canary branches onto
-   the accepted root lifecycle shape.
+3. Fold scheduler, host complete-work, sync flush, and canary branches onto the
+   accepted HostRoot render/commit lifecycle shape.
 
 ## Next Queue Candidates
 
