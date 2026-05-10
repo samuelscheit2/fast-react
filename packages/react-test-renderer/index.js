@@ -4971,7 +4971,6 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     );
   }
   if (
-    normalized.rootRequestId !== undefined &&
     normalized.rootRequestId !== identityRootRequest.requestId
   ) {
     throwPrivateToJSONSerializationError(
@@ -4986,7 +4985,6 @@ function createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
     );
   }
   if (
-    normalized.rootId !== undefined &&
     normalized.rootId !== identityRootRequest.rootId
   ) {
     throwPrivateToJSONSerializationError(
@@ -7586,6 +7584,18 @@ function validatePrivateToJSONSiblingTextHostOutputRow(
     dependencyMetadata,
     'Update'
   );
+  for (const [camelName, snakeName] of [
+    ['publicToJSONAvailable', 'public_to_json_available'],
+    ['publicTestInstanceAvailable', 'public_test_instance_available'],
+    ['nativeExecution', 'native_execution'],
+    ['compatibilityClaimed', 'compatibility_claimed']
+  ]) {
+    if (readPrivateToJSONField(row, camelName, snakeName) !== false) {
+      throwPrivateToJSONSerializationError(
+        'sibling-text-host-output-row-public-native-package-claim'
+      );
+    }
+  }
 
   return freezeRecord({
     id: privateToJSONSiblingTextHostOutputRowId,

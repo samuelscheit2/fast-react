@@ -2290,6 +2290,58 @@ test("react-test-renderer JS private serialization finished-work identity valida
           jsonFacade,
           siblingTextReport,
           withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+            delete evidence.rootRequestId;
+          }),
+          updateError.rootRequest,
+          /sibling-text-finished-work-identity-stale/u
+        );
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          siblingTextReport,
+          withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+            evidence.rootRequestId = `${evidence.rootRequestId}:foreign`;
+          }),
+          updateError.rootRequest,
+          /sibling-text-finished-work-identity-stale/u
+        );
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          siblingTextReport,
+          withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+            delete evidence.rootId;
+          }),
+          updateError.rootRequest,
+          /sibling-text-finished-work-identity-stale/u
+        );
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          siblingTextReport,
+          withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
+            evidence.rootId = `${evidence.rootId}:foreign`;
+          }),
+          updateError.rootRequest,
+          /sibling-text-finished-work-identity-stale/u
+        );
+        for (const fieldName of [
+          "publicToJSONAvailable",
+          "publicTestInstanceAvailable",
+          "nativeExecution",
+          "compatibilityClaimed"
+        ]) {
+          assertSiblingTextAdmissionRejection(
+            jsonFacade,
+            withSiblingTextReportChange(siblingTextReport, (report) => {
+              report.hostOutputRow[fieldName] = true;
+            }),
+            siblingTextIdentity,
+            updateError.rootRequest,
+            /sibling-text-host-output-row-public-native-package-claim/u
+          );
+        }
+        assertSiblingTextAdmissionRejection(
+          jsonFacade,
+          siblingTextReport,
+          withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
             delete evidence.rootFinishedLanesHandoff;
           }),
           updateError.rootRequest,

@@ -5,6 +5,7 @@
 - Implemented package-root `react-test-renderer` private sibling-text toJSON admission on the hidden private facade.
 - The package-root path consumes the dedicated sibling-text finished-work identity evidence and the canonical `rootFinishedLanesHandoff` record.
 - The generic finished-work identity gate now fails closed for sibling-text and broad multi-child reports, preserving public `toJSON`, `toTree`, and TestInstance blockers.
+- Acceptance-audit fix: sibling-text host-output row public/native/package blocker flags are now validated, and package-root sibling-text identity now requires canonical `rootRequestId` and `rootId`.
 
 ## Changed Files
 
@@ -27,6 +28,8 @@
 - Focused serialization local-gate test passed: 10 tests, 10 passing.
 - Package-root sibling-text admission returns the private JS/CJS admission diagnostic, keeps public serialization/native/package compatibility false, and freezes the consumed canonical root handoff.
 - Package-root sibling-text admission rejects missing canonical handoff, alias-only handoff keys, tampered finished-lanes handoff bits, generic sibling-text identity use, and broad multi-child identity claims.
+- Package-root sibling-text admission rejects row-level `publicToJSONAvailable`, `publicTestInstanceAvailable`, `nativeExecution`, and `compatibilityClaimed` claims.
+- Package-root sibling-text admission rejects missing or mismatched `rootRequestId` and `rootId` identity fields.
 - Package surface guard and import smoke both passed without public export or package inventory changes.
 
 ## Risks Or Blockers
