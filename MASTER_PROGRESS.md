@@ -99,9 +99,17 @@ sequencing belong in `MASTER_PLAN.md`.
   returns deterministic stale/no-work/rendered records that hand matching
   callbacks to the HostRoot render-phase path without sync flush, commit, host
   mutation, or public Scheduler package behavior.
+- Worker 156 core root-lane selection helpers were merged, adding
+  React-source-grounded `get_next_lanes`,
+  `get_next_lanes_to_flush_sync`, and prerender checks on `RootLaneState` plus
+  exported pure-core wrappers, without changing reconciler scheduling behavior.
 
 ## Latest Accepted Verification
 
+- Worker 156 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_lanes` tests, full
+  `fast-react-core` tests with 92 unit tests, core clippy with warnings
+  denied, and `git diff --check`.
 - Worker 155 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused root-scheduler and root-work-loop tests,
   full `fast-react-reconciler` tests with 85 unit tests plus 1 doctest,
