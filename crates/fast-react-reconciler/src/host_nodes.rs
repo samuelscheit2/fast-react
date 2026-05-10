@@ -111,10 +111,12 @@ impl HostNodeMetadata {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HostNodePropertyUpdate {
+    payload_kind: &'static str,
     prop_name: &'static str,
     property_name: &'static str,
     old_props: PropsHandle,
     new_props: PropsHandle,
+    execution: HostNodePropertyUpdateExecution,
 }
 
 impl HostNodePropertyUpdate {
@@ -126,11 +128,31 @@ impl HostNodePropertyUpdate {
         new_props: PropsHandle,
     ) -> Self {
         Self {
+            payload_kind: "property",
             prop_name,
             property_name,
             old_props,
             new_props,
+            execution: HostNodePropertyUpdateExecution::CommitUpdate,
         }
+    }
+
+    #[must_use]
+    pub(crate) const fn with_payload_kind(self, payload_kind: &'static str) -> Self {
+        Self {
+            payload_kind,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn with_execution(self, execution: HostNodePropertyUpdateExecution) -> Self {
+        Self { execution, ..self }
+    }
+
+    #[must_use]
+    pub(crate) const fn payload_kind(self) -> &'static str {
+        self.payload_kind
     }
 
     #[must_use]
@@ -152,6 +174,27 @@ impl HostNodePropertyUpdate {
     pub(crate) const fn new_props(self) -> PropsHandle {
         self.new_props
     }
+
+    #[must_use]
+    pub(crate) const fn execution(self) -> HostNodePropertyUpdateExecution {
+        self.execution
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostNodePropertyUpdateExecution {
+    CommitUpdate,
+    ResetTextContent,
+}
+
+impl HostNodePropertyUpdateExecution {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::CommitUpdate => "commit-update",
+            Self::ResetTextContent => "reset-text-content",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,10 +204,12 @@ pub(crate) struct HostNodeAppliedPropertyUpdate {
     root_id: FiberRootId,
     fiber_id: FiberId,
     token_id: HostFiberTokenId,
+    payload_kind: &'static str,
     prop_name: &'static str,
     property_name: &'static str,
     old_props: PropsHandle,
     new_props: PropsHandle,
+    execution: HostNodePropertyUpdateExecution,
 }
 
 impl HostNodeAppliedPropertyUpdate {
@@ -194,6 +239,11 @@ impl HostNodeAppliedPropertyUpdate {
     }
 
     #[must_use]
+    pub(crate) const fn payload_kind(self) -> &'static str {
+        self.payload_kind
+    }
+
+    #[must_use]
     pub(crate) const fn prop_name(self) -> &'static str {
         self.prop_name
     }
@@ -211,6 +261,16 @@ impl HostNodeAppliedPropertyUpdate {
     #[must_use]
     pub(crate) const fn new_props(self) -> PropsHandle {
         self.new_props
+    }
+
+    #[must_use]
+    pub(crate) const fn execution(self) -> HostNodePropertyUpdateExecution {
+        self.execution
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_name(self) -> &'static str {
+        self.execution.as_str()
     }
 }
 
@@ -423,10 +483,12 @@ impl<H: HostTypes> HostNodeStore<H> {
             root_id: record.metadata.root_id,
             fiber_id: record.metadata.fiber_id,
             token_id: record.metadata.token_id,
+            payload_kind: update.payload_kind(),
             prop_name: update.prop_name(),
             property_name: update.property_name(),
             old_props: update.old_props(),
             new_props: update.new_props(),
+            execution: update.execution(),
         };
         record.property_updates.push(applied);
         Ok(applied)
@@ -1031,14 +1093,55 @@ mod tests {
         assert_eq!(applied.root_id(), scope.root_id());
         assert_eq!(applied.fiber_id(), scope.fiber_id());
         assert_eq!(applied.token_id(), scope.token_id());
+        assert_eq!(applied.payload_kind(), "property");
         assert_eq!(applied.prop_name(), "testHostProperty");
         assert_eq!(applied.property_name(), "testHostProperty");
         assert_eq!(applied.old_props(), PropsHandle::from_raw(10));
         assert_eq!(applied.new_props(), PropsHandle::from_raw(11));
+        assert_eq!(
+            applied.execution(),
+            HostNodePropertyUpdateExecution::CommitUpdate
+        );
+        assert_eq!(applied.execution_name(), "commit-update");
 
         let updates = store.instance_property_updates(handle, scope).unwrap();
         assert_eq!(updates, &[applied]);
         assert_eq!(store.instance(handle, scope).unwrap().label, "button");
+    }
+
+    #[test]
+    fn host_nodes_preserve_private_payload_kind_and_reset_execution_evidence() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let scope = instance_scope();
+        let handle = store.insert_instance(
+            scope,
+            TestInstance {
+                id: 1,
+                label: "div",
+            },
+        );
+        let update = HostNodePropertyUpdate::new(
+            "children",
+            "textContent",
+            PropsHandle::from_raw(30),
+            PropsHandle::from_raw(31),
+        )
+        .with_payload_kind("text-content")
+        .with_execution(HostNodePropertyUpdateExecution::ResetTextContent);
+
+        let applied = store
+            .apply_instance_property_update(handle, scope, update)
+            .unwrap();
+
+        assert_eq!(applied.sequence(), 0);
+        assert_eq!(applied.payload_kind(), "text-content");
+        assert_eq!(applied.prop_name(), "children");
+        assert_eq!(applied.property_name(), "textContent");
+        assert_eq!(
+            applied.execution(),
+            HostNodePropertyUpdateExecution::ResetTextContent
+        );
+        assert_eq!(applied.execution_name(), "reset-text-content");
     }
 
     #[test]
