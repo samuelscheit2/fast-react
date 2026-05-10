@@ -1740,6 +1740,12 @@ struct FunctionComponentEffectRingBinding {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentPendingEffectQueueBinding {
+    fiber: FiberId,
+    state: FunctionComponentHookRenderState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FunctionComponentMemoHookBinding {
     hook: HookSlotId,
     value: StateHandle,
@@ -1924,6 +1930,193 @@ impl FunctionComponentEffectUpdateQueueRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCommittedEffectRecord {
+    effect_index: usize,
+    hook_list: HookListId,
+    effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
+    instance: HookEffectInstanceId,
+    phase: FunctionComponentEffectPhase,
+    tag: HookEffectFlags,
+    create: HookEffectCallbackHandle,
+    destroy: Option<HookEffectCallbackHandle>,
+    previous_dependencies: Option<HookEffectDependencies>,
+    dependencies: HookEffectDependencies,
+    dependency_status: Option<FunctionComponentEffectDependencyStatus>,
+    lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "private committed function-component effect queue records for future passive traversal"
+)]
+impl FunctionComponentCommittedEffectRecord {
+    #[must_use]
+    pub const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
+    }
+
+    #[must_use]
+    pub const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn create(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+
+    #[must_use]
+    pub const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub const fn previous_dependencies(self) -> Option<HookEffectDependencies> {
+        self.previous_dependencies
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> Option<FunctionComponentEffectDependencyStatus> {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub const fn matches_flags(self, flags: HookEffectFlags) -> bool {
+        self.tag.contains_all(flags)
+    }
+
+    #[must_use]
+    pub const fn accepted_for_pending_passive(self) -> bool {
+        matches!(self.phase, FunctionComponentEffectPhase::Passive) && self.tag.fires_in_passive()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentCommittedEffectQueue {
+    fiber: FiberId,
+    phase: FunctionComponentHookRenderPhase,
+    hook_list: HookListId,
+    lanes: Lanes,
+    records: Vec<FunctionComponentCommittedEffectRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "private committed function-component effect queue records for future passive traversal"
+)]
+impl FunctionComponentCommittedEffectQueue {
+    #[must_use]
+    pub const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn phase(&self) -> FunctionComponentHookRenderPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn hook_list(&self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[FunctionComponentCommittedEffectRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn accepted_passive_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.accepted_for_pending_passive())
+            .count()
+    }
+
+    #[must_use]
+    pub fn passive_effect_metadata(
+        &self,
+        flags: HookEffectFlags,
+    ) -> Vec<FunctionComponentPassiveEffectMetadata> {
+        if self.lanes.is_empty() {
+            return Vec::new();
+        }
+
+        let mut accepted = Vec::new();
+        for record in &self.records {
+            if !record.matches_flags(flags) {
+                continue;
+            }
+
+            accepted.push(FunctionComponentPassiveEffectMetadata {
+                fiber: self.fiber,
+                hook_list: record.hook_list(),
+                effect_index: accepted.len(),
+                effect: record.effect(),
+                instance: record.instance(),
+                tag: record.tag(),
+                create: record.create(),
+                destroy: record.destroy(),
+                dependencies: record.dependencies(),
+                lanes: self.lanes,
+            });
+        }
+        accepted
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct FunctionComponentHookRenderStore {
     hook_lists: HookListArena,
@@ -1932,6 +2125,8 @@ pub(crate) struct FunctionComponentHookRenderStore {
     current_lists: Vec<FunctionComponentCurrentHookList>,
     effect_rings: Vec<FunctionComponentEffectRingBinding>,
     effect_update_queues: Vec<FunctionComponentEffectUpdateQueue>,
+    pending_effect_queues: Vec<FunctionComponentPendingEffectQueueBinding>,
+    committed_effect_queues: Vec<FunctionComponentCommittedEffectQueue>,
     memo_hooks: Vec<FunctionComponentMemoHookBinding>,
     ref_hooks: Vec<FunctionComponentRefHookBinding>,
     state_dispatches: Vec<FunctionComponentStateDispatchBinding>,
@@ -1948,6 +2143,8 @@ impl Default for FunctionComponentHookRenderStore {
             current_lists: Vec::new(),
             effect_rings: Vec::new(),
             effect_update_queues: Vec::new(),
+            pending_effect_queues: Vec::new(),
+            committed_effect_queues: Vec::new(),
             memo_hooks: Vec::new(),
             ref_hooks: Vec::new(),
             state_dispatches: Vec::new(),
@@ -2036,6 +2233,27 @@ impl FunctionComponentHookRenderStore {
             Some(queue) => Ok(queue.records()),
             None => Ok(&[]),
         }
+    }
+
+    #[must_use]
+    pub fn committed_effect_queue(
+        &self,
+        fiber: FiberId,
+    ) -> Option<&FunctionComponentCommittedEffectQueue> {
+        self.committed_effect_queues
+            .iter()
+            .find(|queue| queue.fiber() == fiber)
+    }
+
+    #[must_use]
+    pub fn committed_passive_effect_metadata(
+        &self,
+        fiber: FiberId,
+        flags: HookEffectFlags,
+    ) -> Vec<FunctionComponentPassiveEffectMetadata> {
+        self.committed_effect_queue(fiber)
+            .map(|queue| queue.passive_effect_metadata(flags))
+            .unwrap_or_default()
     }
 
     pub fn passive_effect_metadata(
@@ -2145,13 +2363,16 @@ impl FunctionComponentHookRenderStore {
         };
         let work_in_progress_list = self.hook_lists.create_list(owner);
 
-        Ok(FunctionComponentHookRenderState {
+        let state = FunctionComponentHookRenderState {
             phase,
             render_fiber: work_in_progress,
             current,
             current_list,
             work_in_progress_list,
-        })
+        };
+        self.record_pending_effect_queue_state_unchecked(state);
+
+        Ok(state)
     }
 
     pub fn begin_render_cursor(
@@ -2789,6 +3010,39 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub fn commit_pending_effect_queue_for_fiber(
+        &mut self,
+        fiber: FiberId,
+        lanes: Lanes,
+    ) -> Result<Option<FunctionComponentCommittedEffectQueue>, FunctionComponentRenderError> {
+        let Some(state) = self.pending_effect_queue_state(fiber) else {
+            return Ok(None);
+        };
+
+        let queue = self.commit_effect_queue_for_render_state(state, lanes)?;
+        self.pending_effect_queues
+            .retain(|binding| binding.fiber != fiber);
+        Ok(Some(queue))
+    }
+
+    pub fn commit_effect_queue_for_render_state(
+        &mut self,
+        state: FunctionComponentHookRenderState,
+        lanes: Lanes,
+    ) -> Result<FunctionComponentCommittedEffectQueue, FunctionComponentRenderError> {
+        let records = self.committed_effect_records_for_render_state(state, lanes)?;
+        let queue = FunctionComponentCommittedEffectQueue {
+            fiber: state.render_fiber(),
+            phase: state.phase(),
+            hook_list: state.work_in_progress_list(),
+            lanes,
+            records,
+        };
+        self.bind_current_list_unchecked(state.render_fiber(), state.work_in_progress_list());
+        self.record_committed_effect_queue_unchecked(queue.clone());
+        Ok(queue)
+    }
+
     pub fn dispatch_state_update(
         &mut self,
         request: FunctionComponentStateDispatchRequest,
@@ -3382,6 +3636,121 @@ impl FunctionComponentHookRenderStore {
             self.effect_update_queues.len() - 1
         }
     }
+
+    fn record_pending_effect_queue_state_unchecked(
+        &mut self,
+        state: FunctionComponentHookRenderState,
+    ) {
+        if let Some(binding) = self
+            .pending_effect_queues
+            .iter_mut()
+            .find(|binding| binding.fiber == state.render_fiber())
+        {
+            binding.state = state;
+        } else {
+            self.pending_effect_queues
+                .push(FunctionComponentPendingEffectQueueBinding {
+                    fiber: state.render_fiber(),
+                    state,
+                });
+        }
+    }
+
+    fn pending_effect_queue_state(
+        &self,
+        fiber: FiberId,
+    ) -> Option<FunctionComponentHookRenderState> {
+        self.pending_effect_queues
+            .iter()
+            .find(|binding| binding.fiber == fiber)
+            .map(|binding| binding.state)
+    }
+
+    fn record_committed_effect_queue_unchecked(
+        &mut self,
+        queue: FunctionComponentCommittedEffectQueue,
+    ) {
+        if let Some(existing) = self
+            .committed_effect_queues
+            .iter_mut()
+            .find(|existing| existing.fiber() == queue.fiber())
+        {
+            *existing = queue;
+        } else {
+            self.committed_effect_queues.push(queue);
+        }
+    }
+
+    fn committed_effect_records_for_render_state(
+        &self,
+        state: FunctionComponentHookRenderState,
+        lanes: Lanes,
+    ) -> Result<Vec<FunctionComponentCommittedEffectRecord>, FunctionComponentRenderError> {
+        let list = state.work_in_progress_list();
+        self.hook_lists.list(list).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+
+        if state.phase() == FunctionComponentHookRenderPhase::Update {
+            let update_records = self.effect_update_queue_records(state)?;
+            if !update_records.is_empty() {
+                return Ok(update_records
+                    .iter()
+                    .map(|record| FunctionComponentCommittedEffectRecord {
+                        effect_index: record.update_index(),
+                        hook_list: record.hook_list(),
+                        effect: record.effect(),
+                        previous_effect: Some(record.previous_effect()),
+                        instance: record.instance(),
+                        phase: record.phase(),
+                        tag: record.tag(),
+                        create: record.create(),
+                        destroy: record.destroy(),
+                        previous_dependencies: Some(record.previous_dependencies()),
+                        dependencies: record.dependencies(),
+                        dependency_status: Some(record.dependency_status()),
+                        lanes,
+                    })
+                    .collect());
+            }
+        }
+
+        let Some(ring) = self.effect_ring(list) else {
+            return Ok(Vec::new());
+        };
+        let effects = ring.iter(&self.hook_effects).map_err(|error| {
+            FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+        })?;
+        let mut records = Vec::new();
+        for (effect_index, effect) in effects.enumerate() {
+            let effect = effect.map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?;
+            let destroy = self
+                .hook_effects
+                .effect_destroy(effect.id())
+                .map_err(|error| {
+                    FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                })?;
+            records.push(FunctionComponentCommittedEffectRecord {
+                effect_index,
+                hook_list: list,
+                effect: effect.id(),
+                previous_effect: None,
+                instance: effect.instance(),
+                phase: function_component_effect_phase_from_flags(effect.tag()),
+                tag: effect.tag(),
+                create: effect.create(),
+                destroy,
+                previous_dependencies: None,
+                dependencies: effect.dependencies(),
+                dependency_status: None,
+                lanes,
+            });
+        }
+
+        Ok(records)
+    }
 }
 
 fn state_payload_from_slot(slot: &HookStateSlot<StateHandle>) -> HookStatePayload {
@@ -3470,6 +3839,18 @@ fn reducer_update_render_record_from_result(
         skipped_update_count: result.skipped_update_count(),
         reverted_update_count: result.reverted_update_count(),
         eager_update_count: result.eager_update_count(),
+    }
+}
+
+fn function_component_effect_phase_from_flags(
+    tag: HookEffectFlags,
+) -> FunctionComponentEffectPhase {
+    if tag.contains_any(HookEffectFlags::INSERTION) {
+        FunctionComponentEffectPhase::Insertion
+    } else if tag.contains_any(HookEffectFlags::LAYOUT) {
+        FunctionComponentEffectPhase::Layout
+    } else {
+        FunctionComponentEffectPhase::Passive
     }
 }
 
@@ -6582,6 +6963,108 @@ mod tests {
     }
 
     #[test]
+    fn function_component_committed_effect_queue_records_rendered_effects_by_fiber() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(93)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let layout = hook_store
+            .mount_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(930),
+                deps(931),
+            )
+            .unwrap();
+        let passive = hook_store
+            .mount_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(932),
+                deps(933),
+            )
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+        assert_eq!(finished.traversal().traversed_count(), 2);
+
+        let committed = hook_store
+            .commit_pending_effect_queue_for_fiber(work_in_progress, Lanes::DEFAULT)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(committed.fiber(), work_in_progress);
+        assert_eq!(committed.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert_eq!(committed.hook_list(), state.work_in_progress_list());
+        assert_eq!(committed.lanes(), Lanes::DEFAULT);
+        assert_eq!(committed.len(), 2);
+        assert!(!committed.is_empty());
+        assert_eq!(committed.accepted_passive_count(), 1);
+        assert_eq!(
+            hook_store.current_list(work_in_progress),
+            Some(state.work_in_progress_list())
+        );
+        assert_eq!(
+            hook_store.committed_effect_queue(work_in_progress),
+            Some(&committed)
+        );
+        assert!(
+            hook_store
+                .commit_pending_effect_queue_for_fiber(work_in_progress, Lanes::DEFAULT)
+                .unwrap()
+                .is_none()
+        );
+
+        let records = committed.records();
+        assert_eq!(records[0].effect_index(), 0);
+        assert_eq!(records[0].effect(), layout.effect());
+        assert_eq!(records[0].previous_effect(), None);
+        assert_eq!(records[0].phase(), FunctionComponentEffectPhase::Layout);
+        assert_eq!(records[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(records[0].create(), callback(930));
+        assert_eq!(records[0].destroy(), None);
+        assert_eq!(records[0].previous_dependencies(), None);
+        assert_eq!(records[0].dependencies(), deps(931));
+        assert_eq!(records[0].dependency_status(), None);
+        assert_eq!(records[0].lanes(), Lanes::DEFAULT);
+        assert!(!records[0].accepted_for_pending_passive());
+        assert_eq!(records[1].effect_index(), 1);
+        assert_eq!(records[1].effect(), passive.effect());
+        assert_eq!(records[1].phase(), FunctionComponentEffectPhase::Passive);
+        assert_eq!(records[1].tag(), HookEffectFlags::PASSIVE_EFFECT);
+        assert!(records[1].accepted_for_pending_passive());
+
+        let passive_metadata = hook_store
+            .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(passive_metadata.len(), 1);
+        assert_eq!(passive_metadata[0].fiber(), work_in_progress);
+        assert_eq!(
+            passive_metadata[0].hook_list(),
+            state.work_in_progress_list()
+        );
+        assert_eq!(passive_metadata[0].effect_index(), 0);
+        assert_eq!(passive_metadata[0].effect(), passive.effect());
+        assert_eq!(passive_metadata[0].instance(), passive.instance());
+        assert_eq!(passive_metadata[0].tag(), HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(passive_metadata[0].create(), callback(932));
+        assert_eq!(passive_metadata[0].destroy(), None);
+        assert_eq!(passive_metadata[0].dependencies(), deps(933));
+        assert_eq!(passive_metadata[0].lanes(), Lanes::DEFAULT);
+    }
+
+    #[test]
     fn private_use_state_mount_records_queue_dispatch_and_pending_update() {
         let (mut arena, _current, work_in_progress, component) = function_component_pair();
         let mut hook_store = FunctionComponentHookRenderStore::new();
@@ -8566,6 +9049,60 @@ mod tests {
         assert_eq!(passive[0].destroy(), Some(callback(1002)));
         assert_eq!(passive[0].dependencies(), deps(1004));
         assert_eq!(passive[0].lanes(), Lanes::DEFAULT);
+
+        let committed = hook_store
+            .commit_pending_effect_queue_for_fiber(work_in_progress, Lanes::DEFAULT)
+            .unwrap()
+            .unwrap();
+        assert_eq!(committed.fiber(), work_in_progress);
+        assert_eq!(committed.phase(), FunctionComponentHookRenderPhase::Update);
+        assert_eq!(committed.hook_list(), state.work_in_progress_list());
+        assert_eq!(committed.len(), 2);
+        assert_eq!(committed.accepted_passive_count(), 1);
+        assert_eq!(
+            hook_store.current_list(work_in_progress),
+            Some(state.work_in_progress_list())
+        );
+
+        let committed_records = committed.records();
+        assert_eq!(committed_records[0].effect_index(), 0);
+        assert_eq!(
+            committed_records[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
+        assert_eq!(committed_records[0].effect(), changed.effect());
+        assert_eq!(
+            committed_records[0].previous_dependencies(),
+            Some(deps(1001))
+        );
+        assert_eq!(committed_records[0].dependencies(), deps(1004));
+        assert_eq!(
+            committed_records[0].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Changed)
+        );
+        assert!(committed_records[0].accepted_for_pending_passive());
+        assert_eq!(committed_records[1].effect_index(), 1);
+        assert_eq!(
+            committed_records[1].previous_effect(),
+            Some(previous_unchanged.effect())
+        );
+        assert_eq!(committed_records[1].effect(), unchanged.effect());
+        assert_eq!(
+            committed_records[1].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Unchanged)
+        );
+        assert!(!committed_records[1].accepted_for_pending_passive());
+
+        let firing_passive = hook_store
+            .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(firing_passive.len(), 1);
+        assert_eq!(firing_passive[0].effect(), changed.effect());
+        assert_eq!(firing_passive[0].destroy(), Some(callback(1002)));
+        let all_passive = hook_store
+            .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE);
+        assert_eq!(all_passive.len(), 2);
+        assert_eq!(all_passive[0].effect(), changed.effect());
+        assert_eq!(all_passive[1].effect(), unchanged.effect());
     }
 
     #[test]

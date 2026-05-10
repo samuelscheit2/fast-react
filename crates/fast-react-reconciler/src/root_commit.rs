@@ -18,8 +18,9 @@ use fast_react_core::{
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 use crate::function_component::{
-    FunctionComponentHookRenderPhase, FunctionComponentHookRenderState,
-    FunctionComponentHookRenderStore, FunctionComponentPassiveEffectMetadata,
+    FunctionComponentCommittedEffectQueue, FunctionComponentHookRenderPhase,
+    FunctionComponentHookRenderState, FunctionComponentHookRenderStore,
+    FunctionComponentPassiveEffectMetadata,
 };
 use crate::root_callbacks::{
     RootUpdateCallbackInvocationGateSnapshot, materialize_root_update_callback_invocation_gate,
@@ -65,6 +66,10 @@ pub enum RootCommitError {
         root: FiberRootId,
         fiber: FiberId,
         tag: FiberTag,
+    },
+    FunctionComponentCommittedEffectQueue {
+        fiber: FiberId,
+        message: String,
     },
     RefHostInstanceMissing {
         root: FiberRootId,
@@ -200,6 +205,12 @@ impl Display for RootCommitError {
                 root.raw(),
                 fiber.slot().get(),
                 tag
+            ),
+            Self::FunctionComponentCommittedEffectQueue { fiber, message } => write!(
+                formatter,
+                "function component fiber {} committed hook-effect queue failed before passive traversal: {}",
+                fiber.slot().get(),
+                message
             ),
             Self::RefHostInstanceMissing { root, fiber } => write!(
                 formatter,
@@ -392,6 +403,7 @@ impl Error for RootCommitError {
             | Self::PendingPassiveAlreadyCommitted { .. }
             | Self::PendingPassiveQueueRejected { .. }
             | Self::ExpectedFunctionComponentPassiveEffectFiber { .. }
+            | Self::FunctionComponentCommittedEffectQueue { .. }
             | Self::RefHostInstanceMissing { .. }
             | Self::EmptyFinishedLanes { .. }
             | Self::CurrentMismatch { .. }
@@ -1944,6 +1956,63 @@ impl<H: HostTypes> FiberRootStore<H> {
 
         Ok(())
     }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private committed hook-effect ownership helper for future passive traversal"
+)]
+pub(crate) fn commit_function_component_effect_queues_for_committed_root<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    lanes: Lanes,
+) -> Result<Vec<FunctionComponentCommittedEffectQueue>, RootCommitError> {
+    let current = store.root(root)?.current();
+    let mut queues = Vec::new();
+    commit_function_component_effect_queues_for_committed_subtree(
+        store.fiber_arena(),
+        current,
+        hook_store,
+        lanes,
+        &mut queues,
+    )?;
+    Ok(queues)
+}
+
+fn commit_function_component_effect_queues_for_committed_subtree(
+    arena: &FiberArena,
+    fiber: FiberId,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    lanes: Lanes,
+    queues: &mut Vec<FunctionComponentCommittedEffectQueue>,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(fiber)?;
+    if node.tag() == FiberTag::FunctionComponent
+        && let Some(queue) = hook_store
+            .commit_pending_effect_queue_for_fiber(fiber, lanes)
+            .map_err(
+                |error| RootCommitError::FunctionComponentCommittedEffectQueue {
+                    fiber,
+                    message: error.to_string(),
+                },
+            )?
+    {
+        queues.push(queue);
+    }
+
+    if let Some(child) = node.child() {
+        commit_function_component_effect_queues_for_committed_subtree(
+            arena, child, hook_store, lanes, queues,
+        )?;
+    }
+    if let Some(sibling) = node.sibling() {
+        commit_function_component_effect_queues_for_committed_subtree(
+            arena, sibling, hook_store, lanes, queues,
+        )?;
+    }
+
+    Ok(())
 }
 
 #[allow(
@@ -4967,8 +5036,8 @@ mod tests {
     };
     use fast_react_core::{
         DeletionListId, DependenciesHandle, FiberFlags, FiberMode, FiberTag, FiberTypeHandle,
-        HookEffectCallbackHandle, HookEffectDependencies, Lane, Lanes, PropsHandle, RefHandle,
-        StateNodeHandle,
+        HookEffectCallbackHandle, HookEffectDependencies, HookEffectFlags, Lane, Lanes,
+        PropsHandle, RefHandle, StateNodeHandle,
     };
     use fast_react_host_config::HostFiberTokenViolation;
 
@@ -7612,6 +7681,142 @@ mod tests {
                 .destroy(),
             Some(callback(714))
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_persists_function_component_effect_queue_without_passive_handoff_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(720);
+        let current_function = append_function_component_child(
+            &mut store,
+            current_root,
+            PropsHandle::from_raw(721),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_changed = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(722),
+                deps(723),
+                Some(callback(724)),
+            )
+            .unwrap();
+        let previous_unchanged = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(725),
+                deps(726),
+                Some(callback(727)),
+            )
+            .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_function = append_function_component_child(
+            &mut store,
+            render.finished_work(),
+            PropsHandle::from_raw(728),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let changed = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(729),
+                deps(730),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        let unchanged = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(731),
+                deps(726),
+                FunctionComponentEffectDependencyStatus::Unchanged,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        assert_eq!(commit.pending_passive_handoff(), None);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+
+        let committed = commit_function_component_effect_queues_for_committed_root(
+            &store,
+            root_id,
+            &mut hook_store,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+
+        assert_eq!(committed.len(), 1);
+        let queue = &committed[0];
+        assert_eq!(queue.fiber(), finished_function);
+        assert_eq!(queue.phase(), FunctionComponentHookRenderPhase::Update);
+        assert_eq!(queue.hook_list(), state.work_in_progress_list());
+        assert_eq!(queue.lanes(), Lanes::DEFAULT);
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue.accepted_passive_count(), 1);
+        assert_eq!(
+            hook_store.current_list(finished_function),
+            Some(state.work_in_progress_list())
+        );
+        assert_eq!(
+            hook_store.committed_effect_queue(finished_function),
+            Some(queue)
+        );
+
+        let records = queue.records();
+        assert_eq!(
+            records[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
+        assert_eq!(records[0].effect(), changed.effect());
+        assert_eq!(records[0].destroy(), Some(callback(724)));
+        assert!(records[0].accepted_for_pending_passive());
+        assert_eq!(
+            records[1].previous_effect(),
+            Some(previous_unchanged.effect())
+        );
+        assert_eq!(records[1].effect(), unchanged.effect());
+        assert_eq!(records[1].destroy(), Some(callback(727)));
+        assert!(!records[1].accepted_for_pending_passive());
+
+        let firing_passive = hook_store
+            .committed_passive_effect_metadata(finished_function, HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(firing_passive.len(), 1);
+        assert_eq!(firing_passive[0].effect(), changed.effect());
+        assert_eq!(firing_passive[0].destroy(), Some(callback(724)));
+        let all_passive = hook_store
+            .committed_passive_effect_metadata(finished_function, HookEffectFlags::PASSIVE);
+        assert_eq!(all_passive.len(), 2);
+        assert_eq!(all_passive[0].effect(), changed.effect());
+        assert_eq!(all_passive[1].effect(), unchanged.effect());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
