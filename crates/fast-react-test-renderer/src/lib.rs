@@ -776,6 +776,380 @@ impl TestRendererRootUpdateOutcome {
     }
 }
 
+pub const TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME: &str =
+    "fast-react-test-renderer.serialization.private-canary";
+pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
+    "react-19.2.6-react-test-renderer-serialization-oracle";
+pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
+pub const TEST_RENDERER_SERIALIZATION_ORACLE_SCENARIO_COUNT: usize = 7;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererSerializationGateStatus {
+    ClosedMissingHostOutput,
+    ClosedMissingFiberInspection,
+    ReadyForPrivateSerializationDiagnostics,
+}
+
+impl TestRendererSerializationGateStatus {
+    #[must_use]
+    pub const fn is_ready(self) -> bool {
+        matches!(self, Self::ReadyForPrivateSerializationDiagnostics)
+    }
+
+    #[must_use]
+    pub const fn is_closed(self) -> bool {
+        !self.is_ready()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererSerializationGateRequirements {
+    root_commit_diagnostics_available: bool,
+    real_host_output_available: bool,
+    committed_fiber_inspection_available: bool,
+}
+
+impl TestRendererSerializationGateRequirements {
+    #[must_use]
+    pub const fn root_commit_diagnostics_available(self) -> bool {
+        self.root_commit_diagnostics_available
+    }
+
+    #[must_use]
+    pub const fn real_host_output_available(self) -> bool {
+        self.real_host_output_available
+    }
+
+    #[must_use]
+    pub const fn committed_fiber_inspection_available(self) -> bool {
+        self.committed_fiber_inspection_available
+    }
+
+    #[must_use]
+    pub const fn private_serialization_ready(self) -> bool {
+        self.root_commit_diagnostics_available
+            && self.real_host_output_available
+            && self.committed_fiber_inspection_available
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererSerializationOracleDiagnostics {
+    oracle_kind: &'static str,
+    probe_mode_count: usize,
+    scenario_count: usize,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererSerializationOracleDiagnostics {
+    #[must_use]
+    pub const fn current() -> Self {
+        Self {
+            oracle_kind: TEST_RENDERER_SERIALIZATION_ORACLE_KIND,
+            probe_mode_count: TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT,
+            scenario_count: TEST_RENDERER_SERIALIZATION_ORACLE_SCENARIO_COUNT,
+            compatibility_claimed: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn oracle_kind(self) -> &'static str {
+        self.oracle_kind
+    }
+
+    #[must_use]
+    pub const fn probe_mode_count(self) -> usize {
+        self.probe_mode_count
+    }
+
+    #[must_use]
+    pub const fn scenario_count(self) -> usize {
+        self.scenario_count
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererFiberHandleDiagnostics {
+    arena_id: u64,
+    slot: usize,
+    generation: u64,
+}
+
+impl TestRendererFiberHandleDiagnostics {
+    #[must_use]
+    pub const fn arena_id(self) -> u64 {
+        self.arena_id
+    }
+
+    #[must_use]
+    pub const fn slot(self) -> usize {
+        self.slot
+    }
+
+    #[must_use]
+    pub const fn generation(self) -> u64 {
+        self.generation
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootUpdateCallbackDiagnostics {
+    empty: bool,
+    visible_count: usize,
+    hidden_count: usize,
+    deferred_hidden_count: usize,
+}
+
+impl TestRendererRootUpdateCallbackDiagnostics {
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.empty
+    }
+
+    #[must_use]
+    pub const fn visible_count(self) -> usize {
+        self.visible_count
+    }
+
+    #[must_use]
+    pub const fn hidden_count(self) -> usize {
+        self.hidden_count
+    }
+
+    #[must_use]
+    pub const fn deferred_hidden_count(self) -> usize {
+        self.deferred_hidden_count
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererCommitDiagnostics {
+    root: FiberRootId,
+    lifecycle: TestRendererRootLifecycle,
+    last_update_kind: Option<TestRendererRootUpdateKind>,
+    last_scheduled_element: Option<RootElementHandle>,
+    previous_current: TestRendererFiberHandleDiagnostics,
+    current: TestRendererFiberHandleDiagnostics,
+    finished_work: TestRendererFiberHandleDiagnostics,
+    finished_lanes_empty: bool,
+    finished_lanes_include_sync: bool,
+    remaining_lanes_empty: bool,
+    pending_lanes_empty: bool,
+    has_remaining_work: bool,
+    root_update_callbacks: TestRendererRootUpdateCallbackDiagnostics,
+}
+
+impl TestRendererCommitDiagnostics {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn lifecycle(self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn last_update_kind(self) -> Option<TestRendererRootUpdateKind> {
+        self.last_update_kind
+    }
+
+    #[must_use]
+    pub const fn last_scheduled_element(self) -> Option<RootElementHandle> {
+        self.last_scheduled_element
+    }
+
+    #[must_use]
+    pub const fn previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub const fn current(self) -> TestRendererFiberHandleDiagnostics {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn finished_lanes_empty(self) -> bool {
+        self.finished_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn finished_lanes_include_sync(self) -> bool {
+        self.finished_lanes_include_sync
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes_empty(self) -> bool {
+        self.remaining_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn pending_lanes_empty(self) -> bool {
+        self.pending_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn has_remaining_work(self) -> bool {
+        self.has_remaining_work
+    }
+
+    #[must_use]
+    pub const fn root_update_callbacks(self) -> TestRendererRootUpdateCallbackDiagnostics {
+        self.root_update_callbacks
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputDiagnostics {
+    container_child_count: usize,
+    instance_count: usize,
+    text_count: usize,
+    real_host_output_available: bool,
+}
+
+impl TestRendererHostOutputDiagnostics {
+    #[must_use]
+    pub const fn container_child_count(self) -> usize {
+        self.container_child_count
+    }
+
+    #[must_use]
+    pub const fn instance_count(self) -> usize {
+        self.instance_count
+    }
+
+    #[must_use]
+    pub const fn text_count(self) -> usize {
+        self.text_count
+    }
+
+    #[must_use]
+    pub const fn real_host_output_available(self) -> bool {
+        self.real_host_output_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererSerializationGateReport {
+    gate_name: &'static str,
+    status: TestRendererSerializationGateStatus,
+    requirements: TestRendererSerializationGateRequirements,
+    oracle: TestRendererSerializationOracleDiagnostics,
+    commit: TestRendererCommitDiagnostics,
+    host_output: TestRendererHostOutputDiagnostics,
+}
+
+impl TestRendererSerializationGateReport {
+    #[must_use]
+    pub const fn gate_name(&self) -> &'static str {
+        self.gate_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> TestRendererSerializationGateStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn is_ready(&self) -> bool {
+        self.status.is_ready()
+    }
+
+    #[must_use]
+    pub const fn is_closed(&self) -> bool {
+        self.status.is_closed()
+    }
+
+    #[must_use]
+    pub const fn requirements(&self) -> TestRendererSerializationGateRequirements {
+        self.requirements
+    }
+
+    #[must_use]
+    pub const fn oracle(&self) -> TestRendererSerializationOracleDiagnostics {
+        self.oracle
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> TestRendererCommitDiagnostics {
+        self.commit
+    }
+
+    #[must_use]
+    pub const fn host_output(&self) -> TestRendererHostOutputDiagnostics {
+        self.host_output
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererSerializationGateError {
+    CommitRootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    CommitIsNotCurrent {
+        root: FiberRootId,
+        expected_current: TestRendererFiberHandleDiagnostics,
+        actual_current: TestRendererFiberHandleDiagnostics,
+    },
+    Closed(TestRendererSerializationGateReport),
+}
+
+impl TestRendererSerializationGateError {
+    #[must_use]
+    pub const fn report(&self) -> Option<&TestRendererSerializationGateReport> {
+        match self {
+            Self::Closed(report) => Some(report),
+            Self::CommitRootMismatch { .. } | Self::CommitIsNotCurrent { .. } => None,
+        }
+    }
+}
+
+impl Display for TestRendererSerializationGateError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CommitRootMismatch { expected, actual } => write!(
+                formatter,
+                "serialization gate commit root {} does not match test renderer root {}",
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::CommitIsNotCurrent {
+                root,
+                expected_current,
+                actual_current,
+            } => write!(
+                formatter,
+                "serialization gate commit fiber slot {} is not current for root {}; current slot is {}",
+                expected_current.slot(),
+                root.raw(),
+                actual_current.slot()
+            ),
+            Self::Closed(report) => write!(
+                formatter,
+                "serialization gate '{}' is closed for root {} with status {:?}",
+                report.gate_name(),
+                report.commit().root().raw(),
+                report.status()
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererSerializationGateError {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererRootError {
     Host(HostError),
@@ -784,6 +1158,7 @@ pub enum TestRendererRootError {
     RootScheduler(RootSchedulerError),
     RootWorkLoop(RootWorkLoopError),
     RootCommit(RootCommitError),
+    SerializationGate(Box<TestRendererSerializationGateError>),
 }
 
 impl Display for TestRendererRootError {
@@ -795,6 +1170,7 @@ impl Display for TestRendererRootError {
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::SerializationGate(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -808,6 +1184,7 @@ impl Error for TestRendererRootError {
             Self::RootScheduler(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
             Self::RootCommit(error) => Some(error),
+            Self::SerializationGate(error) => Some(error),
         }
     }
 }
@@ -845,6 +1222,12 @@ impl From<RootWorkLoopError> for TestRendererRootError {
 impl From<RootCommitError> for TestRendererRootError {
     fn from(error: RootCommitError) -> Self {
         Self::RootCommit(error)
+    }
+}
+
+impl From<TestRendererSerializationGateError> for TestRendererRootError {
+    fn from(error: TestRendererSerializationGateError) -> Self {
+        Self::SerializationGate(Box::new(error))
     }
 }
 
@@ -1029,10 +1412,128 @@ impl TestRendererRoot {
         Ok(commit_finished_host_root(&mut self.store, render)?)
     }
 
+    pub fn describe_serialization_gate_for_canary(
+        &self,
+        commit: &HostRootCommitRecord,
+    ) -> Result<TestRendererSerializationGateReport, TestRendererRootError> {
+        self.validate_serialization_gate_commit(commit)?;
+
+        let snapshot = self.renderer.snapshot_container(&self.container)?;
+        let host_output = TestRendererHostOutputDiagnostics {
+            container_child_count: snapshot.children().len(),
+            instance_count: self.renderer.instances.len(),
+            text_count: self.renderer.texts.len(),
+            real_host_output_available: !snapshot.children().is_empty(),
+        };
+        let requirements = TestRendererSerializationGateRequirements {
+            root_commit_diagnostics_available: true,
+            real_host_output_available: host_output.real_host_output_available(),
+            committed_fiber_inspection_available: false,
+        };
+        let status = if !requirements.real_host_output_available() {
+            TestRendererSerializationGateStatus::ClosedMissingHostOutput
+        } else if !requirements.committed_fiber_inspection_available() {
+            TestRendererSerializationGateStatus::ClosedMissingFiberInspection
+        } else {
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        };
+        let callbacks = commit.root_update_callbacks();
+        let previous_current = commit.previous_current();
+        let current = commit.current();
+        let finished_work = commit.finished_work();
+        let last_update = self.scheduled_updates.last();
+
+        Ok(TestRendererSerializationGateReport {
+            gate_name: TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME,
+            status,
+            requirements,
+            oracle: TestRendererSerializationOracleDiagnostics::current(),
+            commit: TestRendererCommitDiagnostics {
+                root: commit.root(),
+                lifecycle: self.lifecycle,
+                last_update_kind: last_update.map(TestRendererRootScheduledUpdate::kind),
+                last_scheduled_element: last_update.map(TestRendererRootScheduledUpdate::element),
+                previous_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: previous_current.arena_id().get(),
+                    slot: previous_current.slot().get(),
+                    generation: previous_current.generation().get(),
+                },
+                current: TestRendererFiberHandleDiagnostics {
+                    arena_id: current.arena_id().get(),
+                    slot: current.slot().get(),
+                    generation: current.generation().get(),
+                },
+                finished_work: TestRendererFiberHandleDiagnostics {
+                    arena_id: finished_work.arena_id().get(),
+                    slot: finished_work.slot().get(),
+                    generation: finished_work.generation().get(),
+                },
+                finished_lanes_empty: commit.finished_lanes().is_empty(),
+                finished_lanes_include_sync: commit.finished_lanes().includes_sync_lane(),
+                remaining_lanes_empty: commit.remaining_lanes().is_empty(),
+                pending_lanes_empty: commit.pending_lanes().is_empty(),
+                has_remaining_work: commit.has_remaining_work(),
+                root_update_callbacks: TestRendererRootUpdateCallbackDiagnostics {
+                    empty: callbacks.is_empty(),
+                    visible_count: callbacks.visible().len(),
+                    hidden_count: callbacks.hidden().len(),
+                    deferred_hidden_count: callbacks.deferred_hidden().len(),
+                },
+            },
+            host_output,
+        })
+    }
+
+    pub fn require_serialization_gate_ready_for_canary(
+        &self,
+        commit: &HostRootCommitRecord,
+    ) -> Result<TestRendererSerializationGateReport, TestRendererRootError> {
+        let report = self.describe_serialization_gate_for_canary(commit)?;
+        if report.is_ready() {
+            Ok(report)
+        } else {
+            Err(TestRendererSerializationGateError::Closed(report).into())
+        }
+    }
+
     pub fn diagnostic_container_snapshot(
         &self,
     ) -> Result<TestContainerSnapshot, TestRendererRootError> {
         Ok(self.renderer.snapshot_container(&self.container)?)
+    }
+
+    fn validate_serialization_gate_commit(
+        &self,
+        commit: &HostRootCommitRecord,
+    ) -> Result<(), TestRendererRootError> {
+        if commit.root() != self.root_id {
+            return Err(TestRendererSerializationGateError::CommitRootMismatch {
+                expected: self.root_id,
+                actual: commit.root(),
+            }
+            .into());
+        }
+
+        let actual_current = self.store.root(self.root_id)?.current();
+        if actual_current != commit.current() {
+            let expected_current = commit.current();
+            return Err(TestRendererSerializationGateError::CommitIsNotCurrent {
+                root: self.root_id,
+                expected_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: expected_current.arena_id().get(),
+                    slot: expected_current.slot().get(),
+                    generation: expected_current.generation().get(),
+                },
+                actual_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: actual_current.arena_id().get(),
+                    slot: actual_current.slot().get(),
+                    generation: actual_current.generation().get(),
+                },
+            }
+            .into());
+        }
+
+        Ok(())
     }
 
     fn schedule_root_update(
@@ -1994,6 +2495,145 @@ mod tests {
             snapshot_after_create
         );
         assert_eq!(host_storage_counts(&root), storage_after_create);
+    }
+
+    #[test]
+    fn root_serialization_gate_reports_committed_diagnostics_and_missing_host_output() {
+        let callback = RootUpdateCallbackHandle::from_raw(101);
+        let mut root = TestRendererRoot::create_with_root_update_callback_for_canary(
+            root_element(10),
+            TestRendererOptions::new(),
+            callback,
+        )
+        .unwrap();
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+
+        let report = root
+            .describe_serialization_gate_for_canary(&commit)
+            .unwrap();
+        let requirements = report.requirements();
+        let oracle = report.oracle();
+        let commit_diagnostics = report.commit();
+        let callback_diagnostics = commit_diagnostics.root_update_callbacks();
+        let host_output = report.host_output();
+
+        assert_eq!(
+            report.gate_name(),
+            TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME
+        );
+        assert_eq!(
+            report.status(),
+            TestRendererSerializationGateStatus::ClosedMissingHostOutput
+        );
+        assert!(report.is_closed());
+        assert!(!report.is_ready());
+        assert!(requirements.root_commit_diagnostics_available());
+        assert!(!requirements.real_host_output_available());
+        assert!(!requirements.committed_fiber_inspection_available());
+        assert!(!requirements.private_serialization_ready());
+        assert_eq!(
+            oracle.oracle_kind(),
+            TEST_RENDERER_SERIALIZATION_ORACLE_KIND
+        );
+        assert_eq!(
+            oracle.probe_mode_count(),
+            TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT
+        );
+        assert_eq!(
+            oracle.scenario_count(),
+            TEST_RENDERER_SERIALIZATION_ORACLE_SCENARIO_COUNT
+        );
+        assert!(!oracle.compatibility_claimed());
+        assert_eq!(commit_diagnostics.root(), root.root_id());
+        assert_eq!(
+            commit_diagnostics.lifecycle(),
+            TestRendererRootLifecycle::Active
+        );
+        assert_eq!(
+            commit_diagnostics.last_update_kind(),
+            Some(TestRendererRootUpdateKind::Create)
+        );
+        assert_eq!(
+            commit_diagnostics.last_scheduled_element(),
+            Some(root_element(10))
+        );
+        assert_eq!(
+            commit_diagnostics.previous_current().slot(),
+            commit.previous_current().slot().get()
+        );
+        assert_eq!(
+            commit_diagnostics.current().slot(),
+            commit.current().slot().get()
+        );
+        assert_eq!(
+            commit_diagnostics.finished_work().slot(),
+            commit.finished_work().slot().get()
+        );
+        assert_eq!(
+            commit_diagnostics.current(),
+            commit_diagnostics.finished_work()
+        );
+        assert_eq!(commit.current(), render.finished_work());
+        assert!(!commit_diagnostics.finished_lanes_empty());
+        assert!(!commit_diagnostics.finished_lanes_include_sync());
+        assert!(commit_diagnostics.remaining_lanes_empty());
+        assert!(commit_diagnostics.pending_lanes_empty());
+        assert!(!commit_diagnostics.has_remaining_work());
+        assert!(!callback_diagnostics.is_empty());
+        assert_eq!(callback_diagnostics.visible_count(), 1);
+        assert_eq!(callback_diagnostics.hidden_count(), 0);
+        assert_eq!(callback_diagnostics.deferred_hidden_count(), 0);
+        assert_eq!(host_output.container_child_count(), 0);
+        assert_eq!(host_output.instance_count(), 0);
+        assert_eq!(host_output.text_count(), 0);
+        assert!(!host_output.real_host_output_available());
+    }
+
+    #[test]
+    fn root_serialization_gate_fails_closed_before_real_host_output() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let (_render, commit) = render_and_commit_latest_host_root(&mut root);
+
+        let error = root
+            .require_serialization_gate_ready_for_canary(&commit)
+            .unwrap_err();
+
+        let TestRendererRootError::SerializationGate(error) = error else {
+            panic!("expected serialization gate closure");
+        };
+        let TestRendererSerializationGateError::Closed(report) = error.as_ref() else {
+            panic!("expected serialization gate closure");
+        };
+        assert_eq!(
+            report.status(),
+            TestRendererSerializationGateStatus::ClosedMissingHostOutput
+        );
+        assert_eq!(report.commit().root(), root.root_id());
+        assert_eq!(report.host_output().container_child_count(), 0);
+        assert!(!report.requirements().real_host_output_available());
+    }
+
+    #[test]
+    fn root_serialization_gate_rejects_stale_commit_diagnostics() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let (_create_render, create_commit) = render_and_commit_latest_host_root(&mut root);
+        root.update(root_element(2)).unwrap();
+        render_and_commit_latest_host_root(&mut root);
+
+        let error = root
+            .describe_serialization_gate_for_canary(&create_commit)
+            .unwrap_err();
+
+        let TestRendererRootError::SerializationGate(error) = error else {
+            panic!("expected serialization gate error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererSerializationGateError::CommitIsNotCurrent { root: error_root, .. }
+                if *error_root == root.root_id()
+        ));
     }
 
     #[test]
