@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 481 was accepted from queue 473-502. It added private deletion
+  cleanup-order diagnostics proving deleted ref cleanup-return metadata is
+  recorded before deleted-subtree passive destroy metadata and host cleanup
+  records, with a test-renderer unmount readout for the order gate. It was
+  verified after merge with focused root-commit deletion and test-renderer
+  deletion gates, full `fast-react-reconciler` plus `fast-react-test-renderer`
+  tests, Rust fmt, conflict-marker scanning, and `git diff --check`.
 - Worker 480 was accepted from queue 473-502. It added private fail-closed
   Suspense and Offscreen child-shape diagnostics for begin-work and
   root-work-loop preflight/complete handoff paths, preserving the public
