@@ -34,9 +34,7 @@ Subagent policy from the orchestrator:
 - If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
 POLICY
 )"
-prompt_text="$(<"$prompt_file")
-
-$orchestration_policy"
+prompt_text="$(printf '%s\n\n%s' "$(<"$prompt_file")" "$orchestration_policy")"
 
 # Use the interactive TUI, not `codex exec`, so the tmux pane remains readable
 # (including "Pursuing goal") while `script` also records the session log.
