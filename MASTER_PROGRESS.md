@@ -29,6 +29,25 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 719
+
+- Worker 719 added private function-component effect destroy-handle
+  persistence evidence. Update records now prove previous-effect provenance,
+  passive handoff and effect-list metadata carry `previous_effect`, and
+  validation rejects mismatched provenance before public effect execution is
+  admitted.
+- The accepted canaries prove changed dependencies consume the previous destroy
+  handle, unchanged dependencies retain skipped destroy metadata, foreign drift
+  is detectable, and a test-controlled passive create return is stored on the
+  hook effect instance before a later update consumes it as the unmount destroy.
+- Worker 719 was accepted after independent audit and verification with focused
+  function-component, passive-effects, and root-commit tests, broader
+  `function_component`, `passive`, and `root_commit` filters, formatting,
+  clippy, full `npm run check`, conflict-marker scanning, and `git diff
+  --check`; its subagent, worktree, and branch were removed after merge.
+  Public hooks/effects, public `act`, public render, scheduler-driven passive
+  execution, and renderer compatibility remain blocked.
+
 ### Worker 718
 
 - Worker 718 hardened the private sync-flush/root-scheduler finished-work

@@ -47,15 +47,14 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-718 and 721 have also been accepted and
+accepted and cleaned up. Workers 715-719 and 721 have also been accepted and
 cleaned up.
 
-- Worker 719: function-component effect destroy-handle persistence.
 - Worker 720: test-renderer serialization finished-work identity gate.
 
 ## Near-Term Sequencing
 
-1. Monitor workers 719-720 and accept only scoped private evidence that keeps
+1. Monitor worker 720 and accept only scoped private evidence that keeps
    public root, act, flushSync, hooks/effects, test-renderer, and React DOM
    compatibility blocked.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
