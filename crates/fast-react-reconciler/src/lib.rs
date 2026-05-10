@@ -82,8 +82,9 @@ pub use root_work_loop::{
     render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
 };
 pub use scheduler_bridge::{
-    SchedulerBridge, SchedulerCallbackRequest, SchedulerCancellationRecord,
-    SchedulerMicrotaskHandle, SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
+    FAKE_ACT_CALLBACK_NODE, SchedulerActQueueRequest, SchedulerActQueueTaskKind, SchedulerBridge,
+    SchedulerCallbackRequest, SchedulerCancellationRecord, SchedulerMicrotaskHandle,
+    SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
 };
 pub use update_priority::{UpdatePriorityState, request_update_lane};
 pub use update_queue::{
