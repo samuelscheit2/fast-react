@@ -49,6 +49,25 @@ sequencing belong in `MASTER_PLAN.md`.
   workspace checks, test-renderer serialization conformance, package-surface
   and private-admission guards, conflict-marker scanning, and `git diff
   --check`.
+- Workers 656, 659, 661-663, 666-670, 672-675, 677, and 679-683 were
+  accepted, completing queue 655-684. The batch added HostComponent prop/style
+  commit execution, layout-effect destroy/create execution, context-provider
+  commit propagation, Suspense fallback retry execution, Offscreen passive
+  defer/reveal evidence, reducer transition lane execution, test-renderer
+  `toTree`/TestInstance/error-boundary/act/passive/unmount private native
+  evidence, React DOM live-container/root-unmount/fragment/hydration/resource/
+  form private execution evidence, and Scheduler postTask act/root continuation
+  evidence while keeping public compatibility blocked.
+- Queue 655-684 conflict resolutions preserved both sides of overlapping
+  private evidence in host prop/text commits, root work-loop Suspense/context
+  imports, passive Offscreen queue imports, test-renderer `toTree` routing
+  helpers, and React DOM resource fake-head/load-state/order metadata.
+- The completed queue 655-684 state was verified with `cargo fmt --all
+  --check`, full `fast-react-reconciler` tests, full
+  `fast-react-test-renderer` tests, React DOM/test-renderer/Scheduler
+  workspace checks, `npm run check:package-surface`, full conformance checks,
+  focused test-renderer create-routing and serialization gates, focused React
+  DOM root facade checks, conflict-marker scanning, and `git diff --check`.
 
 ### Queue 625-654
 

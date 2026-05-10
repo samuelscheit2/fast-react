@@ -45,32 +45,22 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 655, 657-658, 660, 664-665, 671, 676,
-678, and 684 from queue 655-684 have been accepted; the remaining queue is
-running in isolated `worker/<slug>` branches and worktrees from queue base
-`243817c`.
-
-- 656, 659, 661-663, and 666: Rust reconciler execution paths for
-  HostComponent prop/style commit, layout effects, context, Suspense,
-  Offscreen, and reducer transition lanes.
-- 667-670 and 672: React test-renderer private native execution evidence for
-  `toTree`, TestInstance queries, error boundaries, act/passive flushing, and
-  unmount ref/passive ordering.
-- 673-675, 677, and 679-682: React DOM private root live-container preflight,
-  root unmount ref/passive cleanup, fragment/array fake-DOM rendering,
-  hydration recovery, resource execution, and form action callback preflight.
-- 683: Scheduler postTask act/root continuation evidence.
+Top-level cap: 30 workers. Queue 655-684 has been merged and verified. Clean
+the accepted sessions/worktrees/branches, then launch the next replacement
+queue from the current `main` commit.
 
 ## Near-Term Sequencing
 
-1. Monitor queue 655-684 from tmux pane state and worker progress reports.
-2. Classify completions before accepting work; inspect worker reports,
-   worktree status, changed files, verification, and risks.
-3. Merge accepted completed work in batches, resolving overlap conflicts on
+1. Clean queue 655-684 accepted sessions, worktrees, and worker branches.
+2. Prepare the next replacement queue with non-overlapping write scopes and
+   prompts that require `create_goal` as the first worker action.
+3. Launch replacement workers up to the 30 top-level cap from the current
+   `main` commit.
+4. Monitor tmux pane state and worker progress reports, then classify
+   completions before accepting work.
+5. Merge accepted completed work in batches, resolving overlap conflicts on
    `main`, then clean accepted sessions/worktrees/branches.
-4. Fill open top-level slots with replacement workers only after current
-   completions are merged and cleaned.
-5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+6. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
