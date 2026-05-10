@@ -4,6 +4,7 @@
   "packageDirectories": [
     "react",
     "react-dom",
+    "react-test-renderer",
     "scheduler"
   ],
   "manifestFields": [
@@ -207,6 +208,14 @@
     "reactDom.testUtils": [
       "act"
     ],
+    "reactTestRenderer.root": [
+      "_Scheduler",
+      "act",
+      "create",
+      "unstable_batchedUpdates",
+      "version"
+    ],
+    "reactTestRenderer.shallow": [],
     "scheduler.root": [
       "unstable_now",
       "unstable_IdlePriority",
@@ -634,6 +643,76 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/test-utils"
+          }
+        }
+      ]
+    },
+    "react-test-renderer": {
+      "manifest": {
+        "name": "@fast-react/react-test-renderer",
+        "version": "0.0.0",
+        "private": true,
+        "type": null,
+        "main": "index.js",
+        "exports": null,
+        "types": null,
+        "typings": null,
+        "typesVersions": null,
+        "files": null,
+        "bin": null,
+        "browser": null,
+        "module": null,
+        "react-native": null,
+        "dependencies": {
+          "scheduler": "^0.27.0"
+        },
+        "peerDependencies": {
+          "@fast-react/react": "0.0.0"
+        }
+      },
+      "publicResolverFiles": [
+        "cjs/react-test-renderer.development.js",
+        "cjs/react-test-renderer.production.js",
+        "index.js",
+        "package.json",
+        "shallow.js"
+      ],
+      "declarationFiles": [],
+      "runtimeEntrypoints": [
+        {
+          "file": "index.js",
+          "keySet": "reactTestRenderer.root",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-test-renderer@19.2.6",
+            "entrypoint": "react-test-renderer"
+          }
+        },
+        {
+          "file": "cjs/react-test-renderer.development.js",
+          "keySet": "reactTestRenderer.root",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-test-renderer@19.2.6",
+            "entrypoint": "react-test-renderer/cjs/react-test-renderer.development"
+          }
+        },
+        {
+          "file": "cjs/react-test-renderer.production.js",
+          "keySet": "reactTestRenderer.root",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-test-renderer@19.2.6",
+            "entrypoint": "react-test-renderer/cjs/react-test-renderer.production"
+          }
+        },
+        {
+          "file": "shallow.js",
+          "keySet": "reactTestRenderer.shallow",
+          "metadata": {
+            "placeholder": true,
+            "compatibilityTarget": "react-test-renderer@19.2.6",
+            "entrypoint": "react-test-renderer/shallow"
           }
         }
       ]

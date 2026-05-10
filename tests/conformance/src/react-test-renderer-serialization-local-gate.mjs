@@ -101,6 +101,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
 
   if (
     localChecks.publicJsReactTestRendererFacadePresent &&
+    !localChecks.publicJsReactTestRendererFacadePlaceholder &&
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS.status ===
       "not-present-in-workspace"
   ) {
@@ -127,6 +128,10 @@ export function evaluateReactTestRendererSerializationLocalGate({
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
+  const publicJsReactTestRendererPackageRoots = [
+    "packages/react-test-renderer",
+    "packages/fast-react-test-renderer"
+  ];
   const testRendererCargo = readWorkspaceFile(
     workspaceRoot,
     "crates/fast-react-test-renderer/Cargo.toml"
@@ -141,11 +146,19 @@ export function inspectReactTestRendererSerializationLocalTargets({
   );
 
   const publicJsReactTestRendererFacadePresent =
-    existsWorkspacePath(workspaceRoot, "packages/react-test-renderer/package.json") ||
-    existsWorkspacePath(
-      workspaceRoot,
-      "packages/fast-react-test-renderer/package.json"
+    publicJsReactTestRendererPackageRoots.some((packageRoot) =>
+      existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)
     );
+  const publicJsReactTestRendererFacadePlaceholder =
+    publicJsReactTestRendererPackageRoots.some((packageRoot) =>
+      isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot)
+    );
+  const publicJsReactTestRendererFacadeStatus =
+    publicJsReactTestRendererFacadePresent
+      ? publicJsReactTestRendererFacadePlaceholder
+        ? "placeholder-present"
+        : "present"
+      : "absent";
   const rustTestRendererRootFacadePresent =
     hasSourcePattern(testRendererCargo, /\bfast-react-reconciler\b/u) &&
     hasSourcePattern(
@@ -169,11 +182,38 @@ export function inspectReactTestRendererSerializationLocalTargets({
 
   return {
     publicJsReactTestRendererFacadePresent,
+    publicJsReactTestRendererFacadePlaceholder,
+    publicJsReactTestRendererFacadeStatus,
     rustTestRendererRootFacadePresent,
     committedTestRendererHostOutputPresent,
     committedFiberInspectionPresent,
     rustSerializationApiPresent
   };
+}
+
+function isPlaceholderReactTestRendererPackage(workspaceRoot, packageRoot) {
+  if (!existsWorkspacePath(workspaceRoot, `${packageRoot}/package.json`)) {
+    return false;
+  }
+
+  const packageJson = readWorkspaceFile(workspaceRoot, `${packageRoot}/package.json`);
+  const packageSource = readWorkspaceTree(workspaceRoot, packageRoot);
+
+  return (
+    hasSourcePattern(
+      packageJson,
+      /"name"\s*:\s*"@fast-react\/react-test-renderer"/u
+    ) &&
+    hasSourcePattern(packageSource, /\b__FAST_REACT_PLACEHOLDER__\b/u) &&
+    hasSourcePattern(
+      packageSource,
+      /\bFastReactTestRendererUnimplementedError\b/u
+    ) &&
+    hasSourcePattern(
+      packageSource,
+      /\b0\.0\.0-fast-react-test-renderer-placeholder\b/u
+    )
+  );
 }
 
 function existsWorkspacePath(workspaceRoot, relativePath) {
