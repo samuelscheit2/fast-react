@@ -1,8 +1,12 @@
-'use strict';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const assert = require('node:assert/strict');
-const path = require('node:path');
-const test = require('node:test');
+const require = createRequire(import.meta.url);
+const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(testDirectory, '..', '..', '..');
 
 const privateActQueueFlushDiagnosticsExport =
   '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
@@ -331,14 +335,18 @@ function readPrivateFlushDiagnostics(Scheduler) {
 }
 
 function loadFreshReactActDispatcherGate() {
-  return loadFreshWorkspaceModule('../../react/private-act-dispatcher-gate.js');
+  return loadFreshWorkspaceModule(
+    path.join(repoRoot, 'packages/react/private-act-dispatcher-gate.js')
+  );
 }
 
 function loadFreshSchedulerMock(nodeEnv) {
   const previousNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = nodeEnv;
   try {
-    return loadFreshWorkspaceModule('../unstable_mock.js');
+    return loadFreshWorkspaceModule(
+      path.join(repoRoot, 'packages/scheduler/unstable_mock.js')
+    );
   } finally {
     if (previousNodeEnv === undefined) {
       delete process.env.NODE_ENV;
@@ -348,14 +356,14 @@ function loadFreshSchedulerMock(nodeEnv) {
   }
 }
 
-function loadFreshWorkspaceModule(relativePath) {
-  const modulePath = require.resolve(relativePath);
-  const packageRoot = path.resolve(__dirname, '..', '..');
+function loadFreshWorkspaceModule(modulePath) {
+  const resolvedModulePath = require.resolve(modulePath);
+  const packagesRoot = path.join(repoRoot, 'packages');
   for (const id of Object.keys(require.cache)) {
-    if (id.startsWith(packageRoot)) {
+    if (id.startsWith(packagesRoot)) {
       delete require.cache[id];
     }
   }
-  delete require.cache[modulePath];
-  return require(modulePath);
+  delete require.cache[resolvedModulePath];
+  return require(resolvedModulePath);
 }
