@@ -175,16 +175,23 @@ const actSchedulerReactDispatcherRecordIds = [
 const actSchedulerSyncFlushRecordIds = [
   "sync-flush-act-continuation-record",
   "sync-flush-act-post-passive-continuation-gate",
-  "sync-flush-post-passive-continuation-execution-gate"
+  "sync-flush-post-passive-continuation-execution-gate",
+  "sync-flush-post-passive-continuation-execution-record",
+  "passive-effects-flush-with-sync-flush-continuation-result"
 ];
 const actSchedulerPassiveRecordIds = [
   "pending-passive-commit-handoff",
   "passive-effects-flush-record",
-  "function-component-pending-passive-effect-phase-record"
+  "function-component-pending-passive-effect-phase-record",
+  "passive-effect-callback-invocation-gate-snapshot",
+  "passive-effect-destroy-callback-execution-records"
 ];
 const actSchedulerRootFlushRecordIds = [
   "test-renderer-private-root-request-bridge",
-  "test-renderer-private-root-update-unmount-lifecycle"
+  "test-renderer-private-root-update-unmount-lifecycle",
+  "test-renderer-private-root-native-canary-metadata",
+  "test-renderer-private-tojson-host-output-diagnostic",
+  "test-renderer-private-testinstance-query-path"
 ];
 const acceptedPrivateActFlushPrerequisiteIds = [
   "react-act-private-dispatcher-gate",
@@ -192,7 +199,10 @@ const acceptedPrivateActFlushPrerequisiteIds = [
   "scheduler-mock-flush-helper-metadata",
   "sync-flush-act-continuation-records",
   "sync-flush-post-passive-continuation-execution-gate",
+  "sync-flush-post-passive-private-execution-metadata",
   "passive-effect-flush-metadata",
+  "passive-effect-private-callback-execution-metadata",
+  "test-renderer-private-root-output-diagnostics",
   "test-renderer-private-root-request-records"
 ];
 const blockedPrivateActFlushPrerequisiteIds = [
@@ -2024,7 +2034,13 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-301-hook-effect-destroy-handoff-metadata",
     "worker-303-sync-flush-passive-continuation-execution-gate",
     "worker-304-test-renderer-js-private-root-request-bridge",
-    "worker-307-test-renderer-update-unmount-private-js-bridge"
+    "worker-307-test-renderer-update-unmount-private-js-bridge",
+    "worker-326-passive-effect-create-destroy-callback-invocation-gate",
+    "worker-331-sync-flush-passive-continuation-execution",
+    "worker-332-test-renderer-js-private-root-native-bridge",
+    "worker-333-test-renderer-tojson-host-output-private-path",
+    "worker-334-test-renderer-testinstance-private-query-path",
+    "worker-349-hook-effect-destroy-callback-execution-private"
   ]);
   assert.equal(gate.publicActBehaviorAvailable, false);
   assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
@@ -2047,6 +2063,10 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.postPassiveContinuationExecutionGateAccepted, true);
   assert.equal(gate.passiveActFlushMetadataAccepted, true);
   assert.equal(gate.rootRequestRecordsAccepted, true);
+  assert.equal(gate.privateFlushExecutionMetadataAccepted, true);
+  assert.equal(gate.privateSyncFlushExecutionMetadataAccepted, true);
+  assert.equal(gate.privatePassiveCallbackExecutionMetadataAccepted, true);
+  assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
   assert.equal(gate.privateFlushExecutionReady, false);
   assert.deepEqual(
@@ -2114,6 +2134,14 @@ function assertActSchedulerGate(gate, entrypoint) {
     false
   );
   assert.equal(
+    gate.recognizedSyncFlushActRecords[3].privateFlushExecutionMetadata,
+    true
+  );
+  assert.equal(
+    gate.recognizedSyncFlushActRecords[4].publicSchedulerTaskExecution,
+    false
+  );
+  assert.equal(
     gate.recognizedPassiveActFlushRecords[1].createCallbackInvoked,
     false
   );
@@ -2122,7 +2150,27 @@ function assertActSchedulerGate(gate, entrypoint) {
     false
   );
   assert.equal(
+    gate.recognizedPassiveActFlushRecords[3].testControlOnly,
+    true
+  );
+  assert.equal(
+    gate.recognizedPassiveActFlushRecords[4].privateDestroyExecutionMetadata,
+    true
+  );
+  assert.equal(
     gate.recognizedRootActFlushRecords[0].privateRootRequestExecution,
+    false
+  );
+  assert.equal(
+    gate.recognizedRootActFlushRecords[2].privateHostOutputDiagnosticsAccepted,
+    true
+  );
+  assert.equal(
+    gate.recognizedRootActFlushRecords[3].privateHostOutputDiagnosticsSerializable,
+    true
+  );
+  assert.equal(
+    gate.recognizedRootActFlushRecords[4].publicTestInstanceObjectAvailable,
     false
   );
 }
