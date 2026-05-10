@@ -1,6 +1,7 @@
 'use strict';
 
 const {ELEMENT_NODE, TEXT_NODE} = require('./dom-container.js');
+const {getContainerRoot} = require('./root-markers.js');
 
 const hostInstanceMarkerPrefix = '__fastReactHostInstance$';
 const latestPropsMarkerPrefix = '__fastReactProps$';
@@ -102,11 +103,35 @@ function assertKnownHostInstanceToken(token) {
   return metadata;
 }
 
-function getAttachedNodeFromHostInstanceToken(token) {
+function getMountedHostInstanceNodeFromToken(token) {
   if (getHostInstanceMetadata(token) === null) {
     return null;
   }
-  return tokenToNode.get(token) || null;
+
+  const node = tokenToNode.get(token);
+  if (node === undefined) {
+    return null;
+  }
+
+  return node[internalHostInstanceTokenKey] === token ? node : null;
+}
+
+function assertMountedHostInstanceToken(token) {
+  assertKnownHostInstanceToken(token);
+
+  const node = getMountedHostInstanceNodeFromToken(token);
+  if (node === null) {
+    throw createComponentTreeError(
+      'Cannot use an unmounted React DOM host instance token.',
+      'FAST_REACT_DOM_UNMOUNTED_HOST_INSTANCE_TOKEN'
+    );
+  }
+
+  return node;
+}
+
+function getAttachedNodeFromHostInstanceToken(token) {
+  return getMountedHostInstanceNodeFromToken(token);
 }
 
 function getHostInstanceTokenFromNode(node) {
@@ -120,6 +145,36 @@ function getHostInstanceTokenFromNode(node) {
   }
 
   return tokenToNode.get(token) === node ? token : null;
+}
+
+function getMountedHostInstanceTokenFromNode(node) {
+  return getHostInstanceTokenFromNode(node);
+}
+
+function getClosestMountedHostInstanceTokenFromNode(targetNode) {
+  let currentNode = isObjectLike(targetNode) ? targetNode : null;
+
+  while (currentNode !== null) {
+    const token = getMountedHostInstanceTokenFromNode(currentNode);
+    if (token !== null) {
+      return token;
+    }
+
+    if (getContainerRoot(currentNode) !== null) {
+      return null;
+    }
+
+    currentNode = isObjectLike(currentNode.parentNode)
+      ? currentNode.parentNode
+      : null;
+  }
+
+  return null;
+}
+
+function getClosestMountedHostInstanceNodeFromNode(targetNode) {
+  const token = getClosestMountedHostInstanceTokenFromNode(targetNode);
+  return token === null ? null : getMountedHostInstanceNodeFromToken(token);
 }
 
 function getHostInstanceOwnerFromToken(token) {
@@ -178,6 +233,13 @@ function updateLatestPropsForNode(node, latestProps) {
   return node[internalLatestPropsKey];
 }
 
+function updateLatestPropsForHostInstanceToken(token, latestProps) {
+  return updateLatestPropsForNode(
+    assertMountedHostInstanceToken(token),
+    latestProps
+  );
+}
+
 function getLatestPropsFromNode(node) {
   if (getHostInstanceTokenFromNode(node) === null) {
     return null;
@@ -185,6 +247,11 @@ function getLatestPropsFromNode(node) {
   return Object.prototype.hasOwnProperty.call(node, internalLatestPropsKey)
     ? node[internalLatestPropsKey]
     : null;
+}
+
+function getLatestPropsFromHostInstanceToken(token) {
+  const node = getMountedHostInstanceNodeFromToken(token);
+  return node === null ? null : getLatestPropsFromNode(node);
 }
 
 function detachHostInstanceNode(node) {
@@ -205,16 +272,41 @@ function detachHostInstanceNode(node) {
   return token;
 }
 
+function detachHostInstanceToken(token) {
+  if (getHostInstanceMetadata(token) === null) {
+    return null;
+  }
+
+  const node = tokenToNode.get(token);
+  if (node !== undefined) {
+    if (node[internalHostInstanceTokenKey] === token) {
+      delete node[internalHostInstanceTokenKey];
+      delete node[internalLatestPropsKey];
+    }
+    tokenToNode.delete(token);
+  }
+
+  tokenMetadata.delete(token);
+  return token;
+}
+
 module.exports = {
+  assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
   createHostInstanceToken,
   detachHostInstanceNode,
+  detachHostInstanceToken,
   getAttachedNodeFromHostInstanceToken,
+  getClosestMountedHostInstanceNodeFromNode,
+  getClosestMountedHostInstanceTokenFromNode,
   getHostInstanceOwnerFromNode,
   getHostInstanceOwnerFromToken,
   getHostInstanceTokenFromNode,
+  getLatestPropsFromHostInstanceToken,
   getLatestPropsFromNode,
+  getMountedHostInstanceNodeFromToken,
+  getMountedHostInstanceTokenFromNode,
   getRootOwnerFromHostInstanceToken,
   getRootOwnerFromNode,
   hostInstanceMarkerPrefix,
@@ -223,5 +315,6 @@ module.exports = {
   isHostInstanceNode,
   isHostInstanceToken,
   latestPropsMarkerPrefix,
+  updateLatestPropsForHostInstanceToken,
   updateLatestPropsForNode
 };

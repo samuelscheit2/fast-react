@@ -16,6 +16,9 @@ const componentTree = require(
 const domContainer = require(
   path.join(repoRoot, 'packages/react-dom/src/client/dom-container.js')
 );
+const rootMarkers = require(
+  path.join(repoRoot, 'packages/react-dom/src/client/root-markers.js')
+);
 const reactDom = require(path.join(repoRoot, 'packages/react-dom/index.js'));
 const reactDomClient = require(
   path.join(repoRoot, 'packages/react-dom/client.js')
@@ -44,7 +47,10 @@ const reactDomPackage = require(
     token
   );
   assert.equal(componentTree.getHostInstanceTokenFromNode(node), token);
+  assert.equal(componentTree.getMountedHostInstanceTokenFromNode(node), token);
   assert.equal(componentTree.getAttachedNodeFromHostInstanceToken(token), node);
+  assert.equal(componentTree.getMountedHostInstanceNodeFromToken(token), node);
+  assert.equal(componentTree.assertMountedHostInstanceToken(token), node);
   assert.equal(componentTree.getHostInstanceOwnerFromToken(token), hostOwner);
   assert.equal(
     componentTree.getRootOwnerFromHostInstanceToken(token),
@@ -65,6 +71,29 @@ const reactDomPackage = require(
     nextProps
   );
   assert.equal(componentTree.getLatestPropsFromNode(node), nextProps);
+  assert.equal(
+    componentTree.getLatestPropsFromHostInstanceToken(token),
+    nextProps
+  );
+
+  const tokenProps = {
+    disabled: false,
+    onClick() {
+      return 'token updated';
+    }
+  };
+  assert.equal(
+    componentTree.updateLatestPropsForHostInstanceToken(token, tokenProps),
+    tokenProps
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(node), tokenProps);
+  assert.equal(
+    componentTree.detachHostInstanceToken(token),
+    token
+  );
+  assert.equal(componentTree.getMountedHostInstanceNodeFromToken(token), null);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(node), null);
+  assert.equal(componentTree.getLatestPropsFromNode(node), null);
 }
 
 {
@@ -74,11 +103,19 @@ const reactDomPackage = require(
   const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
 
   assert.equal(componentTree.isHostInstanceNode(textNode), true);
+  assert.equal(componentTree.getMountedHostInstanceNodeFromToken(token), null);
+  assert.throws(
+    () => componentTree.updateLatestPropsForHostInstanceToken(token, {}),
+    {
+      code: 'FAST_REACT_DOM_UNMOUNTED_HOST_INSTANCE_TOKEN'
+    }
+  );
   componentTree.attachHostInstanceNode(textNode, token, null);
   assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
   assert.equal(componentTree.detachHostInstanceNode(textNode), token);
   assert.equal(componentTree.getHostInstanceTokenFromNode(textNode), null);
   assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(componentTree.getLatestPropsFromHostInstanceToken(token), null);
   assert.equal(componentTree.getAttachedNodeFromHostInstanceToken(token), null);
   assert.equal(componentTree.getHostInstanceOwnerFromToken(token), null);
   assert.equal(
@@ -93,6 +130,12 @@ const reactDomPackage = require(
 
   assert.throws(
     () => componentTree.attachHostInstanceNode(createElement('SPAN'), token, {}),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HOST_INSTANCE_TOKEN'
+    }
+  );
+  assert.throws(
+    () => componentTree.updateLatestPropsForHostInstanceToken(token, {}),
     {
       code: 'FAST_REACT_DOM_INVALID_HOST_INSTANCE_TOKEN'
     }
@@ -128,6 +171,98 @@ const reactDomPackage = require(
 }
 
 {
+  const rootOwner = {kind: 'ClosestRoot'};
+  const parentOwner = {kind: 'ClosestParentHost'};
+  const childOwner = {kind: 'ClosestChildHost'};
+  const parent = createElement('SECTION');
+  const child = createElement('BUTTON');
+  const unmanagedLeaf = createElement('SPAN');
+  const parentToken = componentTree.createHostInstanceToken(
+    parentOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childOwner,
+    rootOwner
+  );
+
+  appendChild(parent, child);
+  appendChild(child, unmanagedLeaf);
+  componentTree.attachHostInstanceNode(parent, parentToken, {
+    id: 'parent'
+  });
+  componentTree.attachHostInstanceNode(child, childToken, {
+    id: 'child'
+  });
+
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceTokenFromNode(unmanagedLeaf),
+    childToken
+  );
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceNodeFromNode(unmanagedLeaf),
+    child
+  );
+
+  assert.equal(componentTree.detachHostInstanceNode(child), childToken);
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceTokenFromNode(unmanagedLeaf),
+    parentToken
+  );
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceNodeFromNode(unmanagedLeaf),
+    parent
+  );
+  assert.equal(componentTree.detachHostInstanceNode(parent), parentToken);
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceTokenFromNode(unmanagedLeaf),
+    null
+  );
+}
+
+{
+  const outerRootOwner = {kind: 'OuterRoot'};
+  const outerHostOwner = {kind: 'OuterHost'};
+  const innerRootOwner = {kind: 'InnerRoot'};
+  const outerNode = createElement('ARTICLE');
+  const innerContainer = createElement('DIV');
+  const unmanagedInnerChild = createElement('SPAN');
+  const outerToken = componentTree.createHostInstanceToken(
+    outerHostOwner,
+    outerRootOwner
+  );
+
+  appendChild(outerNode, innerContainer);
+  appendChild(innerContainer, unmanagedInnerChild);
+  componentTree.attachHostInstanceNode(outerNode, outerToken, {
+    id: 'outer'
+  });
+  rootMarkers.markContainerAsRoot(innerRootOwner, innerContainer);
+
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceTokenFromNode(
+      unmanagedInnerChild
+    ),
+    null
+  );
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceNodeFromNode(
+      unmanagedInnerChild
+    ),
+    null
+  );
+
+  rootMarkers.unmarkContainerAsRoot(innerContainer);
+  assert.equal(
+    componentTree.getClosestMountedHostInstanceTokenFromNode(
+      unmanagedInnerChild
+    ),
+    outerToken
+  );
+  assert.equal(componentTree.detachHostInstanceToken(outerToken), outerToken);
+}
+
+{
   assert.equal(componentTree.isHostInstanceNode(createElement('DIV')), true);
   assert.equal(componentTree.isHostInstanceNode(createTextNode('text')), true);
   assert.equal(componentTree.isHostInstanceNode(createContainer()), false);
@@ -158,11 +293,19 @@ const reactDomPackage = require(
 
 {
   const privateHelperNames = [
+    'assertMountedHostInstanceToken',
     'attachHostInstanceNode',
     'createHostInstanceToken',
     'detachHostInstanceNode',
+    'detachHostInstanceToken',
+    'getClosestMountedHostInstanceNodeFromNode',
+    'getClosestMountedHostInstanceTokenFromNode',
     'getHostInstanceTokenFromNode',
     'getLatestPropsFromNode',
+    'getLatestPropsFromHostInstanceToken',
+    'getMountedHostInstanceNodeFromToken',
+    'getMountedHostInstanceTokenFromNode',
+    'updateLatestPropsForHostInstanceToken',
     'updateLatestPropsForNode'
   ];
 
@@ -187,22 +330,34 @@ console.log('React DOM private component tree map shell smoke checks passed.');
 
 function createElement(nodeName) {
   return {
+    childNodes: [],
     nodeName,
-    nodeType: domContainer.ELEMENT_NODE
+    nodeType: domContainer.ELEMENT_NODE,
+    parentNode: null
   };
 }
 
 function createTextNode(data) {
   return {
+    childNodes: [],
     data,
     nodeName: '#text',
-    nodeType: domContainer.TEXT_NODE
+    nodeType: domContainer.TEXT_NODE,
+    parentNode: null
   };
 }
 
 function createContainer() {
   return {
+    childNodes: [],
     nodeName: '#document-fragment',
-    nodeType: domContainer.DOCUMENT_FRAGMENT_NODE
+    nodeType: domContainer.DOCUMENT_FRAGMENT_NODE,
+    parentNode: null
   };
+}
+
+function appendChild(parent, child) {
+  parent.childNodes.push(child);
+  child.parentNode = parent;
+  return child;
 }
