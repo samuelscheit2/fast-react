@@ -45,16 +45,12 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 203: root work-loop complete-work handoff in
-  `/Users/user/Developer/Developer/fast-react-worker-203-root-work-loop-complete-work-handoff`.
 - Worker 204: host work text update diff in
   `/Users/user/Developer/Developer/fast-react-worker-204-host-work-text-update-diff`.
 - Worker 205: root commit mutation log skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-205-root-commit-mutation-log-skeleton`.
 - Worker 206: root commit deletion metadata in
   `/Users/user/Developer/Developer/fast-react-worker-206-root-commit-deletion-metadata`.
-- Worker 207: sync flush commit handoff in
-  `/Users/user/Developer/Developer/fast-react-worker-207-sync-flush-commit-handoff`.
 - Worker 208: test renderer host output canary in
   `/Users/user/Developer/Developer/fast-react-worker-208-test-renderer-host-output-canary`.
 - Worker 209: test renderer serialization private gate in
@@ -63,8 +59,6 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-210-react-test-renderer-js-create-failclosed`.
 - Worker 211: DOM host text-content local gate integration in
   `/Users/user/Developer/Developer/fast-react-worker-211-dom-host-text-content-local-gate`.
-- Worker 212: DOM mutation text node operations in
-  `/Users/user/Developer/Developer/fast-react-worker-212-dom-mutation-text-node-ops`.
 - Worker 213: DOM property payload style/dangerous HTML slice in
   `/Users/user/Developer/Developer/fast-react-worker-213-dom-property-payload-style-dangerous-html`.
 - Worker 214: DOM component tree mounted map helpers in
@@ -95,16 +89,12 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-226-ref-attach-detach-commit-metadata`.
 - Worker 227: Suspense/Offscreen fail-closed lane tests in
   `/Users/user/Developer/Developer/fast-react-worker-227-suspense-offscreen-failclosed-lane-tests`.
-- Worker 228: scheduler microtask cancellation regression in
-  `/Users/user/Developer/Developer/fast-react-worker-228-scheduler-microtask-cancel-regression`.
 - Worker 229: benchmark root render manifest gate expansion in
   `/Users/user/Developer/Developer/fast-react-worker-229-benchmark-root-render-manifest-gate`.
 - Worker 230: DOM text dual-run conformance gate in
   `/Users/user/Developer/Developer/fast-react-worker-230-dom-text-dual-run-conformance-gate`.
 - Worker 231: package surface React DOM subpath tightening in
   `/Users/user/Developer/Developer/fast-react-worker-231-package-surface-react-dom-subpath-tightening`.
-- Worker 232: native handle root lifecycle canary in
-  `/Users/user/Developer/Developer/fast-react-worker-232-native-handle-root-lifecycle-canary`.
 
 ## Near-Term Sequencing
 

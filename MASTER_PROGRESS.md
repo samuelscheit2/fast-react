@@ -326,9 +326,44 @@ sequencing belong in `MASTER_PLAN.md`.
   print scripts, fail-closed local gate, focused tests, and checked artifact
   while leaving React DOM implementation/package exports unchanged and
   compatibility claims blocked.
+- Worker 203 root work-loop complete-work handoff was merged, adding a
+  private test-only canary that validates completed HostRoot render records and
+  hands supported HostComponent/HostText children into the accepted detached
+  host complete-work skeleton without full traversal, child reconciliation,
+  commit effects, renderer output, or public hook facades.
+- Worker 207 sync-flush commit handoff was merged, allowing completed private
+  sync-flush render records to be committed through the accepted inert HostRoot
+  commit API while preserving public `flushSync`, host mutation, effect
+  execution, callback invocation, DOM/test-renderer output, and facade
+  boundaries.
+- Worker 212 DOM mutation text node operations was merged, tightening the
+  private DOM mutation adapter's text update, insert, remove, reset, and clear
+  behavior against fake-DOM smoke coverage without public roots, hydration,
+  events, controlled forms, property payload application, Rust integration, or
+  compatibility claims.
+- Worker 228 scheduler microtask cancellation regressions was merged, locking
+  down internal root scheduler callback cancellation and lane reselection
+  around accepted `get_next_lanes` behavior without changing public Scheduler
+  package files, root commit, sync flush, or root work-loop behavior.
+- Worker 232 native handle root lifecycle canary was merged, adding private
+  `fast-react-napi` handle-table coverage for root-like allocation, lookup,
+  generation retirement, wrong-environment isolation, environment teardown, and
+  post-teardown slot reuse without Node-API bindings, JS values, reconciler
+  integration, or public native APIs.
 
 ## Latest Accepted Verification
 
+- Workers 203, 207, 212, 228, and 232 were verified on their integrated
+  worktrees and again on `main` with focused root-work-loop, host-work,
+  sync-flush, root-commit, scheduler, scheduler-bridge, DOM mutation smoke,
+  and native handle-table tests; the combined `main` result passed
+  `cargo fmt --all --check`, full `fast-react-reconciler` tests with 160 unit
+  tests plus 1 compile-fail doctest, full `fast-react-napi` tests with 18 unit
+  tests, clippy for both touched Rust packages with warnings denied,
+  `node tests/smoke/react-dom-mutation-adapter-shell.mjs`, `npm run check:js`
+  with 480 conformance tests plus package-surface, benchmark, workspace, and
+  native checks, and `git diff --check`; all five merge commits applied
+  cleanly to `main`.
 - Worker 201 was verified on its integrated worktree and again on `main` with
   the focused 13-test DOM text-content oracle suite, byte-stable artifact
   regeneration, `npm run test:conformance -- --runInBand` with 480 tests,
