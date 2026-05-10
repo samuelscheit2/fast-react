@@ -2407,12 +2407,17 @@ mod tests {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     struct DeletionMetadataFixture {
         first_parent: FiberId,
+        first_parent_state_node: StateNodeHandle,
         first_list: DeletionListId,
         first_deleted: FiberId,
+        first_deleted_state_node: StateNodeHandle,
         second_deleted: FiberId,
+        second_deleted_state_node: StateNodeHandle,
         second_parent: FiberId,
+        second_parent_state_node: StateNodeHandle,
         second_list: DeletionListId,
         third_deleted: FiberId,
+        third_deleted_state_node: StateNodeHandle,
     }
 
     fn create_test_fiber(
@@ -2431,6 +2436,18 @@ mod tests {
     ) -> DeletionMetadataFixture {
         let first_parent = create_test_fiber(store, FiberTag::HostComponent, 101);
         let second_parent = create_test_fiber(store, FiberTag::HostComponent, 102);
+        let first_parent_state_node = StateNodeHandle::from_raw(8101);
+        let second_parent_state_node = StateNodeHandle::from_raw(8102);
+        store
+            .fiber_arena_mut()
+            .get_mut(first_parent)
+            .unwrap()
+            .set_state_node(first_parent_state_node);
+        store
+            .fiber_arena_mut()
+            .get_mut(second_parent)
+            .unwrap()
+            .set_state_node(second_parent_state_node);
         store
             .fiber_arena_mut()
             .set_children(host_root_work_in_progress, &[first_parent, second_parent])
@@ -2439,6 +2456,18 @@ mod tests {
         let first_kept = create_test_fiber(store, FiberTag::HostText, 201);
         let first_deleted = create_test_fiber(store, FiberTag::HostText, 202);
         let second_deleted = create_test_fiber(store, FiberTag::HostText, 203);
+        let first_deleted_state_node = StateNodeHandle::from_raw(8202);
+        let second_deleted_state_node = StateNodeHandle::from_raw(8203);
+        store
+            .fiber_arena_mut()
+            .get_mut(first_deleted)
+            .unwrap()
+            .set_state_node(first_deleted_state_node);
+        store
+            .fiber_arena_mut()
+            .get_mut(second_deleted)
+            .unwrap()
+            .set_state_node(second_deleted_state_node);
         store
             .fiber_arena_mut()
             .set_children(first_parent, &[first_kept, first_deleted, second_deleted])
@@ -2453,6 +2482,12 @@ mod tests {
             .unwrap();
 
         let third_deleted = create_test_fiber(store, FiberTag::HostText, 301);
+        let third_deleted_state_node = StateNodeHandle::from_raw(8301);
+        store
+            .fiber_arena_mut()
+            .get_mut(third_deleted)
+            .unwrap()
+            .set_state_node(third_deleted_state_node);
         store
             .fiber_arena_mut()
             .set_children(second_parent, &[third_deleted])
@@ -2464,12 +2499,17 @@ mod tests {
 
         DeletionMetadataFixture {
             first_parent,
+            first_parent_state_node,
             first_list,
             first_deleted,
+            first_deleted_state_node,
             second_deleted,
+            second_deleted_state_node,
             second_parent,
+            second_parent_state_node,
             second_list,
             third_deleted,
+            third_deleted_state_node,
         }
     }
 
@@ -2620,14 +2660,38 @@ mod tests {
             HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
         );
         assert_eq!(apply_records[0].parent(), fixture.first_parent);
+        assert_eq!(
+            apply_records[0].parent_state_node(),
+            fixture.first_parent_state_node
+        );
         assert_eq!(apply_records[0].fiber(), fixture.second_deleted);
+        assert_eq!(
+            apply_records[0].state_node(),
+            fixture.second_deleted_state_node
+        );
         assert_eq!(apply_records[1].fiber(), fixture.first_deleted);
+        assert_eq!(
+            apply_records[1].parent_state_node(),
+            fixture.first_parent_state_node
+        );
+        assert_eq!(
+            apply_records[1].state_node(),
+            fixture.first_deleted_state_node
+        );
         assert_eq!(
             apply_records[2].source(),
             HostRootMutationApplyRecordSource::DeletionList(fixture.second_list)
         );
         assert_eq!(apply_records[2].parent(), fixture.second_parent);
+        assert_eq!(
+            apply_records[2].parent_state_node(),
+            fixture.second_parent_state_node
+        );
         assert_eq!(apply_records[2].fiber(), fixture.third_deleted);
+        assert_eq!(
+            apply_records[2].state_node(),
+            fixture.third_deleted_state_node
+        );
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.finished_work()
