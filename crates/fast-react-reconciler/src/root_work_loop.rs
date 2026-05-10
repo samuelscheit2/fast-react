@@ -16,10 +16,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-#[cfg(test)]
-use fast_react_core::{ContextHandle, ContextValueHandle};
 use fast_react_core::{
-    FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
+    ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
+    StateHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
@@ -27,11 +26,13 @@ use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
     begin_work::{
-        BeginWorkError, BeginWorkRequest, BeginWorkResult, UnsupportedPortalBeginWorkRecord,
-        begin_work, unsupported_portal_begin_work_record,
+        BeginWorkError, BeginWorkRequest, BeginWorkResult, NestedContextProviderBeginWorkError,
+        NestedContextProviderBeginWorkRecord, NestedContextProviderBeginWorkRequest,
+        UnsupportedPortalBeginWorkRecord, begin_work, begin_work_nested_context_provider_child,
+        unsupported_portal_begin_work_record,
     },
     create_host_root_work_in_progress,
-    function_component::FunctionComponentInvoker,
+    function_component::{FunctionComponentContextRenderStore, FunctionComponentInvoker},
     unsupported_features::unsupported_reconciler_feature_for_fiber_tag,
 };
 #[cfg(test)]
@@ -39,13 +40,9 @@ use crate::{
     begin_work::{
         ContextProviderBeginWorkError, ContextProviderBeginWorkRecord,
         ContextProviderBeginWorkRequest, FunctionComponentSingleChildBeginWorkRecord,
-        NestedContextProviderBeginWorkRequest, begin_work_context_provider_child,
-        begin_work_nested_context_provider_child,
-        begin_work_reconcile_function_component_single_child,
+        begin_work_context_provider_child, begin_work_reconcile_function_component_single_child,
     },
-    function_component::{
-        FunctionComponentContextRenderStore, FunctionComponentSingleChildOutputResolver,
-    },
+    function_component::FunctionComponentSingleChildOutputResolver,
     host_work::{
         HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
         mount_test_host_work,
@@ -1128,6 +1125,253 @@ fn handoff_host_root_context_provider_child_begin_work(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootNestedContextProviderBeginWorkHandoffRequest {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    render_lanes: Lanes,
+    outer_context: ContextHandle,
+    outer_value: ContextValueHandle,
+    inner_context: ContextHandle,
+    inner_value: ContextValueHandle,
+}
+
+impl HostRootNestedContextProviderBeginWorkHandoffRequest {
+    #[must_use]
+    const fn new(
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        render_lanes: Lanes,
+        outer_context: ContextHandle,
+        outer_value: ContextValueHandle,
+        inner_context: ContextHandle,
+        inner_value: ContextValueHandle,
+    ) -> Self {
+        Self {
+            root,
+            host_root_work_in_progress,
+            render_lanes,
+            outer_context,
+            outer_value,
+            inner_context,
+            inner_value,
+        }
+    }
+
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    const fn outer_context(self) -> ContextHandle {
+        self.outer_context
+    }
+
+    #[must_use]
+    const fn outer_value(self) -> ContextValueHandle {
+        self.outer_value
+    }
+
+    #[must_use]
+    const fn inner_context(self) -> ContextHandle {
+        self.inner_context
+    }
+
+    #[must_use]
+    const fn inner_value(self) -> ContextValueHandle {
+        self.inner_value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootNestedContextProviderBeginWorkHandoffRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    outer_provider: FiberId,
+    inner_provider: FiberId,
+    function_component: FiberId,
+    begin_work: NestedContextProviderBeginWorkRecord,
+}
+
+impl HostRootNestedContextProviderBeginWorkHandoffRecord {
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn outer_provider(self) -> FiberId {
+        self.outer_provider
+    }
+
+    #[must_use]
+    const fn inner_provider(self) -> FiberId {
+        self.inner_provider
+    }
+
+    #[must_use]
+    const fn function_component(self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    const fn begin_work(self) -> NestedContextProviderBeginWorkRecord {
+        self.begin_work
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootNestedContextProviderBeginWorkHandoffError {
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    NestedContextProvider(Box<NestedContextProviderBeginWorkError>),
+    MissingContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+}
+
+impl Display for HostRootNestedContextProviderBeginWorkHandoffError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ChildPreflight(error) => Display::fmt(error, formatter),
+            Self::NestedContextProvider(error) => Display::fmt(error, formatter),
+            Self::MissingContextProviderChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no ContextProvider child for private nested context handoff",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedContextProviderChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be ContextProvider for private nested context handoff, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+impl Error for HostRootNestedContextProviderBeginWorkHandoffError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::ChildPreflight(error) => Some(error.as_ref()),
+            Self::NestedContextProvider(error) => Some(error.as_ref()),
+            Self::MissingContextProviderChild { .. }
+            | Self::ExpectedContextProviderChild { .. } => None,
+        }
+    }
+}
+
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootNestedContextProviderBeginWorkHandoffError
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+impl From<NestedContextProviderBeginWorkError>
+    for HostRootNestedContextProviderBeginWorkHandoffError
+{
+    fn from(error: NestedContextProviderBeginWorkError) -> Self {
+        Self::NestedContextProvider(Box::new(error))
+    }
+}
+
+fn handoff_host_root_nested_context_provider_child_begin_work<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    request: HostRootNestedContextProviderBeginWorkHandoffRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<
+    HostRootNestedContextProviderBeginWorkHandoffRecord,
+    HostRootNestedContextProviderBeginWorkHandoffError,
+> {
+    let validated = validate_host_root_child_preflight(
+        store,
+        request.root(),
+        request.host_root_work_in_progress(),
+        request.render_lanes(),
+    )?;
+    let outer_provider = validated.child.ok_or(
+        HostRootNestedContextProviderBeginWorkHandoffError::MissingContextProviderChild {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootNestedContextProviderBeginWorkHandoffError::MissingContextProviderChild {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::ContextProvider {
+        return Err(
+            HostRootNestedContextProviderBeginWorkHandoffError::ExpectedContextProviderChild {
+                root: request.root(),
+                host_root_work_in_progress: request.host_root_work_in_progress(),
+                child: outer_provider,
+                tag: child_tag,
+            },
+        );
+    }
+
+    let begin_work = begin_work_nested_context_provider_child(
+        store.fiber_arena_mut(),
+        NestedContextProviderBeginWorkRequest::new(
+            outer_provider,
+            request.render_lanes(),
+            request.outer_context(),
+            request.outer_value(),
+            request.inner_context(),
+            request.inner_value(),
+        ),
+        context_store,
+        invoker,
+    )?;
+
+    Ok(HostRootNestedContextProviderBeginWorkHandoffRecord {
+        root: request.root(),
+        host_root_work_in_progress: request.host_root_work_in_progress(),
+        outer_provider,
+        inner_provider: begin_work.inner_provider(),
+        function_component: begin_work.child(),
+        begin_work,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostRootRenderPhaseRecord {
     root: FiberRootId,
     current: FiberId,
@@ -1393,7 +1637,8 @@ mod tests {
     use crate::function_component::{
         FunctionComponentContextRenderStore, FunctionComponentInvocationError,
         FunctionComponentInvocationRequest, FunctionComponentOutputHandle,
-        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentRenderError, FunctionComponentSingleChildOutput,
+        FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
     };
     use crate::test_support::{FakeContainer, RecordingHost, TestHostNode, TestHostTree};
@@ -2297,20 +2542,11 @@ mod tests {
         let mut registry = TestFunctionComponentRegistry::default();
         registry.register(component, Ok(output));
 
-        let preflight = validate_host_root_child_preflight(
-            &store,
-            root_id,
-            render.work_in_progress(),
-            Lanes::DEFAULT,
-        )
-        .unwrap();
-        assert_eq!(preflight.child, Some(outer_provider));
-        assert_eq!(preflight.child_tag, Some(FiberTag::ContextProvider));
-
-        let record = begin_work_nested_context_provider_child(
-            store.fiber_arena_mut(),
-            NestedContextProviderBeginWorkRequest::new(
-                outer_provider,
+        let root_record = handoff_host_root_nested_context_provider_child_begin_work(
+            &mut store,
+            HostRootNestedContextProviderBeginWorkHandoffRequest::new(
+                root_id,
+                render.work_in_progress(),
                 Lanes::DEFAULT,
                 outer_context,
                 outer_value,
@@ -2321,10 +2557,23 @@ mod tests {
             &mut registry,
         )
         .unwrap();
+        let record = root_record.begin_work();
 
+        assert_eq!(root_record.root(), root_id);
+        assert_eq!(
+            root_record.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(root_record.outer_provider(), outer_provider);
+        assert_eq!(root_record.inner_provider(), inner_provider);
+        assert_eq!(root_record.function_component(), function_component);
         assert_eq!(record.outer_provider(), outer_provider);
         assert_eq!(record.inner_provider(), inner_provider);
         assert_eq!(record.child(), function_component);
+        assert_eq!(record.outer_context(), outer_context);
+        assert_eq!(record.outer_value(), outer_value);
+        assert_eq!(record.inner_context(), inner_context);
+        assert_eq!(record.inner_value(), inner_value);
         assert_eq!(record.child_output(), output);
         assert_eq!(record.child_context_read_count(), 2);
         assert_eq!(record.outer_pushed_stack_depth(), 1);
@@ -2383,6 +2632,144 @@ mod tests {
                 .return_fiber(),
             Some(inner_provider)
         );
+    }
+
+    #[test]
+    fn root_work_loop_nested_context_provider_handoff_unwinds_after_child_error() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(129), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (outer_provider, inner_provider, function_component, component) =
+            attach_nested_context_provider_wip_child(&mut store, render.work_in_progress());
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let outer_default = context_value(950);
+        let inner_default = context_value(960);
+        let outer_context = context_store.create_context(outer_default);
+        let inner_context = context_store.create_context(inner_default);
+        let invocation_error =
+            FunctionComponentInvocationError::component_error("root nested boom");
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Err(invocation_error.clone()));
+
+        let error = handoff_host_root_nested_context_provider_child_begin_work(
+            &mut store,
+            HostRootNestedContextProviderBeginWorkHandoffRequest::new(
+                root_id,
+                render.work_in_progress(),
+                Lanes::DEFAULT,
+                outer_context,
+                context_value(951),
+                inner_context,
+                context_value(961),
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootNestedContextProviderBeginWorkHandoffError::NestedContextProvider(Box::new(
+                NestedContextProviderBeginWorkError::ChildBeginWork {
+                    outer_provider,
+                    inner_provider,
+                    child: function_component,
+                    error: Box::new(BeginWorkError::FunctionComponent(
+                        FunctionComponentRenderError::Invocation {
+                            fiber: function_component,
+                            component,
+                            error: invocation_error,
+                        },
+                    )),
+                },
+            ))
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(
+            registry.calls()[0].context_state().unwrap().stack_depth(),
+            2
+        );
+        assert_eq!(
+            context_store.current_value(outer_context).unwrap(),
+            outer_default
+        );
+        assert_eq!(
+            context_store.current_value(inner_context).unwrap(),
+            inner_default
+        );
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(
+            context_store.active_provider_count(outer_context).unwrap(),
+            0
+        );
+        assert_eq!(
+            context_store.active_provider_count(inner_context).unwrap(),
+            0
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn root_work_loop_nested_context_provider_handoff_rejects_non_provider_root_child_before_push()
+    {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(130), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (_current_child, function_component, _component) =
+            attach_function_component_wip_child(&mut store, render.work_in_progress());
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let outer_context = context_store.create_context(context_value(970));
+        let inner_context = context_store.create_context(context_value(980));
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = handoff_host_root_nested_context_provider_child_begin_work(
+            &mut store,
+            HostRootNestedContextProviderBeginWorkHandoffRequest::new(
+                root_id,
+                render.work_in_progress(),
+                Lanes::DEFAULT,
+                outer_context,
+                context_value(971),
+                inner_context,
+                context_value(981),
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootNestedContextProviderBeginWorkHandoffError::ExpectedContextProviderChild {
+                root: root_id,
+                host_root_work_in_progress: render.work_in_progress(),
+                child: function_component,
+                tag: FiberTag::FunctionComponent,
+            }
+        );
+        assert!(registry.calls().is_empty());
+        assert_eq!(
+            context_store.current_value(outer_context).unwrap(),
+            context_value(970)
+        );
+        assert_eq!(
+            context_store.current_value(inner_context).unwrap(),
+            context_value(980)
+        );
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     #[test]
