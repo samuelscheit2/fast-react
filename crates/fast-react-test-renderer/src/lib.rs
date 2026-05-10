@@ -1724,6 +1724,9 @@ pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
 pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
     ["HostRoot", "HostComponent", "HostText"];
+pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE: [&str; 4] =
+    ["HostRoot", "FunctionComponent", "HostComponent", "HostText"];
+pub const TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE: &str = "CanaryFunctionComponent";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
     "react-19.2.6-react-test-renderer-serialization-oracle";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
@@ -2558,6 +2561,7 @@ impl TestRendererPrivateJsonSerializationReport {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestRendererPrivateTreeNodeType {
+    Component,
     Host,
 }
 
@@ -2565,6 +2569,7 @@ impl TestRendererPrivateTreeNodeType {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Component => "component",
             Self::Host => "host",
         }
     }
@@ -2685,6 +2690,72 @@ impl TestRendererPrivateTreeHostComponentDiagnostic {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTreeFunctionComponentDiagnostic {
+    fiber_tag: &'static str,
+    node_type: TestRendererPrivateTreeNodeType,
+    component_type: &'static str,
+    props: TestProps,
+    instance_available: bool,
+    rendered_child_fiber_tag: &'static str,
+    rendered_child_node_type: TestRendererPrivateTreeNodeType,
+    rendered_child_count: usize,
+    wraps_committed_host_output: bool,
+    public_tree_object_available: bool,
+}
+
+impl TestRendererPrivateTreeFunctionComponentDiagnostic {
+    #[must_use]
+    pub const fn fiber_tag(&self) -> &'static str {
+        self.fiber_tag
+    }
+
+    #[must_use]
+    pub const fn node_type(&self) -> TestRendererPrivateTreeNodeType {
+        self.node_type
+    }
+
+    #[must_use]
+    pub const fn component_type(&self) -> &'static str {
+        self.component_type
+    }
+
+    #[must_use]
+    pub const fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn instance_available(&self) -> bool {
+        self.instance_available
+    }
+
+    #[must_use]
+    pub const fn rendered_child_fiber_tag(&self) -> &'static str {
+        self.rendered_child_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn rendered_child_node_type(&self) -> TestRendererPrivateTreeNodeType {
+        self.rendered_child_node_type
+    }
+
+    #[must_use]
+    pub const fn rendered_child_count(&self) -> usize {
+        self.rendered_child_count
+    }
+
+    #[must_use]
+    pub const fn wraps_committed_host_output(&self) -> bool {
+        self.wraps_committed_host_output
+    }
+
+    #[must_use]
+    pub const fn public_tree_object_available(&self) -> bool {
+        self.public_tree_object_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateTreeMetadataReport {
     diagnostic_name: &'static str,
     source_json_diagnostic_name: &'static str,
@@ -2692,8 +2763,10 @@ pub struct TestRendererPrivateTreeMetadataReport {
     host_output_update_kind: TestRendererRootUpdateKind,
     host_output_snapshot_current: bool,
     accepted_fiber_shape: [&'static str; 3],
+    accepted_composite_fiber_shape: [&'static str; 4],
     root_child_count: usize,
     host_root: TestRendererPrivateTreeHostRootDiagnostic,
+    function_component: TestRendererPrivateTreeFunctionComponentDiagnostic,
     host_component: TestRendererPrivateTreeHostComponentDiagnostic,
     host_text: TestRendererPrivateTreeHostTextDiagnostic,
     public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
@@ -2732,6 +2805,11 @@ impl TestRendererPrivateTreeMetadataReport {
     }
 
     #[must_use]
+    pub const fn accepted_composite_fiber_shape(&self) -> &[&'static str; 4] {
+        &self.accepted_composite_fiber_shape
+    }
+
+    #[must_use]
     pub const fn root_child_count(&self) -> usize {
         self.root_child_count
     }
@@ -2739,6 +2817,11 @@ impl TestRendererPrivateTreeMetadataReport {
     #[must_use]
     pub const fn host_root(&self) -> &TestRendererPrivateTreeHostRootDiagnostic {
         &self.host_root
+    }
+
+    #[must_use]
+    pub const fn function_component(&self) -> &TestRendererPrivateTreeFunctionComponentDiagnostic {
+        &self.function_component
     }
 
     #[must_use]
@@ -4811,11 +4894,25 @@ impl TestRendererRoot {
             host_output_update_kind: json_report.host_output_update_kind(),
             host_output_snapshot_current: json_report.host_output_snapshot_current(),
             accepted_fiber_shape: TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE,
+            accepted_composite_fiber_shape:
+                TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE,
             root_child_count: json_report.root_child_count(),
             host_root: TestRendererPrivateTreeHostRootDiagnostic {
                 fiber_tag: "HostRoot",
                 delegates_to_child: true,
                 child_fiber_tag: "HostComponent",
+                public_tree_object_available: false,
+            },
+            function_component: TestRendererPrivateTreeFunctionComponentDiagnostic {
+                fiber_tag: "FunctionComponent",
+                node_type: TestRendererPrivateTreeNodeType::Component,
+                component_type: TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE,
+                props: TestProps::new(),
+                instance_available: false,
+                rendered_child_fiber_tag: "HostComponent",
+                rendered_child_node_type: TestRendererPrivateTreeNodeType::Host,
+                rendered_child_count: 1,
+                wraps_committed_host_output: true,
                 public_tree_object_available: false,
             },
             host_component: TestRendererPrivateTreeHostComponentDiagnostic {
@@ -6344,6 +6441,7 @@ mod tests {
             .unwrap();
         let gate = report.gate();
         let host_root = report.host_root();
+        let function_component = report.function_component();
         let component = report.host_component();
         let text = report.host_text();
         let blockers = report.public_blockers();
@@ -6373,11 +6471,38 @@ mod tests {
             report.accepted_fiber_shape(),
             &TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE
         );
+        assert_eq!(
+            report.accepted_composite_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE
+        );
         assert_eq!(report.root_child_count(), 1);
         assert_eq!(host_root.fiber_tag(), "HostRoot");
         assert!(host_root.delegates_to_child());
         assert_eq!(host_root.child_fiber_tag(), "HostComponent");
         assert!(!host_root.public_tree_object_available());
+        assert_eq!(function_component.fiber_tag(), "FunctionComponent");
+        assert_eq!(
+            function_component.node_type(),
+            TestRendererPrivateTreeNodeType::Component
+        );
+        assert_eq!(function_component.node_type().as_str(), "component");
+        assert_eq!(
+            function_component.component_type(),
+            TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+        );
+        assert_eq!(function_component.props(), &TestProps::new());
+        assert!(!function_component.instance_available());
+        assert_eq!(
+            function_component.rendered_child_fiber_tag(),
+            "HostComponent"
+        );
+        assert_eq!(
+            function_component.rendered_child_node_type(),
+            TestRendererPrivateTreeNodeType::Host
+        );
+        assert_eq!(function_component.rendered_child_count(), 1);
+        assert!(function_component.wraps_committed_host_output());
+        assert!(!function_component.public_tree_object_available());
         assert_eq!(component.fiber_tag(), "HostComponent");
         assert_eq!(component.node_type(), TestRendererPrivateTreeNodeType::Host);
         assert_eq!(component.node_type().as_str(), "host");
@@ -6440,6 +6565,24 @@ mod tests {
             updated.fiber_inspection()
         );
         assert_eq!(report.root_child_count(), 1);
+        assert_eq!(
+            report.accepted_composite_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(report.function_component().fiber_tag(), "FunctionComponent");
+        assert_eq!(
+            report.function_component().node_type(),
+            TestRendererPrivateTreeNodeType::Component
+        );
+        assert_eq!(
+            report.function_component().component_type(),
+            TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+        );
+        assert_eq!(
+            report.function_component().rendered_child_fiber_tag(),
+            "HostComponent"
+        );
+        assert!(report.function_component().wraps_committed_host_output());
         assert_eq!(report.host_component().element_type().as_str(), "span");
         assert_eq!(report.host_component().props(), &TestProps::new());
         assert_eq!(report.host_component().node_type().as_str(), "host");
@@ -6450,6 +6593,59 @@ mod tests {
         assert!(report.host_text().returns_text_value());
         assert!(!report.public_tree_object_available());
         assert!(report.public_blockers().all_blocked());
+    }
+
+    #[test]
+    fn root_private_tree_metadata_canary_describes_function_component_above_host_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_tree_metadata_for_canary(&output)
+            .unwrap();
+        let function_component = report.function_component();
+
+        assert_eq!(
+            report.accepted_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(
+            report.accepted_composite_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(function_component.fiber_tag(), "FunctionComponent");
+        assert_eq!(
+            function_component.node_type(),
+            TestRendererPrivateTreeNodeType::Component
+        );
+        assert_eq!(
+            function_component.component_type(),
+            TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+        );
+        assert_eq!(function_component.props(), &TestProps::new());
+        assert!(!function_component.instance_available());
+        assert_eq!(
+            function_component.rendered_child_fiber_tag(),
+            report.host_component().fiber_tag()
+        );
+        assert_eq!(
+            function_component.rendered_child_node_type(),
+            report.host_component().node_type()
+        );
+        assert_eq!(function_component.rendered_child_count(), 1);
+        assert!(function_component.wraps_committed_host_output());
+        assert!(!function_component.public_tree_object_available());
+        assert_eq!(report.host_component().rendered_text(), "hello");
+        assert!(!report.public_tree_object_available());
+        assert!(report.public_blockers().tree_method_blocked());
     }
 
     #[test]

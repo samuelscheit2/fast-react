@@ -80,6 +80,13 @@ const privateToTreeFacadeStatus =
   "private-tree-diagnostics-serializable-public-totree-blocked";
 const privateToTreeAcceptedDiagnosticName =
   "fast-react-test-renderer.serialization.private-tree-canary";
+const privateToTreeCompositeAcceptedFiberShape = [
+  "HostRoot",
+  "FunctionComponent",
+  "HostComponent",
+  "HostText"
+];
+const privateToTreeFunctionComponentType = "CanaryFunctionComponent";
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
@@ -120,6 +127,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToTreePrivateFacadeGatePresent: true,
     privateToTreePrivateFacadeConsumesRustTreeMetadata: true,
     privateToTreeHostOutputMetadataRecognizesMinimalShape: true,
+    privateToTreeCompositeFunctionMetadataPresent: true,
     privateToTreeHostOutputMetadataPubliclyBlocked: true,
     privateRecordOnlyTestInstanceWrapperPresent: true,
     privateRecordOnlyTestInstanceQueryPathPresent: true,
@@ -171,6 +179,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-totree-private-facade-gate",
       "js-totree-consumes-accepted-rust-private-tree-metadata",
       "js-totree-recognizes-accepted-minimal-host-output-shape",
+      "js-totree-private-composite-function-metadata",
       "js-totree-public-tree-blocked"
     ]
   );
@@ -620,10 +629,17 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "HostComponent",
       "HostText"
     ]);
+    assert.deepEqual(
+      metadataGate.acceptedCompositeFiberShape,
+      privateToTreeCompositeAcceptedFiberShape
+    );
     assert.equal(metadataGate.acceptedReactSourceAlgorithm, "ReactTestRenderer.js toTree");
+    assert.match(metadataGate.functionComponentBehavior, /nodeType 'component'/u);
     assert.equal(metadataGate.acceptedRustPrivateJsonDiagnostics, true);
     assert.equal(metadataGate.acceptedRustPrivateTreeMetadata, true);
+    assert.equal(metadataGate.acceptedRustPrivateCompositeTreeMetadata, true);
     assert.equal(metadataGate.acceptedCommittedFiberInspection, true);
+    assert.equal(metadataGate.privateCompositeFunctionMetadataAvailable, true);
     assert.equal(metadataGate.publicTreeAvailable, false);
     assert.equal(metadataGate.publicRouteAvailable, false);
     assert.equal(metadataGate.nativeBridgeAvailable, false);
@@ -646,13 +662,15 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "TestRendererRoot::describe_private_tree_metadata_for_canary",
       "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
       "TestRendererPrivateJsonSerializationReport",
-      "TestRendererPrivateTreeMetadataReport"
+      "TestRendererPrivateTreeMetadataReport",
+      "TestRendererPrivateTreeFunctionComponentDiagnostic"
     ]);
     assert.deepEqual(metadataGate.acceptedRustTests, [
       "committed_fiber_inspection_describes_host_root_component_and_text",
       "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
       "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
-      "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit"
+      "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+      "root_private_tree_metadata_canary_describes_function_component_above_host_output"
     ]);
     assert.deepEqual(metadataGate.blockedPublicSurfaces, [
       "create().toTree",
@@ -676,12 +694,14 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     );
     assert.equal(facadeGate.privateFacadeGateAvailable, true);
     assert.equal(facadeGate.privateTreeMetadataSerializable, true);
+    assert.equal(facadeGate.privateCompositeFunctionMetadataSerializable, true);
     assert.equal(
       facadeGate.privateFacadeSymbol,
       privateToTreeFacadeSymbol.description
     );
     assert.equal(facadeGate.privateFacadeStatus, privateToTreeFacadeStatus);
     assert.equal(facadeGate.acceptedRustPrivateTreeMetadata, true);
+    assert.equal(facadeGate.acceptedRustPrivateCompositeTreeMetadata, true);
     assert.equal(
       facadeGate.acceptedRustDiagnosticName,
       privateToTreeAcceptedDiagnosticName
@@ -691,6 +711,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "HostComponent",
       "HostText"
     ]);
+    assert.deepEqual(
+      facadeGate.acceptedCompositeFiberShape,
+      privateToTreeCompositeAcceptedFiberShape
+    );
     assert.deepEqual(facadeGate.acceptedHostOutputUpdateKinds, [
       "Create",
       "Update"
@@ -710,12 +734,14 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "TestRendererRoot::describe_private_tree_metadata_for_canary",
       "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
       "TestRendererPrivateTreeMetadataReport",
+      "TestRendererPrivateTreeFunctionComponentDiagnostic",
       "TestRendererPrivateTreeHostComponentDiagnostic",
       "TestRendererPrivateTreeHostTextDiagnostic"
     ]);
     assert.deepEqual(facadeGate.acceptedRustTests, [
       "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
       "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+      "root_private_tree_metadata_canary_describes_function_component_above_host_output",
       "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
     ]);
     assert.deepEqual(facadeGate.blockedPublicSurfaces, [
@@ -751,6 +777,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateMetadata.gate, metadataGate);
     assert.equal(privateMetadata.rootRequest, error.rootRequest);
     assert.equal(privateMetadata.privateHostOutputTreeMetadataAvailable, true);
+    assert.equal(privateMetadata.privateCompositeFunctionMetadataAvailable, true);
     assert.equal(privateMetadata.publicTreeAvailable, false);
     assert.equal(privateMetadata.publicRouteAvailable, false);
     assert.equal(privateMetadata.nativeBridgeAvailable, false);
@@ -780,14 +807,47 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "HostComponent",
       "HostText"
     ]);
+    assert.deepEqual(
+      shape.acceptedCompositeFiberShape,
+      privateToTreeCompositeAcceptedFiberShape
+    );
     assert.deepEqual(shape.traversal.order, [
+      "HostRoot",
+      "FunctionComponent",
+      "HostComponent",
+      "HostText"
+    ]);
+    assert.deepEqual(shape.traversal.committedHostOutputOrder, [
       "HostRoot",
       "HostComponent",
       "HostText"
     ]);
+    assert.equal(
+      shape.traversal.functionComponentProducesComponentNodeMetadata,
+      true
+    );
+    assert.equal(
+      shape.traversal.functionComponentRendersCommittedHostOutput,
+      true
+    );
     assert.equal(shape.hostRoot.fiberTag, "HostRoot");
     assert.equal(shape.hostRoot.delegatesToChild, true);
+    assert.equal(shape.hostRoot.childFiberTag, "HostComponent");
+    assert.equal(shape.hostRoot.compositeChildFiberTag, "FunctionComponent");
     assert.equal(shape.hostRoot.publicTreeObject, false);
+    assert.deepEqual(shape.functionComponent, {
+      fiberTag: "FunctionComponent",
+      source: "ReactTestRenderer.js toTree FunctionComponent",
+      treeNodeType: "component",
+      componentType: privateToTreeFunctionComponentType,
+      props: {},
+      instanceAvailable: false,
+      renderedChildFiberTag: "HostComponent",
+      renderedChildNodeType: "host",
+      renderedChildCount: 1,
+      wrapsCommittedHostOutput: true,
+      publicTreeObject: false
+    });
     assert.deepEqual(shape.hostComponent, {
       fiberTag: "HostComponent",
       source: "ReactTestRenderer.js toTree HostComponent",
@@ -806,6 +866,8 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       publicTreeObject: false
     });
     assert.equal(shape.publicTreeObjectAvailable, false);
+    assert.equal(Object.hasOwn(shape.functionComponent, "rendered"), false);
+    assert.equal(Object.hasOwn(shape.functionComponent, "instance"), false);
     assert.equal(Object.hasOwn(shape.hostComponent, "rendered"), false);
     assert.equal(Object.hasOwn(shape.hostComponent, "instance"), false);
     assert.equal(
@@ -860,6 +922,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateFacade.metadataGate, metadataGate);
     assert.equal(privateFacade.rootRequest, error.rootRequest);
     assert.equal(privateFacade.privateTreeMetadataSerializable, true);
+    assert.equal(privateFacade.privateCompositeFunctionMetadataSerializable, true);
     assert.equal(privateFacade.publicTreeAvailable, false);
     assert.equal(privateFacade.publicRouteAvailable, false);
     assert.equal(privateFacade.nativeBridgeAvailable, false);
@@ -874,12 +937,20 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(Object.isFrozen(privateTree), true);
     assert.equal(Object.isFrozen(privateTree.props), true);
     assert.equal(Object.isFrozen(privateTree.rendered), true);
+    assert.equal(Object.isFrozen(privateTree.rendered.props), true);
+    assert.equal(Object.isFrozen(privateTree.rendered.rendered), true);
     assert.deepEqual(privateTree, {
-      nodeType: "host",
-      type: "span",
+      nodeType: "component",
+      type: privateToTreeFunctionComponentType,
       props: {},
       instance: null,
-      rendered: ["hello"]
+      rendered: {
+        nodeType: "host",
+        type: "span",
+        props: {},
+        instance: null,
+        rendered: ["hello"]
+      }
     });
     const updatedPrivateTree = privateFacade.serializeAcceptedTreeMetadata(
       createAcceptedMinimalTreeMetadataDiagnostic({
@@ -888,11 +959,17 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       })
     );
     assert.deepEqual(updatedPrivateTree, {
-      nodeType: "host",
-      type: "span",
+      nodeType: "component",
+      type: privateToTreeFunctionComponentType,
       props: {},
       instance: null,
-      rendered: ["goodbye"]
+      rendered: {
+        nodeType: "host",
+        type: "span",
+        props: {},
+        instance: null,
+        rendered: ["goodbye"]
+      }
     });
     assert.equal(
       privateFacade.canSerializeAcceptedTreeMetadata(
@@ -1235,11 +1312,27 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
       }
     },
     acceptedFiberShape: ["HostRoot", "HostComponent", "HostText"],
+    acceptedCompositeFiberShape: privateToTreeCompositeAcceptedFiberShape,
     rootChildCount: 1,
     hostRoot: {
       fiberTag: "HostRoot",
       delegatesToChild: true,
       childFiberTag: "HostComponent",
+      publicTreeObjectAvailable: false
+    },
+    functionComponent: {
+      fiberTag: "FunctionComponent",
+      nodeType: "component",
+      componentType: privateToTreeFunctionComponentType,
+      props: {
+        attributes: {},
+        textContent: null
+      },
+      instanceAvailable: false,
+      renderedChildFiberTag: "HostComponent",
+      renderedChildNodeType: "host",
+      renderedChildCount: 1,
+      wrapsCommittedHostOutput: true,
       publicTreeObjectAvailable: false
     },
     hostComponent: {
