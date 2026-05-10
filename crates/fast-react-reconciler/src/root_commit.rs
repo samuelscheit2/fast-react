@@ -2253,6 +2253,115 @@ pub(crate) fn record_root_commit_error_option_callbacks<H: HostTypes>(
     })
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private root error recovery commit evidence is reserved for private render error workers"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootRenderFailureRecoveryCommitEvidenceForCanary {
+    root: FiberRootId,
+    render_lanes: Lanes,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root error recovery commit evidence is reserved for private render error workers"
+)]
+impl HostRootRenderFailureRecoveryCommitEvidenceForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
+    pub(crate) const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks.on_uncaught_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn on_caught_error(self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks.on_caught_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
+        self.error_option_callbacks.on_recoverable_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(self) -> bool {
+        self.error_option_callbacks.has_configured_error_callback()
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_render_failure_metadata(self) -> bool {
+        self.error_option_callbacks.root() == self.root
+            && self.error_option_callbacks.phase() == RootErrorOptionCallbackPhase::Render
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_attempted(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_current_switched(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn retried_public_work(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn invoked_public_callbacks(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_error_boundaries_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn recoverable_error_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root error recovery commit evidence is reserved for private render error workers"
+)]
+pub(crate) const fn host_root_render_failure_recovery_commit_evidence_for_canary(
+    root: FiberRootId,
+    render_lanes: Lanes,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
+) -> HostRootRenderFailureRecoveryCommitEvidenceForCanary {
+    HostRootRenderFailureRecoveryCommitEvidenceForCanary {
+        root,
+        render_lanes,
+        error_option_callbacks,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct PendingPassiveCommitHandoff {
     root: FiberRootId,
@@ -21267,6 +21376,58 @@ mod tests {
         assert!(!record.public_error_boundaries_enabled());
         assert!(!record.recoverable_error_compatibility_claimed());
         assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert!(host.operations().is_empty());
+    }
+
+    #[test]
+    fn root_commit_render_failure_evidence_preserves_error_handles_without_callbacks() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(
+                FakeContainer::new(1),
+                RootOptions::new()
+                    .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(71))
+                    .with_on_caught_error(RootErrorCallbackHandle::from_raw(72))
+                    .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(73)),
+            )
+            .unwrap();
+        let callbacks = store
+            .root(root_id)
+            .unwrap()
+            .options()
+            .error_option_callback_record(root_id, RootErrorOptionCallbackPhase::Render);
+
+        let evidence = host_root_render_failure_recovery_commit_evidence_for_canary(
+            root_id,
+            Lanes::SYNC,
+            callbacks,
+        );
+
+        assert_eq!(evidence.root(), root_id);
+        assert_eq!(evidence.render_lanes(), Lanes::SYNC);
+        assert_eq!(evidence.error_option_callbacks(), callbacks);
+        assert_eq!(
+            evidence.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(71)
+        );
+        assert_eq!(
+            evidence.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(72)
+        );
+        assert_eq!(
+            evidence.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(73)
+        );
+        assert!(evidence.has_configured_error_callback());
+        assert!(evidence.accepted_render_failure_metadata());
+        assert!(!evidence.commit_attempted());
+        assert!(!evidence.root_current_switched());
+        assert!(!evidence.retried_public_work());
+        assert!(!evidence.invoked_public_callbacks());
+        assert!(!evidence.root_error_callbacks_invoked());
+        assert!(!evidence.public_error_boundaries_enabled());
+        assert!(!evidence.recoverable_error_compatibility_claimed());
         assert!(host.operations().is_empty());
     }
 

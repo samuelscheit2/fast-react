@@ -19,24 +19,26 @@ use crate::root_callbacks::{
 };
 use crate::root_commit::{
     HostRootCallbackDrainRecordForCanary, HostRootCallbackDrainSnapshotForCanary,
-    HostRootCommitRecoverySnapshotForCanary, PendingPassiveCommitHandoff,
-    host_root_commit_recovery_snapshot_for_canary,
+    HostRootCommitRecoverySnapshotForCanary, HostRootRenderFailureRecoveryCommitEvidenceForCanary,
+    PendingPassiveCommitHandoff, host_root_commit_recovery_snapshot_for_canary,
+    host_root_render_failure_recovery_commit_evidence_for_canary,
+};
+use crate::root_scheduler::{
+    RootRenderErrorOptionCallbackRecord, SYNC_FLUSH_LANES,
+    SchedulerBridgeActContinuationExecutionError, SchedulerBridgeActContinuationExecutionResult,
+    SyncFlushActContinuationDrainRecord, SyncFlushActPostPassiveContinuationGateRecord,
+    SyncFlushPostPassiveContinuationExecutionGateRecord, SyncFlushRootRecoverySnapshotForCanary,
+    execute_scheduler_bridge_act_continuations, recompute_might_have_pending_sync_work,
+    record_root_render_error_option_callbacks,
+    sync_flush_act_continuation_drain_record_after_host_output_canary,
+    sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
+    sync_flush_lanes_for_root, sync_flush_post_passive_continuation_execution_gate,
+    sync_flush_root_recovery_snapshot_for_canary,
 };
 #[cfg(test)]
 use crate::root_scheduler::{
     RootSyncSchedulerContinuationExecutionError, RootSyncSchedulerContinuationExecutionRecord,
     execute_sync_scheduler_continuation_for_render_handoff,
-};
-use crate::root_scheduler::{
-    SYNC_FLUSH_LANES, SchedulerBridgeActContinuationExecutionError,
-    SchedulerBridgeActContinuationExecutionResult, SyncFlushActContinuationDrainRecord,
-    SyncFlushActPostPassiveContinuationGateRecord,
-    SyncFlushPostPassiveContinuationExecutionGateRecord, SyncFlushRootRecoverySnapshotForCanary,
-    execute_scheduler_bridge_act_continuations, recompute_might_have_pending_sync_work,
-    sync_flush_act_continuation_drain_record_after_host_output_canary,
-    sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
-    sync_flush_lanes_for_root, sync_flush_post_passive_continuation_execution_gate,
-    sync_flush_root_recovery_snapshot_for_canary,
 };
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
@@ -751,6 +753,8 @@ pub(crate) struct SyncFlushErrorRecoveryRootRecordForCanary {
     scheduler_after: SyncFlushRootRecoverySnapshotForCanary,
     commit_before: Option<HostRootCommitRecoverySnapshotForCanary>,
     commit_after: Option<HostRootCommitRecoverySnapshotForCanary>,
+    render_error_option_callbacks: Option<RootRenderErrorOptionCallbackRecord>,
+    render_failure_commit_evidence: Option<HostRootRenderFailureRecoveryCommitEvidenceForCanary>,
     render_error: Option<RootWorkLoopError>,
     commit_error: Option<RootCommitError>,
     committed: Option<SyncFlushRootRecord>,
@@ -802,6 +806,20 @@ impl SyncFlushErrorRecoveryRootRecordForCanary {
     }
 
     #[must_use]
+    pub(crate) fn render_error_option_callbacks(
+        &self,
+    ) -> Option<&RootRenderErrorOptionCallbackRecord> {
+        self.render_error_option_callbacks.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn render_failure_commit_evidence(
+        &self,
+    ) -> Option<&HostRootRenderFailureRecoveryCommitEvidenceForCanary> {
+        self.render_failure_commit_evidence.as_ref()
+    }
+
+    #[must_use]
     pub(crate) fn render_error(&self) -> Option<&RootWorkLoopError> {
         self.render_error.as_ref()
     }
@@ -846,12 +864,71 @@ impl SyncFlushErrorRecoveryRootRecordForCanary {
     }
 
     #[must_use]
+    pub(crate) fn preserved_error_callback_handles(&self) -> bool {
+        match (
+            self.status,
+            &self.render_error_option_callbacks,
+            self.render_failure_commit_evidence,
+        ) {
+            (
+                SyncFlushErrorRecoveryRootStatusForCanary::RenderFailed,
+                Some(render_callbacks),
+                Some(commit_evidence),
+            ) => {
+                render_callbacks.root() == self.root
+                    && render_callbacks.render_lanes() == self.lanes
+                    && commit_evidence.root() == self.root
+                    && commit_evidence.render_lanes() == self.lanes
+                    && commit_evidence.error_option_callbacks()
+                        == render_callbacks.error_option_callbacks()
+                    && commit_evidence.accepted_render_failure_metadata()
+                    && !render_callbacks.root_error_callbacks_invoked()
+                    && !commit_evidence.root_error_callbacks_invoked()
+            }
+            (
+                SyncFlushErrorRecoveryRootStatusForCanary::Committed
+                | SyncFlushErrorRecoveryRootStatusForCanary::CommitFailed,
+                None,
+                None,
+            ) => true,
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_private_root_error_recovery_commit_evidence(&self) -> bool {
+        match (self.status, self.render_failure_commit_evidence) {
+            (SyncFlushErrorRecoveryRootStatusForCanary::RenderFailed, Some(evidence)) => {
+                evidence.accepted_render_failure_metadata()
+                    && !evidence.commit_attempted()
+                    && !evidence.root_current_switched()
+                    && !evidence.retried_public_work()
+                    && !evidence.invoked_public_callbacks()
+                    && !evidence.root_error_callbacks_invoked()
+                    && !evidence.public_error_boundaries_enabled()
+                    && !evidence.recoverable_error_compatibility_claimed()
+            }
+            (
+                SyncFlushErrorRecoveryRootStatusForCanary::Committed
+                | SyncFlushErrorRecoveryRootStatusForCanary::CommitFailed,
+                None,
+            ) => true,
+            _ => false,
+        }
+    }
+
+    #[must_use]
     pub(crate) const fn retried_public_work(&self) -> bool {
         false
     }
 
     #[must_use]
     pub(crate) const fn invoked_public_callbacks(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
         false
     }
 
@@ -904,7 +981,18 @@ impl SyncFlushErrorRecoveryDiagnosticsForCanary {
         self.records
             .iter()
             .filter(|record| record.is_failure())
-            .all(SyncFlushErrorRecoveryRootRecordForCanary::preserved_lane_and_callback_metadata)
+            .all(|record| {
+                record.preserved_lane_and_callback_metadata()
+                    && record.preserved_error_callback_handles()
+                    && record.accepted_private_root_error_recovery_commit_evidence()
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_private_root_error_recovery_commit_evidence(&self) -> bool {
+        self.records.iter().all(
+            SyncFlushErrorRecoveryRootRecordForCanary::accepted_private_root_error_recovery_commit_evidence,
+        )
     }
 
     #[must_use]
@@ -914,6 +1002,11 @@ impl SyncFlushErrorRecoveryDiagnosticsForCanary {
 
     #[must_use]
     pub(crate) const fn invoked_public_callbacks(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
         false
     }
 
@@ -1344,6 +1437,8 @@ impl SyncFlushRootRecord {
                     scheduler_after,
                     commit_before: Some(commit_before),
                     commit_after: None,
+                    render_error_option_callbacks: None,
+                    render_failure_commit_evidence: None,
                     render_error: None,
                     commit_error: None,
                     committed: Some(committed),
@@ -1366,6 +1461,8 @@ impl SyncFlushRootRecord {
                     scheduler_after,
                     commit_before: Some(commit_before),
                     commit_after: Some(commit_after),
+                    render_error_option_callbacks: None,
+                    render_failure_commit_evidence: None,
                     render_error: None,
                     commit_error: Some(error),
                     committed: None,
@@ -2015,6 +2112,8 @@ fn flush_sync_work_across_scheduled_roots_with_error_recovery_diagnostics_for_ca
                                     scheduler_after,
                                     commit_before: Some(commit_before),
                                     commit_after: None,
+                                    render_error_option_callbacks: None,
+                                    render_failure_commit_evidence: None,
                                     render_error: None,
                                     commit_error: None,
                                     committed: Some(committed),
@@ -2040,6 +2139,8 @@ fn flush_sync_work_across_scheduled_roots_with_error_recovery_diagnostics_for_ca
                                     scheduler_after,
                                     commit_before: Some(commit_before),
                                     commit_after: Some(commit_after),
+                                    render_error_option_callbacks: None,
+                                    render_failure_commit_evidence: None,
                                     render_error: None,
                                     commit_error: Some(error),
                                     committed: None,
@@ -2050,6 +2151,19 @@ fn flush_sync_work_across_scheduled_roots_with_error_recovery_diagnostics_for_ca
                         }
                     }
                     Err(error) => {
+                        let render_error_option_callbacks =
+                            record_root_render_error_option_callbacks(
+                                store,
+                                root_id,
+                                render_lanes,
+                                error.clone(),
+                            )?;
+                        let render_failure_commit_evidence =
+                            host_root_render_failure_recovery_commit_evidence_for_canary(
+                                root_id,
+                                render_lanes,
+                                render_error_option_callbacks.error_option_callbacks(),
+                            );
                         let scheduler_after = sync_flush_root_recovery_snapshot_for_canary(
                             store,
                             root_id,
@@ -2064,6 +2178,8 @@ fn flush_sync_work_across_scheduled_roots_with_error_recovery_diagnostics_for_ca
                             scheduler_after,
                             commit_before: None,
                             commit_after: None,
+                            render_error_option_callbacks: Some(render_error_option_callbacks),
+                            render_failure_commit_evidence: Some(render_failure_commit_evidence),
                             render_error: Some(error),
                             commit_error: None,
                             committed: None,
@@ -2133,6 +2249,7 @@ mod tests {
         RootUpdateCallbackInvocationRequest, RootUpdateCallbackInvocationStatus,
         RootUpdateCallbackInvocationTestControl,
     };
+    use crate::root_config::RootErrorOptionCallbackPhase;
     use crate::root_scheduler::{
         RootSyncSchedulerContinuationExecutionStatus,
         SchedulerBridgeActContinuationExecutionStatus, root_sync_flush_record_for_canary,
@@ -2140,11 +2257,11 @@ mod tests {
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        ExecutionContextState, RootElementHandle, RootOptions, RootSyncFlushExitStatus,
-        RootSyncFlushRecordStatus, TestRendererHostOutputCanaryFixture,
-        TestRendererHostOutputCanaryMutationKind, ensure_root_is_scheduled,
-        finish_test_renderer_host_output_canary_fibers, flush_sync_work_on_all_roots,
-        inspect_test_renderer_host_output_canary_commit,
+        ExecutionContextState, RootElementHandle, RootErrorCallbackHandle, RootOptions,
+        RootRecoverableErrorCallbackHandle, RootSyncFlushExitStatus, RootSyncFlushRecordStatus,
+        TestRendererHostOutputCanaryFixture, TestRendererHostOutputCanaryMutationKind,
+        ensure_root_is_scheduled, finish_test_renderer_host_output_canary_fibers,
+        flush_sync_work_on_all_roots, inspect_test_renderer_host_output_canary_commit,
         prepare_test_renderer_host_output_canary_fibers, scheduled_roots, update_container,
         update_container_sync,
     };
@@ -2683,7 +2800,17 @@ mod tests {
 
     #[test]
     fn sync_flush_error_recovery_diagnostics_preserve_render_failure_metadata() {
-        let (mut store, root_id, host) = root_store();
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let root_id = store
+            .create_client_root(
+                FakeContainer::new(1),
+                RootOptions::new()
+                    .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(4511))
+                    .with_on_caught_error(RootErrorCallbackHandle::from_raw(4512))
+                    .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(4513)),
+            )
+            .unwrap();
         let callback = RootUpdateCallbackHandle::from_raw(4501);
         let update = update_container_sync(
             &mut store,
@@ -2712,8 +2839,10 @@ mod tests {
         assert!(!diagnostics.skipped_no_sync_work());
         assert!(diagnostics.did_capture_failure());
         assert!(diagnostics.preserved_failed_root_metadata());
+        assert!(diagnostics.accepted_private_root_error_recovery_commit_evidence());
         assert!(!diagnostics.retried_public_work());
         assert!(!diagnostics.invoked_public_callbacks());
+        assert!(!diagnostics.root_error_callbacks_invoked());
         assert!(!diagnostics.public_flush_sync_compatibility_claimed());
         assert_eq!(diagnostics.records().len(), 1);
         let record = &diagnostics.records()[0];
@@ -2732,11 +2861,73 @@ mod tests {
                 crate::UpdateQueueError::InvalidQueueHandle { handle }
             )) if *handle == invalid_queue
         ));
+        let render_callbacks = record.render_error_option_callbacks().unwrap();
+        assert_eq!(render_callbacks.root(), root_id);
+        assert_eq!(render_callbacks.render_lanes(), Lanes::SYNC);
+        assert!(matches!(
+            render_callbacks.error(),
+            RootWorkLoopError::UpdateQueue(crate::UpdateQueueError::InvalidQueueHandle {
+                handle
+            }) if *handle == invalid_queue
+        ));
+        assert_eq!(
+            render_callbacks.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(4511)
+        );
+        assert_eq!(
+            render_callbacks.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(4512)
+        );
+        assert_eq!(
+            render_callbacks.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(4513)
+        );
+        let root_error_callbacks = render_callbacks.error_option_callbacks();
+        assert_eq!(root_error_callbacks.root(), root_id);
+        assert_eq!(
+            root_error_callbacks.phase(),
+            RootErrorOptionCallbackPhase::Render
+        );
+        assert!(render_callbacks.has_configured_error_callback());
+        assert!(!render_callbacks.root_error_callbacks_invoked());
+        assert!(!render_callbacks.public_error_boundaries_enabled());
+        assert!(!render_callbacks.recoverable_error_compatibility_claimed());
+        let commit_evidence = record.render_failure_commit_evidence().unwrap();
+        assert_eq!(commit_evidence.root(), root_id);
+        assert_eq!(commit_evidence.render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            commit_evidence.error_option_callbacks(),
+            root_error_callbacks
+        );
+        assert_eq!(
+            commit_evidence.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(4511)
+        );
+        assert_eq!(
+            commit_evidence.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(4512)
+        );
+        assert_eq!(
+            commit_evidence.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(4513)
+        );
+        assert!(commit_evidence.has_configured_error_callback());
+        assert!(commit_evidence.accepted_render_failure_metadata());
+        assert!(!commit_evidence.commit_attempted());
+        assert!(!commit_evidence.root_current_switched());
+        assert!(!commit_evidence.retried_public_work());
+        assert!(!commit_evidence.invoked_public_callbacks());
+        assert!(!commit_evidence.root_error_callbacks_invoked());
+        assert!(!commit_evidence.public_error_boundaries_enabled());
+        assert!(!commit_evidence.recoverable_error_compatibility_claimed());
         assert_eq!(record.scheduler_before().pending_lanes(), pending_lanes);
         assert_eq!(record.scheduler_after().pending_lanes(), pending_lanes);
         assert!(record.preserved_lane_and_callback_metadata());
+        assert!(record.preserved_error_callback_handles());
+        assert!(record.accepted_private_root_error_recovery_commit_evidence());
         assert!(!record.retried_public_work());
         assert!(!record.invoked_public_callbacks());
+        assert!(!record.root_error_callbacks_invoked());
         assert!(!record.public_flush_sync_compatibility_claimed());
         assert_eq!(store.root(root_id).unwrap().current(), previous_current);
         assert_eq!(
