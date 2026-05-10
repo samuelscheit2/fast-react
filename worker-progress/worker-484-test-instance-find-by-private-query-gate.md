@@ -5,7 +5,7 @@
 - `create_goal` was called as the first action before research, file reads,
   implementation, or verification.
 - `get_goal` was available after setup and before this report.
-- Active goal status from `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active goal objective from `get_goal`: add private TestInstance
   `findByType` and `findByProps` diagnostics that build on accepted `findAll`
   metadata without exposing public query compatibility.
