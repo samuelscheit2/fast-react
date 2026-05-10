@@ -806,6 +806,13 @@ pub(crate) fn recompute_might_have_pending_sync_work<H: HostTypes>(
     Ok(has_pending_sync_work)
 }
 
+pub(crate) fn sync_flush_act_continuation_lanes_for_root<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<Lanes, RootSchedulerError> {
+    Ok(select_lanes_for_scheduled_task(store, root_id)?.render_lanes())
+}
+
 /// Prepare all currently scheduled sync roots for a later commit handoff.
 ///
 /// This is the first data-producing foundation for React's
@@ -1810,6 +1817,49 @@ mod tests {
             store.root(root_id).unwrap().lanes().pending_lanes(),
             Lanes::DEFAULT
         );
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_act_continuation_lanes_use_post_commit_selection() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let sync_result =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(1), None)
+                .unwrap();
+        ensure_root_is_scheduled(&mut store, sync_result.schedule()).unwrap();
+        schedule_default_update(&mut store, root_id);
+
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_finished(RootFinishedLanes::new(Lanes::SYNC, Lanes::DEFAULT));
+
+        let continuation_lanes =
+            sync_flush_act_continuation_lanes_for_root(&store, root_id).unwrap();
+
+        assert_eq!(continuation_lanes, Lanes::DEFAULT);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_act_continuation_lanes_respect_suspended_selection() {
+        let (mut store, root_id, host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+
+        let continuation_lanes =
+            sync_flush_act_continuation_lanes_for_root(&store, root_id).unwrap();
+
+        assert_eq!(continuation_lanes, Lanes::NO);
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     #[test]
