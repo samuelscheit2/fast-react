@@ -66,8 +66,8 @@ Results:
 - Focused gate: PASS, with 0 admitted rows, 20 blocked unsupported rows, and 0
   failures.
 - Focused root oracle test: 11 tests passed.
-- Full conformance: 415 tests passed.
-- JS check: passed, including conformance workspace check.
+- Full conformance: 427 tests passed.
+- JS check: passed, including benchmark and conformance workspace checks.
 - Oracle regeneration byte-compare: passed.
 - `git diff --check`: passed after marking new files intent-to-add so they were
   included in whitespace checks.
