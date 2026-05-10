@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 499 was accepted from queue 473-502. It added private root-render E2E
+  act/passive diagnostic admissions and a public facade blocker so accepted
+  act/passive metadata remains separate from public root, act, passive-effect,
+  and flushSync compatibility. Post-merge cleanup refreshed the expected React
+  DOM test-utils act private routing gate id to the current accepted gate. It
+  was verified after merge with focused root-render E2E and public facade
+  conformance gates, the focused root-render/public-facade tests, full
+  conformance workspace checks, conflict-marker scanning, and `git diff --check`.
 - Worker 495 was accepted from queue 473-502. It added private native batched
   JSON transport lifecycle diagnostics and deterministic batch error rows,
   integrating with the already accepted cross-environment teardown diagnostics
