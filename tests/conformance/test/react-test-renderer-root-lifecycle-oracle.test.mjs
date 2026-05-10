@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 import {
@@ -20,6 +21,22 @@ import {
 } from "../src/react-test-renderer-root-lifecycle-scenarios.mjs";
 
 const oracle = readCheckedReactTestRendererRootLifecycleOracle();
+const require = createRequire(import.meta.url);
+const privateGetInstanceDiagnosticsSymbol = Symbol.for(
+  "fast.react_test_renderer.private_get_instance_diagnostics"
+);
+const cjsGetInstanceEntrypoints = [
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.development",
+    specifier:
+      "../../../packages/react-test-renderer/cjs/react-test-renderer.development.js"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.production",
+    specifier:
+      "../../../packages/react-test-renderer/cjs/react-test-renderer.production.js"
+  }
+];
 
 test("checked React Test Renderer root lifecycle oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -240,6 +257,155 @@ test(".root and getInstance boundaries distinguish empty, multi-child, host, fun
   });
 });
 
+test("Fast React CJS getInstance private diagnostics describe class roots while public getInstance stays blocked", () => {
+  for (const entry of cjsGetInstanceEntrypoints) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    const error = captureThrown(() => renderer.getInstance());
+
+    assert.equal(error.name, "FastReactTestRendererUnimplementedError");
+    assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+    assert.equal(error.entrypoint, entry.entrypoint);
+    assert.equal(error.exportName, "create().getInstance");
+    assert.match(error.message, /Public instance lookup is intentionally blocked/u);
+    assert.equal(error.getInstancePrivateClassRootGate, error.routingGate.getInstancePrivateClassRootGate);
+    assert.equal(error.getInstancePrivateClassRootGate.publicGetInstanceAvailable, false);
+    assert.equal(error.getInstancePrivateClassRootGate.nativeBridgeAvailable, false);
+    assert.equal(error.getInstancePrivateClassRootGate.compatibilityClaimed, false);
+    assert.deepEqual(error.getInstancePrivateClassRootGate.acceptedClassRootFiberShape, [
+      "HostRoot",
+      "ClassComponent",
+      "HostComponent",
+      "HostText"
+    ]);
+    assert.deepEqual(error.getInstancePrivateClassRootGate.acceptedHostRootFiberShape, [
+      "HostRoot",
+      "HostComponent"
+    ]);
+    assert.deepEqual(
+      error.getInstancePrivateClassRootGate.acceptedFunctionRootFiberShape,
+      ["HostRoot", "FunctionComponent"]
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(
+      renderer.getInstance,
+      privateGetInstanceDiagnosticsSymbol
+    );
+    assert.notEqual(descriptor, undefined);
+    assert.equal(descriptor.enumerable, false);
+    assert.equal(descriptor.configurable, false);
+    assert.equal(descriptor.writable, false);
+    const diagnostics = descriptor.value;
+    assert.equal(Object.isFrozen(diagnostics), true);
+    assert.equal(
+      diagnostics.id,
+      "react-test-renderer-get-instance-private-class-root-diagnostics"
+    );
+    assert.equal(diagnostics.entrypoint, entry.entrypoint);
+    assert.equal(diagnostics.publicSurface, "create().getInstance");
+    assert.equal(diagnostics.rootRequest, error.rootRequest);
+    assert.equal(diagnostics.privateClassRootDiagnosticsAvailable, true);
+    assert.equal(diagnostics.publicGetInstanceAvailable, false);
+    assert.equal(diagnostics.publicRouteAvailable, false);
+    assert.equal(diagnostics.nativeBridgeAvailable, false);
+    assert.equal(diagnostics.compatibilityClaimed, false);
+
+    const accepted = createAcceptedGetInstanceClassRootDiagnostic();
+    assert.equal(diagnostics.canDescribeAcceptedClassRootDiagnostic(accepted), true);
+    const shape = diagnostics.describeAcceptedClassRootDiagnostic(accepted);
+    assert.equal(Object.isFrozen(shape), true);
+    assert.equal(
+      shape.id,
+      "react-test-renderer-private-get-instance-class-root-diagnostic"
+    );
+    assert.equal(shape.publicSurface, "create().getInstance");
+    assert.deepEqual(shape.traversal.order, [
+      "HostRoot",
+      "ClassComponent",
+      "HostComponent",
+      "HostText"
+    ]);
+    assert.equal(shape.traversal.classComponentReturnsStateNode, true);
+    assert.equal(shape.traversal.functionComponentFailClosed, true);
+    assert.equal(shape.traversal.hostComponentFailClosed, true);
+    assert.deepEqual(shape.hostRootFailClosed, {
+      rootFiberShape: ["HostRoot", "HostComponent"],
+      rootChildFiberTag: "HostComponent",
+      reactPublicResult: "null-with-default-createNodeMock",
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    });
+    assert.deepEqual(shape.functionRootFailClosed, {
+      rootFiberShape: ["HostRoot", "FunctionComponent"],
+      rootChildFiberTag: "FunctionComponent",
+      reactPublicResult: "null",
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    });
+    assert.deepEqual(shape.classComponent, {
+      fiberTag: "ClassComponent",
+      componentType: "CanaryClassComponent",
+      props: { label: "class-root" },
+      stateNodeAvailable: true,
+      renderedChildFiberTag: "HostComponent",
+      renderedChildCount: 1,
+      publicGetInstanceAvailable: false,
+      privateClassInstanceDiagnosticAvailable: true
+    });
+    assert.deepEqual(shape.instance, {
+      constructorName: "CanaryClassInstance",
+      props: { label: "class-root" },
+      state: { marker: "initial-state" },
+      reactPublicResult: "class-instance",
+      publicGetInstanceAvailable: false,
+      privateInstanceAvailable: true
+    });
+    assert.deepEqual(shape.renderedHostComponent, {
+      fiberTag: "HostComponent",
+      treeNodeType: "host",
+      elementType: "span",
+      props: {},
+      renderedChildCount: 1,
+      renderedText: "hello",
+      publicGetInstanceAvailable: false
+    });
+    assert.deepEqual(shape.renderedHostText, {
+      fiberTag: "HostText",
+      text: "hello"
+    });
+    assert.equal(shape.publicGetInstanceAvailable, false);
+    assert.equal(shape.publicRouteAvailable, false);
+    assert.equal(shape.nativeBridgeAvailable, false);
+    assert.equal(shape.compatibilityClaimed, false);
+
+    const rejected = createAcceptedGetInstanceClassRootDiagnostic();
+    rejected.functionRootFailClosed.publicBehaviorFailClosed = false;
+    assert.equal(diagnostics.canDescribeAcceptedClassRootDiagnostic(rejected), false);
+    const privateError = captureThrown(() =>
+      diagnostics.describeAcceptedClassRootDiagnostic(rejected)
+    );
+    assert.equal(
+      privateError.name,
+      "FastReactTestRendererPrivateGetInstanceDiagnosticError"
+    );
+    assert.equal(
+      privateError.code,
+      "FAST_REACT_TEST_RENDERER_PRIVATE_GETINSTANCE_DIAGNOSTIC"
+    );
+    assert.equal(privateError.entrypoint, entry.entrypoint);
+    assert.equal(privateError.exportName, "create().getInstance");
+    assert.equal(privateError.publicGetInstanceAvailable, false);
+    assert.equal(privateError.nativeBridgeAvailable, false);
+    assert.equal(privateError.compatibilityClaimed, false);
+  }
+});
+
 test("createNodeMock, strict mode, concurrent option, and production act absence are recorded", () => {
   const mock = scenarioValue(
     "default-node-development",
@@ -353,6 +519,121 @@ test("print React Test Renderer root lifecycle oracle CLI emits the checked-in a
 
   assert.equal(output, checkedText);
 });
+
+function loadFresh(specifier) {
+  const resolved = require.resolve(specifier);
+  delete require.cache[resolved];
+  return require(resolved);
+}
+
+function captureThrown(callback) {
+  try {
+    callback();
+  } catch (error) {
+    return error;
+  }
+
+  assert.fail("Expected callback to throw");
+}
+
+function createAcceptedGetInstanceClassRootDiagnostic({
+  hostOutputSnapshotCurrent = true,
+  hostOutputUpdateKind = "Create",
+  text = "hello"
+} = {}) {
+  return {
+    diagnosticName:
+      "fast-react-test-renderer.get-instance.private-class-root-canary",
+    sourceTreeDiagnosticName:
+      "fast-react-test-renderer.serialization.private-tree-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent,
+    gate: {
+      status: "ReadyForPrivateSerializationDiagnostics"
+    },
+    acceptedClassFiberShape: [
+      "HostRoot",
+      "ClassComponent",
+      "HostComponent",
+      "HostText"
+    ],
+    hostRootFailClosed: {
+      rootFiberShape: ["HostRoot", "HostComponent"],
+      rootChildFiberTag: "HostComponent",
+      reactPublicResult: "null-with-default-createNodeMock",
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    },
+    functionRootFailClosed: {
+      rootFiberShape: ["HostRoot", "FunctionComponent"],
+      rootChildFiberTag: "FunctionComponent",
+      reactPublicResult: "null",
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    },
+    classComponent: {
+      fiberTag: "ClassComponent",
+      componentType: "CanaryClassComponent",
+      props: {
+        attributes: {
+          label: "class-root"
+        },
+        textContent: null
+      },
+      stateNodeAvailable: true,
+      renderedChildFiberTag: "HostComponent",
+      renderedChildCount: 1,
+      instance: {
+        constructorName: "CanaryClassInstance",
+        props: {
+          attributes: {
+            label: "class-root"
+          },
+          textContent: null
+        },
+        state: {
+          marker: "initial-state"
+        },
+        privateInstanceAvailable: true,
+        publicGetInstanceAvailable: false,
+        reactPublicResult: "class-instance"
+      },
+      publicGetInstanceAvailable: false
+    },
+    renderedHostComponent: {
+      fiberTag: "HostComponent",
+      nodeType: "host",
+      elementType: { name: "span" },
+      props: {
+        attributes: {},
+        textContent: null
+      },
+      instanceAvailable: false,
+      renderedChildCount: 1,
+      renderedText: text,
+      publicTreeObjectAvailable: false
+    },
+    renderedHostText: {
+      fiberTag: "HostText",
+      text,
+      returnsTextValue: true,
+      publicTreeObjectAvailable: false
+    },
+    publicBlockers: {
+      jsonMethodBlocked: true,
+      treeMethodBlocked: true,
+      instanceWrapperBlocked: true,
+      jsFacadeRoutingBlocked: true,
+      publicActBlocked: true,
+      compatibilityClaimBlocked: true
+    },
+    publicGetInstanceAvailable: false,
+    nativeBridgeAvailable: false,
+    compatibilityClaimed: false
+  };
+}
 
 function observation(modeId, scenarioId) {
   return findReactTestRendererRootLifecycleObservation(

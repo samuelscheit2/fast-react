@@ -3778,6 +3778,13 @@ function assertPrivateRootRustLifecycleDiagnostic(diagnostic, expected) {
 }
 
 function assertActSchedulerGate(gate, entrypoint) {
+  const expectedRootFlushRecordIds = entrypoint.includes("/cjs/")
+    ? [
+        ...actSchedulerRootFlushRecordIds,
+        "test-renderer-private-getinstance-class-root-diagnostic"
+      ]
+    : actSchedulerRootFlushRecordIds;
+
   assert.equal(Object.isFrozen(gate), true, entrypoint);
   assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
   assert.equal(gate.status, actSchedulerGateStatus);
@@ -3868,7 +3875,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.recognizedRootActFlushRecords.map((record) => record.id),
-    actSchedulerRootFlushRecordIds
+    expectedRootFlushRecordIds
   );
   assert.deepEqual(
     gate.acceptedPrivateFlushPrerequisiteIds,
@@ -3960,6 +3967,23 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.recognizedRootActFlushRecords[4].standaloneWrapperMetadata,
     false
   );
+  const getInstanceRecord = gate.recognizedRootActFlushRecords.find(
+    (record) =>
+      record.id === "test-renderer-private-getinstance-class-root-diagnostic"
+  );
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(
+      getInstanceRecord.privateClassRootDiagnosticsAvailable,
+      true
+    );
+    assert.equal(
+      getInstanceRecord.acceptedWorker,
+      "worker-464-test-renderer-get-instance-class-gate"
+    );
+    assert.equal(getInstanceRecord.publicGetInstanceAvailable, false);
+  } else {
+    assert.equal(getInstanceRecord, undefined);
+  }
 }
 
 function captureThrown(callback) {

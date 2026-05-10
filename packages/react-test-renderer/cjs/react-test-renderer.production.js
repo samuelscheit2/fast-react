@@ -491,6 +491,33 @@ const testRendererRootActFlushRecords = Object.freeze([
     nativeExecution: false,
     rustExecution: false,
     hostOutputProducedFromJs: false
+  }),
+  Object.freeze({
+    id: 'test-renderer-private-getinstance-class-root-diagnostic',
+    jsRecord: 'react-test-renderer-get-instance-private-class-root-diagnostics',
+    symbol: 'fast.react_test_renderer.private_get_instance_diagnostics',
+    acceptedWorker: 'worker-464-test-renderer-get-instance-class-gate',
+    acceptedRustRecords: Object.freeze([
+      'TestRendererPrivateGetInstanceClassRootReport',
+      'TestRendererPrivateGetInstanceClassComponentDiagnostic',
+      'TestRendererPrivateGetInstanceClassInstanceDiagnostic',
+      'TestRendererPrivateGetInstanceFailClosedRootDiagnostic'
+    ]),
+    acceptedClassRootShape: Object.freeze([
+      'HostRoot',
+      'ClassComponent',
+      'HostComponent',
+      'HostText'
+    ]),
+    failClosedRootShapes: Object.freeze([
+      Object.freeze(['HostRoot', 'HostComponent']),
+      Object.freeze(['HostRoot', 'FunctionComponent'])
+    ]),
+    privateClassRootDiagnosticsAvailable: true,
+    publicGetInstanceAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    hostOutputProducedFromJs: false
   })
 ]);
 const schedulerReactActQueueDiagnosticRecords = Object.freeze([
@@ -1070,6 +1097,30 @@ const privateToTreeCompositeAcceptedFiberShape = Object.freeze([
   'HostText'
 ]);
 const privateToTreeFunctionComponentType = 'CanaryFunctionComponent';
+const privateGetInstanceDiagnosticsSymbol = Symbol.for(
+  'fast.react_test_renderer.private_get_instance_diagnostics'
+);
+const privateGetInstanceDiagnosticsStatus =
+  'private-get-instance-class-root-diagnostics-public-getinstance-blocked';
+const privateGetInstanceAcceptedDiagnosticName =
+  'fast-react-test-renderer.get-instance.private-class-root-canary';
+const privateGetInstanceAcceptedClassFiberShape = Object.freeze([
+  'HostRoot',
+  'ClassComponent',
+  'HostComponent',
+  'HostText'
+]);
+const privateGetInstanceHostRootFiberShape = Object.freeze([
+  'HostRoot',
+  'HostComponent'
+]);
+const privateGetInstanceFunctionRootFiberShape = Object.freeze([
+  'HostRoot',
+  'FunctionComponent'
+]);
+const privateGetInstanceClassComponentType = 'CanaryClassComponent';
+const privateGetInstanceClassConstructorName = 'CanaryClassInstance';
+const privateGetInstanceClassStateMarker = 'initial-state';
 const toTreePrivateHostOutputMetadataGate = Object.freeze({
   id: 'react-test-renderer-totree-private-host-output-metadata-gate',
   publicSurface: 'create().toTree',
@@ -1191,6 +1242,60 @@ const toTreePrivateFacadeGate = Object.freeze({
     'rust-native-test-renderer-create-bridge',
     'public-react-test-renderer-totree-bridge',
     'public-test-instance-and-totree-serialization-contract'
+  ])
+});
+const getInstancePrivateClassRootGate = Object.freeze({
+  id: 'react-test-renderer-get-instance-private-class-root-gate',
+  publicSurface: 'create().getInstance',
+  status: 'ready-for-private-diagnostics-public-getinstance-blocked',
+  deterministic: true,
+  privateClassRootDiagnosticsAvailable: true,
+  privateDiagnosticsSymbol: privateGetInstanceDiagnosticsSymbol.description,
+  privateDiagnosticsStatus: privateGetInstanceDiagnosticsStatus,
+  acceptedReactSourceAlgorithm: 'ReactFiberReconciler.getPublicRootInstance',
+  classComponentBehavior:
+    'returns the root child ClassComponent stateNode as the public instance',
+  functionComponentBehavior:
+    'keeps FunctionComponent root getInstance fail-closed with a null React result and blocked Fast React public route',
+  hostComponentBehavior:
+    'keeps HostComponent root getInstance fail-closed; createNodeMock public instance routing is still blocked',
+  acceptedClassRootFiberShape: privateGetInstanceAcceptedClassFiberShape,
+  acceptedHostRootFiberShape: privateGetInstanceHostRootFiberShape,
+  acceptedFunctionRootFiberShape: privateGetInstanceFunctionRootFiberShape,
+  acceptedRustPrivateGetInstanceDiagnostics: true,
+  acceptedRustPrivateTreeMetadata: true,
+  acceptedRustDiagnosticName: privateGetInstanceAcceptedDiagnosticName,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_get_instance_class_root_for_canary',
+    'TestRendererRoot::describe_private_get_instance_class_root_after_update_for_canary',
+    'TestRendererPrivateGetInstanceClassRootReport',
+    'TestRendererPrivateGetInstanceClassComponentDiagnostic',
+    'TestRendererPrivateGetInstanceClassInstanceDiagnostic',
+    'TestRendererPrivateGetInstanceFailClosedRootDiagnostic'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_get_instance_class_root_canary_describes_class_instance_shape',
+    'root_private_get_instance_class_root_canary_updates_rendered_host_child_only'
+  ]),
+  publicGetInstanceAvailable: false,
+  publicRouteAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false,
+  acceptedWorker: 'worker-464-test-renderer-get-instance-class-gate',
+  blockedPublicSurfaces: Object.freeze([
+    'create().getInstance',
+    'create().root',
+    'ReactTestInstance',
+    'createNodeMock-public-instance',
+    'public-js-react-test-renderer-routing',
+    'compatibility-claim'
+  ]),
+  missingPrerequisites: Object.freeze([
+    'public-class-component-rendering',
+    'public-react-test-renderer-getinstance-bridge',
+    'create-node-mock-public-instance-contract'
   ])
 });
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
@@ -1851,6 +1956,7 @@ const createRoutingGate = Object.freeze({
   toJSONSerializationFacadeGate: toJSONPrivateSerializationFacadeGate,
   toTreeHostOutputMetadataGate: toTreePrivateHostOutputMetadataGate,
   toTreePrivateFacadeGate,
+  getInstancePrivateClassRootGate,
   privateTestInstanceWrapperSkeleton
 });
 const rootRequestBridgeSymbol = Symbol.for(
@@ -2295,6 +2401,8 @@ function createUnsupportedError(
     error.toTreeHostOutputMetadataGate =
       routingGate.toTreeHostOutputMetadataGate;
     error.toTreePrivateFacadeGate = routingGate.toTreePrivateFacadeGate;
+    error.getInstancePrivateClassRootGate =
+      routingGate.getInstancePrivateClassRootGate;
   }
 
   if (privateRootDiagnostics !== undefined) {
@@ -4192,6 +4300,35 @@ function createPrivateToTreeFacade(rootRequest) {
   });
 }
 
+function createPrivateGetInstanceClassRootDiagnostics(rootRequest) {
+  return freezeRecord({
+    id: 'react-test-renderer-get-instance-private-class-root-diagnostics',
+    status: privateGetInstanceDiagnosticsStatus,
+    entrypoint,
+    publicSurface: 'create().getInstance',
+    symbol: privateGetInstanceDiagnosticsSymbol.description,
+    gate: getInstancePrivateClassRootGate,
+    rootRequest,
+    privateClassRootDiagnosticsAvailable: true,
+    publicGetInstanceAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false,
+    canDescribeAcceptedClassRootDiagnostic(report) {
+      try {
+        validatePrivateGetInstanceClassRootDiagnostic(report);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    describeAcceptedClassRootDiagnostic(report) {
+      return describePrivateGetInstanceClassRootDiagnostic(report);
+    }
+  });
+}
+
 function describePrivateToTreeHostOutputDiagnostic(report) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
 
@@ -4542,6 +4679,601 @@ function serializePrivateToTreeMetadataDiagnostic(report) {
     instance: null,
     rendered: renderedHostTree
   });
+}
+
+function describePrivateGetInstanceClassRootDiagnostic(report) {
+  const diagnostic = validatePrivateGetInstanceClassRootDiagnostic(report);
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-get-instance-class-root-diagnostic',
+    status: privateGetInstanceDiagnosticsStatus,
+    entrypoint,
+    publicSurface: 'create().getInstance',
+    sourceDiagnostic: privateGetInstanceAcceptedDiagnosticName,
+    acceptedClassRootFiberShape:
+      getInstancePrivateClassRootGate.acceptedClassRootFiberShape,
+    traversal: freezeRecord({
+      source: 'ReactFiberReconciler.getPublicRootInstance',
+      order: privateGetInstanceAcceptedClassFiberShape,
+      classComponentReturnsStateNode: true,
+      functionComponentFailClosed: true,
+      hostComponentFailClosed: true
+    }),
+    hostRootFailClosed: freezeRecord({
+      rootFiberShape: privateGetInstanceHostRootFiberShape,
+      rootChildFiberTag: 'HostComponent',
+      reactPublicResult: diagnostic.hostRootReactPublicResult,
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    }),
+    functionRootFailClosed: freezeRecord({
+      rootFiberShape: privateGetInstanceFunctionRootFiberShape,
+      rootChildFiberTag: 'FunctionComponent',
+      reactPublicResult: diagnostic.functionRootReactPublicResult,
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    }),
+    classComponent: freezeRecord({
+      fiberTag: 'ClassComponent',
+      componentType: diagnostic.componentType,
+      props: diagnostic.props,
+      stateNodeAvailable: true,
+      renderedChildFiberTag: 'HostComponent',
+      renderedChildCount: 1,
+      publicGetInstanceAvailable: false,
+      privateClassInstanceDiagnosticAvailable: true
+    }),
+    instance: freezeRecord({
+      constructorName: diagnostic.constructorName,
+      props: diagnostic.instanceProps,
+      state: diagnostic.state,
+      reactPublicResult: diagnostic.instanceReactPublicResult,
+      publicGetInstanceAvailable: false,
+      privateInstanceAvailable: true
+    }),
+    renderedHostComponent: freezeRecord({
+      fiberTag: 'HostComponent',
+      treeNodeType: 'host',
+      elementType: diagnostic.type,
+      props: diagnostic.hostProps,
+      renderedChildCount: 1,
+      renderedText: diagnostic.text,
+      publicGetInstanceAvailable: false
+    }),
+    renderedHostText: freezeRecord({
+      fiberTag: 'HostText',
+      text: diagnostic.text
+    }),
+    publicGetInstanceAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function validatePrivateGetInstanceClassRootDiagnostic(report) {
+  try {
+    assertPrivateGetInstanceRecord(report, 'report');
+    assertPrivateGetInstanceStringField(
+      report,
+      'diagnosticName',
+      'diagnostic_name',
+      privateGetInstanceAcceptedDiagnosticName
+    );
+    assertPrivateGetInstanceStringField(
+      report,
+      'sourceTreeDiagnosticName',
+      'source_tree_diagnostic_name',
+      privateToTreeAcceptedDiagnosticName
+    );
+    const updateKind = readPrivateGetInstanceStringField(
+      report,
+      'hostOutputUpdateKind',
+      'host_output_update_kind'
+    );
+    if (updateKind !== 'Create' && updateKind !== 'Update') {
+      throwPrivateGetInstanceDiagnosticsError(
+        'Expected private getInstance diagnostic host output update kind to be Create or Update.'
+      );
+    }
+    assertPrivateGetInstanceBooleanField(
+      report,
+      'hostOutputSnapshotCurrent',
+      'host_output_snapshot_current',
+      true
+    );
+    assertPrivateGetInstanceAcceptedClassFiberShape(
+      readPrivateGetInstanceArrayField(
+        report,
+        'acceptedClassFiberShape',
+        'accepted_class_fiber_shape'
+      )
+    );
+    assertPrivateGetInstanceGateIfPresent(
+      readPrivateToJSONField(report, 'gate')
+    );
+
+    const hostRootFailClosed = readPrivateGetInstanceRecordField(
+      report,
+      'hostRootFailClosed',
+      'host_root_fail_closed'
+    );
+    assertPrivateGetInstanceRootShape(
+      hostRootFailClosed,
+      privateGetInstanceHostRootFiberShape,
+      'HostComponent',
+      'null-with-default-createNodeMock'
+    );
+
+    const functionRootFailClosed = readPrivateGetInstanceRecordField(
+      report,
+      'functionRootFailClosed',
+      'function_root_fail_closed'
+    );
+    assertPrivateGetInstanceRootShape(
+      functionRootFailClosed,
+      privateGetInstanceFunctionRootFiberShape,
+      'FunctionComponent',
+      'null'
+    );
+
+    const classComponent = readPrivateGetInstanceRecordField(
+      report,
+      'classComponent',
+      'class_component'
+    );
+    assertPrivateGetInstanceStringField(
+      classComponent,
+      'fiberTag',
+      'fiber_tag',
+      'ClassComponent'
+    );
+    assertPrivateGetInstanceStringField(
+      classComponent,
+      'componentType',
+      'component_type',
+      privateGetInstanceClassComponentType
+    );
+    assertPrivateGetInstanceBooleanField(
+      classComponent,
+      'stateNodeAvailable',
+      'state_node_available',
+      true
+    );
+    assertPrivateGetInstanceStringField(
+      classComponent,
+      'renderedChildFiberTag',
+      'rendered_child_fiber_tag',
+      'HostComponent'
+    );
+    assertPrivateGetInstanceNumberField(
+      classComponent,
+      'renderedChildCount',
+      'rendered_child_count',
+      1
+    );
+    assertPrivateGetInstanceBooleanField(
+      classComponent,
+      'publicGetInstanceAvailable',
+      'public_get_instance_available',
+      false
+    );
+    const props = normalizePrivateGetInstanceProps(
+      readPrivateToJSONField(classComponent, 'props')
+    );
+
+    const instance = readPrivateGetInstanceRecordField(
+      classComponent,
+      'instance'
+    );
+    assertPrivateGetInstanceStringField(
+      instance,
+      'constructorName',
+      'constructor_name',
+      privateGetInstanceClassConstructorName
+    );
+    assertPrivateGetInstanceBooleanField(
+      instance,
+      'privateInstanceAvailable',
+      'private_instance_available',
+      true
+    );
+    assertPrivateGetInstanceBooleanField(
+      instance,
+      'publicGetInstanceAvailable',
+      'public_get_instance_available',
+      false
+    );
+    assertPrivateGetInstanceStringField(
+      instance,
+      'reactPublicResult',
+      'react_public_result',
+      'class-instance'
+    );
+    const instanceProps = normalizePrivateGetInstanceProps(
+      readPrivateToJSONField(instance, 'props')
+    );
+    if (JSON.stringify(props) !== JSON.stringify(instanceProps)) {
+      throwPrivateGetInstanceDiagnosticsError(
+        'Private getInstance class component props do not match instance props.'
+      );
+    }
+    const state = normalizePrivateGetInstanceState(
+      readPrivateToJSONField(instance, 'state')
+    );
+
+    const renderedHostComponent = readPrivateGetInstanceRecordField(
+      report,
+      'renderedHostComponent',
+      'rendered_host_component'
+    );
+    assertPrivateGetInstanceStringField(
+      renderedHostComponent,
+      'fiberTag',
+      'fiber_tag',
+      'HostComponent'
+    );
+    assertPrivateGetInstanceStringField(
+      renderedHostComponent,
+      'nodeType',
+      'node_type',
+      'host'
+    );
+    assertPrivateGetInstanceBooleanField(
+      renderedHostComponent,
+      'instanceAvailable',
+      'instance_available',
+      false
+    );
+    assertPrivateGetInstanceNumberField(
+      renderedHostComponent,
+      'renderedChildCount',
+      'rendered_child_count',
+      1
+    );
+    const hostProps = normalizePrivateGetInstanceProps(
+      readPrivateToJSONField(renderedHostComponent, 'props')
+    );
+    const renderedText = readPrivateGetInstanceStringField(
+      renderedHostComponent,
+      'renderedText',
+      'rendered_text'
+    );
+
+    const renderedHostText = readPrivateGetInstanceRecordField(
+      report,
+      'renderedHostText',
+      'rendered_host_text'
+    );
+    assertPrivateGetInstanceStringField(
+      renderedHostText,
+      'fiberTag',
+      'fiber_tag',
+      'HostText'
+    );
+    const text = readPrivateGetInstanceStringField(renderedHostText, 'text');
+    if (renderedText !== text) {
+      throwPrivateGetInstanceDiagnosticsError(
+        'Private getInstance rendered host text does not match HostText text.'
+      );
+    }
+
+    assertPrivateGetInstancePublicBlockers(
+      readPrivateGetInstanceRecordField(
+        report,
+        'publicBlockers',
+        'public_blockers'
+      )
+    );
+    assertPrivateGetInstanceBooleanField(
+      report,
+      'publicGetInstanceAvailable',
+      'public_get_instance_available',
+      false
+    );
+    assertPrivateGetInstanceBooleanField(
+      report,
+      'nativeBridgeAvailable',
+      'native_bridge_available',
+      false
+    );
+    assertPrivateGetInstanceBooleanField(
+      report,
+      'compatibilityClaimed',
+      'compatibility_claimed',
+      false
+    );
+
+    return {
+      componentType: readPrivateGetInstanceStringField(
+        classComponent,
+        'componentType',
+        'component_type'
+      ),
+      constructorName: readPrivateGetInstanceStringField(
+        instance,
+        'constructorName',
+        'constructor_name'
+      ),
+      functionRootReactPublicResult: readPrivateGetInstanceStringField(
+        functionRootFailClosed,
+        'reactPublicResult',
+        'react_public_result'
+      ),
+      hostProps,
+      hostRootReactPublicResult: readPrivateGetInstanceStringField(
+        hostRootFailClosed,
+        'reactPublicResult',
+        'react_public_result'
+      ),
+      instanceProps,
+      instanceReactPublicResult: readPrivateGetInstanceStringField(
+        instance,
+        'reactPublicResult',
+        'react_public_result'
+      ),
+      props,
+      state,
+      text,
+      type: normalizePrivateGetInstanceElementType(
+        readPrivateToJSONField(
+          renderedHostComponent,
+          'elementType',
+          'element_type'
+        )
+      )
+    };
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      error.code === 'FAST_REACT_TEST_RENDERER_PRIVATE_GETINSTANCE_DIAGNOSTIC'
+    ) {
+      throw error;
+    }
+    const message =
+      error instanceof Error && typeof error.message === 'string'
+        ? error.message
+        : 'The accepted private getInstance diagnostic shape was rejected.';
+    throwPrivateGetInstanceDiagnosticsError(message);
+  }
+}
+
+function assertPrivateGetInstanceAcceptedClassFiberShape(shape) {
+  if (
+    shape.length !== privateGetInstanceAcceptedClassFiberShape.length ||
+    shape.some(
+      (tag, index) => tag !== privateGetInstanceAcceptedClassFiberShape[index]
+    )
+  ) {
+    throwPrivateGetInstanceDiagnosticsError(
+      'Expected private getInstance acceptedClassFiberShape to be HostRoot, ClassComponent, HostComponent, HostText.'
+    );
+  }
+}
+
+function assertPrivateGetInstanceRootShape(
+  record,
+  expectedShape,
+  expectedChildTag,
+  expectedReactPublicResult
+) {
+  const shape = readPrivateGetInstanceArrayField(
+    record,
+    'rootFiberShape',
+    'root_fiber_shape'
+  );
+  if (
+    shape.length !== expectedShape.length ||
+    shape.some((tag, index) => tag !== expectedShape[index])
+  ) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance rootFiberShape to be ${expectedShape.join(', ')}.`
+    );
+  }
+  assertPrivateGetInstanceStringField(
+    record,
+    'rootChildFiberTag',
+    'root_child_fiber_tag',
+    expectedChildTag
+  );
+  assertPrivateGetInstanceStringField(
+    record,
+    'reactPublicResult',
+    'react_public_result',
+    expectedReactPublicResult
+  );
+  assertPrivateGetInstanceBooleanField(
+    record,
+    'publicGetInstanceAvailable',
+    'public_get_instance_available',
+    false
+  );
+  assertPrivateGetInstanceBooleanField(
+    record,
+    'privateClassInstanceAvailable',
+    'private_class_instance_available',
+    false
+  );
+  assertPrivateGetInstanceBooleanField(
+    record,
+    'publicBehaviorFailClosed',
+    'public_behavior_fail_closed',
+    true
+  );
+}
+
+function readPrivateGetInstanceRecordField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  assertPrivateGetInstanceRecord(value, camelName);
+  return value;
+}
+
+function readPrivateGetInstanceArrayField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  if (!Array.isArray(value)) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance diagnostic field ${camelName} to be an array.`
+    );
+  }
+  return value;
+}
+
+function readPrivateGetInstanceStringField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  if (typeof value !== 'string') {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance diagnostic field ${camelName} to be a string.`
+    );
+  }
+  return value;
+}
+
+function assertPrivateGetInstanceRecord(value, label) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance diagnostic ${label} to be an object.`
+    );
+  }
+}
+
+function assertPrivateGetInstanceStringField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateGetInstanceStringField(
+    record,
+    camelName,
+    snakeName
+  );
+  if (actual !== expected) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance diagnostic field ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateGetInstanceNumberField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateToJSONField(record, camelName, snakeName);
+  if (actual !== expected) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance diagnostic field ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateGetInstanceBooleanField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateToJSONField(record, camelName, snakeName);
+  if (actual !== expected) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance diagnostic field ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateGetInstancePublicBlockers(blockers) {
+  for (const [camelName, snakeName] of [
+    ['jsonMethodBlocked', 'json_method_blocked'],
+    ['treeMethodBlocked', 'tree_method_blocked'],
+    ['instanceWrapperBlocked', 'instance_wrapper_blocked'],
+    ['jsFacadeRoutingBlocked', 'js_facade_routing_blocked'],
+    ['publicActBlocked', 'public_act_blocked'],
+    ['compatibilityClaimBlocked', 'compatibility_claim_blocked']
+  ]) {
+    if (readPrivateToJSONField(blockers, camelName, snakeName) !== true) {
+      throwPrivateGetInstanceDiagnosticsError(
+        `Expected private getInstance public blocker ${camelName} to be true.`
+      );
+    }
+  }
+}
+
+function assertPrivateGetInstanceGateIfPresent(gate) {
+  if (gate === undefined) {
+    return;
+  }
+  assertPrivateGetInstanceRecord(gate, 'gate');
+  const status = readPrivateToJSONField(gate, 'status');
+  if (
+    status !== undefined &&
+    status !== 'ReadyForPrivateSerializationDiagnostics'
+  ) {
+    throwPrivateGetInstanceDiagnosticsError(
+      'Private getInstance diagnostic gate is not ready for private diagnostics.'
+    );
+  }
+}
+
+function normalizePrivateGetInstanceElementType(value) {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const key of ['name', 'elementType', 'element_type', 'type']) {
+      const maybeName = value[key];
+      if (typeof maybeName === 'string' && maybeName.length > 0) {
+        return maybeName;
+      }
+    }
+  }
+  throwPrivateGetInstanceDiagnosticsError(
+    'Expected private getInstance host component element type.'
+  );
+}
+
+function normalizePrivateGetInstanceProps(props) {
+  if (props === undefined || props === null) {
+    return freezeRecord({});
+  }
+  assertPrivateGetInstanceRecord(props, 'props');
+  const normalized = {};
+  const attributes = readPrivateToJSONField(props, 'attributes');
+  if (attributes !== undefined && attributes !== null) {
+    assertPrivateGetInstanceRecord(attributes, 'props.attributes');
+    for (const key of Object.keys(attributes).sort()) {
+      if (key !== 'children') {
+        normalized[key] = attributes[key];
+      }
+    }
+  }
+  for (const key of Object.keys(props).sort()) {
+    if (
+      key === 'attributes' ||
+      key === 'textContent' ||
+      key === 'text_content' ||
+      key === 'children'
+    ) {
+      continue;
+    }
+    normalized[key] = props[key];
+  }
+  return freezeRecord(normalized);
+}
+
+function normalizePrivateGetInstanceState(state) {
+  assertPrivateGetInstanceRecord(state, 'state');
+  const marker = readPrivateToJSONField(state, 'marker');
+  if (marker !== privateGetInstanceClassStateMarker) {
+    throwPrivateGetInstanceDiagnosticsError(
+      `Expected private getInstance state marker to be ${privateGetInstanceClassStateMarker}.`
+    );
+  }
+  return freezeRecord({ marker });
 }
 
 function serializePrivateToJSONHostOutputDiagnostic(report) {
@@ -5255,6 +5987,20 @@ function throwPrivateToTreeMetadataError(message) {
   throw error;
 }
 
+function throwPrivateGetInstanceDiagnosticsError(message) {
+  const error = new Error(`[fast-react] ${entrypoint}.create().getInstance private diagnostics ${message}`);
+  error.name = 'FastReactTestRendererPrivateGetInstanceDiagnosticError';
+  error.code = 'FAST_REACT_TEST_RENDERER_PRIVATE_GETINSTANCE_DIAGNOSTIC';
+  error.entrypoint = entrypoint;
+  error.exportName = 'create().getInstance';
+  error.compatibilityTarget = compatibilityTarget;
+  error.publicGetInstanceAvailable = false;
+  error.nativeBridgeAvailable = false;
+  error.nativeExecution = false;
+  error.compatibilityClaimed = false;
+  throw error;
+}
+
 function definePlaceholderMetadata(exportsObject) {
   Object.defineProperties(exportsObject, {
     __FAST_REACT_PLACEHOLDER__: {
@@ -5313,6 +6059,20 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
     value: createPrivateToTreeFacade(createRequest),
     writable: false
   });
+  const getInstance = createRendererUnsupportedFunction(
+    'create().getInstance',
+    0,
+    'Public instance lookup is intentionally blocked while the private diagnostics record the class-component root shape for getPublicRootInstance; host and function roots remain fail-closed with no public getInstance route.',
+    routingGate,
+    undefined,
+    () => createRequest
+  );
+  Object.defineProperty(getInstance, privateGetInstanceDiagnosticsSymbol, {
+    configurable: false,
+    enumerable: false,
+    value: createPrivateGetInstanceClassRootDiagnostics(createRequest),
+    writable: false
+  });
   const renderer = {
     _Scheduler: schedulerPlaceholder,
     root: undefined,
@@ -5339,14 +6099,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
       () => createPrivateRootUnmountDiagnostics(privateRootBridgeState),
       () => testRendererRootRequestBridge.unmountRendererRootRequest(renderer)
     ),
-    getInstance: createRendererUnsupportedFunction(
-      'create().getInstance',
-      0,
-      'Public instance lookup is intentionally blocked until TestInstance and createNodeMock behavior are implemented.',
-      routingGate,
-      undefined,
-      () => createRequest
-    ),
+    getInstance,
     unstable_flushSync: createRendererUnsupportedFunction(
       'create().unstable_flushSync',
       1,
