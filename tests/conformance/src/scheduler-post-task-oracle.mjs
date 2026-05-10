@@ -25,7 +25,11 @@ export function formatSchedulerPostTaskOracleAsMarkdown(oracle) {
 
   const modeLines = oracle.probeModes.map((mode) => {
     const observationCount = oracle.schedulerObservations[mode.id]?.length ?? 0;
-    return `- ${mode.id}: ${observationCount} scheduler observations`;
+    const fastReactStatuses = countStatuses(
+      oracle.fastReactComparisons?.[mode.id] ?? []
+    );
+
+    return `- ${mode.id}: ${observationCount} scheduler observations; Fast React comparisons ${JSON.stringify(fastReactStatuses)}`;
   });
 
   const coverageLines = Object.entries(oracle.coverage).map(
@@ -38,10 +42,14 @@ export function formatSchedulerPostTaskOracleAsMarkdown(oracle) {
     ([key, value]) => `- ${key}: ${value}`
   );
 
+  const riskLines = (oracle.implementationRisks ?? []).map(
+    (risk) => `- ${risk}`
+  );
+
   return [
     "# Scheduler Post Task Oracle",
     "",
-    "Generated from the exact scheduler 0.27.0 npm artifact. This oracle records normalized scheduler/unstable_post_task behavior under plain Node and controlled Task Scheduling API shims; it does not claim Fast React scheduler compatibility.",
+    "Generated from the exact scheduler 0.27.0 npm artifact and the current local scheduler implementation. This oracle records normalized scheduler/unstable_post_task behavior under plain Node and controlled Task Scheduling API shims; it keeps broad Fast React scheduler compatibility claims false.",
     "",
     "## Scenarios",
     "",
@@ -58,6 +66,10 @@ export function formatSchedulerPostTaskOracleAsMarkdown(oracle) {
     "## Timing Caveats",
     "",
     ...caveatLines,
+    "",
+    "## Implementation Risks",
+    "",
+    ...riskLines,
     "",
     "## Conformance Claims",
     "",
@@ -76,4 +88,44 @@ export function findSchedulerPostTaskObservation(oracle, modeId, scenarioId) {
     );
   }
   return observation;
+}
+
+export function findFastReactSchedulerPostTaskObservation(
+  oracle,
+  modeId,
+  scenarioId
+) {
+  const observation = oracle.fastReactObservations?.[modeId]?.find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  if (!observation) {
+    throw new Error(
+      `Missing Fast React scheduler post-task observation: ${modeId}:${scenarioId}`
+    );
+  }
+  return observation;
+}
+
+export function findFastReactSchedulerPostTaskComparison(
+  oracle,
+  modeId,
+  scenarioId
+) {
+  const comparison = oracle.fastReactComparisons?.[modeId]?.find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  if (!comparison) {
+    throw new Error(
+      `Missing Fast React scheduler post-task comparison: ${modeId}:${scenarioId}`
+    );
+  }
+  return comparison;
+}
+
+function countStatuses(comparisons) {
+  const counts = {};
+  for (const comparison of comparisons) {
+    counts[comparison.status] = (counts[comparison.status] ?? 0) + 1;
+  }
+  return counts;
 }

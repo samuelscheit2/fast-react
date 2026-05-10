@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  findFastReactSchedulerPostTaskComparison,
+  findFastReactSchedulerPostTaskObservation,
   findSchedulerPostTaskObservation,
   readCheckedSchedulerPostTaskOracle,
   readCheckedSchedulerPostTaskOracleText
@@ -12,6 +14,7 @@ import {
   SCHEDULER_POST_TASK_SCENARIOS
 } from "../src/scheduler-post-task-scenarios.mjs";
 import {
+  SCHEDULER_POST_TASK_FAST_REACT_TARGET,
   SCHEDULER_POST_TASK_ORACLE_ARTIFACT_PATH,
   SCHEDULER_POST_TASK_PROBE_MODES,
   SCHEDULER_POST_TASK_TARGET
@@ -67,22 +70,26 @@ test("checked scheduler post-task oracle artifact has the expected schema and ta
   assert.equal(oracle.deterministic, true);
   assert.deepEqual(oracle.generation, {
     method:
-      "exact scheduler npm tarball extracted into a temporary node_modules tree and probed through isolated Node child processes with controlled Task Scheduling API shims",
+      "exact scheduler npm tarball plus local scheduler implementation copied under an isolated alias into a temporary node_modules tree and probed through isolated Node child processes with controlled Task Scheduling API shims",
     lifecycleScriptsExecuted: false,
     rootManifestsOrLockfilesMutated: false,
-    probeIsolation:
-      "one Node child process per scheduler/unstable_post_task scenario and mode",
+    probeIsolation: "one Node child process per target, scenario, and mode",
     probeTimeoutMs: 10000,
     generatedTimestampIncluded: false,
     timingNormalization:
-      "raw wall-clock timestamps are omitted; probes use a controlled window.performance.now shim and record only logical scheduler calls, priority values, delay value categories, abort state, and shouldYield booleans"
+      "raw wall-clock timestamps are omitted; probes use a controlled window.performance.now shim and record only logical scheduler calls, priority values, delay value categories, abort state, and shouldYield booleans; local package metadata and alias subpath resolution are omitted from behavior comparison"
   });
   assert.deepEqual(oracle.schedulerTarget, SCHEDULER_POST_TASK_TARGET);
+  assert.deepEqual(oracle.fastReactTarget, SCHEDULER_POST_TASK_FAST_REACT_TARGET);
   assert.equal(oracle.packages.scheduler.version, "0.27.0");
   assert.equal(oracle.packages.scheduler.tarball.integrityVerified, true);
   assert.deepEqual(
     oracle.packages.scheduler.tarball.files,
     EXPECTED_TARBALL_FILES
+  );
+  assert.equal(
+    oracle.packages.fastReactScheduler.behaviorCompatibilityClaimed,
+    false
   );
 });
 
@@ -95,11 +102,12 @@ test("scheduler post-task oracle keeps compatibility claims scoped", () => {
     plainNodeUnsupportedBehaviorProbed: true,
     controlledTaskSchedulingApiShimUsed: true,
     exportDescriptorBehaviorProbed: true,
-    fastReactComparedToScheduler: false
+    fastReactImplementationComparedToScheduler: true,
+    fastReactBehaviorCompatible: false
   });
   assert.deepEqual(oracle.conformanceClaims, {
     realSchedulerBehaviorProbed: true,
-    fastReactComparedToScheduler: false,
+    fastReactComparedToScheduler: true,
     fastReactBehaviorCompatible: false,
     fullDualRunOracleExists: false,
     compatibilityClaimed: false
@@ -119,9 +127,17 @@ test("scheduler post-task oracle keeps compatibility claims scoped", () => {
     deadlineShouldYieldWithControlledTime: true,
     continuationWithSchedulerYield: true,
     continuationPostTaskFallbackWithoutYield: true,
+    localPackageMetadataExcludedFromBehaviorComparison: true,
+    localAliasSubpathResolutionExcludedFromBehaviorComparison: true,
     browserTaskOrdering: false,
     rawTiming: false
   });
+  assert.deepEqual(
+    oracle.implementationComparison.afterWorker125.statusCounts,
+    {
+      "matched-but-compatibility-not-claimed": 12
+    }
+  );
 });
 
 test("scheduler post-task oracle covers every scenario in every probe mode", () => {
@@ -145,6 +161,14 @@ test("scheduler post-task oracle covers every scenario in every probe mode", () 
       oracle.schedulerObservations[mode.id].length,
       SCHEDULER_POST_TASK_SCENARIO_IDS.length
     );
+    assert.equal(
+      oracle.fastReactObservations[mode.id].length,
+      SCHEDULER_POST_TASK_SCENARIO_IDS.length
+    );
+    assert.equal(
+      oracle.fastReactComparisons[mode.id].length,
+      SCHEDULER_POST_TASK_SCENARIO_IDS.length
+    );
 
     for (const scenarioId of SCHEDULER_POST_TASK_SCENARIO_IDS) {
       const observation = findSchedulerPostTaskObservation(
@@ -155,6 +179,10 @@ test("scheduler post-task oracle covers every scenario in every probe mode", () 
       assert.equal(observation.scenarioId, scenarioId);
       assert.equal(observation.packageName, "scheduler");
       assert.equal(observation.result.status, "returned");
+      assert.equal(
+        fastReactObservation(mode.id, scenarioId).scenarioId,
+        scenarioId
+      );
     }
   }
 });
@@ -552,6 +580,22 @@ test("scheduler post-task oracle captures continuation scheduling fallback", () 
   }
 });
 
+test("scheduler post-task oracle records matching Fast React post-task behavior without claiming broad compatibility", () => {
+  for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
+    for (const scenarioId of SCHEDULER_POST_TASK_SCENARIO_IDS) {
+      const scenarioComparison = comparison(mode.id, scenarioId);
+      assert.equal(
+        scenarioComparison.status,
+        "matched-but-compatibility-not-claimed"
+      );
+      assert.equal(scenarioComparison.compatibilityClaimed, false);
+      assert.equal(scenarioComparison.firstDifferencePath, null);
+      assert.equal(scenarioComparison.schedulerResultStatus, "returned");
+      assert.equal(scenarioComparison.fastReactResultStatus, "returned");
+    }
+  }
+});
+
 test("scheduler post-task oracle artifact has no local temp path leaks", () => {
   const oracleText = readCheckedSchedulerPostTaskOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
@@ -588,6 +632,14 @@ function operationValue(modeId, scenarioId) {
 
 function observation(modeId, scenarioId) {
   return findSchedulerPostTaskObservation(oracle, modeId, scenarioId);
+}
+
+function fastReactObservation(modeId, scenarioId) {
+  return findFastReactSchedulerPostTaskObservation(oracle, modeId, scenarioId);
+}
+
+function comparison(modeId, scenarioId) {
+  return findFastReactSchedulerPostTaskComparison(oracle, modeId, scenarioId);
 }
 
 function descriptorFor(descriptors, key) {

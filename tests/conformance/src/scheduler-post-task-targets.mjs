@@ -12,6 +12,16 @@ export const SCHEDULER_POST_TASK_TARGET = {
   expectedDistShasum: "0c4ef82d67d1e5c1e359e8fc76d3a87f045fe5bd"
 };
 
+export const SCHEDULER_POST_TASK_FAST_REACT_TARGET = {
+  packageName: "fast-react-scheduler",
+  sourcePackageName: "scheduler",
+  entrypoint: "fast-react-scheduler/unstable_post_task",
+  sourceEntrypoint: "scheduler/unstable_post_task",
+  version: "0.27.0",
+  role: "local-fast-react-scheduler-post-task-implementation",
+  targetStatus: "local-workspace-implementation-copied-under-isolated-alias"
+};
+
 export const SCHEDULER_POST_TASK_PROBE_MODES = [
   {
     id: "node-development",

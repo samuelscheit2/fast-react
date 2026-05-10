@@ -575,9 +575,9 @@ const schedulerEntrypoints = [
   },
   {
     keys: schedulerPlaceholderRootKeys,
+    requiresPostTaskWindow: true,
     resolvedFileName: 'unstable_post_task.js',
-    specifier: 'scheduler/unstable_post_task',
-    unsupportedExport: 'unstable_scheduleCallback'
+    specifier: 'scheduler/unstable_post_task'
   },
   {
     keys: schedulerPlaceholderRootKeys,
@@ -629,21 +629,21 @@ const schedulerEntrypoints = [
   },
   {
     keys: schedulerPlaceholderRootKeys,
+    requiresPostTaskWindow: true,
     resolvedFileName: path.join(
       'cjs',
       'scheduler-unstable_post_task.development.js'
     ),
-    specifier: 'scheduler/cjs/scheduler-unstable_post_task.development.js',
-    unsupportedExport: 'unstable_forceFrameRate'
+    specifier: 'scheduler/cjs/scheduler-unstable_post_task.development.js'
   },
   {
     keys: schedulerPlaceholderRootKeys,
+    requiresPostTaskWindow: true,
     resolvedFileName: path.join(
       'cjs',
       'scheduler-unstable_post_task.production.js'
     ),
-    specifier: 'scheduler/cjs/scheduler-unstable_post_task.production.js',
-    unsupportedExport: 'unstable_getCurrentPriorityLevel'
+    specifier: 'scheduler/cjs/scheduler-unstable_post_task.production.js'
   }
 ];
 
@@ -1012,6 +1012,18 @@ function assertSchedulerUnimplemented(callback, label) {
         /no .*scheduler .*implementation yet/,
         label
       );
+      return true;
+    },
+    label
+  );
+}
+
+function assertSchedulerPostTaskPlainNodeUnsupported(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, 'ReferenceError', label);
+      assert.equal(error.message, 'window is not defined', label);
       return true;
     },
     label
@@ -1885,6 +1897,21 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
 
 async function assertSchedulerFileEntrypoint(entrypoint, labelPrefix) {
   const absolutePath = path.join(schedulerPackageRoot, entrypoint.resolvedFileName);
+  if (entrypoint.requiresPostTaskWindow) {
+    assertSchedulerPostTaskPlainNodeUnsupported(
+      () => require(absolutePath),
+      `${labelPrefix} CJS`
+    );
+    await assert.rejects(
+      import(pathToFileURL(absolutePath).href),
+      (error) =>
+        error?.name === 'ReferenceError' &&
+        error?.message === 'window is not defined',
+      `${labelPrefix} ESM`
+    );
+    return;
+  }
+
   const cjsModule = require(absolutePath);
   if (entrypoint.implementedRoot) {
     assertSchedulerImplementedRootKeys(
@@ -2870,6 +2897,18 @@ async function runSchedulerPackageProbe(tempRoot) {
       );
     }
 
+    function assertPostTaskPlainNodeUnsupported(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(error.name, 'ReferenceError', label);
+          assert.equal(error.message, 'window is not defined', label);
+          return true;
+        },
+        label
+      );
+    }
+
     (async () => {
       const packageJson = require('scheduler/package.json');
       assert.equal(packageJson.name, 'scheduler');
@@ -2885,6 +2924,7 @@ async function runSchedulerPackageProbe(tempRoot) {
         implementedMock,
         implementedRoot,
         keys,
+        requiresPostTaskWindow,
         resolvedFileName,
         specifier,
         unsupportedExport
@@ -2894,6 +2934,26 @@ async function runSchedulerPackageProbe(tempRoot) {
           path.join(process.cwd(), 'node_modules', 'scheduler', resolvedFileName),
           specifier
         );
+
+        if (requiresPostTaskWindow) {
+          assertPostTaskPlainNodeUnsupported(() => require(specifier), specifier);
+          if (specifier === 'scheduler/unstable_post_task') {
+            await assert.rejects(
+              import(specifier),
+              (error) => error?.code === 'ERR_MODULE_NOT_FOUND',
+              specifier
+            );
+          } else {
+            await assert.rejects(
+              import(specifier),
+              (error) =>
+                error?.name === 'ReferenceError' &&
+                error?.message === 'window is not defined',
+              specifier
+            );
+          }
+          continue;
+        }
 
         const cjsModule = require(specifier);
         if (implementedRoot) {

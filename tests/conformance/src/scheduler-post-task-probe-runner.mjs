@@ -611,7 +611,10 @@ function resetPostTaskGlobals() {
 
 function clearSchedulerModuleCache() {
   for (const id of Object.keys(require.cache)) {
-    if (id.includes(`${sep}node_modules${sep}scheduler${sep}`)) {
+    if (
+      id.includes(`${sep}node_modules${sep}scheduler${sep}`) ||
+      id.includes(`${sep}node_modules${sep}fast-react-scheduler${sep}`)
+    ) {
       delete require.cache[id];
     }
   }
