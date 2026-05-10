@@ -51,6 +51,31 @@ const repoRoot = path.resolve(
   "..",
   ".."
 );
+const hydrateRootAcceptedPrivateMetadataBlockedPublicFields = Object.freeze([
+  "compatibilityClaimed",
+  "publicRootCompatibilitySurface",
+  "publicRootRenderCompatibilityClaimed",
+  "publicHydrationCompatibilityClaimed",
+  "publicHydrationReplayCompatibilityClaimed",
+  "publicEventCompatibilityClaimed",
+  "publicResourceCompatibilityClaimed",
+  "publicResourceDomInsertionCompatibilityClaimed",
+  "publicStylesheetCompatibilityClaimed",
+  "publicFormCompatibilityClaimed",
+  "publicFormActionCompatibilityClaimed",
+  "publicFormResetCompatibilityClaimed",
+  "publicControlledInputCompatibilityClaimed"
+]);
+const hydrateRootAcceptedPrivateMetadataRowBlockedPublicFields = Object.freeze([
+  "compatibilityClaimed",
+  "publicCompatibilityClaimed",
+  "publicRootRenderCompatibilityClaimed",
+  "publicHydrationCompatibilityClaimed",
+  "publicResourceCompatibilityClaimed",
+  "publicFormCompatibilityClaimed",
+  "promotesHydration",
+  "promotesRootRender"
+]);
 
 test("React DOM public root facade gate blocks placeholders while oracle prerequisites remain accepted", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
@@ -865,6 +890,84 @@ test("React DOM client private hydrateRoot facade preflight is symbol-only and b
       "events",
       "compatibility-claims"
     ]
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics,
+    record.hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    payload.requestRecord.acceptedPrivateMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics.rootRecordId,
+    record.hydrationBoundaryRecord.recordId
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataIds,
+    record.acceptedPrivateMetadataDiagnostics.metadataIds
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataGateIds,
+    record.acceptedPrivateMetadataDiagnostics.gateIds
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics.compatibilityClaimed,
+    false
+  );
+  for (const field of hydrateRootAcceptedPrivateMetadataBlockedPublicFields) {
+    assert.equal(
+      record.acceptedPrivateMetadataDiagnostics[field],
+      false,
+      field
+    );
+  }
+  assert.equal(
+    Array.isArray(record.acceptedPrivateMetadataDiagnostics.metadataRows),
+    true
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics.metadataRows.length,
+    record.acceptedPrivateMetadataDiagnostics.metadataIdCount
+  );
+  record.acceptedPrivateMetadataDiagnostics.metadataRows.forEach(
+    (row, index) => {
+      assert.equal(
+        row.metadataId,
+        record.acceptedPrivateMetadataDiagnostics.metadataIds[index]
+      );
+      assert.equal(
+        row.gateId,
+        record.acceptedPrivateMetadataDiagnostics.gateIds[index]
+      );
+      assert.equal(
+        row.recordType,
+        record.acceptedPrivateMetadataDiagnostics.acceptedRecordTypes[index]
+      );
+      assert.equal(
+        row.acceptedStatus,
+        record.acceptedPrivateMetadataDiagnostics.acceptedStatuses[index]
+      );
+      assert.equal(row.metadataRecognized, true);
+      assert.equal(row.diagnosticOnly, true);
+      assert.equal(row.readOnly, true);
+      for (
+        const field of
+          hydrateRootAcceptedPrivateMetadataRowBlockedPublicFields
+      ) {
+        assert.equal(row[field], false, field);
+      }
+    }
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics
+      .publicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics
+      .publicHydrationReplayCompatibilityClaimed,
+    false
   );
   assert.equal(
     payload.requestRecord.hydrationBoundaryRecord,

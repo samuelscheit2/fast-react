@@ -45,6 +45,34 @@ const {DOCUMENT_NODE, ELEMENT_NODE, TEXT_NODE} = require(
   path.join(packageRoot, 'src/client/dom-container.js')
 );
 
+const hydrateRootAcceptedPrivateMetadataBlockedPublicFields =
+  Object.freeze([
+    'compatibilityClaimed',
+    'publicRootCompatibilitySurface',
+    'publicRootRenderCompatibilityClaimed',
+    'publicHydrationCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicEventCompatibilityClaimed',
+    'publicResourceCompatibilityClaimed',
+    'publicResourceDomInsertionCompatibilityClaimed',
+    'publicStylesheetCompatibilityClaimed',
+    'publicFormCompatibilityClaimed',
+    'publicFormActionCompatibilityClaimed',
+    'publicFormResetCompatibilityClaimed',
+    'publicControlledInputCompatibilityClaimed'
+  ]);
+const hydrateRootAcceptedPrivateMetadataRowBlockedPublicFields =
+  Object.freeze([
+    'compatibilityClaimed',
+    'publicCompatibilityClaimed',
+    'publicRootRenderCompatibilityClaimed',
+    'publicHydrationCompatibilityClaimed',
+    'publicResourceCompatibilityClaimed',
+    'publicFormCompatibilityClaimed',
+    'promotesHydration',
+    'promotesRootRender'
+  ]);
+
 test('private root bridge native handoff mirrors create/render/unmount records only', () => {
   const document = createDocument('native-handoff');
   const container = createElement('DIV', document);
@@ -6303,6 +6331,14 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
     hydratePayload.hydrationBoundaryRecord,
     hydratePreflight.hydrationBoundaryRecord
   );
+  assert.equal(
+    payload.requestRecord.acceptedPrivateMetadataDiagnostics,
+    hydratePreflight.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    hydratePayload.hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics,
+    hydratePreflight.acceptedPrivateMetadataDiagnostics
+  );
   assert.deepEqual(preflight.getHydrateRootPreflightRecords(), [
     hydratePreflight
   ]);
@@ -6351,6 +6387,155 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   assert.equal(serialized.includes('__reactContainer$'), false);
   assertBridgeDidNotTouchContainer(container, document);
 });
+
+test('private react-dom/client hydrateRoot facade preflight rejects row-level public metadata claims', () => {
+  assertHydrateRootTamperedAcceptedMetadataRejected({
+    mutateRow(row, index) {
+      return {
+        ...row,
+        publicCompatibilityClaimed: index === 0
+      };
+    }
+  });
+});
+
+test('private react-dom/client hydrateRoot facade preflight rejects top-level granular public metadata claims', () => {
+  assertHydrateRootTamperedAcceptedMetadataRejected({
+    metadataOverrides: {
+      publicResourceDomInsertionCompatibilityClaimed: true
+    }
+  });
+});
+
+function assertHydrateRootTamperedAcceptedMetadataRejected({
+  metadataOverrides,
+  mutateRow
+}) {
+  const rootBridgePath = path.join(
+    packageRoot,
+    'src/client/root-bridge.js'
+  );
+  const hydrationGatePath = path.join(
+    packageRoot,
+    'src/client/hydration-boundary-gate.js'
+  );
+  const rootBridgeCacheKey = require.resolve(rootBridgePath);
+  const rootBridgeCacheEntry = require.cache[rootBridgeCacheKey];
+  const hydrationGate = require(hydrationGatePath);
+  const originalCreateHydrationBoundaryGate =
+    hydrationGate.createHydrationBoundaryGate;
+  const metadataContracts =
+    hydrationGate.acceptedHydrationBoundaryMetadataContracts;
+  const metadataIds = Object.freeze(
+    metadataContracts.map((contract) => contract.metadataId)
+  );
+  const gateIds = Object.freeze(
+    metadataContracts.map((contract) => contract.gateId)
+  );
+  const acceptedRecordTypes = Object.freeze(
+    metadataContracts.map((contract) => contract.recordType)
+  );
+  const acceptedStatuses = Object.freeze(
+    metadataContracts.map((contract) => contract.acceptedStatus)
+  );
+  const metadataRows = Object.freeze(
+    metadataContracts.map((contract, index) =>
+      Object.freeze(
+        typeof mutateRow === 'function'
+          ? mutateRow(createAcceptedPrivateMetadataRow(contract), index)
+          : createAcceptedPrivateMetadataRow(contract)
+      )
+    )
+  );
+
+  hydrationGate.createHydrationBoundaryGate =
+    function createTamperedHydrationBoundaryGate() {
+      return Object.freeze({
+        recordUnsupportedHydrateRoot() {
+          const recordId = 'tampered-hydration-boundary:1';
+          return Object.freeze({
+            recordId,
+            acceptedPrivateMetadataDiagnostics: Object.freeze({
+              kind:
+                hydrationGate
+                  .HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
+              gateId:
+                hydrationGate.privateHydrationBoundaryAcceptedMetadataGateId,
+              status:
+                hydrationGate.privateHydrationBoundaryAcceptedMetadataStatus,
+              rootRecordId: recordId,
+              compatibilityClaimed: false,
+              publicRootCompatibilitySurface: false,
+              publicRootRenderCompatibilityClaimed: false,
+              publicHydrationCompatibilityClaimed: false,
+              publicHydrationReplayCompatibilityClaimed: false,
+              publicEventCompatibilityClaimed: false,
+              publicResourceCompatibilityClaimed: false,
+              publicResourceDomInsertionCompatibilityClaimed: false,
+              publicStylesheetCompatibilityClaimed: false,
+              publicFormCompatibilityClaimed: false,
+              publicFormActionCompatibilityClaimed: false,
+              publicFormResetCompatibilityClaimed: false,
+              publicControlledInputCompatibilityClaimed: false,
+              metadataIdCount: metadataRows.length,
+              metadataIds,
+              gateIds,
+              acceptedRecordTypes,
+              acceptedStatuses,
+              metadataRows,
+              ...(metadataOverrides || {})
+            }),
+            acceptedPrivateMetadataIds: metadataIds,
+            acceptedPrivateMetadataGateIds: gateIds
+          });
+        }
+      });
+    };
+
+  delete require.cache[rootBridgeCacheKey];
+  try {
+    const freshRootBridge = require(rootBridgePath);
+    const bridge = freshRootBridge.createPrivateRootBridgeShell();
+
+    assert.throws(
+      () => bridge.createHydrateRoot({}, null, null),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST',
+        message: /without public compatibility claims/
+      }
+    );
+  } finally {
+    hydrationGate.createHydrationBoundaryGate =
+      originalCreateHydrationBoundaryGate;
+    delete require.cache[rootBridgeCacheKey];
+    if (rootBridgeCacheEntry !== undefined) {
+      require.cache[rootBridgeCacheKey] = rootBridgeCacheEntry;
+    }
+  }
+}
+
+function createAcceptedPrivateMetadataRow(contract) {
+  return {
+    metadataId: contract.metadataId,
+    category: contract.category,
+    gateId: contract.gateId,
+    recordType: contract.recordType,
+    acceptedStatus: contract.acceptedStatus,
+    blockedReason: contract.blockedReason,
+    reason: contract.reason,
+    metadataRecognized: true,
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    publicCompatibilityClaimed: false,
+    publicRootRenderCompatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicResourceCompatibilityClaimed: false,
+    publicFormCompatibilityClaimed: false,
+    promotesHydration: false,
+    promotesRootRender: false
+  };
+}
 
 test('private react-dom/client facade preflight accepts live container only as blocked evidence', () => {
   const {container, document} = createLiveRootContainerPreflightTarget(
@@ -9906,6 +10091,48 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
     ]
   );
   assert.equal(
+    record.acceptedPrivateMetadataDiagnostics,
+    record.hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics.rootRecordId,
+    record.hydrationBoundaryRecord.recordId
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataIds,
+    record.acceptedPrivateMetadataDiagnostics.metadataIds
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataGateIds,
+    record.acceptedPrivateMetadataDiagnostics.gateIds
+  );
+  assert.equal(
+    Object.isFrozen(record.acceptedPrivateMetadataDiagnostics),
+    true
+  );
+  assertHydrateRootAcceptedPrivateMetadataBlocked(
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics.compatibilityClaimed,
+    false
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics
+      .publicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics
+      .publicHydrationReplayCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    record.acceptedPrivateMetadataDiagnostics
+      .publicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
     rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord(record),
     true
   );
@@ -9932,6 +10159,31 @@ function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
   assert.equal(record.hydration, false);
   assert.equal(record.eventDispatch, false);
   assert.equal(record.compatibilityClaimed, false);
+}
+
+function assertHydrateRootAcceptedPrivateMetadataBlocked(metadata) {
+  for (const field of hydrateRootAcceptedPrivateMetadataBlockedPublicFields) {
+    assert.equal(metadata[field], false, field);
+  }
+
+  assert.equal(Array.isArray(metadata.metadataRows), true);
+  assert.equal(metadata.metadataRows.length, metadata.metadataIdCount);
+  for (let index = 0; index < metadata.metadataRows.length; index++) {
+    const row = metadata.metadataRows[index];
+    assert.equal(row.metadataId, metadata.metadataIds[index]);
+    assert.equal(row.gateId, metadata.gateIds[index]);
+    assert.equal(row.recordType, metadata.acceptedRecordTypes[index]);
+    assert.equal(row.acceptedStatus, metadata.acceptedStatuses[index]);
+    assert.equal(row.metadataRecognized, true);
+    assert.equal(row.diagnosticOnly, true);
+    assert.equal(row.readOnly, true);
+    for (
+      const field of
+        hydrateRootAcceptedPrivateMetadataRowBlockedPublicFields
+    ) {
+      assert.equal(row[field], false, field);
+    }
+  }
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {

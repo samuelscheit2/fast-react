@@ -36,6 +36,7 @@ const {
 } = require('./root-markers.js');
 const {
   HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
+  HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
   HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
@@ -44,6 +45,7 @@ const {
   HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
+  acceptedHydrationBoundaryMetadataContracts,
   createHydrationBoundaryGate,
   getPrivateHydrationBoundaryRecordPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
@@ -51,6 +53,8 @@ const {
   isPrivateHydrationBoundaryRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
+  privateHydrationBoundaryAcceptedMetadataGateId,
+  privateHydrationBoundaryAcceptedMetadataStatus,
   privateHydrationClaimedReplayTargetDispatchExecutionGateId,
   privateHydrationClaimedReplayTargetDispatchExecutionStatus,
   privateHydrationTargetClaimingGateId,
@@ -566,6 +570,32 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
       blocked: true,
       reason: 'React DOM hydrateRoot compatibility remains unclaimed.'
     })
+  ]);
+const HYDRATION_BOUNDARY_ACCEPTED_METADATA_BLOCKED_PUBLIC_FIELDS = freezeArray([
+  'compatibilityClaimed',
+  'publicRootCompatibilitySurface',
+  'publicRootRenderCompatibilityClaimed',
+  'publicHydrationCompatibilityClaimed',
+  'publicHydrationReplayCompatibilityClaimed',
+  'publicEventCompatibilityClaimed',
+  'publicResourceCompatibilityClaimed',
+  'publicResourceDomInsertionCompatibilityClaimed',
+  'publicStylesheetCompatibilityClaimed',
+  'publicFormCompatibilityClaimed',
+  'publicFormActionCompatibilityClaimed',
+  'publicFormResetCompatibilityClaimed',
+  'publicControlledInputCompatibilityClaimed'
+]);
+const HYDRATION_BOUNDARY_ACCEPTED_METADATA_ROW_BLOCKED_PUBLIC_FIELDS =
+  freezeArray([
+    'compatibilityClaimed',
+    'publicCompatibilityClaimed',
+    'publicRootRenderCompatibilityClaimed',
+    'publicHydrationCompatibilityClaimed',
+    'publicResourceCompatibilityClaimed',
+    'publicFormCompatibilityClaimed',
+    'promotesHydration',
+    'promotesRootRender'
   ]);
 const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_ACCEPTED_CAPABILITIES =
   freezeArray([
@@ -3235,6 +3265,11 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     replayQueueDiagnostics: requestRecord.replayQueueDiagnostics,
     targetResolutionDiagnostics: requestRecord.targetResolutionDiagnostics,
     eventReplayBlockers: requestRecord.eventReplayBlockers,
+    acceptedPrivateMetadataDiagnostics:
+      requestRecord.acceptedPrivateMetadataDiagnostics,
+    acceptedPrivateMetadataIds: requestRecord.acceptedPrivateMetadataIds,
+    acceptedPrivateMetadataGateIds:
+      requestRecord.acceptedPrivateMetadataGateIds,
     requestAdmission,
     nativeHandoffRecord: null,
     requestAdmissionStatus: requestAdmission.admissionStatus,
@@ -8381,6 +8416,10 @@ function createHydrateRootRecordWithBridge(
       initialChildren,
       hydrationOptions
     );
+  const acceptedPrivateMetadataDiagnostics =
+    assertHydrationBoundaryAcceptedPrivateMetadataDiagnostics(
+      hydrationBoundaryRecord
+    );
   const sequence = bridgeState.nextHydrateSequence++;
   const hydrateId = `${bridgeState.hydrateIdPrefix}:${sequence}`;
   const requestInfo = createRequestInfo(bridgeState, 'hydrateRoot');
@@ -8416,6 +8455,11 @@ function createHydrateRootRecordWithBridge(
     targetResolutionDiagnostics:
       hydrationBoundaryRecord.targetResolutionDiagnostics,
     eventReplayBlockers: hydrationBoundaryRecord.eventReplayBlockers,
+    acceptedPrivateMetadataDiagnostics,
+    acceptedPrivateMetadataIds:
+      acceptedPrivateMetadataDiagnostics.metadataIds,
+    acceptedPrivateMetadataGateIds:
+      acceptedPrivateMetadataDiagnostics.gateIds,
     markerGuard: hydrationBoundaryRecord.markerGuard,
     listenerGuard: hydrationBoundaryRecord.listenerGuard,
     hydrationRequested: true,
@@ -8825,6 +8869,127 @@ function validateCreateRootBridgeRequestRecord(record) {
   };
 }
 
+function assertHydrationBoundaryAcceptedPrivateMetadataDiagnostics(
+  hydrationBoundaryRecord
+) {
+  const acceptedPrivateMetadataDiagnostics =
+    hydrationBoundaryRecord.acceptedPrivateMetadataDiagnostics;
+  if (
+    !acceptedPrivateMetadataDiagnostics ||
+    typeof acceptedPrivateMetadataDiagnostics !== 'object' ||
+    acceptedPrivateMetadataDiagnostics.kind !==
+      HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND ||
+    acceptedPrivateMetadataDiagnostics.gateId !==
+      privateHydrationBoundaryAcceptedMetadataGateId ||
+    acceptedPrivateMetadataDiagnostics.status !==
+      privateHydrationBoundaryAcceptedMetadataStatus ||
+    acceptedPrivateMetadataDiagnostics.rootRecordId !==
+      hydrationBoundaryRecord.recordId
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private hydrateRoot bridge records require accepted private metadata diagnostics for the same unsupported hydration boundary without public compatibility claims.'
+    );
+  }
+
+  for (
+    const field of
+      HYDRATION_BOUNDARY_ACCEPTED_METADATA_BLOCKED_PUBLIC_FIELDS
+  ) {
+    if (acceptedPrivateMetadataDiagnostics[field] !== false) {
+      throwInvalidRootBridgeRequest(
+        'Private hydrateRoot bridge records require accepted private metadata diagnostics for the same unsupported hydration boundary without public compatibility claims.'
+      );
+    }
+  }
+
+  assertHydrationBoundaryAcceptedPrivateMetadataRows(
+    acceptedPrivateMetadataDiagnostics
+  );
+
+  if (
+    hydrationBoundaryRecord.acceptedPrivateMetadataIds !==
+      acceptedPrivateMetadataDiagnostics.metadataIds ||
+    hydrationBoundaryRecord.acceptedPrivateMetadataGateIds !==
+      acceptedPrivateMetadataDiagnostics.gateIds
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private hydrateRoot bridge records require non-stale accepted private metadata id snapshots from the same hydration boundary.'
+    );
+  }
+
+  return acceptedPrivateMetadataDiagnostics;
+}
+
+function assertHydrationBoundaryAcceptedPrivateMetadataRows(
+  acceptedPrivateMetadataDiagnostics
+) {
+  const metadataRows = acceptedPrivateMetadataDiagnostics.metadataRows;
+  const metadataIds = acceptedPrivateMetadataDiagnostics.metadataIds;
+  const gateIds = acceptedPrivateMetadataDiagnostics.gateIds;
+  const acceptedRecordTypes =
+    acceptedPrivateMetadataDiagnostics.acceptedRecordTypes;
+  const acceptedStatuses =
+    acceptedPrivateMetadataDiagnostics.acceptedStatuses;
+  const contractCount = acceptedHydrationBoundaryMetadataContracts.length;
+
+  if (
+    !Array.isArray(metadataRows) ||
+    metadataRows.length !== contractCount ||
+    acceptedPrivateMetadataDiagnostics.metadataIdCount !== contractCount ||
+    !Array.isArray(metadataIds) ||
+    metadataIds.length !== contractCount ||
+    !Array.isArray(gateIds) ||
+    gateIds.length !== contractCount ||
+    !Array.isArray(acceptedRecordTypes) ||
+    acceptedRecordTypes.length !== contractCount ||
+    !Array.isArray(acceptedStatuses) ||
+    acceptedStatuses.length !== contractCount
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private hydrateRoot bridge records require accepted private metadata row snapshots from the hydration boundary gate.'
+    );
+  }
+
+  for (let index = 0; index < contractCount; index++) {
+    const contract = acceptedHydrationBoundaryMetadataContracts[index];
+    const row = metadataRows[index];
+
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      row.metadataId !== contract.metadataId ||
+      row.category !== contract.category ||
+      row.gateId !== contract.gateId ||
+      row.recordType !== contract.recordType ||
+      row.acceptedStatus !== contract.acceptedStatus ||
+      row.blockedReason !== contract.blockedReason ||
+      row.reason !== contract.reason ||
+      row.metadataRecognized !== true ||
+      row.diagnosticOnly !== true ||
+      row.readOnly !== true ||
+      metadataIds[index] !== contract.metadataId ||
+      gateIds[index] !== contract.gateId ||
+      acceptedRecordTypes[index] !== contract.recordType ||
+      acceptedStatuses[index] !== contract.acceptedStatus
+    ) {
+      throwInvalidRootBridgeRequest(
+        'Private hydrateRoot bridge records require accepted private metadata row snapshots from the hydration boundary gate.'
+      );
+    }
+
+    for (
+      const field of
+        HYDRATION_BOUNDARY_ACCEPTED_METADATA_ROW_BLOCKED_PUBLIC_FIELDS
+    ) {
+      if (row[field] !== false) {
+        throwInvalidRootBridgeRequest(
+          'Private hydrateRoot bridge records require accepted private metadata rows without public compatibility claims.'
+        );
+      }
+    }
+  }
+}
+
 function validateHydrateRootBridgeRequestRecord(record) {
   const payload = rootRecordPayloads.get(record);
   if (payload === undefined) {
@@ -8877,6 +9042,10 @@ function validateHydrateRootBridgeRequestRecord(record) {
       'Private hydrateRoot bridge payload does not match its hydration boundary record.'
     );
   }
+  const acceptedPrivateMetadataDiagnostics =
+    assertHydrationBoundaryAcceptedPrivateMetadataDiagnostics(
+      hydrationBoundaryRecord
+    );
 
   assertRecordField(
     record,
@@ -8917,6 +9086,21 @@ function validateHydrateRootBridgeRequestRecord(record) {
     record,
     'eventReplayBlockers',
     hydrationBoundaryRecord.eventReplayBlockers
+  );
+  assertRecordField(
+    record,
+    'acceptedPrivateMetadataDiagnostics',
+    acceptedPrivateMetadataDiagnostics
+  );
+  assertRecordField(
+    record,
+    'acceptedPrivateMetadataIds',
+    acceptedPrivateMetadataDiagnostics.metadataIds
+  );
+  assertRecordField(
+    record,
+    'acceptedPrivateMetadataGateIds',
+    acceptedPrivateMetadataDiagnostics.gateIds
   );
   assertRecordField(record, 'markerGuard', hydrationBoundaryRecord.markerGuard);
   assertRecordField(
