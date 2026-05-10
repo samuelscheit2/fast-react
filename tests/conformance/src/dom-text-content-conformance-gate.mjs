@@ -45,14 +45,28 @@ export const DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_TEXT_CONTENT_TARGET = {
     "packages/react-dom/src/dom-host/text-content.js#shouldSetTextContent"
 };
 
+export const DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET = {
+  packageName: "@fast-react/react-dom",
+  version: "0.0.0",
+  role: "workspace-fast-react-private-dom-host-text-commit-helper",
+  entrypoint:
+    "packages/react-dom/src/dom-host/mutation.js#DOM_HOST_TEXT_COMMIT_GATE_METADATA"
+};
+
 export const DOM_TEXT_CONTENT_PRIVATE_SHOULD_SET_MATCH_STATUS =
   "matched-react-dom-19.2.6-private-should-set-text-content";
 
 export const DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS =
   "skipped-unsupported-private-text-content-slice";
 
+export const DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS =
+  "matched-react-dom-19.2.6-private-host-text-commit-row";
+
 export const DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS =
   "skipped-unsupported-dom-mutation-root-path";
+
+export const DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS =
+  "skipped-unsupported-private-host-text-content-scenario";
 
 export const DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS =
   Object.freeze([
@@ -94,6 +108,106 @@ export const DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS =
     }
   ]);
 
+export const DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS =
+  Object.freeze([
+    {
+      rowId: "host-text-create-append",
+      scenarioId: "host-text-sibling-boundaries",
+      phaseId: "initial",
+      oracleExtractor: "host-text-sibling-create-append",
+      localProbe: "host-text-create-append",
+      coverage: ["host-text-creation", "appendChild"],
+      reason:
+        "The private mutation helper can append supplied fake-DOM HostText nodes; the gate creates deterministic fake text nodes locally without claiming ownerDocument text-instance creation."
+    },
+    {
+      rowId: "host-text-update-node-value",
+      scenarioId: "host-text-sibling-boundaries",
+      phaseId: "update",
+      oracleExtractor: "host-text-sibling-update-node-value",
+      localProbe: "host-text-update-node-value",
+      coverage: ["host-text-update", "commitTextUpdate"],
+      reason:
+        "The private mutation helper implements HostText node value commits over supplied fake-DOM text nodes."
+    },
+    {
+      rowId: "host-text-delete-remove-child",
+      scenarioId: "host-text-sibling-boundaries",
+      phaseId: "delete-text-siblings",
+      oracleExtractor: "host-text-sibling-delete-remove-child",
+      localProbe: "host-text-delete-remove-child",
+      coverage: ["host-text-deletion", "removeChild"],
+      reason:
+        "The private mutation helper implements fake-DOM text child removal from an explicit parent."
+    },
+    {
+      rowId: "host-text-insert-before",
+      scenarioId: "host-text-insertion-before-element",
+      phaseId: "prepend-text",
+      oracleExtractor: "host-text-insert-before",
+      localProbe: "host-text-insert-before",
+      coverage: ["host-text-creation", "host-text-insertion", "insertBefore"],
+      reason:
+        "The private mutation helper can insert a supplied fake-DOM HostText node before an existing sibling."
+    },
+    {
+      rowId: "reset-text-content-before-managed-child",
+      scenarioId: "text-content-to-managed-child-boundary",
+      phaseId: "managed-child",
+      oracleExtractor: "reset-text-content-before-managed-child",
+      localProbe: "reset-text-content-before-managed-child",
+      coverage: ["resetTextContent"],
+      reason:
+        "The private mutation helper implements the resetTextContent write used before appending managed children."
+    }
+  ]);
+
+export const DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_HOST_TEXT_COMMIT_SCENARIOS =
+  Object.freeze([
+    {
+      scenarioId: "primitive-text-content-shortcut",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "Element-owned primitive text-content shortcut updates are not HostText commit rows and remain outside this private HostText gate."
+    },
+    {
+      scenarioId: "namespace-text-content-boundaries",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "Namespace-sensitive element creation and text updates remain outside the private fake-DOM HostText commit slice."
+    },
+    {
+      scenarioId: "svg-container-text-root",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "SVG-container namespace context remains unsupported by this private HostText commit gate."
+    },
+    {
+      scenarioId: "dangerous-html-exclusion-and-managed-text",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "dangerouslySetInnerHTML leaf behavior and managed-text transitions remain owned by the DOM property boundary gate."
+    },
+    {
+      scenarioId: "dangerous-html-nullish-does-not-shortcut",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "Nullish dangerouslySetInnerHTML behavior is a text-content/property-boundary scenario, not an admitted HostText commit row."
+    },
+    {
+      scenarioId: "dangerous-html-children-conflict",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "dangerouslySetInnerHTML children-conflict errors remain outside private HostText commit behavior."
+    },
+    {
+      scenarioId: "dangerous-html-shape-validation",
+      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_TEXT_CONTENT_SCENARIO_STATUS,
+      reason:
+        "dangerouslySetInnerHTML shape validation remains outside private HostText commit behavior."
+    }
+  ]);
+
 export const DOM_TEXT_CONTENT_CONFORMANCE_GATE = {
   id: DOM_TEXT_CONTENT_CONFORMANCE_GATE_ID,
   reactDomOracle: `${DOM_TEXT_CONTENT_TARGET.packageName}@${DOM_TEXT_CONTENT_TARGET.version}`,
@@ -101,16 +215,28 @@ export const DOM_TEXT_CONTENT_CONFORMANCE_GATE = {
     DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_TEXT_CONTENT_TARGET.packageName,
   localEntrypoint:
     DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_TEXT_CONTENT_TARGET.entrypoint,
+  localHostTextCommitEntrypoint:
+    DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET.entrypoint,
   admittedPrivateShouldSetScenarioIds:
     DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS,
   unsupportedPrivateShouldSetScenarioIds:
     DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS.map(
       (scenario) => scenario.scenarioId
     ),
+  admittedPrivateHostTextCommitRowIds:
+    DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS.map(
+      (row) => row.rowId
+    ),
+  unsupportedPrivateHostTextCommitScenarioIds:
+    DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_HOST_TEXT_COMMIT_SCENARIOS.map(
+      (scenario) => scenario.scenarioId
+    ),
   unsupportedDomRenderPaths: {
     gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS,
+    publicRootsCompared: false,
     serverSerializationCompared: false,
     clientMutationCompared: false,
+    hydrationCompared: false,
     compatibilityClaimed: false
   }
 };
@@ -122,22 +248,28 @@ export function runDomTextContentConformanceGate({
   const localChecks = inspectDomTextContentLocalTargets({ workspaceRoot });
   const localShouldSetTextContentObservations =
     runLocalDomTextContentShouldSetObservations({ workspaceRoot });
+  const localHostTextCommitObservations =
+    runLocalDomHostTextCommitObservations({ workspaceRoot });
 
   return evaluateDomTextContentConformanceGate({
     checkedOracle,
     localChecks,
-    localShouldSetTextContentObservations
+    localShouldSetTextContentObservations,
+    localHostTextCommitObservations
   });
 }
 
 export function evaluateDomTextContentConformanceGate({
   checkedOracle,
   localChecks = inspectDomTextContentLocalTargets(),
-  localShouldSetTextContentObservations
+  localShouldSetTextContentObservations,
+  localHostTextCommitObservations
 } = {}) {
   const failures = [];
   const admittedPrivateShouldSetRows = [];
+  const admittedPrivateHostTextCommitRows = [];
   const skippedUnsupportedPrivateShouldSetRows = [];
+  const skippedUnsupportedPrivateHostTextCommitScenarioRows = [];
   const skippedUnsupportedDomRenderRows = [];
 
   if (!checkedOracle) {
@@ -149,9 +281,17 @@ export function evaluateDomTextContentConformanceGate({
   const localObservations =
     localShouldSetTextContentObservations ??
     runLocalDomTextContentShouldSetObservations();
+  const localHostTextObservations =
+    localHostTextCommitObservations ?? runLocalDomHostTextCommitObservations();
   const localObservationByScenario = new Map(
     localObservations.observations.map((observation) => [
       observation.scenarioId,
+      observation
+    ])
+  );
+  const localHostTextObservationByRow = new Map(
+    localHostTextObservations.observations.map((observation) => [
+      observation.rowId,
       observation
     ])
   );
@@ -159,6 +299,10 @@ export function evaluateDomTextContentConformanceGate({
 
   validateOracleShape({ checkedOracle, failures });
   validateAdmissionMetadata({ shouldSetAdmissions, failures });
+  validateHostTextCommitAdmissionMetadata({
+    localHostTextObservations,
+    failures
+  });
 
   if (!localChecks.privateShouldSetTextContentHelperPresent) {
     failures.push({
@@ -170,6 +314,13 @@ export function evaluateDomTextContentConformanceGate({
     failures.push({
       gateStatus: "local-private-should-set-text-content-load-failed",
       error: localObservations.loadError
+    });
+  }
+
+  if (localHostTextObservations.loadError) {
+    failures.push({
+      gateStatus: "local-private-host-text-commit-load-failed",
+      error: localHostTextObservations.loadError
     });
   }
 
@@ -234,6 +385,73 @@ export function evaluateDomTextContentConformanceGate({
     }
 
     for (const mode of DOM_TEXT_CONTENT_PROBE_MODES) {
+      for (const admittedRow of DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS) {
+        const checkedRow = readExpectedHostTextCommitRowFromOracle({
+          oracle: checkedOracle,
+          modeId: mode.id,
+          admittedRow
+        });
+
+        if (checkedRow.error) {
+          failures.push({
+            modeId: mode.id,
+            rowId: admittedRow.rowId,
+            scenarioId: admittedRow.scenarioId,
+            phaseId: admittedRow.phaseId,
+            gateStatus: "missing-react-dom-host-text-commit-row",
+            error: checkedRow.error
+          });
+          continue;
+        }
+
+        const localObservation = localHostTextObservationByRow.get(
+          admittedRow.rowId
+        );
+        if (!localObservation) {
+          failures.push({
+            modeId: mode.id,
+            rowId: admittedRow.rowId,
+            scenarioId: admittedRow.scenarioId,
+            phaseId: admittedRow.phaseId,
+            gateStatus: "missing-local-private-host-text-commit-observation"
+          });
+          continue;
+        }
+
+        const firstDifferencePath = findFirstDifferencePath(
+          checkedRow.result,
+          localObservation.result
+        );
+        if (firstDifferencePath === null) {
+          admittedPrivateHostTextCommitRows.push({
+            modeId: mode.id,
+            rowId: admittedRow.rowId,
+            scenarioId: admittedRow.scenarioId,
+            phaseId: admittedRow.phaseId,
+            gateStatus: DOM_TEXT_CONTENT_PRIVATE_HOST_TEXT_COMMIT_MATCH_STATUS
+          });
+        } else {
+          failures.push({
+            modeId: mode.id,
+            rowId: admittedRow.rowId,
+            scenarioId: admittedRow.scenarioId,
+            phaseId: admittedRow.phaseId,
+            gateStatus: "admitted-private-host-text-commit-output-mismatch",
+            firstDifferencePath
+          });
+        }
+      }
+    }
+
+    for (const scenario of DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_HOST_TEXT_COMMIT_SCENARIOS) {
+      skippedUnsupportedPrivateHostTextCommitScenarioRows.push({
+        scenarioId: scenario.scenarioId,
+        gateStatus: scenario.gateStatus,
+        reason: scenario.reason
+      });
+    }
+
+    for (const mode of DOM_TEXT_CONTENT_PROBE_MODES) {
       for (const scenario of DOM_TEXT_CONTENT_RENDER_SCENARIOS) {
         const serverObservation = findRenderObservationOrNull({
           oracle: checkedOracle,
@@ -269,7 +487,7 @@ export function evaluateDomTextContentConformanceGate({
             observationKind,
             gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_DOM_RENDER_STATUS,
             reason:
-              "The local gate compares only the implemented private shouldSetTextContent helper; public root rendering, server rendering, and DOM mutation output remain unsupported."
+              "The local gate compares only implemented private helper rows; public root rendering, full client mutation output, server rendering, hydration, and unsupported text-content scenarios remain unsupported."
           });
         }
       }
@@ -278,6 +496,7 @@ export function evaluateDomTextContentConformanceGate({
 
   if (
     skippedUnsupportedPrivateShouldSetRows.length > 0 ||
+    skippedUnsupportedPrivateHostTextCommitScenarioRows.length > 0 ||
     skippedUnsupportedDomRenderRows.length > 0
   ) {
     rejectCompatibilityClaimsWhileSkipped({ checkedOracle, failures });
@@ -290,14 +509,21 @@ export function evaluateDomTextContentConformanceGate({
     ok,
     localChecks,
     localObservationMetadata: localObservations.metadata,
+    localHostTextCommitObservationMetadata: localHostTextObservations.metadata,
     admittedPrivateShouldSetRows,
+    admittedPrivateHostTextCommitRows,
     skippedUnsupportedPrivateShouldSetRows,
+    skippedUnsupportedPrivateHostTextCommitScenarioRows,
     skippedUnsupportedDomRenderRows,
     failures,
     summary: {
       admittedPrivateShouldSetRowCount: admittedPrivateShouldSetRows.length,
+      admittedPrivateHostTextCommitRowCount:
+        admittedPrivateHostTextCommitRows.length,
       skippedUnsupportedPrivateShouldSetRowCount:
         skippedUnsupportedPrivateShouldSetRows.length,
+      skippedUnsupportedPrivateHostTextCommitScenarioCount:
+        skippedUnsupportedPrivateHostTextCommitScenarioRows.length,
       skippedUnsupportedDomRenderRowCount:
         skippedUnsupportedDomRenderRows.length,
       failureCount: failures.length,
@@ -308,9 +534,12 @@ export function evaluateDomTextContentConformanceGate({
         DOM_TEXT_CONTENT_PROBE_MODES.length *
         2,
       privateTextContentBehaviorCompared: ok,
+      privateHostTextCommitBehaviorCompared:
+        ok && admittedPrivateHostTextCommitRows.length > 0,
       fullDomTextContentCompatibilityAdmitted:
         ok &&
         skippedUnsupportedPrivateShouldSetRows.length === 0 &&
+        skippedUnsupportedPrivateHostTextCommitScenarioRows.length === 0 &&
         skippedUnsupportedDomRenderRows.length === 0,
       compatibilityClaimed: false
     }
@@ -349,6 +578,41 @@ export function runLocalDomTextContentShouldSetObservations({
   };
 }
 
+export function runLocalDomHostTextCommitObservations({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  const loadResult = loadLocalPrivateHostTextCommitHelper({ workspaceRoot });
+  if (loadResult.error) {
+    return {
+      metadata: {
+        target: DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET,
+        observationKind: "private-dom-host-text-commit",
+        loaded: false,
+        gateMetadata: null
+      },
+      loadError: loadResult.error,
+      observations: []
+    };
+  }
+
+  return {
+    metadata: {
+      target: DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET,
+      observationKind: "private-dom-host-text-commit",
+      loaded: true,
+      gateMetadata: loadResult.gateMetadata
+    },
+    loadError: null,
+    observations: DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS.map(
+      (admittedRow) =>
+        runLocalHostTextCommitProbe({
+          admittedRow,
+          mutation: loadResult.mutation
+        })
+    )
+  };
+}
+
 export function formatDomTextContentConformanceGateResult(result) {
   const lines = [
     `DOM text-content conformance gate: ${result.ok ? "PASS" : "FAIL"}`,
@@ -357,17 +621,20 @@ export function formatDomTextContentConformanceGateResult(result) {
     `Local target: ${result.gate.localTargetPackageName}`,
     `Local entrypoint: ${result.gate.localEntrypoint}`,
     `Admitted private shouldSetTextContent rows compared: ${result.summary.admittedPrivateShouldSetRowCount}`,
+    `Admitted private HostText commit rows compared: ${result.summary.admittedPrivateHostTextCommitRowCount}`,
     `Skipped unsupported private shouldSetTextContent rows: ${result.summary.skippedUnsupportedPrivateShouldSetRowCount}`,
+    `Skipped unsupported private HostText/text-content scenarios: ${result.summary.skippedUnsupportedPrivateHostTextCommitScenarioCount}`,
     `Skipped unsupported DOM render/mutation rows: ${result.summary.skippedUnsupportedDomRenderRowCount}`,
     `Failures: ${result.summary.failureCount}`
   ];
 
   if (
     result.skippedUnsupportedPrivateShouldSetRows.length > 0 ||
+    result.skippedUnsupportedPrivateHostTextCommitScenarioRows.length > 0 ||
     result.skippedUnsupportedDomRenderRows.length > 0
   ) {
     lines.push(
-      "Full DOM text-content compatibility remains blocked; unsupported private slices and DOM mutation/root paths are not admitted as passing behavior."
+      "Full DOM text-content compatibility remains blocked; unsupported private slices, public roots, server rendering, hydration, full DOM mutation output, and text-content scenarios are not admitted as passing behavior."
     );
   }
 
@@ -463,6 +730,263 @@ function validateAdmissionMetadata({ shouldSetAdmissions, failures }) {
         gateStatus: "dom-render-scenario-admitted-through-private-gate"
       });
     }
+  }
+}
+
+function validateHostTextCommitAdmissionMetadata({
+  localHostTextObservations,
+  failures
+}) {
+  const knownRenderScenarioIds = new Set(
+    DOM_TEXT_CONTENT_RENDER_SCENARIOS.map((scenario) => scenario.id)
+  );
+  const admittedRowIds = DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS.map(
+    (row) => row.rowId
+  );
+  const supportedRowIds =
+    localHostTextObservations.metadata.gateMetadata?.supportedFakeDomRowIds ??
+    [];
+
+  for (const admittedRow of DOM_TEXT_CONTENT_ADMITTED_PRIVATE_HOST_TEXT_COMMIT_ROWS) {
+    if (!knownRenderScenarioIds.has(admittedRow.scenarioId)) {
+      failures.push({
+        rowId: admittedRow.rowId,
+        scenarioId: admittedRow.scenarioId,
+        gateStatus: "unknown-admitted-private-host-text-commit-scenario"
+      });
+    }
+
+    if (!admittedRowIds.includes(admittedRow.rowId)) {
+      failures.push({
+        rowId: admittedRow.rowId,
+        gateStatus: "unknown-admitted-private-host-text-commit-row"
+      });
+    }
+  }
+
+  for (const scenario of DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_HOST_TEXT_COMMIT_SCENARIOS) {
+    if (!knownRenderScenarioIds.has(scenario.scenarioId)) {
+      failures.push({
+        scenarioId: scenario.scenarioId,
+        gateStatus: "unknown-unsupported-private-host-text-commit-scenario"
+      });
+    }
+  }
+
+  const supportedDifference = findFirstDifferencePath(
+    supportedRowIds,
+    admittedRowIds
+  );
+  if (supportedDifference !== null) {
+    failures.push({
+      gateStatus: "local-host-text-commit-supported-row-metadata-mismatch",
+      firstDifferencePath: supportedDifference,
+      supportedRowIds,
+      admittedRowIds
+    });
+  }
+
+  const gateMetadata = localHostTextObservations.metadata.gateMetadata;
+  for (const [key, expected] of [
+    ["publicRootsCompared", false],
+    ["serverRenderingCompared", false],
+    ["hydrationCompared", false],
+    ["browserDomCompared", false],
+    ["compatibilityClaimed", false]
+  ]) {
+    if (gateMetadata?.[key] !== expected) {
+      failures.push({
+        gateStatus: `local-host-text-commit-metadata-${key}-mismatch`,
+        value: gateMetadata?.[key] ?? null
+      });
+    }
+  }
+}
+
+function readExpectedHostTextCommitRowFromOracle({
+  oracle,
+  modeId,
+  admittedRow
+}) {
+  const observation = findRenderObservationOrNull({
+    oracle,
+    modeId,
+    observationKind: "clientMutation",
+    scenarioId: admittedRow.scenarioId
+  });
+  const phase = observation?.result?.phases?.find(
+    (candidate) => candidate.phaseId === admittedRow.phaseId
+  );
+
+  if (!phase) {
+    return {
+      error: `Missing client mutation phase ${admittedRow.phaseId} for ${admittedRow.scenarioId}.`
+    };
+  }
+
+  return normalizeExpectedHostTextCommitRow({ admittedRow, phase });
+}
+
+function normalizeExpectedHostTextCommitRow({ admittedRow, phase }) {
+  switch (admittedRow.oracleExtractor) {
+    case "host-text-sibling-create-append": {
+      const createMutations = phase.mutations.filter(
+        (mutation) =>
+          mutation.type === "createTextNode" &&
+          (mutation.value === "left" || mutation.value === "right")
+      );
+      const appendMutations = phase.mutations.filter(
+        (mutation) =>
+          mutation.type === "appendChild" &&
+          mutation.parent === "DIV" &&
+          mutation.child === "#text"
+      );
+      if (
+        findFirstDifferencePath(
+          createMutations.map((mutation) => mutation.value),
+          ["left", "right"]
+        ) !== null ||
+        appendMutations.length !== 2
+      ) {
+        return {
+          error:
+            "React DOM host-text-sibling initial phase no longer has the expected left/right create and append mutations."
+        };
+      }
+      return {
+        result: {
+          rowId: admittedRow.rowId,
+          operation: admittedRow.localProbe,
+          mutations: [
+            ...createMutations.map(({ type, value }) => ({ type, value })),
+            ...appendMutations.map(({ type, parent, child }) => ({
+              type,
+              parent,
+              child
+            }))
+          ]
+        }
+      };
+    }
+    case "host-text-sibling-update-node-value": {
+      const nodeValueMutations = phase.mutations.filter(
+        (mutation) => mutation.type === "setNodeValue"
+      );
+      if (
+        findFirstDifferencePath(
+          nodeValueMutations.map((mutation) => mutation.value),
+          ["left!", "middle!", "right!"]
+        ) !== null
+      ) {
+        return {
+          error:
+            "React DOM host-text-sibling update phase no longer has the expected left/middle/right node-value writes."
+        };
+      }
+      return {
+        result: {
+          rowId: admittedRow.rowId,
+          operation: admittedRow.localProbe,
+          mutations: [nodeValueMutations[0], nodeValueMutations[2]].map(
+            ({ type, target, value }) => ({ type, target, value })
+          )
+        }
+      };
+    }
+    case "host-text-sibling-delete-remove-child": {
+      const removeMutations = phase.mutations.filter(
+        (mutation) => mutation.type === "removeChild"
+      );
+      if (
+        removeMutations.length !== 2 ||
+        removeMutations.some(
+          (mutation) =>
+            mutation.parent !== "DIV" ||
+            mutation.child !== "#text" ||
+            mutation.found !== true
+        )
+      ) {
+        return {
+          error:
+            "React DOM host-text-sibling delete phase no longer has the expected two text removals."
+        };
+      }
+      return {
+        result: {
+          rowId: admittedRow.rowId,
+          operation: admittedRow.localProbe,
+          mutations: removeMutations.map(({ type, parent, child, found }) => ({
+            type,
+            parent,
+            child,
+            found
+          }))
+        }
+      };
+    }
+    case "host-text-insert-before": {
+      if (
+        findFirstDifferencePath(
+          phase.mutations,
+          [
+            {
+              type: "createTextNode",
+              value: "head"
+            },
+            {
+              type: "insertBefore",
+              parent: "DIV",
+              child: "#text",
+              before: "SPAN",
+              beforeFound: true
+            }
+          ]
+        ) !== null
+      ) {
+        return {
+          error:
+            "React DOM host-text insertion phase no longer has the expected createTextNode plus insertBefore mutations."
+        };
+      }
+      return {
+        result: {
+          rowId: admittedRow.rowId,
+          operation: admittedRow.localProbe,
+          mutations: phase.mutations
+        }
+      };
+    }
+    case "reset-text-content-before-managed-child": {
+      const resetMutation = phase.mutations.find(
+        (mutation) =>
+          mutation.type === "setTextContent" &&
+          mutation.target === "SECTION" &&
+          mutation.value === ""
+      );
+      if (!resetMutation) {
+        return {
+          error:
+            "React DOM managed-child phase no longer records resetTextContent on SECTION before append."
+        };
+      }
+      return {
+        result: {
+          rowId: admittedRow.rowId,
+          operation: admittedRow.localProbe,
+          mutations: [
+            {
+              type: resetMutation.type,
+              target: resetMutation.target,
+              value: resetMutation.value
+            }
+          ]
+        }
+      };
+    }
+    default:
+      return {
+        error: `Unknown HostText commit oracle extractor: ${admittedRow.oracleExtractor}`
+      };
   }
 }
 
@@ -613,6 +1137,43 @@ function loadLocalPrivateTextContentHelper({ workspaceRoot }) {
   }
 }
 
+function loadLocalPrivateHostTextCommitHelper({ workspaceRoot }) {
+  const modulePath = join(
+    workspaceRoot,
+    "packages/react-dom/src/dom-host/mutation.js"
+  );
+
+  try {
+    const mutation = require(modulePath);
+    for (const exportName of [
+      "DOM_HOST_TEXT_COMMIT_GATE_METADATA",
+      "appendChild",
+      "insertBefore",
+      "removeChild",
+      "commitTextUpdate",
+      "resetTextContent"
+    ]) {
+      if (mutation[exportName] == null) {
+        return {
+          error: {
+            name: "TypeError",
+            message: `Local private mutation module does not export ${exportName}`
+          }
+        };
+      }
+    }
+    return {
+      mutation,
+      gateMetadata: mutation.DOM_HOST_TEXT_COMMIT_GATE_METADATA,
+      error: null
+    };
+  } catch (error) {
+    return {
+      error: describeThrown(error)
+    };
+  }
+}
+
 function runLocalShouldSetTextContentProbe({
   scenario,
   shouldSetTextContent
@@ -647,6 +1208,319 @@ function runLocalShouldSetTextContentProbe({
       }
     };
   }
+}
+
+function runLocalHostTextCommitProbe({ admittedRow, mutation }) {
+  try {
+    return {
+      rowId: admittedRow.rowId,
+      scenarioId: admittedRow.scenarioId,
+      phaseId: admittedRow.phaseId,
+      action: "privateDomHostTextCommit",
+      targetPackage:
+        DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET.packageName,
+      entrypoint:
+        DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET.entrypoint,
+      result: runLocalHostTextCommitOperation({ admittedRow, mutation })
+    };
+  } catch (error) {
+    return {
+      rowId: admittedRow.rowId,
+      scenarioId: admittedRow.scenarioId,
+      phaseId: admittedRow.phaseId,
+      action: "privateDomHostTextCommit",
+      targetPackage:
+        DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET.packageName,
+      entrypoint:
+        DOM_TEXT_CONTENT_FAST_REACT_PRIVATE_HOST_TEXT_COMMIT_TARGET.entrypoint,
+      result: {
+        rowId: admittedRow.rowId,
+        operation: admittedRow.localProbe,
+        status: "throws",
+        error: describeThrown(error)
+      }
+    };
+  }
+}
+
+function runLocalHostTextCommitOperation({ admittedRow, mutation }) {
+  const document = new HostTextGateFakeDocument();
+
+  switch (admittedRow.localProbe) {
+    case "host-text-create-append": {
+      const parent = document.createElement("div", { record: false });
+      const left = document.createTextNode("left");
+      const right = document.createTextNode("right");
+      mutation.appendChild(parent, left);
+      mutation.appendChild(parent, right);
+      return {
+        rowId: admittedRow.rowId,
+        operation: admittedRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    case "host-text-update-node-value": {
+      const left = document.createTextNode("left", { record: false });
+      const right = document.createTextNode("right", { record: false });
+      document.clearMutations();
+      mutation.commitTextUpdate(left, "left", "left!");
+      mutation.commitTextUpdate(right, "right", "right!");
+      return {
+        rowId: admittedRow.rowId,
+        operation: admittedRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    case "host-text-delete-remove-child": {
+      const parent = document.createElement("div", { record: false });
+      const left = document.createTextNode("left", { record: false });
+      const anchor = document.createElement("span", { record: false });
+      const right = document.createTextNode("right", { record: false });
+      parent.appendChild(left, { record: false });
+      parent.appendChild(anchor, { record: false });
+      parent.appendChild(right, { record: false });
+      document.clearMutations();
+      mutation.removeChild(parent, left);
+      mutation.removeChild(parent, right);
+      return {
+        rowId: admittedRow.rowId,
+        operation: admittedRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    case "host-text-insert-before": {
+      const parent = document.createElement("div", { record: false });
+      const anchor = document.createElement("span", { record: false });
+      parent.appendChild(anchor, { record: false });
+      document.clearMutations();
+      const head = document.createTextNode("head");
+      mutation.insertBefore(parent, head, anchor);
+      return {
+        rowId: admittedRow.rowId,
+        operation: admittedRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    case "reset-text-content-before-managed-child": {
+      const section = document.createElement("section", { record: false });
+      const initialText = document.createTextNode("Plain text", {
+        record: false
+      });
+      section.appendChild(initialText, { record: false });
+      document.clearMutations();
+      mutation.resetTextContent(section);
+      return {
+        rowId: admittedRow.rowId,
+        operation: admittedRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    default:
+      throw new Error(`Unknown local HostText commit probe: ${admittedRow.localProbe}`);
+  }
+}
+
+class HostTextGateFakeDocument {
+  constructor() {
+    this.mutations = [];
+  }
+
+  createElement(tagName, { record = true } = {}) {
+    return new HostTextGateFakeElement(tagName, this, { record });
+  }
+
+  createTextNode(text, { record = true } = {}) {
+    if (record) {
+      this.mutations.push({
+        type: "createTextNode",
+        value: String(text)
+      });
+    }
+    return new HostTextGateFakeText(text, this);
+  }
+
+  clearMutations() {
+    this.mutations.length = 0;
+  }
+
+  recordAppendChild(parent, child) {
+    this.mutations.push({
+      type: "appendChild",
+      parent: parent.nodeName,
+      child: child.nodeName
+    });
+  }
+
+  recordInsertBefore(parent, child, beforeChild, beforeFound) {
+    this.mutations.push({
+      type: "insertBefore",
+      parent: parent.nodeName,
+      child: child.nodeName,
+      before: beforeChild.nodeName,
+      beforeFound
+    });
+  }
+
+  recordRemoveChild(parent, child, found) {
+    this.mutations.push({
+      type: "removeChild",
+      parent: parent.nodeName,
+      child: child.nodeName,
+      found
+    });
+  }
+
+  recordSetTextContent(node, value) {
+    this.mutations.push({
+      type: "setTextContent",
+      target: node.nodeName,
+      value: String(value)
+    });
+  }
+
+  recordSetNodeValue(node, value) {
+    this.mutations.push({
+      type: "setNodeValue",
+      target: node.nodeName,
+      value: String(value)
+    });
+  }
+}
+
+class HostTextGateFakeNode {
+  constructor(nodeName, nodeType, ownerDocument) {
+    this.childNodes = [];
+    this.nodeName = nodeName;
+    this.nodeType = nodeType;
+    this.ownerDocument = ownerDocument;
+    this.parentNode = null;
+  }
+
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
+
+  get lastChild() {
+    return this.childNodes[this.childNodes.length - 1] || null;
+  }
+
+  appendChild(child, { record = true } = {}) {
+    assertHostTextGateFakeChild(child);
+    detachHostTextGateFakeNode(child);
+    this.childNodes.push(child);
+    child.parentNode = this;
+    if (record) {
+      this.ownerDocument.recordAppendChild(this, child);
+    }
+    return child;
+  }
+
+  insertBefore(child, beforeChild) {
+    assertHostTextGateFakeChild(child);
+    const beforeIndex = this.childNodes.indexOf(beforeChild);
+    if (beforeIndex === -1) {
+      this.ownerDocument.recordInsertBefore(this, child, beforeChild, false);
+      throw new Error("Cannot insert before a node outside the parent.");
+    }
+    detachHostTextGateFakeNode(child);
+    this.childNodes.splice(beforeIndex, 0, child);
+    child.parentNode = this;
+    this.ownerDocument.recordInsertBefore(this, child, beforeChild, true);
+    return child;
+  }
+
+  removeChild(child) {
+    const childIndex = this.childNodes.indexOf(child);
+    if (childIndex === -1) {
+      this.ownerDocument.recordRemoveChild(this, child, false);
+      throw new Error("Cannot remove a node outside the parent.");
+    }
+    this.childNodes.splice(childIndex, 1);
+    child.parentNode = null;
+    this.ownerDocument.recordRemoveChild(this, child, true);
+    return child;
+  }
+}
+
+class HostTextGateFakeElement extends HostTextGateFakeNode {
+  constructor(tagName, ownerDocument, { record = true } = {}) {
+    super(tagName.toUpperCase(), 1, ownerDocument);
+    this._textContent = "";
+    if (record) {
+      ownerDocument.mutations.push({
+        type: "createElement",
+        tagName
+      });
+    }
+  }
+
+  get textContent() {
+    if (this.childNodes.length === 0) {
+      return this._textContent;
+    }
+    return this.childNodes.map((child) => child.textContent).join("");
+  }
+
+  set textContent(value) {
+    this.ownerDocument.recordSetTextContent(this, value);
+    for (const child of [...this.childNodes]) {
+      detachHostTextGateFakeNode(child);
+    }
+    this._textContent = String(value);
+    if (this._textContent !== "") {
+      this.appendChild(this.ownerDocument.createTextNode(this._textContent));
+    }
+  }
+}
+
+class HostTextGateFakeText extends HostTextGateFakeNode {
+  constructor(text, ownerDocument) {
+    super("#text", 3, ownerDocument);
+    this._text = String(text);
+  }
+
+  get data() {
+    return this._text;
+  }
+
+  set data(value) {
+    this.nodeValue = value;
+  }
+
+  get nodeValue() {
+    return this._text;
+  }
+
+  set nodeValue(value) {
+    this._text = String(value);
+    this.ownerDocument.recordSetNodeValue(this, this._text);
+  }
+
+  get textContent() {
+    return this._text;
+  }
+
+  set textContent(value) {
+    this.nodeValue = value;
+  }
+}
+
+function assertHostTextGateFakeChild(child) {
+  if (child == null || typeof child !== "object") {
+    throw new Error("Fake DOM child must be an object.");
+  }
+}
+
+function detachHostTextGateFakeNode(child) {
+  if (child.parentNode === null) {
+    return;
+  }
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
 
 function describeThrown(error) {
