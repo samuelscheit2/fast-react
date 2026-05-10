@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 184: React memo element type guard in
-  `/Users/user/Developer/Developer/fast-react-worker-184-react-memo-element-type-guard`.
 - Worker 185: DOM namespace context helper in
   `/Users/user/Developer/Developer/fast-react-worker-185-dom-namespace-context-helper`.
 - Worker 186: DOM property payload helper in
