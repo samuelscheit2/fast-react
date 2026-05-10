@@ -45,6 +45,7 @@ use fast_react_reconciler::{
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
 
 static NEXT_RENDERER_ID: AtomicU64 = AtomicU64::new(1);
+const NESTED_HOST_OUTPUT_FIXTURE_BASE_RAW: u64 = 10_000;
 
 #[derive(Debug)]
 pub struct TestRenderer {
@@ -775,6 +776,57 @@ struct TestRendererCurrentHostOutput {
     text: TestTextInstance,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestRendererNestedHostOutputFixture {
+    element: RootElementHandle,
+    outer_element_type: TestElementType,
+    outer_props: TestProps,
+    inner_element_type: TestElementType,
+    inner_props: TestProps,
+    text: String,
+    outer_canary_fixture: TestRendererHostOutputCanaryFixture,
+    inner_canary_fixture: TestRendererHostOutputCanaryFixture,
+}
+
+impl TestRendererNestedHostOutputFixture {
+    fn new(
+        element: RootElementHandle,
+        outer_element_type: TestElementType,
+        inner_element_type: TestElementType,
+        text: String,
+    ) -> Self {
+        let base_raw = element.raw();
+        Self {
+            element,
+            outer_element_type,
+            outer_props: TestProps::new(),
+            inner_element_type,
+            inner_props: TestProps::new(),
+            text,
+            outer_canary_fixture: TestRendererHostOutputCanaryFixture::new(
+                base_raw,
+                base_raw.saturating_mul(3).saturating_sub(2),
+                base_raw.saturating_mul(3),
+            ),
+            inner_canary_fixture: TestRendererHostOutputCanaryFixture::new(
+                base_raw.saturating_add(1),
+                base_raw.saturating_mul(3).saturating_sub(1),
+                base_raw.saturating_mul(3),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestRendererCurrentNestedHostOutput {
+    fixture: TestRendererNestedHostOutputFixture,
+    outer_fibers: TestRendererHostOutputCanaryCurrentFibers,
+    inner_fibers: TestRendererHostOutputCanaryCurrentFibers,
+    outer_instance: TestInstance,
+    inner_instance: TestInstance,
+    text: TestTextInstance,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestRendererHostNodeCleanupTarget {
     Instance,
@@ -1261,6 +1313,96 @@ impl TestRendererHostParentPlacedHostOutput {
     #[must_use]
     pub const fn placed_text_snapshot(&self) -> &TestTextSnapshot {
         &self.placed_text_snapshot
+    }
+
+    #[must_use]
+    pub const fn host_parent_placement_apply_count(&self) -> usize {
+        self.host_parent_placement_apply_count
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererNestedCommittedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    commit: HostRootCommitRecord,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    snapshot: TestContainerSnapshot,
+}
+
+impl TestRendererNestedCommittedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererNestedHostParentPlacedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    commit: HostRootCommitRecord,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    previous_snapshot: TestContainerSnapshot,
+    snapshot: TestContainerSnapshot,
+    placed_text_snapshot: TestTextSnapshot,
+    nested_parent_state_node_raw: u64,
+    placed_text_state_node_raw: u64,
+    host_parent_placement_apply_count: usize,
+}
+
+impl TestRendererNestedHostParentPlacedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn previous_snapshot(&self) -> &TestContainerSnapshot {
+        &self.previous_snapshot
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+
+    #[must_use]
+    pub const fn placed_text_snapshot(&self) -> &TestTextSnapshot {
+        &self.placed_text_snapshot
+    }
+
+    #[must_use]
+    pub const fn nested_parent_state_node_raw(&self) -> u64 {
+        self.nested_parent_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn placed_text_state_node_raw(&self) -> u64 {
+        self.placed_text_state_node_raw
     }
 
     #[must_use]
@@ -2559,8 +2701,10 @@ pub struct TestRendererRoot {
     lifecycle: TestRendererRootLifecycle,
     scheduled_updates: Vec<TestRendererRootScheduledUpdate>,
     host_output_fixtures: Vec<TestRendererHostOutputFixture>,
+    nested_host_output_fixtures: Vec<TestRendererNestedHostOutputFixture>,
     host_nodes: TestRendererHostNodeStore,
     current_host_output: Option<TestRendererCurrentHostOutput>,
+    current_nested_host_output: Option<TestRendererCurrentNestedHostOutput>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2598,6 +2742,24 @@ impl TestRendererRoot {
         Ok(root)
     }
 
+    pub fn create_nested_host_components_with_text_for_canary(
+        outer_element_type: impl Into<TestElementType>,
+        inner_element_type: impl Into<TestElementType>,
+        text: impl Into<String>,
+        options: TestRendererOptions,
+    ) -> Result<Self, TestRendererRootError> {
+        let mut root = Self::new_without_initial_update(options)?;
+        let element = root.push_nested_host_output_fixture_for_canary(
+            outer_element_type.into(),
+            inner_element_type.into(),
+            text.into(),
+        );
+        let record =
+            root.schedule_root_update(TestRendererRootUpdateKind::Create, element, None)?;
+        root.scheduled_updates.push(record);
+        Ok(root)
+    }
+
     fn create_with_root_update_callback(
         element: RootElementHandle,
         options: TestRendererOptions,
@@ -2627,8 +2789,10 @@ impl TestRendererRoot {
             lifecycle: TestRendererRootLifecycle::Active,
             scheduled_updates: Vec::new(),
             host_output_fixtures: Vec::new(),
+            nested_host_output_fixtures: Vec::new(),
             host_nodes: TestRendererHostNodeStore::default(),
             current_host_output: None,
+            current_nested_host_output: None,
         })
     }
 
@@ -3009,6 +3173,7 @@ impl TestRendererRoot {
             instance,
             text,
         });
+        self.current_nested_host_output = None;
 
         Ok(Some(TestRendererCommittedHostOutput {
             render,
@@ -3016,6 +3181,63 @@ impl TestRendererRoot {
             completed_fibers: completed,
             commit,
             fiber_inspection,
+            snapshot,
+        }))
+    }
+
+    pub fn render_and_commit_nested_host_output_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererNestedCommittedHostOutput>, TestRendererRootError> {
+        let Some(render) = self.render_latest_scheduled_host_root_for_commit_handoff()? else {
+            return Ok(None);
+        };
+        let fixture = self
+            .nested_host_output_fixture(render.resulting_element())?
+            .clone();
+        let (outer_prepared, inner_prepared) = self
+            .store
+            .prepare_test_renderer_nested_host_output_canary_fibers(
+                render,
+                fixture.outer_canary_fixture,
+                fixture.inner_canary_fixture,
+            )?;
+        let (outer_instance, inner_instance, text) = self
+            .create_detached_nested_host_output_for_canary(
+                &fixture,
+                outer_prepared,
+                inner_prepared,
+            )?;
+        let (outer_fibers, inner_fibers) = self
+            .store
+            .finish_test_renderer_nested_host_output_canary_fibers(
+                outer_prepared,
+                inner_prepared,
+                Self::instance_state_node_raw(outer_instance),
+                Self::instance_state_node_raw(inner_instance),
+                Self::text_state_node_raw(text),
+            )?;
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+        let mut container = self.container;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        self.renderer
+            .append_child_to_container(&mut container, HostChild::Instance(&outer_instance))?;
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+        self.current_host_output = None;
+        self.current_nested_host_output = Some(TestRendererCurrentNestedHostOutput {
+            fixture,
+            outer_fibers,
+            inner_fibers,
+            outer_instance,
+            inner_instance,
+            text,
+        });
+
+        Ok(Some(TestRendererNestedCommittedHostOutput {
+            render,
+            commit,
+            commit_diagnostics,
             snapshot,
         }))
     }
@@ -3106,6 +3328,7 @@ impl TestRendererRoot {
             instance,
             text,
         });
+        self.current_nested_host_output = None;
 
         Ok(Some(TestRendererUpdatedHostOutput {
             render,
@@ -3203,6 +3426,7 @@ impl TestRendererRoot {
             instance: parent,
             text: current.text,
         });
+        self.current_nested_host_output = None;
 
         Ok(TestRendererHostParentPlacedHostOutput {
             render,
@@ -3211,6 +3435,115 @@ impl TestRendererRoot {
             previous_snapshot,
             snapshot,
             placed_text_snapshot,
+            host_parent_placement_apply_count,
+        })
+    }
+
+    pub fn render_and_commit_nested_host_parent_text_placement_for_canary(
+        &mut self,
+        text: impl Into<String>,
+    ) -> Result<TestRendererNestedHostParentPlacedHostOutput, TestRendererRootError> {
+        let current = self.current_nested_host_output.clone().ok_or(
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update,
+            },
+        )?;
+        let scheduled = self.schedule_root_update(
+            TestRendererRootUpdateKind::Update,
+            current.fixture.element,
+            None,
+        )?;
+        self.scheduled_updates.push(scheduled);
+        let render = self
+            .render_latest_scheduled_host_root_for_commit_handoff()?
+            .expect("nested host-parent placement canary schedules an update before rendering");
+        let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let placed_text = text.into();
+        let placed_text_props_raw =
+            self.next_nested_host_parent_placement_text_props_raw_for_canary(&current);
+        let (next_outer_fibers, next_inner_fibers, placed_text_fiber, text_token) = self
+            .store
+            .prepare_test_renderer_nested_host_parent_text_placement_canary_fibers(
+                render,
+                current.outer_fibers,
+                current.inner_fibers,
+                placed_text_props_raw,
+            )?;
+
+        let container = self.container;
+        let root_context = self.renderer.root_host_context(&container)?;
+        let outer_child_context = self.renderer.child_host_context(
+            &root_context,
+            &current.fixture.outer_element_type,
+            &current.fixture.outer_props,
+        )?;
+        let inner_child_context = self.renderer.child_host_context(
+            &outer_child_context,
+            &current.fixture.inner_element_type,
+            &current.fixture.inner_props,
+        )?;
+        let text_token_raw = text_token.raw();
+        let placed_text_instance = self.renderer.create_text_instance(
+            HostFiberTokenRef::new(
+                &text_token_raw,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            &placed_text,
+            &container,
+            &inner_child_context,
+        )?;
+        let nested_parent_state_node_raw = Self::instance_state_node_raw(current.inner_instance);
+        let placed_text_state_node_raw = Self::text_state_node_raw(placed_text_instance);
+        self.store
+            .finish_test_renderer_nested_host_parent_text_placement_canary_fibers(
+                next_outer_fibers,
+                next_inner_fibers,
+                placed_text_fiber,
+                placed_text_state_node_raw,
+                placed_text_props_raw,
+            )?;
+
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+        let host_parent_placement_apply_count =
+            commit.test_only_host_parent_placement_apply_count_for_canary();
+        if !commit.has_test_only_host_parent_placement_apply_for_canary(
+            nested_parent_state_node_raw,
+            placed_text_state_node_raw,
+        ) {
+            return Err(TestRendererRootError::MissingHostParentPlacementApply {
+                parent_state_node_raw: nested_parent_state_node_raw,
+                child_state_node_raw: placed_text_state_node_raw,
+            });
+        }
+
+        let mut inner_instance = current.inner_instance;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        self.renderer
+            .append_child(&mut inner_instance, HostChild::Text(&placed_text_instance))?;
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+        let placed_text_snapshot = self.renderer.snapshot_text(&placed_text_instance)?;
+        self.current_nested_host_output = Some(TestRendererCurrentNestedHostOutput {
+            fixture: current.fixture,
+            outer_fibers: next_outer_fibers,
+            inner_fibers: next_inner_fibers,
+            outer_instance: current.outer_instance,
+            inner_instance,
+            text: current.text,
+        });
+        self.current_host_output = None;
+
+        Ok(TestRendererNestedHostParentPlacedHostOutput {
+            render,
+            commit,
+            commit_diagnostics,
+            previous_snapshot,
+            snapshot,
+            placed_text_snapshot,
+            nested_parent_state_node_raw,
+            placed_text_state_node_raw,
             host_parent_placement_apply_count,
         })
     }
@@ -3315,6 +3648,7 @@ impl TestRendererRoot {
         };
         let snapshot = self.diagnostic_container_snapshot()?;
         self.current_host_output = None;
+        self.current_nested_host_output = None;
 
         Ok(Some(TestRendererStableSiblingInsertedHostOutput {
             render,
@@ -3375,6 +3709,7 @@ impl TestRendererRoot {
         let snapshot = self.diagnostic_container_snapshot()?;
         let detached_instance_snapshot = self.renderer.snapshot_instance(&current.instance)?;
         self.current_host_output = None;
+        self.current_nested_host_output = None;
 
         Ok(Some(TestRendererUnmountedHostOutput {
             render,
@@ -3541,6 +3876,39 @@ impl TestRendererRoot {
             .ok_or(TestRendererRootError::MissingHostOutputFixture { element })
     }
 
+    fn push_nested_host_output_fixture_for_canary(
+        &mut self,
+        outer_element_type: TestElementType,
+        inner_element_type: TestElementType,
+        text: String,
+    ) -> RootElementHandle {
+        let element = RootElementHandle::from_raw(
+            NESTED_HOST_OUTPUT_FIXTURE_BASE_RAW + self.nested_host_output_fixtures.len() as u64,
+        );
+        self.nested_host_output_fixtures
+            .push(TestRendererNestedHostOutputFixture::new(
+                element,
+                outer_element_type,
+                inner_element_type,
+                text,
+            ));
+        element
+    }
+
+    fn nested_host_output_fixture(
+        &self,
+        element: RootElementHandle,
+    ) -> Result<&TestRendererNestedHostOutputFixture, TestRendererRootError> {
+        if element.raw() < NESTED_HOST_OUTPUT_FIXTURE_BASE_RAW {
+            return Err(TestRendererRootError::MissingHostOutputFixture { element });
+        }
+
+        self.nested_host_output_fixtures
+            .get((element.raw() - NESTED_HOST_OUTPUT_FIXTURE_BASE_RAW) as usize)
+            .filter(|fixture| fixture.element == element)
+            .ok_or(TestRendererRootError::MissingHostOutputFixture { element })
+    }
+
     fn next_host_parent_placement_text_props_raw_for_canary(
         &self,
         current: &TestRendererCurrentHostOutput,
@@ -3548,6 +3916,18 @@ impl TestRendererRoot {
         current
             .fixture
             .canary_fixture
+            .text_props_raw()
+            .saturating_add(self.renderer.texts.len() as u64)
+            .saturating_add(1000)
+    }
+
+    fn next_nested_host_parent_placement_text_props_raw_for_canary(
+        &self,
+        current: &TestRendererCurrentNestedHostOutput,
+    ) -> u64 {
+        current
+            .fixture
+            .inner_canary_fixture
             .text_props_raw()
             .saturating_add(self.renderer.texts.len() as u64)
             .saturating_add(1000)
@@ -3598,6 +3978,83 @@ impl TestRendererRoot {
             &root_context,
         )?;
         Ok((instance, text))
+    }
+
+    fn create_detached_nested_host_output_for_canary(
+        &mut self,
+        fixture: &TestRendererNestedHostOutputFixture,
+        outer_prepared: TestRendererHostOutputCanaryPreparedFibers,
+        inner_prepared: TestRendererHostOutputCanaryPreparedFibers,
+    ) -> Result<(TestInstance, TestInstance, TestTextInstance), TestRendererRootError> {
+        let container = self.container;
+        let root_context = self.renderer.root_host_context(&container)?;
+        let outer_child_context = self.renderer.child_host_context(
+            &root_context,
+            &fixture.outer_element_type,
+            &fixture.outer_props,
+        )?;
+        let inner_child_context = self.renderer.child_host_context(
+            &outer_child_context,
+            &fixture.inner_element_type,
+            &fixture.inner_props,
+        )?;
+        let text_token = inner_prepared.text_token().raw();
+        let text = self.renderer.create_text_instance(
+            HostFiberTokenRef::new(
+                &text_token,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            &fixture.text,
+            &container,
+            &inner_child_context,
+        )?;
+
+        let inner_token = inner_prepared.component_token().raw();
+        let mut inner_instance = self.renderer.create_instance(
+            HostFiberTokenRef::new(
+                &inner_token,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::Instance,
+            ),
+            &fixture.inner_element_type,
+            &fixture.inner_props,
+            &container,
+            &outer_child_context,
+        )?;
+        self.renderer
+            .append_initial_child(&mut inner_instance, HostChild::Text(&text))?;
+        self.renderer.finalize_initial_children(
+            &mut inner_instance,
+            &fixture.inner_element_type,
+            &fixture.inner_props,
+            &container,
+            &outer_child_context,
+        )?;
+
+        let outer_token = outer_prepared.component_token().raw();
+        let mut outer_instance = self.renderer.create_instance(
+            HostFiberTokenRef::new(
+                &outer_token,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::Instance,
+            ),
+            &fixture.outer_element_type,
+            &fixture.outer_props,
+            &container,
+            &root_context,
+        )?;
+        self.renderer
+            .append_initial_child(&mut outer_instance, HostChild::Instance(&inner_instance))?;
+        self.renderer.finalize_initial_children(
+            &mut outer_instance,
+            &fixture.outer_element_type,
+            &fixture.outer_props,
+            &container,
+            &root_context,
+        )?;
+
+        Ok((outer_instance, inner_instance, text))
     }
 
     fn validate_private_json_canary_current_fibers(
@@ -4310,6 +4767,30 @@ mod tests {
             .collect()
     }
 
+    fn nested_container_inner_names(snapshot: &TestContainerSnapshot) -> Vec<&str> {
+        snapshot
+            .children()
+            .iter()
+            .map(|child| match child {
+                TestNodeSnapshot::Element(outer) => match &outer.children()[0] {
+                    TestNodeSnapshot::Element(inner) => inner.element_type().as_str(),
+                    TestNodeSnapshot::Text(_) => panic!("expected nested element child"),
+                },
+                TestNodeSnapshot::Text(_) => panic!("expected outer element child"),
+            })
+            .collect()
+    }
+
+    fn nested_container_inner_texts(snapshot: &TestContainerSnapshot) -> Vec<&str> {
+        let TestNodeSnapshot::Element(outer) = &snapshot.children()[0] else {
+            panic!("expected outer element child");
+        };
+        let TestNodeSnapshot::Element(inner) = &outer.children()[0] else {
+            panic!("expected inner element child");
+        };
+        child_texts(inner)
+    }
+
     fn assert_mutation_renderer<T: MutationRenderer>(_renderer: &T) {}
 
     fn assert_operation_error(error: HostError, expected: HostOperationErrorKind) {
@@ -4699,6 +5180,80 @@ mod tests {
             inspection_error,
             TestRendererRootError::FiberInspection(_)
         ));
+    }
+
+    #[test]
+    fn root_host_output_canary_applies_nested_host_parent_text_placement_privately() {
+        let mut root = TestRendererRoot::create_nested_host_components_with_text_for_canary(
+            "section",
+            "label",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_nested_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(container_element_names(created.snapshot()), vec!["section"]);
+        assert_eq!(
+            nested_container_inner_names(created.snapshot()),
+            vec!["label"]
+        );
+        assert_eq!(
+            nested_container_inner_texts(created.snapshot()),
+            vec!["stable"]
+        );
+
+        let placed = root
+            .render_and_commit_nested_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+        let commit = placed.commit();
+        let diagnostics = commit.host_parent_placement_apply_diagnostics_for_canary();
+
+        assert_eq!(placed.render().current(), created.commit().current());
+        assert_eq!(commit.previous_current(), created.commit().current());
+        assert_eq!(commit.current(), placed.render().finished_work());
+        assert_eq!(placed.host_parent_placement_apply_count(), 1);
+        assert!(commit.has_test_only_host_parent_placement_apply_for_canary(
+            placed.nested_parent_state_node_raw(),
+            placed.placed_text_state_node_raw()
+        ));
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].parent_tag_name(), "HostComponent");
+        assert_eq!(
+            diagnostics[0].parent_state_node_raw(),
+            placed.nested_parent_state_node_raw()
+        );
+        assert_eq!(diagnostics[0].tag_name(), "HostText");
+        assert_eq!(
+            diagnostics[0].state_node_raw(),
+            placed.placed_text_state_node_raw()
+        );
+        assert_eq!(
+            diagnostics[0].apply_kind(),
+            "append-placement-to-host-parent"
+        );
+        assert!(diagnostics[0].applies_to_host_parent());
+        assert_eq!(placed.commit_diagnostics().mutation_records().len(), 1);
+        assert_eq!(
+            placed.commit_diagnostics().mutation_records()[0].kind(),
+            TestRendererHostOutputCanaryMutationKind::Placement
+        );
+        assert_eq!(placed.placed_text_snapshot().text(), "inserted");
+        assert_eq!(
+            nested_container_inner_texts(placed.previous_snapshot()),
+            vec!["stable"]
+        );
+        assert_eq!(
+            nested_container_inner_texts(placed.snapshot()),
+            vec!["stable", "inserted"]
+        );
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            placed.snapshot().clone()
+        );
     }
 
     #[test]
