@@ -10796,7 +10796,7 @@ function inspectRootWorkLoopCommitHandoffSourceDiagnostics({ workspaceRoot }) {
             rootCommitSource
           ),
         staleRecordRejectionTestPresent:
-          /root_commit_finished_work_handoff_rejects_stale_record_after_current_switch/u.test(
+          /root_commit_finished_work_handoff_rejects_stale_record_(?:after_current_switch|before_switching_current)/u.test(
             rootCommitSource
           ),
         lanesMismatchErrorVariantPresent:
