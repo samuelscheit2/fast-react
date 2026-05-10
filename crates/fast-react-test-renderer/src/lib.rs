@@ -1674,6 +1674,8 @@ pub const TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME: &str =
     "fast-react-test-renderer.serialization.private-canary";
 pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-json-canary";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.private-facade-result";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
     "react-19.2.6-react-test-renderer-serialization-oracle";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
@@ -2287,6 +2289,83 @@ impl TestRendererPrivateJsonHostComponentDiagnostic {
     #[must_use]
     pub const fn text_child(&self) -> &TestRendererPrivateJsonTextDiagnostic {
         &self.text_child
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonFacadeResult {
+    diagnostic_name: &'static str,
+    source_diagnostic_name: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    element_type: TestElementType,
+    props: TestProps,
+    children: Vec<String>,
+    source_node_count: usize,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_serialization_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateToJsonFacadeResult {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_diagnostic_name(&self) -> &'static str {
+        self.source_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub fn element_type(&self) -> &TestElementType {
+        &self.element_type
+    }
+
+    #[must_use]
+    pub fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub fn children(&self) -> &[String] {
+        &self.children
+    }
+
+    #[must_use]
+    pub const fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    #[must_use]
+    pub const fn source_node_count(&self) -> usize {
+        self.source_node_count
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(&self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
     }
 }
 
@@ -3090,6 +3169,22 @@ impl TestRendererRoot {
         )
     }
 
+    pub fn describe_private_to_json_facade_result_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateToJsonFacadeResult, TestRendererRootError> {
+        let report = self.describe_private_json_serialization_for_canary(output)?;
+        Ok(Self::private_to_json_facade_result_from_report(&report))
+    }
+
+    pub fn describe_private_to_json_facade_result_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateToJsonFacadeResult, TestRendererRootError> {
+        let report = self.describe_private_json_serialization_after_update_for_canary(output)?;
+        Ok(Self::private_to_json_facade_result_from_report(&report))
+    }
+
     fn describe_private_json_serialization_from_current_fibers_for_canary(
         &self,
         commit: &HostRootCommitRecord,
@@ -3131,6 +3226,26 @@ impl TestRendererRoot {
             component,
             public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers::blocked(),
         })
+    }
+
+    fn private_to_json_facade_result_from_report(
+        report: &TestRendererPrivateJsonSerializationReport,
+    ) -> TestRendererPrivateToJsonFacadeResult {
+        let component = report.component();
+
+        TestRendererPrivateToJsonFacadeResult {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME,
+            source_diagnostic_name: report.diagnostic_name(),
+            host_output_update_kind: report.host_output_update_kind(),
+            host_output_snapshot_current: report.host_output_snapshot_current(),
+            element_type: component.element_type().clone(),
+            props: component.props().clone(),
+            children: vec![component.text_child().text().to_owned()],
+            source_node_count: report.node_count(),
+            public_blockers: report.public_blockers(),
+            public_serialization_available: false,
+            compatibility_claimed: false,
+        }
     }
 
     pub fn render_and_commit_host_output_for_canary(
@@ -5475,6 +5590,90 @@ mod tests {
             panic!("expected updated host component");
         };
         assert_eq!(child_texts(current), vec!["goodbye"]);
+    }
+
+    #[test]
+    fn root_private_to_json_facade_result_canary_wraps_create_serialization_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let result = root
+            .describe_private_to_json_facade_result_for_canary(&output)
+            .unwrap();
+
+        assert_eq!(
+            result.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            result.source_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            result.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(result.host_output_snapshot_current());
+        assert_eq!(result.element_type().as_str(), "span");
+        assert_eq!(result.props(), &TestProps::new());
+        assert_eq!(result.children(), &["hello".to_owned()]);
+        assert_eq!(result.child_count(), 1);
+        assert_eq!(result.source_node_count(), 2);
+        assert!(result.public_blockers().all_blocked());
+        assert!(!result.public_serialization_available());
+        assert!(!result.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_facade_result_canary_wraps_update_serialization_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let result = root
+            .describe_private_to_json_facade_result_after_update_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            result.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            result.source_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            result.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(result.host_output_snapshot_current());
+        assert_eq!(result.element_type().as_str(), "span");
+        assert_eq!(result.props(), &TestProps::new());
+        assert_eq!(result.children(), &["goodbye".to_owned()]);
+        assert_eq!(result.source_node_count(), 2);
+        assert!(result.public_blockers().all_blocked());
+        assert!(!result.public_serialization_available());
+        assert!(!result.compatibility_claimed());
     }
 
     #[test]

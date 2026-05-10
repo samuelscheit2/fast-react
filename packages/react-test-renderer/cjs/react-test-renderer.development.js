@@ -756,6 +756,10 @@ const privateToJSONSerializationStatus =
   'private-host-output-diagnostics-serializable-public-tojson-blocked';
 const privateToJSONAcceptedDiagnosticName =
   'fast-react-test-renderer.serialization.private-json-canary';
+const privateToJSONFacadeResultDiagnosticName =
+  'fast-react-test-renderer.tojson.private-facade-result';
+const privateToJSONFacadeResultStatus =
+  'private-tojson-facade-result-backed-by-rust-host-output-public-blocked';
 const toJSONPrivateSerializationFacadeGate = Object.freeze({
   id: 'react-test-renderer-tojson-private-serialization-facade-gate',
   publicSurface: 'create().toJSON',
@@ -766,7 +770,10 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateSerializationFacadeSymbol:
     privateToJSONSerializationFacadeSymbol.description,
   privateSerializationStatus: privateToJSONSerializationStatus,
+  privateDiagnosticResultAvailable: true,
+  privateDiagnosticResultStatus: privateToJSONFacadeResultStatus,
   acceptedRustPrivateJsonDiagnostics: true,
+  acceptedRustPrivateToJSONFacadeResult: true,
   publicSerializationAvailable: false,
   publicRouteAvailable: false,
   nativeBridgeAvailable: false,
@@ -775,10 +782,14 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   acceptedWorker: 'worker-265-test-renderer-private-json-ready-diagnostics',
   acceptedRustCrate: 'fast-react-test-renderer',
   acceptedRustDiagnosticName: privateToJSONAcceptedDiagnosticName,
+  acceptedRustDiagnosticResultName: privateToJSONFacadeResultDiagnosticName,
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_json_serialization_for_canary',
     'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
+    'TestRendererRoot::describe_private_to_json_facade_result_for_canary',
+    'TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary',
     'TestRendererPrivateJsonSerializationReport',
+    'TestRendererPrivateToJsonFacadeResult',
     'TestRendererPrivateJsonPublicSurfaceBlockers'
   ]),
   acceptedRustNodeKinds: Object.freeze([
@@ -797,8 +808,12 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_json_serialization_canary_rejects_stale_host_output_snapshot',
     'root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot',
     'root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update',
-    'root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes'
+    'root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes',
+    'root_private_to_json_facade_result_canary_wraps_create_serialization_evidence',
+    'root_private_to_json_facade_result_canary_wraps_update_serialization_evidence'
   ]),
+  acceptedFacadeResultWorker:
+    'worker-391-test-renderer-public-tojson-private-facade',
   blockedPublicSurfaces: Object.freeze([
     'create().toJSON',
     'create().toTree',
@@ -2608,6 +2623,7 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     gate: toJSONPrivateSerializationFacadeGate,
     rootRequest,
     privateHostOutputDiagnosticsSerializable: true,
+    privateDiagnosticResultAvailable: true,
     publicSerializationAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -2623,6 +2639,17 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     },
     serializeAcceptedHostOutputDiagnostic(report) {
       return serializePrivateToJSONHostOutputDiagnostic(report);
+    },
+    canCreateAcceptedHostOutputDiagnosticResult(report) {
+      try {
+        createPrivateToJSONHostOutputDiagnosticResult(report);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedHostOutputDiagnosticResult(report) {
+      return createPrivateToJSONHostOutputDiagnosticResult(report);
     }
   });
 }
@@ -2727,6 +2754,33 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
 function serializePrivateToJSONHostOutputDiagnostic(report) {
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
 
+  return createPrivateToJSONResultNode(diagnostic);
+}
+
+function createPrivateToJSONHostOutputDiagnosticResult(report) {
+  const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
+  const result = createPrivateToJSONResultNode(diagnostic);
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-tojson-diagnostic-result',
+    diagnosticName: privateToJSONFacadeResultDiagnosticName,
+    status: privateToJSONFacadeResultStatus,
+    entrypoint,
+    publicSurface: 'create().toJSON',
+    sourceDiagnostic: privateToJSONAcceptedDiagnosticName,
+    hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
+    hostOutputSnapshotCurrent: true,
+    result,
+    publicBlockers: createPrivateToJSONPublicBlockerRecord(),
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPrivateToJSONResultNode(diagnostic) {
   return freezeRecord({
     type: diagnostic.type,
     props: diagnostic.props,
@@ -2749,7 +2803,7 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
     'root_node_kind',
     'HostComponent'
   );
-  assertPrivateToJSONHostOutputUpdateKind(report);
+  const hostOutputUpdateKind = assertPrivateToJSONHostOutputUpdateKind(report);
   assertPrivateToJSONBooleanField(
     report,
     'hostOutputSnapshotCurrent',
@@ -2816,6 +2870,7 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
   }
 
   return {
+    hostOutputUpdateKind,
     props,
     text: nodeText,
     type
@@ -2919,6 +2974,7 @@ function assertPrivateToJSONHostOutputUpdateKind(report) {
       'Expected private JSON diagnostic host output update kind to be Create or Update.'
     );
   }
+  return actual;
 }
 
 function assertPrivateToJSONBooleanField(
@@ -2989,6 +3045,17 @@ function assertPrivateToJSONPublicBlockers(blockers) {
       );
     }
   }
+}
+
+function createPrivateToJSONPublicBlockerRecord() {
+  return freezeRecord({
+    jsonMethodBlocked: true,
+    treeMethodBlocked: true,
+    instanceWrapperBlocked: true,
+    jsFacadeRoutingBlocked: true,
+    publicActBlocked: true,
+    compatibilityClaimBlocked: true
+  });
 }
 
 function assertPrivateToJSONGateIfPresent(gate) {

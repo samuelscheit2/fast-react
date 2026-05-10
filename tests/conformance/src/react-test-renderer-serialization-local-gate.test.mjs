@@ -40,7 +40,10 @@ const jsEntrypoints = [
 const expectedToJSONFacadeRustApis = [
   "TestRendererRoot::describe_private_json_serialization_for_canary",
   "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
+  "TestRendererRoot::describe_private_to_json_facade_result_for_canary",
+  "TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary",
   "TestRendererPrivateJsonSerializationReport",
+  "TestRendererPrivateToJsonFacadeResult",
   "TestRendererPrivateJsonPublicSurfaceBlockers"
 ];
 const expectedToJSONFacadeRustTests = [
@@ -49,13 +52,17 @@ const expectedToJSONFacadeRustTests = [
   "root_private_json_serialization_canary_rejects_stale_host_output_snapshot",
   "root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot",
   "root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update",
-  "root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes"
+  "root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes",
+  "root_private_to_json_facade_result_canary_wraps_create_serialization_evidence",
+  "root_private_to_json_facade_result_canary_wraps_update_serialization_evidence"
 ];
 const privateToJSONSerializationFacadeSymbol = Symbol.for(
   "fast.react_test_renderer.private_tojson_serialization_facade"
 );
 const privateToJSONSerializationStatus =
   "private-host-output-diagnostics-serializable-public-tojson-blocked";
+const privateToJSONFacadeResultStatus =
+  "private-tojson-facade-result-backed-by-rust-host-output-public-blocked";
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
   "fast.react_test_renderer.private_totree_host_output_metadata"
 );
@@ -93,6 +100,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToJSONSerializationFacadeGatePresent: true,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics: true,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics: true,
+    privateToJSONSerializationFacadeExposesDiagnosticResult: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateToTreeHostOutputMetadataGatePresent: true,
     privateToTreeHostOutputMetadataRecognizesMinimalShape: true,
@@ -131,6 +139,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-tojson-private-serialization-facade-gate",
       "js-tojson-accepted-rust-private-json-diagnostics",
       "js-tojson-serializes-accepted-host-output-diagnostics",
+      "js-tojson-exposes-private-diagnostic-result",
       "js-tojson-public-serialization-blocked"
     ]
   );
@@ -202,7 +211,13 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       facadeGate.privateSerializationStatus,
       privateToJSONSerializationStatus
     );
+    assert.equal(facadeGate.privateDiagnosticResultAvailable, true);
+    assert.equal(
+      facadeGate.privateDiagnosticResultStatus,
+      privateToJSONFacadeResultStatus
+    );
     assert.equal(facadeGate.acceptedRustPrivateJsonDiagnostics, true);
+    assert.equal(facadeGate.acceptedRustPrivateToJSONFacadeResult, true);
     assert.equal(facadeGate.publicSerializationAvailable, false);
     assert.equal(facadeGate.publicRouteAvailable, false);
     assert.equal(facadeGate.nativeBridgeAvailable, false);
@@ -216,6 +231,10 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(
       facadeGate.acceptedRustDiagnosticName,
       "fast-react-test-renderer.serialization.private-json-canary"
+    );
+    assert.equal(
+      facadeGate.acceptedRustDiagnosticResultName,
+      "fast-react-test-renderer.tojson.private-facade-result"
     );
     assert.deepEqual(
       facadeGate.acceptedRustApis,
@@ -234,6 +253,10 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.deepEqual(
       facadeGate.acceptedRustTests,
       expectedToJSONFacadeRustTests
+    );
+    assert.equal(
+      facadeGate.acceptedFacadeResultWorker,
+      "worker-391-test-renderer-public-tojson-private-facade"
     );
     assert.deepEqual(facadeGate.blockedPublicSurfaces, [
       "create().toJSON",
@@ -273,6 +296,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(privateFacade.gate, facadeGate);
     assert.equal(privateFacade.rootRequest, error.rootRequest);
     assert.equal(privateFacade.privateHostOutputDiagnosticsSerializable, true);
+    assert.equal(privateFacade.privateDiagnosticResultAvailable, true);
     assert.equal(privateFacade.publicSerializationAvailable, false);
     assert.equal(privateFacade.publicRouteAvailable, false);
     assert.equal(privateFacade.nativeBridgeAvailable, false);
@@ -284,6 +308,14 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     );
     assert.equal(
       typeof privateFacade.canSerializeAcceptedHostOutputDiagnostic,
+      "function"
+    );
+    assert.equal(
+      typeof privateFacade.createAcceptedHostOutputDiagnosticResult,
+      "function"
+    );
+    assert.equal(
+      typeof privateFacade.canCreateAcceptedHostOutputDiagnosticResult,
       "function"
     );
 
@@ -324,11 +356,82 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       ),
       true
     );
+    const privateDiagnosticResult =
+      privateFacade.createAcceptedHostOutputDiagnosticResult(
+        createAcceptedMinimalHostOutputDiagnostic()
+      );
+    assert.equal(Object.isFrozen(privateDiagnosticResult), true);
+    assert.equal(
+      privateDiagnosticResult.id,
+      "react-test-renderer-private-tojson-diagnostic-result"
+    );
+    assert.equal(
+      privateDiagnosticResult.diagnosticName,
+      "fast-react-test-renderer.tojson.private-facade-result"
+    );
+    assert.equal(privateDiagnosticResult.status, privateToJSONFacadeResultStatus);
+    assert.equal(privateDiagnosticResult.entrypoint, entry.entrypoint);
+    assert.equal(privateDiagnosticResult.publicSurface, "create().toJSON");
+    assert.equal(
+      privateDiagnosticResult.sourceDiagnostic,
+      "fast-react-test-renderer.serialization.private-json-canary"
+    );
+    assert.equal(privateDiagnosticResult.hostOutputUpdateKind, "Create");
+    assert.equal(privateDiagnosticResult.hostOutputSnapshotCurrent, true);
+    assert.deepEqual(privateDiagnosticResult.result, {
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    assert.equal(Object.isFrozen(privateDiagnosticResult.result), true);
+    assert.equal(Object.isFrozen(privateDiagnosticResult.result.props), true);
+    assert.equal(Object.isFrozen(privateDiagnosticResult.result.children), true);
+    assert.deepEqual(privateDiagnosticResult.publicBlockers, {
+      jsonMethodBlocked: true,
+      treeMethodBlocked: true,
+      instanceWrapperBlocked: true,
+      jsFacadeRoutingBlocked: true,
+      publicActBlocked: true,
+      compatibilityClaimBlocked: true
+    });
+    assert.equal(privateDiagnosticResult.publicSerializationAvailable, false);
+    assert.equal(privateDiagnosticResult.publicRouteAvailable, false);
+    assert.equal(privateDiagnosticResult.nativeBridgeAvailable, false);
+    assert.equal(privateDiagnosticResult.nativeExecution, false);
+    assert.equal(privateDiagnosticResult.compatibilityClaimed, false);
+    const updatedPrivateDiagnosticResult =
+      privateFacade.createAcceptedHostOutputDiagnosticResult(
+        createAcceptedMinimalHostOutputDiagnostic({
+          hostOutputUpdateKind: "Update",
+          text: "goodbye"
+        })
+      );
+    assert.equal(
+      updatedPrivateDiagnosticResult.hostOutputUpdateKind,
+      "Update"
+    );
+    assert.deepEqual(updatedPrivateDiagnosticResult.result, {
+      type: "span",
+      props: {},
+      children: ["goodbye"]
+    });
+    assert.equal(
+      privateFacade.canCreateAcceptedHostOutputDiagnosticResult(
+        createAcceptedMinimalHostOutputDiagnostic()
+      ),
+      true
+    );
 
     const rejectedDiagnostic = createAcceptedMinimalHostOutputDiagnostic();
     rejectedDiagnostic.publicBlockers.jsonMethodBlocked = false;
     assert.equal(
       privateFacade.canSerializeAcceptedHostOutputDiagnostic(rejectedDiagnostic),
+      false
+    );
+    assert.equal(
+      privateFacade.canCreateAcceptedHostOutputDiagnosticResult(
+        rejectedDiagnostic
+      ),
       false
     );
     const privateError = captureThrown(() =>
