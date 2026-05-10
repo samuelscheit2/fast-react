@@ -8,7 +8,7 @@ const {
 const entrypoint = 'react-dom/test-utils';
 
 const privateRoutingGateId =
-  'react-dom-test-utils-act-private-routing-gate-4';
+  'react-dom-test-utils-act-private-routing-gate-5';
 const privateRoutingGateStatus =
   'blocked-public-test-utils-act-private-routing';
 const publicActStatus = 'unsupported-public-test-utils-act-placeholder';
@@ -28,6 +28,12 @@ const passiveEffectsFlushMetadataStatus =
   'metadata-only-passive-flush-without-callback-execution';
 const passiveEffectCallbackHandleStatus =
   'private-passive-effect-callback-invocation-test-control-only';
+const privatePassiveDiagnosticGateId =
+  'react-dom-test-utils-act-private-passive-diagnostic-gate-1';
+const privatePassiveDiagnosticStatus =
+  'accepted-private-passive-effect-diagnostic-without-public-act-passive-drain';
+const privatePassivePublicPrerequisiteStatus =
+  'blocked-accepted-private-passive-diagnostics-until-public-act-passive-drain';
 const privateRootHostOutputDiagnosticGateId =
   'root-render-private-host-output-diagnostic-gate-1';
 const privateRootHostOutputDiagnosticStatus =
@@ -265,6 +271,170 @@ const passiveEffectCallbackInvocationBlockers = freezeArray([
   'PublicActCompatibility',
   'SchedulerDrivenPassiveExecution'
 ]);
+const privatePassiveDiagnosticIds = freezeArray([
+  'passive-effects-committed-fiber-traversal',
+  'passive-effects-scheduler-flush-diagnostic',
+  'passive-effect-mount-unmount-execution-diagnostics',
+  'passive-effect-root-error-routing-diagnostics'
+]);
+const passiveEffectsCommittedFiberTraversalRecords = freezeArray([
+  'FunctionComponentCommittedPassiveEffectsSnapshot',
+  'FunctionComponentCommittedPassiveEffectFiberRecord',
+  'HostRootCommitRecord.function_component_committed_passive_effects',
+  'HostRootCommitRecord::record_function_component_committed_passive_effects_for_canary',
+  'flush_passive_effects_after_commit_from_committed_fiber_effects_for_canary',
+  'CommittedPassiveEffectRecordCountMismatch',
+  'CommittedPassiveEffectDuplicateOrder',
+  'CommittedPassiveEffectRecordMismatch'
+]);
+const passiveEffectsSchedulerFlushDiagnosticRecords = freezeArray([
+  'SchedulerPassiveEffectsFlushRequest',
+  'PassiveEffectSchedulerFlushGateRecord',
+  'PassiveEffectSchedulerFlushGateStatus::Scheduled',
+  'schedule_passive_effects_flush_after_commit_for_canary',
+  'flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary',
+  'PassiveEffectSchedulerFlushExecutionRecord',
+  'PassiveEffectSchedulerFlushExecutionRecord.did_execute_private_callback_executors',
+  'SchedulerPriority::Normal'
+]);
+const passiveEffectMountUnmountExecutionRecords = freezeArray([
+  'PassiveEffectDestroyCallbackExecutionRequest',
+  'PassiveEffectDestroyCallbackExecutionRecord',
+  'PassiveEffectDestroyCallbackErrorRecord',
+  'PassiveEffectMountCreateCallbackExecutionRequest',
+  'PassiveEffectMountCreateCallbackExecutionRecord',
+  'PassiveEffectMountCreateCallbackErrorRecord',
+  'PassiveEffectMountCreateCallbackExecutionGateStatus::TestControlOnly',
+  'PassiveEffectMountCreateCallbackExecutionGateBlocker',
+  'flush_passive_effects_after_commit_with_destroy_executor',
+  'flush_passive_effects_after_commit_with_mount_create_executor',
+  'flush_passive_effects_after_commit_with_callback_executors'
+]);
+const passiveEffectRootErrorRoutingRecords = freezeArray([
+  'PassiveEffectCallbackExecutionErrorKind',
+  'PassiveEffectCallbackExecutionErrorHandle',
+  'PassiveEffectCallbackExecutionErrorRecord',
+  'PassiveEffectRootErrorCaptureRecord',
+  'PassiveEffectRootErrorPropagationRecord',
+  'PassiveEffectRootErrorPropagationStatus::CapturedForRootUpdate',
+  'PassiveEffectRootErrorPropagationBlocker',
+  'RootErrorCaptureScheduleRecord',
+  'RootErrorCaptureSource::PassiveEffectDestroy',
+  'RootErrorCaptureSource::PassiveEffectMountCreate',
+  'capture_passive_effect_root_error'
+]);
+const privatePassiveDiagnosticEvidence = freezeArray([
+  'default-flush-remains-metadata-only',
+  'committed-fiber-passive-effect-snapshot',
+  'scheduler-passive-flush-request-order',
+  'scheduler-flush-executes-metadata-only-passive-drain',
+  'test-controlled-passive-destroy-callback-execution',
+  'test-controlled-passive-mount-create-callback-execution',
+  'passive-callback-error-root-capture-metadata',
+  'root-error-callbacks-not-invoked',
+  'public-act-passive-drain-blocked'
+]);
+const privatePassiveDiagnosticSummary = freezeRecord({
+  acceptedDiagnosticIds: privatePassiveDiagnosticIds,
+  acceptedDiagnosticCount: privatePassiveDiagnosticIds.length,
+  acceptedStatus: privatePassiveDiagnosticStatus,
+  publicActPassiveDrain: false,
+  publicEffectExecution: false,
+  schedulerDrivenPassiveExecution: false,
+  publicRootErrorCallbacksInvoked: false,
+  publicActErrorAggregation: false,
+  compatibilityClaimed: false,
+  source: 'crates/fast-react-reconciler/src/passive_effects.rs'
+});
+const privatePassiveDiagnosticRows = freezeRecords([
+  {
+    id: 'passive-effects-committed-fiber-traversal',
+    present: true,
+    status: privatePassiveDiagnosticStatus,
+    source: 'crates/fast-react-reconciler/src/root_commit.rs',
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privatePassiveDiagnosticGateId,
+    consumesCommittedFiberEffects: true,
+    consumesCallerSuppliedHandoff: false,
+    executesPassiveEffects: false,
+    invokesCallbacks: false,
+    publicActCompatibilityClaimed: false,
+    records: passiveEffectsCommittedFiberTraversalRecords
+  },
+  {
+    id: 'passive-effects-scheduler-flush-diagnostic',
+    present: true,
+    status: privatePassiveDiagnosticStatus,
+    source: 'crates/fast-react-reconciler/src/root_scheduler.rs',
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privatePassiveDiagnosticGateId,
+    schedulesPassiveFlushRequest: true,
+    schedulerPriority: 'Normal',
+    consumesPendingPassive: true,
+    schedulerDrivenPrivateDiagnostic: true,
+    executesPublicSchedulerTasks: false,
+    executesPublicEffects: false,
+    invokesCallbacks: false,
+    publicActCompatibilityClaimed: false,
+    records: passiveEffectsSchedulerFlushDiagnosticRecords
+  },
+  {
+    id: 'passive-effect-mount-unmount-execution-diagnostics',
+    present: true,
+    status: privatePassiveDiagnosticStatus,
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privatePassiveDiagnosticGateId,
+    testControlledInvocationOnly: true,
+    executesDestroyCallbacksUnderTestControl: true,
+    executesMountCreateCallbacksUnderTestControl: true,
+    schedulerDrivenPassiveExecutionEnabled: false,
+    publicEffectExecutionEnabled: false,
+    publicActCompatibilityClaimed: false,
+    records: passiveEffectMountUnmountExecutionRecords
+  },
+  {
+    id: 'passive-effect-root-error-routing-diagnostics',
+    present: true,
+    status: privatePassiveDiagnosticStatus,
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privatePassiveDiagnosticGateId,
+    capturesCommitPhaseErrors: true,
+    schedulesRootErrorUpdates: true,
+    invokesRootErrorCallbacks: false,
+    publicActErrorAggregationEnabled: false,
+    publicActCompatibilityClaimed: false,
+    records: passiveEffectRootErrorRoutingRecords
+  }
+]);
+const privatePassiveBlockedPrerequisites = freezeRecords(
+  privatePassiveDiagnosticRows.map((diagnostic) => ({
+    id: `accepted-private-passive-diagnostic-${diagnostic.id}`,
+    diagnosticId: diagnostic.id,
+    present: false,
+    requiredBeforePublicAct: true,
+    acceptedPrivateDiagnostic: true,
+    status: privatePassivePublicPrerequisiteStatus,
+    diagnosticGateId: privatePassiveDiagnosticGateId,
+    diagnosticStatus: diagnostic.status,
+    publicActExecution: false,
+    publicEffectExecution: false,
+    schedulerDrivenPassiveExecution: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicActErrorAggregation: false,
+    compatibilityClaimed: false,
+    reason:
+      'Accepted only as private passive-effect diagnostics; public react-dom/test-utils.act must stay blocked until public act drains passive effects through public roots.'
+  }))
+);
+const privatePassiveBlockedPrerequisiteIds = freezeArray(
+  privatePassiveBlockedPrerequisites.map((prerequisite) => prerequisite.id)
+);
 
 const acceptedPrivatePrerequisites = freezeRecords([
   {
@@ -373,6 +543,7 @@ const acceptedPrivatePrerequisites = freezeRecords([
     invocationBlockers: passiveEffectCallbackInvocationBlockers,
     phaseRules: passiveEffectCallbackPhaseRules
   },
+  ...privatePassiveDiagnosticRows,
   {
     id: 'react-dom-private-root-bridge-records',
     present: true,
@@ -482,6 +653,15 @@ const blockedPublicPrerequisites = freezeRecords([
     id: 'passive-effect-callback-execution',
     present: false,
     requiredBeforePublicAct: true,
+    blockedByAcceptedPrivatePassiveDiagnostics: true,
+    privatePassiveDiagnosticGateId,
+    privatePassiveDiagnosticStatus,
+    acceptedPrivatePassiveDiagnosticIds: privatePassiveDiagnosticIds,
+    acceptedPrivatePassiveDiagnosticCount: privatePassiveDiagnosticIds.length,
+    publicEffectExecutionEnabled: false,
+    schedulerDrivenPassiveExecutionEnabled: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicActErrorAggregationEnabled: false,
     reason:
       'Passive create and destroy callbacks can run only through explicit private test controls; scheduler-driven passive execution and public act integration remain disabled.'
   },
@@ -568,6 +748,7 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       privateRootHostOutputBlockedPrerequisites,
     blockedPrivateRootWarningBoundaryPrerequisites:
       privateRootWarningBoundaryBlockedPrerequisites,
+    blockedPrivatePassivePrerequisites: privatePassiveBlockedPrerequisites,
     acceptedPrivatePrerequisiteIds: acceptedPrivatePrerequisites.map(
       (prerequisite) => prerequisite.id
     ),
@@ -578,6 +759,8 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       privateRootHostOutputBlockedPrerequisiteIds,
     blockedPrivateRootWarningBoundaryPrerequisiteIds:
       privateRootWarningBoundaryBlockedPrerequisiteIds,
+    blockedPrivatePassivePrerequisiteIds:
+      privatePassiveBlockedPrerequisiteIds,
     reactActPrivateDispatcher: freezeRecord({
       status: reactActPrivateDispatcherStatus,
       requiredRecords: reactActPrivateRecords,
@@ -656,6 +839,24 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       publicActCompatibilityClaimed: false,
       effectCallbackExecutionReady: false
     }),
+    privatePassiveDiagnostics: freezeRecord({
+      gateId: privatePassiveDiagnosticGateId,
+      status: privatePassiveDiagnosticStatus,
+      acceptedDiagnosticIds: privatePassiveDiagnosticIds,
+      acceptedDiagnostics: privatePassiveDiagnosticRows,
+      evidence: privatePassiveDiagnosticEvidence,
+      summary: privatePassiveDiagnosticSummary,
+      blockedPrerequisiteStatus: privatePassivePublicPrerequisiteStatus,
+      blockedPrerequisites: privatePassiveBlockedPrerequisites,
+      blockedPrerequisiteIds: privatePassiveBlockedPrerequisiteIds,
+      publicActPassiveDrain: false,
+      publicEffectExecution: false,
+      schedulerDrivenPassiveExecution: false,
+      publicRootExecution: false,
+      publicRootErrorCallbacksInvoked: false,
+      publicActErrorAggregation: false,
+      compatibilityClaimed: false
+    }),
     reactDomRootBridge: freezeRecord({
       status: rootBridgeRecordOnlyStatus,
       records: rootBridgeRequestRecords,
@@ -725,6 +926,9 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
   const blockedPrivateRootWarningBoundaryPrerequisites =
     options.blockedPrivateRootWarningBoundaryPrerequisites ??
     gate.blockedPrivateRootWarningBoundaryPrerequisites;
+  const blockedPrivatePassivePrerequisites =
+    options.blockedPrivatePassivePrerequisites ??
+    gate.blockedPrivatePassivePrerequisites;
   const publicCompatibilityClaimed =
     options.publicCompatibilityClaimed ?? gate.publicCompatibilityClaimed;
   const publicTestUtilsActReady =
@@ -745,6 +949,10 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
       .map((prerequisite) => prerequisite.id);
   const privateRootWarningBoundaryPrerequisitesStillBlocked =
     blockedPrivateRootWarningBoundaryPrerequisites
+      .filter((prerequisite) => prerequisite.present !== true)
+      .map((prerequisite) => prerequisite.id);
+  const privatePassivePrerequisitesStillBlocked =
+    blockedPrivatePassivePrerequisites
       .filter((prerequisite) => prerequisite.present !== true)
       .map((prerequisite) => prerequisite.id);
   const violations = [];
@@ -785,6 +993,13 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
       )
     );
   }
+  if (privatePassivePrerequisitesStillBlocked.length === 0) {
+    violations.push(
+      createViolation(
+        'private-passive-diagnostic-prerequisites-unblocked-without-new-gate'
+      )
+    );
+  }
 
   return freezeRecord({
     ...gate,
@@ -796,6 +1011,7 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     publicPrerequisitesStillBlocked,
     privateRootHostOutputPrerequisitesStillBlocked,
     privateRootWarningBoundaryPrerequisitesStillBlocked,
+    privatePassivePrerequisitesStillBlocked,
     violations,
     status:
       violations.length === 0
@@ -835,6 +1051,7 @@ function freezeRecords(records) {
 
 module.exports = {
   acceptedPrivatePrerequisites,
+  blockedPrivatePassivePrerequisites: privatePassiveBlockedPrerequisites,
   blockedPrivateRootHostOutputPrerequisites:
     privateRootHostOutputBlockedPrerequisites,
   blockedPrivateRootWarningBoundaryPrerequisites:
