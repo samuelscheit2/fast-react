@@ -200,6 +200,7 @@ impl HostNodePropertyUpdateExecution {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HostNodeAppliedPropertyUpdate {
     sequence: usize,
+    store_order: usize,
     handle: StateNodeHandle,
     root_id: FiberRootId,
     fiber_id: FiberId,
@@ -216,6 +217,11 @@ impl HostNodeAppliedPropertyUpdate {
     #[must_use]
     pub(crate) const fn sequence(self) -> usize {
         self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn store_order(self) -> usize {
+        self.store_order
     }
 
     #[must_use]
@@ -271,6 +277,123 @@ impl HostNodeAppliedPropertyUpdate {
     #[must_use]
     pub(crate) const fn execution_name(self) -> &'static str {
         self.execution.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostNodeLatestPropsUpdate {
+    sequence: usize,
+    store_order: usize,
+    handle: StateNodeHandle,
+    root_id: FiberRootId,
+    fiber_id: FiberId,
+    token_id: HostFiberTokenId,
+    payload_kind: &'static str,
+    prop_name: &'static str,
+    property_update_sequence: usize,
+    property_update_store_order: usize,
+    old_props: PropsHandle,
+    previous_latest_props: Option<PropsHandle>,
+    latest_props: PropsHandle,
+}
+
+impl HostNodeLatestPropsUpdate {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn store_order(self) -> usize {
+        self.store_order
+    }
+
+    #[must_use]
+    pub(crate) const fn handle(self) -> StateNodeHandle {
+        self.handle
+    }
+
+    #[must_use]
+    pub(crate) const fn root_id(self) -> FiberRootId {
+        self.root_id
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber_id(self) -> FiberId {
+        self.fiber_id
+    }
+
+    #[must_use]
+    pub(crate) const fn token_id(self) -> HostFiberTokenId {
+        self.token_id
+    }
+
+    #[must_use]
+    pub(crate) const fn payload_kind(self) -> &'static str {
+        self.payload_kind
+    }
+
+    #[must_use]
+    pub(crate) const fn prop_name(self) -> &'static str {
+        self.prop_name
+    }
+
+    #[must_use]
+    pub(crate) const fn property_update_sequence(self) -> usize {
+        self.property_update_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn property_update_store_order(self) -> usize {
+        self.property_update_store_order
+    }
+
+    #[must_use]
+    pub(crate) const fn old_props(self) -> PropsHandle {
+        self.old_props
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_latest_props(self) -> Option<PropsHandle> {
+        self.previous_latest_props
+    }
+
+    #[must_use]
+    pub(crate) const fn latest_props(self) -> PropsHandle {
+        self.latest_props
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostNodePrivatePropertyCommit {
+    property_update: HostNodeAppliedPropertyUpdate,
+    latest_props_update: HostNodeLatestPropsUpdate,
+}
+
+impl HostNodePrivatePropertyCommit {
+    #[must_use]
+    pub(crate) const fn property_update(self) -> HostNodeAppliedPropertyUpdate {
+        self.property_update
+    }
+
+    #[must_use]
+    pub(crate) const fn latest_props_update(self) -> HostNodeLatestPropsUpdate {
+        self.latest_props_update
+    }
+
+    #[must_use]
+    pub(crate) const fn private_host_store_only(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(self) -> bool {
+        false
     }
 }
 
@@ -477,21 +600,23 @@ impl<H: HostTypes> HostNodeStore<H> {
         update: HostNodePropertyUpdate,
     ) -> Result<HostNodeAppliedPropertyUpdate, HostNodeValidationError> {
         let record = self.record_mut(handle, scope, HostFiberTokenTarget::Instance, true)?;
-        let applied = HostNodeAppliedPropertyUpdate {
-            sequence: record.property_updates.len(),
-            handle,
-            root_id: record.metadata.root_id,
-            fiber_id: record.metadata.fiber_id,
-            token_id: record.metadata.token_id,
-            payload_kind: update.payload_kind(),
-            prop_name: update.prop_name(),
-            property_name: update.property_name(),
-            old_props: update.old_props(),
-            new_props: update.new_props(),
-            execution: update.execution(),
-        };
-        record.property_updates.push(applied);
-        Ok(applied)
+        Ok(record.push_property_update(handle, update))
+    }
+
+    pub(crate) fn commit_instance_property_update_to_private_store(
+        &mut self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+        update: HostNodePropertyUpdate,
+    ) -> Result<HostNodePrivatePropertyCommit, HostNodeValidationError> {
+        let record = self.record_mut(handle, scope, HostFiberTokenTarget::Instance, true)?;
+        let property_update = record.push_property_update(handle, update);
+        let latest_props_update =
+            record.publish_latest_props_after_property_update(handle, property_update);
+        Ok(HostNodePrivatePropertyCommit {
+            property_update,
+            latest_props_update,
+        })
     }
 
     pub(crate) fn instance_property_updates(
@@ -502,6 +627,26 @@ impl<H: HostTypes> HostNodeStore<H> {
         Ok(&self
             .record(handle, scope, HostFiberTokenTarget::Instance, true)?
             .property_updates)
+    }
+
+    pub(crate) fn instance_latest_props(
+        &self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+    ) -> Result<Option<PropsHandle>, HostNodeValidationError> {
+        Ok(self
+            .record(handle, scope, HostFiberTokenTarget::Instance, true)?
+            .latest_props)
+    }
+
+    pub(crate) fn instance_latest_props_updates(
+        &self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+    ) -> Result<&[HostNodeLatestPropsUpdate], HostNodeValidationError> {
+        Ok(&self
+            .record(handle, scope, HostFiberTokenTarget::Instance, true)?
+            .latest_props_updates)
     }
 
     pub(crate) fn invalidate_instance(
@@ -644,6 +789,9 @@ impl<H: HostTypes> HostNodeStore<H> {
             },
             value,
             property_updates: Vec::new(),
+            latest_props: None,
+            latest_props_updates: Vec::new(),
+            next_private_store_order: 0,
         }));
         handle
     }
@@ -881,11 +1029,68 @@ struct HostNodeRecord<H: HostTypes> {
     metadata: HostNodeMetadata,
     value: HostNodeValue<H>,
     property_updates: Vec<HostNodeAppliedPropertyUpdate>,
+    latest_props: Option<PropsHandle>,
+    latest_props_updates: Vec<HostNodeLatestPropsUpdate>,
+    next_private_store_order: usize,
 }
 
 impl<H: HostTypes> HostNodeRecord<H> {
     const fn metadata(&self) -> &HostNodeMetadata {
         &self.metadata
+    }
+
+    fn push_property_update(
+        &mut self,
+        handle: StateNodeHandle,
+        update: HostNodePropertyUpdate,
+    ) -> HostNodeAppliedPropertyUpdate {
+        let applied = HostNodeAppliedPropertyUpdate {
+            sequence: self.property_updates.len(),
+            store_order: self.claim_private_store_order(),
+            handle,
+            root_id: self.metadata.root_id,
+            fiber_id: self.metadata.fiber_id,
+            token_id: self.metadata.token_id,
+            payload_kind: update.payload_kind(),
+            prop_name: update.prop_name(),
+            property_name: update.property_name(),
+            old_props: update.old_props(),
+            new_props: update.new_props(),
+            execution: update.execution(),
+        };
+        self.property_updates.push(applied);
+        applied
+    }
+
+    fn publish_latest_props_after_property_update(
+        &mut self,
+        handle: StateNodeHandle,
+        property_update: HostNodeAppliedPropertyUpdate,
+    ) -> HostNodeLatestPropsUpdate {
+        let latest_props_update = HostNodeLatestPropsUpdate {
+            sequence: self.latest_props_updates.len(),
+            store_order: self.claim_private_store_order(),
+            handle,
+            root_id: self.metadata.root_id,
+            fiber_id: self.metadata.fiber_id,
+            token_id: self.metadata.token_id,
+            payload_kind: property_update.payload_kind(),
+            prop_name: property_update.prop_name(),
+            property_update_sequence: property_update.sequence(),
+            property_update_store_order: property_update.store_order(),
+            old_props: property_update.old_props(),
+            previous_latest_props: self.latest_props,
+            latest_props: property_update.new_props(),
+        };
+        self.latest_props = Some(property_update.new_props());
+        self.latest_props_updates.push(latest_props_update);
+        latest_props_update
+    }
+
+    fn claim_private_store_order(&mut self) -> usize {
+        let order = self.next_private_store_order;
+        self.next_private_store_order += 1;
+        order
     }
 }
 
@@ -1089,6 +1294,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(applied.sequence(), 0);
+        assert_eq!(applied.store_order(), 0);
         assert_eq!(applied.handle(), handle);
         assert_eq!(applied.root_id(), scope.root_id());
         assert_eq!(applied.fiber_id(), scope.fiber_id());
@@ -1106,7 +1312,84 @@ mod tests {
 
         let updates = store.instance_property_updates(handle, scope).unwrap();
         assert_eq!(updates, &[applied]);
+        assert_eq!(store.instance_latest_props(handle, scope).unwrap(), None);
+        assert_eq!(
+            store.instance_latest_props_updates(handle, scope).unwrap(),
+            &[]
+        );
         assert_eq!(store.instance(handle, scope).unwrap().label, "button");
+    }
+
+    #[test]
+    fn host_nodes_commit_style_property_update_to_private_store_then_publish_latest_props() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let scope = instance_scope();
+        let handle = store.insert_instance(
+            scope,
+            TestInstance {
+                id: 1,
+                label: "div",
+            },
+        );
+        let update = HostNodePropertyUpdate::new(
+            "style",
+            "style",
+            PropsHandle::from_raw(40),
+            PropsHandle::from_raw(41),
+        )
+        .with_payload_kind("style");
+
+        let commit = store
+            .commit_instance_property_update_to_private_store(handle, scope, update)
+            .unwrap();
+
+        assert!(commit.private_host_store_only());
+        assert!(!commit.public_dom_compatibility_claimed());
+        let property_update = commit.property_update();
+        let latest_props_update = commit.latest_props_update();
+        assert_eq!(property_update.sequence(), 0);
+        assert_eq!(property_update.store_order(), 0);
+        assert_eq!(property_update.payload_kind(), "style");
+        assert_eq!(property_update.prop_name(), "style");
+        assert_eq!(property_update.old_props(), PropsHandle::from_raw(40));
+        assert_eq!(property_update.new_props(), PropsHandle::from_raw(41));
+        assert_eq!(latest_props_update.sequence(), 0);
+        assert_eq!(latest_props_update.store_order(), 1);
+        assert!(latest_props_update.store_order() > property_update.store_order());
+        assert_eq!(
+            latest_props_update.property_update_sequence(),
+            property_update.sequence()
+        );
+        assert_eq!(
+            latest_props_update.property_update_store_order(),
+            property_update.store_order()
+        );
+        assert_eq!(latest_props_update.handle(), handle);
+        assert_eq!(latest_props_update.root_id(), scope.root_id());
+        assert_eq!(latest_props_update.fiber_id(), scope.fiber_id());
+        assert_eq!(latest_props_update.token_id(), scope.token_id());
+        assert_eq!(latest_props_update.payload_kind(), "style");
+        assert_eq!(latest_props_update.prop_name(), "style");
+        assert_eq!(latest_props_update.old_props(), PropsHandle::from_raw(40));
+        assert_eq!(latest_props_update.previous_latest_props(), None);
+        assert_eq!(
+            latest_props_update.latest_props(),
+            PropsHandle::from_raw(41)
+        );
+        assert!(!latest_props_update.public_dom_compatibility_claimed());
+        assert_eq!(
+            store.instance_property_updates(handle, scope).unwrap(),
+            &[property_update]
+        );
+        assert_eq!(
+            store.instance_latest_props(handle, scope).unwrap(),
+            Some(PropsHandle::from_raw(41))
+        );
+        assert_eq!(
+            store.instance_latest_props_updates(handle, scope).unwrap(),
+            &[latest_props_update]
+        );
+        assert_eq!(store.instance(handle, scope).unwrap().label, "div");
     }
 
     #[test]

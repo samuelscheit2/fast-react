@@ -364,6 +364,22 @@ impl DetachedHostRecords {
         Ok(self.nodes.instance_property_updates(handle, scope)?)
     }
 
+    fn instance_latest_props(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<Option<PropsHandle>, HostWorkError> {
+        let scope = self.scope(handle, HostFiberTokenTarget::Instance)?;
+        Ok(self.nodes.instance_latest_props(handle, scope)?)
+    }
+
+    fn instance_latest_props_updates(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<&[crate::host_nodes::HostNodeLatestPropsUpdate], HostWorkError> {
+        let scope = self.scope(handle, HostFiberTokenTarget::Instance)?;
+        Ok(self.nodes.instance_latest_props_updates(handle, scope)?)
+    }
+
     fn text_metadata(&self, handle: StateNodeHandle) -> Result<HostNodeMetadata, HostWorkError> {
         let scope = self.scope(handle, HostFiberTokenTarget::TextInstance)?;
         Ok(self.nodes.text_metadata(handle, scope)?)
@@ -1150,8 +1166,14 @@ enum TestHostRootMutationHostCall {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestHostRootPrivateStoreMutation {
+    HostComponentPropertyAndLatestProps,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TestHostRootMutationApplyStatus {
     Applied(TestHostRootMutationHostCall),
+    PrivateHostStoreOnly(TestHostRootPrivateStoreMutation),
     RecordedOnly,
 }
 
@@ -1201,6 +1223,19 @@ impl TestHostRootMutationApplyResult {
         self.records
             .iter()
             .filter(|record| matches!(record.status(), TestHostRootMutationApplyStatus::Applied(_)))
+            .count()
+    }
+
+    #[must_use]
+    fn private_host_store_update_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.status(),
+                    TestHostRootMutationApplyStatus::PrivateHostStoreOnly(_)
+                )
+            })
             .count()
     }
 }
@@ -1343,6 +1378,7 @@ struct TestHostRootHostUpdateExecutionDiagnosticForCanary {
     payload: TestHostRootHostUpdatePayloadForCanary,
     status: TestHostRootMutationApplyStatus,
     applied_host_call_count: usize,
+    private_host_store_update_count: usize,
     blockers: [TestHostRootHostUpdateExecutionBlockerForCanary; 4],
 }
 
@@ -1388,6 +1424,11 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
     }
 
     #[must_use]
+    const fn private_host_store_update_count(&self) -> usize {
+        self.private_host_store_update_count
+    }
+
+    #[must_use]
     fn test_host_commit_executed(&self) -> bool {
         matches!(
             self.status,
@@ -1395,6 +1436,16 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
                 TestHostRootMutationHostCall::CommitUpdate
                     | TestHostRootMutationHostCall::CommitTextUpdate
                     | TestHostRootMutationHostCall::ResetTextContent
+            )
+        )
+    }
+
+    #[must_use]
+    fn private_host_store_only_commit_executed(&self) -> bool {
+        matches!(
+            self.status,
+            TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
+                TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps
             )
         )
     }
@@ -1882,6 +1933,7 @@ fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
         payload,
         status,
         applied_host_call_count: apply.applied_host_call_count(),
+        private_host_store_update_count: apply.private_host_store_update_count(),
         blockers: TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS,
     })
 }
@@ -1918,6 +1970,11 @@ const fn host_update_apply_status_matches_mutation_kind(
                 TestHostRootMutationHostCall::CommitTextUpdate,
             ),
             HostRootMutationApplyRecordKind::CommitHostTextUpdate,
+        ) | (
+            TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
+                TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps,
+            ),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate,
         )
     )
 }
@@ -2459,6 +2516,25 @@ fn apply_test_host_component_update_record(
         &payload,
         detached_hosts,
     )?;
+    if should_commit_component_property_payload_to_private_host_store_only(
+        payload.property_row().kind(),
+    ) {
+        let commit = detached_hosts
+            .nodes
+            .commit_instance_property_update_to_private_store(
+                mutation.state_node(),
+                scope,
+                host_node_property_update_for_component_payload(
+                    &payload,
+                    HostNodePropertyUpdateExecution::CommitUpdate,
+                ),
+            )?;
+        debug_assert!(commit.private_host_store_only());
+        debug_assert!(!commit.public_dom_compatibility_claimed());
+        return Ok(TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
+            TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps,
+        ));
+    }
     let host_call = apply_test_host_component_property_payload_host_call(
         store,
         host,
@@ -2470,16 +2546,32 @@ fn apply_test_host_component_update_record(
     detached_hosts.nodes.apply_instance_property_update(
         mutation.state_node(),
         scope,
-        HostNodePropertyUpdate::new(
-            payload.property_row().prop_name(),
-            payload.property_row().property_name(),
-            payload.old_props(),
-            payload.new_props(),
-        )
-        .with_payload_kind(payload.property_row().kind().as_str())
-        .with_execution(host_node_property_update_execution_for_host_call(host_call)),
+        host_node_property_update_for_component_payload(
+            &payload,
+            host_node_property_update_execution_for_host_call(host_call),
+        ),
     )?;
     Ok(TestHostRootMutationApplyStatus::Applied(host_call))
+}
+
+const fn should_commit_component_property_payload_to_private_host_store_only(
+    kind: TestHostComponentPropertyPayloadKind,
+) -> bool {
+    matches!(kind, TestHostComponentPropertyPayloadKind::Style)
+}
+
+fn host_node_property_update_for_component_payload(
+    payload: &HostComponentUpdatePayload,
+    execution: HostNodePropertyUpdateExecution,
+) -> HostNodePropertyUpdate {
+    HostNodePropertyUpdate::new(
+        payload.property_row().prop_name(),
+        payload.property_row().property_name(),
+        payload.old_props(),
+        payload.new_props(),
+    )
+    .with_payload_kind(payload.property_row().kind().as_str())
+    .with_execution(execution)
 }
 
 fn apply_test_host_component_property_payload_host_call(
@@ -2492,7 +2584,6 @@ fn apply_test_host_component_property_payload_host_call(
 ) -> Result<TestHostRootMutationHostCall, HostWorkError> {
     match payload.property_row().kind() {
         TestHostComponentPropertyPayloadKind::SafeTestProperty
-        | TestHostComponentPropertyPayloadKind::Style
         | TestHostComponentPropertyPayloadKind::DangerousHtml => {
             let token = issue_commit_host_token(
                 store,
@@ -2517,6 +2608,9 @@ fn apply_test_host_component_property_payload_host_call(
                 &(),
             )?;
             Ok(TestHostRootMutationHostCall::CommitUpdate)
+        }
+        TestHostComponentPropertyPayloadKind::Style => {
+            unreachable!("style payloads use the private host-store commit path")
         }
         TestHostComponentPropertyPayloadKind::TextContent => {
             let instance = detached_hosts
@@ -3972,6 +4066,7 @@ mod tests {
         let updates = detached_hosts.instance_property_updates(handle).unwrap();
         assert_eq!(updates.len(), 1);
         assert_eq!(updates[0].sequence(), 0);
+        assert_eq!(updates[0].store_order(), 0);
         assert_eq!(updates[0].handle(), handle);
         assert_eq!(updates[0].root_id(), root_id);
         assert_eq!(updates[0].fiber_id(), current_component);
@@ -3982,6 +4077,54 @@ mod tests {
         assert_eq!(updates[0].old_props(), old_props);
         assert_eq!(updates[0].new_props(), new_props);
         assert_eq!(updates[0].execution(), execution);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn assert_single_latest_props_update_after_property_update(
+        detached_hosts: &DetachedHostRecords,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        current_component: FiberId,
+        old_props: PropsHandle,
+        new_props: PropsHandle,
+        payload_kind: TestHostComponentPropertyPayloadKind,
+        prop_name: &'static str,
+    ) {
+        let metadata = detached_hosts.instance_metadata(handle).unwrap();
+        let property_updates = detached_hosts.instance_property_updates(handle).unwrap();
+        let latest_props_updates = detached_hosts
+            .instance_latest_props_updates(handle)
+            .unwrap();
+        assert_eq!(property_updates.len(), 1);
+        assert_eq!(latest_props_updates.len(), 1);
+        assert_eq!(latest_props_updates[0].sequence(), 0);
+        assert_eq!(latest_props_updates[0].store_order(), 1);
+        assert!(latest_props_updates[0].store_order() > property_updates[0].store_order());
+        assert_eq!(latest_props_updates[0].handle(), handle);
+        assert_eq!(latest_props_updates[0].root_id(), root_id);
+        assert_eq!(latest_props_updates[0].fiber_id(), current_component);
+        assert_eq!(latest_props_updates[0].token_id(), metadata.token_id());
+        assert_eq!(
+            latest_props_updates[0].payload_kind(),
+            payload_kind.as_str()
+        );
+        assert_eq!(latest_props_updates[0].prop_name(), prop_name);
+        assert_eq!(
+            latest_props_updates[0].property_update_sequence(),
+            property_updates[0].sequence()
+        );
+        assert_eq!(
+            latest_props_updates[0].property_update_store_order(),
+            property_updates[0].store_order()
+        );
+        assert_eq!(latest_props_updates[0].old_props(), old_props);
+        assert_eq!(latest_props_updates[0].previous_latest_props(), None);
+        assert_eq!(latest_props_updates[0].latest_props(), new_props);
+        assert!(!latest_props_updates[0].public_dom_compatibility_claimed());
+        assert_eq!(
+            detached_hosts.instance_latest_props(handle).unwrap(),
+            Some(new_props)
+        );
     }
 
     struct RootComponentUpdateApplyFixture {
@@ -6870,6 +7013,137 @@ mod tests {
     }
 
     #[test]
+    fn host_work_finished_work_handoff_commits_one_style_update_to_private_host_store_only() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let initial_props = initial.props();
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let payload = update_root_component_for_commit(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let row =
+            TestHostComponentPropertyPayloadRow::style(payload.old_props(), payload.new_props());
+        detached_hosts.component_updates[0].property_row = row;
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 17)
+                .unwrap();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        let diagnostic = apply_one_test_host_update_with_finished_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            update_render,
+            Some(pending),
+            18,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(diagnostic.source_handoff_order(), 17);
+        assert_eq!(diagnostic.commit_order(), 18);
+        assert_eq!(diagnostic.mutation().fiber(), payload.work_in_progress());
+        assert_eq!(
+            diagnostic.status(),
+            TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
+                TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps
+            )
+        );
+        assert!(!diagnostic.test_host_commit_executed());
+        assert!(diagnostic.private_host_store_only_commit_executed());
+        assert_eq!(diagnostic.applied_host_call_count(), 0);
+        assert_eq!(diagnostic.private_host_store_update_count(), 1);
+        assert_eq!(
+            diagnostic.payload().host_component_property_payload_kind(),
+            Some(TestHostComponentPropertyPayloadKind::Style)
+        );
+        assert_eq!(
+            diagnostic.payload().host_component_prop_name(),
+            Some(TEST_HOST_STYLE_PROP_NAME)
+        );
+        assert_eq!(
+            diagnostic.payload(),
+            &TestHostRootHostUpdatePayloadForCanary::HostComponent {
+                current: current_component,
+                work_in_progress: payload.work_in_progress(),
+                state_node,
+                old_props: initial_props,
+                new_props: next.props(),
+                ty: "section",
+                property_payload_kind: TestHostComponentPropertyPayloadKind::Style,
+                prop_name: TEST_HOST_STYLE_PROP_NAME,
+                property_name: TEST_HOST_STYLE_PROP_NAME,
+            }
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            update_render.finished_work()
+        );
+        assert_eq!(store.host_tokens().len(), token_count_before_apply);
+        assert_single_component_property_update(
+            &detached_hosts,
+            state_node,
+            root_id,
+            current_component,
+            payload.old_props(),
+            payload.new_props(),
+            row.kind(),
+            row.prop_name(),
+            row.property_name(),
+            HostNodePropertyUpdateExecution::CommitUpdate,
+        );
+        assert_single_latest_props_update_after_property_update(
+            &detached_hosts,
+            state_node,
+            root_id,
+            current_component,
+            payload.old_props(),
+            payload.new_props(),
+            row.kind(),
+            row.prop_name(),
+        );
+        assert!(!diagnostic.react_dom_compatibility_claimed());
+        assert!(!row.public_dom_property_compatibility_claimed());
+        assert_eq!(host.operations(), operations_before_apply);
+    }
+
+    #[test]
     fn host_work_host_component_update_handoff_rejects_stale_finished_work_before_mutation() {
         let (mut store, root_id) = root_store();
         let mut host = RecordingHost::default();
@@ -7104,68 +7378,110 @@ mod tests {
     }
 
     #[test]
-    fn host_work_records_style_and_dangerous_html_rows_as_private_payload_execution_evidence() {
-        for row_kind in [
-            TestHostComponentPropertyPayloadKind::Style,
-            TestHostComponentPropertyPayloadKind::DangerousHtml,
-        ] {
-            let mut fixture = root_component_update_apply_fixture();
-            let row = match row_kind {
-                TestHostComponentPropertyPayloadKind::Style => {
-                    TestHostComponentPropertyPayloadRow::style(
-                        fixture.payload.old_props(),
-                        fixture.payload.new_props(),
-                    )
-                }
-                TestHostComponentPropertyPayloadKind::DangerousHtml => {
-                    TestHostComponentPropertyPayloadRow::dangerous_html(
-                        fixture.payload.old_props(),
-                        fixture.payload.new_props(),
-                    )
-                }
-                _ => unreachable!("test only covers style/dangerousHTML rows"),
-            };
-            fixture.detached_hosts.component_updates[0].property_row = row;
+    fn host_work_commits_style_row_to_private_host_store_then_latest_props_without_host_call() {
+        let mut fixture = root_component_update_apply_fixture();
+        let row = TestHostComponentPropertyPayloadRow::style(
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+        );
+        fixture.detached_hosts.component_updates[0].property_row = row;
 
-            let apply = apply_test_host_root_commit_mutations(
-                &mut fixture.store,
-                &mut fixture.host,
-                &fixture.commit,
-                &mut fixture.detached_hosts,
+        let apply = apply_test_host_root_commit_mutations(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.commit,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(apply.records().len(), 1);
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::PrivateHostStoreOnly(
+                TestHostRootPrivateStoreMutation::HostComponentPropertyAndLatestProps
             )
-            .unwrap();
+        );
+        assert_eq!(apply.applied_host_call_count(), 0);
+        assert_eq!(apply.private_host_store_update_count(), 1);
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply
+        );
+        assert_single_component_property_update(
+            &fixture.detached_hosts,
+            fixture.state_node,
+            fixture.root_id,
+            fixture.payload.current(),
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+            row.kind(),
+            row.prop_name(),
+            row.property_name(),
+            HostNodePropertyUpdateExecution::CommitUpdate,
+        );
+        assert_single_latest_props_update_after_property_update(
+            &fixture.detached_hosts,
+            fixture.state_node,
+            fixture.root_id,
+            fixture.payload.current(),
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+            row.kind(),
+            row.prop_name(),
+        );
+        assert!(!row.public_dom_property_compatibility_claimed());
+        assert_eq!(fixture.host.operations(), fixture.operations_before_apply);
+    }
 
-            assert_eq!(apply.records().len(), 1);
-            assert_eq!(
-                apply.records()[0].mutation().kind(),
-                HostRootMutationApplyRecordKind::CommitHostComponentUpdate
-            );
-            assert_eq!(
-                apply.records()[0].status(),
-                TestHostRootMutationApplyStatus::Applied(
-                    TestHostRootMutationHostCall::CommitUpdate
-                )
-            );
-            assert_eq!(
-                fixture.store.host_tokens().len(),
-                fixture.token_count_before_apply + 1
-            );
-            assert_single_component_property_update(
-                &fixture.detached_hosts,
-                fixture.state_node,
-                fixture.root_id,
-                fixture.payload.current(),
-                fixture.payload.old_props(),
-                fixture.payload.new_props(),
-                row.kind(),
-                row.prop_name(),
-                row.property_name(),
-                HostNodePropertyUpdateExecution::CommitUpdate,
-            );
-            let mut expected_operations = fixture.operations_before_apply;
-            expected_operations.push("commit_update");
-            assert_eq!(fixture.host.operations(), expected_operations);
-        }
+    #[test]
+    fn host_work_records_dangerous_html_row_as_private_payload_execution_evidence() {
+        let mut fixture = root_component_update_apply_fixture();
+        let row = TestHostComponentPropertyPayloadRow::dangerous_html(
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+        );
+        fixture.detached_hosts.component_updates[0].property_row = row;
+
+        let apply = apply_test_host_root_commit_mutations(
+            &mut fixture.store,
+            &mut fixture.host,
+            &fixture.commit,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(apply.records().len(), 1);
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
+        );
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply + 1
+        );
+        assert_single_component_property_update(
+            &fixture.detached_hosts,
+            fixture.state_node,
+            fixture.root_id,
+            fixture.payload.current(),
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+            row.kind(),
+            row.prop_name(),
+            row.property_name(),
+            HostNodePropertyUpdateExecution::CommitUpdate,
+        );
+        let mut expected_operations = fixture.operations_before_apply;
+        expected_operations.push("commit_update");
+        assert_eq!(fixture.host.operations(), expected_operations);
     }
 
     #[test]
