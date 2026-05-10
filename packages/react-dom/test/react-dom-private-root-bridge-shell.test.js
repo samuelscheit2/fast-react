@@ -35,13 +35,22 @@ const listenerRegistry = require(
 const eventListener = require(
   path.join(packageRoot, 'src/events/react-dom-event-listener.js')
 );
+const eventSystemFlags = require(
+  path.join(packageRoot, 'src/events/event-system-flags.js')
+);
 const rootListeners = require(
   path.join(packageRoot, 'src/events/root-listeners.js')
 );
 const pluginEventSystem = require(
   path.join(packageRoot, 'src/events/plugin-event-system.js')
 );
-const {DOCUMENT_NODE, ELEMENT_NODE, TEXT_NODE, describeContainer} = require(
+const {
+  COMMENT_NODE,
+  DOCUMENT_NODE,
+  ELEMENT_NODE,
+  TEXT_NODE,
+  describeContainer
+} = require(
   path.join(packageRoot, 'src/client/dom-container.js')
 );
 
@@ -6772,6 +6781,284 @@ test('private react-dom/client hydrateRoot facade preflight records only blocked
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private react-dom/client hydrateRoot target-claiming preflight requires marker/listener gates and canonical evidence', () => {
+  const document = createDocument('private-client-hydrate-target-claiming');
+  const container = createElement('DIV', document);
+  const target = createElement('BUTTON', document);
+  const start = createCommentNode('$', document);
+  const end = createCommentNode('/$', document);
+  start.parentNode = container;
+  target.parentNode = container;
+  end.parentNode = container;
+  container.childNodes = [start, target, end];
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.hydrateRoot,
+    rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+  );
+  const preflight = descriptor.value({
+    hydrateIdPrefix: 'hydrate-target-claim-root',
+    publicFacadeHydratePreflightIdPrefix: 'hydrate-target-claim-preflight',
+    requestIdPrefix: 'hydrate-target-claim-request'
+  });
+  const hydratePreflight = preflight.hydrateRoot(
+    container,
+    {
+      props: {
+        children: 'target claim'
+      },
+      type: 'App'
+    },
+    {
+      identifierPrefix: 'hydrate-target-claim-',
+      onRecoverableError() {}
+    }
+  );
+  const wrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      'click',
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapper,
+      {
+        target,
+        type: 'click'
+      }
+    );
+
+  const targetClaimPreflight = preflight.preflightTargetClaiming(
+    hydratePreflight,
+    dispatchRecord,
+    {
+      source: 'hydrate-root-target-claim-preflight-test'
+    }
+  );
+  const payload =
+    rootBridge.getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload(
+      targetClaimPreflight
+    );
+  const hydratePayload =
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+      hydratePreflight
+    );
+  const claimPayload =
+    rootBridge.getPrivateHydrationTargetClaimingDiagnosticPayload(
+      targetClaimPreflight.targetClaimingDiagnostic
+    );
+
+  assert.equal(Object.isFrozen(targetClaimPreflight), true);
+  assert.equal(
+    targetClaimPreflight.$$typeof,
+    rootBridge.privateHydrateRootPublicFacadeTargetClaimingPreflightRecordType
+  );
+  assert.equal(
+    targetClaimPreflight.kind,
+    'FastReactDomPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord'
+  );
+  assert.equal(
+    targetClaimPreflight.preflightStatus,
+    rootBridge
+      .ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TARGET_CLAIMING_PREFLIGHTED
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
+      targetClaimPreflight
+    ),
+    true
+  );
+  assert.equal(
+    targetClaimPreflight.targetClaimingPreflightId,
+    'hydrate-target-claim-preflight:1:target-claiming:1'
+  );
+  assert.equal(
+    targetClaimPreflight.preconditions.markerListenerPreflightRequired,
+    true
+  );
+  assert.equal(
+    targetClaimPreflight.preconditions.currentStateMatchesMarkerListenerPreflight,
+    true
+  );
+  assert.equal(
+    targetClaimPreflight.preconditions.canonicalTargetClaimingEvidence,
+    true
+  );
+  assert.equal(
+    targetClaimPreflight.preconditions.targetClaimingDiagnosticImmutable,
+    true
+  );
+  assert.equal(
+    targetClaimPreflight.preconditions.targetDispatchLinkDiagnosticImmutable,
+    true
+  );
+  assert.equal(targetClaimPreflight.preconditions.stateUnchanged, true);
+  assert.equal(targetClaimPreflight.markerListenerStateUnchanged, true);
+  assert.equal(targetClaimPreflight.targetDispatchLinkAccepted, true);
+  assert.equal(targetClaimPreflight.targetClaimingPayloadAccepted, true);
+  assert.equal(targetClaimPreflight.claimRecorded, true);
+  assert.equal(targetClaimPreflight.claimedTargetMetadata, true);
+  assert.equal(targetClaimPreflight.targetClaimExecuted, false);
+  assert.equal(targetClaimPreflight.publicHydrationTargetClaimed, false);
+  assert.equal(targetClaimPreflight.publicHydrateRootEnabled, false);
+  assert.equal(targetClaimPreflight.publicHydrationCompatibilityClaimed, false);
+  assert.equal(
+    targetClaimPreflight.publicHydrationReplayCompatibilityClaimed,
+    false
+  );
+  assert.equal(targetClaimPreflight.eventDispatch, false);
+  assert.equal(targetClaimPreflight.eventReplayInstalled, false);
+  assert.equal(targetClaimPreflight.replayQueuesDrained, false);
+  assert.equal(targetClaimPreflight.compatibilityClaimed, false);
+  assert.deepEqual(
+    targetClaimPreflight.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'hydrate-root-marker-listener-preflight-required',
+      'hydrate-root-target-dispatch-link-diagnostic',
+      'hydrate-root-target-claiming-canonical-evidence',
+      'hydrate-root-target-claiming-state-unchanged'
+    ]
+  );
+  assert.equal(targetClaimPreflight.targetPath, 'container.childNodes[1]');
+  assert.equal(targetClaimPreflight.targetPathDeterministicallySelected, true);
+  assert.equal(targetClaimPreflight.targetPathResolvedToDispatchTarget, true);
+  assert.equal(targetClaimPreflight.targetContainerMatchesBoundaryRecord, true);
+  assert.equal(targetClaimPreflight.hydratableLookupTargetPathRetained, true);
+  assert.equal(targetClaimPreflight.markerPath, 'container.childNodes[0]');
+  assert.equal(
+    targetClaimPreflight.markerContractId,
+    'suspense-completed-start'
+  );
+  assert.equal(
+    targetClaimPreflight.markerListenerPreflight,
+    hydratePreflight.markerListenerPreflight
+  );
+  assert.equal(payload.preflight, preflight);
+  assert.equal(payload.requestRecord, hydratePayload.requestRecord);
+  assert.equal(payload.dispatchRecord, dispatchRecord);
+  assert.equal(payload.targetClaimingDiagnostic, targetClaimPreflight.targetClaimingDiagnostic);
+  assert.equal(payload.targetClaimingPayload, claimPayload);
+  assert.equal(claimPayload.hydrationBoundaryRecord, hydratePreflight.hydrationBoundaryRecord);
+  assert.equal(claimPayload.targetDispatchLinkDiagnostic, targetClaimPreflight.targetDispatchLinkDiagnostic);
+  assert.equal(claimPayload.ownershipDiagnostics, targetClaimPreflight.ownershipDiagnostics);
+  assert.equal(Object.isFrozen(claimPayload.targetPathEvidence), true);
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .targetClaimingPreflightRecordCount,
+    1
+  );
+  assert.deepEqual(preflight.getHydrateRootTargetClaimingPreflightRecords(), [
+    targetClaimPreflight
+  ]);
+  assert.throws(
+    () =>
+      preflight.preflightTargetClaiming(
+        hydratePayload.requestRecord,
+        dispatchRecord
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT',
+      message: /marker\/listener/
+    }
+  );
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+});
+
+test('private react-dom/client hydrateRoot target-claiming preflight rejects non-canonical claim evidence', () => {
+  const rootBridgePath = path.join(
+    packageRoot,
+    'src/client/root-bridge.js'
+  );
+  const hydrationGatePath = path.join(
+    packageRoot,
+    'src/client/hydration-boundary-gate.js'
+  );
+  const rootBridgeCacheKey = require.resolve(rootBridgePath);
+  const rootBridgeCacheEntry = require.cache[rootBridgeCacheKey];
+  const hydrationGate = require(hydrationGatePath);
+  const originalCreateHydrationBoundaryGate =
+    hydrationGate.createHydrationBoundaryGate;
+
+  hydrationGate.createHydrationBoundaryGate =
+    function createNonCanonicalTargetClaimingGate(options) {
+      const gate = originalCreateHydrationBoundaryGate(options);
+      return Object.freeze({
+        ...gate,
+        createHydrationTargetClaimingDiagnostic(...args) {
+          const claim = gate.createHydrationTargetClaimingDiagnostic(...args);
+          return Object.freeze({...claim});
+        }
+      });
+    };
+
+  delete require.cache[rootBridgeCacheKey];
+  try {
+    const freshRootBridge = require(rootBridgePath);
+    const document = createDocument(
+      'private-client-hydrate-target-claiming-noncanonical'
+    );
+    const container = createElement('DIV', document);
+    const target = createElement('BUTTON', document);
+    const start = createCommentNode('$', document);
+    const end = createCommentNode('/$', document);
+    start.parentNode = container;
+    target.parentNode = container;
+    end.parentNode = container;
+    container.childNodes = [start, target, end];
+    const preflight =
+      freshRootBridge.createPrivateHydrateRootPublicFacadePreflight({
+        publicFacadeHydratePreflightIdPrefix:
+          'hydrate-target-claim-noncanonical'
+      });
+    const hydratePreflight = preflight.hydrateRoot(
+      container,
+      {
+        props: {
+          children: 'target claim'
+        },
+        type: 'App'
+      },
+      {
+        identifierPrefix: 'hydrate-target-claim-noncanonical-'
+      }
+    );
+    const wrapper =
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        'click',
+        eventSystemFlags.IS_CAPTURE_PHASE
+      );
+    const dispatchRecord =
+      pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+        wrapper,
+        {
+          target,
+          type: 'click'
+        }
+      );
+
+    assert.throws(
+      () => preflight.preflightTargetClaiming(hydratePreflight, dispatchRecord),
+      {
+        code:
+          hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE,
+        message: /canonical immutable/
+      }
+    );
+  } finally {
+    hydrationGate.createHydrationBoundaryGate =
+      originalCreateHydrationBoundaryGate;
+    delete require.cache[rootBridgeCacheKey];
+    if (rootBridgeCacheEntry !== undefined) {
+      require.cache[rootBridgeCacheKey] = rootBridgeCacheEntry;
+    }
+  }
+});
+
 test('private react-dom/client hydrateRoot facade preflight records existing marker/listener preconditions without writes', () => {
   const document = createDocument(
     'private-client-hydrate-existing-marker-listener'
@@ -11672,6 +11959,15 @@ function createTextNode(text, ownerDocument) {
     }
   });
   return target;
+}
+
+function createCommentNode(data, ownerDocument) {
+  return createEventTarget({
+    data,
+    nodeName: '#comment',
+    nodeType: COMMENT_NODE,
+    ownerDocument
+  });
 }
 
 function createEventTarget(fields) {
