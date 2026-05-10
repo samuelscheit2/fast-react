@@ -16,8 +16,14 @@ use fast_react_core::{
     FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, bubble_properties,
 };
 
-use crate::begin_work::ContextProviderUseContextOpenScopeBeginWorkRecord;
+use crate::begin_work::{
+    ContextProviderUseContextOpenScopeBeginWorkRecord,
+    UnsupportedOffscreenVisibilityChildTraversalBlocker,
+    UnsupportedOffscreenVisibilityTransitionRecord,
+    unsupported_offscreen_visibility_transition_record,
+};
 use crate::function_component::FunctionComponentContextRenderStore;
+use crate::unsupported_features::OFFSCREEN_UNSUPPORTED_FEATURE;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ContextProviderStackRestorationPhase {
@@ -222,6 +228,163 @@ fn expect_context_provider(
     } else {
         Err(ContextProviderStackRestorationError::UnexpectedFiberTag { fiber, tag })
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OffscreenVisibilityTransitionCompleteWorkBlockerRecord {
+    offscreen: FiberId,
+    child: Option<FiberId>,
+    child_tag: Option<FiberTag>,
+    child_sibling: Option<FiberId>,
+    child_sibling_tag: Option<FiberTag>,
+    flags: FiberFlags,
+    subtree_flags: FiberFlags,
+    transition: UnsupportedOffscreenVisibilityTransitionRecord,
+    feature: &'static str,
+}
+
+impl OffscreenVisibilityTransitionCompleteWorkBlockerRecord {
+    #[must_use]
+    pub const fn offscreen(&self) -> FiberId {
+        self.offscreen
+    }
+
+    #[must_use]
+    pub const fn child(&self) -> Option<FiberId> {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn child_tag(&self) -> Option<FiberTag> {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub const fn child_sibling(&self) -> Option<FiberId> {
+        self.child_sibling
+    }
+
+    #[must_use]
+    pub const fn child_sibling_tag(&self) -> Option<FiberTag> {
+        self.child_sibling_tag
+    }
+
+    #[must_use]
+    pub const fn flags(&self) -> FiberFlags {
+        self.flags
+    }
+
+    #[must_use]
+    pub const fn subtree_flags(&self) -> FiberFlags {
+        self.subtree_flags
+    }
+
+    #[must_use]
+    pub const fn transition(&self) -> &UnsupportedOffscreenVisibilityTransitionRecord {
+        &self.transition
+    }
+
+    #[must_use]
+    pub const fn feature(&self) -> &'static str {
+        self.feature
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OffscreenVisibilityTransitionCompleteWorkBlockerError {
+    FiberTopology(FiberTopologyError),
+    UnexpectedFiberTag { fiber: FiberId, tag: FiberTag },
+    MissingVisibilityTransition { offscreen: FiberId },
+}
+
+impl Display for OffscreenVisibilityTransitionCompleteWorkBlockerError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UnexpectedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be Offscreen for private visibility transition complete-work blocker diagnostics, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingVisibilityTransition { offscreen } => write!(
+                formatter,
+                "Offscreen fiber {} has no hidden/visible transition for private complete-work blocker diagnostics",
+                offscreen.slot().get()
+            ),
+        }
+    }
+}
+
+impl Error for OffscreenVisibilityTransitionCompleteWorkBlockerError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::UnexpectedFiberTag { .. } | Self::MissingVisibilityTransition { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for OffscreenVisibilityTransitionCompleteWorkBlockerError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+pub(crate) fn complete_offscreen_visibility_transition_blocker_for_test(
+    arena: &FiberArena,
+    offscreen: FiberId,
+    render_lanes: Lanes,
+) -> Result<
+    OffscreenVisibilityTransitionCompleteWorkBlockerRecord,
+    OffscreenVisibilityTransitionCompleteWorkBlockerError,
+> {
+    let node = arena.get(offscreen)?;
+    let tag = node.tag();
+    if tag != FiberTag::Offscreen {
+        return Err(
+            OffscreenVisibilityTransitionCompleteWorkBlockerError::UnexpectedFiberTag {
+                fiber: offscreen,
+                tag,
+            },
+        );
+    }
+
+    let child = node.child();
+    let (child_tag, child_sibling, child_sibling_tag) = match child {
+        Some(child) => {
+            let child_node = arena.get(child)?;
+            let child_sibling = child_node.sibling();
+            let child_sibling_tag = match child_sibling {
+                Some(child_sibling) => Some(arena.get(child_sibling)?.tag()),
+                None => None,
+            };
+            (Some(child_node.tag()), child_sibling, child_sibling_tag)
+        }
+        None => (None, None, None),
+    };
+
+    let transition = unsupported_offscreen_visibility_transition_record(
+        arena,
+        offscreen,
+        render_lanes,
+        UnsupportedOffscreenVisibilityChildTraversalBlocker::CompleteWorkDoesNotBubbleChildrenOrScheduleVisibility,
+    )?
+    .ok_or(OffscreenVisibilityTransitionCompleteWorkBlockerError::MissingVisibilityTransition {
+        offscreen,
+    })?;
+
+    Ok(OffscreenVisibilityTransitionCompleteWorkBlockerRecord {
+        offscreen,
+        child,
+        child_tag,
+        child_sibling,
+        child_sibling_tag,
+        flags: node.flags(),
+        subtree_flags: node.subtree_flags(),
+        transition,
+        feature: OFFSCREEN_UNSUPPORTED_FEATURE,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -432,7 +595,9 @@ pub(crate) fn complete_host_root_one_level_child_set_for_test(
 mod tests {
     use super::*;
     use crate::begin_work::{
-        ContextProviderBeginWorkRequest,
+        ContextProviderBeginWorkRequest, UnsupportedOffscreenVisibility,
+        UnsupportedOffscreenVisibilityChildTraversalBlocker, UnsupportedOffscreenVisibilityMode,
+        UnsupportedOffscreenVisibilityTransitionKind,
         begin_work_context_provider_use_context_child_for_complete_traversal,
     };
     use crate::function_component::{
@@ -440,7 +605,7 @@ mod tests {
         FunctionComponentInvocationError, FunctionComponentInvocationRequest,
         FunctionComponentOutputHandle, FunctionComponentRenderError,
     };
-    use fast_react_core::{FiberMode, FiberTypeHandle, PropsHandle};
+    use fast_react_core::{FiberMode, FiberTypeHandle, Lane, PropsHandle, ReactKey, StateHandle};
 
     fn context_value(raw: u64) -> ContextValueHandle {
         ContextValueHandle::from_raw(raw)
@@ -522,6 +687,60 @@ mod tests {
         (arena, context_store, begin_work, default_value)
     }
 
+    fn offscreen_complete_transition_pair(
+        key: &'static str,
+        previous_hidden_state: StateHandle,
+        current_hidden_state: StateHandle,
+        previous_lanes: Lanes,
+        previous_child_lanes: Lanes,
+        work_in_progress_lanes: Lanes,
+        work_in_progress_child_lanes: Lanes,
+    ) -> (FiberArena, FiberId, FiberId, FiberId, FiberId) {
+        let mut arena = FiberArena::new();
+        let previous = arena.create_fiber(
+            FiberTag::Offscreen,
+            Some(ReactKey::from_normalized(key)),
+            PropsHandle::from_raw(900),
+            FiberMode::CONCURRENT,
+        );
+        {
+            let node = arena.get_mut(previous).unwrap();
+            node.set_memoized_state(previous_hidden_state);
+            node.set_lanes(previous_lanes);
+            node.set_child_lanes(previous_child_lanes);
+        }
+        let work_in_progress = arena
+            .create_work_in_progress(previous, PropsHandle::from_raw(901))
+            .unwrap();
+        {
+            let node = arena.get_mut(work_in_progress).unwrap();
+            node.set_memoized_state(current_hidden_state);
+            node.set_lanes(work_in_progress_lanes);
+            node.set_child_lanes(work_in_progress_child_lanes);
+        }
+        let first_child = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(902),
+            FiberMode::NO,
+        );
+        let second_child = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(903),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(first_child)
+            .unwrap()
+            .merge_flags(FiberFlags::PLACEMENT);
+        arena
+            .set_children(work_in_progress, &[first_child, second_child])
+            .unwrap();
+
+        (arena, previous, work_in_progress, first_child, second_child)
+    }
+
     #[test]
     fn complete_context_provider_restores_stack_and_bubbles_children() {
         let (mut arena, mut context_store, begin_work, default_value) = provider_scope();
@@ -562,6 +781,177 @@ mod tests {
             default_value
         );
         assert_eq!(context_store.stack_depth(), 0);
+    }
+
+    #[test]
+    fn complete_offscreen_visibility_transition_blocker_keeps_effects_blocked() {
+        let render_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+        let previous_lanes = Lanes::OFFSCREEN;
+        let previous_child_lanes = Lanes::from(Lane::RETRY_1);
+        let work_in_progress_lanes = Lanes::DEFAULT;
+        let work_in_progress_child_lanes = Lanes::from(Lane::TRANSITION_1);
+        let (arena, previous, work_in_progress, first_child, second_child) =
+            offscreen_complete_transition_pair(
+                "complete-hidden-panel",
+                StateHandle::from_raw(904),
+                StateHandle::NONE,
+                previous_lanes,
+                previous_child_lanes,
+                work_in_progress_lanes,
+                work_in_progress_child_lanes,
+            );
+
+        let record = complete_offscreen_visibility_transition_blocker_for_test(
+            &arena,
+            work_in_progress,
+            render_lanes,
+        )
+        .unwrap();
+
+        assert_eq!(record.offscreen(), work_in_progress);
+        assert_eq!(record.child(), Some(first_child));
+        assert_eq!(record.child_tag(), Some(FiberTag::HostComponent));
+        assert_eq!(record.child_sibling(), Some(second_child));
+        assert_eq!(record.child_sibling_tag(), Some(FiberTag::HostText));
+        assert_eq!(record.flags(), FiberFlags::NO);
+        assert_eq!(record.subtree_flags(), FiberFlags::NO);
+        assert_eq!(record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
+        let transition = record.transition();
+        assert_eq!(transition.previous(), previous);
+        assert_eq!(transition.work_in_progress(), work_in_progress);
+        assert_eq!(
+            transition.key().map(ReactKey::as_str),
+            Some("complete-hidden-panel")
+        );
+        assert_eq!(
+            transition.mode(),
+            UnsupportedOffscreenVisibilityMode::Visible
+        );
+        assert_eq!(
+            transition.previous_visibility(),
+            UnsupportedOffscreenVisibility::Hidden
+        );
+        assert_eq!(
+            transition.current_visibility(),
+            UnsupportedOffscreenVisibility::Visible
+        );
+        assert_eq!(
+            transition.transition(),
+            UnsupportedOffscreenVisibilityTransitionKind::HiddenToVisible
+        );
+        assert_eq!(
+            transition.child_traversal_blocker(),
+            UnsupportedOffscreenVisibilityChildTraversalBlocker::CompleteWorkDoesNotBubbleChildrenOrScheduleVisibility
+        );
+        assert_eq!(transition.render_lanes(), render_lanes);
+        assert_eq!(transition.previous_lanes(), previous_lanes);
+        assert_eq!(transition.previous_child_lanes(), previous_child_lanes);
+        assert_eq!(transition.work_in_progress_lanes(), work_in_progress_lanes);
+        assert_eq!(
+            transition.work_in_progress_child_lanes(),
+            work_in_progress_child_lanes
+        );
+        assert!(transition.render_includes_offscreen_lane());
+        assert!(!transition.work_in_progress_includes_offscreen_lane());
+        assert_eq!(arena.get(work_in_progress).unwrap().flags(), FiberFlags::NO);
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().subtree_flags(),
+            FiberFlags::NO
+        );
+        assert!(
+            arena
+                .get(first_child)
+                .unwrap()
+                .flags()
+                .contains_all(FiberFlags::PLACEMENT)
+        );
+
+        let render_lanes = Lanes::DEFAULT;
+        let previous_lanes = Lanes::SYNC;
+        let previous_child_lanes = Lanes::from(Lane::TRANSITION_2);
+        let work_in_progress_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+        let work_in_progress_child_lanes = Lanes::from(Lane::RETRY_2);
+        let (arena, previous, work_in_progress, first_child, second_child) =
+            offscreen_complete_transition_pair(
+                "complete-visible-panel",
+                StateHandle::NONE,
+                StateHandle::from_raw(905),
+                previous_lanes,
+                previous_child_lanes,
+                work_in_progress_lanes,
+                work_in_progress_child_lanes,
+            );
+
+        let record = complete_offscreen_visibility_transition_blocker_for_test(
+            &arena,
+            work_in_progress,
+            render_lanes,
+        )
+        .unwrap();
+
+        assert_eq!(record.offscreen(), work_in_progress);
+        assert_eq!(record.child(), Some(first_child));
+        assert_eq!(record.child_tag(), Some(FiberTag::HostComponent));
+        assert_eq!(record.child_sibling(), Some(second_child));
+        assert_eq!(record.child_sibling_tag(), Some(FiberTag::HostText));
+        assert_eq!(record.flags(), FiberFlags::NO);
+        assert_eq!(record.subtree_flags(), FiberFlags::NO);
+        assert_eq!(record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
+        let transition = record.transition();
+        assert_eq!(transition.previous(), previous);
+        assert_eq!(transition.work_in_progress(), work_in_progress);
+        assert_eq!(
+            transition.key().map(ReactKey::as_str),
+            Some("complete-visible-panel")
+        );
+        assert_eq!(
+            transition.mode(),
+            UnsupportedOffscreenVisibilityMode::Hidden
+        );
+        assert_eq!(
+            transition.previous_visibility(),
+            UnsupportedOffscreenVisibility::Visible
+        );
+        assert_eq!(
+            transition.current_visibility(),
+            UnsupportedOffscreenVisibility::Hidden
+        );
+        assert_eq!(
+            transition.transition(),
+            UnsupportedOffscreenVisibilityTransitionKind::VisibleToHidden
+        );
+        assert_eq!(
+            transition.child_traversal_blocker(),
+            UnsupportedOffscreenVisibilityChildTraversalBlocker::CompleteWorkDoesNotBubbleChildrenOrScheduleVisibility
+        );
+        assert_eq!(transition.render_lanes(), render_lanes);
+        assert_eq!(transition.previous_lanes(), previous_lanes);
+        assert_eq!(transition.previous_child_lanes(), previous_child_lanes);
+        assert_eq!(transition.work_in_progress_lanes(), work_in_progress_lanes);
+        assert_eq!(
+            transition.work_in_progress_child_lanes(),
+            work_in_progress_child_lanes
+        );
+        assert!(!transition.render_includes_offscreen_lane());
+        assert!(transition.work_in_progress_includes_offscreen_lane());
+        assert!(
+            !arena
+                .get(work_in_progress)
+                .unwrap()
+                .flags()
+                .contains_any(FiberFlags::VISIBILITY)
+        );
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().subtree_flags(),
+            FiberFlags::NO
+        );
+        assert!(
+            arena
+                .get(first_child)
+                .unwrap()
+                .flags()
+                .contains_all(FiberFlags::PLACEMENT)
+        );
     }
 
     #[test]
