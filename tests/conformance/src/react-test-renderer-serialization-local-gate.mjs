@@ -44,6 +44,27 @@ export const REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS =
   }
 ];
 
+export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
+  {
+    id: "js-tojson-private-serialization-facade-gate",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The JS react-test-renderer facade must record a private toJSON gate without exposing a public serializer."
+  },
+  {
+    id: "js-tojson-accepted-rust-private-json-diagnostics",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON gate must point at the accepted Rust private JSON diagnostic report, API, and canary tests."
+  },
+  {
+    id: "js-tojson-public-serialization-blocked",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON gate must keep public serialization, native bridge execution, and compatibility claims false."
+  }
+];
+
 export const REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS =
   "blocked-public-react-test-renderer-serialization-compatibility";
 
@@ -104,9 +125,14 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.committedTestRendererHostOutputPresent &&
     localChecks.committedFiberInspectionPresent &&
     localChecks.privateJsonDiagnosticsPresent;
-  const requiredLocalTargetsReady = privateDiagnosticsReady;
-  const publicCompatibilityReady =
+  const privateToJSONFacadeGateReady =
     privateDiagnosticsReady &&
+    localChecks.privateToJSONSerializationFacadeGatePresent &&
+    localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics &&
+    localChecks.privateToJSONSerializationFacadePubliclyBlocked;
+  const requiredLocalTargetsReady = privateToJSONFacadeGateReady;
+  const publicCompatibilityReady =
+    privateToJSONFacadeGateReady &&
     localChecks.publicJsFacadeRoutingPresent &&
     localChecks.publicToJSONAvailable &&
     localChecks.publicToTreeAvailable &&
@@ -125,6 +151,25 @@ export function evaluateReactTestRendererSerializationLocalGate({
         }
         if (requirement.id === "private-json-diagnostics") {
           return !localChecks.privateJsonDiagnosticsPresent;
+        }
+        return true;
+      }
+    ).map((requirement) => requirement.id);
+  const privateToJSONFacadeBlockers =
+    REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS.filter(
+      (requirement) => {
+        if (
+          requirement.id === "js-tojson-private-serialization-facade-gate"
+        ) {
+          return !localChecks.privateToJSONSerializationFacadeGatePresent;
+        }
+        if (
+          requirement.id === "js-tojson-accepted-rust-private-json-diagnostics"
+        ) {
+          return !localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics;
+        }
+        if (requirement.id === "js-tojson-public-serialization-blocked") {
+          return !localChecks.privateToJSONSerializationFacadePubliclyBlocked;
         }
         return true;
       }
@@ -197,12 +242,14 @@ export function evaluateReactTestRendererSerializationLocalGate({
     status:
       violations.length > 0
         ? "blocked-with-violations"
-        : privateDiagnosticsReady
+        : privateToJSONFacadeGateReady
         ? REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS
         : REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTICS_BLOCKED_STATUS,
     requiredLocalTargetsReady,
     privateDiagnosticsReady,
     privateDiagnosticBlockers,
+    privateToJSONFacadeGateReady,
+    privateToJSONFacadeBlockers,
     publicCompatibilityReady,
     publicCompatibilityClaimed,
     publicCompatibilityBlockers,
@@ -283,6 +330,65 @@ export function inspectReactTestRendererSerializationLocalTargets({
     testRendererSource,
     /\bTestRendererPrivateJsonPublicSurfaceBlockers\b/u
   );
+  const privateToJSONSerializationFacadeGatePresent =
+    publicJsReactTestRendererFacadePresent &&
+    publicJsReactTestRendererFacadePlaceholder &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\btoJSONPrivateSerializationFacadeGate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-tojson-private-serialization-facade-gate\b/u
+    );
+  const privateToJSONSerializationFacadeRecognizesRustDiagnostics =
+    privateToJSONSerializationFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedRustPrivateJsonDiagnostics\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfast-react-test-renderer\.serialization\.private-json-canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_json_serialization_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererPrivateJsonSerializationReport\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\broot_private_json_serialization_canary_describes_minimal_host_component_with_text\b/u
+    );
+  const privateToJSONSerializationFacadePubliclyBlocked =
+    privateToJSONSerializationFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicSerializationAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicRouteAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bnativeBridgeAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bnativeExecution\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcompatibilityClaimed\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreateRendererUnsupportedFunction\(\s*['"]create\(\)\.toJSON['"]/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -319,6 +425,9 @@ export function inspectReactTestRendererSerializationLocalTargets({
     committedTestRendererHostOutputPresent,
     committedFiberInspectionPresent,
     privateJsonDiagnosticsPresent,
+    privateToJSONSerializationFacadeGatePresent,
+    privateToJSONSerializationFacadeRecognizesRustDiagnostics,
+    privateToJSONSerializationFacadePubliclyBlocked,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,

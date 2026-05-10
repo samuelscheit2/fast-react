@@ -66,6 +66,51 @@ const unmountPrivateRoute = Object.freeze({
     'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics'
   ])
 });
+const toJSONPrivateSerializationFacadeGate = Object.freeze({
+  id: 'react-test-renderer-tojson-private-serialization-facade-gate',
+  publicSurface: 'create().toJSON',
+  status: 'ready-for-private-diagnostics-public-tojson-blocked',
+  deterministic: true,
+  privateFacadeGateAvailable: true,
+  acceptedRustPrivateJsonDiagnostics: true,
+  publicSerializationAvailable: false,
+  publicRouteAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false,
+  acceptedWorker: 'worker-265-test-renderer-private-json-ready-diagnostics',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustDiagnosticName:
+    'fast-react-test-renderer.serialization.private-json-canary',
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_json_serialization_for_canary',
+    'TestRendererPrivateJsonSerializationReport',
+    'TestRendererPrivateJsonPublicSurfaceBlockers'
+  ]),
+  acceptedRustNodeKinds: Object.freeze([
+    'HostComponent',
+    'Text'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_json_serialization_canary_describes_minimal_host_component_with_text',
+    'root_private_json_serialization_canary_rejects_stale_host_output_snapshot',
+    'root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update',
+    'root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes'
+  ]),
+  blockedPublicSurfaces: Object.freeze([
+    'create().toJSON',
+    'create().toTree',
+    'create().root',
+    'ReactTestInstance',
+    'public-js-react-test-renderer-routing',
+    'compatibility-claim'
+  ]),
+  missingPrerequisites: Object.freeze([
+    'rust-native-test-renderer-create-bridge',
+    'public-react-test-renderer-tojson-bridge',
+    'public-test-instance-and-totree-serialization-contract'
+  ])
+});
 const privateRoutes = Object.freeze([
   updatePrivateRoute,
   unmountPrivateRoute
@@ -88,7 +133,8 @@ const createRoutingGate = Object.freeze({
   prerequisites: createRoutingPrerequisites,
   privateRoutes,
   updatePrivateRoute,
-  unmountPrivateRoute
+  unmountPrivateRoute,
+  toJSONSerializationFacadeGate: toJSONPrivateSerializationFacadeGate
 });
 const schedulerMockKeys = [
   'log',
@@ -182,6 +228,8 @@ function createUnsupportedError(exportName, action, detail, routingGate) {
     error.privateRoutes = routingGate.privateRoutes;
     error.updatePrivateRoute = routingGate.updatePrivateRoute;
     error.unmountPrivateRoute = routingGate.unmountPrivateRoute;
+    error.toJSONSerializationFacadeGate =
+      routingGate.toJSONSerializationFacadeGate;
   }
 
   return error;
@@ -283,7 +331,7 @@ function createPlaceholderRenderer(routingGate) {
     toJSON: createRendererUnsupportedFunction(
       'create().toJSON',
       0,
-      'Serialization is intentionally blocked until committed test-renderer host output and serializer APIs exist.',
+      'Serialization is intentionally blocked for the public API. The JS facade only records that Rust private JSON diagnostics are accepted; it has no native bridge, public serializer, or compatibility claim.',
       routingGate
     ),
     toTree: createRendererUnsupportedFunction(
