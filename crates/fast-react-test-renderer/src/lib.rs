@@ -1774,6 +1774,12 @@ pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.find-by-private-query";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.query-bridge-preflight";
+pub const TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID: &str =
+    "fast-react-test-renderer-current-root-canary-metadata";
+pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.root-create.private-preflight";
+pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS: &str =
+    "private-root-create-preflight-ready-public-root-blocked";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
@@ -1818,6 +1824,387 @@ pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
     "react-19.2.6-react-test-renderer-serialization-oracle";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_SCENARIO_COUNT: usize = 7;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererRootCreatePreflightChildShape {
+    Text,
+    Empty,
+    Unsupported,
+}
+
+impl TestRendererRootCreatePreflightChildShape {
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Text => "Text",
+            Self::Empty => "Empty",
+            Self::Unsupported => "Unsupported",
+        }
+    }
+
+    const fn is_supported_for_create_preflight(self) -> bool {
+        matches!(self, Self::Text)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootCreatePreflightInputShape {
+    element: RootElementHandle,
+    root_node_kind: &'static str,
+    element_type: &'static str,
+    child_shape: TestRendererRootCreatePreflightChildShape,
+}
+
+impl TestRendererRootCreatePreflightInputShape {
+    #[must_use]
+    pub const fn host_component_with_text_child(
+        element: RootElementHandle,
+        element_type: &'static str,
+    ) -> Self {
+        Self {
+            element,
+            root_node_kind: "HostComponent",
+            element_type,
+            child_shape: TestRendererRootCreatePreflightChildShape::Text,
+        }
+    }
+
+    #[must_use]
+    pub const fn host_component_with_unsupported_children(
+        element: RootElementHandle,
+        element_type: &'static str,
+    ) -> Self {
+        Self {
+            element,
+            root_node_kind: "HostComponent",
+            element_type,
+            child_shape: TestRendererRootCreatePreflightChildShape::Unsupported,
+        }
+    }
+
+    #[must_use]
+    pub const fn element(self) -> RootElementHandle {
+        self.element
+    }
+
+    #[must_use]
+    pub const fn root_node_kind(self) -> &'static str {
+        self.root_node_kind
+    }
+
+    #[must_use]
+    pub const fn element_type(self) -> &'static str {
+        self.element_type
+    }
+
+    #[must_use]
+    pub const fn child_shape(self) -> TestRendererRootCreatePreflightChildShape {
+        self.child_shape
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootCreatePreflightCanaryApiIdentity {
+    metadata_id: &'static str,
+    metadata_status: &'static str,
+    operation: &'static str,
+    root_api: &'static str,
+    preflight_api: &'static str,
+    root_options_type: &'static str,
+    test_renderer_options_type: &'static str,
+    container_update_api: &'static str,
+    scheduler_api: &'static str,
+}
+
+impl TestRendererRootCreatePreflightCanaryApiIdentity {
+    #[must_use]
+    pub const fn current() -> Self {
+        Self {
+            metadata_id: TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID,
+            metadata_status: "private-root-execution-bridge-current-rust-canary-metadata",
+            operation: "create",
+            root_api: "TestRendererRoot::create",
+            preflight_api: "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+            root_options_type: "RootOptions",
+            test_renderer_options_type: "TestRendererOptions",
+            container_update_api: "update_container",
+            scheduler_api: "ensure_root_is_scheduled",
+        }
+    }
+
+    #[must_use]
+    pub const fn new_for_canary(
+        metadata_id: &'static str,
+        metadata_status: &'static str,
+        root_api: &'static str,
+    ) -> Self {
+        Self {
+            metadata_id,
+            metadata_status,
+            operation: "create",
+            root_api,
+            preflight_api: "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+            root_options_type: "RootOptions",
+            test_renderer_options_type: "TestRendererOptions",
+            container_update_api: "update_container",
+            scheduler_api: "ensure_root_is_scheduled",
+        }
+    }
+
+    #[must_use]
+    pub const fn metadata_id(self) -> &'static str {
+        self.metadata_id
+    }
+
+    #[must_use]
+    pub const fn metadata_status(self) -> &'static str {
+        self.metadata_status
+    }
+
+    #[must_use]
+    pub const fn operation(self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn root_api(self) -> &'static str {
+        self.root_api
+    }
+
+    #[must_use]
+    pub const fn preflight_api(self) -> &'static str {
+        self.preflight_api
+    }
+
+    #[must_use]
+    pub const fn root_options_type(self) -> &'static str {
+        self.root_options_type
+    }
+
+    #[must_use]
+    pub const fn test_renderer_options_type(self) -> &'static str {
+        self.test_renderer_options_type
+    }
+
+    #[must_use]
+    pub const fn container_update_api(self) -> &'static str {
+        self.container_update_api
+    }
+
+    #[must_use]
+    pub const fn scheduler_api(self) -> &'static str {
+        self.scheduler_api
+    }
+
+    fn is_current(self) -> bool {
+        self.metadata_id == TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID
+            && self.metadata_status == "private-root-execution-bridge-current-rust-canary-metadata"
+            && self.operation == "create"
+            && self.root_api == "TestRendererRoot::create"
+            && self.preflight_api
+                == "TestRendererRoot::describe_private_root_create_preflight_for_canary"
+            && self.root_options_type == "RootOptions"
+            && self.test_renderer_options_type == "TestRendererOptions"
+            && self.container_update_api == "update_container"
+            && self.scheduler_api == "ensure_root_is_scheduled"
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootCreatePreflightOptionsMetadata {
+    options_type: &'static str,
+    strict_mode: bool,
+    has_create_node_mock: bool,
+    root_error_options: TestRendererRootErrorOptionDiagnostics,
+    root_options_metadata_available: bool,
+    create_node_mock_invoked: bool,
+    public_root_error_callbacks_invoked: bool,
+}
+
+impl TestRendererRootCreatePreflightOptionsMetadata {
+    fn from_options(options: &TestRendererOptions) -> Self {
+        let root_error_options = TestRendererRootErrorOptionDiagnostics {
+            on_uncaught_error: options.on_uncaught_error(),
+            on_caught_error: options.on_caught_error(),
+            on_recoverable_error: options.on_recoverable_error(),
+            root_error_option_metadata_available: true,
+            public_root_error_callbacks_invoked: false,
+            public_error_boundary_behavior_available: false,
+            compatibility_claimed: false,
+        };
+
+        Self {
+            options_type: "TestRendererOptions",
+            strict_mode: options.strict_mode(),
+            has_create_node_mock: options.has_create_node_mock(),
+            root_error_options,
+            root_options_metadata_available: true,
+            create_node_mock_invoked: false,
+            public_root_error_callbacks_invoked: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn options_type(self) -> &'static str {
+        self.options_type
+    }
+
+    #[must_use]
+    pub const fn strict_mode(self) -> bool {
+        self.strict_mode
+    }
+
+    #[must_use]
+    pub const fn has_create_node_mock(self) -> bool {
+        self.has_create_node_mock
+    }
+
+    #[must_use]
+    pub const fn root_error_options(self) -> TestRendererRootErrorOptionDiagnostics {
+        self.root_error_options
+    }
+
+    #[must_use]
+    pub const fn root_options_metadata_available(self) -> bool {
+        self.root_options_metadata_available
+    }
+
+    #[must_use]
+    pub const fn create_node_mock_invoked(self) -> bool {
+        self.create_node_mock_invoked
+    }
+
+    #[must_use]
+    pub const fn public_root_error_callbacks_invoked(self) -> bool {
+        self.public_root_error_callbacks_invoked
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererRootCreatePreflightDiagnostics {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    input_shape: TestRendererRootCreatePreflightInputShape,
+    root_options: TestRendererRootCreatePreflightOptionsMetadata,
+    canary_api_identity: TestRendererRootCreatePreflightCanaryApiIdentity,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element: RootElementHandle,
+    container_update_api: &'static str,
+    scheduler_api: &'static str,
+    private_rust_root_created: bool,
+    private_root_canary_boundary_validated: bool,
+    public_renderer_root_created: bool,
+    public_root_available: bool,
+    native_addon_loaded: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+    rust_execution_from_js: bool,
+    host_output_produced_from_js: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererRootCreatePreflightDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn input_shape(self) -> TestRendererRootCreatePreflightInputShape {
+        self.input_shape
+    }
+
+    #[must_use]
+    pub const fn root_options(self) -> TestRendererRootCreatePreflightOptionsMetadata {
+        self.root_options
+    }
+
+    #[must_use]
+    pub const fn canary_api_identity(self) -> TestRendererRootCreatePreflightCanaryApiIdentity {
+        self.canary_api_identity
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element(self) -> RootElementHandle {
+        self.scheduled_element
+    }
+
+    #[must_use]
+    pub const fn container_update_api(self) -> &'static str {
+        self.container_update_api
+    }
+
+    #[must_use]
+    pub const fn scheduler_api(self) -> &'static str {
+        self.scheduler_api
+    }
+
+    #[must_use]
+    pub const fn private_rust_root_created(self) -> bool {
+        self.private_rust_root_created
+    }
+
+    #[must_use]
+    pub const fn private_root_canary_boundary_validated(self) -> bool {
+        self.private_root_canary_boundary_validated
+    }
+
+    #[must_use]
+    pub const fn public_renderer_root_created(self) -> bool {
+        self.public_renderer_root_created
+    }
+
+    #[must_use]
+    pub const fn public_root_available(self) -> bool {
+        self.public_root_available
+    }
+
+    #[must_use]
+    pub const fn native_addon_loaded(self) -> bool {
+        self.native_addon_loaded
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(self) -> bool {
+        self.native_execution
+    }
+
+    #[must_use]
+    pub const fn rust_execution_from_js(self) -> bool {
+        self.rust_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn host_output_produced_from_js(self) -> bool {
+        self.host_output_produced_from_js
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestRendererPrivateErrorDiagnosticPhase {
@@ -4728,6 +5115,46 @@ impl Display for TestRendererStableSiblingInsertionCanaryError {
 impl Error for TestRendererStableSiblingInsertionCanaryError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererRootCreatePreflightError {
+    UnsupportedChildren {
+        child_shape: TestRendererRootCreatePreflightChildShape,
+    },
+    StaleCanaryMetadata {
+        expected_metadata_id: &'static str,
+        actual_metadata_id: &'static str,
+        expected_root_api: &'static str,
+        actual_root_api: &'static str,
+    },
+    MissingRootOptions,
+}
+
+impl Display for TestRendererRootCreatePreflightError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedChildren { child_shape } => write!(
+                formatter,
+                "private root-create preflight only accepts a HostComponent with one text child, found {} children",
+                child_shape.code()
+            ),
+            Self::StaleCanaryMetadata {
+                expected_metadata_id,
+                actual_metadata_id,
+                expected_root_api,
+                actual_root_api,
+            } => write!(
+                formatter,
+                "private root-create preflight canary metadata is stale: expected {expected_metadata_id}/{expected_root_api}, found {actual_metadata_id}/{actual_root_api}",
+            ),
+            Self::MissingRootOptions => formatter.write_str(
+                "private root-create preflight requires explicit TestRendererOptions metadata",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererRootCreatePreflightError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererRootError {
     Host(HostError),
     FiberRootStore(FiberRootStoreError),
@@ -4738,6 +5165,7 @@ pub enum TestRendererRootError {
     SerializationGate(Box<TestRendererSerializationGateError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
+    RootCreatePreflight(Box<TestRendererRootCreatePreflightError>),
     HostOutputCanary(TestRendererHostOutputCanaryError),
     FiberInspection(TestRendererCommittedFiberInspectionError),
     MissingHostOutputFixture {
@@ -4773,6 +5201,7 @@ impl Display for TestRendererRootError {
             Self::SerializationGate(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
+            Self::RootCreatePreflight(error) => Display::fmt(error, formatter),
             Self::HostOutputCanary(error) => Display::fmt(error, formatter),
             Self::FiberInspection(error) => Display::fmt(error, formatter),
             Self::MissingHostOutputFixture { element } => write!(
@@ -4821,6 +5250,7 @@ impl Error for TestRendererRootError {
             Self::SerializationGate(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
+            Self::RootCreatePreflight(error) => Some(error),
             Self::HostOutputCanary(error) => Some(error),
             Self::FiberInspection(error) => Some(error),
             Self::MissingHostOutputFixture { .. }
@@ -4883,6 +5313,12 @@ impl From<TestRendererPrivateJsonSerializationError> for TestRendererRootError {
 impl From<TestRendererStableSiblingInsertionCanaryError> for TestRendererRootError {
     fn from(error: TestRendererStableSiblingInsertionCanaryError) -> Self {
         Self::StableSiblingInsertionCanary(Box::new(error))
+    }
+}
+
+impl From<TestRendererRootCreatePreflightError> for TestRendererRootError {
+    fn from(error: TestRendererRootCreatePreflightError) -> Self {
+        Self::RootCreatePreflight(Box::new(error))
     }
 }
 
@@ -5136,6 +5572,65 @@ impl TestRendererRoot {
     #[must_use]
     pub fn last_scheduled_update(&self) -> Option<&TestRendererRootScheduledUpdate> {
         self.scheduled_updates.last()
+    }
+
+    pub fn describe_private_root_create_preflight_for_canary(
+        input_shape: TestRendererRootCreatePreflightInputShape,
+        options: Option<TestRendererOptions>,
+        canary_api_identity: TestRendererRootCreatePreflightCanaryApiIdentity,
+    ) -> Result<TestRendererRootCreatePreflightDiagnostics, TestRendererRootError> {
+        if !input_shape
+            .child_shape()
+            .is_supported_for_create_preflight()
+        {
+            return Err(TestRendererRootCreatePreflightError::UnsupportedChildren {
+                child_shape: input_shape.child_shape(),
+            }
+            .into());
+        }
+
+        if !canary_api_identity.is_current() {
+            let current = TestRendererRootCreatePreflightCanaryApiIdentity::current();
+            return Err(TestRendererRootCreatePreflightError::StaleCanaryMetadata {
+                expected_metadata_id: current.metadata_id(),
+                actual_metadata_id: canary_api_identity.metadata_id(),
+                expected_root_api: current.root_api(),
+                actual_root_api: canary_api_identity.root_api(),
+            }
+            .into());
+        }
+
+        let Some(options) = options else {
+            return Err(TestRendererRootCreatePreflightError::MissingRootOptions.into());
+        };
+        let root_options = TestRendererRootCreatePreflightOptionsMetadata::from_options(&options);
+        let root = Self::create(input_shape.element(), options)?;
+        let scheduled_update = root
+            .last_scheduled_update()
+            .expect("TestRendererRoot::create schedules an initial HostRoot update");
+
+        Ok(TestRendererRootCreatePreflightDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS,
+            root: root.root_id(),
+            input_shape,
+            root_options,
+            canary_api_identity,
+            scheduled_update_kind: scheduled_update.kind(),
+            scheduled_element: scheduled_update.element(),
+            container_update_api: scheduled_update.kind().container_update_api(),
+            scheduler_api: "ensure_root_is_scheduled",
+            private_rust_root_created: true,
+            private_root_canary_boundary_validated: true,
+            public_renderer_root_created: false,
+            public_root_available: false,
+            native_addon_loaded: false,
+            native_bridge_available: false,
+            native_execution: false,
+            rust_execution_from_js: false,
+            host_output_produced_from_js: false,
+            compatibility_claimed: false,
+        })
     }
 
     pub fn describe_private_error_boundary_diagnostics_for_canary(
@@ -7980,6 +8475,185 @@ mod tests {
 
     fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {
         records.iter().map(|record| record.callback()).collect()
+    }
+
+    #[test]
+    fn root_private_create_preflight_validates_create_canary_without_public_root() {
+        let invocation_count = Arc::new(AtomicUsize::new(0));
+        let invocation_count_for_mock = Arc::clone(&invocation_count);
+        let options = TestRendererOptions::new()
+            .with_strict_mode(true)
+            .with_create_node_mock(TestCreateNodeMock::new(move || {
+                invocation_count_for_mock.fetch_add(1, Ordering::SeqCst);
+            }))
+            .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(611))
+            .with_on_caught_error(RootErrorCallbackHandle::from_raw(612))
+            .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(613));
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(91),
+            "div",
+        );
+
+        let diagnostics = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(options),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.status(),
+            TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS
+        );
+        assert_eq!(diagnostics.input_shape(), input);
+        assert_eq!(diagnostics.input_shape().root_node_kind(), "HostComponent");
+        assert_eq!(diagnostics.input_shape().element_type(), "div");
+        assert_eq!(
+            diagnostics.input_shape().child_shape(),
+            TestRendererRootCreatePreflightChildShape::Text
+        );
+        assert_eq!(
+            diagnostics.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(diagnostics.scheduled_element(), root_element(91));
+        assert_eq!(diagnostics.container_update_api(), "update_container");
+        assert_eq!(diagnostics.scheduler_api(), "ensure_root_is_scheduled");
+
+        let api_identity = diagnostics.canary_api_identity();
+        assert_eq!(
+            api_identity.metadata_id(),
+            TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID
+        );
+        assert_eq!(api_identity.operation(), "create");
+        assert_eq!(api_identity.root_api(), "TestRendererRoot::create");
+        assert_eq!(
+            api_identity.preflight_api(),
+            "TestRendererRoot::describe_private_root_create_preflight_for_canary"
+        );
+        assert_eq!(api_identity.root_options_type(), "RootOptions");
+        assert_eq!(
+            api_identity.test_renderer_options_type(),
+            "TestRendererOptions"
+        );
+
+        let root_options = diagnostics.root_options();
+        assert_eq!(root_options.options_type(), "TestRendererOptions");
+        assert!(root_options.strict_mode());
+        assert!(root_options.has_create_node_mock());
+        assert!(root_options.root_options_metadata_available());
+        assert!(!root_options.create_node_mock_invoked());
+        assert_eq!(
+            root_options.root_error_options().on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(611)
+        );
+        assert_eq!(
+            root_options.root_error_options().on_caught_error(),
+            RootErrorCallbackHandle::from_raw(612)
+        );
+        assert_eq!(
+            root_options.root_error_options().on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(613)
+        );
+        assert!(!root_options.public_root_error_callbacks_invoked());
+
+        assert!(diagnostics.private_rust_root_created());
+        assert!(diagnostics.private_root_canary_boundary_validated());
+        assert!(!diagnostics.public_renderer_root_created());
+        assert!(!diagnostics.public_root_available());
+        assert!(!diagnostics.native_addon_loaded());
+        assert!(!diagnostics.native_bridge_available());
+        assert!(!diagnostics.native_execution());
+        assert!(!diagnostics.rust_execution_from_js());
+        assert!(!diagnostics.host_output_produced_from_js());
+        assert!(!diagnostics.compatibility_claimed());
+        assert_eq!(invocation_count.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn root_private_create_preflight_fails_closed_for_unsupported_children() {
+        let input =
+            TestRendererRootCreatePreflightInputShape::host_component_with_unsupported_children(
+                root_element(92),
+                "div",
+            );
+
+        let error = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::RootCreatePreflight(error) = error else {
+            panic!("expected root-create preflight error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererRootCreatePreflightError::UnsupportedChildren {
+                child_shape: TestRendererRootCreatePreflightChildShape::Unsupported
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_create_preflight_fails_closed_for_stale_canary_metadata() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(93),
+            "div",
+        );
+        let stale_identity = TestRendererRootCreatePreflightCanaryApiIdentity::new_for_canary(
+            "fast-react-test-renderer-stale-root-canary-metadata",
+            "private-root-execution-bridge-current-rust-canary-metadata",
+            "TestRendererRoot::create_legacy",
+        );
+
+        let error = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            stale_identity,
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::RootCreatePreflight(error) = error else {
+            panic!("expected root-create preflight error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererRootCreatePreflightError::StaleCanaryMetadata {
+                expected_metadata_id: TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID,
+                actual_metadata_id: "fast-react-test-renderer-stale-root-canary-metadata",
+                expected_root_api: "TestRendererRoot::create",
+                actual_root_api: "TestRendererRoot::create_legacy"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_create_preflight_fails_closed_without_root_options() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(94),
+            "div",
+        );
+
+        let error = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            None,
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::RootCreatePreflight(error) = error else {
+            panic!("expected root-create preflight error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererRootCreatePreflightError::MissingRootOptions
+        ));
     }
 
     #[test]

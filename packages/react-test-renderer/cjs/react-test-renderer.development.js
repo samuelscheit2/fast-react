@@ -54,6 +54,13 @@ const privateFlushSyncActRoutingDiagnosticsSymbol = Symbol.for(
 );
 const privateFlushSyncActRoutingDiagnosticsStatus =
   'private-flushsync-act-routing-diagnostics-public-flushsync-blocked';
+const privateRootCreatePreflightDiagnosticName =
+  'fast-react-test-renderer.root-create.private-preflight';
+const privateRootCreatePreflightStatus =
+  'private-root-create-preflight-ready-public-root-blocked';
+const privateRootCreatePreflightSymbol = Symbol.for(
+  'fast.react_test_renderer.private_root_create_preflight'
+);
 const privateActPassiveEffectDrainMetadataBrand = Symbol.for(
   'fast.react_test_renderer.private_act_passive_effect_drain_metadata'
 );
@@ -1314,6 +1321,43 @@ const createRoutingPrerequisites = Object.freeze([
       'The JS package has no public bridge to Rust host-output serialization for toJSON, toTree, or TestInstance surfaces.'
   })
 ]);
+const privateRootCreatePreflightGate = Object.freeze({
+  id: 'react-test-renderer-private-root-create-preflight-gate',
+  status: privateRootCreatePreflightStatus,
+  entrypoint,
+  publicSurface: 'create()',
+  deterministic: true,
+  diagnosticName: privateRootCreatePreflightDiagnosticName,
+  symbol: privateRootCreatePreflightSymbol.description,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_root_create_preflight_for_canary',
+    'TestRendererRoot::create',
+    'TestRendererOptions::reconciler_options',
+    'update_container',
+    'ensure_root_is_scheduled'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_create_preflight_validates_create_canary_without_public_root',
+    'root_private_create_preflight_fails_closed_for_unsupported_children',
+    'root_private_create_preflight_fails_closed_for_stale_canary_metadata',
+    'root_private_create_preflight_fails_closed_without_root_options'
+  ]),
+  acceptedInputShapes: Object.freeze([
+    'HostComponentWithTextChild'
+  ]),
+  requiredRootOptions: true,
+  validatesAcceptedRustRootCreateCanary: true,
+  privateRustRootCreated: true,
+  publicRendererRootCreated: false,
+  publicRootAvailable: false,
+  publicCreateBehaviorAvailable: false,
+  nativeAddonLoaded: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const updateUnmountRustLifecycleDiagnosticGate = Object.freeze({
   id: 'react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate',
   status: 'accepted-private-update-unmount-lifecycle-diagnostics-public-root-blocked',
@@ -2693,6 +2737,7 @@ const createRoutingGate = Object.freeze({
   privateRoutes,
   updatePrivateRoute,
   unmountPrivateRoute,
+  privateRootCreatePreflightGate,
   updateUnmountRustLifecycleDiagnosticGate,
   privateUpdateUnmountLifecycleDiagnosticsAccepted: true,
   privateUpdateUnmountLifecycleDiagnosticConsumptionAvailable: true,
@@ -2750,6 +2795,8 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
   create: freezeRecord({
     operation: 'create',
     rootApi: 'TestRendererRoot::create',
+    rootCreatePreflightApi:
+      'TestRendererRoot::describe_private_root_create_preflight_for_canary',
     hostOutputCanaryApi:
       'TestRendererRoot::create_host_component_with_text_for_canary',
     updateKind: 'Create',
@@ -2841,14 +2888,16 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-234-test-renderer-host-output-update-unmount-canary',
     'worker-265-test-renderer-private-json-ready-diagnostics',
     'worker-465-test-renderer-error-boundary-diagnostics',
-    'worker-530-test-renderer-error-boundary-update-refresh'
+    'worker-530-test-renderer-error-boundary-update-refresh',
+    'worker-539-test-renderer-live-rust-root-create-preflight'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
     'worker-306-test-renderer-testinstance-private-wrapper-skeleton',
     'worker-307-test-renderer-update-unmount-private-js-bridge',
     'worker-423-test-renderer-native-root-execution-bridge',
-    'worker-426-test-renderer-testinstance-bridge-query'
+    'worker-426-test-renderer-testinstance-bridge-query',
+    'worker-539-test-renderer-live-rust-root-create-preflight'
   ]),
   root: freezeRecord({
     rustType: 'TestRendererRoot',
@@ -2899,6 +2948,28 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     fixtureText: 'hello',
     realHostOutputCanaryAvailable: true,
     generalMutationTraversalAvailable: false
+  }),
+  rootCreatePreflight: freezeRecord({
+    diagnosticName: privateRootCreatePreflightDiagnosticName,
+    status: privateRootCreatePreflightStatus,
+    gate: privateRootCreatePreflightGate,
+    bridgeMetadataSource:
+      'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata',
+    acceptedRustApis: privateRootCreatePreflightGate.acceptedRustApis,
+    acceptedRustTests: privateRootCreatePreflightGate.acceptedRustTests,
+    acceptedInputShapes: privateRootCreatePreflightGate.acceptedInputShapes,
+    requiredRootOptions: true,
+    rootOptionsMetadataAvailable: true,
+    staleCanaryMetadataRejection: true,
+    unsupportedChildrenRejection: true,
+    missingRootOptionsRejection: true,
+    publicRendererRootCreated: false,
+    publicRootAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
   }),
   errorBoundaryDiagnostics: privateErrorBoundaryDiagnosticsGate,
   privateJson: freezeRecord({
@@ -3231,6 +3302,8 @@ function createUnsupportedError(
     error.rootRequestExecutionStatus = rootRequest.executionStatus;
     error.rootRequestCompatibilityStatus = rootRequest.compatibilityStatus;
     if (isRootRequestRecord(rootRequest)) {
+      error.privateRootCreatePreflight =
+        getRootCreatePreflightForRootRequest(rootRequest);
       error.privateTestInstanceWrapperRecord =
         getTestInstanceQueryDiagnosticsForRootRequest(rootRequest);
       error.privateErrorBoundaryDiagnostics =
@@ -4971,6 +5044,7 @@ function getIdPrefix(value, fallback) {
 const rootRequestPayloads = new WeakMap();
 const rootHandleStates = new WeakMap();
 const rendererRootHandles = new WeakMap();
+const rootRequestCreatePreflights = new WeakMap();
 const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 const rootRequestErrorBoundaryDiagnostics = new WeakMap();
 
@@ -5068,6 +5142,19 @@ function createTestRendererRootRequestBridge(options) {
     getRustCanaryOperationMetadata(record) {
       return getRustCanaryOperationMetadataForRequestRecord(record);
     },
+    getRootCreatePreflight(record) {
+      return getRootCreatePreflightForRootRequest(record);
+    },
+    getRendererRootCreatePreflight(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      if (rootHandle === undefined) {
+        return null;
+      }
+      const requests = getRootRequestsForHandle(rootHandle);
+      return requests.length === 0
+        ? null
+        : getRootCreatePreflightForRootRequest(requests[0]);
+    },
     getTestInstanceQueryDiagnostics(record) {
       return getTestInstanceQueryDiagnosticsForRootRequest(record);
     },
@@ -5152,6 +5239,20 @@ function createTestRendererRootRequestBridge(options) {
     },
     consumeAcceptedRustTestInstanceQueryDiagnostics(record, diagnostics) {
       return consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest(
+        record,
+        diagnostics
+      );
+    },
+    canConsumeAcceptedRustRootCreatePreflight(record, diagnostics) {
+      try {
+        consumeAcceptedRustRootCreatePreflightForRequest(record, diagnostics);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumeAcceptedRustRootCreatePreflight(record, diagnostics) {
+      return consumeAcceptedRustRootCreatePreflightForRequest(
         record,
         diagnostics
       );
@@ -5354,6 +5455,9 @@ function createRootRequestRecord({
     optionsInfo:
       operation === 'create' ? describeCreateOptions(rootOptions) : null,
     callbackInfo: describeRootRequestValue(callback),
+    privateRootCreatePreflightGate:
+      operation === 'create' ? privateRootCreatePreflightGate : null,
+    privateRootCreatePreflightAvailable: operation === 'create',
     privateErrorBoundaryDiagnosticsGate,
     privateErrorBoundaryDiagnosticsAvailable:
       operation === 'create' || operation === 'update',
@@ -5367,6 +5471,10 @@ function createRootRequestRecord({
       updateKindEnum: 'TestRendererRootUpdateKind',
       updateKind,
       rootApi,
+      rootCreatePreflightApi:
+        operation === 'create'
+          ? 'TestRendererRoot::describe_private_root_create_preflight_for_canary'
+          : null,
       containerUpdateApi,
       schedulerApi: 'ensure_root_is_scheduled',
       expectedOutcome: rustOutcome,
@@ -6134,6 +6242,427 @@ function getRustCanaryOperationMetadataForRequestRecord(record) {
   }
 
   return record.rustCanaryOperationMetadata;
+}
+
+function getRootCreateRequestForRootRequest(record) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+
+  if (record.operation === 'create') {
+    return record;
+  }
+
+  const handleState = rootHandleStates.get(record.rootHandle);
+  const createRequest =
+    handleState === undefined
+      ? null
+      : handleState.requests.find((request) => request.operation === 'create');
+
+  if (createRequest === undefined || createRequest === null) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer create request for root-create preflight.'
+    );
+  }
+
+  return createRequest;
+}
+
+function getRootCreatePreflightForRootRequest(record) {
+  const createRequest = getRootCreateRequestForRootRequest(record);
+  let preflight = rootRequestCreatePreflights.get(createRequest);
+  if (preflight === undefined) {
+    preflight = createPrivateRootCreatePreflightRecord(createRequest);
+    rootRequestCreatePreflights.set(createRequest, preflight);
+  }
+  return preflight;
+}
+
+function createPrivateRootCreatePreflightRecord(rootRequest) {
+  if (!isRootRequestRecord(rootRequest) || rootRequest.operation !== 'create') {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer create request record.'
+    );
+  }
+
+  const inputShape = describeRootCreatePreflightInputShape(rootRequest);
+  const rootOptionsMetadata = rootRequest.optionsInfo;
+  const canaryApiIdentity =
+    createRootCreatePreflightCanaryApiIdentity(rootRequest);
+  const hasRequiredRootOptions =
+    rootOptionsMetadata !== null &&
+    rootOptionsMetadata.type !== 'undefined' &&
+    rootOptionsMetadata.type !== 'null';
+  const ready =
+    inputShape.supportedChildren === true &&
+    hasRequiredRootOptions === true &&
+    isCurrentRootCreatePreflightCanaryApiIdentity(canaryApiIdentity);
+  const failureReason =
+    inputShape.supportedChildren !== true
+      ? 'unsupported-children'
+      : hasRequiredRootOptions !== true
+        ? 'missing-root-options'
+        : ready
+          ? null
+          : 'stale-canary-metadata';
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateRootCreatePreflight',
+    diagnosticName: privateRootCreatePreflightDiagnosticName,
+    status: ready
+      ? privateRootCreatePreflightStatus
+      : `blocked-private-root-create-preflight-${failureReason}`,
+    ready,
+    failureReason,
+    entrypoint,
+    compatibilityTarget,
+    gate: privateRootCreatePreflightGate,
+    rootRequest,
+    rootHandle: rootRequest.rootHandle,
+    rootId: rootRequest.rootId,
+    rootSequence: rootRequest.rootSequence,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    operation: 'create',
+    publicSurface: 'create()',
+    createInputShape: inputShape,
+    rootOptionsMetadata,
+    rootOptionsRequired: true,
+    rootOptionsMetadataAvailable: hasRequiredRootOptions,
+    canaryApiIdentity,
+    rustCanaryMetadata: rootRequest.rustCanaryMetadata,
+    rustCanaryOperationMetadata: rootRequest.rustCanaryOperationMetadata,
+    privateRustRootCreated: ready,
+    privateRootCanaryBoundaryValidated: ready,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: ready,
+    blockedPublicRoot: freezeRecord({
+      status: rootRequestCompatibilityStatus,
+      publicRendererRootCreated: false,
+      publicRootAvailable: false,
+      publicCreateBehaviorAvailable: false,
+      compatibilityClaimed: false
+    }),
+    publicRendererRootCreated: false,
+    publicRootAvailable: false,
+    publicCreateBehaviorAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    reconcilerExecutionFromJs: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function describeRootCreatePreflightInputShape(rootRequest) {
+  const payload = rootRequestPayloads.get(rootRequest);
+  const element = payload === undefined ? undefined : payload.element;
+  const elementType = describeRootCreateElementType(element);
+  const children = describeRootCreateChildren(element);
+  const acceptedShape =
+    elementType.kind === 'HostComponent' && children.kind === 'Text'
+      ? 'HostComponentWithTextChild'
+      : 'Unsupported';
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererRootCreateInputShape',
+    elementInfo: rootRequest.elementInfo,
+    rootElementHandle: rootRequest.rootElementHandle,
+    acceptedShape,
+    rootNodeKind: elementType.kind,
+    elementType: elementType.value,
+    elementTypeValueType: elementType.valueType,
+    childShape: children.kind,
+    childValueType: children.valueType,
+    childCount: children.count,
+    supportedChildren: acceptedShape === 'HostComponentWithTextChild',
+    failClosedForUnsupportedChildren: true,
+    publicRootAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function describeRootCreateElementType(element) {
+  if (element === null) {
+    return freezeRecord({
+      kind: 'NullRoot',
+      value: null,
+      valueType: 'null'
+    });
+  }
+  if (
+    element !== undefined &&
+    element !== null &&
+    typeof element === 'object' &&
+    typeof element.type === 'string'
+  ) {
+    return freezeRecord({
+      kind: 'HostComponent',
+      value: element.type,
+      valueType: 'string'
+    });
+  }
+
+  return freezeRecord({
+    kind: 'Unsupported',
+    value: null,
+    valueType: element === null ? 'null' : typeof element
+  });
+}
+
+function describeRootCreateChildren(element) {
+  const children =
+    element !== null &&
+    typeof element === 'object' &&
+    element.props !== null &&
+    typeof element.props === 'object'
+      ? element.props.children
+      : undefined;
+  const valueType = children === null ? 'null' : typeof children;
+
+  if (typeof children === 'string' || typeof children === 'number') {
+    return freezeRecord({
+      kind: 'Text',
+      valueType,
+      count: 1
+    });
+  }
+  if (children === undefined || children === null) {
+    return freezeRecord({
+      kind: 'Empty',
+      valueType,
+      count: 0
+    });
+  }
+  if (Array.isArray(children)) {
+    return freezeRecord({
+      kind: 'Array',
+      valueType: 'object',
+      count: children.length
+    });
+  }
+
+  return freezeRecord({
+    kind: 'Unsupported',
+    valueType,
+    count: 1
+  });
+}
+
+function createRootCreatePreflightCanaryApiIdentity(rootRequest) {
+  const operationMetadata = rootRequest.rustCanaryOperationMetadata;
+  const rootMetadata = rootRequest.rustCanaryMetadata.root;
+
+  return freezeRecord({
+    metadataId: rootRequest.rustCanaryMetadata.id,
+    metadataStatus: rootRequest.rustCanaryMetadata.status,
+    operation: 'create',
+    rootApi: operationMetadata.rootApi,
+    preflightApi:
+      operationMetadata.rootCreatePreflightApi ??
+      'TestRendererRoot::describe_private_root_create_preflight_for_canary',
+    rootOptionsType: rootMetadata.rootOptionsType,
+    testRendererOptionsType: rootMetadata.optionsType,
+    updateKind: operationMetadata.updateKind,
+    rustUpdateKind: operationMetadata.rustUpdateKind,
+    containerUpdateApi: operationMetadata.containerUpdateApi,
+    schedulerApi: operationMetadata.schedulerApi,
+    acceptedRustCrate: rootRequest.rustCanaryMetadata.acceptedRustCrate
+  });
+}
+
+function isCurrentRootCreatePreflightCanaryApiIdentity(apiIdentity) {
+  return (
+    apiIdentity.metadataId === currentRustTestRendererRootCanaryMetadata.id &&
+    apiIdentity.metadataStatus ===
+      currentRustTestRendererRootCanaryMetadata.status &&
+    apiIdentity.operation === 'create' &&
+    apiIdentity.rootApi === 'TestRendererRoot::create' &&
+    apiIdentity.preflightApi ===
+      'TestRendererRoot::describe_private_root_create_preflight_for_canary' &&
+    apiIdentity.rootOptionsType === 'RootOptions' &&
+    apiIdentity.testRendererOptionsType === 'TestRendererOptions' &&
+    apiIdentity.containerUpdateApi === 'update_container' &&
+    apiIdentity.schedulerApi === 'ensure_root_is_scheduled'
+  );
+}
+
+function consumeAcceptedRustRootCreatePreflightForRequest(
+  record,
+  diagnostic
+) {
+  const createRequest = getRootCreateRequestForRootRequest(record);
+  const preflight = getRootCreatePreflightForRootRequest(createRequest);
+  if (preflight.ready !== true) {
+    throwInvalidRootRequest(
+      `Private root-create preflight is closed: ${preflight.failureReason}.`
+    );
+  }
+
+  const normalized =
+    normalizeAcceptedRustRootCreatePreflightDiagnostic(diagnostic);
+  assertAcceptedRustRootCreatePreflightMatchesRequest(
+    preflight,
+    normalized
+  );
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateRootCreatePreflightConsumption',
+    diagnosticName: privateRootCreatePreflightDiagnosticName,
+    status: privateRootCreatePreflightStatus,
+    entrypoint,
+    compatibilityTarget,
+    rootRequest: createRequest,
+    preflight,
+    sourceDiagnostic: normalized,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+    privateRootCanaryBoundaryValidated: true,
+    publicRendererRootCreated: false,
+    publicRootAvailable: false,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function normalizeAcceptedRustRootCreatePreflightDiagnostic(diagnostic) {
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a Rust test-renderer root-create preflight diagnostic object.'
+    );
+  }
+
+  const apiIdentity = readDiagnosticField(diagnostic, [
+    'canaryApiIdentity',
+    'rustCanaryApiIdentity',
+    'apiIdentity'
+  ]);
+
+  return freezeRecord({
+    diagnosticName: readDiagnosticField(diagnostic, [
+      'diagnosticName',
+      'diagnostic_name'
+    ]),
+    status: readDiagnosticField(diagnostic, ['status']),
+    operation: readDiagnosticField(diagnostic, ['operation']),
+    createInputShape: readDiagnosticField(diagnostic, [
+      'createInputShape',
+      'inputShape',
+      'input_shape'
+    ]),
+    rootOptionsMetadata: readDiagnosticField(diagnostic, [
+      'rootOptionsMetadata',
+      'rootOptions',
+      'root_options'
+    ]),
+    canaryApiIdentity:
+      normalizeRootCreatePreflightCanaryApiIdentity(apiIdentity)
+  });
+}
+
+function normalizeRootCreatePreflightCanaryApiIdentity(apiIdentity) {
+  if (apiIdentity === null || typeof apiIdentity !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a root-create preflight canary API identity object.'
+    );
+  }
+
+  return freezeRecord({
+    metadataId: readDiagnosticField(apiIdentity, [
+      'metadataId',
+      'metadata_id'
+    ]),
+    metadataStatus: readDiagnosticField(apiIdentity, [
+      'metadataStatus',
+      'metadata_status'
+    ]),
+    operation: readDiagnosticField(apiIdentity, ['operation']),
+    rootApi: readDiagnosticField(apiIdentity, ['rootApi', 'root_api']),
+    preflightApi: readDiagnosticField(apiIdentity, [
+      'preflightApi',
+      'preflight_api'
+    ]),
+    rootOptionsType: readDiagnosticField(apiIdentity, [
+      'rootOptionsType',
+      'root_options_type'
+    ]),
+    testRendererOptionsType: readDiagnosticField(apiIdentity, [
+      'testRendererOptionsType',
+      'test_renderer_options_type'
+    ]),
+    containerUpdateApi: readDiagnosticField(apiIdentity, [
+      'containerUpdateApi',
+      'container_update_api'
+    ]),
+    schedulerApi: readDiagnosticField(apiIdentity, [
+      'schedulerApi',
+      'scheduler_api'
+    ])
+  });
+}
+
+function assertAcceptedRustRootCreatePreflightMatchesRequest(
+  preflight,
+  diagnostic
+) {
+  if (diagnostic.diagnosticName !== privateRootCreatePreflightDiagnosticName) {
+    throwInvalidRootRequest(
+      'Rust root-create preflight diagnostic name is not accepted.'
+    );
+  }
+  if (diagnostic.status !== privateRootCreatePreflightStatus) {
+    throwInvalidRootRequest(
+      'Rust root-create preflight diagnostic status is not accepted.'
+    );
+  }
+  if (diagnostic.operation !== 'create') {
+    throwInvalidRootRequest(
+      'Rust root-create preflight diagnostic operation does not match the private request.'
+    );
+  }
+
+  const apiIdentity = diagnostic.canaryApiIdentity;
+  if (
+    apiIdentity.metadataId !== preflight.canaryApiIdentity.metadataId ||
+    apiIdentity.metadataStatus !==
+      preflight.canaryApiIdentity.metadataStatus ||
+    apiIdentity.rootApi !== preflight.canaryApiIdentity.rootApi ||
+    apiIdentity.preflightApi !== preflight.canaryApiIdentity.preflightApi ||
+    apiIdentity.rootOptionsType !==
+      preflight.canaryApiIdentity.rootOptionsType ||
+    apiIdentity.testRendererOptionsType !==
+      preflight.canaryApiIdentity.testRendererOptionsType ||
+    apiIdentity.containerUpdateApi !==
+      preflight.canaryApiIdentity.containerUpdateApi ||
+    apiIdentity.schedulerApi !== preflight.canaryApiIdentity.schedulerApi
+  ) {
+    throwInvalidRootRequest(
+      'Rust root-create preflight canary API identity is stale.'
+    );
+  }
+
+  if (
+    diagnostic.createInputShape !== undefined &&
+    diagnostic.createInputShape.acceptedShape !==
+      preflight.createInputShape.acceptedShape
+  ) {
+    throwInvalidRootRequest(
+      'Rust root-create preflight input shape does not match the private request.'
+    );
+  }
+  if (
+    diagnostic.rootOptionsMetadata !== undefined &&
+    diagnostic.rootOptionsMetadata.type !== preflight.rootOptionsMetadata.type
+  ) {
+    throwInvalidRootRequest(
+      'Rust root-create preflight root options metadata does not match the private request.'
+    );
+  }
 }
 
 function getTestInstanceQueryDiagnosticsForRootRequest(record) {
