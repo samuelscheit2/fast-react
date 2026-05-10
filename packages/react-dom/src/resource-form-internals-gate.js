@@ -10,6 +10,7 @@ const hasOwn = Object.prototype.hasOwnProperty;
 
 const resourceFormActionInternalsGateSchemaVersion = 1;
 const formActionResetDispatcherGateSchemaVersion = 1;
+const formActionEventExtractionGateSchemaVersion = 1;
 const resourceHintDispatcherMetadataGateSchemaVersion = 1;
 const resourceHintFakeDomAdapterGateSchemaVersion = 1;
 const resourceHintFakeDomInsertionGateSchemaVersion = 1;
@@ -25,6 +26,8 @@ const privateResourceFormActionGateRecordType =
   'fast.react_dom.private_resource_form_action_gate_record';
 const privateFormActionResetDispatcherRecordType =
   'fast.react_dom.private_form_action_reset_dispatcher_record';
+const privateFormActionEventExtractionRecordType =
+  'fast.react_dom.private_form_action_event_extraction_record';
 const privateResourceHintDispatcherMetadataRecordType =
   'fast.react_dom.private_resource_hint_dispatcher_metadata_record';
 const privateResourceHintFakeDomAdapterAdmissionRecordType =
@@ -63,6 +66,8 @@ const privateResourceHintStylesheetPrecedenceGateId =
   'resource-hint-stylesheet-precedence-private-gate-1';
 const privateFormActionResetDispatcherGateId =
   'form-action-reset-private-dispatcher-gate-1';
+const privateFormActionEventExtractionGateId =
+  'form-action-event-extraction-private-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
   'blocked-private-resource-hint-fake-dom-adapter-admission-required';
 const privateResourceHintFakeDomAdapterAdmissionStatus =
@@ -119,6 +124,10 @@ const privateFormActionSubmissionIntentRecordedStatus =
   'recorded-private-form-action-submission-intent';
 const privateFormActionResetIntentRecordedStatus =
   'recorded-private-form-action-reset-intent';
+const privateFormActionEventExtractionStatus =
+  'private-form-action-event-extraction-metadata-only';
+const privateFormActionEventExtractionRecordedStatus =
+  'recorded-private-form-action-event-extraction-metadata';
 const privateResourceFormActionGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE';
 const privateResourceFormActionGateUnknownRequestCode =
@@ -131,6 +140,10 @@ const privateFormActionResetDispatcherInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_RESET_DISPATCHER_INVALID_RECORD';
 const privateFormActionResetDispatcherUnknownIntentCode =
   'FAST_REACT_DOM_FORM_ACTION_RESET_DISPATCHER_UNKNOWN_INTENT';
+const privateFormActionEventExtractionGateErrorCode =
+  'FAST_REACT_DOM_FORM_ACTION_EVENT_EXTRACTION_GATE';
+const privateFormActionEventExtractionInvalidRecordCode =
+  'FAST_REACT_DOM_FORM_ACTION_EVENT_EXTRACTION_INVALID_RECORD';
 const privateResourceHintDispatcherMetadataGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_HINT_DISPATCHER_METADATA_GATE';
 const privateResourceHintDispatcherMetadataInvalidShapeCode =
@@ -312,6 +325,32 @@ const formActionResetIntentSideEffects = freezeRecord({
   formDispatcherMetadataRecorded: true,
   resetIntentRecorded: true,
   resetDispatcherOrderingRecorded: true
+});
+
+const formActionEventExtractionBlockedSideEffects = freezeRecord({
+  sourceSubmissionIntentConsumed: false,
+  eventExtractionMetadataRecorded: false,
+  formActionEventPluginInvoked: false,
+  nativeEventInspected: false,
+  realFormInspected: false,
+  submitControlInspected: false,
+  formPropsRead: false,
+  submitControlPropsRead: false,
+  formDataConstructed: false,
+  syntheticEventCreated: false,
+  listenerDispatchStarted: false,
+  defaultPrevented: false,
+  actionInvoked: false,
+  hostTransitionStarted: false,
+  resetStateQueued: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const formActionEventExtractionMetadataSideEffects = freezeRecord({
+  ...formActionEventExtractionBlockedSideEffects,
+  sourceSubmissionIntentConsumed: true,
+  eventExtractionMetadataRecorded: true
 });
 
 const resourceHintDispatcherSideEffects = freezeRecord({
@@ -635,6 +674,34 @@ const formActionResetDispatcherMissingPrerequisites = freezeArray([
     'no-public-form-action-compatibility',
     'react-dom-client',
     'Public form action and reset compatibility remains unclaimed.'
+  )
+]);
+
+const formActionEventExtractionMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-form-action-event-plugin-execution',
+    'react-dom-events',
+    'Form action event extraction records accepted metadata only and does not invoke the event plugin.'
+  ),
+  prerequisite(
+    'no-synthetic-event-construction',
+    'react-dom-events',
+    'Submit extraction does not create SyntheticEvents or dispatch listeners.'
+  ),
+  prerequisite(
+    'no-client-form-data-construction',
+    'react-dom-form',
+    'Client form action extraction does not inspect controls or construct form data.'
+  ),
+  prerequisite(
+    'no-host-transition-form-status',
+    'react-dom-form',
+    'Host transition pending form status is not wired to public roots.'
+  ),
+  prerequisite(
+    'no-public-form-action-compatibility',
+    'react-dom-client',
+    'Public form action submit/requestSubmit compatibility remains unclaimed.'
   )
 ]);
 
@@ -1198,6 +1265,14 @@ const formActionResetDispatcherContracts = freezeArray([
   )
 ]);
 
+const formActionEventExtractionContracts = freezeArray([
+  formActionEventExtractionContract(
+    'form-action-submit-event-extraction',
+    'submit',
+    'form-action-submission-intent'
+  )
+]);
+
 const controlledFormContracts = freezeArray([
   controlledFormContract('input-controlled-value', 'input'),
   controlledFormContract('select-controlled-value', 'select'),
@@ -1388,6 +1463,7 @@ indexControlledInputPrivateWrapperPropertyPayloadContracts();
 
 const recordPayloads = new WeakMap();
 const formActionResetDispatcherPayloads = new WeakMap();
+const formActionEventExtractionPayloads = new WeakMap();
 const resourceHintDispatcherMetadataPayloads = new WeakMap();
 const resourceHintFakeDomAdapterAdmissionPayloads = new WeakMap();
 const resourceHintFakeDomInsertionPayloads = new WeakMap();
@@ -1405,6 +1481,8 @@ const controlledInputPrivateWrapperPropertyPayloadRecordPayloads =
 const defaultGate = createResourceFormActionInternalsGate();
 const defaultFormActionResetDispatcherGate =
   createFormActionResetDispatcherGate();
+const defaultFormActionEventExtractionGate =
+  createFormActionEventExtractionGate();
 const defaultResourceHintFakeDomAdapterGate =
   createResourceHintFakeDomAdapterGate();
 const defaultControlledInputValueTrackerGate =
@@ -1492,6 +1570,19 @@ function createFormActionResetDispatcherGate(options) {
         'reset',
         intent
       );
+    }
+  });
+}
+
+function createFormActionEventExtractionGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'form-action-event-extraction'
+  );
+
+  return Object.freeze({
+    recordEventExtractionFromSubmissionIntent(record) {
+      return recordFormActionEventExtractionWithGate(gateState, record);
     }
   });
 }
@@ -1692,6 +1783,11 @@ function recordFormActionResetIntent(intent) {
   return defaultFormActionResetDispatcherGate.recordResetIntent(intent);
 }
 
+function recordFormActionEventExtractionFromSubmissionIntent(record) {
+  return defaultFormActionEventExtractionGate
+    .recordEventExtractionFromSubmissionIntent(record);
+}
+
 function recordUnsupportedControlledFormRequest(requestName, args) {
   return defaultGate.recordControlledFormRequest(requestName, args);
 }
@@ -1794,6 +1890,14 @@ function getPrivateFormActionResetDispatcherRecordPayload(record) {
 
 function isPrivateFormActionResetDispatcherRecord(value) {
   return formActionResetDispatcherPayloads.has(value);
+}
+
+function getPrivateFormActionEventExtractionRecordPayload(record) {
+  return formActionEventExtractionPayloads.get(record) || null;
+}
+
+function isPrivateFormActionEventExtractionRecord(value) {
+  return formActionEventExtractionPayloads.has(value);
 }
 
 function getPrivateResourceHintDispatcherMetadataRecordPayload(record) {
@@ -1914,6 +2018,7 @@ function describeResourceFormActionInternalsGate() {
       singletons: singletonContracts,
       formActions: formActionContracts,
       formActionResetDispatchers: formActionResetDispatcherContracts,
+      formActionEventExtractions: formActionEventExtractionContracts,
       controlledForms: controlledFormContracts,
       controlledInputValueTrackers: controlledInputValueTrackerContracts,
       controlledInputPrivateWrapperPropertyPayloads:
@@ -1924,6 +2029,8 @@ function describeResourceFormActionInternalsGate() {
       describePrivateResourceHintDispatcherMetadataGate(),
     formActionResetDispatcher:
       describePrivateFormActionResetDispatcherGate(),
+    formActionEventExtraction:
+      describePrivateFormActionEventExtractionGate(),
     controlledInputValueTracker: describeControlledInputValueTrackerGate(),
     missingPrerequisites
   });
@@ -1961,6 +2068,40 @@ function describePrivateFormActionResetDispatcherGate() {
     resetsForms: false,
     sideEffects: formActionResetDispatcherBlockedSideEffects,
     missingPrerequisites: formActionResetDispatcherMissingPrerequisites
+  });
+}
+
+function describePrivateFormActionEventExtractionGate() {
+  return freezeRecord({
+    schemaVersion: formActionEventExtractionGateSchemaVersion,
+    gateId: privateFormActionEventExtractionGateId,
+    compatibilityTarget,
+    status: privateFormActionEventExtractionStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: oracleEvidence(
+      formActionsOracleKind,
+      formActionEventExtractionContracts.length
+    ),
+    contracts: formActionEventExtractionContracts,
+    acceptedSourceRecordType: privateFormActionResetDispatcherRecordType,
+    acceptedSourceGateId: privateFormActionResetDispatcherGateId,
+    acceptedSourceStatus: privateFormActionSubmissionIntentRecordedStatus,
+    acceptedIntentKind: 'submission',
+    acceptedEventName: 'submit',
+    acceptedSubmissionTriggers: freezeArray(['submit', 'requestSubmit']),
+    consumesSubmitRequestSubmitActionMetadata: true,
+    recordsEventExtractionMetadata: true,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    createsSyntheticEvents: false,
+    constructsFormData: false,
+    invokesActions: false,
+    startsHostTransition: false,
+    queuesReset: false,
+    touchesPublicRoot: false,
+    sideEffects: formActionEventExtractionBlockedSideEffects,
+    missingPrerequisites: formActionEventExtractionMissingPrerequisites
   });
 }
 
@@ -2348,6 +2489,28 @@ function createUnsupportedFormActionResetDispatcherError(record) {
   return error;
 }
 
+function createUnsupportedFormActionEventExtractionError(record) {
+  const payload = assertPrivateFormActionEventExtractionRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private form action event-extraction gate records submit metadata only.'
+  );
+
+  error.code = privateFormActionEventExtractionGateErrorCode;
+  error.extractionId = payload.extractionId;
+  error.extractionSequence = payload.extractionSequence;
+  error.sourceRequestId = payload.sourceRequestId;
+  error.sourceRequestSequence = payload.sourceRequestSequence;
+  error.requestType = payload.requestType;
+  error.status = payload.status;
+  error.eventExtraction = payload.eventExtraction;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
 function createUnsupportedControlledInputRestoreQueueDiagnosticError(record) {
   const payload = assertPrivateControlledInputRestoreQueueDiagnosticRecord(
     record
@@ -2633,6 +2796,63 @@ function recordFormActionResetDispatcherIntentWithGate(
   });
 
   formActionResetDispatcherPayloads.set(payload, payload);
+  return payload;
+}
+
+function recordFormActionEventExtractionWithGate(gateState, record) {
+  const sourceRecord = assertFormActionSubmissionRecordForEventExtraction(
+    record
+  );
+  const contract = getFormActionEventExtractionContract(
+    sourceRecord.contractId
+  );
+  const extractionSequence = gateState.nextRequestSequence++;
+  const extractionId = `${gateState.requestIdPrefix}:${extractionSequence}`;
+  const sourceActionMetadata = sourceRecord.intent.actionMetadata;
+
+  const payload = freezeRecord({
+    schemaVersion: formActionEventExtractionGateSchemaVersion,
+    $$typeof: privateFormActionEventExtractionRecordType,
+    kind: 'FastReactDomPrivateFormActionEventExtractionRecord',
+    gateId: privateFormActionEventExtractionGateId,
+    compatibilityTarget,
+    status: privateFormActionEventExtractionRecordedStatus,
+    unsupportedCode: unimplementedCode,
+    extractionId,
+    extractionSequence,
+    sourceRequestId: sourceRecord.requestId,
+    sourceRequestSequence: sourceRecord.requestSequence,
+    sourceRequestType: sourceRecord.requestType,
+    sourceGateId: sourceRecord.gateId,
+    sourceStatus: sourceRecord.status,
+    requestType: `form-action-event-extraction.${contract.eventName}`,
+    intentKind: sourceRecord.intentKind,
+    contractId: contract.id,
+    sourceContractId: sourceRecord.contractId,
+    oracleKind: sourceRecord.oracleKind,
+    oracleSchemaVersion: sourceRecord.oracleSchemaVersion,
+    eventName: contract.eventName,
+    submissionTrigger: sourceRecord.intent.submissionTrigger,
+    actionKind: sourceRecord.intent.actionKind,
+    actionSource: sourceRecord.intent.actionSource,
+    submitControlKind: sourceRecord.intent.submitControlKind,
+    formActionKind: sourceRecord.intent.formActionKind,
+    submitterActionKind: sourceRecord.intent.submitterActionKind,
+    submitterActionOverridesFormAction:
+      sourceRecord.intent.submitterActionOverridesFormAction,
+    sourceActionMetadata:
+      createFormActionEventExtractionSourceActionMetadata(
+        sourceActionMetadata
+      ),
+    eventExtraction:
+      createFormActionEventExtractionMetadata(sourceRecord),
+    eventExtractionBoundary:
+      createFormActionEventExtractionBoundary(contract, sourceRecord),
+    sideEffects: formActionEventExtractionMetadataSideEffects,
+    missingPrerequisites: formActionEventExtractionMissingPrerequisites
+  });
+
+  formActionEventExtractionPayloads.set(payload, payload);
   return payload;
 }
 
@@ -3505,6 +3725,25 @@ function getControlledInputPrivateWrapperPropertyPayloadContract(
   throw error;
 }
 
+function getFormActionEventExtractionContract(sourceContractId) {
+  for (const contract of formActionEventExtractionContracts) {
+    if (contract.sourceContractId === sourceContractId) {
+      return contract;
+    }
+  }
+
+  const error = new Error(
+    `Unsupported private React DOM form action event-extraction source contract: ${String(
+      sourceContractId
+    )}.`
+  );
+  error.name = 'FastReactDomFormActionEventExtractionGateError';
+  error.code = privateFormActionEventExtractionInvalidRecordCode;
+  error.sourceContractId = sourceContractId;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertPrivateResourceFormActionGateRecord(record) {
   const payload = getPrivateResourceFormActionGateRecordPayload(record);
   if (payload !== null) {
@@ -3533,6 +3772,120 @@ function assertPrivateFormActionResetDispatcherRecord(record) {
   error.code = privateFormActionResetDispatcherInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
+}
+
+function assertPrivateFormActionEventExtractionRecord(record) {
+  const payload = getPrivateFormActionEventExtractionRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM form action event-extraction record.'
+  );
+  error.name = 'FastReactDomFormActionEventExtractionGateError';
+  error.code = privateFormActionEventExtractionInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertFormActionSubmissionRecordForEventExtraction(record) {
+  const payload = getPrivateFormActionResetDispatcherRecordPayload(record);
+  if (payload === null) {
+    throwInvalidFormActionEventExtractionRecord(
+      'source record must be a private form action submission intent record'
+    );
+  }
+
+  if (
+    payload.intentKind !== 'submission' ||
+    payload.status !== privateFormActionSubmissionIntentRecordedStatus ||
+    payload.contractId !== 'form-action-submission-intent' ||
+    payload.eventName !== 'submit'
+  ) {
+    throwInvalidFormActionEventExtractionRecord(
+      'source record must be a recorded submit action intent',
+      payload
+    );
+  }
+
+  const intent = payload.intent;
+  const metadata = intent && intent.actionMetadata;
+  if (
+    intent == null ||
+    metadata == null ||
+    metadata.metadataOnly !== true ||
+    metadata.eventName !== 'submit'
+  ) {
+    throwInvalidFormActionEventExtractionRecord(
+      'source record must carry worker 492 action metadata',
+      payload
+    );
+  }
+
+  if (
+    metadata.submissionTrigger !== 'submit' &&
+    metadata.submissionTrigger !== 'requestSubmit'
+  ) {
+    throwInvalidFormActionEventExtractionRecord(
+      'source action metadata must be for submit or requestSubmit',
+      payload
+    );
+  }
+
+  if (
+    metadata.requestSubmitWouldDispatchSubmitEvent !==
+      (metadata.submissionTrigger === 'requestSubmit')
+  ) {
+    throwInvalidFormActionEventExtractionRecord(
+      'source requestSubmit dispatch metadata is inconsistent',
+      payload
+    );
+  }
+
+  for (const field of [
+    'rawFormCaptured',
+    'rawEventCaptured',
+    'rawSubmitterCaptured',
+    'realFormInspected',
+    'submitControlInspected',
+    'formDataConstructed',
+    'syntheticEventCreated',
+    'defaultPreventedByGate',
+    'actionInvoked',
+    'hostTransitionStarted',
+    'compatibilityClaimed'
+  ]) {
+    if (metadata[field] !== false) {
+      throwInvalidFormActionEventExtractionRecord(
+        `source action metadata ${field} must be false`,
+        payload
+      );
+    }
+  }
+
+  for (const field of [
+    'formCaptured',
+    'rawEventCaptured',
+    'rawActionCaptured',
+    'realFormInspected',
+    'submitControlInspected',
+    'formDataConstructed',
+    'syntheticEventCreated',
+    'defaultPreventedByGate',
+    'actionInvoked',
+    'hostTransitionStarted',
+    'compatibilityClaimed'
+  ]) {
+    if (intent[field] !== false) {
+      throwInvalidFormActionEventExtractionRecord(
+        `source intent ${field} must be false`,
+        payload
+      );
+    }
+  }
+
+  return payload;
 }
 
 function assertPrivateControlledInputValueTrackerRecord(record) {
@@ -6938,6 +7291,98 @@ function createFormActionSubmissionMetadata(metadata) {
   });
 }
 
+function createFormActionEventExtractionSourceActionMetadata(metadata) {
+  return freezeRecord({
+    metadataOnly: metadata.metadataOnly,
+    submissionTrigger: metadata.submissionTrigger,
+    eventName: metadata.eventName,
+    requestSubmitWouldDispatchSubmitEvent:
+      metadata.requestSubmitWouldDispatchSubmitEvent,
+    replayed: metadata.replayed,
+    resolvedActionKind: metadata.resolvedActionKind,
+    formActionKind: metadata.formActionKind,
+    submitterActionKind: metadata.submitterActionKind,
+    actionSource: metadata.actionSource,
+    submitControlKind: metadata.submitControlKind,
+    submitterActionOverridesFormAction:
+      metadata.submitterActionOverridesFormAction,
+    submitterValueWouldBeIncludedInFormData:
+      metadata.submitterValueWouldBeIncludedInFormData,
+    nativeNavigationWouldBePrevented:
+      metadata.nativeNavigationWouldBePrevented,
+    pendingStatusWouldBeSet: metadata.pendingStatusWouldBeSet,
+    actionInvocationWouldBeScheduled:
+      metadata.actionInvocationWouldBeScheduled,
+    formPropsRead: metadata.formPropsRead,
+    submitterPropsRead: metadata.submitterPropsRead,
+    submitterAttributeRead: metadata.submitterAttributeRead,
+    rawFormCaptured: metadata.rawFormCaptured,
+    rawEventCaptured: metadata.rawEventCaptured,
+    rawSubmitterCaptured: metadata.rawSubmitterCaptured,
+    realFormInspected: metadata.realFormInspected,
+    submitControlInspected: metadata.submitControlInspected,
+    formDataConstructed: metadata.formDataConstructed,
+    syntheticEventCreated: metadata.syntheticEventCreated,
+    defaultPreventedByGate: metadata.defaultPreventedByGate,
+    actionInvoked: metadata.actionInvoked,
+    hostTransitionStarted: metadata.hostTransitionStarted,
+    compatibilityClaimed: metadata.compatibilityClaimed
+  });
+}
+
+function createFormActionEventExtractionMetadata(sourceRecord) {
+  const metadata = sourceRecord.intent.actionMetadata;
+
+  return freezeRecord({
+    metadataOnly: true,
+    sourceGateId: sourceRecord.gateId,
+    sourceRequestId: sourceRecord.requestId,
+    sourceRequestSequence: sourceRecord.requestSequence,
+    sourceRequestType: sourceRecord.requestType,
+    sourceStatus: sourceRecord.status,
+    sourceMetadataOnly: metadata.metadataOnly,
+    eventName: metadata.eventName,
+    submissionTrigger: metadata.submissionTrigger,
+    requestSubmitWouldDispatchSubmitEvent:
+      metadata.requestSubmitWouldDispatchSubmitEvent,
+    consumedSubmitRequestSubmitActionMetadata: true,
+    wouldExtractSubmitEvent: true,
+    wouldUseFormActionEventPlugin: true,
+    wouldCreateSyntheticEvent: false,
+    wouldConstructFormData: false,
+    wouldInvokeAction: false,
+    wouldStartHostTransition: false,
+    sourceDefaultPrevented: sourceRecord.intent.defaultPrevented,
+    nativeNavigationWouldBePrevented:
+      metadata.nativeNavigationWouldBePrevented,
+    pendingStatusWouldBeSet: metadata.pendingStatusWouldBeSet,
+    actionInvocationWouldBeScheduled:
+      metadata.actionInvocationWouldBeScheduled,
+    submitterValueWouldBeIncludedInFormData:
+      metadata.submitterValueWouldBeIncludedInFormData,
+    formPropsRead: false,
+    submitterPropsRead: false,
+    submitterAttributeRead: false,
+    rawFormCaptured: false,
+    rawEventCaptured: false,
+    rawSubmitterCaptured: false,
+    nativeEventInspected: false,
+    targetInspected: false,
+    currentTargetInspected: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    listenerDispatchStarted: false,
+    defaultPreventedByGate: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    resetStateQueued: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getDefaultResetOrderingKind(intent) {
   if (intent && intent.resetSource === 'action-completion') {
     return 'action-completion-reset-before-action';
@@ -7070,6 +7515,41 @@ function createFormActionResetDispatcherBoundary(contract, normalizedIntent) {
   });
 }
 
+function createFormActionEventExtractionBoundary(contract, sourceRecord) {
+  return freezeRecord({
+    gateId: privateFormActionEventExtractionGateId,
+    gateStatus: privateFormActionEventExtractionStatus,
+    contractId: contract.id,
+    sourceContractId: contract.sourceContractId,
+    sourceRecordType: privateFormActionResetDispatcherRecordType,
+    sourceGateId: sourceRecord.gateId,
+    sourceStatus: sourceRecord.status,
+    sourceIntentKind: sourceRecord.intentKind,
+    eventName: contract.eventName,
+    submissionTrigger: sourceRecord.intent.submissionTrigger,
+    consumesSubmitRequestSubmitActionMetadata: true,
+    recordsEventExtractionMetadata: true,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    formCaptured: false,
+    rawEventCaptured: false,
+    rawActionCaptured: false,
+    nativeEventInspected: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    listenerDispatchStarted: false,
+    defaultPrevented: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    resetStateQueued: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
 function throwInvalidFormActionResetDispatcherIntent(contract, reason) {
   const error = new Error(
     `Invalid private React DOM form action/reset dispatcher intent for ${contract.id}: ${reason}.`
@@ -7080,6 +7560,23 @@ function throwInvalidFormActionResetDispatcherIntent(contract, reason) {
   error.contractId = contract.id;
   error.intentKind = contract.intentKind;
   error.reason = reason;
+  throw error;
+}
+
+function throwInvalidFormActionEventExtractionRecord(reason, sourceRecord) {
+  const error = new Error(
+    `Invalid private React DOM form action event-extraction source record: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionEventExtractionGateError';
+  error.code = privateFormActionEventExtractionInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  if (sourceRecord != null) {
+    error.sourceRequestId = sourceRecord.requestId;
+    error.sourceRequestSequence = sourceRecord.requestSequence;
+    error.sourceRequestType = sourceRecord.requestType;
+    error.sourceStatus = sourceRecord.status;
+  }
   throw error;
 }
 
@@ -8225,6 +8722,25 @@ function formActionResetDispatcherContract(
   });
 }
 
+function formActionEventExtractionContract(id, eventName, sourceContractId) {
+  return freezeRecord({
+    id,
+    eventName,
+    sourceContractId,
+    capability: 'react-dom-form-action-event-extraction',
+    oracleKind: formActionsOracleKind,
+    acceptedSourceRecordType: privateFormActionResetDispatcherRecordType,
+    acceptedSourceStatus: privateFormActionSubmissionIntentRecordedStatus,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    createsSyntheticEvents: false,
+    constructsFormData: false,
+    invokesActions: false,
+    startsHostTransition: false,
+    compatibilityClaimed: false
+  });
+}
+
 function controlledFormContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -8353,6 +8869,7 @@ module.exports = {
   controlledInputValueTrackerMissingPrerequisites,
   controlledInputValueTrackerOracleCoverage,
   controlledInputValueTrackerSideEffects,
+  createFormActionEventExtractionGate,
   createFormActionResetDispatcherGate,
   createControlledInputPrivateWrapperPropertyPayloadRecord,
   createControlledInputPrivateRestoreQueueDiagnosticGate,
@@ -8364,6 +8881,7 @@ module.exports = {
   createResourceHintPreloadPreinitOrderGate,
   createResourceHintStylesheetPrecedenceGate,
   createResourceFormActionInternalsGate,
+  createUnsupportedFormActionEventExtractionError,
   createUnsupportedFormActionResetDispatcherError,
   createUnsupportedControlledInputValueTrackerError,
   createUnsupportedControlledInputRestoreQueueDiagnosticError,
@@ -8379,6 +8897,7 @@ module.exports = {
   describeControlledInputValueTrackerFakeDomDiagnosticGate,
   describeControlledInputPrivateRestoreQueueDiagnosticGate,
   describeControlledInputPrivateWrapperPropertyPayloadGate,
+  describePrivateFormActionEventExtractionGate,
   describePrivateFormActionResetDispatcherGate,
   describePrivateResourceHintFakeDomAdapterGate,
   describePrivateResourceHintFakeDomInsertionGate,
@@ -8388,6 +8907,11 @@ module.exports = {
   describePrivateResourceHintStylesheetPrecedenceGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
+  formActionEventExtractionBlockedSideEffects,
+  formActionEventExtractionContracts,
+  formActionEventExtractionGateSchemaVersion,
+  formActionEventExtractionMetadataSideEffects,
+  formActionEventExtractionMissingPrerequisites,
   formActionResetDispatcherBlockedSideEffects,
   formActionResetDispatcherContracts,
   formActionResetDispatcherGateSchemaVersion,
@@ -8400,6 +8924,7 @@ module.exports = {
   getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload,
   getPrivateControlledInputRestoreQueueDiagnosticRecordPayload,
   getPrivateControlledInputWrapperPropertyPayloadRecordPayload,
+  getPrivateFormActionEventExtractionRecordPayload,
   getPrivateFormActionResetDispatcherRecordPayload,
   getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload,
   getPrivateResourceHintFakeDomInsertionRecordPayload,
@@ -8419,6 +8944,7 @@ module.exports = {
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
   isPrivateControlledInputRestoreQueueDiagnosticRecord,
   isPrivateControlledInputWrapperPropertyPayloadRecord,
+  isPrivateFormActionEventExtractionRecord,
   isPrivateFormActionResetDispatcherRecord,
   isPrivateResourceFormActionGateRecord,
   isPrivateResourceHintDispatcherMetadataRecord,
@@ -8438,6 +8964,12 @@ module.exports = {
   privateControlledInputValueTrackerGateRecordType,
   privateControlledInputValueTrackerGateUnknownScenarioCode,
   privateControlledInputWrapperPropertyPayloadRecordType,
+  privateFormActionEventExtractionGateErrorCode,
+  privateFormActionEventExtractionGateId,
+  privateFormActionEventExtractionInvalidRecordCode,
+  privateFormActionEventExtractionRecordedStatus,
+  privateFormActionEventExtractionRecordType,
+  privateFormActionEventExtractionStatus,
   privateFormActionResetDispatcherGateErrorCode,
   privateFormActionResetDispatcherGateId,
   privateFormActionResetDispatcherInvalidIntentCode,
@@ -8512,6 +9044,7 @@ module.exports = {
   privateResourceHintDispatcherMetadataUnknownRequestCode,
   installControlledInputValueTrackerFakeDomDiagnostic,
   observeControlledInputValueTrackerFakeDomDiagnostic,
+  recordFormActionEventExtractionFromSubmissionIntent,
   recordFormActionResetIntent,
   recordFormActionSubmissionIntent,
   recordControlledInputPostEventRestoreIntentFromFakeDomObservation,

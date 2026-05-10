@@ -20,6 +20,7 @@ import {
   readCheckedReactDomFormActionsOracleText
 } from "../src/react-dom-form-actions-oracle.mjs";
 import {
+  assertPrivateFormActionResetDispatcherGate,
   assertFastReactFormActionPrerequisiteGate,
   assertFastReactFormActionsUnsupportedGate
 } from "../src/react-dom-form-actions-unsupported-gates.mjs";
@@ -88,6 +89,10 @@ test("React DOM form-actions oracle keeps compatibility claims intentionally nar
 
 test("Fast React form-action APIs stay unsupported placeholders until form adapters exist", () => {
   assertFastReactFormActionsUnsupportedGate();
+});
+
+test("Fast React form-action event extraction stays private metadata-only", () => {
+  assertPrivateFormActionResetDispatcherGate();
 });
 
 test("Fast React form-action implementation gates stay fail-closed", () => {
