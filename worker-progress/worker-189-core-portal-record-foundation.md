@@ -87,6 +87,23 @@ traversal, host config behavior, or public React DOM compatibility.
   passed.
 - `git diff --check`: passed.
 
+## Post-Merge Orchestrator Verification
+
+- Orchestrator merged current `main` into this branch and resolved the
+  `crates/fast-react-core/src/lib.rs` export-list conflict by preserving
+  accepted context-stack exports and adding `ReactPortalRecord` to the element
+  export group.
+- Post-merge verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-core --all-features portal`: 4 portal tests
+  - `cargo test -p fast-react-core --all-features element`: 11 filtered
+    element/symbol tests
+  - `cargo test -p fast-react-core --all-features symbols`: 4 symbol tests
+  - `cargo test -p fast-react-core --all-features`: 122 unit tests and 0
+    doctests
+  - `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+
 ## Quality, Maintainability, Performance, And Security
 
 - Quality: the record mirrors existing normalized core data patterns and keeps
