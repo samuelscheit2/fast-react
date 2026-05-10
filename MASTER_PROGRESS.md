@@ -141,9 +141,18 @@ sequencing belong in `MASTER_PLAN.md`.
   Fast React vs `scheduler@0.27.0` root-entry oracle comparisons with 22
   matched-but-not-claimed rows while keeping broad Scheduler compatibility and
   browser post-task ordering claims false.
+- Worker 165 package surface guard was merged, adding a strict smoke snapshot
+  for package directories, public resolver files, declaration-file presence,
+  runtime export keys, and placeholder metadata, wired into `check:js` without
+  dropping the benchmark gate.
 
 ## Latest Accepted Verification
 
+- Worker 165 was verified on its integrated worktree and again on `main` with
+  `node --check tests/smoke/package-surface-guard.mjs`,
+  `npm run check:package-surface`, `npm run check:js` covering the package
+  guard, smoke imports, benchmark gate, workspace checks, and 428 conformance
+  tests, plus `git diff --check`.
 - Worker 164 was verified on its integrated worktree and again on `main` with
   scheduler root syntax checks, byte-stable scheduler root oracle regeneration,
   focused Scheduler conformance covering 62 tests, `npm run check:js` with 428

@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 165: package surface guard in
-  `/Users/user/Developer/Developer/fast-react-worker-165-package-surface-guard`.
 - Worker 167: React DOM private root bridge in
   `/Users/user/Developer/Developer/fast-react-worker-167-react-dom-private-root-bridge`.
 - Worker 168: DOM component tree map shell in
