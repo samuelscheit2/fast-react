@@ -45,48 +45,18 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 383-412 is assigned in isolated worktrees;
-workers 388, 407, and 409 have been accepted, leaving 27 active top-level
-workers from this queue.
-
-| Worker | Focus |
-| --- | --- |
-| 383 | Root commit HostComponent update apply |
-| 384 | Root commit HostComponent deletion apply |
-| 385 | Root commit ref callback execution handoff |
-| 386 | Context provider begin-work runtime read |
-| 387 | Root work-loop context provider handoff |
-| 389 | Passive effects error propagation private path |
-| 390 | Sync flush act private execution |
-| 391 | Test renderer public `toJSON` private facade |
-| 392 | Test renderer public `toTree` private facade |
-| 393 | Test renderer update/unmount JS private routing |
-| 394 | Test renderer act private scheduler consumption |
-| 395 | React DOM private root public-facade adapter |
-| 396 | React DOM host-output attribute update gate |
-| 397 | React DOM event invocation from private root output |
-| 398 | React DOM ref ordering from root commit metadata |
-| 399 | Controlled input private restore queue gate |
-| 400 | Resource hint head singleton private gate |
-| 401 | Hydration marker replay event queue private path |
-| 402 | Portal private child reconciliation gate |
-| 403 | Native root bridge JSON transport smoke |
-| 404 | Scheduler mock private callback execution |
-| 405 | React act private continuation gate |
-| 406 | React DOM test-utils act private root output |
-| 408 | Package surface private root-output audit |
-| 410 | Root render E2E private `flushSync` admission |
-| 411 | Root render E2E private warning boundary |
-| 412 | Private root-output gate docs and smoke refresh |
+Top-level cap: 30 workers. Queue 383-412 has been accepted and merged. Do not
+queue the next batch until the accepted worker sessions, worktrees, and branches
+from that queue are cleaned.
 
 ## Near-Term Sequencing
 
-1. Monitor queue 383-412 for completion and merge completed workers before
-   queuing more.
+1. Clean accepted worker sessions, worktrees, and branches left from queue
+   383-412.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-3. After the queue drains, refill up to the 30 top-level worker cap with the
-   next narrow implementation or conformance checkpoints.
+3. Refill up to the 30 top-level worker cap with the next narrow implementation
+   or conformance checkpoints after cleanup is complete.
 
 ## Next Queue Candidates
 

@@ -29,16 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-- Workers 388, 407, and 409 were accepted from queue 383-412. The batch added
-  a private function-component effect update queue that records changed and
-  unchanged update dependencies for passive handoff, diagnostic-only benchmark
-  timing canaries for admitted private React DOM root host-output rows, and a
-  context-object local gate refresh that records accepted private `useContext`
-  and Provider handoff progress while keeping public context compatibility
-  blocked.
-- Workers 388, 407, and 409 were verified after merge with `cargo fmt --all
-  --check`, `cargo test -p fast-react-reconciler --all-features`, `npm run
-  check:benchmarks`, `npm run check:js`, and `git diff --check HEAD~3..HEAD`.
+- Workers 383-412 were accepted as a complete implementation batch. The batch
+  added root commit HostComponent update/deletion and ref-callback handoff
+  canaries, context provider begin-work/root-work-loop handoffs, passive error
+  propagation, sync-flush/React act private execution paths, react-test-renderer
+  `toJSON`/`toTree` facades plus update/unmount/act routing, React DOM private
+  root facade, host-output attribute/event/ref/hydration/portal/resource/
+  controlled-input/test-utils gates, native bridge transport smoke coverage,
+  scheduler private callback execution, package-surface refreshes, benchmark
+  timing canaries, and root-render E2E `flushSync`/warning-boundary admissions
+  while keeping public compatibility claims blocked.
+- Workers 383-412 were verified after merge with full reconciler,
+  test-renderer, and N-API Rust tests, workspace clippy with `-D warnings`,
+  package-surface and benchmark checks, `npm run check:js`, conflict-marker and
+  `git diff --check` guards. Post-merge integration cleanup fixed clippy-only
+  private canary helper warnings, accepted the new private `toTree` package
+  facade marker, and corrected private ref metadata snapshot normalization for
+  React DOM root ref-ordering diagnostics.
 - Workers 353-382 were accepted as a complete implementation batch. The batch
   added private root commit HostText update, nested placement, deletion cleanup,
   root-work-loop and sync-flush host-output commit handoffs, function-component
