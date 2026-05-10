@@ -29,6 +29,82 @@ pub enum SchedulerActQueueTaskKind {
     RenderCallback,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
+pub(crate) enum SchedulerActScopeBoundaryKind {
+    Enter,
+    Exit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SchedulerActScopeBoundaryRecord {
+    kind: SchedulerActScopeBoundaryKind,
+    depth_before: usize,
+    depth_after: usize,
+    nested: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum SchedulerActContinuationStatus {
+    NoContinuation,
+    PendingContinuation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SchedulerActContinuationRecord {
+    root: FiberRootId,
+    sync_flush_order: usize,
+    flushed_lanes: fast_react_core::Lanes,
+    remaining_lanes: fast_react_core::Lanes,
+    continuation_lanes: fast_react_core::Lanes,
+    act_scope_depth: usize,
+    nested_act_scope: bool,
+    status: SchedulerActContinuationStatus,
+}
+
+#[allow(dead_code)]
+impl SchedulerActContinuationRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn sync_flush_order(self) -> usize {
+        self.sync_flush_order
+    }
+
+    #[must_use]
+    pub(crate) const fn flushed_lanes(self) -> fast_react_core::Lanes {
+        self.flushed_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> fast_react_core::Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn continuation_lanes(self) -> fast_react_core::Lanes {
+        self.continuation_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn act_scope_depth(self) -> usize {
+        self.act_scope_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn nested_act_scope(self) -> bool {
+        self.nested_act_scope
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> SchedulerActContinuationStatus {
+        self.status
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SchedulerActQueueRequest {
     kind: SchedulerActQueueTaskKind,
@@ -156,8 +232,11 @@ impl SchedulerCancellationRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SchedulerBridge {
     act_queue_active: bool,
+    act_scope_depth: usize,
     next_callback_handle: u64,
     next_microtask_handle: u64,
+    act_scope_boundary_records: Vec<SchedulerActScopeBoundaryRecord>,
+    act_continuation_records: Vec<SchedulerActContinuationRecord>,
     act_queue_requests: Vec<SchedulerActQueueRequest>,
     callback_requests: Vec<SchedulerCallbackRequest>,
     cancellation_records: Vec<SchedulerCancellationRecord>,
@@ -169,8 +248,11 @@ impl SchedulerBridge {
     pub const fn new() -> Self {
         Self {
             act_queue_active: false,
+            act_scope_depth: 0,
             next_callback_handle: 1,
             next_microtask_handle: 1,
+            act_scope_boundary_records: Vec::new(),
+            act_continuation_records: Vec::new(),
             act_queue_requests: Vec::new(),
             callback_requests: Vec::new(),
             cancellation_records: Vec::new(),
@@ -195,6 +277,71 @@ impl SchedulerBridge {
 
     pub fn set_act_queue_active(&mut self, active: bool) {
         self.act_queue_active = active;
+        self.act_scope_depth = usize::from(active);
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn enter_act_scope(&mut self) -> SchedulerActScopeBoundaryRecord {
+        let depth_before = self.act_scope_depth;
+        let depth_after = depth_before + 1;
+        self.act_scope_depth = depth_after;
+        self.act_queue_active = true;
+
+        let record = SchedulerActScopeBoundaryRecord {
+            kind: SchedulerActScopeBoundaryKind::Enter,
+            depth_before,
+            depth_after,
+            nested: depth_before > 0,
+        };
+        self.act_scope_boundary_records.push(record);
+        record
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn exit_act_scope(&mut self) -> SchedulerActScopeBoundaryRecord {
+        let depth_before = self.act_scope_depth;
+        let depth_after = depth_before.saturating_sub(1);
+        self.act_scope_depth = depth_after;
+        self.act_queue_active = depth_after > 0;
+
+        let record = SchedulerActScopeBoundaryRecord {
+            kind: SchedulerActScopeBoundaryKind::Exit,
+            depth_before,
+            depth_after,
+            nested: depth_before > 1,
+        };
+        self.act_scope_boundary_records.push(record);
+        record
+    }
+
+    pub(crate) fn record_sync_flush_act_continuation(
+        &mut self,
+        root: FiberRootId,
+        sync_flush_order: usize,
+        flushed_lanes: fast_react_core::Lanes,
+        remaining_lanes: fast_react_core::Lanes,
+        continuation_lanes: fast_react_core::Lanes,
+    ) -> Option<SchedulerActContinuationRecord> {
+        if !self.act_queue_active {
+            return None;
+        }
+
+        let record = SchedulerActContinuationRecord {
+            root,
+            sync_flush_order,
+            flushed_lanes,
+            remaining_lanes,
+            continuation_lanes,
+            act_scope_depth: self.act_scope_depth,
+            nested_act_scope: self.act_scope_depth > 1,
+            status: if continuation_lanes.is_non_empty() {
+                SchedulerActContinuationStatus::PendingContinuation
+            } else {
+                SchedulerActContinuationStatus::NoContinuation
+            },
+        };
+        self.act_continuation_records.push(record);
+        Some(record)
     }
 
     pub fn request_microtask(&mut self, kind: SchedulerMicrotaskKind) -> SchedulerMicrotaskRequest {
@@ -272,6 +419,18 @@ impl SchedulerBridge {
     }
 
     #[must_use]
+    #[cfg(test)]
+    pub(crate) fn act_scope_boundary_records(&self) -> &[SchedulerActScopeBoundaryRecord] {
+        &self.act_scope_boundary_records
+    }
+
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn act_continuation_records(&self) -> &[SchedulerActContinuationRecord] {
+        &self.act_continuation_records
+    }
+
+    #[must_use]
     pub fn callback_requests(&self) -> &[SchedulerCallbackRequest] {
         &self.callback_requests
     }
@@ -297,7 +456,7 @@ impl Default for SchedulerBridge {
 mod tests {
     use super::*;
     use crate::RootCallbackPriority;
-    use fast_react_core::Lane;
+    use fast_react_core::{Lane, Lanes};
 
     fn root_id(raw: u64) -> FiberRootId {
         FiberRootId::new(raw).unwrap()
@@ -335,6 +494,7 @@ mod tests {
         let request = bridge.request_act_root_schedule_task();
 
         assert!(bridge.is_act_queue_active());
+        assert_eq!(bridge.act_scope_depth, 1);
         assert_eq!(request.kind(), SchedulerActQueueTaskKind::RootSchedule);
         assert_eq!(request.node(), RootSchedulerCallbackHandle::NONE);
         assert_eq!(request.root(), None);
@@ -385,6 +545,81 @@ mod tests {
         );
         assert_eq!(bridge.act_queue_requests(), &[request]);
         assert!(bridge.callback_requests().is_empty());
+    }
+
+    #[test]
+    fn scheduler_bridge_records_nested_act_scope_boundaries() {
+        let mut bridge = SchedulerBridge::new();
+
+        let enter_outer = bridge.enter_act_scope();
+        let enter_nested = bridge.enter_act_scope();
+        let exit_nested = bridge.exit_act_scope();
+        let exit_outer = bridge.exit_act_scope();
+
+        assert_eq!(enter_outer.kind, SchedulerActScopeBoundaryKind::Enter);
+        assert_eq!(enter_outer.depth_before, 0);
+        assert_eq!(enter_outer.depth_after, 1);
+        assert!(!enter_outer.nested);
+        assert_eq!(enter_nested.kind, SchedulerActScopeBoundaryKind::Enter);
+        assert_eq!(enter_nested.depth_before, 1);
+        assert_eq!(enter_nested.depth_after, 2);
+        assert!(enter_nested.nested);
+        assert_eq!(exit_nested.kind, SchedulerActScopeBoundaryKind::Exit);
+        assert_eq!(exit_nested.depth_before, 2);
+        assert_eq!(exit_nested.depth_after, 1);
+        assert!(exit_nested.nested);
+        assert_eq!(exit_outer.kind, SchedulerActScopeBoundaryKind::Exit);
+        assert_eq!(exit_outer.depth_before, 1);
+        assert_eq!(exit_outer.depth_after, 0);
+        assert!(!exit_outer.nested);
+        assert!(!bridge.is_act_queue_active());
+        assert_eq!(bridge.act_scope_depth, 0);
+        assert_eq!(
+            bridge.act_scope_boundary_records(),
+            &[enter_outer, enter_nested, exit_nested, exit_outer]
+        );
+    }
+
+    #[test]
+    fn scheduler_bridge_records_act_continuation_only_while_active() {
+        let mut bridge = SchedulerBridge::new();
+        let root = root_id(1);
+
+        assert_eq!(
+            bridge.record_sync_flush_act_continuation(
+                root,
+                0,
+                Lanes::SYNC,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            ),
+            None
+        );
+
+        bridge.enter_act_scope();
+        bridge.enter_act_scope();
+        let record = bridge
+            .record_sync_flush_act_continuation(
+                root,
+                2,
+                Lanes::SYNC,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+
+        assert_eq!(record.root(), root);
+        assert_eq!(record.sync_flush_order(), 2);
+        assert_eq!(record.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(record.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.continuation_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.act_scope_depth(), 2);
+        assert!(record.nested_act_scope());
+        assert_eq!(
+            record.status(),
+            SchedulerActContinuationStatus::PendingContinuation
+        );
+        assert_eq!(bridge.act_continuation_records(), &[record]);
     }
 
     #[test]

@@ -12,7 +12,11 @@ use std::fmt::{self, Display, Formatter};
 use fast_react_core::Lanes;
 use fast_react_host_config::HostTypes;
 
-use crate::root_scheduler::{recompute_might_have_pending_sync_work, sync_flush_lanes_for_root};
+use crate::root_scheduler::{
+    recompute_might_have_pending_sync_work, sync_flush_act_continuation_lanes_for_root,
+    sync_flush_lanes_for_root,
+};
+use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootSyncFlushRecord,
@@ -27,6 +31,7 @@ pub struct SyncFlushRootRecord {
     render_lanes: Lanes,
     render_phase: HostRootRenderPhaseRecord,
     commit: HostRootCommitRecord,
+    act_continuation: Option<SchedulerActContinuationRecord>,
 }
 
 impl SyncFlushRootRecord {
@@ -245,18 +250,31 @@ fn commit_render_phase<H: HostTypes>(
     render_phase: HostRootRenderPhaseRecord,
 ) -> Result<SyncFlushRootRecord, SyncFlushError> {
     let commit = commit_finished_host_root(store, render_phase)?;
+    let continuation_lanes =
+        sync_flush_act_continuation_lanes_for_root(store, render_phase.root())?;
+    let act_continuation = store
+        .scheduler_bridge_mut()
+        .record_sync_flush_act_continuation(
+            render_phase.root(),
+            order,
+            render_phase.render_lanes(),
+            commit.remaining_lanes(),
+            continuation_lanes,
+        );
     Ok(SyncFlushRootRecord {
         order,
         root: render_phase.root(),
         render_lanes: render_phase.render_lanes(),
         render_phase,
         commit,
+        act_continuation,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         ExecutionContextState, RootElementHandle, RootOptions, RootSyncFlushRecordStatus,
@@ -398,6 +416,107 @@ mod tests {
         assert!(callbacks.hidden().is_empty());
         assert!(callbacks.deferred_hidden().is_empty());
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_handoff_records_no_act_continuation_when_act_queue_inactive() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(68));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+
+        assert_eq!(committed.remaining_lanes(), Lanes::NO);
+        assert_eq!(committed.act_continuation, None);
+        assert!(
+            store
+                .scheduler_bridge()
+                .act_continuation_records()
+                .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_handoff_records_nested_act_continuation_after_commit() {
+        let (mut store, root_id, host) = root_store();
+        let sync_element = RootElementHandle::from_raw(69);
+        let default_element = RootElementHandle::from_raw(70);
+        let enter_outer = store.scheduler_bridge_mut().enter_act_scope();
+        let enter_nested = store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, sync_element);
+        let default_update = update_container(&mut store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+
+        let continuation = committed.act_continuation.unwrap();
+        assert_eq!(continuation.root(), root_id);
+        assert_eq!(continuation.sync_flush_order(), committed.order());
+        assert_eq!(continuation.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(continuation.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(continuation.continuation_lanes(), Lanes::DEFAULT);
+        assert_eq!(continuation.act_scope_depth(), 2);
+        assert!(continuation.nested_act_scope());
+        assert_eq!(
+            continuation.status(),
+            SchedulerActContinuationStatus::PendingContinuation
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_continuation_records(),
+            &[continuation]
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_scope_boundary_records(),
+            &[enter_outer, enter_nested]
+        );
+        assert_eq!(current_host_root_element(&store, root_id), sync_element);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().microtask_requests().is_empty());
+    }
+
+    #[test]
+    fn sync_flush_handoff_records_active_act_boundary_without_pending_continuation() {
+        let (mut store, root_id, host) = root_store();
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(71));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+
+        let continuation = committed.act_continuation.unwrap();
+        assert_eq!(continuation.root(), root_id);
+        assert_eq!(continuation.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(continuation.remaining_lanes(), Lanes::NO);
+        assert_eq!(continuation.continuation_lanes(), Lanes::NO);
+        assert_eq!(continuation.act_scope_depth(), 1);
+        assert!(!continuation.nested_act_scope());
+        assert_eq!(
+            continuation.status(),
+            SchedulerActContinuationStatus::NoContinuation
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_continuation_records(),
+            &[continuation]
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
