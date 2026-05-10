@@ -1354,6 +1354,176 @@ test("private hydration text mismatch gate records recoverable-error metadata wi
   assert.deepEqual(document.__registrations, []);
 });
 
+test("private hydration text mismatch recoverable-error routing execution consumes accepted boundary metadata", () => {
+  const document = createDocument("text-mismatch-recoverable-execution");
+  const container = createElement("DIV", document);
+  const callbackCalls = [];
+  container.childNodes = [createText("server title")];
+
+  function onRecoverableError(error, errorInfo) {
+    callbackCalls.push({
+      error,
+      errorInfo,
+      message: error.message,
+      name: error.name
+    });
+  }
+
+  const hydrationOptions = {
+    identifierPrefix: "recoverable-execution-",
+    onRecoverableError
+  };
+  const record = hydrationGate
+    .createHydrationBoundaryGate({
+      markerOracle: oracle,
+      recordIdPrefix: "recoverable-execution"
+    })
+    .recordUnsupportedHydrateRoot(
+      container,
+      { props: { children: "client title" }, type: "App" },
+      hydrationOptions
+    );
+
+  const execution =
+    hydrationGate
+      .createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
+        record,
+        record.acceptedPrivateMetadataDiagnostics,
+        {
+          enableRecoverableErrorRoutingExecution: true,
+          hydrationOptions,
+          mismatchLabels: ["title"],
+          source: "conformance-text-mismatch-recoverable-execution"
+        }
+      );
+
+  assert.equal(
+    hydrationGate
+      .isPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
+        execution
+      ),
+    true
+  );
+  assert.equal(
+    execution.kind,
+    hydrationGate
+      .HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_RECORD_KIND
+  );
+  assert.equal(
+    execution.status,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingExecutionStatus
+  );
+  assert.equal(execution.acceptedBoundaryMetadataConsumed, true);
+  assert.equal(
+    execution.acceptedBoundaryMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    execution.acceptedBoundaryMetadataId,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId
+  );
+  assert.equal(
+    execution.acceptedBoundaryMetadataRow.gateId,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId
+  );
+  assert.equal(execution.recoverableErrorMetadata, record.recoverableErrorMetadata);
+  assert.equal(execution.textMismatchRowCount, 1);
+  assert.equal(execution.callbackInvocationRecordCount, 1);
+  assert.equal(execution.callbackInvocationErrorCount, 0);
+  assert.equal(execution.rootOptionCallbackConfigured, true);
+  assert.equal(execution.privateOnRecoverableErrorInvoked, true);
+  assert.equal(execution.onRecoverableErrorInvoked, true);
+  assert.equal(execution.publicOnRecoverableErrorInvoked, false);
+  assert.equal(execution.publicRootErrorCallbacksInvoked, false);
+  assert.equal(execution.recoverableErrorsQueued, false);
+  assert.equal(execution.hydration, false);
+  assert.equal(execution.canHydrate, false);
+  assert.equal(execution.domMutation, false);
+  assert.equal(execution.eventReplayInstalled, false);
+  assert.equal(execution.eventsReplayed, false);
+  assert.equal(execution.publicHydrateRootSupported, false);
+  assert.equal(execution.publicHydrationCompatibilityClaimed, false);
+  assert.equal(execution.compatibilityClaimed, false);
+  assert.deepEqual(
+    execution.callbackInvocationRecords.map((entry) => [
+      entry.phase,
+      entry.sourceLabel,
+      entry.textMismatchRowId,
+      entry.expectedText,
+      entry.actualText,
+      entry.callbackReturnStatus,
+      entry.onRecoverableErrorInvoked,
+      entry.publicOnRecoverableErrorInvoked,
+      entry.queuedRecoverableError
+    ]),
+    [
+      [
+        "hydration-text-mismatch-recoverable-error-routing-execution",
+        "title",
+        "recoverable-execution:1:text-mismatch:0",
+        "client title",
+        "server title",
+        "returned-undefined",
+        true,
+        false,
+        false
+      ]
+    ]
+  );
+
+  assert.equal(callbackCalls.length, 1);
+  assert.equal(
+    callbackCalls[0].message,
+    "Hydration failed because the server rendered text did not match the client."
+  );
+  assert.equal(callbackCalls[0].name, "Error");
+  assert.equal(callbackCalls[0].error instanceof Error, true);
+  assert.deepEqual(callbackCalls[0].errorInfo, {
+    componentStack: null
+  });
+
+  const payload =
+    hydrationGate
+      .getPrivateHydrationTextMismatchRecoverableErrorRoutingExecutionPayload(
+        execution
+      );
+  assert.equal(payload.callback, onRecoverableError);
+  assert.equal(payload.hydrationBoundaryRecord, record);
+  assert.equal(payload.hydrationOptions, hydrationOptions);
+  assert.equal(
+    payload.acceptedBoundaryMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(payload.callbackInvocationResults[0].error, callbackCalls[0].error);
+  assert.equal(
+    payload.callbackInvocationResults[0].errorInfo,
+    callbackCalls[0].errorInfo
+  );
+  assert.equal(container.childNodes[0].nodeValue, "server title");
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+
+  assert.throws(
+    () =>
+      hydrationGate
+        .createHydrationTextMismatchRecoverableErrorRoutingExecutionRecord(
+          record,
+          record.acceptedPrivateMetadataDiagnostics,
+          {
+            hydrationOptions
+          }
+        ),
+    {
+      code:
+        hydrationGate
+          .INVALID_HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_ROUTING_EXECUTION_CODE
+    }
+  );
+});
+
 test("private hydration replay error metadata connects ownership rows to root options", () => {
   const document = createDocument("replay-error-metadata");
   const container = createElement("DIV", document);

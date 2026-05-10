@@ -1829,6 +1829,8 @@ function markerContractId(marker) {
 function expectedAcceptedPrivateMetadataIds() {
   return [
     'hydration-replay-ownership',
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId,
     'resource-map-commit',
     'stylesheet-load-error-state',
     'form-action-event-extraction',
@@ -1839,6 +1841,8 @@ function expectedAcceptedPrivateMetadataIds() {
 function expectedAcceptedPrivateMetadataGateIds() {
   return [
     hydrationGate.privateHydrationReplayOwnershipGateId,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId,
     resourceFormGate.privateResourceHintResourceMapCommitGateId,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
     resourceFormGate.privateFormActionEventExtractionGateId,
@@ -1903,7 +1907,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
   assert.equal(diagnostics.resetQueueCommitted, false);
   assert.equal(diagnostics.formResetCommitted, false);
   assert.equal(diagnostics.realFormReset, false);
-  assert.equal(diagnostics.metadataIdCount, 5);
+  assert.equal(diagnostics.metadataIdCount, 6);
   assert.deepEqual(
     diagnostics.metadataIds,
     expectedAcceptedPrivateMetadataIds()
@@ -1914,6 +1918,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
   );
   assert.deepEqual(diagnostics.acceptedRecordTypes, [
     hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
     resourceFormGate.privateResourceHintResourceMapCommitRecordType,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateRecordType,
     resourceFormGate.privateFormActionEventExtractionRecordType,
@@ -1921,6 +1926,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
   ]);
   assert.deepEqual(diagnostics.acceptedStatuses, [
     'blocked-replay-ownership-retained-through-drain-order',
+    'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded',
     resourceFormGate.privateResourceHintResourceMapCommitStatus,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateStatus,
     resourceFormGate.privateFormActionEventExtractionRecordedStatus,
@@ -1946,6 +1952,22 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
           hydrationGate.HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
         acceptedStatus:
           'blocked-replay-ownership-retained-through-drain-order',
+        compatibilityClaimed: false,
+        promotesHydration: false,
+        promotesRootRender: false
+      },
+      {
+        metadataId:
+          hydrationGate
+            .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId,
+        category: 'hydration',
+        gateId:
+          hydrationGate
+            .privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId,
+        recordType:
+          hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
+        acceptedStatus:
+          'blocked-hydration-text-mismatch-recoverable-error-metadata-recorded',
         compatibilityClaimed: false,
         promotesHydration: false,
         promotesRootRender: false
@@ -2009,6 +2031,7 @@ function assertAcceptedPrivateMetadataDiagnostics(diagnostics, expected) {
     [
       ['public-hydration-replay', true],
       ['public-root-render', true],
+      ['public-recoverable-error-routing', true],
       ['resource-dom-insertion', true],
       ['stylesheet-runtime-state', true],
       ['form-action-execution', true],

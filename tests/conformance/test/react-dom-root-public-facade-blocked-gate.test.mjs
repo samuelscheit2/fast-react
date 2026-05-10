@@ -2009,6 +2009,8 @@ test("React DOM public root facade remains blocked with hydration resource/form 
   );
   assert.deepEqual(metadata.metadataIds, [
     "hydration-replay-ownership",
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId,
     "resource-map-commit",
     "stylesheet-load-error-state",
     "form-action-event-extraction",
@@ -2016,6 +2018,8 @@ test("React DOM public root facade remains blocked with hydration resource/form 
   ]);
   assert.deepEqual(metadata.gateIds, [
     hydrationGate.privateHydrationReplayOwnershipGateId,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingExecutionGateId,
     resourceFormGate.privateResourceHintResourceMapCommitGateId,
     resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId,
     resourceFormGate.privateFormActionEventExtractionGateId,
