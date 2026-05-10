@@ -1558,6 +1558,11 @@ impl HostRootOffscreenRevealCommitHandoffRecordForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn passive_visibility_effects_deferred(&self) -> bool {
+        self.execution_request.passive_visibility_effects_deferred()
+    }
+
+    #[must_use]
     pub(crate) fn public_compatibility_blocked(&self) -> bool {
         self.execution_request
             .public_offscreen_compatibility_blocked()
@@ -1566,6 +1571,12 @@ impl HostRootOffscreenRevealCommitHandoffRecordForCanary {
                 .public_activity_compatibility_blocked()
             && self.execution_request.public_root_rendering_blocked()
             && self.execution_request.public_compatibility_claim_blocked()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_passive_compatibility_blocked(&self) -> bool {
+        self.execution_request
+            .public_passive_compatibility_blocked()
     }
 }
 
@@ -1727,6 +1738,11 @@ impl HostRootOffscreenRevealCommitExecutionRequestForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn passive_visibility_effects_deferred(&self) -> bool {
+        self.reveal_metadata.passive_visibility_effects_blocked()
+    }
+
+    #[must_use]
     pub(crate) const fn newly_visible_suspensey_commit_traversal_blocked(&self) -> bool {
         true
     }
@@ -1754,6 +1770,11 @@ impl HostRootOffscreenRevealCommitExecutionRequestForCanary {
 
     #[must_use]
     pub(crate) const fn public_compatibility_claim_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_passive_compatibility_blocked(&self) -> bool {
         true
     }
 }
@@ -22393,7 +22414,9 @@ mod tests {
         assert!(handoff.consumed_finished_work_record());
         assert!(handoff.complete_metadata_matches_commit());
         assert!(handoff.visibility_commit_work_blocked());
+        assert!(handoff.passive_visibility_effects_deferred());
         assert!(handoff.public_compatibility_blocked());
+        assert!(handoff.public_passive_compatibility_blocked());
         assert_eq!(handoff.commit().root(), root_id);
         assert_eq!(
             handoff.commit().previous_current(),
@@ -22442,12 +22465,14 @@ mod tests {
         assert!(request.hidden_to_visible_reveal());
         assert!(request.host_visibility_mutation_blocked());
         assert!(request.passive_visibility_effects_blocked());
+        assert!(request.passive_visibility_effects_deferred());
         assert!(request.newly_visible_suspensey_commit_traversal_blocked());
         assert!(request.would_accumulate_newly_visible_suspensey_commit());
         assert!(request.public_offscreen_compatibility_blocked());
         assert!(request.public_activity_compatibility_blocked());
         assert!(request.public_root_rendering_blocked());
         assert!(request.public_compatibility_claim_blocked());
+        assert!(request.public_passive_compatibility_blocked());
         assert_eq!(
             request.actual_candidate_subtree_flags(),
             fixture.reveal_metadata.candidate_subtree_flags()

@@ -1015,7 +1015,9 @@ struct OffscreenHiddenLaneRevealCommitGateRecord {
     reveal_commit: OffscreenRevealCommitMetadataRecord,
     child_traversal_blocked: bool,
     host_visibility_mutation_blocked: bool,
+    passive_visibility_effects_deferred: bool,
     public_offscreen_compatibility_blocked: bool,
+    public_passive_compatibility_blocked: bool,
     public_activity_compatibility_blocked: bool,
 }
 
@@ -1082,8 +1084,18 @@ impl OffscreenHiddenLaneRevealCommitGateRecord {
     }
 
     #[must_use]
+    const fn passive_visibility_effects_deferred(&self) -> bool {
+        self.passive_visibility_effects_deferred
+    }
+
+    #[must_use]
     const fn public_offscreen_compatibility_blocked(&self) -> bool {
         self.public_offscreen_compatibility_blocked
+    }
+
+    #[must_use]
+    const fn public_passive_compatibility_blocked(&self) -> bool {
+        self.public_passive_compatibility_blocked
     }
 
     #[must_use]
@@ -1342,6 +1354,7 @@ fn offscreen_hidden_lane_reveal_commit_gate_for_test(
     }
 
     let reveal_commit = offscreen_reveal_commit_metadata_for_test(complete_work, committed_lanes)?;
+    let passive_visibility_effects_deferred = reveal_commit.passive_visibility_effects_blocked();
 
     Ok(OffscreenHiddenLaneRevealCommitGateRecord {
         root,
@@ -1356,7 +1369,9 @@ fn offscreen_hidden_lane_reveal_commit_gate_for_test(
         reveal_commit,
         child_traversal_blocked: complete_work.child_traversal_blocked(),
         host_visibility_mutation_blocked: complete_work.host_mutation_blocked(),
+        passive_visibility_effects_deferred,
         public_offscreen_compatibility_blocked: complete_work.public_compatibility_blocked(),
+        public_passive_compatibility_blocked: true,
         public_activity_compatibility_blocked: true,
     })
 }
@@ -10707,7 +10722,9 @@ mod tests {
         assert!(reveal.public_compatibility_blocked());
         assert!(record.child_traversal_blocked());
         assert!(record.host_visibility_mutation_blocked());
+        assert!(record.passive_visibility_effects_deferred());
         assert!(record.public_offscreen_compatibility_blocked());
+        assert!(record.public_passive_compatibility_blocked());
         assert!(record.public_activity_compatibility_blocked());
 
         let source = TestHostTree::new();

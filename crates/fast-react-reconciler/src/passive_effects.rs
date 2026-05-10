@@ -14,6 +14,8 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+#[cfg(test)]
+use fast_react_core::FiberTag;
 use fast_react_core::{
     FiberId, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes, RefHandle,
     StateNodeHandle,
@@ -22,6 +24,8 @@ use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostType
 
 use crate::function_component::FunctionComponentHookRenderPhase;
 use crate::host_tokens::HostFiberTokenId;
+#[cfg(test)]
+use crate::root_commit::HostRootOffscreenRevealCommitHandoffRecordForCanary;
 use crate::root_commit::{
     FunctionComponentCommittedPassiveEffectsSnapshot,
     FunctionComponentDeletedSubtreePassiveEffectsSnapshot, FunctionComponentEffectListCommitPhase,
@@ -2435,6 +2439,464 @@ impl EffectLifecycleExecutionSnapshot {
     pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
         false
     }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OffscreenPassiveDeferRevealEvidenceRecordForCanary {
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+    offscreen: FiberId,
+    hidden_subtree: FiberId,
+    hidden_subtree_tag: FiberTag,
+    hidden_update_lane: fast_react_core::Lane,
+    hidden_update_count: usize,
+    passive_record_count: usize,
+    hidden_subtree_passive_record_count: usize,
+    passive_unmount_count: usize,
+    passive_mount_count: usize,
+    first_passive_flush_index: Option<usize>,
+    first_passive_pending_order: Option<PendingPassiveEffectOrder>,
+    passive_visibility_effects_deferred: bool,
+    passive_callbacks_deferred: bool,
+    public_offscreen_compatibility_blocked: bool,
+    public_passive_compatibility_blocked: bool,
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private Offscreen passive reveal evidence is reserved for deterministic canaries"
+)]
+impl OffscreenPassiveDeferRevealEvidenceRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn offscreen(&self) -> FiberId {
+        self.offscreen
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_subtree(&self) -> FiberId {
+        self.hidden_subtree
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_subtree_tag(&self) -> FiberTag {
+        self.hidden_subtree_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_update_lane(&self) -> fast_react_core::Lane {
+        self.hidden_update_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_update_count(&self) -> usize {
+        self.hidden_update_count
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_record_count(&self) -> usize {
+        self.passive_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_subtree_passive_record_count(&self) -> usize {
+        self.hidden_subtree_passive_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_unmount_count(&self) -> usize {
+        self.passive_unmount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_mount_count(&self) -> usize {
+        self.passive_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn first_passive_flush_index(&self) -> Option<usize> {
+        self.first_passive_flush_index
+    }
+
+    #[must_use]
+    pub(crate) const fn first_passive_pending_order(&self) -> Option<PendingPassiveEffectOrder> {
+        self.first_passive_pending_order
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_visibility_effects_deferred(&self) -> bool {
+        self.passive_visibility_effects_deferred
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_callbacks_deferred(&self) -> bool {
+        self.passive_callbacks_deferred
+    }
+
+    #[must_use]
+    pub(crate) const fn public_offscreen_compatibility_blocked(&self) -> bool {
+        self.public_offscreen_compatibility_blocked
+    }
+
+    #[must_use]
+    pub(crate) const fn public_passive_compatibility_blocked(&self) -> bool {
+        self.public_passive_compatibility_blocked
+    }
+
+    #[must_use]
+    pub(crate) const fn proves_deferred_reveal_for_one_hidden_subtree(&self) -> bool {
+        self.passive_visibility_effects_deferred
+            && self.passive_callbacks_deferred
+            && self.public_offscreen_compatibility_blocked
+            && self.public_passive_compatibility_blocked
+            && self.hidden_subtree_passive_record_count == self.passive_record_count
+            && self.passive_record_count > 0
+            && self.passive_mount_count > 0
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OffscreenPassiveDeferRevealEvidenceErrorForCanary {
+    PassiveEffects(PassiveEffectsFlushError),
+    RevealCommitMismatch {
+        root: FiberRootId,
+    },
+    PassiveFlushRootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    PassiveFlushFinishedWorkMismatch {
+        root: FiberRootId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+    },
+    PassiveFlushLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    PassiveFlushNotConsumed {
+        root: FiberRootId,
+        status: PassiveEffectsFlushStatus,
+    },
+    MissingPassiveVisibilityDeferral {
+        root: FiberRootId,
+        offscreen: FiberId,
+    },
+    PublicOffscreenCompatibilityClaimed {
+        root: FiberRootId,
+        offscreen: FiberId,
+    },
+    PublicPassiveCompatibilityClaimed {
+        root: FiberRootId,
+    },
+    UnexpectedPassiveCallbackExecution {
+        root: FiberRootId,
+    },
+    MissingHiddenSubtreePassiveRecord {
+        root: FiberRootId,
+        hidden_subtree: FiberId,
+    },
+    PassiveRecordOutsideHiddenSubtree {
+        root: FiberRootId,
+        hidden_subtree: FiberId,
+        fiber: FiberId,
+    },
+}
+
+#[cfg(test)]
+impl Display for OffscreenPassiveDeferRevealEvidenceErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PassiveEffects(error) => Display::fmt(error, formatter),
+            Self::RevealCommitMismatch { root } => write!(
+                formatter,
+                "root {} Offscreen passive reveal evidence requires reveal metadata matching the committed root",
+                root.raw()
+            ),
+            Self::PassiveFlushRootMismatch { expected, actual } => write!(
+                formatter,
+                "Offscreen passive reveal evidence expected root {}, found root {}",
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::PassiveFlushFinishedWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} Offscreen passive reveal evidence expected finished work fiber slot {}, found {:?}",
+                root.raw(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get())
+            ),
+            Self::PassiveFlushLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} Offscreen passive reveal evidence lanes {:?} do not match committed lanes {:?}",
+                root.raw(),
+                actual,
+                expected
+            ),
+            Self::PassiveFlushNotConsumed { root, status } => write!(
+                formatter,
+                "root {} Offscreen passive reveal evidence requires a consumed passive flush, found {:?}",
+                root.raw(),
+                status
+            ),
+            Self::MissingPassiveVisibilityDeferral { root, offscreen } => write!(
+                formatter,
+                "root {} Offscreen fiber {} did not keep passive visibility effects deferred",
+                root.raw(),
+                offscreen.slot().get()
+            ),
+            Self::PublicOffscreenCompatibilityClaimed { root, offscreen } => write!(
+                formatter,
+                "root {} Offscreen fiber {} unexpectedly claimed public Offscreen compatibility",
+                root.raw(),
+                offscreen.slot().get()
+            ),
+            Self::PublicPassiveCompatibilityClaimed { root } => write!(
+                formatter,
+                "root {} Offscreen passive reveal evidence unexpectedly claimed public passive compatibility",
+                root.raw()
+            ),
+            Self::UnexpectedPassiveCallbackExecution { root } => write!(
+                formatter,
+                "root {} Offscreen passive reveal evidence expected deferred passive callbacks",
+                root.raw()
+            ),
+            Self::MissingHiddenSubtreePassiveRecord {
+                root,
+                hidden_subtree,
+            } => write!(
+                formatter,
+                "root {} hidden subtree fiber {} has no passive reveal record",
+                root.raw(),
+                hidden_subtree.slot().get()
+            ),
+            Self::PassiveRecordOutsideHiddenSubtree {
+                root,
+                hidden_subtree,
+                fiber,
+            } => write!(
+                formatter,
+                "root {} passive fiber {} is outside hidden subtree fiber {}",
+                root.raw(),
+                fiber.slot().get(),
+                hidden_subtree.slot().get()
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for OffscreenPassiveDeferRevealEvidenceErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::PassiveEffects(error) => Some(error),
+            Self::RevealCommitMismatch { .. }
+            | Self::PassiveFlushRootMismatch { .. }
+            | Self::PassiveFlushFinishedWorkMismatch { .. }
+            | Self::PassiveFlushLanesMismatch { .. }
+            | Self::PassiveFlushNotConsumed { .. }
+            | Self::MissingPassiveVisibilityDeferral { .. }
+            | Self::PublicOffscreenCompatibilityClaimed { .. }
+            | Self::PublicPassiveCompatibilityClaimed { .. }
+            | Self::UnexpectedPassiveCallbackExecution { .. }
+            | Self::MissingHiddenSubtreePassiveRecord { .. }
+            | Self::PassiveRecordOutsideHiddenSubtree { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<PassiveEffectsFlushError> for OffscreenPassiveDeferRevealEvidenceErrorForCanary {
+    fn from(error: PassiveEffectsFlushError) -> Self {
+        Self::PassiveEffects(error)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "crate-private Offscreen passive reveal evidence is reserved for deterministic canaries"
+)]
+pub(crate) fn record_offscreen_passive_defer_reveal_evidence_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    reveal_handoff: &HostRootOffscreenRevealCommitHandoffRecordForCanary,
+    passive_flush: &PassiveEffectsFlushResult,
+) -> Result<
+    OffscreenPassiveDeferRevealEvidenceRecordForCanary,
+    OffscreenPassiveDeferRevealEvidenceErrorForCanary,
+> {
+    let commit = reveal_handoff.commit();
+    let root = commit.root();
+    let reveal = reveal_handoff.reveal_metadata();
+    let offscreen = reveal.offscreen();
+    let hidden_subtree = reveal.child();
+
+    if !reveal_handoff.complete_metadata_matches_commit() {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::RevealCommitMismatch { root },
+        );
+    }
+    if passive_flush.root() != root {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::PassiveFlushRootMismatch {
+                expected: root,
+                actual: passive_flush.root(),
+            },
+        );
+    }
+    if passive_flush.finished_work() != Some(commit.finished_work()) {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::PassiveFlushFinishedWorkMismatch {
+                root,
+                expected: commit.finished_work(),
+                actual: passive_flush.finished_work(),
+            },
+        );
+    }
+    if passive_flush.lanes() != commit.finished_lanes() {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::PassiveFlushLanesMismatch {
+                root,
+                expected: commit.finished_lanes(),
+                actual: passive_flush.lanes(),
+            },
+        );
+    }
+    if !passive_flush.consumed_pending_passive() {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::PassiveFlushNotConsumed {
+                root,
+                status: passive_flush.status(),
+            },
+        );
+    }
+    let passive_visibility_effects_deferred = reveal_handoff.passive_visibility_effects_deferred();
+    if !passive_visibility_effects_deferred {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::MissingPassiveVisibilityDeferral {
+                root,
+                offscreen,
+            },
+        );
+    }
+    let public_offscreen_compatibility_blocked = reveal_handoff.public_compatibility_blocked();
+    if !public_offscreen_compatibility_blocked {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::PublicOffscreenCompatibilityClaimed {
+                root,
+                offscreen,
+            },
+        );
+    }
+
+    let public_passive_compatibility_blocked = reveal_handoff
+        .public_passive_compatibility_blocked()
+        && !passive_flush.public_effect_execution_enabled()
+        && !passive_flush.public_act_compatibility_claimed()
+        && !passive_flush.scheduler_driven_passive_execution_enabled();
+    if !public_passive_compatibility_blocked {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::PublicPassiveCompatibilityClaimed {
+                root,
+            },
+        );
+    }
+
+    let passive_callbacks_deferred = !passive_flush.did_execute_destroy_callbacks()
+        && !passive_flush.did_execute_mount_create_callbacks()
+        && passive_flush
+            .records()
+            .iter()
+            .all(|record| !record.destroy_callback_invoked() && !record.create_callback_invoked());
+    if !passive_callbacks_deferred {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::UnexpectedPassiveCallbackExecution {
+                root,
+            },
+        );
+    }
+
+    let mut hidden_subtree_passive_record_count = 0;
+    let mut passive_unmount_count = 0;
+    let mut passive_mount_count = 0;
+    let mut first_passive_flush_index = None;
+    let mut first_passive_pending_order = None;
+    for record in passive_flush.records() {
+        if !committed_subtree_contains_fiber(store, hidden_subtree, record.fiber())? {
+            return Err(
+                OffscreenPassiveDeferRevealEvidenceErrorForCanary::PassiveRecordOutsideHiddenSubtree {
+                    root,
+                    hidden_subtree,
+                    fiber: record.fiber(),
+                },
+            );
+        }
+
+        hidden_subtree_passive_record_count += 1;
+        first_passive_flush_index = first_passive_flush_index.or(Some(record.flush_index()));
+        first_passive_pending_order = first_passive_pending_order.or(Some(record.pending_order()));
+        match record.phase() {
+            PendingPassiveEffectPhase::Unmount => passive_unmount_count += 1,
+            PendingPassiveEffectPhase::Mount => passive_mount_count += 1,
+        }
+    }
+
+    if hidden_subtree_passive_record_count == 0 || passive_mount_count == 0 {
+        return Err(
+            OffscreenPassiveDeferRevealEvidenceErrorForCanary::MissingHiddenSubtreePassiveRecord {
+                root,
+                hidden_subtree,
+            },
+        );
+    }
+
+    Ok(OffscreenPassiveDeferRevealEvidenceRecordForCanary {
+        root,
+        finished_work: commit.finished_work(),
+        lanes: commit.finished_lanes(),
+        offscreen,
+        hidden_subtree,
+        hidden_subtree_tag: reveal.child_tag(),
+        hidden_update_lane: reveal_handoff.execution_request().hidden_update_lane(),
+        hidden_update_count: reveal_handoff.execution_request().hidden_update_count(),
+        passive_record_count: passive_flush.records().len(),
+        hidden_subtree_passive_record_count,
+        passive_unmount_count,
+        passive_mount_count,
+        first_passive_flush_index,
+        first_passive_pending_order,
+        passive_visibility_effects_deferred,
+        passive_callbacks_deferred,
+        public_offscreen_compatibility_blocked,
+        public_passive_compatibility_blocked,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4939,6 +5401,11 @@ fn execute_passive_mount_create_callbacks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::begin_work::{BeginWorkRequest, unsupported_offscreen_begin_work_record};
+    use crate::complete_work::{
+        complete_offscreen_visibility_transition_blocker_for_test,
+        offscreen_reveal_commit_metadata_for_test,
+    };
     use crate::function_component::{
         FunctionComponentEffectDependencyStatus, FunctionComponentEffectPhase,
         FunctionComponentHookRenderPhase, FunctionComponentHookRenderStore,
@@ -4950,8 +5417,10 @@ mod tests {
         FunctionComponentLayoutEffectCallbackInvocationTestControl,
         HostRootDeletionCleanupOrderPhase,
         commit_function_component_effect_queues_for_committed_root,
+        commit_offscreen_reveal_complete_metadata_handoff_for_canary,
         queue_function_component_deleted_subtree_pending_passive_effects,
         queue_function_component_pending_passive_effects,
+        record_host_root_finished_work_pending_commit_for_canary,
     };
     use crate::root_config::PendingPassiveUnmountOrigin;
     use crate::root_scheduler::schedule_passive_effects_flush_after_commit_for_canary;
@@ -4959,12 +5428,14 @@ mod tests {
     use crate::{
         RootElementHandle, RootErrorCallbackHandle, RootOptions,
         RootRecoverableErrorCallbackHandle, RootSchedulerCallbackHandle, RootSyncFlushExitStatus,
-        SchedulerPriority, commit_finished_host_root, ensure_root_is_scheduled,
-        render_host_root_for_lanes, update_container, update_container_sync,
+        RootUpdateCallbackHandle, SchedulerPriority, commit_finished_host_root,
+        ensure_root_is_scheduled, render_host_root_for_lanes, update_container,
+        update_container_sync,
     };
     use fast_react_core::{
-        DependenciesHandle, FiberMode, FiberTag, FiberTypeHandle, HookEffectCallbackHandle,
-        HookEffectDependencies, Lane, PropsHandle, RefHandle, StateNodeHandle,
+        DependenciesHandle, FiberFlags, FiberMode, FiberTag, FiberTypeHandle,
+        HookEffectCallbackHandle, HookEffectDependencies, Lane, PropsHandle, ReactKey, RefHandle,
+        StateHandle, StateNodeHandle,
     };
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
@@ -5015,6 +5486,60 @@ mod tests {
             .set_children(parent, &[child])
             .unwrap();
         child
+    }
+
+    fn attach_offscreen_passive_reveal_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberId) {
+        let previous = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            Some(ReactKey::from_normalized("passive-reveal")),
+            PropsHandle::from_raw(12_500),
+            FiberMode::CONCURRENT,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(previous).unwrap();
+            node.set_memoized_state(StateHandle::from_raw(12_501));
+            node.set_lanes(Lanes::OFFSCREEN);
+            node.set_child_lanes(Lanes::from(Lane::RETRY_1));
+            node.set_state_node(StateNodeHandle::from_raw(12_502));
+        }
+
+        let offscreen = store
+            .fiber_arena_mut()
+            .create_work_in_progress(previous, PropsHandle::from_raw(12_503))
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(offscreen).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(12_504));
+            node.set_memoized_state(StateHandle::NONE);
+            node.set_lanes(Lanes::DEFAULT);
+            node.set_child_lanes(Lanes::from(Lane::TRANSITION_1));
+            node.set_state_node(StateNodeHandle::from_raw(12_505));
+        }
+
+        let hidden_subtree = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(12_506),
+            FiberMode::CONCURRENT,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(hidden_subtree)
+            .unwrap()
+            .merge_flags(FiberFlags::PLACEMENT | FiberFlags::MAY_SUSPEND_COMMIT);
+        store
+            .fiber_arena_mut()
+            .set_children(offscreen, &[hidden_subtree])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[offscreen])
+            .unwrap();
+
+        (previous, offscreen, hidden_subtree)
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -6493,6 +7018,145 @@ mod tests {
             store.scheduler_bridge().microtask_requests().len(),
             microtask_request_count
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_offscreen_reveal_records_deferred_hidden_subtree_passive_evidence() {
+        let (mut store, root_id, host) = root_store();
+        let hidden_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(12_520),
+            Some(RootUpdateCallbackHandle::from_raw(12_521)),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden_update.update())
+            .unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_hidden_update(hidden_update.lane())
+            .unwrap();
+
+        let lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+        let render = render_host_root_for_lanes(&mut store, root_id, lanes).unwrap();
+        let (_, offscreen, hidden_subtree) =
+            attach_offscreen_passive_reveal_child(&mut store, render.finished_work());
+        let hidden_function = append_function_component_child(
+            &mut store,
+            hidden_subtree,
+            PropsHandle::from_raw(12_522),
+            FiberTypeHandle::from_raw(12_523),
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), hidden_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Mount);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(12_524),
+                deps(12_525),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            lanes,
+        )
+        .unwrap();
+        assert_eq!(queued.queued_unmount_count(), 0);
+        assert_eq!(queued.queued_mount_count(), 1);
+
+        let begin_work = unsupported_offscreen_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(offscreen, lanes),
+        )
+        .unwrap();
+        let complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+            store.fiber_arena(),
+            offscreen,
+            &begin_work,
+            lanes,
+        )
+        .unwrap();
+        let reveal_metadata =
+            offscreen_reveal_commit_metadata_for_test(&complete_work, lanes).unwrap();
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&mut store, render, 1)
+                .unwrap();
+        let reveal_handoff = commit_offscreen_reveal_complete_metadata_handoff_for_canary(
+            &mut store,
+            render,
+            Some(pending),
+            reveal_metadata,
+            2,
+        )
+        .unwrap();
+        assert!(reveal_handoff.passive_visibility_effects_deferred());
+        assert!(reveal_handoff.public_passive_compatibility_blocked());
+
+        let mut commit = reveal_handoff.commit().clone();
+        commit
+            .record_function_component_committed_passive_effects_for_canary(std::slice::from_ref(
+                &queued,
+            ))
+            .unwrap();
+        let passive_flush =
+            flush_passive_effects_after_commit_from_committed_fiber_effects_for_canary(
+                &mut store, &commit,
+            )
+            .unwrap();
+
+        let evidence = record_offscreen_passive_defer_reveal_evidence_for_canary(
+            &store,
+            &reveal_handoff,
+            &passive_flush,
+        )
+        .unwrap();
+
+        assert_eq!(evidence.root(), root_id);
+        assert_eq!(evidence.finished_work(), render.finished_work());
+        assert_eq!(evidence.lanes(), lanes);
+        assert_eq!(evidence.offscreen(), offscreen);
+        assert_eq!(evidence.hidden_subtree(), hidden_subtree);
+        assert_eq!(evidence.hidden_subtree_tag(), FiberTag::HostComponent);
+        assert_eq!(evidence.hidden_update_lane(), Lane::DEFAULT);
+        assert_eq!(evidence.hidden_update_count(), 1);
+        assert_eq!(evidence.passive_record_count(), 1);
+        assert_eq!(evidence.hidden_subtree_passive_record_count(), 1);
+        assert_eq!(evidence.passive_unmount_count(), 0);
+        assert_eq!(evidence.passive_mount_count(), 1);
+        assert_eq!(evidence.first_passive_flush_index(), Some(0));
+        assert_eq!(
+            evidence.first_passive_pending_order(),
+            Some(queued.records()[0].mount_order())
+        );
+        assert!(evidence.passive_visibility_effects_deferred());
+        assert!(evidence.passive_callbacks_deferred());
+        assert!(evidence.public_offscreen_compatibility_blocked());
+        assert!(evidence.public_passive_compatibility_blocked());
+        assert!(evidence.proves_deferred_reveal_for_one_hidden_subtree());
+
+        let record = passive_flush.records()[0];
+        assert_eq!(record.fiber(), hidden_function);
+        assert_eq!(record.effect(), Some(registration.effect()));
+        assert_eq!(record.create_callback(), Some(callback(12_524)));
+        assert!(!record.create_callback_invoked());
+        assert!(!passive_flush.public_effect_execution_enabled());
+        assert!(!passive_flush.public_act_compatibility_claimed());
+        assert!(!passive_flush.scheduler_driven_passive_execution_enabled());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
