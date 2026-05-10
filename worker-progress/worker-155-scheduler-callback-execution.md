@@ -1,12 +1,14 @@
 # Worker 155 - Scheduler Callback Execution
 
 ## Goal
-- Status: active
+- Status: complete
 - Objective: connect scheduled root callback records to the HostRoot render-phase entry point from worker 129, producing deterministic execution records and stale-callback behavior without owning sync flush, commit, or public Scheduler package behavior
 
 ## Progress
 - 2026-05-10: Goal created and confirmed with `get_goal`.
 - 2026-05-10: Implemented scheduler callback execution records and verified the required suites.
+- 2026-05-10: Integrated with current `main`, keeping the accepted sync-flush
+  scheduler records and adding callback execution records alongside them.
 
 ## Summary
 
@@ -89,7 +91,7 @@ cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warning
 git diff --check
 ```
 
-Full reconciler result: 66 unit tests passed plus 1 doctest.
+Integrated full reconciler result: 85 unit tests passed plus 1 doctest.
 
 Changed-path scope:
 
