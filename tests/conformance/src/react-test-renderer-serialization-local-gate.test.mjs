@@ -2196,6 +2196,152 @@ test("react-test-renderer JS private serialization finished-work identity valida
   }
 });
 
+test("react-test-renderer JS private native unmount serialization rejects finished-work identity evidence", () => {
+  const cjsEntrypoints = jsEntrypoints.filter((entry) =>
+    entry.entrypoint.startsWith("react-test-renderer/cjs/")
+  );
+
+  for (const entry of cjsEntrypoints) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    const jsonError = captureThrown(() => renderer.toJSON());
+    const jsonFacade = Object.getOwnPropertyDescriptor(
+      renderer.toJSON,
+      privateToJSONSerializationFacadeSymbol
+    ).value;
+    const treeError = captureThrown(() => renderer.toTree());
+    const treeFacade = Object.getOwnPropertyDescriptor(
+      renderer.toTree,
+      privateToTreeFacadeSymbol
+    ).value;
+    const unmountError = captureThrown(() => renderer.unmount());
+    const unmountExecutionRecord = createAcceptedNativeExecutionRecord(
+      unmountError.rootRequest
+    );
+
+    const jsonUnmountReport = createAcceptedEmptyRootHostOutputDiagnostic({
+      hostOutputUpdateKind: "Unmount"
+    });
+    assert.equal(
+      jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        jsonUnmountReport
+      ),
+      true
+    );
+    const jsonUnmountResult =
+      jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        jsonUnmountReport
+      );
+    assert.equal(jsonUnmountResult.operation, "unmount");
+    assert.equal(jsonUnmountResult.finishedWorkIdentity, null);
+    assert.equal(
+      jsonUnmountResult.consumesAcceptedFinishedWorkIdentityGate,
+      false
+    );
+
+    const jsonUnmountIdentityEvidence =
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: unmountError.rootRequest,
+        publicSurface: "create().toJSON",
+        sourceSerializationDiagnosticName:
+          "fast-react-test-renderer.serialization.private-json-canary",
+        consumesPrivateToJSONEvidence: true,
+        consumesPrivateToTreeEvidence: false,
+        hostOutputUpdateKind: "Unmount"
+      });
+    assert.equal(
+      jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        jsonUnmountReport,
+        jsonUnmountIdentityEvidence
+      ),
+      false
+    );
+    const jsonErrorWithIdentity = captureThrown(() =>
+      jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        jsonUnmountReport,
+        jsonUnmountIdentityEvidence
+      )
+    );
+    assert.equal(
+      jsonErrorWithIdentity.name,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assert.match(
+      jsonErrorWithIdentity.message,
+      /unmount.*finished-work identity/u
+    );
+    assert.equal(jsonErrorWithIdentity.nativeExecution, false);
+    assert.equal(jsonErrorWithIdentity.compatibilityClaimed, false);
+
+    const treeUnmountReport = createAcceptedUnmountTreeMetadataDiagnostic();
+    assert.equal(
+      treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        treeUnmountReport
+      ),
+      true
+    );
+    const treeUnmountResult =
+      treeFacade.createAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        treeUnmountReport
+      );
+    assert.equal(treeUnmountResult.operation, "unmount");
+    assert.equal(treeUnmountResult.finishedWorkIdentity, null);
+    assert.equal(
+      treeUnmountResult.consumesAcceptedFinishedWorkIdentityGate,
+      false
+    );
+
+    const treeUnmountIdentityEvidence =
+      createAcceptedFinishedWorkIdentityEvidence({
+        rootRequest: unmountError.rootRequest,
+        publicSurface: "create().toTree",
+        sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+        consumesPrivateToJSONEvidence: false,
+        consumesPrivateToTreeEvidence: true,
+        hostOutputUpdateKind: "Unmount"
+      });
+    assert.equal(
+      treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        treeUnmountReport,
+        treeUnmountIdentityEvidence
+      ),
+      false
+    );
+    const treeErrorWithIdentity = captureThrown(() =>
+      treeFacade.createAcceptedNativeExecutionDiagnosticResult(
+        unmountExecutionRecord,
+        treeUnmountReport,
+        treeUnmountIdentityEvidence
+      )
+    );
+    assert.equal(
+      treeErrorWithIdentity.name,
+      "FastReactTestRendererPrivateToTreeMetadataError"
+    );
+    assert.match(
+      treeErrorWithIdentity.message,
+      /unmount.*finished-work identity/u
+    );
+    assert.equal(treeErrorWithIdentity.nativeExecution, false);
+    assert.equal(treeErrorWithIdentity.compatibilityClaimed, false);
+    assert.equal(
+      jsonError.rootRequest.rootHandle,
+      treeError.rootRequest.rootHandle
+    );
+  }
+});
+
 test("react-test-renderer serialization scenario admission is explicit and blocked for public rows", () => {
   assert.deepEqual(
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS.map(
@@ -2295,6 +2441,27 @@ function captureThrown(callback) {
   }
 
   assert.fail("Expected callback to throw");
+}
+
+function createAcceptedNativeExecutionRecord(rootRequest) {
+  return {
+    kind: "FastReactTestRendererPrivateRootExecutionResult",
+    status: "accepted-private-test-renderer-root-execution-result",
+    request: rootRequest,
+    operation: rootRequest.operation,
+    requestId: rootRequest.requestId,
+    requestSequence: rootRequest.requestSequence,
+    rustOutcome: rootRequest.rustOutcome,
+    scheduled: true,
+    privateRootRequestExecution: true,
+    rustRootExecutionBridgeStatus:
+      "admitted-private-test-renderer-native-root-execution-bridge",
+    rustRootExecutionBoundaryCalled: true,
+    serializationAvailable: false,
+    publicRouteAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    compatibilityClaimed: false
+  };
 }
 
 function createAcceptedFinishedWorkIdentityEvidence({
@@ -2734,6 +2901,24 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
   attachToJSONUpdateUnmountRow(diagnostic, {
     previousRootChildCount: 1,
     currentRootChildCount: 1
+  });
+  return diagnostic;
+}
+
+function createAcceptedUnmountTreeMetadataDiagnostic() {
+  const diagnostic = {
+    diagnosticName: privateToTreeAcceptedDiagnosticName,
+    sourceJsonDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind: "Unmount",
+    hostOutputSnapshotCurrent: true,
+    rootChildCount: 0,
+    publicBlockers: createAcceptedPrivateJsonPublicBlockers(),
+    publicTreeObjectAvailable: false
+  };
+  attachToJSONUpdateUnmountRow(diagnostic, {
+    previousRootChildCount: 1,
+    currentRootChildCount: 0
   });
   return diagnostic;
 }

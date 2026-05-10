@@ -15662,6 +15662,14 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
     rootRequest,
     executionRecord
   );
+  if (
+    execution.operation === 'unmount' &&
+    finishedWorkIdentityEvidence !== undefined
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Private native unmount toTree serialization cannot accept finished-work identity evidence.'
+    );
+  }
   const finishedWorkIdentity =
     execution.operation === 'create' || execution.operation === 'update'
       ? createPrivateSerializationFinishedWorkIdentityGateResult(
@@ -16531,6 +16539,14 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     rootRequest,
     executionRecord
   );
+  if (
+    execution.operation === 'unmount' &&
+    finishedWorkIdentityEvidence !== undefined
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Private native unmount toJSON serialization cannot accept finished-work identity evidence.'
+    );
+  }
   const finishedWorkIdentity =
     execution.operation === 'create' || execution.operation === 'update'
       ? createPrivateSerializationFinishedWorkIdentityGateResult(
