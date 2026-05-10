@@ -2180,6 +2180,10 @@ const privateUnmountNativeBridgeCleanupHandoffDiagnosticId =
   'react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic';
 const privateUnmountNativeBridgeCleanupHandoffStatus =
   'private-unmount-native-bridge-cleanup-handoff-public-unmount-blocked';
+const privateUnmountPassiveRefCleanupOrderDiagnosticId =
+  'react-test-renderer-unmount-passive-ref-cleanup-order-private-diagnostic';
+const privateUnmountPassiveRefCleanupOrderStatus =
+  'private-unmount-passive-ref-cleanup-order-public-unmount-blocked';
 const privateUnmountHostChildDetachmentBlockers = Object.freeze({
   id: 'react-test-renderer-unmount-host-child-detachment-blockers',
   status:
@@ -2480,11 +2484,17 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
+  privateUnmountFinishedWorkIdentityGateAvailable: true,
   validatesUpdateRootRequestIdentity: true,
   updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
     'worker-726-test-renderer-update-native-serialization-identity-admission',
+  unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
   updateNativeExecutionRequiresFinishedWorkIdentity: true,
+  unmountNativeExecutionRequiresFinishedWorkIdentity: true,
   rejectsStaleUpdateFinishedWorkIdentity: true,
+  rejectsStaleUnmountFinishedWorkIdentity: true,
+  requiresUnmountDeletionCleanupHandoffEvidence: true,
   rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
@@ -2542,7 +2552,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   ]),
   acceptedHostOutputUpdateKinds: Object.freeze([
     'Create',
-    'Update'
+    'Update',
+    'Unmount'
   ]),
   propElisionFromSerializedProps: true,
   hostOutputSnapshotFreshnessRequired: true,
@@ -2562,6 +2573,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_json_update_native_execution_requires_finished_work_identity_gate',
+    'root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
@@ -2722,11 +2734,17 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
+  privateUnmountFinishedWorkIdentityGateAvailable: true,
   validatesUpdateRootRequestIdentity: true,
   updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
     'worker-726-test-renderer-update-native-serialization-identity-admission',
+  unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
   updateNativeExecutionRequiresFinishedWorkIdentity: true,
+  unmountNativeExecutionRequiresFinishedWorkIdentity: true,
   rejectsStaleUpdateFinishedWorkIdentity: true,
+  rejectsStaleUnmountFinishedWorkIdentity: true,
+  requiresUnmountDeletionCleanupHandoffEvidence: true,
   rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
@@ -2779,6 +2797,7 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
     'root_private_to_tree_update_native_execution_requires_finished_work_identity_gate',
+    'root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
@@ -3903,7 +3922,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
       'worker-639-test-renderer-tojson-after-native-execution',
     hostShapeApi:
       'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
-    acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update']),
+    acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update', 'Unmount']),
     acceptedHostRootShapes: freezeArray([
       'EmptyRoot',
       'SingleHostChild',
@@ -8059,6 +8078,15 @@ function normalizeAcceptedRustUnmountDeletionCommitHandoff(evidence) {
       'Expected Rust unmount deletion handoff cleanup blocker metadata.'
     );
   }
+  const passiveRefCleanupOrder =
+    normalizeAcceptedRustUnmountPassiveRefCleanupOrder(
+      readDiagnosticField(handoff, [
+        'passiveRefCleanupOrder',
+        'passiveRefCleanupOrderEvidence',
+        'passive_ref_cleanup_order',
+        'passive_ref_cleanup_order_evidence'
+      ])
+    );
 
   return freezeRecord({
     sourceDiagnostic: handoff,
@@ -8072,6 +8100,12 @@ function normalizeAcceptedRustUnmountDeletionCommitHandoff(evidence) {
       'rootRequestId',
       'requestId',
       'request_id'
+    ]),
+    requestSequence: readDiagnosticField(handoff, [
+      'rootRequestSequence',
+      'root_request_sequence',
+      'requestSequence',
+      'request_sequence'
     ]),
     rootId: readDiagnosticField(handoff, [
       'jsRootId',
@@ -8147,7 +8181,8 @@ function normalizeAcceptedRustUnmountDeletionCommitHandoff(evidence) {
       'act_flushing_claimed'
     ]),
     hostChildDetachmentBlockers:
-      normalizeAcceptedRustUnmountCleanupBlockers(blockers)
+      normalizeAcceptedRustUnmountCleanupBlockers(blockers),
+    passiveRefCleanupOrder
   });
 }
 
@@ -8173,6 +8208,15 @@ function normalizeAcceptedRustUnmountNativeBridgeCleanupHandoff(evidence) {
 
   const deletionCommitHandoff =
     normalizeAcceptedRustUnmountDeletionCommitHandoff(cleanupHandoff);
+  const passiveRefCleanupOrder =
+    normalizeAcceptedRustUnmountPassiveRefCleanupOrder(
+      readDiagnosticField(cleanupHandoff, [
+        'passiveRefCleanupOrder',
+        'passiveRefCleanupOrderEvidence',
+        'passive_ref_cleanup_order',
+        'passive_ref_cleanup_order_evidence'
+      ])
+    );
 
   return freezeRecord({
     sourceDiagnostic: cleanupHandoff,
@@ -8187,6 +8231,12 @@ function normalizeAcceptedRustUnmountNativeBridgeCleanupHandoff(evidence) {
       'root_request_id',
       'requestId',
       'request_id'
+    ]),
+    requestSequence: readDiagnosticField(cleanupHandoff, [
+      'rootRequestSequence',
+      'root_request_sequence',
+      'requestSequence',
+      'request_sequence'
     ]),
     rootId: readDiagnosticField(cleanupHandoff, [
       'jsRootId',
@@ -8247,9 +8297,24 @@ function normalizeAcceptedRustUnmountNativeBridgeCleanupHandoff(evidence) {
       'hostNodeCleanupCount',
       'host_node_cleanup_count'
     ]),
+    refCleanupReturnCount: readNonNegativeDiagnosticInteger(cleanupHandoff, [
+      'refCleanupReturnCount',
+      'ref_cleanup_return_count'
+    ]),
+    passiveDestroyCount: readNonNegativeDiagnosticInteger(cleanupHandoff, [
+      'passiveDestroyCount',
+      'passive_destroy_count'
+    ]),
     cleanupOrderRecordCount: readNonNegativeDiagnosticInteger(
       cleanupHandoff,
       ['cleanupOrderRecordCount', 'cleanup_order_record_count']
+    ),
+    nativeCleanupAfterRefAndPassiveOrdering: readBooleanDiagnosticField(
+      cleanupHandoff,
+      [
+        'nativeCleanupAfterRefAndPassiveOrdering',
+        'native_cleanup_after_ref_and_passive_ordering'
+      ]
     ),
     minimalTreeCleanupHandoff: readBooleanDiagnosticField(cleanupHandoff, [
       'minimalTreeCleanupHandoff',
@@ -8292,7 +8357,120 @@ function normalizeAcceptedRustUnmountNativeBridgeCleanupHandoff(evidence) {
       'nativeExecution',
       'native_execution'
     ]),
+    passiveRefCleanupOrder,
     deletionCommitHandoff
+  });
+}
+
+function normalizeAcceptedRustUnmountPassiveRefCleanupOrder(evidence) {
+  if (evidence === null || typeof evidence !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust unmount passive/ref cleanup order evidence.'
+    );
+  }
+
+  return freezeRecord({
+    sourceDiagnostic: evidence,
+    diagnosticId: readDiagnosticField(evidence, [
+      'diagnosticId',
+      'diagnostic_id',
+      'id'
+    ]),
+    status: readDiagnosticField(evidence, ['status']),
+    rootId: readDiagnosticField(evidence, [
+      'jsRootId',
+      'rootId',
+      'root_id',
+      'root'
+    ]),
+    refCleanupReturnCount: readNonNegativeDiagnosticInteger(evidence, [
+      'refCleanupReturnCount',
+      'ref_cleanup_return_count'
+    ]),
+    passiveDestroyCount: readNonNegativeDiagnosticInteger(evidence, [
+      'passiveDestroyCount',
+      'passive_destroy_count'
+    ]),
+    hostNodeCleanupCount: readNonNegativeDiagnosticInteger(evidence, [
+      'hostNodeCleanupCount',
+      'host_node_cleanup_count'
+    ]),
+    cleanupOrderRecordCount: readNonNegativeDiagnosticInteger(evidence, [
+      'cleanupOrderRecordCount',
+      'cleanup_order_record_count'
+    ]),
+    firstHostNodeCleanupOrder: readNullableNonNegativeDiagnosticInteger(
+      evidence,
+      ['firstHostNodeCleanupOrder', 'first_host_node_cleanup_order']
+    ),
+    lastRefCleanupReturnOrder: readNullableNonNegativeDiagnosticInteger(
+      evidence,
+      ['lastRefCleanupReturnOrder', 'last_ref_cleanup_return_order']
+    ),
+    firstPassiveDestroyOrder: readNullableNonNegativeDiagnosticInteger(
+      evidence,
+      ['firstPassiveDestroyOrder', 'first_passive_destroy_order']
+    ),
+    lastPassiveDestroyOrder: readNullableNonNegativeDiagnosticInteger(
+      evidence,
+      ['lastPassiveDestroyOrder', 'last_passive_destroy_order']
+    ),
+    refCleanupReturnPrecedesPassiveDestroy: readBooleanDiagnosticField(
+      evidence,
+      [
+        'refCleanupReturnPrecedesPassiveDestroy',
+        'ref_cleanup_return_precedes_passive_destroy'
+      ]
+    ),
+    hostCleanupFollowsRefCleanupReturn: readBooleanDiagnosticField(evidence, [
+      'hostCleanupFollowsRefCleanupReturn',
+      'host_cleanup_follows_ref_cleanup_return'
+    ]),
+    hostCleanupFollowsPassiveDestroy: readBooleanDiagnosticField(evidence, [
+      'hostCleanupFollowsPassiveDestroy',
+      'host_cleanup_follows_passive_destroy'
+    ]),
+    nativeCleanupAfterRefAndPassiveOrdering: readBooleanDiagnosticField(
+      evidence,
+      [
+        'nativeCleanupAfterRefAndPassiveOrdering',
+        'native_cleanup_after_ref_and_passive_ordering'
+      ]
+    ),
+    minimalTreeOrderingIsHostCleanupOnly: readBooleanDiagnosticField(
+      evidence,
+      [
+        'minimalTreeOrderingIsHostCleanupOnly',
+        'minimal_tree_ordering_is_host_cleanup_only'
+      ]
+    ),
+    refCleanupReturnCallbacksInvoked: readBooleanDiagnosticField(evidence, [
+      'refCleanupReturnCallbacksInvoked',
+      'ref_cleanup_return_callbacks_invoked'
+    ]),
+    passiveDestroyCallbacksInvoked: readBooleanDiagnosticField(evidence, [
+      'passiveDestroyCallbacksInvoked',
+      'passive_destroy_callbacks_invoked'
+    ]),
+    publicEffectsFlushed: readBooleanDiagnosticField(evidence, [
+      'publicEffectsFlushed',
+      'public_effects_flushed'
+    ]),
+    publicRefOrEffectCompatibilityClaimed: readBooleanDiagnosticField(
+      evidence,
+      [
+        'publicRefOrEffectCompatibilityClaimed',
+        'public_ref_or_effect_compatibility_claimed'
+      ]
+    ),
+    publicUnmountCompatibilityClaimed: readBooleanDiagnosticField(evidence, [
+      'publicUnmountCompatibilityClaimed',
+      'public_unmount_compatibility_claimed'
+    ]),
+    actFlushingClaimed: readBooleanDiagnosticField(evidence, [
+      'actFlushingClaimed',
+      'act_flushing_claimed'
+    ])
   });
 }
 
@@ -8371,15 +8549,17 @@ function assertAcceptedRustUnmountDeletionCommitHandoffMatchesRequest(
       'Rust unmount deletion handoff status does not match the accepted gate.'
     );
   }
-  if (
-    handoff.requestId !== undefined &&
-    handoff.requestId !== record.requestId
-  ) {
+  if (handoff.requestId !== record.requestId) {
     throwInvalidRootRequest(
       'Rust unmount deletion handoff request id does not match the private request.'
     );
   }
-  if (handoff.rootId !== undefined && handoff.rootId !== record.rootId) {
+  if (handoff.requestSequence !== record.requestSequence) {
+    throwInvalidRootRequest(
+      'Rust unmount deletion handoff request sequence does not match the private request.'
+    );
+  }
+  if (handoff.rootId !== record.rootId) {
     throwInvalidRootRequest(
       'Rust unmount deletion handoff root id does not match the private request.'
     );
@@ -8415,6 +8595,7 @@ function assertAcceptedRustUnmountDeletionCommitHandoffMatchesRequest(
     );
   }
   assertPrivateUnmountCleanupBlockersPresent(handoff);
+  assertPrivateUnmountPassiveRefCleanupOrderPresent(handoff);
   if (
     handoff.publicUnmountCompatibilityClaimed !== false ||
     handoff.publicHostTeardownCompatibilityClaimed !== false ||
@@ -8446,18 +8627,17 @@ function assertAcceptedRustUnmountNativeBridgeCleanupHandoffMatchesRequest(
       'Rust unmount cleanup handoff status does not match the accepted gate.'
     );
   }
-  if (
-    cleanupHandoff.requestId !== undefined &&
-    cleanupHandoff.requestId !== record.requestId
-  ) {
+  if (cleanupHandoff.requestId !== record.requestId) {
     throwInvalidRootRequest(
       'Rust unmount cleanup handoff request id does not match the private request.'
     );
   }
-  if (
-    cleanupHandoff.rootId !== undefined &&
-    cleanupHandoff.rootId !== record.rootId
-  ) {
+  if (cleanupHandoff.requestSequence !== record.requestSequence) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff request sequence does not match the private request.'
+    );
+  }
+  if (cleanupHandoff.rootId !== record.rootId) {
     throwInvalidRootRequest(
       'Rust unmount cleanup handoff root id does not match the private request.'
     );
@@ -8480,22 +8660,59 @@ function assertAcceptedRustUnmountNativeBridgeCleanupHandoffMatchesRequest(
       'Rust unmount cleanup handoff does not describe the accepted native bridge admission.'
     );
   }
+  assertPrivateUnmountPassiveRefCleanupOrderPresent(cleanupHandoff);
+  const hostOnlyCleanupVariant =
+    cleanupHandoff.minimalTreeCleanupHandoff === true &&
+    cleanupHandoff.hostNodeCleanupCount === 2 &&
+    cleanupHandoff.refCleanupReturnCount === 0 &&
+    cleanupHandoff.passiveDestroyCount === 0 &&
+    cleanupHandoff.cleanupOrderRecordCount === 2 &&
+    cleanupHandoff.nativeCleanupAfterRefAndPassiveOrdering === true &&
+    cleanupHandoff.passiveRefCleanupOrder
+      .minimalTreeOrderingIsHostCleanupOnly === true;
+  const refPassiveCleanupVariant =
+    cleanupHandoff.minimalTreeCleanupHandoff === false &&
+    cleanupHandoff.hostNodeCleanupCount === 2 &&
+    cleanupHandoff.refCleanupReturnCount === 1 &&
+    cleanupHandoff.passiveDestroyCount === 1 &&
+    cleanupHandoff.cleanupOrderRecordCount === 4 &&
+    cleanupHandoff.nativeCleanupAfterRefAndPassiveOrdering === true &&
+    cleanupHandoff.passiveRefCleanupOrder
+      .minimalTreeOrderingIsHostCleanupOnly === false;
   if (
     cleanupHandoff.previousRootChildCount !== 1 ||
     cleanupHandoff.currentRootChildCount !== 0 ||
     cleanupHandoff.detachedInstance !== true ||
     cleanupHandoff.detachedInstanceChildCount !== 0 ||
-    cleanupHandoff.minimalTreeCleanupHandoff !== true
+    hostOnlyCleanupVariant !== true &&
+      refPassiveCleanupVariant !== true
   ) {
     throwInvalidRootRequest(
-      'Rust unmount cleanup handoff does not describe the accepted minimal tree cleanup.'
+      'Rust unmount cleanup handoff does not describe an accepted unmount cleanup variant.'
     );
   }
   if (
     cleanupHandoff.hostNodeCleanupCount !==
       cleanupHandoff.deletionCommitHandoff.hostNodeCleanupCount ||
+    cleanupHandoff.refCleanupReturnCount !==
+      cleanupHandoff.passiveRefCleanupOrder.refCleanupReturnCount ||
+    cleanupHandoff.passiveDestroyCount !==
+      cleanupHandoff.passiveRefCleanupOrder.passiveDestroyCount ||
+    cleanupHandoff.cleanupOrderRecordCount !==
+      cleanupHandoff.hostNodeCleanupCount +
+        cleanupHandoff.refCleanupReturnCount +
+        cleanupHandoff.passiveDestroyCount ||
     cleanupHandoff.cleanupOrderRecordCount !==
       cleanupHandoff.deletionCommitHandoff.cleanupOrderRecordCount ||
+    cleanupHandoff.nativeCleanupAfterRefAndPassiveOrdering !==
+      cleanupHandoff.passiveRefCleanupOrder
+        .nativeCleanupAfterRefAndPassiveOrdering ||
+    cleanupHandoff.passiveRefCleanupOrder.hostNodeCleanupCount !==
+      cleanupHandoff.deletionCommitHandoff.passiveRefCleanupOrder
+        .hostNodeCleanupCount ||
+    cleanupHandoff.passiveRefCleanupOrder.cleanupOrderRecordCount !==
+      cleanupHandoff.deletionCommitHandoff.passiveRefCleanupOrder
+        .cleanupOrderRecordCount ||
     cleanupHandoff.rustUnmountCleanupHandoffExecuted !== true ||
     cleanupHandoff.hostOutputProduced !== true
   ) {
@@ -8514,6 +8731,9 @@ function assertAcceptedRustUnmountNativeBridgeCleanupHandoffMatchesRequest(
       'Rust unmount cleanup handoff must not claim public unmount, host teardown, act flushing, native bridge availability, or native execution.'
     );
   }
+  assertPrivateUnmountPassiveRefCleanupOrderPresent(
+    cleanupHandoff.deletionCommitHandoff
+  );
 }
 
 function assertPrivateUnmountCleanupBlockersPresent(handoff) {
@@ -8527,7 +8747,14 @@ function assertPrivateUnmountCleanupBlockersPresent(handoff) {
       'Rust unmount deletion handoff cleanup records do not match the commit.'
     );
   }
-  if (handoff.cleanupOrderRecordCount !== handoff.hostNodeCleanupCount) {
+  const passiveRefCleanupOrder = handoff.passiveRefCleanupOrder;
+  const expectedCleanupOrderRecordCount =
+    passiveRefCleanupOrder == null
+      ? handoff.hostNodeCleanupCount
+      : passiveRefCleanupOrder.refCleanupReturnCount +
+        passiveRefCleanupOrder.passiveDestroyCount +
+        passiveRefCleanupOrder.hostNodeCleanupCount;
+  if (handoff.cleanupOrderRecordCount !== expectedCleanupOrderRecordCount) {
     throwInvalidRootRequest(
       'Rust unmount deletion handoff cleanup order evidence is incomplete.'
     );
@@ -8561,6 +8788,84 @@ function assertPrivateUnmountCleanupBlockersPresent(handoff) {
   ) {
     throwInvalidRootRequest(
       'Rust unmount cleanup blockers must not claim public unmount, host teardown, or act flushing.'
+    );
+  }
+}
+
+function assertPrivateUnmountPassiveRefCleanupOrderPresent(handoff) {
+  const order = handoff.passiveRefCleanupOrder;
+  if (order.diagnosticId !== privateUnmountPassiveRefCleanupOrderDiagnosticId) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order diagnostic id does not match the accepted gate.'
+    );
+  }
+  if (order.status !== privateUnmountPassiveRefCleanupOrderStatus) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order status does not match the accepted gate.'
+    );
+  }
+  if (order.rootId !== handoff.rootId) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order root id does not match the deletion handoff.'
+    );
+  }
+  if (
+    order.hostNodeCleanupCount !== handoff.hostNodeCleanupCount ||
+    order.cleanupOrderRecordCount !== handoff.cleanupOrderRecordCount ||
+    order.cleanupOrderRecordCount !==
+      order.refCleanupReturnCount +
+        order.passiveDestroyCount +
+        order.hostNodeCleanupCount
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order counts do not match the native cleanup handoff.'
+    );
+  }
+  if (
+    order.refCleanupReturnPrecedesPassiveDestroy !== true ||
+    order.hostCleanupFollowsRefCleanupReturn !== true ||
+    order.hostCleanupFollowsPassiveDestroy !== true ||
+    order.nativeCleanupAfterRefAndPassiveOrdering !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order does not place native cleanup after accepted ref/passive ordering.'
+    );
+  }
+  const hostOnlyCleanup =
+    order.refCleanupReturnCount === 0 &&
+    order.passiveDestroyCount === 0 &&
+    order.hostNodeCleanupCount === 2 &&
+    order.cleanupOrderRecordCount === 2 &&
+    order.firstHostNodeCleanupOrder === 0 &&
+    order.lastRefCleanupReturnOrder === null &&
+    order.firstPassiveDestroyOrder === null &&
+    order.lastPassiveDestroyOrder === null &&
+    order.minimalTreeOrderingIsHostCleanupOnly === true;
+  const refPassiveCleanup =
+    order.refCleanupReturnCount === 1 &&
+    order.passiveDestroyCount === 1 &&
+    order.hostNodeCleanupCount === 2 &&
+    order.cleanupOrderRecordCount === 4 &&
+    order.firstHostNodeCleanupOrder === 2 &&
+    order.lastRefCleanupReturnOrder === 0 &&
+    order.firstPassiveDestroyOrder === 1 &&
+    order.lastPassiveDestroyOrder === 1 &&
+    order.minimalTreeOrderingIsHostCleanupOnly === false;
+  if (hostOnlyCleanup !== true && refPassiveCleanup !== true) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order does not describe an accepted cleanup variant.'
+    );
+  }
+  if (
+    order.refCleanupReturnCallbacksInvoked !== false ||
+    order.passiveDestroyCallbacksInvoked !== false ||
+    order.publicEffectsFlushed !== false ||
+    order.publicRefOrEffectCompatibilityClaimed !== false ||
+    order.publicUnmountCompatibilityClaimed !== false ||
+    order.actFlushingClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount passive/ref cleanup order must not claim public ref/effect, passive flush, act, or unmount behavior.'
     );
   }
 }
@@ -8602,12 +8907,19 @@ function createPrivateUnmountNativeBridgeAdmissionRecord({
     validatesLifecycleEvidence: true,
     validatesCleanupBlockers: true,
     validatesMinimalTreeCleanupHandoff: true,
+    validatesPassiveRefCleanupOrder: true,
+    tiesNativeCleanupToRefDetachmentAndPassiveDestroyOrder: true,
     deletionCommitHandoffAccepted: true,
     cleanupHandoffAccepted: true,
     lifecycleEvidenceAccepted: true,
     cleanupBlockersAccepted: true,
+    passiveRefCleanupOrderAccepted: true,
     hostNodeCleanupCount: deletionCommitHandoff.hostNodeCleanupCount,
+    refCleanupReturnCount: cleanupHandoff.refCleanupReturnCount,
+    passiveDestroyCount: cleanupHandoff.passiveDestroyCount,
     cleanupOrderRecordCount: deletionCommitHandoff.cleanupOrderRecordCount,
+    nativeCleanupAfterRefAndPassiveOrdering:
+      cleanupHandoff.nativeCleanupAfterRefAndPassiveOrdering,
     rustUnmountCleanupHandoffExecuted:
       cleanupHandoff.rustUnmountCleanupHandoffExecuted,
     hostOutputProduced: cleanupHandoff.hostOutputProduced,
@@ -8642,6 +8954,19 @@ function readNonNegativeDiagnosticInteger(record, names) {
   if (!isNonNegativeInteger(value)) {
     throwInvalidRootRequest(
       `Expected non-negative integer private unmount diagnostic field: ${names[0]}.`
+    );
+  }
+  return value;
+}
+
+function readNullableNonNegativeDiagnosticInteger(record, names) {
+  const value = readDiagnosticField(record, names);
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isNonNegativeInteger(value)) {
+    throwInvalidRootRequest(
+      `Expected nullable non-negative integer private unmount diagnostic field: ${names[0]}.`
     );
   }
   return value;
@@ -9565,6 +9890,7 @@ function consumeRootExecutionResult(record, result, handoff) {
     operation: record.operation,
     requestId: record.requestId,
     requestSequence: record.requestSequence,
+    rootId: record.rootId,
     updateKind: record.updateKind,
     rustOutcome: record.rustOutcome,
     scheduled: record.scheduled,
@@ -9980,11 +10306,17 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
+    privateUnmountFinishedWorkIdentityGateAvailable: true,
     validatesUpdateRootRequestIdentity: true,
     updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
       toJSONPrivateSerializationFacadeGate.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
+      toJSONPrivateSerializationFacadeGate.unmountNativeExecutionFinishedWorkIdentityAdmissionWorker,
     updateNativeExecutionRequiresFinishedWorkIdentity: true,
+    unmountNativeExecutionRequiresFinishedWorkIdentity: true,
     rejectsStaleUpdateFinishedWorkIdentity: true,
+    rejectsStaleUnmountFinishedWorkIdentity: true,
+    requiresUnmountDeletionCleanupHandoffEvidence: true,
     rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
@@ -10135,11 +10467,17 @@ function createPrivateToTreeFacade(rootRequest) {
     privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
+    privateUnmountFinishedWorkIdentityGateAvailable: true,
     validatesUpdateRootRequestIdentity: true,
     updateNativeExecutionFinishedWorkIdentityAdmissionWorker:
       toTreePrivateFacadeGate.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    unmountNativeExecutionFinishedWorkIdentityAdmissionWorker:
+      toTreePrivateFacadeGate.unmountNativeExecutionFinishedWorkIdentityAdmissionWorker,
     updateNativeExecutionRequiresFinishedWorkIdentity: true,
+    unmountNativeExecutionRequiresFinishedWorkIdentity: true,
     rejectsStaleUpdateFinishedWorkIdentity: true,
+    rejectsStaleUnmountFinishedWorkIdentity: true,
+    requiresUnmountDeletionCleanupHandoffEvidence: true,
     rejectsMultichildUpdateNativeExecutionIdentityAdmission: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
@@ -10642,25 +10980,20 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
     rootRequest,
     executionRecord
   );
-  if (
-    execution.operation === 'unmount' &&
-    finishedWorkIdentityEvidence !== undefined
-  ) {
-    throwPrivateToTreeMetadataError(
-      'Private native unmount toTree serialization cannot accept finished-work identity evidence.'
-    );
-  }
   const finishedWorkIdentity =
-    execution.operation === 'create' || execution.operation === 'update'
-      ? createPrivateSerializationFinishedWorkIdentityGateResult(
-          rootRequest,
-          'create().toTree',
-          privateToTreeAcceptedDiagnosticName,
-          finishedWorkIdentityEvidence,
-          report,
-          execution.request
-        )
-      : null;
+    createPrivateSerializationFinishedWorkIdentityGateResult(
+      rootRequest,
+      'create().toTree',
+      privateToTreeAcceptedDiagnosticName,
+      finishedWorkIdentityEvidence,
+      report,
+      execution.request
+    );
+  validatePrivateUnmountNativeExecutionFinishedWorkIdentity(
+    'create().toTree',
+    execution,
+    finishedWorkIdentity
+  );
   const diagnostic = validatePrivateToTreeNativeExecutionDiagnostic(report);
   const expectedHostOutputUpdateKind =
     hostOutputUpdateKindForRootExecutionOperation(execution.operation);
@@ -11488,25 +11821,20 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     rootRequest,
     executionRecord
   );
-  if (
-    execution.operation === 'unmount' &&
-    finishedWorkIdentityEvidence !== undefined
-  ) {
-    throwPrivateToJSONSerializationError(
-      'Private native unmount toJSON serialization cannot accept finished-work identity evidence.'
-    );
-  }
   const finishedWorkIdentity =
-    execution.operation === 'create' || execution.operation === 'update'
-      ? createPrivateSerializationFinishedWorkIdentityGateResult(
-          rootRequest,
-          'create().toJSON',
-          privateToJSONAcceptedDiagnosticName,
-          finishedWorkIdentityEvidence,
-          report,
-          execution.request
-        )
-      : null;
+    createPrivateSerializationFinishedWorkIdentityGateResult(
+      rootRequest,
+      'create().toJSON',
+      privateToJSONAcceptedDiagnosticName,
+      finishedWorkIdentityEvidence,
+      report,
+      execution.request
+    );
+  validatePrivateUnmountNativeExecutionFinishedWorkIdentity(
+    'create().toJSON',
+    execution,
+    finishedWorkIdentity
+  );
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
   const expectedHostOutputUpdateKind =
     hostOutputUpdateKindForRootExecutionOperation(execution.operation);
@@ -11827,6 +12155,8 @@ function rootRequestOperationForHostOutputUpdateKind(
       return 'create';
     case 'Update':
       return 'update';
+    case 'Unmount':
+      return 'unmount';
     default:
       throwPrivateSerializationFinishedWorkIdentityError(
         publicSurface,
@@ -12131,6 +12461,216 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
   if (publicBlockers !== undefined) {
     assertPrivateToJSONPublicBlockers(publicBlockers);
   }
+  if (identity.hostOutputUpdateKind === 'Unmount') {
+    validatePrivateUnmountSerializationFinishedWorkIdentitySourceReport(
+      publicSurface,
+      report
+    );
+  }
+}
+
+function validatePrivateUnmountSerializationFinishedWorkIdentitySourceReport(
+  publicSurface,
+  report
+) {
+  try {
+    const diagnostic =
+      publicSurface === 'create().toTree'
+        ? validatePrivateToTreeNativeExecutionDiagnostic(report)
+        : validatePrivateToJSONHostOutputDiagnostic(report);
+    if (
+      diagnostic.hostOutputUpdateKind !== 'Unmount' ||
+      diagnostic.hostOutputShape !== 'EmptyRoot' ||
+      diagnostic.hostOutputRow === null ||
+      diagnostic.hostOutputRow.id !== privateToJSONUnmountHostOutputRowId ||
+      diagnostic.rootChildCount !== 0 ||
+      diagnostic.result !== null
+    ) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private unmount serialization finished-work identity requires empty-root row evidence.'
+      );
+    }
+    if (
+      publicSurface === 'create().toJSON' &&
+      diagnostic.sourceNodeCount !== 0
+    ) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private unmount toJSON finished-work identity requires an empty source report.'
+      );
+    }
+    if (
+      publicSurface === 'create().toTree' &&
+      diagnostic.sourceFiberCount !== 0
+    ) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private unmount toTree finished-work identity requires an empty source report.'
+      );
+    }
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      (error.code === 'FAST_REACT_TEST_RENDERER_PRIVATE_TOJSON_SERIALIZATION' ||
+        error.code === 'FAST_REACT_TEST_RENDERER_PRIVATE_TOTREE_METADATA')
+    ) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        error instanceof Error
+          ? error.message
+          : 'Private unmount serialization source report is not accepted.'
+      );
+    }
+    throw error;
+  }
+}
+
+function validatePrivateUnmountNativeExecutionFinishedWorkIdentity(
+  publicSurface,
+  execution,
+  identity
+) {
+  if (execution.operation !== 'unmount') {
+    return;
+  }
+  const request = execution.request;
+  if (!isRootRequestRecord(request) || request.operation !== 'unmount') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization requires an unmount root request.'
+    );
+  }
+  if (
+    execution.requestId !== request.requestId ||
+    execution.requestSequence !== request.requestSequence ||
+    execution.rootId !== request.rootId ||
+    identity.rootRequest !== request ||
+    identity.rootRequestId !== request.requestId ||
+    identity.rootRequestSequence !== request.requestSequence ||
+    identity.rootRequestOperation !== 'unmount' ||
+    identity.rootId !== request.rootId ||
+    identity.hostOutputUpdateKind !== 'Unmount'
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization finished-work identity is stale.'
+    );
+  }
+
+  const admission = readDiagnosticField(execution, [
+    'privateUnmountNativeBridgeAdmission',
+    'private_unmount_native_bridge_admission'
+  ]);
+  if (!isObjectLike(admission)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization requires accepted deletion and cleanup handoff evidence.'
+    );
+  }
+  const cleanupHandoff =
+    readDiagnosticField(execution, [
+      'privateUnmountNativeBridgeCleanupHandoff',
+      'private_unmount_native_bridge_cleanup_handoff'
+    ]) ??
+    readDiagnosticField(admission, ['cleanupHandoff', 'cleanup_handoff']);
+  const deletionCommitHandoff =
+    readDiagnosticField(admission, [
+      'deletionCommitHandoff',
+      'deletion_commit_handoff'
+    ]) ??
+    readDiagnosticField(cleanupHandoff, [
+      'deletionCommitHandoff',
+      'deletion_commit_handoff'
+    ]);
+  if (!isObjectLike(cleanupHandoff) || !isObjectLike(deletionCommitHandoff)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization requires accepted deletion and cleanup handoff evidence.'
+    );
+  }
+
+  if (
+    admission.id !== privateUnmountNativeBridgeAdmissionDiagnosticId ||
+    admission.status !== privateUnmountNativeBridgeAdmissionStatus ||
+    admission.operation !== 'unmount' ||
+    admission.request !== request ||
+    admission.requestId !== request.requestId ||
+    admission.requestSequence !== request.requestSequence ||
+    admission.rootId !== request.rootId ||
+    admission.updateKind !== testRendererRootUpdateKindUnmount ||
+    admission.updateOutcome !== testRendererRootUpdateOutcomeScheduled ||
+    admission.scheduled !== true ||
+    admission.cleanupHandoffDiagnosticId !==
+      privateUnmountNativeBridgeCleanupHandoffDiagnosticId ||
+    admission.deletionCommitHandoffDiagnosticId !==
+      privateUnmountDeletionCommitHandoffDiagnosticId
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization admission metadata is stale.'
+    );
+  }
+  for (const field of [
+    'consumesPrivateUnmountRouteMetadata',
+    'consumesAcceptedRustLifecycleDiagnostics',
+    'consumesAcceptedDeletionCommitHandoff',
+    'consumesActualRustCleanupHandoff',
+    'requiresActualRustCleanupHandoff',
+    'deletionCommitHandoffAccepted',
+    'cleanupHandoffAccepted',
+    'lifecycleEvidenceAccepted',
+    'cleanupBlockersAccepted',
+    'passiveRefCleanupOrderAccepted',
+    'nativeCleanupAfterRefAndPassiveOrdering',
+    'rustUnmountCleanupHandoffExecuted',
+    'hostOutputProduced'
+  ]) {
+    if (admission[field] !== true) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private native unmount serialization admission is missing cleanup/deletion evidence.'
+      );
+    }
+  }
+  if (
+    admission.publicRouteAvailable !== false ||
+    admission.publicUnmountCompatibilityClaimed !== false ||
+    admission.publicHostTeardownCompatibilityClaimed !== false ||
+    admission.actFlushingClaimed !== false ||
+    admission.nativeBridgeAvailable !== false ||
+    admission.nativeExecution !== false ||
+    admission.compatibilityClaimed !== false ||
+    execution.serializationAvailable !== false ||
+    execution.publicRouteAvailable !== false ||
+    execution.publicCreateUpdateUnmountBehaviorAvailable !== false ||
+    execution.nativeAddonLoaded !== false ||
+    execution.nativeBridgeAvailable !== false ||
+    execution.nativeExecution !== false ||
+    execution.compatibilityClaimed !== false
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization cannot claim public or native compatibility.'
+    );
+  }
+
+  try {
+    assertAcceptedRustUnmountDeletionCommitHandoffMatchesRequest(
+      request,
+      deletionCommitHandoff
+    );
+    assertAcceptedRustUnmountNativeBridgeCleanupHandoffMatchesRequest(
+      request,
+      cleanupHandoff
+    );
+  } catch (_error) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private native unmount serialization cleanup handoff evidence is not accepted.'
+    );
+  }
 }
 
 function throwPrivateSerializationFinishedWorkIdentityError(
@@ -12222,6 +12762,9 @@ function consumeAcceptedToJSONNativeExecutionRecordImpl(
   if (
     consumed.request !== request ||
     consumed.operation !== request.operation ||
+    consumed.requestId !== request.requestId ||
+    consumed.requestSequence !== request.requestSequence ||
+    consumed.rootId !== request.rootId ||
     consumed.rustOutcome !== request.rustOutcome ||
     consumed.privateRootRequestExecution !== true ||
     consumed.rustRootExecutionBridgeStatus !==
@@ -12245,6 +12788,15 @@ function consumeAcceptedToJSONNativeExecutionRecordImpl(
   ) {
     throwPrivateToJSONSerializationError(
       'Private native toJSON evidence cannot claim public serialization compatibility.'
+    );
+  }
+  if (
+    consumed.nativeAddonLoaded === true ||
+    consumed.nativeBridgeAvailable === true ||
+    consumed.nativeExecution === true
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Private native toJSON evidence cannot claim native bridge loading or execution.'
     );
   }
 

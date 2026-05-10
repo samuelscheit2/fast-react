@@ -2350,7 +2350,17 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     facade.updateNativeExecutionRequiresFinishedWorkIdentity,
     true
   );
+  assert.equal(
+    facade.unmountNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    "worker-733-test-renderer-unmount-finished-work-identity"
+  );
+  assert.equal(
+    facade.unmountNativeExecutionRequiresFinishedWorkIdentity,
+    true
+  );
   assert.equal(facade.rejectsStaleUpdateFinishedWorkIdentity, true);
+  assert.equal(facade.rejectsStaleUnmountFinishedWorkIdentity, true);
+  assert.equal(facade.requiresUnmountDeletionCleanupHandoffEvidence, true);
   assert.equal(
     facade.rejectsMultichildUpdateNativeExecutionIdentityAdmission,
     true
@@ -2392,6 +2402,7 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.deepEqual(facade.nativeExecutionAcceptedRustTests, [
     "root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records",
     "root_private_to_json_update_native_execution_requires_finished_work_identity_gate",
+    "root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate",
     "root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row",
     "root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row",
     "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
@@ -2785,6 +2796,29 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     unmountError.rootRequest,
     executor
   );
+  const unmountJSONIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: unmountError.rootRequest,
+    publicSurface: "create().toJSON",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    consumesPrivateToJSONEvidence: true,
+    consumesPrivateToTreeEvidence: false,
+    hostOutputUpdateKind: "Unmount"
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      unmountResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        rootNodeKind: "EmptyRoot",
+        nodes: []
+      })
+    ),
+    false
+  );
   const unmountEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       unmountResult,
@@ -2795,9 +2829,11 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
         rootChildCount: 0,
         rootNodeKind: "EmptyRoot",
         nodes: []
-      })
+      }),
+      unmountJSONIdentity
     );
   assert.equal(unmountEvidence.operation, "unmount");
+  assert.equal(unmountEvidence.rootId, unmountError.rootRequest.rootId);
   assert.equal(unmountEvidence.hostOutputUpdateKind, "Unmount");
   assert.equal(unmountEvidence.hostOutputShape, "EmptyRoot");
   assert.equal(
@@ -2810,10 +2846,87 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(unmountEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
   assert.equal(unmountEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
   assert.equal(unmountEvidence.consumesAcceptedNativeUnmountExecutionRecord, true);
+  assert.equal(unmountEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(
+    unmountEvidence.finishedWorkIdentity.rootRequestOperation,
+    "unmount"
+  );
+  assert.equal(
+    unmountEvidence.finishedWorkIdentity.rootRequestId,
+    unmountError.rootRequest.requestId
+  );
   assert.equal(unmountEvidence.consumesAcceptedHostOutputRow, true);
   assert.equal(unmountEvidence.publicSerializationAvailable, false);
   assert.equal(unmountEvidence.nativeExecution, false);
   assert.equal(unmountEvidence.compatibilityClaimed, false);
+  const staleUnmountIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      unmountResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        rootNodeKind: "EmptyRoot",
+        nodes: []
+      }),
+      {
+        ...unmountJSONIdentity,
+        rootRequestSequence: unmountJSONIdentity.rootRequestSequence + 1
+      }
+    )
+  );
+  assert.equal(
+    staleUnmountIdentityError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(staleUnmountIdentityError.message, /request sequence is stale/u);
+  const nativeUnmountClaimError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      {
+        ...unmountResult,
+        nativeExecution: true
+      },
+      privateToJSONReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        rootNodeKind: "EmptyRoot",
+        nodes: []
+      }),
+      unmountJSONIdentity
+    )
+  );
+  assert.equal(
+    nativeUnmountClaimError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.equal(nativeUnmountClaimError.nativeExecution, false);
+  const missingCleanupEvidenceError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      {
+        ...unmountResult,
+        privateUnmountNativeBridgeAdmission: {
+          ...unmountResult.privateUnmountNativeBridgeAdmission,
+          cleanupHandoffAccepted: false
+        }
+      },
+      privateToJSONReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        rootNodeKind: "EmptyRoot",
+        nodes: []
+      }),
+      unmountJSONIdentity
+    )
+  );
+  assert.equal(
+    missingCleanupEvidenceError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
 });
 
 test("react-test-renderer CJS development private toTree facade consumes accepted native execution records", () => {
@@ -2905,7 +3018,17 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     facade.updateNativeExecutionRequiresFinishedWorkIdentity,
     true
   );
+  assert.equal(
+    facade.unmountNativeExecutionFinishedWorkIdentityAdmissionWorker,
+    "worker-733-test-renderer-unmount-finished-work-identity"
+  );
+  assert.equal(
+    facade.unmountNativeExecutionRequiresFinishedWorkIdentity,
+    true
+  );
   assert.equal(facade.rejectsStaleUpdateFinishedWorkIdentity, true);
+  assert.equal(facade.rejectsStaleUnmountFinishedWorkIdentity, true);
+  assert.equal(facade.requiresUnmountDeletionCleanupHandoffEvidence, true);
   assert.equal(
     facade.rejectsMultichildUpdateNativeExecutionIdentityAdmission,
     true
@@ -3117,6 +3240,27 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     unmountError.rootRequest,
     executor
   );
+  const unmountTreeIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: unmountError.rootRequest,
+    publicSurface: "create().toTree",
+    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    consumesPrivateToJSONEvidence: false,
+    consumesPrivateToTreeEvidence: true,
+    hostOutputUpdateKind: "Unmount"
+  });
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      unmountResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        text: null
+      })
+    ),
+    false
+  );
   const unmountEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       unmountResult,
@@ -3126,9 +3270,11 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
         rowShape: "EmptyRoot",
         rootChildCount: 0,
         text: null
-      })
+      }),
+      unmountTreeIdentity
     );
   assert.equal(unmountEvidence.operation, "unmount");
+  assert.equal(unmountEvidence.rootId, unmountError.rootRequest.rootId);
   assert.equal(unmountEvidence.hostOutputUpdateKind, "Unmount");
   assert.equal(unmountEvidence.hostOutputShape, "EmptyRoot");
   assert.equal(
@@ -3141,11 +3287,80 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(unmountEvidence.consumesAcceptedNativeCreateExecutionRecord, false);
   assert.equal(unmountEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
   assert.equal(unmountEvidence.consumesAcceptedNativeUnmountExecutionRecord, true);
+  assert.equal(unmountEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(
+    unmountEvidence.finishedWorkIdentity.rootRequestOperation,
+    "unmount"
+  );
+  assert.equal(
+    unmountEvidence.finishedWorkIdentity.rootRequestId,
+    unmountError.rootRequest.requestId
+  );
   assert.equal(unmountEvidence.consumesAcceptedHostOutputRow, true);
   assert.equal(unmountEvidence.functionComponentAboveHostOutputShape, false);
   assert.equal(unmountEvidence.publicTreeAvailable, false);
   assert.equal(unmountEvidence.nativeExecution, false);
   assert.equal(unmountEvidence.compatibilityClaimed, false);
+  const publicUnmountTreeIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      unmountResult,
+      privateToTreeReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        text: null
+      }),
+      {
+        ...unmountTreeIdentity,
+        compatibilityClaimed: true
+      }
+    )
+  );
+  assert.equal(
+    publicUnmountTreeIdentityError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  const staleUnmountTreeExecutionError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      {
+        ...unmountResult,
+        requestSequence: unmountResult.requestSequence + 1
+      },
+      privateToTreeReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        text: null
+      }),
+      unmountTreeIdentity
+    )
+  );
+  assert.equal(
+    staleUnmountTreeExecutionError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  const missingTreeCleanupEvidenceError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      {
+        ...unmountResult,
+        privateUnmountNativeBridgeAdmission: null
+      },
+      privateToTreeReport({
+        hostOutputUpdateKind: "Unmount",
+        rowId: privateToJSONUnmountHostOutputRowId,
+        rowShape: "EmptyRoot",
+        rootChildCount: 0,
+        text: null
+      }),
+      unmountTreeIdentity
+    )
+  );
+  assert.equal(
+    missingTreeCleanupEvidenceError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
 
   assert.throws(() => renderer.toTree(), {
     code: "FAST_REACT_UNIMPLEMENTED",
@@ -6363,6 +6578,7 @@ function createRustUnmountDeletionCommitHandoffSource(request, overrides = {}) {
     diagnosticId: privateUnmountDeletionCommitHandoffDiagnosticId,
     status: privateUnmountDeletionCommitHandoffStatus,
     rootRequestId: request.requestId,
+    rootRequestSequence: request.requestSequence,
     rootId: request.rootId,
     lifecycle: normalizeExpectedRustLifecycle(request.lifecycleStatusAfter),
     scheduledUpdateKind: "Unmount",
@@ -6433,10 +6649,30 @@ function createRustUnmountNativeBridgeCleanupHandoffSource(
   deletionCommitHandoff,
   overrides = {}
 ) {
+  const passiveRefCleanupOrder =
+    overrides.passiveRefCleanupOrder ??
+    deletionCommitHandoff.passiveRefCleanupOrder ??
+    deletionCommitHandoff.passive_ref_cleanup_order;
+  const refCleanupReturnCount =
+    passiveRefCleanupOrder.refCleanupReturnCount ??
+    passiveRefCleanupOrder.ref_cleanup_return_count;
+  const passiveDestroyCount =
+    passiveRefCleanupOrder.passiveDestroyCount ??
+    passiveRefCleanupOrder.passive_destroy_count;
+  const hostNodeCleanupCount =
+    deletionCommitHandoff.hostNodeCleanupCount ??
+    deletionCommitHandoff.host_node_cleanup_count;
+  const cleanupOrderRecordCount =
+    deletionCommitHandoff.cleanupOrderRecordCount ??
+    deletionCommitHandoff.cleanup_order_record_count;
+  const nativeCleanupAfterRefAndPassiveOrdering =
+    passiveRefCleanupOrder.nativeCleanupAfterRefAndPassiveOrdering ??
+    passiveRefCleanupOrder.native_cleanup_after_ref_and_passive_ordering;
   return {
     diagnostic_id: privateUnmountNativeBridgeCleanupHandoffDiagnosticId,
     status: privateUnmountNativeBridgeCleanupHandoffStatus,
     root_request_id: request.requestId,
+    root_request_sequence: request.requestSequence,
     root: request.rootId,
     route_outcome: rootUpdateOutcomeScheduled,
     route_dependency_id: "react-test-renderer-unmount-route-private-diagnostic",
@@ -6451,13 +6687,17 @@ function createRustUnmountNativeBridgeCleanupHandoffSource(
     current_root_child_count: 0,
     detached_instance: true,
     detached_instance_child_count: 0,
-    host_node_cleanup_count:
-      deletionCommitHandoff.hostNodeCleanupCount ??
-      deletionCommitHandoff.host_node_cleanup_count,
-    cleanup_order_record_count:
-      deletionCommitHandoff.cleanupOrderRecordCount ??
-      deletionCommitHandoff.cleanup_order_record_count,
-    minimal_tree_cleanup_handoff: true,
+    host_node_cleanup_count: hostNodeCleanupCount,
+    ref_cleanup_return_count: refCleanupReturnCount,
+    passive_destroy_count: passiveDestroyCount,
+    cleanup_order_record_count: cleanupOrderRecordCount,
+    native_cleanup_after_ref_and_passive_ordering:
+      nativeCleanupAfterRefAndPassiveOrdering,
+    minimal_tree_cleanup_handoff:
+      refCleanupReturnCount === 0 &&
+      passiveDestroyCount === 0 &&
+      cleanupOrderRecordCount === hostNodeCleanupCount &&
+      nativeCleanupAfterRefAndPassiveOrdering === true,
     rust_unmount_cleanup_handoff_executed: true,
     host_output_produced: true,
     public_unmount_compatibility_claimed: false,
@@ -6465,10 +6705,7 @@ function createRustUnmountNativeBridgeCleanupHandoffSource(
     act_flushing_claimed: false,
     native_bridge_available: false,
     native_execution: false,
-    passive_ref_cleanup_order:
-      overrides.passiveRefCleanupOrder ??
-      deletionCommitHandoff.passiveRefCleanupOrder ??
-      deletionCommitHandoff.passive_ref_cleanup_order,
+    passive_ref_cleanup_order: passiveRefCleanupOrder,
     deletion_commit_handoff: deletionCommitHandoff,
     ...overrides
   };
@@ -9571,6 +9808,29 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     entrypoint
   );
   assert.equal(gate.validatesUpdateRootRequestIdentity, true, entrypoint);
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(
+      gate.privateUnmountFinishedWorkIdentityGateAvailable,
+      true,
+      entrypoint
+    );
+    assert.equal(
+      gate.unmountNativeExecutionFinishedWorkIdentityAdmissionWorker,
+      "worker-733-test-renderer-unmount-finished-work-identity",
+      entrypoint
+    );
+    assert.equal(
+      gate.unmountNativeExecutionRequiresFinishedWorkIdentity,
+      true,
+      entrypoint
+    );
+    assert.equal(gate.rejectsStaleUnmountFinishedWorkIdentity, true, entrypoint);
+    assert.equal(
+      gate.requiresUnmountDeletionCleanupHandoffEvidence,
+      true,
+      entrypoint
+    );
+  }
   assert.equal(
     gate.privateFinishedWorkIdentityDiagnosticName,
     "fast-react-test-renderer.serialization.private-finished-work-identity",
@@ -9712,6 +9972,7 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
       ? [
           "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records",
           "root_private_to_tree_update_native_execution_requires_finished_work_identity_gate",
+          "root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate",
           ...(developmentCompositeToTreeEvidence
             ? [
                 "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
@@ -9781,6 +10042,29 @@ function assertPrivateToTreeFacade(record, entrypoint) {
     entrypoint
   );
   assert.equal(record.validatesUpdateRootRequestIdentity, true, entrypoint);
+  if (entrypoint.includes("/cjs/")) {
+    assert.equal(
+      record.privateUnmountFinishedWorkIdentityGateAvailable,
+      true,
+      entrypoint
+    );
+    assert.equal(
+      record.unmountNativeExecutionFinishedWorkIdentityAdmissionWorker,
+      "worker-733-test-renderer-unmount-finished-work-identity",
+      entrypoint
+    );
+    assert.equal(
+      record.unmountNativeExecutionRequiresFinishedWorkIdentity,
+      true,
+      entrypoint
+    );
+    assert.equal(record.rejectsStaleUnmountFinishedWorkIdentity, true, entrypoint);
+    assert.equal(
+      record.requiresUnmountDeletionCleanupHandoffEvidence,
+      true,
+      entrypoint
+    );
+  }
   assert.equal(
     record.privateFinishedWorkIdentityDiagnosticName,
     "fast-react-test-renderer.serialization.private-finished-work-identity",

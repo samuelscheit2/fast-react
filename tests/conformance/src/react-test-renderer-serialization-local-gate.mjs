@@ -1061,6 +1061,26 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
+      /\bprivateUnmountFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bunmountNativeExecutionRequiresFinishedWorkIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brejectsStaleUnmountFinishedWorkIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brequiresUnmountDeletionCleanupHandoffEvidence\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-733-test-renderer-unmount-finished-work-identity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
       /\bgetLatestScheduledRootRequestForSerializationIdentity\b/u
     ) &&
     hasSourcePattern(
@@ -1069,7 +1089,19 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
+      /\bidentity\.rootRequestOperation\s*!==\s*['"]unmount['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
       /\brootRequestOperationForHostOutputUpdateKind\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateUnmountNativeExecutionFinishedWorkIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateUnmountSerializationFinishedWorkIdentitySourceReport\b/u
     ) &&
     hasSourcePattern(
       testRendererSource,
@@ -1086,6 +1118,10 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       testRendererSource,
       /\broot_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_unmount_native_execution_requires_finished_work_identity_gate\b/u
     ) &&
     hasSourcePattern(
       testRendererSource,
@@ -1396,6 +1432,26 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
+      /\bprivateUnmountFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bunmountNativeExecutionRequiresFinishedWorkIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brejectsStaleUnmountFinishedWorkIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brequiresUnmountDeletionCleanupHandoffEvidence\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-733-test-renderer-unmount-finished-work-identity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
       /\bgetLatestScheduledRootRequestForSerializationIdentity\b/u
     ) &&
     hasSourcePattern(
@@ -1404,7 +1460,19 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
+      /\bidentity\.rootRequestOperation\s*!==\s*['"]unmount['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
       /\brootRequestOperationForHostOutputUpdateKind\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateUnmountNativeExecutionFinishedWorkIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateUnmountSerializationFinishedWorkIdentitySourceReport\b/u
     ) &&
     hasSourcePattern(
       testRendererSource,
@@ -1421,6 +1489,10 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       testRendererSource,
       /\broot_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate\b/u
     ) &&
     hasSourcePattern(
       testRendererSource,
