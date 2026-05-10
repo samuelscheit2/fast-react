@@ -910,6 +910,131 @@ test("private input/change controlled restore bridge links latest props without 
   componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
+test("private input/change controlled restore execution mutates only an admitted fake-DOM target", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-input-change-execution"
+    });
+  const eventDispatch = createPrivateControlledEventDispatch({
+    domEventName: "input",
+    latestProps: {
+      type: "text",
+      value: "alpha",
+      onChange() {},
+      onInput() {}
+    },
+    nodeName: "INPUT",
+    value: "live-browser-mutated"
+  });
+  const inputPreflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      eventDispatch.dispatchRecord
+    );
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    eventDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-event-latest-props-post-event-restore-queue",
+      queueId: "oracle-input-change-execution-restore",
+      eventName: "input",
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+  const writePreflight = gate.preflightRestoreQueueWrites([intent], {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-write-preflight",
+    queueId: "oracle-input-change-execution-write-preflight",
+    targetKind: "controlled-input-post-event-restore-queue-write-preflight"
+  });
+  const bridge = gate.recordInputChangeEventControlledRestoreBridge(
+    inputPreflight,
+    intent,
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-input-change-event-controlled-restore-bridge",
+      queueId: "oracle-input-change-execution-bridge",
+      targetKind: "controlled-input-change-event-restore-queue-bridge"
+    }
+  );
+  const writeExecution = gate.recordRestoreQueueWriteExecution(
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-controlled-input-post-event-restore-queue-write-execution",
+      queueId: "oracle-input-change-execution-write",
+      targetKind: "controlled-input-post-event-restore-queue-write-execution"
+    }
+  );
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(writePreflight, {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-flush-blocker",
+    queueId: "oracle-input-change-execution-flush",
+    targetKind: "controlled-input-post-event-restore-queue-flush-blocker"
+  });
+  const wrapperIntent = gate.recordRestoreQueueWrapperMutationIntent(
+    writeExecution,
+    flushBlocker,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-controlled-input-post-event-restore-wrapper-mutation-intent",
+      queueId: "oracle-input-change-execution-wrapper",
+      targetKind:
+        "controlled-input-post-event-restore-wrapper-mutation-intent"
+    }
+  );
+  const fakeTarget = createPrivateControlledInputFakeDomTarget({
+    value: "browser-mutated"
+  });
+  const execution = gate.recordInputChangeEventControlledRestoreExecution(
+    inputPreflight,
+    bridge,
+    writeExecution,
+    flushBlocker,
+    wrapperIntent,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-input-change-event-controlled-restore-execution",
+      queueId: "oracle-input-change-execution",
+      targetKind: "controlled-input-change-event-restore-queue-execution",
+      fakeDomTarget: fakeTarget
+    }
+  );
+
+  assert.equal(fakeTarget.value, "alpha");
+  assert.equal(eventDispatch.targetNode.value, "live-browser-mutated");
+  assert.equal(
+    execution.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueInputChangeExecutionStatus
+  );
+  assert.equal(execution.latestPropsValidation.currentLatestPropsFresh, true);
+  assert.equal(execution.restoreQueueWriteEvidence.restoreQueueWritten, true);
+  assert.equal(execution.flushIntentEvidence.restoreQueueFlushed, true);
+  assert.equal(
+    execution.wrapperMutationExecutionEvidence.wrapperWritePerformed,
+    true
+  );
+  assert.equal(execution.sideEffects.privateRestoreQueueWritten, true);
+  assert.equal(execution.sideEffects.privateRestoreQueueFlushed, true);
+  assert.equal(execution.sideEffects.restoreQueueWritten, false);
+  assert.equal(execution.sideEffects.browserInputMutated, false);
+  assert.equal(execution.sideEffects.fakeDomInputMutated, true);
+  assert.equal(
+    execution.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  componentTree.detachHostInstanceToken(eventDispatch.token);
+});
+
 test("private controlled restore queue write execution records deterministic mutation intent", () => {
   const gate =
     controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
@@ -1308,133 +1433,6 @@ test("private controlled restore wrapper mutation intent records blocked value a
     assert.equal(Object.hasOwn(dispatch.targetNode, "_valueTracker"), false);
     componentTree.detachHostInstanceToken(dispatch.token);
   }
-});
-
-test("private input/change controlled restore execution records fake-DOM text evidence without compatibility claims", () => {
-  const gate =
-    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
-      requestIdPrefix: "controlled-oracle-input-change-execution"
-    });
-  const eventDispatch = createPrivateControlledEventDispatch({
-    domEventName: "input",
-    latestProps: {
-      type: "text",
-      value: "alpha",
-      onChange() {},
-      onInput() {}
-    },
-    nodeName: "INPUT",
-    value: "browser-mutated"
-  });
-  const inputPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      eventDispatch.dispatchRecord
-    );
-  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
-    eventDispatch.dispatchRecord,
-    {
-      explicitAdmission: true,
-      queueKind:
-        "deterministic-event-latest-props-post-event-restore-queue",
-      queueId: "oracle-input-change-execution-restore",
-      eventName: "input",
-      targetKind: "controlled-input-post-event-restore-queue"
-    }
-  );
-  const writePreflight = gate.preflightRestoreQueueWrites([intent], {
-    explicitAdmission: true,
-    queueKind:
-      "deterministic-controlled-input-post-event-restore-queue-write-preflight",
-    queueId: "oracle-input-change-execution-preflight",
-    targetKind: "controlled-input-post-event-restore-queue-write-preflight"
-  });
-  const bridge = gate.recordInputChangeEventControlledRestoreBridge(
-    inputPreflight,
-    intent,
-    writePreflight,
-    {
-      explicitAdmission: true,
-      queueKind:
-        "deterministic-input-change-event-controlled-restore-bridge",
-      queueId: "oracle-input-change-execution-bridge",
-      targetKind: "controlled-input-change-event-restore-queue-bridge"
-    }
-  );
-  const writeExecution = gate.recordRestoreQueueWriteExecution(
-    writePreflight,
-    {
-      explicitAdmission: true,
-      queueKind:
-        "deterministic-controlled-input-post-event-restore-queue-write-execution",
-      queueId: "oracle-input-change-execution-write",
-      targetKind: "controlled-input-post-event-restore-queue-write-execution"
-    }
-  );
-  const flushBlocker = gate.recordRestoreQueueFlushBlocker(writePreflight, {
-    explicitAdmission: true,
-    queueKind:
-      "deterministic-controlled-input-post-event-restore-queue-flush-blocker",
-    queueId: "oracle-input-change-execution-flush",
-    targetKind: "controlled-input-post-event-restore-queue-flush-blocker"
-  });
-  const wrapperIntent = gate.recordRestoreQueueWrapperMutationIntent(
-    writeExecution,
-    flushBlocker,
-    {
-      explicitAdmission: true,
-      queueKind:
-        "deterministic-controlled-input-post-event-restore-wrapper-mutation-intent",
-      queueId: "oracle-input-change-execution-wrapper",
-      targetKind: "controlled-input-post-event-restore-wrapper-mutation-intent"
-    }
-  );
-  const execution = gate.recordInputChangeEventControlledRestoreExecution(
-    bridge,
-    writeExecution,
-    flushBlocker,
-    wrapperIntent,
-    {
-      explicitAdmission: true,
-      queueKind:
-        "deterministic-input-change-event-controlled-restore-execution",
-      queueId: "oracle-input-change-execution",
-      targetKind: "controlled-input-change-event-restore-queue-execution",
-      fakeDomTarget: eventDispatch.targetNode
-    }
-  );
-
-  assert.equal(
-    execution.status,
-    controlledRestoreQueue.controlledInputPostEventRestoreQueueInputChangeExecutionStatus
-  );
-  assert.deepEqual(execution.acceptedRestoreKinds, ["input-text-value"]);
-  assert.equal(
-    execution.latestPropsValidation.latestPropsEvidenceMatch,
-    true
-  );
-  assert.equal(
-    execution.restoreQueueWriteEvidence.restoreQueueWriteExecutionAccepted,
-    true
-  );
-  assert.equal(execution.flushIntentEvidence.flushIntentAccepted, true);
-  assert.equal(
-    execution.wrapperMutationExecutionEvidence
-      .wrapperMutationExecutionRecorded,
-    true
-  );
-  assert.equal(execution.postEventRestoreBoundary.restoreQueueWritten, false);
-  assert.equal(execution.postEventRestoreBoundary.restoreQueueFlushed, false);
-  assert.equal(execution.postEventRestoreBoundary.hostWrapperInvoked, false);
-  assert.equal(execution.postEventRestoreBoundary.wrapperWritePerformed, false);
-  assert.equal(execution.sideEffects.browserInputMutated, false);
-  assert.equal(
-    execution.publicControlledBehaviorBoundary.compatibilityClaimed,
-    false
-  );
-  assert.equal(Object.hasOwn(eventDispatch.targetNode, "_valueTracker"), false);
-  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
-
-  componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
 test("private controlled select and textarea post-event restore queue consumes fake-DOM observations with latest props only", () => {

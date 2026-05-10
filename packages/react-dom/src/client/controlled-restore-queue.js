@@ -94,7 +94,7 @@ const controlledInputPostEventRestoreQueueInputChangeBridgeRowStatus =
 const controlledInputPostEventRestoreQueueInputChangeExecutionStatus =
   'private-controlled-input-change-event-restore-queue-execution';
 const controlledInputPostEventRestoreQueueInputChangeExecutionRowStatus =
-  'recorded-private-input-change-event-controlled-restore-execution-row';
+  'executed-private-input-change-event-controlled-restore-row';
 const controlledInputPostEventRestoreQueueWrapperMutationIntentStatus =
   'private-controlled-input-post-event-restore-wrapper-mutation-intent';
 const controlledInputPostEventRestoreQueueWrapperMutationIntentRowStatus =
@@ -959,6 +959,7 @@ function recordControlledInputChangeEventRestoreQueueBridgeWithGate(
 
 function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
   gateState,
+  inputChangePreflightRecord,
   bridgeRecord,
   writeExecutionRecord,
   flushBlockerRecord,
@@ -967,6 +968,10 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
 ) {
   const normalizedAdmission =
     normalizeInputChangeEventRestoreQueueExecutionAdmission(admission);
+  const inputPreflight =
+    assertInputChangeEventExtractionPreflightForRestoreQueueBridge(
+      inputChangePreflightRecord
+    );
   const sourceBridge =
     assertInputChangeEventRestoreQueueExecutionBridgeRecord(bridgeRecord);
   const sourceWriteExecution =
@@ -981,30 +986,94 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     assertInputChangeEventRestoreQueueExecutionWrapperMutationIntentRecord(
       wrapperMutationIntentRecord
     );
+  const latestPropsValidation =
+    createInputChangeEventRestoreQueueExecutionLatestPropsValidation(
+      inputPreflight,
+      sourceBridge
+    );
   assertInputChangeEventRestoreQueueExecutionSources(
+    inputPreflight,
     sourceBridge,
     sourceWriteExecution,
     sourceFlushBlocker,
     sourceWrapperIntent,
-    normalizedAdmission
+    normalizedAdmission,
+    latestPropsValidation
   );
 
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
-  const executionRows = freezeArray(
-    sourceBridge.bridgeRows.map((bridgeRow, index) =>
-      createInputChangeEventRestoreQueueExecutionRow(
-        requestId,
-        requestSequence,
-        sourceBridge,
-        sourceWriteExecution,
-        sourceFlushBlocker,
-        sourceWrapperIntent,
-        bridgeRow,
-        index
-      )
+  const bridgeRow = sourceBridge.bridgeRows[0];
+  const writeExecutionRow =
+    findInputChangeEventRestoreQueueExecutionWriteRow(
+      sourceWriteExecution,
+      bridgeRow
+    );
+  const wrapperIntentRow =
+    findInputChangeEventRestoreQueueExecutionWrapperRow(
+      sourceWrapperIntent,
+      bridgeRow
+    );
+  const executionResult =
+    executeInputChangeEventControlledRestoreOnFakeDom(
+      gateState,
+      normalizedAdmission,
+      latestPropsValidation,
+      sourceWriteExecution,
+      sourceFlushBlocker,
+      sourceWrapperIntent,
+      bridgeRow,
+      writeExecutionRow,
+      wrapperIntentRow
+    );
+  const executionRows = freezeArray([
+    createInputChangeEventRestoreQueueExecutionRow(
+      requestId,
+      requestSequence,
+      sourceBridge,
+      sourceWriteExecution,
+      sourceFlushBlocker,
+      sourceWrapperIntent,
+      bridgeRow,
+      writeExecutionRow,
+      wrapperIntentRow,
+      executionResult
     )
-  );
+  ]);
+  const eventExtractionEvidence =
+    createInputChangeEventRestoreQueueExecutionExtractionEvidence(
+      inputPreflight,
+      sourceBridge
+    );
+  const restoreQueueWriteEvidence =
+    createInputChangeEventRestoreQueueExecutionWriteEvidence(
+      sourceWriteExecution,
+      executionRows,
+      executionResult
+    );
+  const flushIntentEvidence =
+    createInputChangeEventRestoreQueueExecutionFlushIntentEvidence(
+      sourceFlushBlocker,
+      executionRows,
+      executionResult
+    );
+  const wrapperMutationExecutionEvidence =
+    createInputChangeEventRestoreQueueExecutionWrapperEvidence(
+      sourceWrapperIntent,
+      executionRows,
+      executionResult
+    );
+  const sideEffects =
+    createInputChangeEventRestoreQueueExecutionSideEffects(
+      executionRows,
+      executionResult
+    );
+  const postEventRestoreBoundary =
+    createInputChangeEventRestoreQueueExecutionBoundary(
+      executionRows,
+      executionResult
+    );
+  const admissionRecord = normalizedAdmission.record;
   const payload = freezeRecord({
     schemaVersion: controlledInputPostEventRestoreQueueGateSchemaVersion,
     $$typeof:
@@ -1017,9 +1086,11 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     unsupportedCode: unimplementedCode,
     requestId,
     requestSequence,
-    queueKind: normalizedAdmission.queueKind,
-    queueId: normalizedAdmission.queueId,
-    admission: normalizedAdmission,
+    queueKind: admissionRecord.queueKind,
+    queueId: admissionRecord.queueId,
+    admission: admissionRecord,
+    acceptedInputChangePreflightRecordKind:
+      INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
     acceptedSourceRecordTypes: freezeArray([
       privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
       privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
@@ -1048,31 +1119,15 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
     sourceRequestIds: freezeArray(
       executionRows.map((row) => row.sourceRequestId)
     ),
+    eventExtractionEvidence,
+    latestPropsValidation: latestPropsValidation.record,
+    restoreQueueWriteEvidence,
+    flushIntentEvidence,
+    wrapperMutationExecutionEvidence,
     inputChangeRestoreExecutionRows: executionRows,
-    latestPropsValidation:
-      createInputChangeEventRestoreQueueExecutionLatestPropsValidation(
-        sourceBridge
-      ),
-    restoreQueueWriteEvidence:
-      createInputChangeEventRestoreQueueExecutionWriteEvidence(
-        sourceWriteExecution,
-        executionRows
-      ),
-    flushIntentEvidence:
-      createInputChangeEventRestoreQueueExecutionFlushIntentEvidence(
-        sourceFlushBlocker,
-        executionRows
-      ),
-    wrapperMutationExecutionEvidence:
-      createInputChangeEventRestoreQueueExecutionWrapperEvidence(
-        sourceWrapperIntent,
-        executionRows
-      ),
-    postEventRestoreBoundary:
-      createInputChangeEventRestoreQueueExecutionBoundary(executionRows),
+    postEventRestoreBoundary,
     publicControlledBehaviorBoundary: createPublicControlledBehaviorBoundary(),
-    sideEffects:
-      createInputChangeEventRestoreQueueExecutionSideEffects(executionRows)
+    sideEffects
   });
 
   controlledInputPostEventRestoreQueueInputChangeExecutionPayloads.set(
@@ -2844,7 +2899,7 @@ function createInputChangeEventRestoreQueueBridgeSummary() {
 function createInputChangeEventRestoreQueueExecutionSummary() {
   return freezeRecord({
     status: controlledInputPostEventRestoreQueueInputChangeExecutionStatus,
-    metadataOnly: true,
+    metadataOnly: false,
     deterministicFakeDomOnly: true,
     acceptedBridgeRecordType:
       privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
@@ -2872,13 +2927,14 @@ function createInputChangeEventRestoreQueueExecutionSummary() {
     ]),
     eventDispatches: false,
     syntheticEventCreation: false,
-    restoreQueueWrites: false,
-    restoreQueueFlushes: false,
-    hostWrapperInvocations: false,
-    wrapperWrites: false,
-    hostValueReads: false,
-    hostValueWrites: false,
+    restoreQueueWrites: true,
+    restoreQueueFlushes: true,
+    hostWrapperInvocations: true,
+    wrapperWrites: true,
+    hostValueReads: true,
+    hostValueWrites: true,
     valueTrackerWrites: false,
+    fakeDomMutations: true,
     liveDomMutations: false,
     publicControlledBehaviorEnabled: false,
     compatibilityClaimed: false
@@ -3704,6 +3760,124 @@ function createInputChangeEventRestoreQueueBridgeSideEffects(bridgeRows) {
   });
 }
 
+function executeInputChangeEventControlledRestoreOnFakeDom(
+  gateState,
+  admission,
+  latestPropsValidation,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperIntentRecord,
+  bridgeRow,
+  writeExecutionRow,
+  wrapperIntentRow
+) {
+  const fakeDomTarget = admission.fakeDomTarget;
+  const targetField = getInputChangeRestoreExecutionTargetField(bridgeRow);
+  const beforeValueSnapshot = readInputChangeRestoreFakeDomField(
+    fakeDomTarget,
+    targetField
+  );
+  const nextValueSnapshot = getInputChangeRestoreNextValue(
+    latestPropsValidation.latestProps,
+    bridgeRow
+  );
+  const queueEntry = createInputChangeRestoreQueueEntry(
+    bridgeRow,
+    writeExecutionRow,
+    wrapperIntentRow,
+    targetField,
+    beforeValueSnapshot,
+    nextValueSnapshot
+  );
+
+  const restoreQueueLengthBeforeWrite =
+    gateState.inputChangeRestoreQueue.length;
+  gateState.inputChangeRestoreTarget = queueEntry;
+  const restoreQueueLengthAfterWrite =
+    gateState.inputChangeRestoreQueue.length;
+  const queueSnapshot = freezeRecord({
+    status:
+      'private-input-change-controlled-restore-queue-snapshot-before-wrapper',
+    sourceWriteExecutionRequestId: writeExecutionRecord.requestId,
+    sourceFlushBlockerRequestId: flushBlockerRecord.requestId,
+    sourceWrapperMutationIntentRequestId: wrapperIntentRecord.requestId,
+    restoreTarget: createInputChangeRestoreQueueEntrySummary(queueEntry),
+    restoreQueue: freezeArray(
+      gateState.inputChangeRestoreQueue.map(
+        createInputChangeRestoreQueueEntrySummary
+      )
+    ),
+    restoreQueueLength: gateState.inputChangeRestoreQueue.length,
+    queueSnapshotBeforeWrapperRestore: true,
+    queueClearedBeforeWrapperRestore: true,
+    rawTargetCaptured: false,
+    liveDomNodeAccepted: false
+  });
+
+  gateState.inputChangeRestoreTarget = null;
+  gateState.inputChangeRestoreQueue = [];
+  writeInputChangeRestoreFakeDomField(
+    fakeDomTarget,
+    targetField,
+    nextValueSnapshot
+  );
+  const afterValueSnapshot = readInputChangeRestoreFakeDomField(
+    fakeDomTarget,
+    targetField
+  );
+
+  return freezeRecord({
+    targetField,
+    beforeValueSnapshot,
+    nextValueSnapshot,
+    afterValueSnapshot,
+    queueEntry,
+    queueSnapshot,
+    restoreQueueLengthBeforeWrite,
+    restoreQueueLengthAfterWrite,
+    restoreQueueWritten: true,
+    restoreQueueFlushed: true,
+    controlledStateRestoreInvoked: true,
+    hostWrapperInvoked: true,
+    wrapperWritePerformed: true,
+    fakeDomInputMutated: true,
+    hostValueRead: true,
+    hostValueWritten: true,
+    browserInputMutated: false,
+    valueTrackerFieldWritten: false,
+    liveDomNodeAccepted: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createInputChangeEventRestoreQueueExecutionExtractionEvidence(
+  inputPreflight,
+  bridgeRecord
+) {
+  return freezeRecord({
+    status:
+      'accepted-input-change-event-extraction-for-controlled-restore-execution',
+    sourceInputChangePreflightRecordKind: inputPreflight.kind,
+    sourceInputChangePreflightStatus: inputPreflight.status,
+    blockedReason: inputPreflight.blockedReason,
+    sourceBridgeRequestId: bridgeRecord.requestId,
+    pluginName: inputPreflight.pluginName,
+    reactName: inputPreflight.reactName,
+    reactEventType: inputPreflight.reactEventType,
+    domEventName: inputPreflight.domEventName,
+    nativeEventType: inputPreflight.nativeEventType,
+    hostTag: inputPreflight.targetTag,
+    inputType: inputPreflight.targetType,
+    targetKind: inputPreflight.targetMetadata.targetKind,
+    inputChangeExtractionPreflightAccepted: true,
+    eventDispatch: false,
+    syntheticEventCreated: false,
+    syntheticEventDispatched: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createInputChangeEventRestoreQueueExecutionRow(
   executionRequestId,
   executionRequestSequence,
@@ -3712,20 +3886,10 @@ function createInputChangeEventRestoreQueueExecutionRow(
   flushBlockerRecord,
   wrapperIntentRecord,
   bridgeRow,
-  index
+  writeExecutionRow,
+  wrapperIntentRow,
+  executionResult
 ) {
-  const rowSequence = index + 1;
-  const writeExecutionRow =
-    findInputChangeEventRestoreQueueExecutionWriteRow(
-      writeExecutionRecord,
-      bridgeRow
-    );
-  const wrapperIntentRow =
-    findInputChangeEventRestoreQueueExecutionWrapperRow(
-      wrapperIntentRecord,
-      bridgeRow
-    );
-
   return freezeRecord({
     $$typeof:
       privateControlledInputPostEventRestoreQueueInputChangeExecutionRowType,
@@ -3735,8 +3899,8 @@ function createInputChangeEventRestoreQueueExecutionRow(
       controlledInputPostEventRestoreQueueInputChangeExecutionRowStatus,
     executionRequestId,
     executionRequestSequence,
-    rowId: `${executionRequestId}:row:${rowSequence}`,
-    rowSequence,
+    rowId: `${executionRequestId}:row:1`,
+    rowSequence: 1,
     sourceBridgeRequestId: bridgeRecord.requestId,
     sourceBridgeRowId: bridgeRow.rowId,
     sourceRestoreRequestId: bridgeRow.sourceRestoreRequestId,
@@ -3745,12 +3909,10 @@ function createInputChangeEventRestoreQueueExecutionRow(
       bridgeRow.sourceWritePreflightRequestId,
     sourceWriteIntentRowId: bridgeRow.sourceWriteIntentRowId,
     sourceWriteExecutionRequestId: writeExecutionRecord.requestId,
-    sourceWriteExecutionRowId:
-      writeExecutionRow === null ? null : writeExecutionRow.rowId,
+    sourceWriteExecutionRowId: writeExecutionRow.rowId,
     sourceFlushBlockerRequestId: flushBlockerRecord.requestId,
     sourceWrapperMutationIntentRequestId: wrapperIntentRecord.requestId,
-    sourceWrapperMutationIntentRowId:
-      wrapperIntentRow === null ? null : wrapperIntentRow.rowId,
+    sourceWrapperMutationIntentRowId: wrapperIntentRow.rowId,
     domEventName: bridgeRow.domEventName,
     nativeEventType: bridgeRow.nativeEventType,
     pluginName: bridgeRow.pluginName,
@@ -3763,10 +3925,12 @@ function createInputChangeEventRestoreQueueExecutionRow(
     controlledPropName: bridgeRow.controlledPropName,
     acceptedRestoreKind: bridgeRow.acceptedRestoreKind,
     hostWrapperOperation: bridgeRow.hostWrapperOperation,
-    wrapperMutationKind:
-      wrapperIntentRow === null ? null : wrapperIntentRow.wrapperMutationKind,
-    intendedUpdateKind:
-      wrapperIntentRow === null ? null : wrapperIntentRow.intendedUpdateKind,
+    wrapperMutationKind: wrapperIntentRow.wrapperMutationKind,
+    intendedUpdateKind: wrapperIntentRow.intendedUpdateKind,
+    targetField: executionResult.targetField,
+    beforeValueSnapshot: executionResult.beforeValueSnapshot,
+    nextValueSnapshot: executionResult.nextValueSnapshot,
+    afterValueSnapshot: executionResult.afterValueSnapshot,
     queueSlot: bridgeRow.queueSlot,
     queueSlotIndex: bridgeRow.queueSlotIndex,
     latestPropsEvidenceLinked: bridgeRow.latestPropsEvidenceLinked,
@@ -3781,66 +3945,132 @@ function createInputChangeEventRestoreQueueExecutionRow(
     wrapperMutationIntentAccepted: true,
     wrapperMutationExecutionRecorded: true,
     restoreTargetMutationRecorded:
-      writeExecutionRow === null
-        ? false
-        : writeExecutionRow.restoreTargetMutationRecorded,
+      writeExecutionRow.restoreTargetMutationRecorded,
     restoreQueueAppendMutationRecorded:
-      writeExecutionRow === null
-        ? false
-        : writeExecutionRow.restoreQueueAppendMutationRecorded,
+      writeExecutionRow.restoreQueueAppendMutationRecorded,
     metadataRestoreTargetWritten:
-      writeExecutionRow === null
-        ? false
-        : writeExecutionRow.metadataRestoreTargetWritten,
+      writeExecutionRow.metadataRestoreTargetWritten,
     metadataRestoreQueueWritten:
-      writeExecutionRow === null
-        ? false
-        : writeExecutionRow.metadataRestoreQueueWritten,
-    wrapperMutationIntentRecorded: wrapperIntentRow !== null,
+      writeExecutionRow.metadataRestoreQueueWritten,
+    wrapperMutationIntentRecorded: true,
     eventDispatch: false,
     syntheticEventCreated: false,
     syntheticEventDispatched: false,
-    restoreQueueWritten: false,
-    restoreQueueFlushed: false,
+    restoreQueueWritten: executionResult.restoreQueueWritten,
+    restoreQueueFlushed: executionResult.restoreQueueFlushed,
     controlledStateRestoreScheduled: false,
-    controlledStateRestoreInvoked: false,
-    hostWrapperInvoked: false,
-    wrapperWritePerformed: false,
+    controlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
     radioGroupLookupRequired: false,
     radioGroupLookupPerformed: false,
     valueTrackerFieldWritten: false,
-    hostValueRead: false,
-    hostValueWritten: false,
+    hostValueRead: executionResult.hostValueRead,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
     browserInputMutated: false,
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawLatestPropsRetained: false,
+    liveDomNodeAccepted: false,
     publicControlledBehaviorEnabled: false,
     compatibilityClaimed: false
   });
 }
 
 function createInputChangeEventRestoreQueueExecutionLatestPropsValidation(
+  inputPreflight,
   bridgeRecord
 ) {
-  return freezeRecord({
-    status: 'validated-input-change-controlled-restore-latest-props',
-    sourceBridgeRequestId: bridgeRecord.requestId,
-    latestPropsEvidenceLinked:
-      bridgeRecord.latestPropsEvidenceBridge.latestPropsEvidenceLinked,
-    latestPropsEvidenceMatch:
-      bridgeRecord.latestPropsEvidenceBridge.latestPropsEvidenceMatch,
-    inputPropKeys: bridgeRecord.latestPropsEvidenceBridge.inputPropKeys,
-    restorePropKeys: bridgeRecord.latestPropsEvidenceBridge.restorePropKeys,
-    staleLatestPropsRejected: true,
-    rawLatestPropsRetained: false,
-    compatibilityClaimed: false
-  });
+  const preflightPayload =
+    getInputChangeEventExtractionPreflightRecordPayload(inputPreflight);
+  const lookupRecord =
+    preflightPayload === null
+      ? null
+      : preflightPayload.targetListenerLookupRecord;
+  const lookupPayload =
+    lookupRecord == null
+      ? null
+      : getEventListenerTargetLookupRecordPayload(lookupRecord);
+  const latestProps =
+    lookupPayload === null ? null : lookupPayload.latestProps;
+  const targetNode =
+    lookupPayload === null ? null : lookupPayload.hostInstanceNode;
+  const currentLatestProps = getLatestPropsFromNode(targetNode);
+  const latestPropsObject = isObjectLike(latestProps);
+  const currentLatestPropsFresh =
+    latestPropsObject === true && currentLatestProps === latestProps;
+  const propDescription = describeLatestProps(latestProps);
+  const propKeys = normalizeBridgePropKeys(propDescription.propKeys);
+  const inputPropKeys = normalizeBridgePropKeys(
+    bridgeRecord.latestPropsEvidenceBridge?.inputPropKeys
+  );
+  const restorePropKeys = normalizeBridgePropKeys(
+    bridgeRecord.latestPropsEvidenceBridge?.restorePropKeys
+  );
+  const propKeysMatch =
+    bridgeArraysEqual(propKeys, inputPropKeys) === true &&
+    bridgeArraysEqual(propKeys, restorePropKeys) === true;
+  const bridgeRow = Array.isArray(bridgeRecord.bridgeRows)
+    ? bridgeRecord.bridgeRows[0]
+    : null;
+  const controlledPropName =
+    bridgeRow === null ? null : bridgeRow.controlledPropName;
+  const controlledProp =
+    controlledPropName === null
+      ? freezeRecord({present: false, nonNull: false})
+      : describeMetadataProp(latestProps, controlledPropName);
+  const rejectionReason =
+    getInputChangeEventRestoreQueueExecutionLatestPropsRejectionReason(
+      lookupPayload,
+      latestPropsObject,
+      currentLatestPropsFresh,
+      propKeysMatch,
+      controlledProp,
+      bridgeRow
+    );
+  const accepted = rejectionReason === null;
+
+  return {
+    accepted,
+    latestProps,
+    targetNode,
+    record: freezeRecord({
+      status: accepted
+        ? 'validated-input-change-controlled-restore-latest-props'
+        : 'rejected-input-change-controlled-restore-latest-props',
+      sourceInputChangePreflightRecordKind: inputPreflight.kind,
+      sourceBridgeRequestId: bridgeRecord.requestId,
+      latestPropsValidationAccepted: accepted,
+      rejectionReason,
+      targetHostInstanceStatus:
+        lookupRecord == null ? null : lookupRecord.targetHostInstanceStatus,
+      targetHostTag: getHostTagFromTargetNode(targetNode),
+      latestPropsObject,
+      currentLatestPropsFresh,
+      propKeys,
+      inputPropKeys,
+      restorePropKeys,
+      propKeysMatch,
+      controlledPropName,
+      controlledProp,
+      latestPropsEvidenceLinked:
+        bridgeRecord.latestPropsEvidenceBridge.latestPropsEvidenceLinked,
+      latestPropsEvidenceMatch:
+        bridgeRecord.latestPropsEvidenceBridge.latestPropsEvidenceMatch,
+      staleLatestPropsRejected: true,
+      latestPropsExposed: false,
+      rawLatestPropsRetained: false,
+      compatibilityClaimed: false
+    })
+  };
 }
 
 function createInputChangeEventRestoreQueueExecutionWriteEvidence(
   writeExecutionRecord,
-  executionRows
+  executionRows,
+  executionResult
 ) {
   return freezeRecord({
     status: controlledInputPostEventRestoreQueueWriteExecutionStatus,
@@ -3848,15 +4078,23 @@ function createInputChangeEventRestoreQueueExecutionWriteEvidence(
     sourcePreflightRequestId: writeExecutionRecord.sourcePreflightRequestId,
     rowCount: executionRows.length,
     restoreQueueWriteExecutionAccepted: true,
+    restoreTarget: createInputChangeRestoreQueueEntrySummary(
+      executionResult.queueEntry
+    ),
+    restoreQueueLengthBeforeWrite:
+      executionResult.restoreQueueLengthBeforeWrite,
+    restoreQueueLengthAfterWrite:
+      executionResult.restoreQueueLengthAfterWrite,
     metadataRestoreTargetWritten: executionRows.some(
       (row) => row.metadataRestoreTargetWritten
     ),
     metadataRestoreQueueWritten: executionRows.some(
       (row) => row.metadataRestoreQueueWritten
     ),
-    restoreQueueWritten: false,
+    restoreQueueWritten: executionResult.restoreQueueWritten,
     restoreQueueFlushed: false,
     hostWrapperInvoked: false,
+    fakeDomInputMutated: false,
     browserInputMutated: false,
     compatibilityClaimed: false
   });
@@ -3864,7 +4102,8 @@ function createInputChangeEventRestoreQueueExecutionWriteEvidence(
 
 function createInputChangeEventRestoreQueueExecutionFlushIntentEvidence(
   flushBlockerRecord,
-  executionRows
+  executionRows,
+  executionResult
 ) {
   return freezeRecord({
     status: controlledInputPostEventRestoreQueueFlushBlockerStatus,
@@ -3874,8 +4113,12 @@ function createInputChangeEventRestoreQueueExecutionFlushIntentEvidence(
     flushIntentAccepted: true,
     intendedFlushSequence:
       flushBlockerRecord.intendedFlushOrder.flushSequence,
-    restoreQueueFlushed: false,
+    queueSnapshot: executionResult.queueSnapshot,
+    restoreQueueFlushed: executionResult.restoreQueueFlushed,
+    controlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
     hostWrapperInvoked: false,
+    fakeDomInputMutated: false,
     browserInputMutated: false,
     compatibilityClaimed: false
   });
@@ -3883,7 +4126,8 @@ function createInputChangeEventRestoreQueueExecutionFlushIntentEvidence(
 
 function createInputChangeEventRestoreQueueExecutionWrapperEvidence(
   wrapperIntentRecord,
-  executionRows
+  executionRows,
+  executionResult
 ) {
   return freezeRecord({
     status:
@@ -3898,20 +4142,28 @@ function createInputChangeEventRestoreQueueExecutionWrapperEvidence(
     wrapperOperationNames: freezeArray(
       executionRows.map((row) => row.hostWrapperOperation)
     ),
-    wrapperWritePerformed: false,
-    hostValueRead: false,
-    hostValueWritten: false,
+    targetField: executionResult.targetField,
+    beforeValueSnapshot: executionResult.beforeValueSnapshot,
+    nextValueSnapshot: executionResult.nextValueSnapshot,
+    afterValueSnapshot: executionResult.afterValueSnapshot,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
+    hostValueRead: executionResult.hostValueRead,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
     browserInputMutated: false,
+    valueTrackerFieldWritten: false,
     compatibilityClaimed: false
   });
 }
 
 function createInputChangeEventRestoreQueueExecutionBoundary(
-  executionRows
+  executionRows,
+  executionResult
 ) {
   return freezeRecord({
     status:
-      'blocked-input-change-event-controlled-restore-queue-execution',
+      'executed-private-input-change-event-controlled-restore-queue',
     restoreQueueGateStatus:
       controlledInputPostEventRestoreQueueInputChangeExecutionStatus,
     executionRowsRecorded: executionRows.length,
@@ -3921,27 +4173,36 @@ function createInputChangeEventRestoreQueueExecutionBoundary(
     restoreQueueWriteExecutionAccepted: executionRows.length > 0,
     flushIntentAccepted: executionRows.length > 0,
     wrapperMutationExecutionRecorded: executionRows.length > 0,
-    restoreQueueWritten: false,
-    restoreQueueFlushed: false,
-    controlledStateRestoreInvoked: false,
-    hostWrapperInvoked: false,
-    wrapperWritePerformed: false,
-    hostValueWritten: false,
+    restoreQueueWritten: executionResult.restoreQueueWritten,
+    restoreQueueFlushed: executionResult.restoreQueueFlushed,
+    controlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
     browserInputMutated: false,
+    publicControlledBehaviorEnabled: false,
     compatibilityClaimed: false
   });
 }
 
 function createInputChangeEventRestoreQueueExecutionSideEffects(
-  executionRows
+  executionRows,
+  executionResult
 ) {
   return freezeRecord({
     ...controlledInputPostEventRestoreQueueNoSideEffects,
     inputChangeEventExtractionPreflightAccepted: executionRows.length > 0,
     latestPropsEvidenceAccepted: executionRows.length > 0,
     latestPropsMetadataRead: executionRows.length > 0,
+    latestPropsValidationAccepted: executionRows.length > 0,
     inputChangeControlledRestoreBridgeRecorded: executionRows.length > 0,
     inputChangeControlledRestoreBridgeRowsCreated:
+      executionRows.length > 0,
+    inputChangeControlledRestoreExecutionRecorded:
+      executionRows.length > 0,
+    inputChangeControlledRestoreExecutionRowsCreated:
       executionRows.length > 0,
     restoreQueueWriteExecutionRecorded: executionRows.length > 0,
     restoreQueueMutationIntentRecorded: executionRows.length > 0,
@@ -3950,7 +4211,8 @@ function createInputChangeEventRestoreQueueExecutionSideEffects(
     wrapperMutationIntentRowsCreated: executionRows.length > 0,
     wrapperMutationIntentRowCount: executionRows.length,
     wrapperOperationNamesRecorded: executionRows.length > 0,
-    wrapperSideEffectsBlocked: true,
+    wrapperMutationExecuted: executionRows.length > 0,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
     metadataRestoreTargetWritten: executionRows.some(
       (row) => row.metadataRestoreTargetWritten
     ),
@@ -3959,8 +4221,169 @@ function createInputChangeEventRestoreQueueExecutionSideEffects(
     ),
     restoreQueueWriteOrderRecorded: executionRows.length > 0,
     restoreQueueFlushOrderRecorded: executionRows.length > 0,
-    hostWrapperRestoreOrderRecorded: executionRows.length > 0
+    hostWrapperRestoreOrderRecorded: executionRows.length > 0,
+    privateRestoreQueueWritten: executionResult.restoreQueueWritten,
+    privateRestoreQueueFlushed: executionResult.restoreQueueFlushed,
+    privateControlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    controlledStateRestoreInvoked: false,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    hostValueRead: executionResult.hostValueRead,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
+    browserInputMutated: false
   });
+}
+
+function createInputChangeRestoreQueueEntry(
+  bridgeRow,
+  writeExecutionRow,
+  wrapperIntentRow,
+  targetField,
+  beforeValueSnapshot,
+  nextValueSnapshot
+) {
+  return freezeRecord({
+    status: 'queued-private-input-change-controlled-restore-target',
+    sourceRestoreRequestId: bridgeRow.sourceRestoreRequestId,
+    sourceWritePreflightRequestId: bridgeRow.sourceWritePreflightRequestId,
+    sourceWriteExecutionRowId: writeExecutionRow.rowId,
+    sourceWrapperMutationIntentRowId: wrapperIntentRow.rowId,
+    queueSlot: bridgeRow.queueSlot,
+    queueSlotIndex: bridgeRow.queueSlotIndex,
+    hostTag: bridgeRow.hostTag,
+    inputType: bridgeRow.inputType,
+    controlKind: bridgeRow.controlKind,
+    controlledPropName: bridgeRow.controlledPropName,
+    acceptedRestoreKind: bridgeRow.acceptedRestoreKind,
+    hostWrapperOperation: bridgeRow.hostWrapperOperation,
+    wrapperMutationKind: wrapperIntentRow.wrapperMutationKind,
+    targetField,
+    beforeValueSnapshot,
+    nextValueSnapshot,
+    fakeDomOnly: true,
+    rawTargetCaptured: false,
+    liveDomNodeAccepted: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createInputChangeRestoreQueueEntrySummary(entry) {
+  return freezeRecord({
+    status: entry.status,
+    sourceRestoreRequestId: entry.sourceRestoreRequestId,
+    sourceWritePreflightRequestId: entry.sourceWritePreflightRequestId,
+    sourceWriteExecutionRowId: entry.sourceWriteExecutionRowId,
+    sourceWrapperMutationIntentRowId:
+      entry.sourceWrapperMutationIntentRowId,
+    queueSlot: entry.queueSlot,
+    queueSlotIndex: entry.queueSlotIndex,
+    hostTag: entry.hostTag,
+    inputType: entry.inputType,
+    controlKind: entry.controlKind,
+    controlledPropName: entry.controlledPropName,
+    acceptedRestoreKind: entry.acceptedRestoreKind,
+    hostWrapperOperation: entry.hostWrapperOperation,
+    wrapperMutationKind: entry.wrapperMutationKind,
+    targetField: entry.targetField,
+    beforeValueSnapshot: entry.beforeValueSnapshot,
+    nextValueSnapshot: entry.nextValueSnapshot,
+    fakeDomOnly: true,
+    rawTargetCaptured: false,
+    liveDomNodeAccepted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getInputChangeEventRestoreQueueExecutionLatestPropsRejectionReason(
+  lookupPayload,
+  latestPropsObject,
+  currentLatestPropsFresh,
+  propKeysMatch,
+  controlledProp,
+  bridgeRow
+) {
+  if (lookupPayload === null) {
+    return 'missing-input-change-latest-props-lookup';
+  }
+  if (latestPropsObject !== true) {
+    return 'input-change-latest-props-not-object';
+  }
+  if (currentLatestPropsFresh !== true) {
+    return 'stale-latest-props-for-execution';
+  }
+  if (bridgeRow === null) {
+    return 'missing-input-change-restore-bridge-row';
+  }
+  if (propKeysMatch !== true) {
+    return 'latest-props-evidence-keys-mismatch';
+  }
+  if (
+    !isObjectLike(controlledProp) ||
+    controlledProp.present !== true ||
+    controlledProp.nonNull !== true
+  ) {
+    return 'latest-props-controlled-prop-not-accepted';
+  }
+  return null;
+}
+
+function getInputChangeRestoreExecutionTargetField(bridgeRow) {
+  return bridgeRow.controlledPropName === 'checked' ? 'checked' : 'value';
+}
+
+function getInputChangeRestoreNextValue(latestProps, bridgeRow) {
+  const propName = bridgeRow.controlledPropName;
+  const value = latestProps[propName];
+  if (propName === 'checked') {
+    return value === true;
+  }
+  return coerceInputChangeRestoreStringValue(value);
+}
+
+function coerceInputChangeRestoreStringValue(value) {
+  if (typeof value === 'function' || typeof value === 'symbol') {
+    return '';
+  }
+  if (value == null) {
+    return '';
+  }
+  try {
+    return String(value);
+  } catch (error) {
+    throwInputChangeEventRestoreQueueExecutionError(
+      'latest-props-value-string-coercion-failed'
+    );
+  }
+}
+
+function readInputChangeRestoreFakeDomField(fakeDomTarget, targetField) {
+  try {
+    return targetField === 'checked'
+      ? fakeDomTarget.checked === true
+      : coerceInputChangeRestoreStringValue(fakeDomTarget.value);
+  } catch (error) {
+    throwInputChangeEventRestoreQueueExecutionError(
+      'fake-dom-target-field-read-failed'
+    );
+  }
+}
+
+function writeInputChangeRestoreFakeDomField(
+  fakeDomTarget,
+  targetField,
+  nextValue
+) {
+  try {
+    fakeDomTarget[targetField] = nextValue;
+  } catch (error) {
+    throwInputChangeEventRestoreQueueExecutionError(
+      'fake-dom-wrapper-mutation-failed'
+    );
+  }
 }
 
 function createPostEventRestoreQueueWrapperMutationIntentSourceRecords(
@@ -4961,53 +5384,61 @@ function normalizeInputChangeEventRestoreQueueExecutionAdmission(
       'fakeDomTarget must be an object'
     );
   }
+  if (isExplicitControlledRestoreFakeDomTarget(fakeDomTarget) !== true) {
+    throwInputChangeEventRestoreQueueExecutionError(
+      'fakeDomTarget must carry the private fake DOM marker'
+    );
+  }
   if (isLikelyLiveDomNode(fakeDomTarget)) {
     throwInputChangeEventRestoreQueueExecutionError(
       'unsupported-live-dom-node'
     );
   }
 
-  return freezeRecord({
-    queueKind,
-    queueId: getAdmissionStringProperty(
-      admission,
-      'queueId',
-      'anonymous-input-change-controlled-restore-execution'
-    ),
-    targetKind,
-    explicitAdmission: true,
-    deterministicFakeDomOnly: true,
-    fakeDomTargetAccepted: true,
-    fakeDomTargetCaptured: false,
-    acceptedSourceRecordTypes: freezeArray([
-      privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
-      privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
-      privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
-      privateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordType
-    ]),
-    recordsEventExtraction: true,
-    recordsLatestPropsValidation: true,
-    recordsRestoreQueueWriteExecution: true,
-    recordsFlushIntent: true,
-    recordsWrapperMutationExecutionEvidence: true,
-    rejectsStaleLatestProps: true,
-    rejectsRadioGroupAmbiguity: true,
-    rejectsLiveDomNodesBeforeMutation: true,
-    restoreQueueWriteAllowed: false,
-    restoreFlushAllowed: false,
-    hostWrapperInvocationAllowed: false,
-    wrapperWriteAllowed: false,
-    radioGroupLookupAllowed: false,
-    liveDescriptorInstallationAllowed: false,
-    valueTrackerFieldWriteAllowed: false,
-    hostValueReadAllowed: false,
-    hostValueWriteAllowed: false,
-    rawTargetCaptured: false,
-    rawLatestPropsRetained: false,
-    realDomNodeAccepted: false,
-    publicControlledBehaviorEnabled: false,
-    compatibilityClaimed: false
-  });
+  return {
+    fakeDomTarget,
+    record: freezeRecord({
+      queueKind,
+      queueId: getAdmissionStringProperty(
+        admission,
+        'queueId',
+        'anonymous-input-change-controlled-restore-execution'
+      ),
+      targetKind,
+      explicitAdmission: true,
+      deterministicFakeDomOnly: true,
+      fakeDomTargetAccepted: true,
+      fakeDomTargetCaptured: false,
+      acceptedSourceRecordTypes: freezeArray([
+        privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
+        privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
+        privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
+        privateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordType
+      ]),
+      recordsEventExtraction: true,
+      recordsLatestPropsValidation: true,
+      recordsRestoreQueueWriteExecution: true,
+      recordsFlushIntent: true,
+      recordsWrapperMutationExecutionEvidence: true,
+      rejectsStaleLatestProps: true,
+      rejectsRadioGroupAmbiguity: true,
+      rejectsLiveDomNodesBeforeMutation: true,
+      restoreQueueWriteAllowed: true,
+      restoreFlushAllowed: true,
+      hostWrapperInvocationAllowed: true,
+      wrapperWriteAllowed: true,
+      radioGroupLookupAllowed: false,
+      liveDescriptorInstallationAllowed: false,
+      valueTrackerFieldWriteAllowed: false,
+      hostValueReadAllowed: true,
+      hostValueWriteAllowed: true,
+      rawTargetCaptured: false,
+      rawLatestPropsRetained: false,
+      realDomNodeAccepted: false,
+      publicControlledBehaviorEnabled: false,
+      compatibilityClaimed: false
+    })
+  };
 }
 
 function normalizePostEventRestoreQueueAdmission(admission) {
@@ -5713,19 +6144,23 @@ function assertInputChangeEventRestoreQueueExecutionWrapperMutationIntentRecord(
 }
 
 function assertInputChangeEventRestoreQueueExecutionSources(
+  inputPreflight,
   bridgeRecord,
   writeExecutionRecord,
   flushBlockerRecord,
   wrapperIntentRecord,
-  admission
+  admission,
+  latestPropsValidation
 ) {
   const rejectionReason =
     getInputChangeEventRestoreQueueExecutionRejectionReason(
+      inputPreflight,
       bridgeRecord,
       writeExecutionRecord,
       flushBlockerRecord,
       wrapperIntentRecord,
-      admission
+      admission,
+      latestPropsValidation
     );
   if (rejectionReason !== null) {
     throwInputChangeEventRestoreQueueExecutionError(
@@ -5738,11 +6173,13 @@ function assertInputChangeEventRestoreQueueExecutionSources(
 }
 
 function getInputChangeEventRestoreQueueExecutionRejectionReason(
+  inputPreflight,
   bridgeRecord,
   writeExecutionRecord,
   flushBlockerRecord,
   wrapperIntentRecord,
-  admission
+  admission,
+  latestPropsValidation
 ) {
   if (
     bridgeRecord.status !==
@@ -5755,6 +6192,23 @@ function getInputChangeEventRestoreQueueExecutionRejectionReason(
     bridgeRecord.latestPropsEvidenceBridge.latestPropsEvidenceMatch !== true
   ) {
     return 'input-change-restore-bridge-not-accepted';
+  }
+
+  if (
+    bridgeRecord.sourceInputChangePreflight.sourceRecordKind !==
+      inputPreflight.kind ||
+    bridgeRecord.sourceInputChangePreflight.sourceRecordStatus !==
+      inputPreflight.status ||
+    bridgeRecord.sourceInputChangePreflight.domEventName !==
+      inputPreflight.domEventName ||
+    bridgeRecord.sourceInputChangePreflight.nativeEventType !==
+      inputPreflight.nativeEventType
+  ) {
+    return 'stale-input-change-extraction-preflight-source';
+  }
+
+  if (latestPropsValidation.accepted !== true) {
+    return latestPropsValidation.record.rejectionReason;
   }
 
   if (
@@ -5775,6 +6229,27 @@ function getInputChangeEventRestoreQueueExecutionRejectionReason(
       flushBlockerRecord.requestId
   ) {
     return 'stale-wrapper-mutation-intent-source';
+  }
+
+  if (
+    inputChangeEventRestoreQueueExecutionHasRadioAmbiguity(
+      writeExecutionRecord,
+      flushBlockerRecord,
+      wrapperIntentRecord
+    )
+  ) {
+    return 'radio-group-ambiguity-before-mutation';
+  }
+
+  if (
+    !Array.isArray(writeExecutionRecord.writeExecutionRows) ||
+    !Array.isArray(flushBlockerRecord.queueSnapshot?.entries) ||
+    !Array.isArray(wrapperIntentRecord.wrapperMutationIntentRows) ||
+    writeExecutionRecord.writeExecutionRows.length !== 1 ||
+    flushBlockerRecord.queueSnapshot.entries.length !== 1 ||
+    wrapperIntentRecord.wrapperMutationIntentRows.length !== 1
+  ) {
+    return 'unsupported-multiple-restore-targets-before-mutation';
   }
 
   const bridgeRow = bridgeRecord.bridgeRows[0];
@@ -5804,6 +6279,15 @@ function getInputChangeEventRestoreQueueExecutionRejectionReason(
   if (
     (bridgeRow.acceptedRestoreKind !== 'input-text-value' &&
       bridgeRow.acceptedRestoreKind !== 'input-checkbox-checked') ||
+    bridgeRow.hostTag !== 'input' ||
+    (bridgeRow.acceptedRestoreKind === 'input-text-value' &&
+      (bridgeRow.inputType !== 'text' ||
+        bridgeRow.controlKind !== 'value' ||
+        bridgeRow.controlledPropName !== 'value')) ||
+    (bridgeRow.acceptedRestoreKind === 'input-checkbox-checked' &&
+      (bridgeRow.inputType !== 'checkbox' ||
+        bridgeRow.controlKind !== 'checked' ||
+        bridgeRow.controlledPropName !== 'checked')) ||
     bridgeRow.acceptedRestoreKind !==
       writeExecutionRow.acceptedRestoreKind ||
     bridgeRow.acceptedRestoreKind !== wrapperIntentRow.acceptedRestoreKind
@@ -5812,7 +6296,7 @@ function getInputChangeEventRestoreQueueExecutionRejectionReason(
   }
 
   if (
-    admission.fakeDomTargetAccepted !== true ||
+    admission.record.fakeDomTargetAccepted !== true ||
     bridgeRow.restoreQueueWritten !== false ||
     bridgeRow.restoreQueueFlushed !== false ||
     writeExecutionRow.restoreQueueWritten !== false ||
@@ -5826,6 +6310,30 @@ function getInputChangeEventRestoreQueueExecutionRejectionReason(
   }
 
   return null;
+}
+
+function inputChangeEventRestoreQueueExecutionHasRadioAmbiguity(
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperIntentRecord
+) {
+  const writeRows = Array.isArray(writeExecutionRecord.writeExecutionRows)
+    ? writeExecutionRecord.writeExecutionRows
+    : [];
+  const snapshotEntries = Array.isArray(flushBlockerRecord.queueSnapshot?.entries)
+    ? flushBlockerRecord.queueSnapshot.entries
+    : [];
+  const wrapperRows = Array.isArray(wrapperIntentRecord.wrapperMutationIntentRows)
+    ? wrapperIntentRecord.wrapperMutationIntentRows
+    : [];
+
+  return [...writeRows, ...snapshotEntries, ...wrapperRows].some(
+    (row) =>
+      isObjectLike(row) &&
+      (row.inputType === 'radio' ||
+        row.acceptedRestoreKind === 'input-radio-checked' ||
+        row.radioGroupLookupRequired === true)
+  );
 }
 
 function findInputChangeEventRestoreQueueExecutionWriteRow(
@@ -7261,6 +7769,8 @@ function createGateState(options) {
       : 'controlled-post-event-restore-queue';
 
   return {
+    inputChangeRestoreQueue: [],
+    inputChangeRestoreTarget: null,
     nextRequestSequence: 1,
     requestIdPrefix: prefix
   };
@@ -7278,11 +7788,24 @@ function isLikelyLiveDomNode(value) {
     return false;
   }
 
-  const ownerDocument = value.ownerDocument;
-  return (
-    isObjectLike(ownerDocument) &&
-    isObjectLike(ownerDocument.defaultView)
-  );
+  try {
+    return (
+      typeof value.nodeType === 'number' ||
+      value.ownerDocument != null ||
+      typeof value.addEventListener === 'function' ||
+      typeof value.removeEventListener === 'function'
+    );
+  } catch (error) {
+    return true;
+  }
+}
+
+function isExplicitControlledRestoreFakeDomTarget(value) {
+  try {
+    return value[controlledInputValueTrackerFakeDomTargetMarker] === true;
+  } catch (error) {
+    return false;
+  }
 }
 
 function arrayShallowEqual(left, right) {

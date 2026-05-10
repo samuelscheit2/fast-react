@@ -5498,8 +5498,12 @@ test('private input/change controlled restore execution consumes fake-DOM text p
       targetKind: 'controlled-input-post-event-restore-wrapper-mutation-intent'
     }
   );
+  const fakeTarget = createControlledInputFakeDomTarget({
+    value: 'browser-mutated'
+  });
   const restoreExecution =
     gate.recordInputChangeEventControlledRestoreExecution(
+      inputPreflight,
       bridge,
       execution,
       flushBlocker,
@@ -5510,7 +5514,7 @@ test('private input/change controlled restore execution consumes fake-DOM text p
           'deterministic-input-change-event-controlled-restore-execution',
         queueId: 'input-change-execution-final',
         targetKind: 'controlled-input-change-event-restore-queue-execution',
-        fakeDomTarget: dispatch.targetNode
+        fakeDomTarget: fakeTarget
       }
     );
 
@@ -5530,10 +5534,16 @@ test('private input/change controlled restore execution consumes fake-DOM text p
     ),
     restoreExecution
   );
+  assert.equal(fakeTarget.value, 'alpha');
+  assert.equal(dispatch.targetNode.value, 'browser-mutated');
   assert.equal(restoreExecution.executionRowCount, 1);
   assert.deepEqual(
     restoreExecution.inputChangeRestoreExecutionRows.map((row) => ({
       acceptedRestoreKind: row.acceptedRestoreKind,
+      targetField: row.targetField,
+      beforeValueSnapshot: row.beforeValueSnapshot,
+      nextValueSnapshot: row.nextValueSnapshot,
+      afterValueSnapshot: row.afterValueSnapshot,
       fakeDomTargetAccepted: row.fakeDomTargetAccepted,
       latestPropsEvidenceMatch: row.latestPropsEvidenceMatch,
       restoreQueueWriteExecutionAccepted:
@@ -5545,20 +5555,26 @@ test('private input/change controlled restore execution consumes fake-DOM text p
       restoreQueueFlushed: row.restoreQueueFlushed,
       hostWrapperInvoked: row.hostWrapperInvoked,
       wrapperWritePerformed: row.wrapperWritePerformed,
+      fakeDomInputMutated: row.fakeDomInputMutated,
       browserInputMutated: row.browserInputMutated
     })),
     [
       {
         acceptedRestoreKind: 'input-text-value',
+        targetField: 'value',
+        beforeValueSnapshot: 'browser-mutated',
+        nextValueSnapshot: 'alpha',
+        afterValueSnapshot: 'alpha',
         fakeDomTargetAccepted: true,
         latestPropsEvidenceMatch: true,
         restoreQueueWriteExecutionAccepted: true,
         flushIntentAccepted: true,
         wrapperMutationExecutionRecorded: true,
-        restoreQueueWritten: false,
-        restoreQueueFlushed: false,
-        hostWrapperInvoked: false,
-        wrapperWritePerformed: false,
+        restoreQueueWritten: true,
+        restoreQueueFlushed: true,
+        hostWrapperInvoked: true,
+        wrapperWritePerformed: true,
+        fakeDomInputMutated: true,
         browserInputMutated: false
       }
     ]
@@ -5568,14 +5584,37 @@ test('private input/change controlled restore execution consumes fake-DOM text p
     true
   );
   assert.equal(
+    restoreExecution.latestPropsValidation.latestPropsValidationAccepted,
+    true
+  );
+  assert.equal(
+    restoreExecution.latestPropsValidation.currentLatestPropsFresh,
+    true
+  );
+  assert.equal(
     restoreExecution.wrapperMutationExecutionEvidence
       .wrapperMutationExecutionRecorded,
     true
   );
+  assert.equal(
+    restoreExecution.wrapperMutationExecutionEvidence.wrapperWritePerformed,
+    true
+  );
   assert.equal(restoreExecution.postEventRestoreBoundary.fakeDomOnly, true);
+  assert.equal(
+    restoreExecution.postEventRestoreBoundary.restoreQueueWritten,
+    true
+  );
+  assert.equal(
+    restoreExecution.postEventRestoreBoundary.restoreQueueFlushed,
+    true
+  );
   assert.equal(restoreExecution.sideEffects.restoreQueueWritten, false);
   assert.equal(restoreExecution.sideEffects.restoreQueueFlushed, false);
-  assert.equal(restoreExecution.sideEffects.hostWrapperInvoked, false);
+  assert.equal(restoreExecution.sideEffects.privateRestoreQueueWritten, true);
+  assert.equal(restoreExecution.sideEffects.privateRestoreQueueFlushed, true);
+  assert.equal(restoreExecution.sideEffects.hostWrapperInvoked, true);
+  assert.equal(restoreExecution.sideEffects.fakeDomInputMutated, true);
   assert.equal(restoreExecution.sideEffects.browserInputMutated, false);
   assert.equal(
     restoreExecution.publicControlledBehaviorBoundary.compatibilityClaimed,
@@ -5602,9 +5641,12 @@ test('private input/change controlled restore execution consumes fake-DOM text p
   const liveDocument = createRootBridgeDocument();
   liveDocument.defaultView = {};
   const liveNode = createRootBridgeElement('INPUT', liveDocument);
+  liveNode[resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker] =
+    true;
   assert.throws(
     () =>
       gate.recordInputChangeEventControlledRestoreExecution(
+        inputPreflight,
         bridge,
         execution,
         flushBlocker,
