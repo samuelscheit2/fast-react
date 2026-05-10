@@ -21,7 +21,12 @@ use crate::host_nodes::{
     HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError, HostNodeViolation,
 };
 use crate::root_commit::{
-    HostRootDeletionCleanupRecord, HostRootMutationApplyRecord, HostRootMutationApplyRecordKind,
+    HostRootDeletionCleanupRecord, HostRootFinishedWorkCommitHandoffErrorForCanary,
+    HostRootFinishedWorkPendingCommitRecordForCanary, HostRootMutationApplyRecord,
+    HostRootMutationApplyRecordKind, HostRootSingleHostUpdateApplyRecordErrorForCanary,
+    commit_finished_host_root_with_finished_work_handoff_for_canary,
+    record_host_root_finished_work_pending_commit_for_canary,
+    record_host_root_single_host_update_apply_for_canary,
 };
 use crate::test_support::{
     FakeHostFiberToken, FakeInstance, FakeTextInstance, RecordingHost, TestHostElement,
@@ -723,6 +728,277 @@ impl TestHostRootMutationApplyResult {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TestHostRootHostUpdatePayloadForCanary {
+    HostComponent {
+        current: FiberId,
+        work_in_progress: FiberId,
+        state_node: StateNodeHandle,
+        old_props: PropsHandle,
+        new_props: PropsHandle,
+        ty: &'static str,
+    },
+    HostText {
+        current: FiberId,
+        work_in_progress: FiberId,
+        state_node: StateNodeHandle,
+        old_text: String,
+        new_text: String,
+    },
+}
+
+impl TestHostRootHostUpdatePayloadForCanary {
+    #[must_use]
+    fn component(payload: HostComponentUpdatePayload) -> Self {
+        Self::HostComponent {
+            current: payload.current(),
+            work_in_progress: payload.work_in_progress(),
+            state_node: payload.state_node(),
+            old_props: payload.old_props(),
+            new_props: payload.new_props(),
+            ty: payload.ty(),
+        }
+    }
+
+    #[must_use]
+    fn text(payload: HostTextUpdatePayload) -> Self {
+        Self::HostText {
+            current: payload.current(),
+            work_in_progress: payload.work_in_progress(),
+            state_node: payload.state_node(),
+            old_text: payload.old_text().to_owned(),
+            new_text: payload.new_text().to_owned(),
+        }
+    }
+
+    #[must_use]
+    const fn current(&self) -> FiberId {
+        match self {
+            Self::HostComponent { current, .. } | Self::HostText { current, .. } => *current,
+        }
+    }
+
+    #[must_use]
+    const fn work_in_progress(&self) -> FiberId {
+        match self {
+            Self::HostComponent {
+                work_in_progress, ..
+            }
+            | Self::HostText {
+                work_in_progress, ..
+            } => *work_in_progress,
+        }
+    }
+
+    #[must_use]
+    const fn state_node(&self) -> StateNodeHandle {
+        match self {
+            Self::HostComponent { state_node, .. } | Self::HostText { state_node, .. } => {
+                *state_node
+            }
+        }
+    }
+
+    #[must_use]
+    const fn is_host_component_props_update(&self) -> bool {
+        matches!(self, Self::HostComponent { .. })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestHostRootHostUpdateExecutionBlockerForCanary {
+    PublicRootRendering,
+    ReactDomCompatibility,
+    TestRendererCompatibility,
+    PublicRendererPackageBehavior,
+}
+
+const TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS:
+    [TestHostRootHostUpdateExecutionBlockerForCanary; 4] = [
+    TestHostRootHostUpdateExecutionBlockerForCanary::PublicRootRendering,
+    TestHostRootHostUpdateExecutionBlockerForCanary::ReactDomCompatibility,
+    TestHostRootHostUpdateExecutionBlockerForCanary::TestRendererCompatibility,
+    TestHostRootHostUpdateExecutionBlockerForCanary::PublicRendererPackageBehavior,
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestHostRootHostUpdateExecutionDiagnosticForCanary {
+    root: FiberRootId,
+    finished_work: FiberId,
+    source_handoff_order: usize,
+    commit_order: usize,
+    mutation: HostRootMutationApplyRecord,
+    payload: TestHostRootHostUpdatePayloadForCanary,
+    status: TestHostRootMutationApplyStatus,
+    applied_host_call_count: usize,
+    blockers: [TestHostRootHostUpdateExecutionBlockerForCanary; 4],
+}
+
+impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    const fn source_handoff_order(&self) -> usize {
+        self.source_handoff_order
+    }
+
+    #[must_use]
+    const fn commit_order(&self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    const fn mutation(&self) -> HostRootMutationApplyRecord {
+        self.mutation
+    }
+
+    #[must_use]
+    const fn payload(&self) -> &TestHostRootHostUpdatePayloadForCanary {
+        &self.payload
+    }
+
+    #[must_use]
+    const fn status(&self) -> TestHostRootMutationApplyStatus {
+        self.status
+    }
+
+    #[must_use]
+    const fn applied_host_call_count(&self) -> usize {
+        self.applied_host_call_count
+    }
+
+    #[must_use]
+    fn test_host_commit_executed(&self) -> bool {
+        matches!(
+            self.status,
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::CommitUpdate
+                    | TestHostRootMutationHostCall::CommitTextUpdate
+            )
+        )
+    }
+
+    #[must_use]
+    const fn blockers(&self) -> &[TestHostRootHostUpdateExecutionBlockerForCanary; 4] {
+        &self.blockers
+    }
+
+    #[must_use]
+    const fn public_root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    const fn public_renderer_package_behavior_exposed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TestHostRootHostUpdateExecutionErrorForCanary {
+    FinishedWorkHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    HostUpdateRecord(HostRootSingleHostUpdateApplyRecordErrorForCanary),
+    UnsupportedPayload {
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+        kind: HostRootMutationApplyRecordKind,
+    },
+    HostWork(HostWorkError),
+    HostUpdateNotApplied {
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+        status: Option<TestHostRootMutationApplyStatus>,
+    },
+}
+
+impl Display for TestHostRootHostUpdateExecutionErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FinishedWorkHandoff(error) => Display::fmt(error, formatter),
+            Self::HostUpdateRecord(error) => Display::fmt(error, formatter),
+            Self::UnsupportedPayload {
+                root,
+                finished_work,
+                fiber,
+                kind,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} rejected unsupported private test-host update payload for fiber slot {} ({kind:?}) before mutation",
+                root.raw(),
+                finished_work.slot().get(),
+                fiber.slot().get()
+            ),
+            Self::HostWork(error) => Display::fmt(error, formatter),
+            Self::HostUpdateNotApplied {
+                root,
+                finished_work,
+                fiber,
+                status,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} did not apply private test-host update for fiber slot {}; status was {:?}",
+                root.raw(),
+                finished_work.slot().get(),
+                fiber.slot().get(),
+                status
+            ),
+        }
+    }
+}
+
+impl Error for TestHostRootHostUpdateExecutionErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FinishedWorkHandoff(error) => Some(error),
+            Self::HostUpdateRecord(error) => Some(error),
+            Self::HostWork(error) => Some(error),
+            Self::UnsupportedPayload { .. } | Self::HostUpdateNotApplied { .. } => None,
+        }
+    }
+}
+
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for TestHostRootHostUpdateExecutionErrorForCanary
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkHandoff(error)
+    }
+}
+
+impl From<HostRootSingleHostUpdateApplyRecordErrorForCanary>
+    for TestHostRootHostUpdateExecutionErrorForCanary
+{
+    fn from(error: HostRootSingleHostUpdateApplyRecordErrorForCanary) -> Self {
+        Self::HostUpdateRecord(error)
+    }
+}
+
+impl From<HostWorkError> for TestHostRootHostUpdateExecutionErrorForCanary {
+    fn from(error: HostWorkError) -> Self {
+        Self::HostWork(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TestHostRootDeletionCleanupAction {
     DetachDeletedInstance,
@@ -843,6 +1119,126 @@ fn apply_test_host_root_commit_mutations(
         finished_work: commit.finished_work(),
         records,
     })
+}
+
+fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    pending: Option<HostRootFinishedWorkPendingCommitRecordForCanary>,
+    commit_order: usize,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<
+    TestHostRootHostUpdateExecutionDiagnosticForCanary,
+    TestHostRootHostUpdateExecutionErrorForCanary,
+> {
+    let pending_update = record_host_root_single_host_update_apply_for_canary(store, render)?;
+    let mutation = pending_update.mutation();
+    let Some(payload) = accepted_test_host_update_payload_for_canary(detached_hosts, mutation)
+    else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::UnsupportedPayload {
+                root: pending_update.root(),
+                finished_work: pending_update.finished_work(),
+                fiber: pending_update.fiber(),
+                kind: pending_update.kind(),
+            },
+        );
+    };
+
+    let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        pending,
+        commit_order,
+    )?;
+    let committed_update = handoff
+        .commit()
+        .single_host_update_apply_record_for_canary()?;
+    if committed_update.mutation() != mutation {
+        return Err(
+            HostRootSingleHostUpdateApplyRecordErrorForCanary::ExpectedSingleHostUpdateRecord {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                mutation_record_count: handoff.commit().mutation_apply_log().len(),
+                host_update_record_count: 0,
+            }
+            .into(),
+        );
+    }
+
+    let apply =
+        apply_test_host_root_commit_mutations(store, host, handoff.commit(), detached_hosts)?;
+    let applied_status = apply
+        .records()
+        .iter()
+        .find(|record| record.mutation() == mutation)
+        .map(|record| record.status());
+    let Some(status) = applied_status else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                fiber: mutation.fiber(),
+                status: None,
+            },
+        );
+    };
+    if !host_update_apply_status_matches_mutation_kind(status, mutation.kind()) {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.commit().root(),
+                finished_work: handoff.commit().finished_work(),
+                fiber: mutation.fiber(),
+                status: Some(status),
+            },
+        );
+    }
+
+    Ok(TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        root: handoff.commit().root(),
+        finished_work: handoff.commit().finished_work(),
+        source_handoff_order: handoff.pending().handoff_order(),
+        commit_order: handoff.commit_order(),
+        mutation,
+        payload,
+        status,
+        applied_host_call_count: apply.applied_host_call_count(),
+        blockers: TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS,
+    })
+}
+
+fn accepted_test_host_update_payload_for_canary(
+    detached_hosts: &DetachedHostRecords,
+    mutation: HostRootMutationApplyRecord,
+) -> Option<TestHostRootHostUpdatePayloadForCanary> {
+    match mutation.kind() {
+        HostRootMutationApplyRecordKind::CommitHostComponentUpdate => detached_hosts
+            .component_update_payload(mutation)
+            .map(TestHostRootHostUpdatePayloadForCanary::component),
+        HostRootMutationApplyRecordKind::CommitHostTextUpdate => detached_hosts
+            .text_update_payload(mutation)
+            .map(TestHostRootHostUpdatePayloadForCanary::text),
+        _ => None,
+    }
+}
+
+const fn host_update_apply_status_matches_mutation_kind(
+    status: TestHostRootMutationApplyStatus,
+    kind: HostRootMutationApplyRecordKind,
+) -> bool {
+    matches!(
+        (status, kind),
+        (
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate,
+        ) | (
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::CommitTextUpdate,
+            ),
+            HostRootMutationApplyRecordKind::CommitHostTextUpdate,
+        )
+    )
 }
 
 fn apply_test_host_root_deletion_cleanup(
@@ -2404,6 +2800,35 @@ mod tests {
         {
             let node = store.fiber_arena_mut().get_mut(work_in_progress).unwrap();
             node.set_flags(FiberFlags::UPDATE);
+            node.set_memoized_props(next_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_in_progress])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        work_in_progress
+    }
+
+    fn update_root_component_for_commit_without_payload(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+        current_component: FiberId,
+        next_props: PropsHandle,
+    ) -> FiberId {
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_component, next_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_in_progress).unwrap();
+            node.set_flags(FiberFlags::UPDATE);
+            node.set_state_node(state_node);
             node.set_memoized_props(next_props);
         }
         store
@@ -4086,6 +4511,356 @@ mod tests {
         let mut expected_operations = operations_before_apply;
         expected_operations.push("commit_update");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_finished_work_handoff_applies_one_host_component_update_to_test_host_commit_path()
+    {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let initial_props = initial.props();
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let payload = update_root_component_for_commit(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 7)
+                .unwrap();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        let diagnostic = apply_one_test_host_update_with_finished_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            update_render,
+            Some(pending),
+            8,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(diagnostic.finished_work(), update_render.finished_work());
+        assert_eq!(diagnostic.source_handoff_order(), 7);
+        assert_eq!(diagnostic.commit_order(), 8);
+        assert_eq!(diagnostic.mutation().fiber(), payload.work_in_progress());
+        assert_eq!(
+            diagnostic.mutation().alternate_fiber(),
+            Some(current_component)
+        );
+        assert_eq!(
+            diagnostic.mutation().kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(
+            diagnostic.status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
+        );
+        assert!(diagnostic.test_host_commit_executed());
+        assert_eq!(diagnostic.applied_host_call_count(), 1);
+        assert_eq!(
+            diagnostic.blockers(),
+            &TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS
+        );
+        assert!(diagnostic.public_root_rendering_blocked());
+        assert!(!diagnostic.public_renderer_package_behavior_exposed());
+        assert!(!diagnostic.react_dom_compatibility_claimed());
+        assert!(!diagnostic.test_renderer_compatibility_claimed());
+        assert!(diagnostic.payload().is_host_component_props_update());
+        assert_eq!(diagnostic.payload().current(), current_component);
+        assert_eq!(
+            diagnostic.payload().work_in_progress(),
+            payload.work_in_progress()
+        );
+        assert_eq!(diagnostic.payload().state_node(), state_node);
+        assert_eq!(
+            diagnostic.payload(),
+            &TestHostRootHostUpdatePayloadForCanary::HostComponent {
+                current: current_component,
+                work_in_progress: payload.work_in_progress(),
+                state_node,
+                old_props: initial_props,
+                new_props: next.props(),
+                ty: "section",
+            }
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            update_render.finished_work()
+        );
+        assert_eq!(store.host_tokens().len(), token_count_before_apply + 1);
+        let mut expected_operations = operations_before_apply;
+        expected_operations.push("commit_update");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_host_component_update_handoff_rejects_stale_finished_work_before_mutation() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        update_root_component_for_commit(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let stale_pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 9)
+                .unwrap()
+                .with_previous_current_for_canary(update_render.finished_work());
+        let previous_current = store.root(root_id).unwrap().current();
+        let operations_before_apply = host.operations();
+
+        let error = apply_one_test_host_update_with_finished_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            update_render,
+            Some(stale_pending),
+            10,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootHostUpdateExecutionErrorForCanary::FinishedWorkHandoff(
+                HostRootFinishedWorkCommitHandoffErrorForCanary::StaleFinishedWorkRecord {
+                    root,
+                    finished_work,
+                    ..
+                }
+            ) if root == root_id && finished_work == update_render.finished_work()
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(update_render.finished_work())
+        );
+        assert_eq!(host.operations(), operations_before_apply);
+    }
+
+    #[test]
+    fn host_work_host_component_update_handoff_rejects_unsupported_payload_before_mutation() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let update_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(86));
+        let updated_component = update_root_component_for_commit_without_payload(
+            &mut store,
+            update_render.finished_work(),
+            current_component,
+            PropsHandle::from_raw(9_603),
+        );
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 11)
+                .unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let operations_before_apply = host.operations();
+
+        let error = apply_one_test_host_update_with_finished_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            update_render,
+            Some(pending),
+            12,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootHostUpdateExecutionErrorForCanary::UnsupportedPayload {
+                root,
+                finished_work,
+                fiber,
+                kind,
+            } if root == root_id
+                && finished_work == update_render.finished_work()
+                && fiber == updated_component
+                && kind == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(update_render.finished_work())
+        );
+        assert_eq!(host.operations(), operations_before_apply);
+    }
+
+    #[test]
+    fn host_work_host_component_update_handoff_rejects_wrong_root_record_before_mutation() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, first_root, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            first_root,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, first_root, next_element);
+        update_root_component_for_commit(
+            &mut store,
+            first_root,
+            update_render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        update_container(
+            &mut store,
+            second_root,
+            RootElementHandle::from_raw(9_604),
+            None,
+        )
+        .unwrap();
+        let second_render =
+            render_host_root_for_lanes(&mut store, second_root, Lanes::DEFAULT).unwrap();
+        let wrong_root_pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, second_render, 13)
+                .unwrap();
+        let previous_current = store.root(first_root).unwrap().current();
+        let operations_before_apply = host.operations();
+
+        let error = apply_one_test_host_update_with_finished_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            update_render,
+            Some(wrong_root_pending),
+            14,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootHostUpdateExecutionErrorForCanary::FinishedWorkHandoff(
+                HostRootFinishedWorkCommitHandoffErrorForCanary::ForeignFinishedWorkRecord {
+                    expected_root,
+                    actual_root,
+                    ..
+                }
+            ) if expected_root == first_root && actual_root == second_root
+        ));
+        assert_eq!(store.root(first_root).unwrap().current(), previous_current);
+        assert_eq!(
+            store
+                .root(first_root)
+                .unwrap()
+                .scheduling()
+                .work_in_progress(),
+            Some(update_render.finished_work())
+        );
+        assert_eq!(host.operations(), operations_before_apply);
     }
 
     #[test]
