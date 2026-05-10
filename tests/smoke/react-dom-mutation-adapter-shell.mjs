@@ -94,6 +94,18 @@ function runSmokeChecks() {
   }
 
   {
+    const parent = createElement('div');
+    const before = createElement('span');
+    const text = createText('head');
+
+    parent.appendChild(before);
+    assert.equal(domHost.insertBefore(parent, text, before), text);
+    assert.deepEqual(childNames(parent), ['#text', 'span']);
+    assert.equal(parent.textContent, 'head');
+    assert.equal(text.parentNode, parent);
+  }
+
+  {
     const container = createElement('div');
     const child = createElement('article');
 
@@ -119,10 +131,25 @@ function runSmokeChecks() {
   }
 
   {
+    const parent = createElement('div');
+    const first = createText('first');
+    const second = createText('second');
+
+    parent.appendChild(first);
+    parent.appendChild(second);
+
+    assert.equal(domHost.removeChild(parent, first), first);
+    assert.deepEqual(childNames(parent), ['#text']);
+    assert.equal(parent.textContent, 'second');
+    assert.equal(first.parentNode, null);
+    assert.equal(second.parentNode, parent);
+  }
+
+  {
     const container = createElement('main');
-    const first = createElement('header');
+    const first = createText('intro');
     const second = createElement('section');
-    const third = createElement('footer');
+    const third = createText('outro');
 
     container.appendChild(first);
     container.appendChild(second);
@@ -142,16 +169,26 @@ function runSmokeChecks() {
     assert.equal(text.data, 'new');
     assert.equal(text.nodeValue, 'new');
     assert.equal(text.textContent, 'new');
+    assert.deepEqual(text.writeLog, [['nodeValue', 'new']]);
   }
 
   {
     const parent = createElement('div');
-    parent.appendChild(createText('managed'));
+    const text = createText('managed');
+
+    parent.appendChild(text);
     assert.equal(parent.textContent, 'managed');
+
+    assert.equal(domHost.setTextContent(parent, 'updated'), undefined);
+    assert.equal(parent.firstChild, text);
+    assert.deepEqual(childNames(parent), ['#text']);
+    assert.equal(parent.textContent, 'updated');
+    assert.deepEqual(text.writeLog, [['nodeValue', 'updated']]);
 
     assert.equal(domHost.resetTextContent(parent), undefined);
     assert.equal(parent.textContent, '');
     assert.deepEqual(childNames(parent), []);
+    assert.equal(text.parentNode, null);
 
     assert.equal(domHost.setTextContent(parent, 123), undefined);
     assert.equal(parent.textContent, '123');
@@ -197,6 +234,10 @@ class FakeNode {
 
   get firstChild() {
     return this.childNodes[0] || null;
+  }
+
+  get lastChild() {
+    return this.childNodes[this.childNodes.length - 1] || null;
   }
 
   appendChild(child) {
@@ -261,6 +302,7 @@ class FakeText extends FakeNode {
   constructor(text) {
     super('#text', 3);
     this._data = String(text);
+    this.writeLog = [];
   }
 
   get data() {
@@ -268,7 +310,9 @@ class FakeText extends FakeNode {
   }
 
   set data(value) {
-    this._data = String(value);
+    const text = String(value);
+    this.writeLog.push(['data', text]);
+    this._data = text;
   }
 
   get nodeValue() {
@@ -276,7 +320,9 @@ class FakeText extends FakeNode {
   }
 
   set nodeValue(value) {
-    this._data = String(value);
+    const text = String(value);
+    this.writeLog.push(['nodeValue', text]);
+    this._data = text;
   }
 
   get textContent() {
@@ -284,7 +330,9 @@ class FakeText extends FakeNode {
   }
 
   set textContent(value) {
-    this._data = String(value);
+    const text = String(value);
+    this.writeLog.push(['textContent', text]);
+    this._data = text;
   }
 }
 

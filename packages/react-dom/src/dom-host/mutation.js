@@ -169,29 +169,26 @@ function isAncestorOf(candidateAncestor, node) {
 function setTextNodeValue(textInstance, text, operation) {
   assertDomLikeObject(textInstance, operation, 'child');
   const stringText = String(text);
-  let wrote = false;
-
-  if ('data' in textInstance) {
-    textInstance.data = stringText;
-    wrote = true;
-  }
 
   if ('nodeValue' in textInstance) {
     textInstance.nodeValue = stringText;
-    wrote = true;
+    return;
   }
 
-  if (!wrote && 'textContent' in textInstance) {
+  if ('data' in textInstance) {
+    textInstance.data = stringText;
+    return;
+  }
+
+  if ('textContent' in textInstance) {
     textInstance.textContent = stringText;
-    wrote = true;
+    return;
   }
 
-  if (!wrote) {
-    throw createDomHostMutationError(
-      'FAST_REACT_DOM_INVALID_TEXT_INSTANCE',
-      `Cannot ${operation} on a text node without data, nodeValue, or textContent.`
-    );
-  }
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_INVALID_TEXT_INSTANCE',
+    `Cannot ${operation} on a text node without data, nodeValue, or textContent.`
+  );
 }
 
 function setNodeTextContent(instance, text, operation) {
@@ -203,7 +200,40 @@ function setNodeTextContent(instance, text, operation) {
     );
   }
 
-  instance.textContent = String(text);
+  const stringText = String(text);
+  if (stringText !== '') {
+    const firstChild = getFirstChild(instance);
+    if (
+      firstChild !== null &&
+      firstChild === getLastChild(instance) &&
+      isTextNode(firstChild)
+    ) {
+      setTextNodeValue(firstChild, stringText, operation);
+      return;
+    }
+  }
+
+  instance.textContent = stringText;
+}
+
+function getLastChild(parent) {
+  if (parent.lastChild !== undefined) {
+    return parent.lastChild || null;
+  }
+
+  if (Array.isArray(parent.childNodes) && parent.childNodes.length > 0) {
+    return parent.childNodes[parent.childNodes.length - 1];
+  }
+
+  return null;
+}
+
+function isTextNode(node) {
+  return (
+    node != null &&
+    typeof node === 'object' &&
+    (node.nodeType === 3 || node.nodeName === '#text')
+  );
 }
 
 module.exports = {
