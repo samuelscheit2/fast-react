@@ -162,6 +162,113 @@ test("React DOM public root facade inspection records current placeholder bounda
   }
 });
 
+test("React DOM client private facade adapter is symbol-only and routes to private records", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+
+  assert.deepEqual(Object.keys(reactDomClient), [
+    "createRoot",
+    "hydrateRoot",
+    "version"
+  ]);
+  assert.equal(Object.hasOwn(reactDomClient, "rootPublicFacadeAdapter"), false);
+  assert.equal(
+    Object.hasOwn(
+      reactDomClient,
+      "__FAST_REACT_PRIVATE_ROOT_PUBLIC_FACADE_ADAPTER__"
+    ),
+    false
+  );
+  assert.equal(Symbol.keyFor(symbol), "fast.react_dom.client.private_root_public_facade_adapter");
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(descriptor.value, rootBridge.createPrivateRootPublicFacadeAdapter);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(reactDomClient.hydrateRoot, symbol),
+    undefined
+  );
+
+  const document = createPrivateGateDocument(
+    "public-facade-private-adapter",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const adapter = descriptor.value({
+    requestIdPrefix: "facade-conformance-request",
+    rootIdPrefix: "facade-conformance-root",
+    updateIdPrefix: "facade-conformance-update"
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+  const render = root.render({
+    props: {
+      children: "adapter child"
+    },
+    type: "span"
+  });
+  const unmount = root.unmount();
+
+  assert.equal(
+    adapter.adapterStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY
+  );
+  assert.equal(adapter.publicCreateRootEnabled, false);
+  assert.equal(adapter.publicHydrateRootEnabled, false);
+  assert.equal(adapter.compatibilityClaimed, false);
+  assert.equal(create.requestType, "createRoot");
+  assert.equal(render.requestType, "root.render");
+  assert.equal(unmount.requestType, "root.unmount");
+  assert.equal(create.requestId, "facade-conformance-request:1");
+  assert.equal(render.updateId, "facade-conformance-update:1");
+  assert.equal(unmount.updateId, "facade-conformance-update:2");
+  assert.deepEqual(adapter.getRootRequestRecords(root), [
+    create,
+    render,
+    unmount
+  ]);
+  assert.equal(rootBridge.getPrivateRootPublicFacadeRootPayload(root).root, root);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root).rootType,
+    rootBridge.privateRootPublicFacadeRootType
+  );
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assert.deepEqual(publicBoundary.exportKeys, [
+    "createRoot",
+    "hydrateRoot",
+    "version"
+  ]);
+});
+
 test("React DOM public root facade update and unmount rows stay blocked apart from private request metadata", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,

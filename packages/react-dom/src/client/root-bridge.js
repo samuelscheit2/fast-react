@@ -100,6 +100,13 @@ const privateRootHostOutputUpdateHandoffRecordType =
   'fast.react_dom.private_root_host_output_update_handoff_record';
 const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
   'fast.react_dom.private_root_ref_callback_host_output_ordering_diagnostic_record';
+const privateRootPublicFacadeAdapterType =
+  'fast.react_dom.private_root_public_facade_adapter';
+const privateRootPublicFacadeRootType =
+  'fast.react_dom.private_root_public_facade_root';
+const privateRootPublicFacadeAdapterSymbol = Symbol.for(
+  'fast.react_dom.client.private_root_public_facade_adapter'
+);
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -143,6 +150,8 @@ const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-host-output-update';
 const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
   'admitted-private-root-ref-callback-host-output-ordering-diagnostic';
+const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
+  'ready-private-react-dom-client-root-public-facade-adapter';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -588,6 +597,8 @@ const rootPortalFakeDomMountPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffRecords = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
+const rootPublicFacadeAdapterPayloads = new WeakMap();
+const rootPublicFacadeRootPayloads = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -719,6 +730,123 @@ function createPrivateRootBridgeShell(options) {
 }
 
 const defaultBridgeShell = createPrivateRootBridgeShell();
+
+function createPrivateRootPublicFacadeAdapter(options) {
+  const bridge = createPrivateRootBridgeShell(options);
+  const adapterState = {
+    adapter: null,
+    bridge,
+    roots: []
+  };
+  const adapter = freezeRecord({
+    $$typeof: privateRootPublicFacadeAdapterType,
+    kind: 'FastReactDomPrivateRootPublicFacadeAdapter',
+    entrypoint: 'react-dom/client',
+    adapterStatus: ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    recordOnlyBridge: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    createRoot(container, rootOptions) {
+      return createPrivateRootPublicFacadeRoot(
+        adapterState,
+        container,
+        rootOptions
+      );
+    },
+    getRootCreateRecord(root) {
+      return assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
+        .createRecord;
+    },
+    getRootRequestRecords(root) {
+      return freezeArray(
+        assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
+          .requestRecords
+      );
+    },
+    getRootPayload(root) {
+      return createPrivateRootPublicFacadeRootPayloadSnapshot(
+        assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
+      );
+    }
+  });
+
+  adapterState.adapter = adapter;
+  rootPublicFacadeAdapterPayloads.set(adapter, adapterState);
+  return adapter;
+}
+
+function createPrivateRootPublicFacadeRoot(
+  adapterState,
+  container,
+  rootOptions
+) {
+  const createRecord = adapterState.bridge.createClientRoot(
+    container,
+    rootOptions
+  );
+  const payload = {
+    adapter: adapterState.adapter,
+    bridge: adapterState.bridge,
+    container,
+    createRecord,
+    renderRecords: [],
+    requestRecords: [createRecord],
+    root: null,
+    rootHandle: createRecord.handle,
+    rootOptions,
+    rootType: privateRootPublicFacadeRootType,
+    unmountRecords: []
+  };
+  const root = {};
+
+  Object.defineProperties(root, {
+    render: {
+      enumerable: true,
+      value: function render(element) {
+        const callback =
+          arguments.length > 1 ? arguments[1] : undefined;
+        const record = adapterState.bridge.renderContainer(
+          createRecord.handle,
+          element,
+          callback
+        );
+        payload.requestRecords.push(record);
+        payload.renderRecords.push(record);
+        return record;
+      }
+    },
+    unmount: {
+      enumerable: true,
+      value: function unmount() {
+        const callback = arguments.length > 0 ? arguments[0] : undefined;
+        const record = adapterState.bridge.unmountContainer(
+          createRecord.handle,
+          callback
+        );
+        payload.requestRecords.push(record);
+        payload.unmountRecords.push(record);
+        return record;
+      }
+    }
+  });
+
+  Object.freeze(root);
+  payload.root = root;
+  rootPublicFacadeRootPayloads.set(root, payload);
+  adapterState.roots.push(root);
+  return root;
+}
 
 function createClientRootRecord(container, rootOptions) {
   return defaultBridgeShell.createClientRoot(container, rootOptions);
@@ -1742,6 +1870,37 @@ function getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload(record) {
 
 function isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord(value) {
   return rootRefCallbackHostOutputOrderingDiagnosticPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeAdapterPayload(adapter) {
+  const payload = rootPublicFacadeAdapterPayloads.get(adapter);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return freezeRecord({
+    adapter: payload.adapter,
+    bridge: payload.bridge,
+    rootCount: payload.roots.length,
+    roots: freezeArray(payload.roots)
+  });
+}
+
+function isPrivateRootPublicFacadeAdapter(value) {
+  return rootPublicFacadeAdapterPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeRootPayload(root) {
+  const payload = rootPublicFacadeRootPayloads.get(root);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return createPrivateRootPublicFacadeRootPayloadSnapshot(payload);
+}
+
+function isPrivateRootPublicFacadeRoot(value) {
+  return rootPublicFacadeRootPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -4134,6 +4293,35 @@ function describePortalCommitListenerSideEffects(
   });
 }
 
+function assertPrivateRootPublicFacadeRootForAdapter(root, adapterState) {
+  const payload = rootPublicFacadeRootPayloads.get(root);
+  if (payload === undefined) {
+    throwInvalidRootPublicFacadeAdapter(
+      'Expected a private React DOM root public facade root.'
+    );
+  }
+  if (payload.adapter !== adapterState.adapter) {
+    throwForeignRootBridgeRequest();
+  }
+  return payload;
+}
+
+function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
+  return freezeRecord({
+    adapter: payload.adapter,
+    bridge: payload.bridge,
+    container: payload.container,
+    createRecord: payload.createRecord,
+    renderRecords: freezeArray(payload.renderRecords),
+    requestRecords: freezeArray(payload.requestRecords),
+    root: payload.root,
+    rootHandle: payload.rootHandle,
+    rootOptions: payload.rootOptions,
+    rootType: payload.rootType,
+    unmountRecords: freezeArray(payload.unmountRecords)
+  });
+}
+
 function throwInvalidRootBridgeRequest(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST';
@@ -4194,6 +4382,12 @@ function throwInvalidRefCallbackHostOutputOrderingDiagnostic(message) {
   const error = new Error(message);
   error.code =
     'FAST_REACT_DOM_INVALID_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC';
+  throw error;
+}
+
+function throwInvalidRootPublicFacadeAdapter(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
   throw error;
 }
 
@@ -4350,6 +4544,7 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED,
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
+  ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
@@ -4382,6 +4577,7 @@ module.exports = {
   createPortalFakeDomMountDiagnosticRecord,
   createPortalRootBoundaryRecord,
   createPrivateRootBridgeShell,
+  createPrivateRootPublicFacadeAdapter,
   createPrivateRootHandle,
   createPrivateRootOwner,
   createRefCallbackHostOutputOrderingDiagnosticRecord,
@@ -4398,6 +4594,8 @@ module.exports = {
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootPortalFakeDomMountPayload,
+  getPrivateRootPublicFacadeAdapterPayload,
+  getPrivateRootPublicFacadeRootPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
   getPrivateRootUnmountHostOutputCleanupPayload,
@@ -4409,6 +4607,8 @@ module.exports = {
   isPrivateRootPortalCommitHandoffRecord,
   isPrivateRootPortalFakeDomMountRecord,
   isPrivateRootPortalBoundaryRecord,
+  isPrivateRootPublicFacadeAdapter,
+  isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRootHandle,
@@ -4424,6 +4624,9 @@ module.exports = {
   privateRootNativeHandoffRecordType,
   privateRootPortalBoundaryRecordType,
   privateRootPortalCommitHandoffRecordType,
+  privateRootPublicFacadeAdapterSymbol,
+  privateRootPublicFacadeAdapterType,
+  privateRootPublicFacadeRootType,
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
