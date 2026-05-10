@@ -290,6 +290,149 @@ test("React DOM client private facade adapter is symbol-only and routes to priva
   ]);
 });
 
+test("React DOM client private facade preflight is symbol-only and routes to accepted diagnostics", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadePreflightSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+
+  assert.deepEqual(Object.keys(reactDomClient), [
+    "createRoot",
+    "hydrateRoot",
+    "version"
+  ]);
+  assert.equal(Object.hasOwn(reactDomClient, "rootPublicFacadePreflight"), false);
+  assert.equal(
+    Symbol.keyFor(symbol),
+    "fast.react_dom.client.private_root_public_facade_preflight"
+  );
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(descriptor.value, rootBridge.createPrivateRootPublicFacadePreflight);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(reactDomClient.hydrateRoot, symbol),
+    undefined
+  );
+
+  const document = createPrivateGateDocument(
+    "public-facade-private-preflight",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const preflight = descriptor.value({
+    nativeEnvironmentId: 427,
+    nativeHandoffIdPrefix: "facade-preflight-native",
+    publicFacadePreflightIdPrefix: "facade-preflight",
+    requestIdPrefix: "facade-preflight-request",
+    rootIdPrefix: "facade-preflight-root",
+    updateIdPrefix: "facade-preflight-update"
+  });
+  const root = preflight.createRoot(container);
+  const create = preflight.getRootCreatePreflight(root);
+  const render = root.render({
+    props: {
+      children: "preflight child"
+    },
+    type: "span"
+  });
+  const unmount = root.unmount();
+
+  assert.equal(
+    preflight.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY
+  );
+  assert.equal(preflight.publicCreateRootEnabled, false);
+  assert.equal(preflight.publicHydrateRootEnabled, false);
+  assert.equal(preflight.acceptedPrivateBridgeDiagnostics, true);
+  assert.equal(preflight.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadePreflight(preflight),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadePreflightRoot(root),
+    true
+  );
+  assert.equal(rootBridge.isPrivateRootPublicFacadePreflightRecord(create), true);
+  assert.deepEqual(Object.keys(root), ["render", "unmount"]);
+  assert.equal(create.facadeCall, "createRoot");
+  assert.equal(render.facadeCall, "root.render");
+  assert.equal(unmount.facadeCall, "root.unmount");
+  for (const record of [create, render, unmount]) {
+    assert.equal(
+      record.preflightStatus,
+      rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED
+    );
+    assert.equal(
+      record.requestAdmissionStatus,
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+    );
+    assert.equal(
+      record.nativeHandoffStatus,
+      rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+    );
+    assert.equal(record.publicRootCompatibilitySurface, false);
+    assert.equal(record.nativeExecution, false);
+    assert.equal(record.reconcilerExecution, false);
+    assert.equal(record.domMutation, false);
+    assert.equal(record.markerWrites, false);
+    assert.equal(record.listenerInstallation, false);
+    assert.equal(record.compatibilityClaimed, false);
+  }
+  assert.equal(create.requestId, "facade-preflight-request:1");
+  assert.equal(render.updateId, "facade-preflight-update:1");
+  assert.equal(unmount.updateId, "facade-preflight-update:2");
+  assert.deepEqual(preflight.getRootPreflightRecords(root), [
+    create,
+    render,
+    unmount
+  ]);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight)
+      .preflightRecordCount,
+    3
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightRootPayload(root)
+      .rootType,
+    rootBridge.privateRootPublicFacadePreflightRootType
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightRecordPayload(render)
+      .requestAdmission,
+    render.requestAdmission
+  );
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+});
+
 test("React DOM public root facade update and unmount rows stay blocked apart from private request metadata", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,

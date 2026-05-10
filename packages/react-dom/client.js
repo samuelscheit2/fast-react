@@ -7,7 +7,9 @@ const {
 } = require('./placeholder-utils.js');
 const {
   createPrivateRootPublicFacadeAdapter,
-  privateRootPublicFacadeAdapterSymbol
+  createPrivateRootPublicFacadePreflight,
+  privateRootPublicFacadeAdapterSymbol,
+  privateRootPublicFacadePreflightSymbol
 } = require('./src/client/root-bridge.js');
 
 const entrypoint = 'react-dom/client';
@@ -17,6 +19,12 @@ Object.defineProperty(createRoot, privateRootPublicFacadeAdapterSymbol, {
   configurable: false,
   enumerable: false,
   value: createPrivateRootPublicFacadeAdapter,
+  writable: false
+});
+Object.defineProperty(createRoot, privateRootPublicFacadePreflightSymbol, {
+  configurable: false,
+  enumerable: false,
+  value: createPrivateRootPublicFacadePreflight,
   writable: false
 });
 
