@@ -31,12 +31,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ### Queue 534-564
 
-- Worker 563 was accepted from the current worker wave. It compacted
-  `MASTER_PROGRESS.md` from detailed older per-worker archive text to concise
-  accepted-batch summaries, preserved explicit queue 503-533 acceptance and
-  verification facts, and added its worker report. It was verified with the
-  documented planning/progress ownership checklist, stale-current-queue text
-  searches, and `git diff --check`.
+- Workers 534-562 and 564 were accepted, completing the queue after worker 563
+  had compacted the master progress history. The batch added root work-loop
+  finished-work handoff diagnostics, lane-priority scheduling canaries,
+  function-component `useCallback`, layout-effect, context-provider lane, and
+  hook dispatcher blockers; test-renderer live-root, serialization, act,
+  toJSON/update/unmount, and root-create preflight gates; React DOM facade,
+  hydration/resource/form/controlled-restore/event/portal/style/dangerous HTML
+  diagnostics; scheduler mock/postTask and native batch sequencing refreshes;
+  package-surface and benchmark audits; Suspense, Offscreen, and React
+  `cloneElement` child-array freeze parity evidence. Public compatibility
+  remains blocked.
+- Queue 534-564 was verified after merge with focused Rust reconciler
+  begin-work checks, `fast-react-test-renderer` tests, React DOM workspace
+  checks, React workspace checks, Scheduler/native/package-surface/benchmark
+  checks from the accepted worker reports, focused DOM event/resource/form/
+  controlled/style/dangerousHTML/root-facade/test-renderer/element-object
+  conformance tests, import-smoke checks, conflict-marker scans, and
+  `git diff --check`.
 
 ### Queue 503-533
 
