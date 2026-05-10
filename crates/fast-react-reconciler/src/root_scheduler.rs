@@ -1029,6 +1029,16 @@ impl SuspenseThenableRetryRootRenderHandoffRecord {
     }
 
     #[must_use]
+    pub(crate) fn proves_private_thenable_ping_render_handoff(self) -> bool {
+        self.root_work_loop_reached()
+            && !self.suspense_boundary_rendering_executed()
+            && !self.fallback_traversal_executed()
+            && !self.wakeable_subscription_performed()
+            && !self.public_suspense_compatibility_claimed()
+            && !self.public_root_compatibility_claimed()
+    }
+
+    #[must_use]
     pub(crate) const fn suspense_boundary_rendering_executed(self) -> bool {
         self.request.suspense_boundary_rendering_executed()
     }
@@ -5623,6 +5633,7 @@ mod tests {
         assert_eq!(handoff.callback(), callback);
         assert_eq!(handoff.scheduled_root(), request.scheduled_root());
         assert!(handoff.root_work_loop_reached());
+        assert!(handoff.proves_private_thenable_ping_render_handoff());
         assert!(!handoff.suspense_boundary_rendering_executed());
         assert!(!handoff.fallback_traversal_executed());
         assert!(!handoff.wakeable_subscription_performed());
