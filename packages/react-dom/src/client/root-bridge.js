@@ -1115,6 +1115,42 @@ const ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES =
       blocked: true,
       reason:
         'React DOM event error or root error callback compatibility is not claimed by this private record.'
+      })
+    ]);
+const ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'portal-owner-root-event-path-metadata',
+      accepted: true,
+      reason:
+        'The routing record is linked to an accepted private portal owner-root event path gate.'
+    }),
+    freezeRecord({
+      id: 'portal-listener-error-route-correlation',
+      accepted: true,
+      reason:
+        'The listener error route target is validated against the accepted portal event target metadata.'
+    })
+  ]);
+const ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-portal-event-bubbling',
+      blocked: true,
+      reason:
+        'The diagnostic links portal event metadata without enabling public portal event bubbling.'
+    }),
+    freezeRecord({
+      id: 'portal-container-listener-dispatch',
+      blocked: true,
+      reason:
+        'The diagnostic does not install portal container listeners or replay browser dispatch.'
+    }),
+    freezeRecord({
+      id: 'portal-synthetic-event-dispatch',
+      blocked: true,
+      reason:
+        'Portal SyntheticEvent creation, propagation, and listener dispatch remain blocked.'
     })
   ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES = freezeArray([
@@ -5993,18 +6029,39 @@ function createEventListenerRootErrorRoutingRecordWithBridge(
     requestValidation.rootHandleState.rootOptions
   );
   const routingOptions = normalizeEventListenerRootErrorRoutingOptions(options);
+  const portalEventOwnerRootValidation =
+    validateEventListenerRootErrorRoutingPortalEventOwnerRootGate(
+      requestValidation,
+      eventValidation,
+      routingOptions
+    );
   const rootErrorOptionCallbackRecords = freezeArray(
     eventValidation.listenerErrorRoutes.map((errorRoute, index) =>
       createEventListenerRootErrorOptionCallbackRecord({
         errorRoute,
         errorRoutePayload: eventValidation.listenerErrorRoutePayloads[index],
         index,
+        portalEventOwnerRootValidation,
         requestValidation,
         rootErrorCallbacks,
         routingOptions
       })
     )
   );
+  const acceptedCapabilities =
+    portalEventOwnerRootValidation.enabled === true
+      ? freezeArray([
+          ...ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
+          ...ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES
+        ])
+      : ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES;
+  const blockedCapabilities =
+    portalEventOwnerRootValidation.enabled === true
+      ? freezeArray([
+          ...ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+          ...ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES
+        ])
+      : ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES;
   const record = freezeRecord({
     $$typeof: privateRootEventListenerErrorRoutingRecordType,
     kind: 'FastReactDomPrivateRootEventListenerErrorRoutingRecord',
@@ -6032,6 +6089,30 @@ function createEventListenerRootErrorRoutingRecordWithBridge(
       eventValidation.eventDispatchCanaryRecord.domEventName,
     eventErrorRouteSource:
       'private-root-host-output-click-dispatch-canary',
+    portalEventErrorRoutingDiagnostic:
+      portalEventOwnerRootValidation.enabled,
+    portalEventOwnerRootGateLinked:
+      portalEventOwnerRootValidation.enabled,
+    portalEventOwnerRootGateId:
+      portalEventOwnerRootValidation.gateId,
+    portalEventOwnerRootGateStatus:
+      portalEventOwnerRootValidation.gateStatus,
+    portalEventOwnerRootGateKind:
+      portalEventOwnerRootValidation.gateKind,
+    portalEventOwnerRootGate:
+      portalEventOwnerRootValidation.gateSummary,
+    portalEventOwnerRootMatchesTargetRoot:
+      portalEventOwnerRootValidation.ownerRootMatchesTargetRoot,
+    portalEventTargetDispatchPathLength:
+      portalEventOwnerRootValidation.targetDispatchPathLength,
+    portalContainerContainsEventTarget:
+      portalEventOwnerRootValidation.portalContainerContainsTarget,
+    rootContainerContainsEventTarget:
+      portalEventOwnerRootValidation.rootContainerContainsTarget,
+    portalEventBubbling: false,
+    publicPortalBubbling: false,
+    portalEventDispatch: false,
+    portalListenerInstallation: false,
     rootErrorOptionCallbackRecordStatus:
       ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
     rootErrorOptionCallbackRecordCount:
@@ -6048,10 +6129,8 @@ function createEventListenerRootErrorRoutingRecordWithBridge(
     onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
     onRecoverableErrorConfigured:
       rootErrorCallbacks.onRecoverableError.configured,
-    acceptedCapabilities:
-      ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
-    blockedCapabilities:
-      ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+    acceptedCapabilities,
+    blockedCapabilities,
     publicRootExecution: false,
     publicRootObjectExposed: false,
     nativeExecution: false,
@@ -6089,6 +6168,14 @@ function createEventListenerRootErrorRoutingRecordWithBridge(
         eventValidation.listenerErrorRoutePayloads,
       listenerErrorRoutes: eventValidation.listenerErrorRoutes,
       options: routingOptions.rawOptions,
+      portalEventOwnerRootGatePayload:
+        portalEventOwnerRootValidation.gatePayload,
+      portalEventOwnerRootGateRecord:
+        portalEventOwnerRootValidation.gateRecord,
+      portalEventOwnerRootPluginGatePayload:
+        portalEventOwnerRootValidation.pluginGatePayload,
+      portalEventOwnerRootPluginGateRecord:
+        portalEventOwnerRootValidation.pluginGateRecord,
       rootErrorCallbacks,
       rootErrorOptionCallbackRecords,
       rootOptions: requestValidation.rootHandleState.rootOptions,
@@ -8348,10 +8435,120 @@ function validateEventListenerRootErrorRoutingCanary(
   };
 }
 
+function validateEventListenerRootErrorRoutingPortalEventOwnerRootGate(
+  requestValidation,
+  eventValidation,
+  routingOptions
+) {
+  const gateRecord = routingOptions.portalEventOwnerRootGateRecord;
+  if (gateRecord === null) {
+    return freezeRecord({
+      enabled: false,
+      gateId: null,
+      gateKind: null,
+      gatePayload: null,
+      gateRecord: null,
+      gateStatus: 'not-applicable',
+      gateSummary: null,
+      ownerRootMatchesTargetRoot: false,
+      pluginGatePayload: null,
+      pluginGateRecord: null,
+      portalContainerContainsTarget: false,
+      rootContainerContainsTarget: false,
+      targetDispatchPathLength: 0
+    });
+  }
+
+  const gatePayload = rootPortalEventOwnerRootGatePayloads.get(gateRecord);
+  if (
+    gatePayload === undefined ||
+    !isPrivateRootPortalEventOwnerRootGateRecord(gateRecord)
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Portal event listener root error routing requires an accepted private portal owner-root gate record.'
+    );
+  }
+  if (
+    gateRecord.gateStatus !== ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_RECORDED ||
+    gateRecord.eventBubblingStatus !== ROOT_BRIDGE_PORTAL_EVENT_BUBBLING_BLOCKED
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Portal event listener root error routing requires a blocked portal owner-root event gate.'
+    );
+  }
+
+  const portalRootHandleState = getPrivateRootHandleState(
+    gatePayload.rootHandle
+  );
+  if (
+    portalRootHandleState !== requestValidation.rootHandleState ||
+    gatePayload.rootHandle.owner !== requestValidation.rootOwner
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Portal event listener root error routing requires the same private root owner.'
+    );
+  }
+
+  const pluginGateRecord = gatePayload.eventOwnerRootGateRecord;
+  const pluginGatePayload = getPluginPortalEventOwnerRootGateRecordPayload(
+    pluginGateRecord
+  );
+  if (
+    pluginGatePayload === null ||
+    !isPluginPortalEventOwnerRootGateRecord(pluginGateRecord)
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Portal event listener root error routing requires plugin owner-root path metadata.'
+    );
+  }
+  if (
+    pluginGateRecord.domEventName !==
+      eventValidation.eventDispatchCanaryRecord.domEventName ||
+    pluginGateRecord.targetInst !==
+      eventValidation.eventDispatchCanaryRecord.targetInst ||
+    pluginGateRecord.targetInst !==
+      eventValidation.eventDispatchCanaryPayload.targetRecord.targetInst ||
+    pluginGatePayload.targetNode !==
+      eventValidation.eventDispatchCanaryPayload.targetPayload.targetNode
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Portal event listener root error routing requires the listener error route target to match the portal owner-root path.'
+    );
+  }
+  if (
+    pluginGatePayload.ownerRoot !== requestValidation.rootOwner ||
+    pluginGateRecord.ownerRootMatchesTargetRoot !== true ||
+    pluginGateRecord.publicPortalBubblingEnabled !== false ||
+    pluginGateRecord.eventDispatch !== false
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Portal event listener root error routing requires blocked owner-root portal event metadata.'
+    );
+  }
+
+  return freezeRecord({
+    enabled: true,
+    gateId: gateRecord.gateId,
+    gateKind: gateRecord.kind,
+    gatePayload,
+    gateRecord,
+    gateStatus: gateRecord.gateStatus,
+    gateSummary: summarizePortalEventOwnerRootGateRecord(pluginGateRecord),
+    ownerRootMatchesTargetRoot: pluginGateRecord.ownerRootMatchesTargetRoot,
+    pluginGatePayload,
+    pluginGateRecord,
+    portalContainerContainsTarget:
+      pluginGateRecord.portalContainerContainsTarget,
+    rootContainerContainsTarget: pluginGateRecord.rootContainerContainsTarget,
+    targetDispatchPathLength: pluginGateRecord.targetDispatchPathLength
+  });
+}
+
 function createEventListenerRootErrorOptionCallbackRecord({
   errorRoute,
   errorRoutePayload,
   index,
+  portalEventOwnerRootValidation,
   requestValidation,
   rootErrorCallbacks,
   routingOptions
@@ -8384,6 +8581,23 @@ function createEventListenerRootErrorOptionCallbackRecord({
     registrationName: errorRoute.registrationName,
     listenerPhase: errorRoute.phase,
     targetInst: errorRoute.targetInst,
+    portalEventErrorRoutingDiagnostic:
+      portalEventOwnerRootValidation.enabled,
+    portalEventOwnerRootGateId:
+      portalEventOwnerRootValidation.gateId,
+    portalEventOwnerRootGateStatus:
+      portalEventOwnerRootValidation.gateStatus,
+    portalEventOwnerRootMatchesTargetRoot:
+      portalEventOwnerRootValidation.ownerRootMatchesTargetRoot,
+    portalEventTargetDispatchPathLength:
+      portalEventOwnerRootValidation.targetDispatchPathLength,
+    portalContainerContainsEventTarget:
+      portalEventOwnerRootValidation.portalContainerContainsTarget,
+    rootContainerContainsEventTarget:
+      portalEventOwnerRootValidation.rootContainerContainsTarget,
+    portalEventBubbling: false,
+    publicPortalBubbling: false,
+    portalEventDispatch: false,
     errorName: errorSummary.name,
     errorMessage: errorSummary.message,
     errorCode: errorSummary.code,
@@ -8424,6 +8638,11 @@ function normalizeEventListenerRootErrorRoutingOptions(options) {
     : [];
 
   return freezeRecord({
+    portalEventOwnerRootGateRecord:
+      normalizedOptions.portalEventOwnerRootGateRecord === null ||
+      normalizedOptions.portalEventOwnerRootGateRecord === undefined
+        ? null
+        : normalizedOptions.portalEventOwnerRootGateRecord,
     rawOptions: options,
     routeLabels: freezeArray(routeLabels)
   });
@@ -9510,6 +9729,8 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_RECORDED,
   ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_LISTENER_INSTALLATION_BLOCKED,
   ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_BLOCKED_CAPABILITIES,

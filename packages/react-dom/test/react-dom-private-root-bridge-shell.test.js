@@ -3562,6 +3562,180 @@ test('private root bridge event listener error routing records root option metad
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test('private portal event listener error routing links owner-root metadata without public portal compatibility', () => {
+  const document = createDocument('private-portal-event-error-routing');
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  const publicRootErrorCalls = [];
+  const listenerCalls = [];
+  const thrown = new Error('bridge portal event listener route error');
+  thrown.code = 'BRIDGE_PORTAL_EVENT_LISTENER_ROUTE';
+  function onUncaughtError(error) {
+    publicRootErrorCalls.push(['uncaught', error.message]);
+  }
+  function onCaughtError(error) {
+    publicRootErrorCalls.push(['caught', error.message]);
+  }
+  function onRecoverableError(error) {
+    publicRootErrorCalls.push(['recoverable', error.message]);
+  }
+  function onClickCapture() {
+    listenerCalls.push('capture');
+    throw thrown;
+  }
+  function onClick() {
+    listenerCalls.push('bubble');
+  }
+
+  const portalChild = {
+    props: {
+      children: 'portal event listener route',
+      onClick,
+      onClickCapture
+    },
+    type: 'button'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: 'portal-error-boundary',
+    portalCommitIdPrefix: 'portal-error-commit',
+    portalEventOwnerRootIdPrefix: 'portal-error-owner',
+    portalMountIdPrefix: 'portal-error-mount',
+    sideEffectIdPrefix: 'portal-error-side-effect'
+  });
+  const create = bridge.createClientRoot(rootContainer, {
+    onCaughtError,
+    onRecoverableError,
+    onUncaughtError
+  });
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    'portal-error-key'
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const ownerGate = bridge.createPortalEventOwnerRootGate(mount);
+  const ownerGatePayload =
+    rootBridge.getPrivateRootPortalEventOwnerRootGatePayload(ownerGate);
+  const portalTargetPayload = {
+    hostNode: ownerGatePayload.hostComponentNode,
+    hostToken: ownerGatePayload.hostInstanceToken,
+    rootOwner: create.owner
+  };
+  const clickRecord =
+    rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+      sideEffects.listenerRegistration,
+      portalTargetPayload,
+      {
+        enableListenerErrorRoutingDiagnostics: true
+      }
+    );
+
+  const routing = bridge.createEventListenerRootErrorRouting(
+    [create, render],
+    clickRecord,
+    {
+      portalEventOwnerRootGateRecord: ownerGate,
+      routeLabels: ['bridge-portal-event-listener-error-route']
+    }
+  );
+
+  assert.equal(clickRecord.listenerErrorRouteCount, 1);
+  assert.equal(clickRecord.targetInst, ownerGatePayload.hostInstanceToken);
+  assert.equal(
+    clickRecord.listenerErrorRoutes[0].targetInst,
+    ownerGatePayload.hostInstanceToken
+  );
+  assert.equal(routing.portalEventErrorRoutingDiagnostic, true);
+  assert.equal(routing.portalEventOwnerRootGateLinked, true);
+  assert.equal(routing.portalEventOwnerRootGateId, ownerGate.gateId);
+  assert.equal(
+    routing.portalEventOwnerRootGateStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_EVENT_OWNER_ROOT_RECORDED
+  );
+  assert.equal(routing.portalEventOwnerRootGateKind, ownerGate.kind);
+  assert.equal(routing.portalEventOwnerRootMatchesTargetRoot, true);
+  assert.equal(routing.portalEventTargetDispatchPathLength, 1);
+  assert.equal(routing.portalContainerContainsEventTarget, true);
+  assert.equal(routing.rootContainerContainsEventTarget, false);
+  assert.equal(routing.portalEventBubbling, false);
+  assert.equal(routing.publicPortalBubbling, false);
+  assert.equal(routing.portalEventDispatch, false);
+  assert.equal(routing.portalListenerInstallation, false);
+  assert.equal(routing.eventDispatch, false);
+  assert.equal(routing.publicDispatchEnabled, false);
+  assert.equal(routing.reportGlobalErrorInvoked, false);
+  assert.equal(routing.publicRootErrorCallbacksInvoked, false);
+  assert.equal(routing.rootErrorCallbackInvocationCount, 0);
+  assert.equal(routing.compatibilityClaimed, false);
+  assert.deepEqual(
+    routing.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'private-listener-error-route',
+      'root-error-option-callback-metadata',
+      'portal-owner-root-event-path-metadata',
+      'portal-listener-error-route-correlation'
+    ]
+  );
+  assert.deepEqual(
+    routing.blockedCapabilities
+      .slice(-3)
+      .map((capability) => capability.id),
+    [
+      'public-portal-event-bubbling',
+      'portal-container-listener-dispatch',
+      'portal-synthetic-event-dispatch'
+    ]
+  );
+
+  const [callbackRecord] = routing.rootErrorOptionCallbackRecords;
+  assert.equal(callbackRecord.sourceErrorRouteTarget, 'reportGlobalError');
+  assert.equal(
+    callbackRecord.sourceLabel,
+    'bridge-portal-event-listener-error-route'
+  );
+  assert.equal(callbackRecord.registrationName, 'onClickCapture');
+  assert.equal(callbackRecord.portalEventErrorRoutingDiagnostic, true);
+  assert.equal(callbackRecord.portalEventOwnerRootGateId, ownerGate.gateId);
+  assert.equal(callbackRecord.portalEventOwnerRootMatchesTargetRoot, true);
+  assert.equal(callbackRecord.portalEventTargetDispatchPathLength, 1);
+  assert.equal(callbackRecord.portalContainerContainsEventTarget, true);
+  assert.equal(callbackRecord.rootContainerContainsEventTarget, false);
+  assert.equal(callbackRecord.portalEventBubbling, false);
+  assert.equal(callbackRecord.publicPortalBubbling, false);
+  assert.equal(callbackRecord.portalEventDispatch, false);
+  assert.equal(callbackRecord.errorMessage, thrown.message);
+  assert.equal(callbackRecord.errorCode, 'BRIDGE_PORTAL_EVENT_LISTENER_ROUTE');
+  assert.equal(callbackRecord.reportGlobalErrorInvoked, false);
+  assert.equal(callbackRecord.publicRootErrorCallbacksInvoked, false);
+
+  const payload =
+    rootBridge.getPrivateRootEventListenerErrorRoutingPayload(routing);
+  assert.equal(payload.portalEventOwnerRootGateRecord, ownerGate);
+  assert.equal(
+    payload.portalEventOwnerRootPluginGateRecord,
+    ownerGatePayload.eventOwnerRootGateRecord
+  );
+  assert.equal(
+    payload.portalEventOwnerRootPluginGatePayload.targetNode,
+    ownerGatePayload.hostComponentNode
+  );
+  assert.equal(payload.listenerErrorRoutePayloads[0].error, thrown);
+  assert.deepEqual(publicRootErrorCalls, []);
+  assert.deepEqual(listenerCalls, ['capture', 'bubble']);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
+
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test('private react-dom/client facade adapter routes root calls to bridge records', () => {
   const document = createDocument('private-client-facade-adapter');
   const container = createElement('DIV', document);
