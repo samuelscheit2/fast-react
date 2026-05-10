@@ -31,10 +31,15 @@ const INVALID_EVENT_LISTENER_LATEST_PROPS_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_LISTENER_LATEST_PROPS';
 const INVALID_EVENT_LISTENER_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_LISTENER';
+const HOST_INSTANCE_NODE_RECORD_KIND =
+  'FastReactDomComponentTreeHostInstanceNodeRecord';
+const privateHostInstanceNodeRecordType =
+  'fast.react_dom.private_component_tree_host_instance_node_record';
 
 const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
 const eventListenerTargetLookupRecordPayloads = new WeakMap();
+const hostInstanceNodeRecordPayloads = new WeakMap();
 
 const disabledMouseEventRegistrationNames = new Set([
   'onClick',
@@ -268,6 +273,56 @@ function createEventTargetNormalizationRecord(targetNode) {
   });
 }
 
+function createMountedHostInstanceNodeRecord(token) {
+  assertKnownHostInstanceToken(token);
+
+  const node = getMountedHostInstanceNodeFromToken(token);
+  if (node === null) {
+    throw createComponentTreeError(
+      'Cannot create a React DOM host instance node record from an unmounted token.',
+      'FAST_REACT_DOM_UNMOUNTED_HOST_INSTANCE_TOKEN'
+    );
+  }
+
+  const hostOwner = getHostInstanceOwnerFromToken(token);
+  const rootOwner = getRootOwnerFromHostInstanceToken(token);
+  const latestProps = getLatestPropsFromNode(node);
+  const hasLatestRef =
+    latestProps !== null &&
+    typeof latestProps === 'object' &&
+    Object.prototype.hasOwnProperty.call(latestProps, 'ref');
+  const latestRef = hasLatestRef ? latestProps.ref : undefined;
+
+  const record = Object.freeze({
+    $$typeof: privateHostInstanceNodeRecordType,
+    kind: HOST_INSTANCE_NODE_RECORD_KIND,
+    status: 'mounted-host-instance-node',
+    hostInstanceToken: token,
+    hostOwner,
+    rootOwner,
+    nodeType: typeof node.nodeType === 'number' ? node.nodeType : null,
+    latestPropsStatus: latestProps === null ? 'missing' : 'present',
+    latestRefStatus: hasLatestRef ? 'present' : 'missing',
+    exposesHostNode: false,
+    exposesLatestProps: false
+  });
+
+  hostInstanceNodeRecordPayloads.set(
+    record,
+    Object.freeze({
+      node,
+      token,
+      hostOwner,
+      rootOwner,
+      latestProps,
+      hasLatestRef,
+      latestRef
+    })
+  );
+
+  return record;
+}
+
 function createEventListenerTargetLookupRecord(
   targetNormalizationRecord,
   registrationName
@@ -423,6 +478,18 @@ function getEventListenerTargetLookupRecordPayload(record) {
 
 function isEventListenerTargetLookupRecord(record) {
   return getEventListenerTargetLookupRecordPayload(record) !== null;
+}
+
+function getPrivateHostInstanceNodeRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return hostInstanceNodeRecordPayloads.get(record) || null;
+}
+
+function isPrivateHostInstanceNodeRecord(value) {
+  return getPrivateHostInstanceNodeRecordPayload(value) !== null;
 }
 
 function createEventListenerTargetLookupRecordFromPayload(payload) {
@@ -774,6 +841,7 @@ module.exports = {
   EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
   EVENT_LISTENER_TARGET_LOOKUP_UNMOUNTED_CODE,
   EVENT_TARGET_NORMALIZATION_RECORD_KIND,
+  HOST_INSTANCE_NODE_RECORD_KIND,
   INVALID_EVENT_LISTENER_CODE,
   INVALID_EVENT_LISTENER_LATEST_PROPS_CODE,
   INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE,
@@ -788,6 +856,7 @@ module.exports = {
   createEventListenerTargetLookupRecord,
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
+  createMountedHostInstanceNodeRecord,
   detachHostInstanceNode,
   detachHostInstanceToken,
   getAttachedNodeFromHostInstanceToken,
@@ -801,6 +870,7 @@ module.exports = {
   getLatestPropsFromNode,
   getMountedHostInstanceNodeFromToken,
   getMountedHostInstanceTokenFromNode,
+  getPrivateHostInstanceNodeRecordPayload,
   getRootOwnerFromHostInstanceToken,
   getRootOwnerFromNode,
   hostInstanceMarkerPrefix,
@@ -808,8 +878,10 @@ module.exports = {
   internalLatestPropsKey,
   isEventListenerTargetLookupRecord,
   isHostInstanceNode,
+  isPrivateHostInstanceNodeRecord,
   isHostInstanceToken,
   latestPropsMarkerPrefix,
+  privateHostInstanceNodeRecordType,
   updateLatestPropsForHostInstanceToken,
   updateLatestPropsForNode
 };

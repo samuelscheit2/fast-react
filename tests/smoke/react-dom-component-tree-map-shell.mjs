@@ -183,6 +183,36 @@ const reactDomPackage = require(
     componentTree.getLatestPropsFromHostInstanceToken(token),
     recordProps
   );
+  const hostNodeRecord =
+    componentTree.createMountedHostInstanceNodeRecord(token);
+  const hostNodePayload =
+    componentTree.getPrivateHostInstanceNodeRecordPayload(hostNodeRecord);
+  assert.equal(
+    componentTree.isPrivateHostInstanceNodeRecord(hostNodeRecord),
+    true
+  );
+  assert.equal(
+    hostNodeRecord.$$typeof,
+    componentTree.privateHostInstanceNodeRecordType
+  );
+  assert.equal(
+    hostNodeRecord.kind,
+    componentTree.HOST_INSTANCE_NODE_RECORD_KIND
+  );
+  assert.equal(hostNodeRecord.status, 'mounted-host-instance-node');
+  assert.equal(hostNodeRecord.hostInstanceToken, token);
+  assert.equal(hostNodeRecord.hostOwner, hostOwner);
+  assert.equal(hostNodeRecord.rootOwner, rootOwner);
+  assert.equal(hostNodeRecord.latestPropsStatus, 'present');
+  assert.equal(hostNodeRecord.latestRefStatus, 'missing');
+  assert.equal(hostNodeRecord.exposesHostNode, false);
+  assert.equal(hostNodeRecord.exposesLatestProps, false);
+  assert.equal(Object.hasOwn(hostNodeRecord, 'node'), false);
+  assert.equal(Object.hasOwn(hostNodeRecord, 'latestProps'), false);
+  assert.equal(hostNodePayload.node, node);
+  assert.equal(hostNodePayload.token, token);
+  assert.equal(hostNodePayload.latestProps, recordProps);
+  assert.equal(hostNodePayload.hasLatestRef, false);
   assert.equal(eventCallCount, 0);
   assert.equal(
     componentTree.detachHostInstanceToken(token),
@@ -677,6 +707,7 @@ const reactDomPackage = require(
       'layout-effect-execution',
       'dom-mutation',
       'public-root-integration',
+      'root-error-propagation',
       'react-dom-ref-compatibility-claim'
     ]
   );
@@ -688,6 +719,7 @@ const reactDomPackage = require(
       record.tokenPhase,
       record.tokenTarget,
       record.componentTreeStatus,
+      record.hostNodeRecordKind,
       record.latestRefStatus,
       record.compatibilityClaimed
     ]),
@@ -699,6 +731,7 @@ const reactDomPackage = require(
         refCallbackGate.REF_TOKEN_PHASE_DELETION,
         refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
         'mounted-latest-props-validated',
+        componentTree.HOST_INSTANCE_NODE_RECORD_KIND,
         'matches-private-metadata',
         false
       ],
@@ -709,6 +742,7 @@ const reactDomPackage = require(
         refCallbackGate.REF_TOKEN_PHASE_COMMIT,
         refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
         'mounted-latest-props-validated',
+        componentTree.HOST_INSTANCE_NODE_RECORD_KIND,
         'matches-private-metadata',
         false
       ]
@@ -748,6 +782,111 @@ const reactDomPackage = require(
   assert.equal(refCallCount, 0);
   assert.deepEqual(node.childNodes, []);
 
+  const attachDetachSnapshot =
+    refCallbackGate.createRefCallbackAttachDetachGateSnapshot({
+      rootCommitRefMetadata: {
+        detach: [detachRecord],
+        attach: [attachRecord]
+      }
+    });
+
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackAttachDetachGateSnapshot(
+      attachDetachSnapshot
+    ),
+    true
+  );
+  assert.equal(
+    attachDetachSnapshot.$$typeof,
+    refCallbackGate.privateDomRefCallbackAttachDetachGateSnapshotType
+  );
+  assert.equal(
+    attachDetachSnapshot.status,
+    refCallbackGate.REF_CALLBACK_ATTACH_DETACH_GATE_STATUS
+  );
+  assert.equal(attachDetachSnapshot.recordCount, 2);
+  assert.equal(attachDetachSnapshot.callbackRefRecordCount, 2);
+  assert.equal(attachDetachSnapshot.objectRefRecordCount, 0);
+  assert.equal(
+    attachDetachSnapshot.errorPropagationStatus,
+    refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS
+  );
+  assert.equal(
+    attachDetachSnapshot.errorPropagation.willReportRootErrors,
+    false
+  );
+  assert.equal(attachDetachSnapshot.ordering.source, 'root-commit-ref-metadata');
+  assert.equal(
+    attachDetachSnapshot.ordering.detachRecordsBeforeAttachRecords,
+    true
+  );
+  assert.equal(attachDetachSnapshot.rootErrorsReported, false);
+  assert.equal(attachDetachSnapshot.callbackRefsInvoked, false);
+  assert.equal(attachDetachSnapshot.objectRefsMutated, false);
+  assert.deepEqual(
+    attachDetachSnapshot.records.map((record) => [
+      record.sequence,
+      record.action,
+      record.refKind,
+      record.operation,
+      record.ordering.phase,
+      record.errorPropagationStatus,
+      record.hostNodeRecordKind,
+      record.callbackRefsInvoked,
+      record.objectRefsMutated,
+      record.rootErrorsReported
+    ]),
+    [
+      [
+        0,
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_KIND_CALLBACK,
+        refCallbackGate.REF_OPERATION_CALLBACK_DETACH,
+        'mutation-ref-detach',
+        refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+        componentTree.HOST_INSTANCE_NODE_RECORD_KIND,
+        false,
+        false,
+        false
+      ],
+      [
+        1,
+        refCallbackGate.REF_ACTION_ATTACH,
+        refCallbackGate.REF_KIND_CALLBACK,
+        refCallbackGate.REF_OPERATION_CALLBACK_ATTACH,
+        'layout-ref-attach',
+        refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+        componentTree.HOST_INSTANCE_NODE_RECORD_KIND,
+        false,
+        false,
+        false
+      ]
+    ]
+  );
+
+  for (const record of attachDetachSnapshot.records) {
+    assert.equal(
+      refCallbackGate.isPrivateRefCallbackAttachDetachGateRecord(record),
+      true
+    );
+    assert.equal(Object.hasOwn(record, 'ref'), false);
+    assert.equal(Object.hasOwn(record, 'node'), false);
+    assert.equal(Object.hasOwn(record, 'latestProps'), false);
+    assert.equal(
+      componentTree.isPrivateHostInstanceNodeRecord(record.hostNodeRecord),
+      true
+    );
+  }
+
+  const attachDetachPayload =
+    refCallbackGate.getPrivateRefCallbackAttachDetachGateRecordPayload(
+      attachDetachSnapshot.records[0]
+    );
+  assert.equal(attachDetachPayload.hostNode.node, node);
+  assert.equal(attachDetachPayload.hostNode.latestProps, secondProps);
+  assert.equal(attachDetachPayload.metadata.ref, firstRef);
+  assert.equal(refCallCount, 0);
+
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 }
 
@@ -785,8 +924,34 @@ const reactDomPackage = require(
     snapshot.records[0].detachReason,
     refCallbackGate.REF_DETACH_REASON_DELETED
   );
+  const attachDetachSnapshot =
+    refCallbackGate.createRefCallbackAttachDetachGateSnapshot({
+      rootCommitRefMetadata: {
+        detach: [detachRecord],
+        attach: []
+      }
+    });
+  assert.equal(attachDetachSnapshot.records.length, 1);
+  assert.equal(attachDetachSnapshot.callbackRefRecordCount, 0);
+  assert.equal(attachDetachSnapshot.objectRefRecordCount, 1);
+  assert.equal(
+    attachDetachSnapshot.records[0].refKind,
+    refCallbackGate.REF_KIND_OBJECT
+  );
+  assert.equal(
+    attachDetachSnapshot.records[0].operation,
+    refCallbackGate.REF_OPERATION_OBJECT_DETACH
+  );
+  assert.equal(attachDetachSnapshot.records[0].objectRefsMutated, false);
+  assert.equal(
+    refCallbackGate.getPrivateRefCallbackAttachDetachGateRecordPayload(
+      attachDetachSnapshot.records[0]
+    ).ref,
+    objectRef
+  );
   assert.equal(objectRef.current, 'unchanged');
   assert.equal(snapshot.objectRefsMutated, false);
+  assert.equal(attachDetachSnapshot.objectRefsMutated, false);
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 }
 
@@ -1019,6 +1184,7 @@ const reactDomPackage = require(
     'commitLatestPropsFromMutationRecord',
     'commitLatestPropsFromMutationRecords',
     'createHostInstanceToken',
+    'createMountedHostInstanceNodeRecord',
     'detachHostInstanceNode',
     'detachHostInstanceToken',
     'getClosestMountedHostInstanceNodeFromNode',
@@ -1028,9 +1194,11 @@ const reactDomPackage = require(
     'getLatestPropsFromHostInstanceToken',
     'getMountedHostInstanceNodeFromToken',
     'getMountedHostInstanceTokenFromNode',
+    'getPrivateHostInstanceNodeRecordPayload',
     'updateLatestPropsForHostInstanceToken',
     'updateLatestPropsForNode',
     'createRefAttachMetadataRecord',
+    'createRefCallbackAttachDetachGateSnapshot',
     'createRefCallbackComponentTreeGateSnapshot',
     'createRefDetachMetadataRecord'
   ];
