@@ -1061,6 +1061,26 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
+      /\bprivateUnmountFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatesUnmountRootRequestIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatesUnmountDeletionAndCleanupHandoffIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateSerializationUnmountHandoffIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateUnmountNativeBridgeCleanupHandoffDiagnosticId\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
       /\bgetLatestScheduledRootRequestForSerializationIdentity\b/u
     ) &&
     hasSourcePattern(
@@ -1393,6 +1413,26 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bvalidatesUpdateRootRequestIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateUnmountFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatesUnmountRootRequestIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatesUnmountDeletionAndCleanupHandoffIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatePrivateSerializationUnmountHandoffIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateUnmountNativeBridgeCleanupHandoffDiagnosticId\b/u
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,

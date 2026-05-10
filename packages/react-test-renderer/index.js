@@ -968,6 +968,20 @@ const privateSerializationFinishedWorkIdentityDiagnosticName =
   'fast-react-test-renderer.serialization.private-finished-work-identity';
 const privateSerializationFinishedWorkIdentityStatus =
   'private-serialization-finished-work-identity-validated-public-serialization-blocked';
+const privateToJSONUnmountHostOutputRowId =
+  'react-test-renderer-tojson-unmount-host-output-private-diagnostic';
+const privateToJSONUpdateUnmountRowStatus =
+  'private-tojson-update-unmount-host-output-rows-public-tojson-blocked';
+const privateUnmountDeletionCommitHandoffDiagnosticId =
+  'react-test-renderer-unmount-deletion-commit-handoff-private-diagnostic';
+const privateUnmountDeletionCommitHandoffStatus =
+  'private-unmount-deletion-commit-handoff-public-unmount-blocked';
+const privateUnmountNativeBridgeAdmissionDiagnosticId =
+  'react-test-renderer-unmount-native-bridge-admission-private-diagnostic';
+const privateUnmountNativeBridgeCleanupHandoffDiagnosticId =
+  'react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic';
+const privateUnmountNativeBridgeCleanupHandoffStatus =
+  'private-unmount-native-bridge-cleanup-handoff-public-unmount-blocked';
 const toJSONPrivateSerializationFacadeGate = Object.freeze({
   id: 'react-test-renderer-tojson-private-serialization-facade-gate',
   publicSurface: 'create().toJSON',
@@ -982,13 +996,19 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateDiagnosticResultStatus: privateToJSONFacadeResultStatus,
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
+  privateUnmountFinishedWorkIdentityGateAvailable: true,
   validatesUpdateRootRequestIdentity: true,
+  validatesUnmountRootRequestIdentity: true,
+  validatesUnmountDeletionAndCleanupHandoffIdentity: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
   privateFinishedWorkIdentityStatus:
     privateSerializationFinishedWorkIdentityStatus,
   consumesCommittedHostRootFinishedWorkIdentity: true,
   consumesCommittedHostRootFinishedWorkLanes: true,
+  acceptedUnmountFinishedWorkIdentityWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
+  acceptedUnmountHostOutputUpdateKindForFinishedWorkIdentity: 'Unmount',
   acceptedRustPrivateJsonDiagnostics: true,
   acceptedRustPrivateToJSONFacadeResult: true,
   publicSerializationAvailable: false,
@@ -1008,6 +1028,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_json_facade_result_for_canary',
     'TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary',
     'TestRendererRoot::describe_private_to_json_finished_work_identity_gate_for_canary',
+    'TestRendererRoot::describe_private_to_json_unmount_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
     'TestRendererPrivateJsonSerializationReport',
     'TestRendererPrivateJsonRenderedRoot',
@@ -1046,6 +1067,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_facade_result_canary_wraps_update_serialization_evidence',
     'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_to_json_unmount_finished_work_identity_gate_accepts_ref_passive_cleanup_handoff',
+    'root_private_to_json_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
@@ -1170,13 +1193,19 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateCompositeFunctionMetadataSerializable: true,
   privateFinishedWorkIdentityGateAvailable: true,
   privateUpdateFinishedWorkIdentityGateAvailable: true,
+  privateUnmountFinishedWorkIdentityGateAvailable: true,
   validatesUpdateRootRequestIdentity: true,
+  validatesUnmountRootRequestIdentity: true,
+  validatesUnmountDeletionAndCleanupHandoffIdentity: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
   privateFinishedWorkIdentityStatus:
     privateSerializationFinishedWorkIdentityStatus,
   consumesCommittedHostRootFinishedWorkIdentity: true,
   consumesCommittedHostRootFinishedWorkLanes: true,
+  acceptedUnmountFinishedWorkIdentityWorker:
+    'worker-733-test-renderer-unmount-finished-work-identity',
+  acceptedUnmountHostOutputUpdateKindForFinishedWorkIdentity: 'Unmount',
   privateFacadeSymbol: privateToTreeFacadeSymbol.description,
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedRustPrivateTreeMetadata: true,
@@ -1201,6 +1230,7 @@ const toTreePrivateFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
     'TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary',
+    'TestRendererRoot::describe_private_to_tree_unmount_finished_work_identity_gate_for_canary',
     'TestRendererPrivateTreeMetadataReport',
     'TestRendererPrivateSerializationFinishedWorkIdentityGate',
     'TestRendererPrivateTreeFunctionComponentDiagnostic',
@@ -1213,6 +1243,7 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
   ]),
@@ -4020,7 +4051,10 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateDiagnosticResultAvailable: true,
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
+    privateUnmountFinishedWorkIdentityGateAvailable: true,
     validatesUpdateRootRequestIdentity: true,
+    validatesUnmountRootRequestIdentity: true,
+    validatesUnmountDeletionAndCleanupHandoffIdentity: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
     privateFinishedWorkIdentityStatus:
@@ -4134,7 +4168,10 @@ function createPrivateToTreeFacade(rootRequest) {
     privateCompositeFunctionMetadataSerializable: true,
     privateFinishedWorkIdentityGateAvailable: true,
     privateUpdateFinishedWorkIdentityGateAvailable: true,
+    privateUnmountFinishedWorkIdentityGateAvailable: true,
     validatesUpdateRootRequestIdentity: true,
+    validatesUnmountRootRequestIdentity: true,
+    validatesUnmountDeletionAndCleanupHandoffIdentity: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
     privateFinishedWorkIdentityStatus:
@@ -4649,7 +4686,8 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     );
   }
   if (
-    identityRootRequest.operation === 'update' &&
+    (identityRootRequest.operation === 'update' ||
+      identityRootRequest.operation === 'unmount') &&
     getLatestScheduledRootRequestForSerializationIdentity(
       identityRootRequest.rootHandle
     ) !== identityRootRequest
@@ -4681,6 +4719,14 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
       'Private serialization finished-work identity belongs to a foreign root.'
     );
   }
+  const unmountHandoffIdentity =
+    normalized.hostOutputUpdateKind === 'Unmount'
+      ? validatePrivateSerializationUnmountHandoffIdentity(
+          publicSurface,
+          identityRootRequest,
+          evidence
+        )
+      : null;
   if (
     !privateSerializationFinishedWorkHandlesEqual(
       normalized.renderFinishedWork,
@@ -4771,8 +4817,30 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     rootRequestId: identityRootRequest.requestId,
     rootRequestSequence: identityRootRequest.requestSequence,
     rootRequestOperation: identityRootRequest.operation,
+    rootRequestUpdateKind: identityRootRequest.updateKind,
     rootId: identityRootRequest.rootId,
     hostOutputUpdateKind: normalized.hostOutputUpdateKind,
+    ...(unmountHandoffIdentity === null
+      ? {}
+      : {
+          unmountDeletionCommitHandoff:
+            unmountHandoffIdentity.deletionCommitHandoff,
+          unmountCleanupHandoff: unmountHandoffIdentity.cleanupHandoff,
+          unmountDeletionCommitHandoffAccepted: true,
+          unmountCleanupHandoffAccepted: true,
+          unmountHandoffIdentityAccepted: true,
+          cleanupHandoffVariant: unmountHandoffIdentity.cleanupHandoffVariant,
+          hostNodeCleanupCount:
+            unmountHandoffIdentity.cleanupHandoff.hostNodeCleanupCount,
+          refCleanupReturnCount:
+            unmountHandoffIdentity.cleanupHandoff.refCleanupReturnCount,
+          passiveDestroyCount:
+            unmountHandoffIdentity.cleanupHandoff.passiveDestroyCount,
+          cleanupOrderRecordCount:
+            unmountHandoffIdentity.cleanupHandoff.cleanupOrderRecordCount,
+          minimalTreeCleanupHandoff:
+            unmountHandoffIdentity.cleanupHandoff.minimalTreeCleanupHandoff
+        }),
     renderCurrent: normalized.renderCurrent,
     renderFinishedWork: normalized.renderFinishedWork,
     commitPreviousCurrent: normalized.commitPreviousCurrent,
@@ -4829,11 +4897,685 @@ function rootRequestOperationForHostOutputUpdateKind(
       return 'create';
     case 'Update':
       return 'update';
+    case 'Unmount':
+      return 'unmount';
     default:
       throwPrivateSerializationFinishedWorkIdentityError(
         publicSurface,
         'Private serialization finished-work identity host output update kind is not accepted.'
       );
+  }
+}
+
+function validatePrivateSerializationUnmountHandoffIdentity(
+  publicSurface,
+  identityRootRequest,
+  evidence
+) {
+  assertPrivateSerializationUnmountRequestField(
+    publicSurface,
+    evidence,
+    [
+      'rootRequestOperation',
+      'root_request_operation',
+      'operation',
+      'rootOperation'
+    ],
+    identityRootRequest.operation,
+    'operation'
+  );
+  assertPrivateSerializationUnmountRequestField(
+    publicSurface,
+    evidence,
+    [
+      'rootRequestUpdateKind',
+      'root_request_update_kind',
+      'updateKind',
+      'update_kind'
+    ],
+    identityRootRequest.updateKind,
+    'update kind'
+  );
+
+  const handoffContainer =
+    readPrivateSerializationField(evidence, [
+      'unmountHandoffIdentity',
+      'unmount_handoff_identity',
+      'privateUnmountNativeBridgeAdmission',
+      'private_unmount_native_bridge_admission',
+      'nativeBridgeAdmission',
+      'native_bridge_admission'
+    ]) ?? evidence;
+  const cleanupHandoff = normalizePrivateSerializationUnmountCleanupHandoff(
+    publicSurface,
+    identityRootRequest,
+    readPrivateSerializationField(handoffContainer, [
+      'cleanupHandoff',
+      'cleanup_handoff',
+      'unmountCleanupHandoff',
+      'unmount_cleanup_handoff',
+      'unmountNativeBridgeCleanupHandoff',
+      'unmount_native_bridge_cleanup_handoff',
+      'privateUnmountNativeBridgeCleanupHandoff',
+      'private_unmount_native_bridge_cleanup_handoff'
+    ])
+  );
+  const deletionHandoff =
+    normalizePrivateSerializationUnmountDeletionHandoff(
+      publicSurface,
+      identityRootRequest,
+      readPrivateSerializationField(handoffContainer, [
+        'deletionCommitHandoff',
+        'deletion_commit_handoff',
+        'unmountDeletionCommitHandoff',
+        'unmount_deletion_commit_handoff',
+        'deletionHandoff',
+        'deletion_handoff'
+      ])
+    );
+  const cleanupDeletionHandoff =
+    cleanupHandoff.deletionCommitHandoff === null
+      ? null
+      : normalizePrivateSerializationUnmountDeletionHandoff(
+          publicSurface,
+          identityRootRequest,
+          cleanupHandoff.deletionCommitHandoff.sourceDiagnostic
+        );
+
+  if (
+    cleanupDeletionHandoff !== null &&
+    !privateSerializationUnmountDeletionHandoffsMatch(
+      cleanupDeletionHandoff,
+      deletionHandoff
+    )
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity cleanup handoff points at a different deletion handoff.'
+    );
+  }
+  if (
+    cleanupHandoff.deletionCommitHandoffId !== deletionHandoff.diagnosticId
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity cleanup handoff does not reference the accepted deletion handoff.'
+    );
+  }
+  if (
+    cleanupHandoff.hostNodeCleanupCount !==
+      deletionHandoff.hostNodeCleanupCount ||
+    cleanupHandoff.cleanupOrderRecordCount !==
+      deletionHandoff.cleanupOrderRecordCount
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity cleanup counts do not match the deletion handoff.'
+    );
+  }
+
+  return freezeRecord({
+    deletionCommitHandoff: deletionHandoff,
+    cleanupHandoff,
+    cleanupHandoffVariant:
+      cleanupHandoff.refCleanupReturnCount === 0 &&
+      cleanupHandoff.passiveDestroyCount === 0
+        ? 'host-only'
+        : 'ref-passive'
+  });
+}
+
+function privateSerializationUnmountDeletionHandoffsMatch(left, right) {
+  return (
+    left.diagnosticId === right.diagnosticId &&
+    left.status === right.status &&
+    left.requestId === right.requestId &&
+    left.requestSequence === right.requestSequence &&
+    left.rootId === right.rootId &&
+    left.operation === right.operation &&
+    left.updateKind === right.updateKind &&
+    left.lifecycle === right.lifecycle &&
+    left.scheduledElementIsNone === right.scheduledElementIsNone &&
+    left.hostNodeCleanupCount === right.hostNodeCleanupCount &&
+    left.cleanupOrderRecordCount === right.cleanupOrderRecordCount &&
+    left.publicUnmountCompatibilityClaimed ===
+      right.publicUnmountCompatibilityClaimed &&
+    left.publicHostTeardownCompatibilityClaimed ===
+      right.publicHostTeardownCompatibilityClaimed &&
+    left.actFlushingClaimed === right.actFlushingClaimed
+  );
+}
+
+function assertPrivateSerializationUnmountRequestField(
+  publicSurface,
+  record,
+  names,
+  expected,
+  label
+) {
+  if (readPrivateSerializationField(record, names) !== expected) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Private unmount finished-work identity ${label} does not match the private request.`
+    );
+  }
+}
+
+function normalizePrivateSerializationUnmountDeletionHandoff(
+  publicSurface,
+  identityRootRequest,
+  handoff
+) {
+  assertPrivateSerializationRecord(
+    publicSurface,
+    handoff,
+    'Expected private unmount finished-work identity deletion handoff evidence.'
+  );
+
+  const normalized = freezeRecord({
+    sourceDiagnostic: handoff,
+    diagnosticId: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['diagnosticId', 'diagnostic_id', 'id'],
+      'deletion handoff diagnostic id'
+    ),
+    status: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['status'],
+      'deletion handoff status'
+    ),
+    requestId: readPrivateSerializationRequiredField(
+      publicSurface,
+      handoff,
+      ['rootRequestId', 'root_request_id', 'requestId', 'request_id'],
+      'deletion handoff request id'
+    ),
+    requestSequence: readPrivateSerializationRequiredNonNegativeInteger(
+      publicSurface,
+      handoff,
+      [
+        'rootRequestSequence',
+        'root_request_sequence',
+        'requestSequence',
+        'request_sequence'
+      ],
+      'deletion handoff request sequence'
+    ),
+    rootId: readPrivateSerializationRequiredField(
+      publicSurface,
+      handoff,
+      ['jsRootId', 'js_root_id', 'rootId', 'root_id', 'root'],
+      'deletion handoff root id'
+    ),
+    operation: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['operation', 'rootOperation', 'root_operation'],
+      'deletion handoff operation'
+    ),
+    updateKind: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['updateKind', 'update_kind', 'scheduledUpdateKind'],
+      'deletion handoff update kind'
+    ),
+    lifecycle: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['lifecycle', 'lifecycleStatusAfter', 'lifecycle_status_after'],
+      'deletion handoff lifecycle'
+    ),
+    scheduledElementIsNone: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['scheduledElementIsNone', 'scheduled_element_is_none'],
+      'deletion handoff scheduled element'
+    ),
+    hostNodeCleanupCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['hostNodeCleanupCount', 'host_node_cleanup_count'],
+        'deletion handoff host cleanup count'
+      ),
+    cleanupOrderRecordCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['cleanupOrderRecordCount', 'cleanup_order_record_count'],
+        'deletion handoff cleanup order count'
+      ),
+    publicUnmountCompatibilityClaimed:
+      readPrivateSerializationRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'publicUnmountCompatibilityClaimed',
+          'public_unmount_compatibility_claimed'
+        ],
+        'deletion handoff public unmount claim'
+      ),
+    publicHostTeardownCompatibilityClaimed:
+      readPrivateSerializationRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'publicHostTeardownCompatibilityClaimed',
+          'public_host_teardown_compatibility_claimed'
+        ],
+        'deletion handoff public host teardown claim'
+      ),
+    actFlushingClaimed: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['actFlushingClaimed', 'act_flushing_claimed'],
+      'deletion handoff act flushing claim'
+    )
+  });
+
+  if (
+    normalized.diagnosticId !== privateUnmountDeletionCommitHandoffDiagnosticId ||
+    normalized.status !== privateUnmountDeletionCommitHandoffStatus ||
+    normalized.requestId !== identityRootRequest.requestId ||
+    normalized.requestSequence !== identityRootRequest.requestSequence ||
+    normalized.rootId !== identityRootRequest.rootId ||
+    normalized.operation !== identityRootRequest.operation ||
+    normalized.updateKind !== identityRootRequest.updateKind ||
+    normalized.lifecycle !== testRendererRootLifecycleUnmountScheduled ||
+    normalized.scheduledElementIsNone !== true ||
+    normalized.hostNodeCleanupCount < 1 ||
+    normalized.cleanupOrderRecordCount < normalized.hostNodeCleanupCount ||
+    normalized.publicUnmountCompatibilityClaimed !== false ||
+    normalized.publicHostTeardownCompatibilityClaimed !== false ||
+    normalized.actFlushingClaimed !== false
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity deletion handoff does not match the private unmount request.'
+    );
+  }
+
+  return normalized;
+}
+
+function normalizePrivateSerializationUnmountCleanupHandoff(
+  publicSurface,
+  identityRootRequest,
+  handoff
+) {
+  assertPrivateSerializationRecord(
+    publicSurface,
+    handoff,
+    'Expected private unmount finished-work identity cleanup handoff evidence.'
+  );
+
+  const deletionCommitHandoff = readPrivateSerializationField(handoff, [
+    'deletionCommitHandoff',
+    'deletion_commit_handoff'
+  ]);
+  const normalized = freezeRecord({
+    sourceDiagnostic: handoff,
+    diagnosticId: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['diagnosticId', 'diagnostic_id', 'id'],
+      'cleanup handoff diagnostic id'
+    ),
+    status: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['status'],
+      'cleanup handoff status'
+    ),
+    requestId: readPrivateSerializationRequiredField(
+      publicSurface,
+      handoff,
+      ['rootRequestId', 'root_request_id', 'requestId', 'request_id'],
+      'cleanup handoff request id'
+    ),
+    requestSequence: readPrivateSerializationRequiredNonNegativeInteger(
+      publicSurface,
+      handoff,
+      [
+        'rootRequestSequence',
+        'root_request_sequence',
+        'requestSequence',
+        'request_sequence'
+      ],
+      'cleanup handoff request sequence'
+    ),
+    rootId: readPrivateSerializationRequiredField(
+      publicSurface,
+      handoff,
+      ['jsRootId', 'js_root_id', 'rootId', 'root_id', 'root'],
+      'cleanup handoff root id'
+    ),
+    operation: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['operation', 'rootOperation', 'root_operation'],
+      'cleanup handoff operation'
+    ),
+    updateKind: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['updateKind', 'update_kind', 'scheduledUpdateKind'],
+      'cleanup handoff update kind'
+    ),
+    routeOutcome: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['routeOutcome', 'route_outcome'],
+      'cleanup handoff route outcome'
+    ),
+    lifecycle: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['lifecycle', 'lifecycleStatusAfter', 'lifecycle_status_after'],
+      'cleanup handoff lifecycle'
+    ),
+    scheduledElementIsNone: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['scheduledElementIsNone', 'scheduled_element_is_none'],
+      'cleanup handoff scheduled element'
+    ),
+    routeDependencyId: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['routeDependencyId', 'route_dependency_id'],
+      'cleanup handoff route dependency'
+    ),
+    deletionCommitHandoffId: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['deletionCommitHandoffId', 'deletion_commit_handoff_id'],
+      'cleanup handoff deletion handoff id'
+    ),
+    admissionDiagnosticId: readPrivateSerializationRequiredString(
+      publicSurface,
+      handoff,
+      ['admissionDiagnosticId', 'admission_diagnostic_id'],
+      'cleanup handoff admission id'
+    ),
+    previousRootChildCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['previousRootChildCount', 'previous_root_child_count'],
+        'cleanup handoff previous root child count'
+      ),
+    currentRootChildCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['currentRootChildCount', 'current_root_child_count'],
+        'cleanup handoff current root child count'
+      ),
+    detachedInstance: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['detachedInstance', 'detached_instance'],
+      'cleanup handoff detached instance'
+    ),
+    detachedInstanceChildCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['detachedInstanceChildCount', 'detached_instance_child_count'],
+        'cleanup handoff detached child count'
+      ),
+    hostNodeCleanupCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['hostNodeCleanupCount', 'host_node_cleanup_count'],
+        'cleanup handoff host cleanup count'
+      ),
+    refCleanupReturnCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['refCleanupReturnCount', 'ref_cleanup_return_count'],
+        'cleanup handoff ref cleanup count'
+      ),
+    passiveDestroyCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['passiveDestroyCount', 'passive_destroy_count'],
+        'cleanup handoff passive destroy count'
+      ),
+    cleanupOrderRecordCount:
+      readPrivateSerializationRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['cleanupOrderRecordCount', 'cleanup_order_record_count'],
+        'cleanup handoff cleanup order count'
+      ),
+    nativeCleanupAfterRefAndPassiveOrdering:
+      readPrivateSerializationRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'nativeCleanupAfterRefAndPassiveOrdering',
+          'native_cleanup_after_ref_and_passive_ordering'
+        ],
+        'cleanup handoff ref/passive ordering'
+      ),
+    minimalTreeCleanupHandoff: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['minimalTreeCleanupHandoff', 'minimal_tree_cleanup_handoff'],
+      'cleanup handoff minimal tree marker'
+    ),
+    rustUnmountCleanupHandoffExecuted:
+      readPrivateSerializationRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'rustUnmountCleanupHandoffExecuted',
+          'rust_unmount_cleanup_handoff_executed'
+        ],
+        'cleanup handoff execution marker'
+      ),
+    hostOutputProduced: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['hostOutputProduced', 'host_output_produced'],
+      'cleanup handoff host output marker'
+    ),
+    publicUnmountCompatibilityClaimed:
+      readPrivateSerializationRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'publicUnmountCompatibilityClaimed',
+          'public_unmount_compatibility_claimed'
+        ],
+        'cleanup handoff public unmount claim'
+      ),
+    publicHostTeardownCompatibilityClaimed:
+      readPrivateSerializationRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'publicHostTeardownCompatibilityClaimed',
+          'public_host_teardown_compatibility_claimed'
+        ],
+        'cleanup handoff public host teardown claim'
+      ),
+    actFlushingClaimed: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['actFlushingClaimed', 'act_flushing_claimed'],
+      'cleanup handoff act flushing claim'
+    ),
+    nativeBridgeAvailable: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['nativeBridgeAvailable', 'native_bridge_available'],
+      'cleanup handoff native bridge claim'
+    ),
+    nativeExecution: readPrivateSerializationRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['nativeExecution', 'native_execution'],
+      'cleanup handoff native execution claim'
+    ),
+    deletionCommitHandoff:
+      deletionCommitHandoff === undefined
+        ? null
+        : freezeRecord({ sourceDiagnostic: deletionCommitHandoff })
+  });
+  const cleanupOnlyCount =
+    normalized.hostNodeCleanupCount +
+    normalized.refCleanupReturnCount +
+    normalized.passiveDestroyCount;
+  const refPassiveCleanup =
+    normalized.refCleanupReturnCount > 0 ||
+    normalized.passiveDestroyCount > 0;
+
+  if (
+    normalized.diagnosticId !==
+      privateUnmountNativeBridgeCleanupHandoffDiagnosticId ||
+    normalized.status !== privateUnmountNativeBridgeCleanupHandoffStatus ||
+    normalized.requestId !== identityRootRequest.requestId ||
+    normalized.requestSequence !== identityRootRequest.requestSequence ||
+    normalized.rootId !== identityRootRequest.rootId ||
+    normalized.operation !== identityRootRequest.operation ||
+    normalized.updateKind !== identityRootRequest.updateKind ||
+    normalized.routeOutcome !== testRendererRootUpdateOutcomeScheduled ||
+    normalized.lifecycle !== testRendererRootLifecycleUnmountScheduled ||
+    normalized.scheduledElementIsNone !== true ||
+    normalized.routeDependencyId !==
+      'react-test-renderer-unmount-route-private-diagnostic' ||
+    normalized.deletionCommitHandoffId !==
+      privateUnmountDeletionCommitHandoffDiagnosticId ||
+    normalized.admissionDiagnosticId !==
+      privateUnmountNativeBridgeAdmissionDiagnosticId ||
+    normalized.previousRootChildCount !== 1 ||
+    normalized.currentRootChildCount !== 0 ||
+    normalized.detachedInstance !== true ||
+    normalized.detachedInstanceChildCount !== 0 ||
+    normalized.hostNodeCleanupCount < 1 ||
+    normalized.cleanupOrderRecordCount !== cleanupOnlyCount ||
+    normalized.nativeCleanupAfterRefAndPassiveOrdering !== true ||
+    normalized.rustUnmountCleanupHandoffExecuted !== true ||
+    normalized.hostOutputProduced !== true ||
+    normalized.publicUnmountCompatibilityClaimed !== false ||
+    normalized.publicHostTeardownCompatibilityClaimed !== false ||
+    normalized.actFlushingClaimed !== false ||
+    normalized.nativeBridgeAvailable !== false ||
+    normalized.nativeExecution !== false ||
+    (normalized.minimalTreeCleanupHandoff === true && refPassiveCleanup) ||
+    (normalized.minimalTreeCleanupHandoff === false && !refPassiveCleanup)
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity cleanup handoff does not match the private unmount request.'
+    );
+  }
+
+  return normalized;
+}
+
+function readPrivateSerializationField(record, names) {
+  if (record === null || typeof record !== 'object') {
+    return undefined;
+  }
+  for (const name of names) {
+    if (Object.hasOwn(record, name)) {
+      return record[name];
+    }
+  }
+  return undefined;
+}
+
+function readPrivateSerializationRequiredField(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateSerializationField(record, names);
+  if (value === undefined) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private unmount finished-work identity ${label}.`
+    );
+  }
+  return value;
+}
+
+function readPrivateSerializationRequiredString(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateSerializationRequiredField(
+    publicSurface,
+    record,
+    names,
+    label
+  );
+  if (typeof value !== 'string') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private unmount finished-work identity ${label} string.`
+    );
+  }
+  return value;
+}
+
+function readPrivateSerializationRequiredBoolean(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateSerializationRequiredField(
+    publicSurface,
+    record,
+    names,
+    label
+  );
+  if (typeof value !== 'boolean') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private unmount finished-work identity ${label} boolean.`
+    );
+  }
+  return value;
+}
+
+function readPrivateSerializationRequiredNonNegativeInteger(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateSerializationRequiredField(
+    publicSurface,
+    record,
+    names,
+    label
+  );
+  if (!Number.isInteger(value) || value < 0) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private unmount finished-work identity ${label} non-negative integer.`
+    );
+  }
+  return value;
+}
+
+function assertPrivateSerializationRecord(publicSurface, value, message) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throwPrivateSerializationFinishedWorkIdentityError(publicSurface, message);
   }
 }
 
@@ -5129,6 +5871,9 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
       'Private serialization source report host output snapshot is stale.'
     );
   }
+  if (identity.hostOutputUpdateKind === 'Unmount') {
+    validatePrivateSerializationUnmountSourceReport(publicSurface, report);
+  }
   const publicBlockers = readPrivateToJSONField(
     report,
     'publicBlockers',
@@ -5136,6 +5881,85 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
   );
   if (publicBlockers !== undefined) {
     assertPrivateToJSONPublicBlockers(publicBlockers);
+  }
+}
+
+function validatePrivateSerializationUnmountSourceReport(
+  publicSurface,
+  report
+) {
+  if (
+    publicSurface === 'create().toTree' &&
+    readPrivateToJSONField(
+      report,
+      'sourceJsonDiagnosticName',
+      'source_json_diagnostic_name'
+    ) !== privateToJSONAcceptedDiagnosticName
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity source tree report does not reference the accepted JSON diagnostic.'
+    );
+  }
+  if (
+    readPrivateSerializationRequiredNonNegativeInteger(
+      publicSurface,
+      report,
+      ['rootChildCount', 'root_child_count'],
+      'unmount source root child count'
+    ) !== 0
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity source report is not an empty root.'
+    );
+  }
+
+  const row = readPrivateSerializationField(report, [
+    'hostOutputRow',
+    'host_output_row'
+  ]);
+  assertPrivateSerializationRecord(
+    publicSurface,
+    row,
+    'Expected private unmount finished-work identity host output row evidence.'
+  );
+  if (
+    readPrivateSerializationRequiredString(
+      publicSurface,
+      row,
+      ['id'],
+      'unmount host output row id'
+    ) !== privateToJSONUnmountHostOutputRowId ||
+    readPrivateSerializationRequiredString(
+      publicSurface,
+      row,
+      ['status'],
+      'unmount host output row status'
+    ) !== privateToJSONUpdateUnmountRowStatus ||
+    readPrivateSerializationRequiredString(
+      publicSurface,
+      row,
+      ['hostOutputUpdateKind', 'host_output_update_kind'],
+      'unmount host output row update kind'
+    ) !== 'Unmount' ||
+    readPrivateSerializationRequiredNonNegativeInteger(
+      publicSurface,
+      row,
+      ['previousRootChildCount', 'previous_root_child_count'],
+      'unmount host output row previous child count'
+    ) !== 1 ||
+    readPrivateSerializationRequiredNonNegativeInteger(
+      publicSurface,
+      row,
+      ['currentRootChildCount', 'current_root_child_count'],
+      'unmount host output row current child count'
+    ) !== 0
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private unmount finished-work identity host output row is not the accepted empty-root unmount row.'
+    );
   }
 }
 
