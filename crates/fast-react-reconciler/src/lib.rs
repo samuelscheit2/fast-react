@@ -38,13 +38,21 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    ElementTypeHandle, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
-    StateNodeHandle, UnimplementedReactBehavior, bubble_properties, unimplemented_behavior,
+    DependenciesHandle, ElementTypeHandle, FiberFlags, FiberId, FiberTag, FiberTopologyError,
+    FiberTypeHandle, HookEffectCallbackHandle, HookEffectDependencies, Lanes, PropsHandle,
+    RefHandle, StateNodeHandle, UnimplementedReactBehavior, bubble_properties,
+    unimplemented_behavior,
 };
 use fast_react_host_config::{
     HostCapability, HostError, HostFiberTokenPhase, HostFiberTokenTarget, HostOperationError,
     HostTreeUpdateMode, HostTreeUpdateModeError, HostTypes, MutationRenderer,
     UnsupportedHostCapability,
+};
+
+use function_component::{FunctionComponentEffectPhase, FunctionComponentHookRenderStore};
+use root_commit::{
+    FunctionComponentDeletedSubtreePendingPassiveCommitHandoff,
+    queue_function_component_deleted_subtree_pending_passive_effects,
 };
 
 pub use concurrent_updates::{
@@ -373,6 +381,10 @@ pub enum TestRendererHostOutputCanaryError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     HostFiberToken(HostFiberTokenValidationError),
+    PassiveRefCleanupFixtureRejected {
+        root: FiberRootId,
+        reason: &'static str,
+    },
     RootMismatch {
         expected: FiberRootId,
         actual: FiberRootId,
@@ -402,6 +414,11 @@ impl Display for TestRendererHostOutputCanaryError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::HostFiberToken(error) => Display::fmt(error, formatter),
+            Self::PassiveRefCleanupFixtureRejected { root, reason } => write!(
+                formatter,
+                "test-renderer unmount passive/ref cleanup canary for root {} was rejected: {reason}",
+                root.raw()
+            ),
             Self::RootMismatch { expected, actual } => write!(
                 formatter,
                 "test-renderer canary root {} does not match render root {}",
@@ -447,7 +464,8 @@ impl Error for TestRendererHostOutputCanaryError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::HostFiberToken(error) => Some(error),
-            Self::RootMismatch { .. }
+            Self::PassiveRefCleanupFixtureRejected { .. }
+            | Self::RootMismatch { .. }
             | Self::ExpectedCurrentHostRoot { .. }
             | Self::ExpectedUnmountRender { .. }
             | Self::ExpectedFiberTag { .. }
@@ -768,6 +786,58 @@ impl TestRendererHostOutputCanaryDeletedFibers {
     #[must_use]
     pub const fn component_deletion_token(self) -> HostFiberTokenId {
         self.component_deletion_token
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererHostOutputUnmountRefPassiveCleanupCanary {
+    root: FiberRootId,
+    host_root: FiberId,
+    deleted_component: FiberId,
+    passive_component: FiberId,
+    deleted_text: FiberId,
+    handoff: FunctionComponentDeletedSubtreePendingPassiveCommitHandoff,
+}
+
+impl TestRendererHostOutputUnmountRefPassiveCleanupCanary {
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root(&self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn deleted_component(&self) -> FiberId {
+        self.deleted_component
+    }
+
+    #[must_use]
+    pub const fn passive_component(&self) -> FiberId {
+        self.passive_component
+    }
+
+    #[must_use]
+    pub const fn deleted_text(&self) -> FiberId {
+        self.deleted_text
+    }
+
+    #[must_use]
+    pub fn queued_passive_unmount_count(&self) -> usize {
+        self.handoff.queued_unmount_count()
+    }
+
+    pub fn record_passive_destroy_metadata_for_canary(
+        &self,
+        commit: &mut HostRootCommitRecord,
+    ) -> Result<(), RootCommitError> {
+        commit.record_function_component_deleted_subtree_passive_effects_for_canary(
+            std::slice::from_ref(&self.handoff),
+        )?;
+        Ok(())
     }
 }
 
@@ -1161,6 +1231,102 @@ pub fn prepare_test_renderer_host_output_unmount_canary_fibers<H: HostTypes>(
         host_root: render.work_in_progress(),
         render_lanes: render.render_lanes(),
         component_deletion_token,
+    })
+}
+
+#[doc(hidden)]
+pub fn prepare_test_renderer_host_output_unmount_ref_passive_cleanup_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    current: TestRendererHostOutputCanaryCurrentFibers,
+) -> Result<TestRendererHostOutputUnmountRefPassiveCleanupCanary, TestRendererHostOutputCanaryError>
+{
+    validate_test_renderer_host_output_canary_current(store, render, current)?;
+    if render.resulting_element().is_some() {
+        return Err(TestRendererHostOutputCanaryError::ExpectedUnmountRender {
+            root: render.root(),
+            actual: render.resulting_element(),
+        });
+    }
+
+    let mode = store.fiber_arena().get(current.component())?.mode();
+    let passive_component = store.fiber_arena_mut().create_fiber(
+        FiberTag::FunctionComponent,
+        None,
+        PropsHandle::from_raw(98_701),
+        mode,
+    );
+    {
+        let node = store.fiber_arena_mut().get_mut(passive_component)?;
+        node.set_fiber_type(FiberTypeHandle::from_raw(98_702));
+    }
+    store
+        .fiber_arena_mut()
+        .set_children(current.component(), &[])?;
+    store
+        .fiber_arena_mut()
+        .set_children(passive_component, &[current.text()])?;
+    store
+        .fiber_arena_mut()
+        .set_children(current.component(), &[passive_component])?;
+    {
+        let node = store.fiber_arena_mut().get_mut(current.component())?;
+        node.set_ref_handle(RefHandle::from_raw(98_703));
+    }
+
+    let mut hook_store = FunctionComponentHookRenderStore::new();
+    hook_store
+        .create_current_effect_metadata(
+            store.fiber_arena_mut(),
+            passive_component,
+            FunctionComponentEffectPhase::Passive,
+            HookEffectCallbackHandle::from_raw(98_704),
+            HookEffectDependencies::array(DependenciesHandle::from_raw(98_705)),
+            Some(HookEffectCallbackHandle::from_raw(98_706)),
+        )
+        .map_err(
+            |_error| TestRendererHostOutputCanaryError::PassiveRefCleanupFixtureRejected {
+                root: render.root(),
+                reason: "passive-effect-metadata-rejected",
+            },
+        )?;
+
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, current.text())?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, passive_component)?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, current.component())?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, current.host_root())?;
+
+    let handoff = queue_function_component_deleted_subtree_pending_passive_effects(
+        store,
+        render.root(),
+        &hook_store,
+        render.work_in_progress(),
+        current.component(),
+        render.render_lanes(),
+    )
+    .map_err(
+        |_error| TestRendererHostOutputCanaryError::PassiveRefCleanupFixtureRejected {
+            root: render.root(),
+            reason: "deleted-subtree-passive-handoff-rejected",
+        },
+    )?;
+
+    if handoff.queued_unmount_count() != 1 {
+        return Err(
+            TestRendererHostOutputCanaryError::PassiveRefCleanupFixtureRejected {
+                root: render.root(),
+                reason: "deleted-subtree-passive-handoff-count-mismatch",
+            },
+        );
+    }
+
+    Ok(TestRendererHostOutputUnmountRefPassiveCleanupCanary {
+        root: render.root(),
+        host_root: render.work_in_progress(),
+        deleted_component: current.component(),
+        passive_component,
+        deleted_text: current.text(),
+        handoff,
     })
 }
 
