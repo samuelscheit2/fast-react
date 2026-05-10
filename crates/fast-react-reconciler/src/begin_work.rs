@@ -1,10 +1,12 @@
-//! Private begin-work handoff for function components.
+//! Private begin-work handoff for function components and a narrow Fragment canary.
 //!
 //! This is intentionally below the public work loop. The default handoff
-//! delegates only the accepted function-component render skeleton; the private
-//! single-child helper records one admitted HostComponent/HostText output for
-//! root-loop canaries. It does not implement broad reconciliation, complete
-//! host work, commit effects, mutate hosts, or switch roots.
+//! delegates only the accepted function-component render skeleton and one
+//! unkeyed Fragment with exactly one existing HostComponent/HostText child. The
+//! private function-component single-child helper records one admitted
+//! HostComponent/HostText output for root-loop canaries. It does not implement
+//! broad reconciliation, complete host work, commit effects, mutate hosts, or
+//! switch roots.
 
 #![allow(dead_code)]
 
@@ -57,13 +59,23 @@ impl BeginWorkRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BeginWorkResult {
     FunctionComponent(FunctionComponentBeginWorkRecord),
+    Fragment(FragmentSingleHostChildBeginWorkRecord),
 }
 
 impl BeginWorkResult {
     #[must_use]
-    pub const fn function_component(self) -> FunctionComponentBeginWorkRecord {
+    pub fn function_component(self) -> FunctionComponentBeginWorkRecord {
         match self {
             Self::FunctionComponent(record) => record,
+            Self::Fragment(_) => panic!("begin-work result was not a FunctionComponent"),
+        }
+    }
+
+    #[must_use]
+    pub fn fragment(self) -> FragmentSingleHostChildBeginWorkRecord {
+        match self {
+            Self::Fragment(record) => record,
+            Self::FunctionComponent(_) => panic!("begin-work result was not a Fragment"),
         }
     }
 }
@@ -162,6 +174,54 @@ impl FunctionComponentBeginWorkRecord {
 pub(crate) struct FunctionComponentSingleChildBeginWorkRecord {
     begin_work: FunctionComponentBeginWorkRecord,
     single_child: FunctionComponentSingleChildReconciliationRecord,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FragmentSingleHostChildBeginWorkRecord {
+    fragment: FiberId,
+    current: Option<FiberId>,
+    child: FiberId,
+    child_tag: FiberTag,
+    pending_props: PropsHandle,
+    child_pending_props: PropsHandle,
+    render_lanes: Lanes,
+}
+
+impl FragmentSingleHostChildBeginWorkRecord {
+    #[must_use]
+    pub const fn fragment(self) -> FiberId {
+        self.fragment
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn child(self) -> FiberId {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn child_tag(self) -> FiberTag {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub const fn pending_props(self) -> PropsHandle {
+        self.pending_props
+    }
+
+    #[must_use]
+    pub const fn child_pending_props(self) -> PropsHandle {
+        self.child_pending_props
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
 }
 
 impl FunctionComponentSingleChildBeginWorkRecord {
@@ -830,6 +890,7 @@ pub(crate) enum BeginWorkError {
     FiberTopology(FiberTopologyError),
     FunctionComponent(FunctionComponentRenderError),
     FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
+    FragmentSingleHostChild(FragmentSingleHostChildBeginWorkError),
     UnsupportedPortal(UnsupportedPortalBeginWorkRecord),
     UnsupportedFiberTag { fiber: FiberId, tag: FiberTag },
 }
@@ -840,6 +901,7 @@ impl Display for BeginWorkError {
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::FunctionComponent(error) => Display::fmt(error, formatter),
             Self::FunctionComponentSingleChild(error) => Display::fmt(error, formatter),
+            Self::FragmentSingleHostChild(error) => Display::fmt(error, formatter),
             Self::UnsupportedPortal(record) => write!(
                 formatter,
                 "portal fiber {} reached begin-work but {feature} is unsupported; key {:?}, child {:?}, pending props {:?}, state node {:?}",
@@ -852,7 +914,7 @@ impl Display for BeginWorkError {
             ),
             Self::UnsupportedFiberTag { fiber, tag } => write!(
                 formatter,
-                "fiber {} has unsupported begin-work tag {:?}; only FunctionComponent is delegated by this private handoff",
+                "fiber {} has unsupported begin-work tag {:?}; only FunctionComponent and an exact single-host-child Fragment are delegated by this private handoff",
                 fiber.slot().get(),
                 tag
             ),
@@ -866,6 +928,7 @@ impl Error for BeginWorkError {
             Self::FiberTopology(error) => Some(error),
             Self::FunctionComponent(error) => Some(error),
             Self::FunctionComponentSingleChild(error) => Some(error),
+            Self::FragmentSingleHostChild(error) => Some(error),
             Self::UnsupportedPortal(_) | Self::UnsupportedFiberTag { .. } => None,
         }
     }
@@ -886,6 +949,132 @@ impl From<FunctionComponentRenderError> for BeginWorkError {
 impl From<FunctionComponentSingleChildReconciliationError> for BeginWorkError {
     fn from(error: FunctionComponentSingleChildReconciliationError) -> Self {
         Self::FunctionComponentSingleChild(error)
+    }
+}
+
+impl From<FragmentSingleHostChildBeginWorkError> for BeginWorkError {
+    fn from(error: FragmentSingleHostChildBeginWorkError) -> Self {
+        Self::FragmentSingleHostChild(error)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FragmentSingleHostChildBeginWorkError {
+    FiberTopology(FiberTopologyError),
+    UnexpectedFiberTag {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    KeyedFragmentUnsupported {
+        fragment: FiberId,
+        key: ReactKey,
+    },
+    FragmentSiblingUnsupported {
+        fragment: FiberId,
+        sibling: FiberId,
+    },
+    MissingChild {
+        fragment: FiberId,
+    },
+    MultipleChildren {
+        fragment: FiberId,
+        first_child: FiberId,
+        sibling: FiberId,
+    },
+    UnsupportedChildTag {
+        fragment: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    ExistingCurrentChild {
+        fragment: FiberId,
+        current: FiberId,
+        child: FiberId,
+    },
+}
+
+impl Display for FragmentSingleHostChildBeginWorkError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::UnexpectedFiberTag { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be Fragment for private single-host-child begin-work, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::KeyedFragmentUnsupported { fragment, key } => write!(
+                formatter,
+                "Fragment fiber {} has key {:?}; keyed Fragment reconciliation stays unsupported by this canary",
+                fragment.slot().get(),
+                key.as_str()
+            ),
+            Self::FragmentSiblingUnsupported { fragment, sibling } => write!(
+                formatter,
+                "Fragment fiber {} has sibling {}; this private canary does not traverse Fragment siblings",
+                fragment.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::MissingChild { fragment } => write!(
+                formatter,
+                "Fragment fiber {} has no child; this private canary requires exactly one HostComponent or HostText child",
+                fragment.slot().get()
+            ),
+            Self::MultipleChildren {
+                fragment,
+                first_child,
+                sibling,
+            } => write!(
+                formatter,
+                "Fragment fiber {} has multiple children (first {}, sibling {}); this private canary admits exactly one host child",
+                fragment.slot().get(),
+                first_child.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::UnsupportedChildTag {
+                fragment,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "Fragment fiber {} child {} has unsupported tag {:?}; this private canary admits only HostComponent and HostText",
+                fragment.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::ExistingCurrentChild {
+                fragment,
+                current,
+                child,
+            } => write!(
+                formatter,
+                "Fragment fiber {} current alternate {} already has child {}; update/list reconciliation stays unsupported by this canary",
+                fragment.slot().get(),
+                current.slot().get(),
+                child.slot().get()
+            ),
+        }
+    }
+}
+
+impl Error for FragmentSingleHostChildBeginWorkError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::UnexpectedFiberTag { .. }
+            | Self::KeyedFragmentUnsupported { .. }
+            | Self::FragmentSiblingUnsupported { .. }
+            | Self::MissingChild { .. }
+            | Self::MultipleChildren { .. }
+            | Self::UnsupportedChildTag { .. }
+            | Self::ExistingCurrentChild { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for FragmentSingleHostChildBeginWorkError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
     }
 }
 
@@ -920,25 +1109,102 @@ pub(crate) fn begin_work(
     let work_in_progress = request.work_in_progress();
     let tag = arena.get(work_in_progress)?.tag();
 
-    if tag != FiberTag::FunctionComponent {
-        if tag == FiberTag::Portal {
-            return Err(BeginWorkError::UnsupportedPortal(
-                unsupported_portal_begin_work_record(arena, request)?,
-            ));
-        }
+    match tag {
+        FiberTag::FunctionComponent => {
+            let render = render_function_component(
+                arena,
+                work_in_progress,
+                request.render_lanes(),
+                invoker,
+            )?;
 
-        return Err(BeginWorkError::UnsupportedFiberTag {
+            Ok(BeginWorkResult::FunctionComponent(
+                FunctionComponentBeginWorkRecord { render },
+            ))
+        }
+        FiberTag::Fragment => Ok(BeginWorkResult::Fragment(
+            begin_work_fragment_single_host_child(arena, request)?,
+        )),
+        FiberTag::Portal => Err(BeginWorkError::UnsupportedPortal(
+            unsupported_portal_begin_work_record(arena, request)?,
+        )),
+        _ => Err(BeginWorkError::UnsupportedFiberTag {
             fiber: work_in_progress,
+            tag,
+        }),
+    }
+}
+
+pub(crate) fn begin_work_fragment_single_host_child(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+) -> Result<FragmentSingleHostChildBeginWorkRecord, FragmentSingleHostChildBeginWorkError> {
+    let fragment = request.work_in_progress();
+    let node = arena.get(fragment)?;
+    let tag = node.tag();
+    if tag != FiberTag::Fragment {
+        return Err(FragmentSingleHostChildBeginWorkError::UnexpectedFiberTag {
+            fiber: fragment,
             tag,
         });
     }
+    if let Some(key) = node.key().cloned() {
+        return Err(
+            FragmentSingleHostChildBeginWorkError::KeyedFragmentUnsupported { fragment, key },
+        );
+    }
+    if let Some(sibling) = node.sibling() {
+        return Err(
+            FragmentSingleHostChildBeginWorkError::FragmentSiblingUnsupported { fragment, sibling },
+        );
+    }
+    let current = node.alternate();
+    let pending_props = node.pending_props();
+    let child = node
+        .child()
+        .ok_or(FragmentSingleHostChildBeginWorkError::MissingChild { fragment })?;
 
-    let render =
-        render_function_component(arena, work_in_progress, request.render_lanes(), invoker)?;
+    if let Some(current) = current
+        && let Some(child) = arena.get(current)?.child()
+    {
+        return Err(
+            FragmentSingleHostChildBeginWorkError::ExistingCurrentChild {
+                fragment,
+                current,
+                child,
+            },
+        );
+    }
 
-    Ok(BeginWorkResult::FunctionComponent(
-        FunctionComponentBeginWorkRecord { render },
-    ))
+    let child_node = arena.get(child)?;
+    if let Some(sibling) = child_node.sibling() {
+        return Err(FragmentSingleHostChildBeginWorkError::MultipleChildren {
+            fragment,
+            first_child: child,
+            sibling,
+        });
+    }
+    let child_tag = child_node.tag();
+    if !matches!(child_tag, FiberTag::HostComponent | FiberTag::HostText) {
+        return Err(FragmentSingleHostChildBeginWorkError::UnsupportedChildTag {
+            fragment,
+            child,
+            tag: child_tag,
+        });
+    }
+    let child_pending_props = child_node.pending_props();
+
+    arena.get_mut(fragment)?.set_memoized_props(pending_props);
+
+    Ok(FragmentSingleHostChildBeginWorkRecord {
+        fragment,
+        current,
+        child,
+        child_tag,
+        pending_props,
+        child_pending_props,
+        render_lanes: request.render_lanes(),
+    })
 }
 
 pub(crate) fn begin_work_with_context_reads(
@@ -1398,6 +1664,23 @@ mod tests {
             .unwrap();
 
         (arena, current, work_in_progress, component)
+    }
+
+    fn fragment_with_host_child(
+        child_tag: FiberTag,
+        fragment_props: PropsHandle,
+        child_props: PropsHandle,
+    ) -> (FiberArena, FiberId, FiberId) {
+        assert!(matches!(
+            child_tag,
+            FiberTag::HostComponent | FiberTag::HostText
+        ));
+        let mut arena = FiberArena::new();
+        let fragment = arena.create_fiber(FiberTag::Fragment, None, fragment_props, FiberMode::NO);
+        let child = arena.create_fiber(child_tag, None, child_props, FiberMode::NO);
+        arena.set_children(fragment, &[child]).unwrap();
+
+        (arena, fragment, child)
     }
 
     #[test]
@@ -2322,6 +2605,286 @@ mod tests {
         assert_eq!(record.single_child().child_element_type(), child_type);
         assert_eq!(record.single_child().child_props(), child_props);
         assert_eq!(record.single_child().render_lanes(), Lanes::SYNC);
+    }
+
+    #[test]
+    fn begin_work_delegates_unkeyed_fragment_with_single_host_child_without_invoking() {
+        for (child_tag, raw) in [(FiberTag::HostText, 710), (FiberTag::HostComponent, 720)] {
+            let fragment_props = PropsHandle::from_raw(raw);
+            let child_props = PropsHandle::from_raw(raw + 1);
+            let (mut arena, fragment, child) =
+                fragment_with_host_child(child_tag, fragment_props, child_props);
+            let mut registry = TestFunctionComponentRegistry::default();
+
+            let record = begin_work(
+                &mut arena,
+                BeginWorkRequest::new(fragment, Lanes::DEFAULT),
+                &mut registry,
+            )
+            .unwrap()
+            .fragment();
+
+            assert_eq!(record.fragment(), fragment);
+            assert_eq!(record.current(), None);
+            assert_eq!(record.child(), child);
+            assert_eq!(record.child_tag(), child_tag);
+            assert_eq!(record.pending_props(), fragment_props);
+            assert_eq!(record.child_pending_props(), child_props);
+            assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+            assert!(registry.calls().is_empty());
+
+            let fragment_node = arena.get(fragment).unwrap();
+            assert_eq!(fragment_node.child(), Some(child));
+            assert_eq!(fragment_node.memoized_props(), fragment_props);
+            assert_eq!(fragment_node.flags(), fast_react_core::FiberFlags::NO);
+            let child_node = arena.get(child).unwrap();
+            assert_eq!(child_node.return_fiber(), Some(fragment));
+            assert_eq!(child_node.memoized_props(), PropsHandle::NONE);
+            assert_eq!(child_node.lanes(), Lanes::NO);
+            assert_eq!(child_node.flags(), fast_react_core::FiberFlags::NO);
+        }
+    }
+
+    #[test]
+    fn begin_work_fragment_single_host_child_fails_closed_for_keyed_multiple_or_missing_children() {
+        let mut registry = TestFunctionComponentRegistry::default();
+        let mut keyed_arena = FiberArena::new();
+        let keyed_fragment = keyed_arena.create_fiber(
+            FiberTag::Fragment,
+            Some(ReactKey::from_normalized("frag")),
+            PropsHandle::from_raw(730),
+            FiberMode::NO,
+        );
+        let keyed_child = keyed_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(731),
+            FiberMode::NO,
+        );
+        keyed_arena
+            .set_children(keyed_fragment, &[keyed_child])
+            .unwrap();
+        assert_eq!(
+            begin_work(
+                &mut keyed_arena,
+                BeginWorkRequest::new(keyed_fragment, Lanes::DEFAULT),
+                &mut registry,
+            ),
+            Err(BeginWorkError::FragmentSingleHostChild(
+                FragmentSingleHostChildBeginWorkError::KeyedFragmentUnsupported {
+                    fragment: keyed_fragment,
+                    key: ReactKey::from_normalized("frag"),
+                },
+            ))
+        );
+
+        let mut missing_arena = FiberArena::new();
+        let missing_fragment = missing_arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(740),
+            FiberMode::NO,
+        );
+        assert_eq!(
+            begin_work(
+                &mut missing_arena,
+                BeginWorkRequest::new(missing_fragment, Lanes::DEFAULT),
+                &mut registry,
+            ),
+            Err(BeginWorkError::FragmentSingleHostChild(
+                FragmentSingleHostChildBeginWorkError::MissingChild {
+                    fragment: missing_fragment,
+                },
+            ))
+        );
+
+        let mut multiple_arena = FiberArena::new();
+        let multiple_fragment = multiple_arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(750),
+            FiberMode::NO,
+        );
+        let first_child = multiple_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(751),
+            FiberMode::NO,
+        );
+        let sibling = multiple_arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(752),
+            FiberMode::NO,
+        );
+        multiple_arena
+            .set_children(multiple_fragment, &[first_child, sibling])
+            .unwrap();
+        assert_eq!(
+            begin_work(
+                &mut multiple_arena,
+                BeginWorkRequest::new(multiple_fragment, Lanes::DEFAULT),
+                &mut registry,
+            ),
+            Err(BeginWorkError::FragmentSingleHostChild(
+                FragmentSingleHostChildBeginWorkError::MultipleChildren {
+                    fragment: multiple_fragment,
+                    first_child,
+                    sibling,
+                },
+            ))
+        );
+
+        assert!(registry.calls().is_empty());
+        assert_eq!(
+            keyed_arena.get(keyed_fragment).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+        assert_eq!(
+            missing_arena
+                .get(missing_fragment)
+                .unwrap()
+                .memoized_props(),
+            PropsHandle::NONE
+        );
+        assert_eq!(
+            multiple_arena
+                .get(multiple_fragment)
+                .unwrap()
+                .memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn begin_work_fragment_fails_closed_for_sibling_update_or_unsupported_child() {
+        let mut sibling_arena = FiberArena::new();
+        let parent = sibling_arena.create_fiber(
+            FiberTag::HostRoot,
+            None,
+            PropsHandle::from_raw(760),
+            FiberMode::NO,
+        );
+        let fragment = sibling_arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(761),
+            FiberMode::NO,
+        );
+        let fragment_child = sibling_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(762),
+            FiberMode::NO,
+        );
+        sibling_arena
+            .set_children(fragment, &[fragment_child])
+            .unwrap();
+        let sibling = sibling_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(763),
+            FiberMode::NO,
+        );
+        sibling_arena
+            .set_children(parent, &[fragment, sibling])
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        assert_eq!(
+            begin_work(
+                &mut sibling_arena,
+                BeginWorkRequest::new(fragment, Lanes::DEFAULT),
+                &mut registry,
+            ),
+            Err(BeginWorkError::FragmentSingleHostChild(
+                FragmentSingleHostChildBeginWorkError::FragmentSiblingUnsupported {
+                    fragment,
+                    sibling,
+                },
+            ))
+        );
+
+        let mut update_arena = FiberArena::new();
+        let current = update_arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(770),
+            FiberMode::NO,
+        );
+        let current_child = update_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(771),
+            FiberMode::NO,
+        );
+        update_arena
+            .set_children(current, &[current_child])
+            .unwrap();
+        let work_in_progress = update_arena
+            .create_work_in_progress(current, PropsHandle::from_raw(772))
+            .unwrap();
+        let wip_child = update_arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(773),
+            FiberMode::NO,
+        );
+        update_arena
+            .set_children(work_in_progress, &[wip_child])
+            .unwrap();
+        assert_eq!(
+            begin_work(
+                &mut update_arena,
+                BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+                &mut registry,
+            ),
+            Err(BeginWorkError::FragmentSingleHostChild(
+                FragmentSingleHostChildBeginWorkError::ExistingCurrentChild {
+                    fragment: work_in_progress,
+                    current,
+                    child: current_child,
+                },
+            ))
+        );
+
+        for tag in [
+            FiberTag::FunctionComponent,
+            FiberTag::Fragment,
+            FiberTag::Portal,
+            FiberTag::Suspense,
+            FiberTag::Offscreen,
+        ] {
+            let mut arena = FiberArena::new();
+            let fragment = arena.create_fiber(
+                FiberTag::Fragment,
+                None,
+                PropsHandle::from_raw(780),
+                FiberMode::NO,
+            );
+            let child = arena.create_fiber(tag, None, PropsHandle::from_raw(781), FiberMode::NO);
+            arena.set_children(fragment, &[child]).unwrap();
+
+            assert_eq!(
+                begin_work(
+                    &mut arena,
+                    BeginWorkRequest::new(fragment, Lanes::DEFAULT),
+                    &mut registry,
+                ),
+                Err(BeginWorkError::FragmentSingleHostChild(
+                    FragmentSingleHostChildBeginWorkError::UnsupportedChildTag {
+                        fragment,
+                        child,
+                        tag,
+                    },
+                ))
+            );
+            assert_eq!(
+                arena.get(fragment).unwrap().memoized_props(),
+                PropsHandle::NONE
+            );
+        }
+
+        assert!(registry.calls().is_empty());
     }
 
     #[test]
