@@ -2671,29 +2671,78 @@ function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
     "worker-364-test-renderer-totree-private-host-output",
     entrypoint
   );
-  assert.deepEqual(gate.acceptedRustWorkers, [
+  const expectedAcceptedRustWorkers = [
     "worker-235-test-renderer-private-fiber-inspection",
     "worker-265-test-renderer-private-json-ready-diagnostics"
-  ]);
-  assert.deepEqual(gate.acceptedRustApis, [
-    "inspect_test_renderer_committed_fiber_tree",
-    "TestRendererCommittedFiberTreeInspection::host_root",
-    "TestRendererCommittedFiberTreeInspection::host_component",
-    "TestRendererCommittedFiberTreeInspection::host_text",
-    "TestRendererRoot::describe_private_json_serialization_for_canary",
-    "TestRendererRoot::describe_private_tree_metadata_for_canary",
-    "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
-    "TestRendererPrivateJsonSerializationReport",
-    "TestRendererPrivateTreeMetadataReport",
-    "TestRendererPrivateTreeFunctionComponentDiagnostic"
-  ]);
-  assert.deepEqual(gate.acceptedRustTests, [
-    "committed_fiber_inspection_describes_host_root_component_and_text",
-    "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
-    "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
-    "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
-    "root_private_tree_metadata_canary_describes_function_component_above_host_output"
-  ]);
+  ];
+  const committedFiberShapeDiagnostics =
+    gate.privateCommittedFiberInspectionShapeDiagnosticsAvailable === true;
+  if (committedFiberShapeDiagnostics) {
+    expectedAcceptedRustWorkers.push(
+      "worker-516-test-renderer-committed-fiber-tree-inspection"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustWorkers, expectedAcceptedRustWorkers);
+  assert.deepEqual(
+    gate.acceptedRustApis,
+    committedFiberShapeDiagnostics
+      ? [
+          "inspect_test_renderer_committed_fiber_tree",
+          "TestRendererCommittedFiberTreeInspection::shape_name",
+          "TestRendererCommittedFiberTreeInspection::nodes",
+          "TestRendererCommittedFiberTreeInspection::root_children",
+          "TestRendererCommittedFiberTreeInspection::host_children",
+          "TestRendererCommittedFiberTreeInspection::function_component",
+          "TestRendererCommittedFiberTreeInspection::host_components",
+          "TestRendererCommittedFiberTreeInspection::host_texts",
+          "TestRendererCommittedFiberTreeInspection::fiber_tag_order",
+          "TestRendererCommittedFiberTreeInspection::host_root",
+          "TestRendererCommittedFiberTreeInspection::host_component",
+          "TestRendererCommittedFiberTreeInspection::host_text",
+          "TestRendererRoot::describe_private_json_serialization_for_canary",
+          "TestRendererRoot::describe_private_tree_metadata_for_canary",
+          "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+          "TestRendererRoot::describe_private_tree_committed_fiber_inspection_for_canary",
+          "TestRendererPrivateJsonSerializationReport",
+          "TestRendererPrivateTreeMetadataReport",
+          "TestRendererPrivateTreeCommittedFiberInspectionReport",
+          "TestRendererPrivateTreeFunctionComponentDiagnostic"
+        ]
+      : [
+          "inspect_test_renderer_committed_fiber_tree",
+          "TestRendererCommittedFiberTreeInspection::host_root",
+          "TestRendererCommittedFiberTreeInspection::host_component",
+          "TestRendererCommittedFiberTreeInspection::host_text",
+          "TestRendererRoot::describe_private_json_serialization_for_canary",
+          "TestRendererRoot::describe_private_tree_metadata_for_canary",
+          "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+          "TestRendererPrivateJsonSerializationReport",
+          "TestRendererPrivateTreeMetadataReport",
+          "TestRendererPrivateTreeFunctionComponentDiagnostic"
+        ]
+  );
+  assert.deepEqual(
+    gate.acceptedRustTests,
+    committedFiberShapeDiagnostics
+      ? [
+          "committed_fiber_inspection_describes_host_root_component_and_text",
+          "committed_fiber_inspection_describes_multi_child_host_root_shape",
+          "committed_fiber_inspection_describes_function_component_above_host_shape",
+          "committed_fiber_inspection_describes_function_component_above_multi_child_shape",
+          "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
+          "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
+          "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+          "root_private_tree_metadata_canary_describes_function_component_above_host_output",
+          "root_private_tree_committed_fiber_inspection_records_minimal_shape_privately"
+        ]
+      : [
+          "committed_fiber_inspection_describes_host_root_component_and_text",
+          "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
+          "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
+          "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
+          "root_private_tree_metadata_canary_describes_function_component_above_host_output"
+        ]
+  );
   assert.deepEqual(gate.blockedPublicSurfaces, [
     "create().toTree",
     "create().toJSON",
