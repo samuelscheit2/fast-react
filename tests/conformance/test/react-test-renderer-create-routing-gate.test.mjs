@@ -2172,6 +2172,41 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     "unmount"
   ]);
   assert.equal(
+    facade.privateNativeExecutionHostOutputRowEvidenceAvailable,
+    true
+  );
+  assert.deepEqual(facade.privateNativeExecutionHostOutputShapes, [
+    "SingleHostText",
+    "NestedHostText",
+    "SiblingText",
+    "EmptyRoot"
+  ]);
+  assert.deepEqual(facade.privateNativeExecutionHostOutputRowIds, [
+    privateToJSONUpdateHostOutputRowId,
+    privateToJSONNestedUpdateHostOutputRowId,
+    privateToJSONSiblingTextHostOutputRowId,
+    privateToJSONUnmountHostOutputRowId
+  ]);
+  assert.equal(
+    facade.multiChildNativeExecutionEvidenceWorker,
+    "worker-697-test-renderer-tojson-multichild-native-execution"
+  );
+  assert.deepEqual(facade.nativeExecutionAcceptedRustApis, [
+    "TestRendererRoot::describe_private_to_json_after_create_native_execution_for_canary",
+    "TestRendererRoot::describe_private_to_json_after_update_native_execution_for_canary",
+    "TestRendererRoot::describe_private_to_json_after_nested_update_native_execution_for_canary",
+    "TestRendererRoot::describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics",
+    "TestRendererRoot::describe_private_to_json_after_unmount_native_execution_for_canary",
+    "TestRendererPrivateToJsonNativeExecutionEvidence"
+  ]);
+  assert.deepEqual(facade.nativeExecutionAcceptedRustTests, [
+    "root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records",
+    "root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row",
+    "root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row",
+    "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
+    "root_private_to_json_native_execution_evidence_rejects_stale_update_record"
+  ]);
+  assert.equal(
     typeof facade.createAcceptedNativeExecutionDiagnosticResult,
     "function"
   );
@@ -2245,11 +2280,93 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(updateEvidence.consumesAcceptedNativeUpdateExecutionRecord, true);
   assert.equal(updateEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
   assert.equal(updateEvidence.consumesAcceptedHostOutputRow, true);
+  assert.equal(updateEvidence.acceptedHostOutputRowShape, true);
+  assert.equal(updateEvidence.nestedHostOutputRowShape, false);
+  assert.equal(updateEvidence.siblingTextHostOutputRowShape, false);
   assert.deepEqual(updateEvidence.result, {
     type: "span",
     props: { "data-state": "new" },
     children: ["goodbye"]
   });
+
+  const nestedUpdateEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONNestedUpdateHostOutputRowId,
+        rowShape: "NestedHostText",
+        rootChildCount: 1,
+        rootNodeKind: "HostComponent",
+        nodes: [
+          hostComponentNode(0, null, [1], "section"),
+          hostComponentNode(1, 0, [2, 3], "span"),
+          textNode(2, 1, "stable"),
+          textNode(3, 1, "inserted")
+        ]
+      })
+    );
+  assert.equal(nestedUpdateEvidence.operation, "update");
+  assert.equal(nestedUpdateEvidence.hostOutputShape, "NestedHostText");
+  assert.equal(
+    nestedUpdateEvidence.hostOutputRowId,
+    privateToJSONNestedUpdateHostOutputRowId
+  );
+  assert.equal(nestedUpdateEvidence.sourceNodeCount, 4);
+  assert.equal(nestedUpdateEvidence.rootChildCount, 1);
+  assert.equal(nestedUpdateEvidence.minimalTreeShape, false);
+  assert.equal(nestedUpdateEvidence.acceptedHostOutputRowShape, true);
+  assert.equal(nestedUpdateEvidence.nestedHostOutputRowShape, true);
+  assert.equal(nestedUpdateEvidence.siblingTextHostOutputRowShape, false);
+  assert.deepEqual(nestedUpdateEvidence.result, {
+    type: "section",
+    props: {},
+    children: [
+      {
+        type: "span",
+        props: {},
+        children: ["stable", "inserted"]
+      }
+    ]
+  });
+
+  const siblingTextUpdateEvidence =
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONSiblingTextHostOutputRowId,
+        rowShape: "SiblingText",
+        rootChildCount: 2,
+        rootNodeKind: "MultipleHostChildren",
+        nodes: [
+          textNode(0, null, "first sibling"),
+          hostComponentNode(1, null, [2], "span"),
+          textNode(2, 1, "second sibling")
+        ]
+      })
+    );
+  assert.equal(siblingTextUpdateEvidence.operation, "update");
+  assert.equal(siblingTextUpdateEvidence.hostOutputShape, "SiblingText");
+  assert.equal(
+    siblingTextUpdateEvidence.hostOutputRowId,
+    privateToJSONSiblingTextHostOutputRowId
+  );
+  assert.equal(siblingTextUpdateEvidence.sourceNodeCount, 3);
+  assert.equal(siblingTextUpdateEvidence.rootChildCount, 2);
+  assert.equal(siblingTextUpdateEvidence.minimalTreeShape, false);
+  assert.equal(siblingTextUpdateEvidence.acceptedHostOutputRowShape, true);
+  assert.equal(siblingTextUpdateEvidence.nestedHostOutputRowShape, false);
+  assert.equal(siblingTextUpdateEvidence.siblingTextHostOutputRowShape, true);
+  assert.deepEqual(siblingTextUpdateEvidence.result, [
+    "first sibling",
+    {
+      type: "span",
+      props: {},
+      children: ["second sibling"]
+    }
+  ]);
+
   assert.equal(
     captureThrown(() => renderer.toJSON()).name,
     "FastReactTestRendererUnimplementedError"
@@ -2329,6 +2446,32 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(mismatchError.publicSerializationAvailable, false);
   assert.equal(mismatchError.nativeExecution, false);
   assert.match(mismatchError.message, /Update toJSON evidence/u);
+
+  const rowShapeMismatchError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONNestedUpdateHostOutputRowId,
+        rowShape: "SiblingText",
+        rootChildCount: 2,
+        rootNodeKind: "MultipleHostChildren",
+        nodes: [
+          textNode(0, null, "first sibling"),
+          hostComponentNode(1, null, [2], "span"),
+          textNode(2, 1, "second sibling")
+        ]
+      })
+    )
+  );
+  assert.equal(
+    rowShapeMismatchError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    rowShapeMismatchError.message,
+    /row shape to be NestedHostText/u
+  );
 });
 
 test("react-test-renderer CJS development private toTree facade consumes accepted native execution records", () => {

@@ -70,6 +70,10 @@ const privateToJSONFacadeResultStatus =
   "private-tojson-facade-result-backed-by-rust-host-output-public-blocked";
 const privateToJSONUpdateHostOutputRowId =
   "react-test-renderer-tojson-update-host-output-private-diagnostic";
+const privateToJSONNestedUpdateHostOutputRowId =
+  "react-test-renderer-tojson-nested-host-output-update-private-diagnostic";
+const privateToJSONSiblingTextHostOutputRowId =
+  "react-test-renderer-tojson-sibling-text-host-output-private-diagnostic";
 const privateToJSONUnmountHostOutputRowId =
   "react-test-renderer-tojson-unmount-host-output-private-diagnostic";
 const privateToJSONUpdateUnmountRowStatus =
@@ -378,6 +382,44 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         facadeGate.privateUpdateUnmountHostOutputRows.map((row) => row.id),
         [privateToJSONUpdateHostOutputRowId, privateToJSONUnmountHostOutputRowId]
       );
+      assert.deepEqual(
+        facadeGate.privateNestedUpdateSiblingTextHostOutputRows.map((row) => row.id),
+        [
+          privateToJSONNestedUpdateHostOutputRowId,
+          privateToJSONSiblingTextHostOutputRowId
+        ]
+      );
+      assert.deepEqual(facadeGate.privateNativeExecutionHostOutputShapes, [
+        "SingleHostText",
+        "NestedHostText",
+        "SiblingText",
+        "EmptyRoot"
+      ]);
+      assert.deepEqual(facadeGate.privateNativeExecutionHostOutputRowIds, [
+        privateToJSONUpdateHostOutputRowId,
+        privateToJSONNestedUpdateHostOutputRowId,
+        privateToJSONSiblingTextHostOutputRowId,
+        privateToJSONUnmountHostOutputRowId
+      ]);
+      assert.equal(
+        facadeGate.multiChildNativeExecutionEvidenceWorker,
+        "worker-697-test-renderer-tojson-multichild-native-execution"
+      );
+      assert.deepEqual(facadeGate.nativeExecutionAcceptedRustApis, [
+        "TestRendererRoot::describe_private_to_json_after_create_native_execution_for_canary",
+        "TestRendererRoot::describe_private_to_json_after_update_native_execution_for_canary",
+        "TestRendererRoot::describe_private_to_json_after_nested_update_native_execution_for_canary",
+        "TestRendererRoot::describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics",
+        "TestRendererRoot::describe_private_to_json_after_unmount_native_execution_for_canary",
+        "TestRendererPrivateToJsonNativeExecutionEvidence"
+      ]);
+      assert.deepEqual(facadeGate.nativeExecutionAcceptedRustTests, [
+        "root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records",
+        "root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row",
+        "root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row",
+        "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
+        "root_private_to_json_native_execution_evidence_rejects_stale_update_record"
+      ]);
     }
     assert.deepEqual(
       facadeGate.acceptedRustApis,
@@ -468,6 +510,29 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       assert.deepEqual(
         privateFacade.privateUpdateUnmountHostOutputRows.map((row) => row.id),
         [privateToJSONUpdateHostOutputRowId, privateToJSONUnmountHostOutputRowId]
+      );
+      assert.deepEqual(
+        privateFacade.privateNestedUpdateSiblingTextHostOutputRows.map((row) => row.id),
+        [
+          privateToJSONNestedUpdateHostOutputRowId,
+          privateToJSONSiblingTextHostOutputRowId
+        ]
+      );
+      assert.deepEqual(privateFacade.privateNativeExecutionHostOutputShapes, [
+        "SingleHostText",
+        "NestedHostText",
+        "SiblingText",
+        "EmptyRoot"
+      ]);
+      assert.deepEqual(privateFacade.privateNativeExecutionHostOutputRowIds, [
+        privateToJSONUpdateHostOutputRowId,
+        privateToJSONNestedUpdateHostOutputRowId,
+        privateToJSONSiblingTextHostOutputRowId,
+        privateToJSONUnmountHostOutputRowId
+      ]);
+      assert.equal(
+        privateFacade.multiChildNativeExecutionEvidenceWorker,
+        "worker-697-test-renderer-tojson-multichild-native-execution"
       );
     }
     assert.equal(privateFacade.publicSerializationAvailable, false);
