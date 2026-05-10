@@ -2396,6 +2396,16 @@ pub const TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_ID: &str =
     "fast-react-test-renderer-root-work-loop-finished-work-preflight-metadata";
 pub const TEST_RENDERER_PRIVATE_ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS: &str =
     "accepted-root-work-loop-finished-work-preflight-metadata";
+pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.create-route.private-admission";
+pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS: &str =
+    "private-create-route-admission-rust-root-create-work-loop-evidence-public-create-blocked";
+pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID: &str =
+    "react-test-renderer-create-route-admission-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_ID: &str =
+    "fast-react-test-renderer-create-route-admission-metadata";
+pub const TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_STATUS: &str =
+    "accepted-create-route-rust-root-create-work-loop-admission-metadata";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
@@ -2813,6 +2823,122 @@ impl TestRendererRootWorkLoopFinishedWorkPreflightMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateCreateRouteAdmissionMetadata {
+    metadata_id: &'static str,
+    metadata_status: &'static str,
+    accepted_worker: &'static str,
+    accepted_rust_crate: &'static str,
+    root_api: &'static str,
+    preflight_api: &'static str,
+    work_loop_render_phase_api: &'static str,
+    lifecycle_record: &'static str,
+    execution_result_record: &'static str,
+    accepted_input_shape: &'static str,
+}
+
+impl TestRendererPrivateCreateRouteAdmissionMetadata {
+    #[must_use]
+    pub const fn current() -> Self {
+        Self {
+            metadata_id: TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_ID,
+            metadata_status: TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_STATUS,
+            accepted_worker: "worker-610-test-renderer-create-native-bridge-admission",
+            accepted_rust_crate: "fast-react-test-renderer",
+            root_api: "TestRendererRoot::create",
+            preflight_api: "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+            work_loop_render_phase_api: "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+            lifecycle_record: "TestRendererRootScheduledUpdate",
+            execution_result_record: "TestRendererPrivateCreateRouteAdmissionDiagnostics",
+            accepted_input_shape: "HostComponentWithTextChild",
+        }
+    }
+
+    #[must_use]
+    pub const fn new_for_canary(
+        metadata_id: &'static str,
+        metadata_status: &'static str,
+        root_api: &'static str,
+    ) -> Self {
+        Self {
+            metadata_id,
+            metadata_status,
+            accepted_worker: "worker-610-test-renderer-create-native-bridge-admission",
+            accepted_rust_crate: "fast-react-test-renderer",
+            root_api,
+            preflight_api: "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+            work_loop_render_phase_api: "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+            lifecycle_record: "TestRendererRootScheduledUpdate",
+            execution_result_record: "TestRendererPrivateCreateRouteAdmissionDiagnostics",
+            accepted_input_shape: "HostComponentWithTextChild",
+        }
+    }
+
+    #[must_use]
+    pub const fn metadata_id(self) -> &'static str {
+        self.metadata_id
+    }
+
+    #[must_use]
+    pub const fn metadata_status(self) -> &'static str {
+        self.metadata_status
+    }
+
+    #[must_use]
+    pub const fn accepted_worker(self) -> &'static str {
+        self.accepted_worker
+    }
+
+    #[must_use]
+    pub const fn accepted_rust_crate(self) -> &'static str {
+        self.accepted_rust_crate
+    }
+
+    #[must_use]
+    pub const fn root_api(self) -> &'static str {
+        self.root_api
+    }
+
+    #[must_use]
+    pub const fn preflight_api(self) -> &'static str {
+        self.preflight_api
+    }
+
+    #[must_use]
+    pub const fn work_loop_render_phase_api(self) -> &'static str {
+        self.work_loop_render_phase_api
+    }
+
+    #[must_use]
+    pub const fn lifecycle_record(self) -> &'static str {
+        self.lifecycle_record
+    }
+
+    #[must_use]
+    pub const fn execution_result_record(self) -> &'static str {
+        self.execution_result_record
+    }
+
+    #[must_use]
+    pub const fn accepted_input_shape(self) -> &'static str {
+        self.accepted_input_shape
+    }
+
+    fn is_current(self) -> bool {
+        let current = Self::current();
+        self.metadata_id == current.metadata_id
+            && self.metadata_status == current.metadata_status
+            && self.accepted_worker == current.accepted_worker
+            && self.accepted_rust_crate == current.accepted_rust_crate
+            && self.root_api == current.root_api
+            && self.preflight_api == current.preflight_api
+            && self.work_loop_render_phase_api == current.work_loop_render_phase_api
+            && self.lifecycle_record == current.lifecycle_record
+            && self.execution_result_record == current.execution_result_record
+            && self.accepted_input_shape == current.accepted_input_shape
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
     row_id: &'static str,
     status: &'static str,
@@ -3035,6 +3161,196 @@ impl TestRendererRootCreatePreflightDiagnostics {
     #[must_use]
     pub const fn rust_execution_from_js(self) -> bool {
         self.rust_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn host_output_produced_from_js(self) -> bool {
+        self.host_output_produced_from_js
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateCreateRouteAdmissionDiagnostics {
+    record_id: &'static str,
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    public_surface: &'static str,
+    js_facade_metadata_source: &'static str,
+    rust_admission_metadata: TestRendererPrivateCreateRouteAdmissionMetadata,
+    root_create_preflight: TestRendererRootCreatePreflightDiagnostics,
+    work_loop_finished_work_preflight: TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element: RootElementHandle,
+    rust_outcome: &'static str,
+    consumes_js_facade_create_metadata: bool,
+    consumes_accepted_rust_root_create_execution_evidence: bool,
+    consumes_accepted_rust_root_create_preflight_diagnostics: bool,
+    consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata: bool,
+    missing_rust_admission_record_rejection: bool,
+    stale_rust_admission_record_rejection: bool,
+    public_renderer_root_created: bool,
+    public_root_available: bool,
+    public_create_behavior_available: bool,
+    public_serialization_available: bool,
+    native_addon_loaded: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+    rust_execution_from_js: bool,
+    reconciler_execution_from_js: bool,
+    host_output_produced_from_js: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateCreateRouteAdmissionDiagnostics {
+    #[must_use]
+    pub const fn record_id(self) -> &'static str {
+        self.record_id
+    }
+
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn js_facade_metadata_source(self) -> &'static str {
+        self.js_facade_metadata_source
+    }
+
+    #[must_use]
+    pub const fn rust_admission_metadata(self) -> TestRendererPrivateCreateRouteAdmissionMetadata {
+        self.rust_admission_metadata
+    }
+
+    #[must_use]
+    pub const fn root_create_preflight(self) -> TestRendererRootCreatePreflightDiagnostics {
+        self.root_create_preflight
+    }
+
+    #[must_use]
+    pub const fn work_loop_finished_work_preflight(
+        self,
+    ) -> TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+        self.work_loop_finished_work_preflight
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element(self) -> RootElementHandle {
+        self.scheduled_element
+    }
+
+    #[must_use]
+    pub const fn rust_outcome(self) -> &'static str {
+        self.rust_outcome
+    }
+
+    #[must_use]
+    pub const fn consumes_js_facade_create_metadata(self) -> bool {
+        self.consumes_js_facade_create_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_rust_root_create_execution_evidence(self) -> bool {
+        self.consumes_accepted_rust_root_create_execution_evidence
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_rust_root_create_preflight_diagnostics(self) -> bool {
+        self.consumes_accepted_rust_root_create_preflight_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata(
+        self,
+    ) -> bool {
+        self.consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata
+    }
+
+    #[must_use]
+    pub const fn missing_rust_admission_record_rejection(self) -> bool {
+        self.missing_rust_admission_record_rejection
+    }
+
+    #[must_use]
+    pub const fn stale_rust_admission_record_rejection(self) -> bool {
+        self.stale_rust_admission_record_rejection
+    }
+
+    #[must_use]
+    pub const fn public_renderer_root_created(self) -> bool {
+        self.public_renderer_root_created
+    }
+
+    #[must_use]
+    pub const fn public_root_available(self) -> bool {
+        self.public_root_available
+    }
+
+    #[must_use]
+    pub const fn public_create_behavior_available(self) -> bool {
+        self.public_create_behavior_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn native_addon_loaded(self) -> bool {
+        self.native_addon_loaded
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(self) -> bool {
+        self.native_execution
+    }
+
+    #[must_use]
+    pub const fn rust_execution_from_js(self) -> bool {
+        self.rust_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn reconciler_execution_from_js(self) -> bool {
+        self.reconciler_execution_from_js
     }
 
     #[must_use]
@@ -6340,6 +6656,72 @@ impl Display for TestRendererRootCreatePreflightError {
 impl Error for TestRendererRootCreatePreflightError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateCreateRouteAdmissionError {
+    MissingRustAdmissionRecord,
+    StaleRustAdmissionRecord {
+        expected_metadata_id: &'static str,
+        actual_metadata_id: &'static str,
+        expected_root_api: &'static str,
+        actual_root_api: &'static str,
+    },
+    MissingRootCreatePreflight,
+    StaleRootCreatePreflight {
+        expected_diagnostic_name: &'static str,
+        actual_diagnostic_name: &'static str,
+        expected_status: &'static str,
+        actual_status: &'static str,
+    },
+    StaleWorkLoopFinishedWorkPreflight {
+        expected_metadata_id: &'static str,
+        actual_metadata_id: &'static str,
+        expected_render_phase_api: &'static str,
+        actual_render_phase_api: &'static str,
+    },
+}
+
+impl Display for TestRendererPrivateCreateRouteAdmissionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingRustAdmissionRecord => formatter.write_str(
+                "private create-route admission requires an accepted Rust admission record",
+            ),
+            Self::StaleRustAdmissionRecord {
+                expected_metadata_id,
+                actual_metadata_id,
+                expected_root_api,
+                actual_root_api,
+            } => write!(
+                formatter,
+                "private create-route admission Rust record is stale: expected {expected_metadata_id}/{expected_root_api}, found {actual_metadata_id}/{actual_root_api}",
+            ),
+            Self::MissingRootCreatePreflight => formatter.write_str(
+                "private create-route admission requires accepted root-create preflight diagnostics",
+            ),
+            Self::StaleRootCreatePreflight {
+                expected_diagnostic_name,
+                actual_diagnostic_name,
+                expected_status,
+                actual_status,
+            } => write!(
+                formatter,
+                "private create-route admission root-create preflight is stale: expected {expected_diagnostic_name}/{expected_status}, found {actual_diagnostic_name}/{actual_status}",
+            ),
+            Self::StaleWorkLoopFinishedWorkPreflight {
+                expected_metadata_id,
+                actual_metadata_id,
+                expected_render_phase_api,
+                actual_render_phase_api,
+            } => write!(
+                formatter,
+                "private create-route admission work-loop finished-work preflight is stale: expected {expected_metadata_id}/{expected_render_phase_api}, found {actual_metadata_id}/{actual_render_phase_api}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateCreateRouteAdmissionError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererRootError {
     Host(HostError),
     FiberRootStore(FiberRootStoreError),
@@ -6352,6 +6734,7 @@ pub enum TestRendererRootError {
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
     RootCreatePreflight(Box<TestRendererRootCreatePreflightError>),
+    PrivateCreateRouteAdmission(Box<TestRendererPrivateCreateRouteAdmissionError>),
     HostOutputCanary(TestRendererHostOutputCanaryError),
     FiberInspection(TestRendererCommittedFiberInspectionError),
     MissingHostOutputFixture {
@@ -6389,6 +6772,7 @@ impl Display for TestRendererRootError {
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
             Self::RootCreatePreflight(error) => Display::fmt(error, formatter),
+            Self::PrivateCreateRouteAdmission(error) => Display::fmt(error, formatter),
             Self::HostOutputCanary(error) => Display::fmt(error, formatter),
             Self::FiberInspection(error) => Display::fmt(error, formatter),
             Self::MissingHostOutputFixture { element } => write!(
@@ -6439,6 +6823,7 @@ impl Error for TestRendererRootError {
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
             Self::RootCreatePreflight(error) => Some(error),
+            Self::PrivateCreateRouteAdmission(error) => Some(error),
             Self::HostOutputCanary(error) => Some(error),
             Self::FiberInspection(error) => Some(error),
             Self::MissingHostOutputFixture { .. }
@@ -6513,6 +6898,12 @@ impl From<TestRendererStableSiblingInsertionCanaryError> for TestRendererRootErr
 impl From<TestRendererRootCreatePreflightError> for TestRendererRootError {
     fn from(error: TestRendererRootCreatePreflightError) -> Self {
         Self::RootCreatePreflight(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateCreateRouteAdmissionError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateCreateRouteAdmissionError) -> Self {
+        Self::PrivateCreateRouteAdmission(Box::new(error))
     }
 }
 
@@ -6878,6 +7269,99 @@ impl TestRendererRoot {
             native_bridge_available: false,
             native_execution: false,
             rust_execution_from_js: false,
+            host_output_produced_from_js: false,
+            compatibility_claimed: false,
+        })
+    }
+
+    pub fn describe_private_create_route_admission_for_canary(
+        root_create_preflight: Option<TestRendererRootCreatePreflightDiagnostics>,
+        rust_admission_metadata: Option<TestRendererPrivateCreateRouteAdmissionMetadata>,
+    ) -> Result<TestRendererPrivateCreateRouteAdmissionDiagnostics, TestRendererRootError> {
+        let Some(rust_admission_metadata) = rust_admission_metadata else {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::MissingRustAdmissionRecord.into(),
+            );
+        };
+        if !rust_admission_metadata.is_current() {
+            let current = TestRendererPrivateCreateRouteAdmissionMetadata::current();
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleRustAdmissionRecord {
+                    expected_metadata_id: current.metadata_id(),
+                    actual_metadata_id: rust_admission_metadata.metadata_id(),
+                    expected_root_api: current.root_api(),
+                    actual_root_api: rust_admission_metadata.root_api(),
+                }
+                .into(),
+            );
+        }
+
+        let Some(root_create_preflight) = root_create_preflight else {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::MissingRootCreatePreflight.into(),
+            );
+        };
+        if root_create_preflight.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME
+            || root_create_preflight.status() != TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS
+        {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleRootCreatePreflight {
+                    expected_diagnostic_name:
+                        TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME,
+                    actual_diagnostic_name: root_create_preflight.diagnostic_name(),
+                    expected_status: TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS,
+                    actual_status: root_create_preflight.status(),
+                }
+                .into(),
+            );
+        }
+
+        let work_loop_finished_work_preflight =
+            root_create_preflight.work_loop_finished_work_preflight();
+        let work_loop_metadata = work_loop_finished_work_preflight.metadata();
+        if !work_loop_metadata.is_current() {
+            let current = TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current();
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleWorkLoopFinishedWorkPreflight {
+                    expected_metadata_id: current.metadata_id(),
+                    actual_metadata_id: work_loop_metadata.metadata_id(),
+                    expected_render_phase_api: current.render_phase_api(),
+                    actual_render_phase_api: work_loop_metadata.render_phase_api(),
+                }
+                .into(),
+            );
+        }
+
+        Ok(TestRendererPrivateCreateRouteAdmissionDiagnostics {
+            record_id: TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID,
+            diagnostic_name: TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS,
+            root: root_create_preflight.root(),
+            operation: "create",
+            public_surface: "create()",
+            js_facade_metadata_source: "FastReactTestRendererPrivateRootRequestRecord",
+            rust_admission_metadata,
+            root_create_preflight,
+            work_loop_finished_work_preflight,
+            scheduled_update_kind: root_create_preflight.scheduled_update_kind(),
+            scheduled_element: root_create_preflight.scheduled_element(),
+            rust_outcome: "Scheduled",
+            consumes_js_facade_create_metadata: true,
+            consumes_accepted_rust_root_create_execution_evidence: true,
+            consumes_accepted_rust_root_create_preflight_diagnostics: true,
+            consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata: true,
+            missing_rust_admission_record_rejection: true,
+            stale_rust_admission_record_rejection: true,
+            public_renderer_root_created: false,
+            public_root_available: false,
+            public_create_behavior_available: false,
+            public_serialization_available: false,
+            native_addon_loaded: false,
+            native_bridge_available: false,
+            native_execution: false,
+            rust_execution_from_js: false,
+            reconciler_execution_from_js: false,
             host_output_produced_from_js: false,
             compatibility_claimed: false,
         })
@@ -10779,6 +11263,165 @@ mod tests {
                 expected_render_phase_api: "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
                 actual_render_phase_api: "TestRendererRoot::render_stale_host_root_for_commit_handoff"
             }
+        ));
+    }
+
+    #[test]
+    fn root_private_create_route_admission_consumes_create_and_work_loop_evidence() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(97),
+            "div",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+
+        let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            admission.record_id(),
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            admission.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            admission.status(),
+            TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_STATUS
+        );
+        assert_eq!(admission.root(), preflight.root());
+        assert_eq!(admission.operation(), "create");
+        assert_eq!(admission.public_surface(), "create()");
+        assert_eq!(
+            admission.js_facade_metadata_source(),
+            "FastReactTestRendererPrivateRootRequestRecord"
+        );
+        assert_eq!(
+            admission.rust_admission_metadata(),
+            TestRendererPrivateCreateRouteAdmissionMetadata::current()
+        );
+        assert_eq!(admission.root_create_preflight(), preflight);
+        assert_eq!(
+            admission.work_loop_finished_work_preflight(),
+            preflight.work_loop_finished_work_preflight()
+        );
+        assert_eq!(
+            admission.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(admission.scheduled_element(), root_element(97));
+        assert_eq!(admission.rust_outcome(), "Scheduled");
+        assert!(admission.consumes_js_facade_create_metadata());
+        assert!(admission.consumes_accepted_rust_root_create_execution_evidence());
+        assert!(admission.consumes_accepted_rust_root_create_preflight_diagnostics());
+        assert!(admission.consumes_accepted_rust_root_work_loop_finished_work_preflight_metadata());
+        assert!(admission.missing_rust_admission_record_rejection());
+        assert!(admission.stale_rust_admission_record_rejection());
+        assert!(!admission.public_renderer_root_created());
+        assert!(!admission.public_root_available());
+        assert!(!admission.public_create_behavior_available());
+        assert!(!admission.public_serialization_available());
+        assert!(!admission.native_addon_loaded());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
+        assert!(!admission.rust_execution_from_js());
+        assert!(!admission.reconciler_execution_from_js());
+        assert!(!admission.host_output_produced_from_js());
+        assert!(!admission.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_create_route_admission_rejects_missing_rust_admission_record() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(98),
+            "div",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+
+        let error = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            None,
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::PrivateCreateRouteAdmission(error) = error else {
+            panic!("expected create-route admission error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateCreateRouteAdmissionError::MissingRustAdmissionRecord
+        ));
+    }
+
+    #[test]
+    fn root_private_create_route_admission_rejects_stale_rust_admission_record() {
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            root_element(99),
+            "div",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let stale_admission_metadata =
+            TestRendererPrivateCreateRouteAdmissionMetadata::new_for_canary(
+                "fast-react-test-renderer-stale-create-route-admission-metadata",
+                TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_STATUS,
+                "TestRendererRoot::create_legacy",
+            );
+
+        let error = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(stale_admission_metadata),
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::PrivateCreateRouteAdmission(error) = error else {
+            panic!("expected create-route admission error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateCreateRouteAdmissionError::StaleRustAdmissionRecord {
+                expected_metadata_id: TEST_RENDERER_PRIVATE_CREATE_ROUTE_ADMISSION_METADATA_ID,
+                actual_metadata_id: "fast-react-test-renderer-stale-create-route-admission-metadata",
+                expected_root_api: "TestRendererRoot::create",
+                actual_root_api: "TestRendererRoot::create_legacy"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_create_route_admission_rejects_missing_root_create_preflight() {
+        let error = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            None,
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap_err();
+
+        let TestRendererRootError::PrivateCreateRouteAdmission(error) = error else {
+            panic!("expected create-route admission error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateCreateRouteAdmissionError::MissingRootCreatePreflight
         ));
     }
 

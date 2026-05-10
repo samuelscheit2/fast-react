@@ -93,6 +93,16 @@ const privateRootWorkLoopFinishedWorkPreflightMetadataId =
   "fast-react-test-renderer-root-work-loop-finished-work-preflight-metadata";
 const privateRootWorkLoopFinishedWorkPreflightMetadataStatus =
   "accepted-root-work-loop-finished-work-preflight-metadata";
+const privateCreateRouteAdmissionDiagnosticName =
+  "fast-react-test-renderer.create-route.private-admission";
+const privateCreateRouteAdmissionStatus =
+  "private-create-route-admission-rust-root-create-work-loop-evidence-public-create-blocked";
+const privateCreateRouteAdmissionRecordId =
+  "react-test-renderer-create-route-admission-private-diagnostic";
+const privateCreateRouteAdmissionMetadataId =
+  "fast-react-test-renderer-create-route-admission-metadata";
+const privateCreateRouteAdmissionMetadataStatus =
+  "accepted-create-route-rust-root-create-work-loop-admission-metadata";
 const privateRootCreatePreflightSymbolDescription =
   "fast.react_test_renderer.private_root_create_preflight";
 const privateRootCreatePreflightSymbol = Symbol.for(
@@ -195,6 +205,31 @@ const errorSurfacePrivateDiagnosticRowIds = [
   "react-test-renderer-act-scheduler-private-diagnostic"
 ];
 const expectedPrivateRoutes = [
+  {
+    acceptedRustApis: [
+      "TestRendererRoot::create",
+      "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+      "TestRendererRoot::describe_private_create_route_admission_for_canary",
+      "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
+    ],
+    acceptedRustTests: [
+      "root_private_create_route_admission_consumes_create_and_work_loop_evidence",
+      "root_private_create_route_admission_rejects_missing_rust_admission_record",
+      "root_private_create_route_admission_rejects_stale_rust_admission_record",
+      "root_private_create_route_admission_rejects_missing_root_create_preflight"
+    ],
+    acceptedWorkers: [
+      "worker-153-test-renderer-root-canary",
+      "worker-539-test-renderer-live-rust-root-create-preflight",
+      "worker-573-test-renderer-private-root-work-loop-preflight",
+      "worker-610-test-renderer-create-native-bridge-admission"
+    ],
+    acceptedWorker: "worker-610-test-renderer-create-native-bridge-admission",
+    rootWorkLoopUpdateRoute: false,
+    acceptedOutcomes: [rootUpdateOutcomeScheduled],
+    id: "react-test-renderer-create-private-route",
+    publicSurface: "create()"
+  },
   {
     acceptedRustApis: [
       "TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary",
@@ -1065,6 +1100,100 @@ test("react-test-renderer CJS development private root-create preflight validate
     preflight,
     createRequest,
     entry.entrypoint
+  );
+  const admission = bridge.getRootCreateRouteAdmission(createRequest);
+  assert.equal(
+    bridge.getRendererRootCreateRouteAdmission(renderer),
+    admission
+  );
+  assertPrivateCreateRouteAdmission(
+    admission,
+    preflight,
+    createRequest,
+    entry.entrypoint
+  );
+
+  const rustAdmissionDiagnostic =
+    createRustCreateRouteAdmissionDiagnosticSource(admission);
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      rustAdmissionDiagnostic
+    ),
+    true
+  );
+  const consumedAdmission =
+    bridge.consumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      rustAdmissionDiagnostic
+    );
+  assertPrivateCreateRouteAdmissionConsumption(
+    consumedAdmission,
+    admission,
+    createRequest,
+    entry.entrypoint
+  );
+
+  const missingAdmissionRecord = {
+    id: rustAdmissionDiagnostic.id,
+    diagnosticName: rustAdmissionDiagnostic.diagnosticName,
+    status: rustAdmissionDiagnostic.status,
+    operation: rustAdmissionDiagnostic.operation,
+    publicSurface: rustAdmissionDiagnostic.publicSurface,
+    jsFacadeMetadataSource: rustAdmissionDiagnostic.jsFacadeMetadataSource,
+    rootCreatePreflight: rustAdmissionDiagnostic.rootCreatePreflight,
+    workLoopFinishedWorkPreflight:
+      rustAdmissionDiagnostic.workLoopFinishedWorkPreflight,
+    rootCreateExecutionEvidence:
+      rustAdmissionDiagnostic.rootCreateExecutionEvidence,
+    consumesJsFacadeCreateMetadata: true,
+    consumesAcceptedRustRootCreateExecutionEvidence: true,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+    consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true
+  };
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      missingAdmissionRecord
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      bridge.consumeAcceptedRustRootCreateRouteAdmission(
+        createRequest,
+        missingAdmissionRecord
+      ),
+    {
+      code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
+      name: "FastReactTestRendererPrivateRootRequestError"
+    }
+  );
+
+  const staleAdmissionDiagnostic = {
+    ...rustAdmissionDiagnostic,
+    rustAdmissionMetadata: {
+      ...rustAdmissionDiagnostic.rustAdmissionMetadata,
+      metadataId: "fast-react-test-renderer-stale-create-route-admission"
+    }
+  };
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreateRouteAdmission(
+      createRequest,
+      staleAdmissionDiagnostic
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      bridge.consumeAcceptedRustRootCreateRouteAdmission(
+        createRequest,
+        staleAdmissionDiagnostic
+      ),
+    {
+      code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
+      name: "FastReactTestRendererPrivateRootRequestError"
+    }
   );
 
   const staleDiagnostic = {
@@ -2268,6 +2397,19 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
       typeof bridge.consumeAcceptedRustRootCreatePreflight,
       "function"
     );
+    assert.equal(typeof bridge.getRootCreateRouteAdmission, "function");
+    assert.equal(
+      typeof bridge.getRendererRootCreateRouteAdmission,
+      "function"
+    );
+    assert.equal(
+      typeof bridge.canConsumeAcceptedRustRootCreateRouteAdmission,
+      "function"
+    );
+    assert.equal(
+      typeof bridge.consumeAcceptedRustRootCreateRouteAdmission,
+      "function"
+    );
   }
   assert.equal(typeof bridge.getTestInstanceQueryDiagnostics, "function");
   assert.equal(typeof bridge.getRootTestInstanceQueryDiagnostics, "function");
@@ -2810,6 +2952,73 @@ function assertPrivateRootCreatePreflightGate(gate, entrypoint) {
   assert.equal(gate.compatibilityClaimed, false);
 }
 
+function assertPrivateCreateRouteAdmissionGate(gate, label) {
+  assert.equal(Object.isFrozen(gate), true, label);
+  assert.equal(gate.id, privateCreateRouteAdmissionRecordId, label);
+  assert.equal(gate.status, privateCreateRouteAdmissionStatus, label);
+  assert.equal(gate.publicSurface, "create()", label);
+  assert.equal(gate.deterministic, true, label);
+  assert.equal(
+    gate.diagnosticName,
+    privateCreateRouteAdmissionDiagnosticName,
+    label
+  );
+  assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
+  assert.equal(
+    gate.acceptedWorker,
+    "worker-610-test-renderer-create-native-bridge-admission",
+    label
+  );
+  assert.deepEqual(gate.acceptedRustRecords, [
+    "TestRendererRootScheduledUpdate",
+    "TestRendererRootCreatePreflightDiagnostics",
+    "TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics",
+    "TestRendererPrivateCreateRouteAdmissionDiagnostics"
+  ]);
+  assert.deepEqual(gate.acceptedRustApis, [
+    "TestRendererRoot::create",
+    "TestRendererRoot::describe_private_root_create_preflight_for_canary",
+    "TestRendererRoot::describe_private_create_route_admission_for_canary",
+    "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_private_create_route_admission_consumes_create_and_work_loop_evidence",
+    "root_private_create_route_admission_rejects_missing_rust_admission_record",
+    "root_private_create_route_admission_rejects_stale_rust_admission_record",
+    "root_private_create_route_admission_rejects_missing_root_create_preflight"
+  ]);
+  assert.equal(gate.consumesJsFacadeCreateMetadata, true, label);
+  assert.equal(
+    gate.consumesAcceptedRustRootCreateExecutionEvidence,
+    true,
+    label
+  );
+  assert.equal(
+    gate.consumesAcceptedRustRootCreatePreflightDiagnostics,
+    true,
+    label
+  );
+  assert.equal(
+    gate.consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
+    true,
+    label
+  );
+  assert.equal(gate.missingRustAdmissionRecordRejection, true, label);
+  assert.equal(gate.staleRustAdmissionRecordRejection, true, label);
+  assert.equal(gate.publicRouteAvailable, false, label);
+  assert.equal(gate.publicRendererRootCreated, false, label);
+  assert.equal(gate.publicRootAvailable, false, label);
+  assert.equal(gate.publicCreateBehaviorAvailable, false, label);
+  assert.equal(gate.publicSerializationAvailable, false, label);
+  assert.equal(gate.nativeAddonLoaded, false, label);
+  assert.equal(gate.nativeBridgeAvailable, false, label);
+  assert.equal(gate.nativeExecution, false, label);
+  assert.equal(gate.rustExecutionFromJs, false, label);
+  assert.equal(gate.reconcilerExecutionFromJs, false, label);
+  assert.equal(gate.hostOutputProducedFromJs, false, label);
+  assert.equal(gate.compatibilityClaimed, false, label);
+}
+
 function assertPrivateRootCreatePreflightConsumption(
   consumed,
   preflight,
@@ -2849,6 +3058,196 @@ function assertPrivateRootCreatePreflightConsumption(
   assert.equal(consumed.compatibilityClaimed, false);
 }
 
+function assertPrivateCreateRouteAdmission(
+  admission,
+  preflight,
+  request,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(admission), true, entrypoint);
+  assert.equal(
+    admission.kind,
+    "FastReactTestRendererPrivateCreateRouteAdmission"
+  );
+  assert.equal(admission.id, privateCreateRouteAdmissionRecordId);
+  assert.equal(
+    admission.diagnosticName,
+    privateCreateRouteAdmissionDiagnosticName
+  );
+  assert.equal(admission.status, privateCreateRouteAdmissionStatus);
+  assert.equal(admission.ready, true);
+  assert.equal(admission.failureReason, null);
+  assert.equal(admission.entrypoint, entrypoint);
+  assert.equal(admission.compatibilityTarget, compatibilityTarget);
+  assertPrivateCreateRouteAdmissionGate(admission.gate, entrypoint);
+  assert.equal(admission.rootRequest, request);
+  assert.equal(admission.rootHandle, request.rootHandle);
+  assert.equal(admission.rootId, request.rootId);
+  assert.equal(admission.rootSequence, request.rootSequence);
+  assert.equal(admission.rootRequestId, request.requestId);
+  assert.equal(admission.rootRequestSequence, request.requestSequence);
+  assert.equal(admission.operation, "create");
+  assert.equal(admission.publicSurface, "create()");
+  assert.equal(
+    admission.jsFacadeMetadataSource,
+    "FastReactTestRendererPrivateRootRequestRecord"
+  );
+  assert.equal(
+    admission.bridgeMetadataSource,
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.rootCreateRouteAdmission"
+  );
+  assert.equal(Object.isFrozen(admission.rustAdmissionMetadata), true);
+  assert.equal(
+    admission.rustAdmissionMetadata.metadataId,
+    privateCreateRouteAdmissionMetadataId
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.metadataStatus,
+    privateCreateRouteAdmissionMetadataStatus
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.recordId,
+    privateCreateRouteAdmissionRecordId
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.diagnosticName,
+    privateCreateRouteAdmissionDiagnosticName
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.status,
+    privateCreateRouteAdmissionStatus
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.acceptedWorker,
+    "worker-610-test-renderer-create-native-bridge-admission"
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.rootApi,
+    "TestRendererRoot::create"
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.preflightApi,
+    "TestRendererRoot::describe_private_root_create_preflight_for_canary"
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.workLoopRenderPhaseApi,
+    "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.lifecycleRecord,
+    "TestRendererRootScheduledUpdate"
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.executionResultRecord,
+    "TestRendererPrivateCreateRouteAdmissionDiagnostics"
+  );
+  assert.equal(
+    admission.rustAdmissionMetadata.acceptedInputShape,
+    "HostComponentWithTextChild"
+  );
+  assert.equal(admission.rootCreatePreflight, preflight);
+  assert.equal(
+    admission.workLoopFinishedWorkPreflight,
+    preflight.workLoopFinishedWorkPreflight
+  );
+  assert.equal(Object.isFrozen(admission.rootCreateExecutionEvidence), true);
+  assert.equal(admission.rootCreateExecutionEvidence.operation, "create");
+  assert.equal(
+    admission.rootCreateExecutionEvidence.requestId,
+    request.requestId
+  );
+  assert.equal(
+    admission.rootCreateExecutionEvidence.rootApi,
+    "TestRendererRoot::create"
+  );
+  assert.equal(admission.rootCreateExecutionEvidence.updateKind, "Create");
+  assert.equal(
+    admission.rootCreateExecutionEvidence.rustOutcome,
+    "Scheduled"
+  );
+  assert.equal(admission.rootCreateExecutionEvidence.scheduled, true);
+  assert.equal(
+    admission.rootCreateExecutionEvidence.rootCreatePreflight,
+    preflight
+  );
+  assert.equal(admission.consumesJsFacadeCreateMetadata, true);
+  assert.equal(
+    admission.consumesAcceptedRustRootCreateExecutionEvidence,
+    true
+  );
+  assert.equal(
+    admission.consumesAcceptedRustRootCreatePreflightDiagnostics,
+    true
+  );
+  assert.equal(
+    admission
+      .consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
+    true
+  );
+  assert.equal(admission.missingRustAdmissionRecordRejection, true);
+  assert.equal(admission.staleRustAdmissionRecordRejection, true);
+  assert.equal(admission.publicRendererRootCreated, false);
+  assert.equal(admission.publicRootAvailable, false);
+  assert.equal(admission.publicCreateBehaviorAvailable, false);
+  assert.equal(admission.publicSerializationAvailable, false);
+  assert.equal(admission.nativeAddonLoaded, false);
+  assert.equal(admission.nativeBridgeAvailable, false);
+  assert.equal(admission.nativeExecution, false);
+  assert.equal(admission.rustExecutionFromJs, false);
+  assert.equal(admission.reconcilerExecutionFromJs, false);
+  assert.equal(admission.hostOutputProducedFromJs, false);
+  assert.equal(admission.compatibilityClaimed, false);
+}
+
+function assertPrivateCreateRouteAdmissionConsumption(
+  consumed,
+  admission,
+  request,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(consumed), true, entrypoint);
+  assert.equal(
+    consumed.kind,
+    "FastReactTestRendererPrivateCreateRouteAdmissionConsumption"
+  );
+  assert.equal(consumed.id, privateCreateRouteAdmissionRecordId);
+  assert.equal(
+    consumed.diagnosticName,
+    privateCreateRouteAdmissionDiagnosticName
+  );
+  assert.equal(consumed.status, privateCreateRouteAdmissionStatus);
+  assert.equal(consumed.entrypoint, entrypoint);
+  assert.equal(consumed.compatibilityTarget, compatibilityTarget);
+  assert.equal(consumed.rootRequest, request);
+  assert.equal(consumed.admission, admission);
+  assert.equal(consumed.rootCreatePreflight, admission.rootCreatePreflight);
+  assert.equal(Object.isFrozen(consumed.sourceDiagnostic), true);
+  assert.equal(consumed.consumesJsFacadeCreateMetadata, true);
+  assert.equal(
+    consumed.consumesAcceptedRustRootCreateExecutionEvidence,
+    true
+  );
+  assert.equal(
+    consumed.consumesAcceptedRustRootCreatePreflightDiagnostics,
+    true
+  );
+  assert.equal(
+    consumed.consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
+    true
+  );
+  assert.equal(consumed.publicRendererRootCreated, false);
+  assert.equal(consumed.publicRootAvailable, false);
+  assert.equal(consumed.publicCreateBehaviorAvailable, false);
+  assert.equal(consumed.publicSerializationAvailable, false);
+  assert.equal(consumed.nativeAddonLoaded, false);
+  assert.equal(consumed.nativeBridgeAvailable, false);
+  assert.equal(consumed.nativeExecution, false);
+  assert.equal(consumed.rustExecutionFromJs, false);
+  assert.equal(consumed.reconcilerExecutionFromJs, false);
+  assert.equal(consumed.hostOutputProducedFromJs, false);
+  assert.equal(consumed.compatibilityClaimed, false);
+}
+
 function createRustRootCreatePreflightDiagnosticSource(preflight) {
   return {
     diagnosticName: privateRootCreatePreflightDiagnosticName,
@@ -2858,6 +3257,26 @@ function createRustRootCreatePreflightDiagnosticSource(preflight) {
     rootOptionsMetadata: preflight.rootOptionsMetadata,
     canaryApiIdentity: preflight.canaryApiIdentity,
     workLoopFinishedWorkPreflight: preflight.workLoopFinishedWorkPreflight
+  };
+}
+
+function createRustCreateRouteAdmissionDiagnosticSource(admission) {
+  return {
+    id: privateCreateRouteAdmissionRecordId,
+    diagnosticName: privateCreateRouteAdmissionDiagnosticName,
+    status: privateCreateRouteAdmissionStatus,
+    operation: "create",
+    publicSurface: "create()",
+    jsFacadeMetadataSource: "FastReactTestRendererPrivateRootRequestRecord",
+    rustAdmissionMetadata: admission.rustAdmissionMetadata,
+    rootCreatePreflight: admission.rootCreatePreflight,
+    workLoopFinishedWorkPreflight:
+      admission.workLoopFinishedWorkPreflight,
+    rootCreateExecutionEvidence: admission.rootCreateExecutionEvidence,
+    consumesJsFacadeCreateMetadata: true,
+    consumesAcceptedRustRootCreateExecutionEvidence: true,
+    consumesAcceptedRustRootCreatePreflightDiagnostics: true,
+    consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true
   };
 }
 
@@ -3057,6 +3476,11 @@ function assertRustCanaryMetadata(metadata, label) {
       "worker-575-test-renderer-unmount-deletion-commit-link"
     );
   }
+  if (metadata.rootCreateRouteAdmission !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-610-test-renderer-create-native-bridge-admission"
+    );
+  }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
   const expectedAcceptedJsBridgeWorkers = [
     "worker-304-test-renderer-js-private-root-request-bridge",
@@ -3069,6 +3493,11 @@ function assertRustCanaryMetadata(metadata, label) {
     expectedAcceptedJsBridgeWorkers.push(
       "worker-539-test-renderer-live-rust-root-create-preflight",
       "worker-573-test-renderer-private-root-work-loop-preflight"
+    );
+  }
+  if (metadata.rootCreateRouteAdmission !== undefined) {
+    expectedAcceptedJsBridgeWorkers.push(
+      "worker-610-test-renderer-create-native-bridge-admission"
     );
   }
   assert.deepEqual(
@@ -3385,6 +3814,85 @@ function assertRustCanaryMetadata(metadata, label) {
     assert.equal(rootCreatePreflight.nativeExecution, false);
     assert.equal(rootCreatePreflight.rustExecutionFromJs, false);
     assert.equal(rootCreatePreflight.compatibilityClaimed, false);
+  }
+
+  if (metadata.rootCreateRouteAdmission !== undefined) {
+    const admission = metadata.rootCreateRouteAdmission;
+    assert.equal(Object.isFrozen(admission), true, label);
+    assert.equal(admission.metadataId, privateCreateRouteAdmissionMetadataId);
+    assert.equal(
+      admission.metadataStatus,
+      privateCreateRouteAdmissionMetadataStatus
+    );
+    assert.equal(
+      admission.diagnosticName,
+      privateCreateRouteAdmissionDiagnosticName
+    );
+    assert.equal(admission.status, privateCreateRouteAdmissionStatus);
+    assert.equal(admission.recordId, privateCreateRouteAdmissionRecordId);
+    assertPrivateCreateRouteAdmissionGate(admission.gate, label);
+    assert.equal(
+      admission.bridgeMetadataSource,
+      "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.rootCreateRouteAdmission"
+    );
+    assert.equal(
+      admission.acceptedWorker,
+      "worker-610-test-renderer-create-native-bridge-admission"
+    );
+    assert.equal(admission.acceptedRustCrate, "fast-react-test-renderer");
+    assert.deepEqual(
+      admission.acceptedRustApis,
+      admission.gate.acceptedRustApis
+    );
+    assert.deepEqual(
+      admission.acceptedRustTests,
+      admission.gate.acceptedRustTests
+    );
+    assert.equal(admission.rootApi, "TestRendererRoot::create");
+    assert.equal(
+      admission.preflightApi,
+      "TestRendererRoot::describe_private_root_create_preflight_for_canary"
+    );
+    assert.equal(
+      admission.workLoopRenderPhaseApi,
+      "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
+    );
+    assert.equal(
+      admission.lifecycleRecord,
+      "TestRendererRootScheduledUpdate"
+    );
+    assert.equal(
+      admission.executionResultRecord,
+      "TestRendererPrivateCreateRouteAdmissionDiagnostics"
+    );
+    assert.equal(admission.acceptedInputShape, "HostComponentWithTextChild");
+    assert.equal(admission.consumesJsFacadeCreateMetadata, true);
+    assert.equal(
+      admission.consumesAcceptedRustRootCreateExecutionEvidence,
+      true
+    );
+    assert.equal(
+      admission.consumesAcceptedRustRootCreatePreflightDiagnostics,
+      true
+    );
+    assert.equal(
+      admission
+        .consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
+      true
+    );
+    assert.equal(admission.missingRustAdmissionRecordRejection, true);
+    assert.equal(admission.staleRustAdmissionRecordRejection, true);
+    assert.equal(admission.publicRendererRootCreated, false);
+    assert.equal(admission.publicRootAvailable, false);
+    assert.equal(admission.publicCreateBehaviorAvailable, false);
+    assert.equal(admission.publicSerializationAvailable, false);
+    assert.equal(admission.nativeAddonLoaded, false);
+    assert.equal(admission.nativeBridgeAvailable, false);
+    assert.equal(admission.nativeExecution, false);
+    assert.equal(admission.rustExecutionFromJs, false);
+    assert.equal(admission.reconcilerExecutionFromJs, false);
+    assert.equal(admission.hostOutputProducedFromJs, false);
+    assert.equal(admission.compatibilityClaimed, false);
   }
 
   if (metadata.unmountDeletionCommitHandoff !== undefined) {
@@ -3876,17 +4384,32 @@ function assertCreateRoutingGate(error, entrypoint) {
   }
 
   assert.equal(error.privateRoutes, gate.privateRoutes);
+  assert.equal(error.createPrivateRoute, gate.createPrivateRoute);
   assert.equal(error.updatePrivateRoute, gate.updatePrivateRoute);
   assert.equal(error.unmountPrivateRoute, gate.unmountPrivateRoute);
   assert.equal(Object.isFrozen(gate.privateRoutes), true);
+  const expectedRoutes =
+    gate.createPrivateRoute === undefined
+      ? expectedPrivateRoutes.slice(1)
+      : expectedPrivateRoutes;
   assert.deepEqual(
     gate.privateRoutes.map((privateRoute) => privateRoute.id),
-    expectedPrivateRoutes.map((privateRoute) => privateRoute.id)
+    expectedRoutes.map((privateRoute) => privateRoute.id)
   );
-  assert.equal(gate.privateRoutes[0], gate.updatePrivateRoute);
-  assert.equal(gate.privateRoutes[1], gate.unmountPrivateRoute);
-  assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[0]);
-  assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[1]);
+  if (gate.createPrivateRoute !== undefined) {
+    assert.equal(gate.privateRoutes[0], gate.createPrivateRoute);
+    assertPrivateRoute(gate.createPrivateRoute, expectedPrivateRoutes[0]);
+    assertPrivateCreateRouteAdmissionGate(
+      gate.privateCreateRouteAdmissionGate,
+      entrypoint
+    );
+    assert.equal(gate.privateCreateRouteAdmissionAvailable, true);
+  }
+  const routeOffset = gate.createPrivateRoute === undefined ? 0 : 1;
+  assert.equal(gate.privateRoutes[routeOffset], gate.updatePrivateRoute);
+  assert.equal(gate.privateRoutes[routeOffset + 1], gate.unmountPrivateRoute);
+  assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[1]);
+  assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[2]);
   if (gate.privateRootCreatePreflightGate !== undefined) {
     assertPrivateRootCreatePreflightGate(
       gate.privateRootCreatePreflightGate,
@@ -3939,10 +4462,13 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.equal(privateRoute.nativeExecution, false);
   assert.equal(
     privateRoute.acceptedWorker,
-    "worker-234-test-renderer-host-output-update-unmount-canary"
+    expected.acceptedWorker ?? expected.acceptedWorkers[0]
   );
   if (privateRoute.acceptedWorkers === undefined) {
-    assert.equal(privateRoute.acceptedWorker, expected.acceptedWorkers[0]);
+    assert.equal(
+      privateRoute.acceptedWorker,
+      expected.acceptedWorker ?? expected.acceptedWorkers[0]
+    );
   } else {
     assert.equal(Object.isFrozen(privateRoute.acceptedWorkers), true);
     assert.deepEqual(privateRoute.acceptedWorkers, expected.acceptedWorkers);
@@ -3968,6 +4494,26 @@ function assertPrivateRoute(privateRoute, expected) {
     assert.equal(privateRoute.compatibilityClaimed, false);
   } else {
     assert.equal(privateRoute.rootWorkLoopUpdateRouteGate, undefined);
+  }
+  if (privateRoute.createRouteAdmissionGate !== undefined) {
+    assertPrivateCreateRouteAdmissionGate(
+      privateRoute.createRouteAdmissionGate,
+      privateRoute.createRouteAdmissionGate.entrypoint ?? privateRoute.publicSurface
+    );
+    assert.equal(privateRoute.consumesJsFacadeCreateMetadata, true);
+    assert.equal(
+      privateRoute.consumesAcceptedRustRootCreateExecutionEvidence,
+      true
+    );
+    assert.equal(
+      privateRoute.consumesAcceptedRustRootCreatePreflightDiagnostics,
+      true
+    );
+    assert.equal(
+      privateRoute
+        .consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
+      true
+    );
   }
   assert.equal(Object.isFrozen(privateRoute.acceptedRustApis), true);
   assert.deepEqual(
