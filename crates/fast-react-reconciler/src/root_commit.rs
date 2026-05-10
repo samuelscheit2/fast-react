@@ -6064,6 +6064,14 @@ mod tests {
         FunctionComponentEffectDependencyStatus, FunctionComponentEffectPhase,
         FunctionComponentHookRenderStore,
     };
+    use crate::passive_effects::{
+        PASSIVE_EFFECT_CALLBACK_INVOCATION_GATE_BLOCKERS,
+        PassiveEffectCallbackInvocationErrorHandle, PassiveEffectCallbackInvocationGateStatus,
+        PassiveEffectCallbackInvocationKind, PassiveEffectCallbackInvocationRequest,
+        PassiveEffectCallbackInvocationStatus, PassiveEffectCallbackInvocationTestControl,
+        PassiveEffectsFlushStatus,
+        execute_passive_effect_callbacks_after_commit_from_committed_fiber_effects_under_test_control_for_canary,
+    };
     use crate::root_callbacks::{
         ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS,
         ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS, RootUpdateCallbackInvocationErrorHandle,
@@ -6246,6 +6254,42 @@ mod tests {
         ) -> Result<(), RootUpdateCallbackInvocationErrorHandle> {
             self.calls.push(request);
             self.result(request.callback())
+        }
+    }
+
+    #[derive(Default)]
+    struct TestPassiveEffectCallbackControl {
+        calls: Vec<PassiveEffectCallbackInvocationRequest>,
+        returned_destroy: Option<HookEffectCallbackHandle>,
+    }
+
+    impl TestPassiveEffectCallbackControl {
+        fn with_returned_destroy(mut self, destroy: HookEffectCallbackHandle) -> Self {
+            self.returned_destroy = Some(destroy);
+            self
+        }
+
+        fn calls(&self) -> &[PassiveEffectCallbackInvocationRequest] {
+            &self.calls
+        }
+    }
+
+    impl PassiveEffectCallbackInvocationTestControl for TestPassiveEffectCallbackControl {
+        fn invoke_passive_effect_destroy(
+            &mut self,
+            request: PassiveEffectCallbackInvocationRequest,
+        ) -> Result<(), PassiveEffectCallbackInvocationErrorHandle> {
+            self.calls.push(request);
+            Ok(())
+        }
+
+        fn invoke_passive_effect_create(
+            &mut self,
+            request: PassiveEffectCallbackInvocationRequest,
+        ) -> Result<Option<HookEffectCallbackHandle>, PassiveEffectCallbackInvocationErrorHandle>
+        {
+            self.calls.push(request);
+            Ok(self.returned_destroy)
         }
     }
 
@@ -8981,6 +9025,177 @@ mod tests {
         assert_eq!(all_passive.len(), 2);
         assert_eq!(all_passive[0].effect(), changed.effect());
         assert_eq!(all_passive[1].effect(), unchanged.effect());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_committed_passive_execution_gate_runs_callbacks_under_test_control() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(732);
+        let current_function = append_function_component_child(
+            &mut store,
+            current_root,
+            PropsHandle::from_raw(733),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(734),
+                deps(735),
+                Some(callback(736)),
+            )
+            .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(737),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(738),
+                deps(739),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let queued_effect = queued.records()[0];
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let committed = commit
+            .record_function_component_committed_passive_effects_for_canary(std::slice::from_ref(
+                &queued,
+            ))
+            .unwrap();
+        assert_eq!(committed.fiber_count(), 1);
+        assert_eq!(committed.fibers()[0].fiber(), finished_function);
+        assert_eq!(committed.queued_unmount_count(), 1);
+        assert_eq!(committed.queued_mount_count(), 1);
+
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut control =
+            TestPassiveEffectCallbackControl::default().with_returned_destroy(callback(740));
+
+        let execution =
+            execute_passive_effect_callbacks_after_commit_from_committed_fiber_effects_under_test_control_for_canary(
+                &mut store,
+                &commit,
+                &mut control,
+            )
+            .unwrap();
+
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.finished_work(), Some(finished_work));
+        assert_eq!(execution.lanes(), Lanes::DEFAULT);
+        assert_eq!(execution.flush_status(), PassiveEffectsFlushStatus::Flushed);
+        assert_eq!(execution.flush_record_count(), 2);
+        assert_eq!(execution.skipped_flush_records_without_callbacks(), 0);
+        assert_eq!(execution.len(), 2);
+        assert_eq!(execution.completed_count(), 2);
+        assert_eq!(execution.error_count(), 0);
+        assert!(!execution.has_errors());
+        assert_eq!(
+            execution.status(),
+            PassiveEffectCallbackInvocationGateStatus::TestControlOnly
+        );
+        assert_eq!(
+            execution.blockers(),
+            &PASSIVE_EFFECT_CALLBACK_INVOCATION_GATE_BLOCKERS
+        );
+        assert!(!execution.public_effect_execution_enabled());
+        assert!(!execution.public_act_compatibility_claimed());
+        assert!(!execution.scheduler_driven_passive_execution_enabled());
+
+        let records = execution.records();
+        assert_eq!(records[0].invocation_order(), 0);
+        assert_eq!(records[1].invocation_order(), 1);
+        assert_eq!(
+            records[0].kind(),
+            PassiveEffectCallbackInvocationKind::Destroy
+        );
+        assert_eq!(
+            records[1].kind(),
+            PassiveEffectCallbackInvocationKind::Create
+        );
+        assert_eq!(
+            records[0].status(),
+            PassiveEffectCallbackInvocationStatus::Completed
+        );
+        assert_eq!(
+            records[1].status(),
+            PassiveEffectCallbackInvocationStatus::Completed
+        );
+        assert_eq!(
+            records[0].pending_order(),
+            queued_effect.unmount_order().unwrap()
+        );
+        assert_eq!(records[1].pending_order(), queued_effect.mount_order());
+        assert!(records[0].pending_order() < records[1].pending_order());
+        assert_eq!(records[0].fiber(), finished_function);
+        assert_eq!(records[1].fiber(), finished_function);
+        assert_eq!(records[0].effect(), registration.effect());
+        assert_eq!(records[1].effect(), registration.effect());
+        assert_eq!(records[0].instance(), previous.instance());
+        assert_eq!(records[1].instance(), registration.instance());
+        assert_eq!(records[0].callback(), callback(736));
+        assert_eq!(records[1].callback(), callback(738));
+        assert_eq!(records[0].returned_destroy(), None);
+        assert_eq!(records[1].returned_destroy(), Some(callback(740)));
+
+        assert_eq!(control.calls().len(), 2);
+        assert_eq!(
+            control.calls()[0].kind(),
+            PassiveEffectCallbackInvocationKind::Destroy
+        );
+        assert_eq!(
+            control.calls()[1].kind(),
+            PassiveEffectCallbackInvocationKind::Create
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
