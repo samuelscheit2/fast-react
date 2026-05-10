@@ -63,6 +63,14 @@ const rendererKeys = [
   "getInstance",
   "unstable_flushSync"
 ];
+const testInstanceQuerySurfaceNames = [
+  "find",
+  "findAll",
+  "findByType",
+  "findAllByType",
+  "findByProps",
+  "findAllByProps"
+];
 const schedulerMockKeys = [
   "log",
   "reset",
@@ -275,6 +283,70 @@ test("react-test-renderer update and unmount routing metadata points at accepted
   }
 });
 
+test("react-test-renderer TestInstance query and serialization surfaces stay public fail-closed", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const renderer = moduleExports.create({ type: "blocked-query" });
+    assertRendererShape(renderer, entry.entrypoint, moduleExports._Scheduler);
+    assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+
+    const rootError = captureThrown(() => renderer.root);
+    assertReactTestRendererUnimplemented(
+      rootError,
+      entry.entrypoint,
+      "create().root"
+    );
+    assertCreateRoutingGate(rootError, entry.entrypoint);
+    assert.match(
+      rootError.message,
+      /TestInstance root access is intentionally blocked/u
+    );
+
+    for (const queryName of testInstanceQuerySurfaceNames) {
+      let predicateCalled = false;
+      const queryError = captureThrown(() => {
+        const root = renderer.root;
+        return root[queryName](() => {
+          predicateCalled = true;
+          return true;
+        });
+      });
+
+      assert.equal(predicateCalled, false, `${entry.entrypoint} ${queryName}`);
+      assertReactTestRendererUnimplemented(
+        queryError,
+        entry.entrypoint,
+        "create().root"
+      );
+      assertCreateRoutingGate(queryError, entry.entrypoint);
+    }
+
+    for (const operation of [
+      {
+        exportName: "create().toJSON",
+        detail: /Serialization is intentionally blocked/u,
+        run: () => renderer.toJSON()
+      },
+      {
+        exportName: "create().toTree",
+        detail: /Fiber tree inspection is intentionally blocked/u,
+        run: () => renderer.toTree()
+      }
+    ]) {
+      const error = captureThrown(operation.run);
+      assertReactTestRendererUnimplemented(
+        error,
+        entry.entrypoint,
+        operation.exportName
+      );
+      assertCreateRoutingGate(error, entry.entrypoint);
+      assert.match(error.message, operation.detail);
+      assert.equal(error.routingGate.serializationAvailable, false);
+      assert.equal(error.routingGate.compatibilityClaimed, false);
+    }
+  }
+});
+
 test("react-test-renderer create routing gate does not load native bridge artifacts", () => {
   const originalLoad = Module._load;
   const originalNodeExtension = Module._extensions[".node"];
@@ -352,6 +424,13 @@ function assertRendererShape(renderer, label, moduleScheduler) {
   assert.equal(renderer.getInstance.length, 0, label);
   assert.equal(renderer.unstable_flushSync.length, 1, label);
   assert.deepEqual(Object.keys(renderer._Scheduler), schedulerMockKeys, label);
+}
+
+function assertNoPublicTestInstanceQueryMethods(renderer, label) {
+  for (const queryName of testInstanceQuerySurfaceNames) {
+    assert.equal(Object.hasOwn(renderer, queryName), false, label);
+    assert.equal(queryName in renderer, false, label);
+  }
 }
 
 function assertReactTestRendererUnimplemented(error, entrypoint, exportName) {
