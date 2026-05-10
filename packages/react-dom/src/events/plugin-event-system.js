@@ -32,6 +32,8 @@ const DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND =
   'FastReactDomDispatchListenerInvocationCanaryRecord';
 const DISPATCH_LISTENER_CANARY_EVENT_KIND =
   'FastReactDomDispatchListenerCanaryEvent';
+const DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND =
+  'FastReactDomDispatchQueueInvocationCanaryRecord';
 
 const EVENT_DISPATCH_BLOCKED_CODE = 'FAST_REACT_DOM_EVENT_DISPATCH_BLOCKED';
 const PLUGIN_EXTRACTION_BLOCKED_CODE =
@@ -56,6 +58,8 @@ const PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS =
   'admitted-private-fake-dom-event-dispatch-metadata';
 const PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS =
   'controlled-private-single-listener-invocation-canary';
+const PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS =
+  'controlled-private-dispatch-queue-invocation-canary';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -147,6 +151,7 @@ const simpleEventReactNames = createSimpleEventReactNameMap();
 const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
+const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
 
 function isObjectLike(value) {
   return (
@@ -543,6 +548,139 @@ function invokeSingleListenerCanaryFromDispatchRecord(dispatchRecord, options) {
   });
 }
 
+function invokeDispatchQueueCanaryFromDispatchRecords(
+  dispatchRecords,
+  options
+) {
+  const normalizedDispatchRecords = normalizeDispatchRecordList(
+    dispatchRecords
+  );
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const useProcessingOrder = normalizedOptions.useProcessingOrder !== false;
+  const invocationRecords = [];
+  let dispatchQueueEntryCount = 0;
+  let listenerCandidateCount = 0;
+  let listenerInvocationCount = 0;
+  let listenerErrorCount = 0;
+
+  for (
+    let dispatchRecordIndex = 0;
+    dispatchRecordIndex < normalizedDispatchRecords.length;
+    dispatchRecordIndex++
+  ) {
+    const dispatchRecord = normalizedDispatchRecords[dispatchRecordIndex];
+    const dispatchQueue = dispatchRecord.dispatchQueue;
+
+    for (
+      let dispatchQueueEntryIndex = 0;
+      dispatchQueueEntryIndex < dispatchQueue.entries.length;
+      dispatchQueueEntryIndex++
+    ) {
+      const dispatchQueueEntry = assertDispatchQueueEntryRecord(
+        dispatchQueue.entries[dispatchQueueEntryIndex]
+      );
+      const entryPayload =
+        getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+      const listenerRecords = useProcessingOrder
+        ? entryPayload.processingListenerRecords
+        : entryPayload.listenerRecords;
+      dispatchQueueEntryCount++;
+      listenerCandidateCount += listenerRecords.length;
+
+      for (
+        let listenerIndex = 0;
+        listenerIndex < listenerRecords.length;
+        listenerIndex++
+      ) {
+        const invocationRecord = invokeDispatchListenerRecordForCanary(
+          listenerRecords[listenerIndex],
+          {
+            dispatchQueueEntry,
+            dispatchRecord,
+            listenerIndex,
+            selectedFromProcessingOrder: useProcessingOrder
+          }
+        );
+        invocationRecords.push(invocationRecord);
+        listenerInvocationCount += invocationRecord.listenerInvocationCount;
+        if (invocationRecord.listenerErrorCaptured) {
+          listenerErrorCount++;
+        }
+      }
+    }
+  }
+
+  const frozenInvocationRecords = Object.freeze(invocationRecords.slice());
+  const invocationOrder = Object.freeze(
+    frozenInvocationRecords.map((invocationRecord, index) =>
+      Object.freeze({
+        currentTarget: invocationRecord.currentTarget,
+        dispatchPathIndex: invocationRecord.dispatchPathIndex,
+        index,
+        listenerErrorCaptured: invocationRecord.listenerErrorCaptured,
+        phase: invocationRecord.phase,
+        registrationName: invocationRecord.registrationName,
+        targetInst: invocationRecord.targetInst
+      })
+    )
+  );
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    captureListenerInvocationCount: frozenInvocationRecords.filter(
+      (invocationRecord) =>
+        invocationRecord.phase === 'capture' &&
+        invocationRecord.listenerInvocationCount > 0
+    ).length,
+    dispatchQueueEntryCount,
+    dispatchQueueProcessed: false,
+    dispatchRecordCount: normalizedDispatchRecords.length,
+    exposesCanaryEvents: false,
+    exposesListeners: false,
+    exposesNativeEvents: false,
+    exposesSyntheticEvent: false,
+    invocationOrder,
+    invocationRecordCount: frozenInvocationRecords.length,
+    invocationStatus:
+      frozenInvocationRecords.length === 0
+        ? 'skipped-no-listeners'
+        : listenerErrorCount === 0
+          ? 'invoked-dispatch-queue-canary'
+          : 'captured-dispatch-queue-listener-errors',
+    kind: DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND,
+    listenerCandidateCount,
+    listenerErrorCount,
+    listenerInvocationCount,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    selectedFromProcessingOrder: useProcessingOrder,
+    status: PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
+    syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    bubbleListenerInvocationCount: frozenInvocationRecords.filter(
+      (invocationRecord) =>
+        invocationRecord.phase === 'bubble' &&
+        invocationRecord.listenerInvocationCount > 0
+    ).length,
+    willInvokeListeners: false
+  });
+
+  dispatchQueueInvocationCanaryRecordPayloads.set(
+    record,
+    Object.freeze({
+      dispatchRecords: Object.freeze(normalizedDispatchRecords.slice()),
+      invocationRecords: frozenInvocationRecords,
+      options: Object.freeze({
+        useProcessingOrder
+      })
+    })
+  );
+
+  return record;
+}
+
 function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) {
   const normalizedListenerRecord =
     assertDispatchListenerRecord(dispatchListenerRecord);
@@ -817,6 +955,18 @@ function isDispatchListenerInvocationCanaryRecord(record) {
   return getDispatchListenerInvocationCanaryRecordPayload(record) !== null;
 }
 
+function getDispatchQueueInvocationCanaryRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return dispatchQueueInvocationCanaryRecordPayloads.get(record) || null;
+}
+
+function isDispatchQueueInvocationCanaryRecord(record) {
+  return getDispatchQueueInvocationCanaryRecordPayload(record) !== null;
+}
+
 function assertEventDispatchRecord(record) {
   if (
     !isObjectLike(record) ||
@@ -872,6 +1022,16 @@ function normalizeSingleListenerCanaryOptions(options) {
     ),
     useProcessingOrder: normalizedOptions.useProcessingOrder !== false
   };
+}
+
+function normalizeDispatchRecordList(dispatchRecords) {
+  if (Array.isArray(dispatchRecords)) {
+    return dispatchRecords.map((dispatchRecord) =>
+      assertEventDispatchRecord(dispatchRecord)
+    );
+  }
+
+  return [assertEventDispatchRecord(dispatchRecords)];
 }
 
 function normalizeNonNegativeInteger(value, fallback, fieldName) {
@@ -1134,6 +1294,7 @@ module.exports = {
   DISPATCH_LISTENER_RECORD_KIND,
   DISPATCH_LISTENER_CANARY_EVENT_KIND,
   DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND,
+  DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND,
   DISPATCH_QUEUE_ENTRY_RECORD_KIND,
   DISPATCH_QUEUE_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
@@ -1150,6 +1311,7 @@ module.exports = {
   PLUGIN_EXTRACTION_RECORD_KIND,
   POLYFILL_EVENT_PLUGIN_NAMES,
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+  PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
   SCROLL_END_EVENT_PLUGIN_NAME,
@@ -1161,12 +1323,15 @@ module.exports = {
   getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
+  getDispatchQueueInvocationCanaryRecordPayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
   getWrapperRecord,
   invokeDispatchListenerRecordForCanary,
+  invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord,
   isDispatchListenerInvocationCanaryRecord,
   isDispatchListenerRecord,
-  isDispatchQueueEntryRecord
+  isDispatchQueueEntryRecord,
+  isDispatchQueueInvocationCanaryRecord
 };
