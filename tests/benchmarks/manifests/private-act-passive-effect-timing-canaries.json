@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "private-act-passive-effect-timing-canaries",
+  "description": "Diagnostic-only timing canary manifest for private act passive-drain and passive effect execution/error-routing gates; public comparable timing remains blocked until public act, test-renderer, effect, and error-surface gates are green.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "private-act-renderer-backed-passive-drain-timing-canary",
+    "private-passive-effect-mount-unmount-execution-timing-canary",
+    "private-passive-effect-error-routing-timing-canary"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-private-renderer-backed-act-passive-drain-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-private-renderer-backed-act-drain-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-act-oracle.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Package-private React act metadata admits renderer-backed act drain diagnostics that consume accepted Scheduler, reconciler, and test-renderer records while public React.act, scheduler timing, queued work execution, effect execution, and renderer root compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-private-act-passive-drain-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-private-act-passive-drain-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-test-renderer-act-oracle.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "The private react-test-renderer act scheduler gate accepts passive flush metadata, private sync-flush continuation metadata, private passive callback metadata, and private root-output diagnostics without executing public act work or claiming public test-renderer compatibility."
+      }
+    },
+    {
+      "id": "reconciler-private-passive-effect-mount-unmount-execution-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-private-passive-effect-mount-unmount-execution-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-reconciler passive_effects_ --all-features",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Private reconciler canaries execute passive destroy callbacks before mount-create callbacks under explicit test controls and record deterministic callback metadata while public effect execution, scheduler-driven passive execution, and public act compatibility remain blocked."
+      }
+    },
+    {
+      "id": "reconciler-private-passive-effect-error-routing-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-error-surface-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-private-passive-effect-error-routing-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-reconciler passive_effects_callback_executor_errors_preserve_cross_phase_order_and_block_root_errors --all-features",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Private passive effect error-routing canaries preserve destroy-before-create error order and schedule root error capture metadata without invoking root error callbacks or enabling public act error aggregation."
+      }
+    },
+    {
+      "id": "react-act-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-act-public-compatibility-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-act-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public React.act remains blocked behind renderer roots, passive effects, act continuation flushing, and compatibility claims, so private act passive-drain timing cannot become public comparable timing evidence."
+      }
+    },
+    {
+      "id": "react-test-renderer-act-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-act-public-compatibility-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-test-renderer-act-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public react-test-renderer act compatibility remains blocked because public act queue draining, public scheduler flush execution, passive callback execution, root request execution, and host-output commit compatibility are not admitted."
+      }
+    },
+    {
+      "id": "react-test-renderer-error-surface-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-error-surface-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-error-surface-public-compatibility-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-test-renderer-error-surface-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public test-renderer error-surface compatibility remains blocked; passive effect error routing is private root-error metadata only and does not prove public callback invocation, console, or act aggregation behavior."
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "private-act-passive-effect-timing-canaries-diagnostic-admission",
+      "description": "Private act passive-drain and passive effect execution/error-routing timing canaries may collect diagnostic timing for admitted private gates only.",
+      "scenarioIds": [
+        "private-act-renderer-backed-passive-drain-timing-canary",
+        "private-passive-effect-mount-unmount-execution-timing-canary",
+        "private-passive-effect-error-routing-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-private-renderer-backed-act-passive-drain-gate",
+        "react-test-renderer-private-act-passive-drain-gate",
+        "reconciler-private-passive-effect-mount-unmount-execution-gate",
+        "reconciler-private-passive-effect-error-routing-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "These timing canaries are admitted only for private act passive-drain, passive callback execution, and passive error-routing diagnostics; public act behavior, scheduler-driven passive execution, effect compatibility, error-surface compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-act-passive-effect-public-timing-promotion-blocked",
+      "description": "Public comparable timing promotion remains blocked until public React.act, react-test-renderer act, passive effect, and error-surface gates become green.",
+      "scenarioIds": [
+        "private-act-renderer-backed-passive-drain-timing-canary",
+        "private-passive-effect-mount-unmount-execution-timing-canary",
+        "private-passive-effect-error-routing-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-act-public-compatibility",
+        "react-test-renderer-act-public-compatibility",
+        "react-test-renderer-error-surface-public-compatibility"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Comparable public timing remains blocked until public React.act, react-test-renderer act, passive effect execution, passive error routing, scheduler flushing, renderer roots, and error-surface gates are green-admitted and claim compatibility."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "private-act-renderer-backed-passive-drain-timing-canary",
+      "area": "React private renderer-backed act passive-drain timing canary",
+      "entrypoints": [
+        "packages/react/private-act-dispatcher-gate.js",
+        "packages/react-test-renderer/index.js",
+        "packages/scheduler/unstable_mock.js",
+        "crates/fast-react-reconciler/src/root_scheduler.rs",
+        "crates/fast-react-reconciler/src/passive_effects.rs"
+      ],
+      "conformanceGateIds": [
+        "react-private-renderer-backed-act-passive-drain-gate",
+        "react-test-renderer-private-act-passive-drain-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The act passive-drain timing canary covers only private renderer-backed act drain diagnostics, accepted internal queues, passive flush metadata, and test-renderer root-output metadata; public React.act, public react-test-renderer act, queued work execution, passive effect execution, scheduler timing, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-passive-effect-mount-unmount-execution-timing-canary",
+      "area": "Reconciler private passive effect mount/unmount execution timing canary",
+      "entrypoints": [
+        "crates/fast-react-reconciler/src/passive_effects.rs",
+        "crates/fast-react-reconciler/src/root_commit.rs",
+        "crates/fast-react-reconciler/src/root_scheduler.rs"
+      ],
+      "conformanceGateIds": [
+        "reconciler-private-passive-effect-mount-unmount-execution-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The passive effect mount/unmount execution timing canary covers only private test-control destroy and mount-create callback executors with deterministic unmount-before-mount ordering; public effect execution, scheduler-driven passive execution, public act compatibility, hook facade compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-passive-effect-error-routing-timing-canary",
+      "area": "Reconciler private passive effect error-routing timing canary",
+      "entrypoints": [
+        "crates/fast-react-reconciler/src/passive_effects.rs",
+        "crates/fast-react-reconciler/src/root_scheduler.rs",
+        "packages/react-test-renderer/index.js"
+      ],
+      "conformanceGateIds": [
+        "reconciler-private-passive-effect-error-routing-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The passive effect error-routing timing canary covers only private destroy and mount-create error metadata, root error capture scheduling, and blocked root callback/act aggregation records; public error-surface compatibility, public act error aggregation, callback invocation claims, and comparable timing remain blocked."
+    }
+  ]
+}
