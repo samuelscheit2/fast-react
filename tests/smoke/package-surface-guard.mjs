@@ -82,6 +82,7 @@ const exactPrivatePublicFileGuards = {
     'src/client/dom-container.js',
     'src/client/dom-host-context.js',
     'src/client/dom-namespaces.js',
+    'src/client/dom-property-operations.js',
     'src/client/hydration-boundary-gate.js',
     'src/client/hydration-marker-parser.js',
     'src/client/ref-callback-gate.js',
