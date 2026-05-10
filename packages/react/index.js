@@ -27,6 +27,7 @@ const { createContext } = require('./context-object.js');
 const { createChildrenHelpers } = require('./children-helper.js');
 const { forwardRef, lazy, memo } = require('./wrapper-object.js');
 const { Component, PureComponent } = require('./component-class.js');
+const { startTransition } = require('./transition.js');
 
 const entrypoint = 'react';
 
@@ -70,10 +71,7 @@ exports.forwardRef = forwardRef;
 exports.isValidElement = isValidElement;
 exports.lazy = lazy;
 exports.memo = memo;
-exports.startTransition = createUnimplementedFunction(
-  entrypoint,
-  'startTransition'
-);
+exports.startTransition = startTransition;
 exports.unstable_useCacheRefresh = createUnimplementedFunction(
   entrypoint,
   'unstable_useCacheRefresh'
