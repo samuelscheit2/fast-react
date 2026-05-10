@@ -49,6 +49,22 @@ sequencing belong in `MASTER_PLAN.md`.
   reconciler Suspense and root-scheduler tests, focused React DOM private root
   bridge and root-render conformance checks, `npm run check --workspace
   @fast-react/react-dom`, conflict-marker scanning, and `git diff --check`.
+- Workers 626, 627, 629, 632, 633, 635, 646, 648-651, and 653-654 were
+  accepted from the active queue. The batch added private sync-flush/act root
+  execution evidence, broader function-component `useState` host output,
+  private effect update/unmount lifecycle execution, Offscreen reveal
+  complete/commit handoff proof, host-child insert-before and payload execution
+  evidence, private focus/blur dispatch, hydration claim replay and
+  recoverable-error callback gates, stylesheet/script/modulepreload resource
+  commit diagnostics, and Scheduler mock/postTask private execution routes
+  while keeping public compatibility blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, focused
+  reconciler checks for sync flush, root scheduler/commit/work-loop, function
+  components, effects, Offscreen, complete work, host work, and host nodes;
+  focused React DOM event, hydration, resource, and conformance checks; `npm
+  run check --workspace @fast-react/react-dom`; focused Scheduler mock/postTask
+  checks; `npm run check --workspace scheduler`; `npm run
+  check:package-surface`; conflict-marker scanning; and `git diff --check`.
 
 ### Queue 595-624
 
