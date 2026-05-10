@@ -215,6 +215,16 @@
       "unstable_batchedUpdates",
       "version"
     ],
+    "reactTestRenderer.renderer": [
+      "_Scheduler",
+      "root",
+      "toJSON",
+      "toTree",
+      "update",
+      "unmount",
+      "getInstance",
+      "unstable_flushSync"
+    ],
     "reactTestRenderer.shallow": [],
     "scheduler.root": [
       "unstable_now",
@@ -1004,6 +1014,69 @@
         "shallow.js"
       ],
       "declarationFiles": [],
+      "packageJsonKeys": [
+        "name",
+        "version",
+        "private",
+        "description",
+        "main",
+        "scripts",
+        "dependencies",
+        "peerDependencies",
+        "engines"
+      ],
+      "packageMetadata": {
+        "description": "React Test Renderer compatibility package placeholder for Fast React.",
+        "scripts": {
+          "check": "node ../../tests/smoke/import-entrypoints.mjs",
+          "test": "node ../../tests/smoke/import-entrypoints.mjs"
+        },
+        "engines": {
+          "node": ">=26.0.0"
+        }
+      },
+      "physicalNoExportsSubpaths": [
+        {
+          "specifier": "@fast-react/react-test-renderer",
+          "file": "index.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/index",
+          "file": "index.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/index.js",
+          "file": "index.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/package.json",
+          "file": "package.json"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/shallow",
+          "file": "shallow.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/shallow.js",
+          "file": "shallow.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/cjs/react-test-renderer.development",
+          "file": "cjs/react-test-renderer.development.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/cjs/react-test-renderer.development.js",
+          "file": "cjs/react-test-renderer.development.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/cjs/react-test-renderer.production",
+          "file": "cjs/react-test-renderer.production.js"
+        },
+        {
+          "specifier": "@fast-react/react-test-renderer/cjs/react-test-renderer.production.js",
+          "file": "cjs/react-test-renderer.production.js"
+        }
+      ],
       "runtimeEntrypoints": [
         {
           "file": "index.js",
@@ -1012,6 +1085,72 @@
             "placeholder": true,
             "compatibilityTarget": "react-test-renderer@19.2.6",
             "entrypoint": "react-test-renderer"
+          },
+          "version": "0.0.0-fast-react-test-renderer-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "act",
+              "functionName": "act",
+              "length": 1
+            },
+            {
+              "exportName": "unstable_batchedUpdates",
+              "functionName": "unstable_batchedUpdates",
+              "length": 2
+            }
+          ],
+          "reactTestRendererRoot": {
+            "createFunction": {
+              "functionName": "create",
+              "length": 2
+            },
+            "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
+            "rendererKeySet": "reactTestRenderer.renderer",
+            "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
+            "rootAccessor": {
+              "exportName": "create().root",
+              "enumerable": true,
+              "configurable": true,
+              "getterLength": 0
+            },
+            "rendererFunctions": [
+              {
+                "property": "toJSON",
+                "exportName": "create().toJSON",
+                "functionName": "toJSON",
+                "length": 0
+              },
+              {
+                "property": "toTree",
+                "exportName": "create().toTree",
+                "functionName": "toTree",
+                "length": 0
+              },
+              {
+                "property": "update",
+                "exportName": "create().update",
+                "functionName": "update",
+                "length": 1
+              },
+              {
+                "property": "unmount",
+                "exportName": "create().unmount",
+                "functionName": "unmount",
+                "length": 0
+              },
+              {
+                "property": "getInstance",
+                "exportName": "create().getInstance",
+                "functionName": "getInstance",
+                "length": 0
+              },
+              {
+                "property": "unstable_flushSync",
+                "exportName": "create().unstable_flushSync",
+                "functionName": "unstable_flushSync",
+                "length": 1
+              }
+            ]
           }
         },
         {
@@ -1021,6 +1160,72 @@
             "placeholder": true,
             "compatibilityTarget": "react-test-renderer@19.2.6",
             "entrypoint": "react-test-renderer/cjs/react-test-renderer.development"
+          },
+          "version": "0.0.0-fast-react-test-renderer-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "act",
+              "functionName": "act",
+              "length": 1
+            },
+            {
+              "exportName": "unstable_batchedUpdates",
+              "functionName": "unstable_batchedUpdates",
+              "length": 2
+            }
+          ],
+          "reactTestRendererRoot": {
+            "createFunction": {
+              "functionName": "create",
+              "length": 2
+            },
+            "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
+            "rendererKeySet": "reactTestRenderer.renderer",
+            "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
+            "rootAccessor": {
+              "exportName": "create().root",
+              "enumerable": true,
+              "configurable": true,
+              "getterLength": 0
+            },
+            "rendererFunctions": [
+              {
+                "property": "toJSON",
+                "exportName": "create().toJSON",
+                "functionName": "toJSON",
+                "length": 0
+              },
+              {
+                "property": "toTree",
+                "exportName": "create().toTree",
+                "functionName": "toTree",
+                "length": 0
+              },
+              {
+                "property": "update",
+                "exportName": "create().update",
+                "functionName": "update",
+                "length": 1
+              },
+              {
+                "property": "unmount",
+                "exportName": "create().unmount",
+                "functionName": "unmount",
+                "length": 0
+              },
+              {
+                "property": "getInstance",
+                "exportName": "create().getInstance",
+                "functionName": "getInstance",
+                "length": 0
+              },
+              {
+                "property": "unstable_flushSync",
+                "exportName": "create().unstable_flushSync",
+                "functionName": "unstable_flushSync",
+                "length": 1
+              }
+            ]
           }
         },
         {
@@ -1030,6 +1235,70 @@
             "placeholder": true,
             "compatibilityTarget": "react-test-renderer@19.2.6",
             "entrypoint": "react-test-renderer/cjs/react-test-renderer.production"
+          },
+          "version": "0.0.0-fast-react-test-renderer-placeholder",
+          "undefinedExports": [
+            "act"
+          ],
+          "unsupportedExports": [
+            {
+              "exportName": "unstable_batchedUpdates",
+              "functionName": "unstable_batchedUpdates",
+              "length": 2
+            }
+          ],
+          "reactTestRendererRoot": {
+            "createFunction": {
+              "functionName": "create",
+              "length": 2
+            },
+            "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
+            "rendererKeySet": "reactTestRenderer.renderer",
+            "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
+            "rootAccessor": {
+              "exportName": "create().root",
+              "enumerable": true,
+              "configurable": true,
+              "getterLength": 0
+            },
+            "rendererFunctions": [
+              {
+                "property": "toJSON",
+                "exportName": "create().toJSON",
+                "functionName": "toJSON",
+                "length": 0
+              },
+              {
+                "property": "toTree",
+                "exportName": "create().toTree",
+                "functionName": "toTree",
+                "length": 0
+              },
+              {
+                "property": "update",
+                "exportName": "create().update",
+                "functionName": "update",
+                "length": 1
+              },
+              {
+                "property": "unmount",
+                "exportName": "create().unmount",
+                "functionName": "unmount",
+                "length": 0
+              },
+              {
+                "property": "getInstance",
+                "exportName": "create().getInstance",
+                "functionName": "getInstance",
+                "length": 0
+              },
+              {
+                "property": "unstable_flushSync",
+                "exportName": "create().unstable_flushSync",
+                "functionName": "unstable_flushSync",
+                "length": 1
+              }
+            ]
           }
         },
         {
@@ -1039,6 +1308,10 @@
             "placeholder": true,
             "compatibilityTarget": "react-test-renderer@19.2.6",
             "entrypoint": "react-test-renderer/shallow"
+          },
+          "reactTestRendererShallow": {
+            "functionName": "shallow",
+            "length": 0
           }
         }
       ]

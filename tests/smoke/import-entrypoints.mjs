@@ -554,6 +554,58 @@ const reactTestRendererShallowEntrypoints = [
   }
 ];
 
+const reactTestRendererPhysicalSubpaths = [
+  {
+    specifier: '@fast-react/react-test-renderer',
+    file: 'index.js'
+  },
+  {
+    specifier: '@fast-react/react-test-renderer/index',
+    file: 'index.js'
+  },
+  {
+    specifier: '@fast-react/react-test-renderer/index.js',
+    file: 'index.js'
+  },
+  {
+    specifier: '@fast-react/react-test-renderer/package.json',
+    file: 'package.json'
+  },
+  {
+    specifier: '@fast-react/react-test-renderer/shallow',
+    file: 'shallow.js'
+  },
+  {
+    specifier: '@fast-react/react-test-renderer/shallow.js',
+    file: 'shallow.js'
+  },
+  {
+    specifier:
+      '@fast-react/react-test-renderer/cjs/react-test-renderer.development',
+    file: 'cjs/react-test-renderer.development.js'
+  },
+  {
+    specifier:
+      '@fast-react/react-test-renderer/cjs/react-test-renderer.development.js',
+    file: 'cjs/react-test-renderer.development.js'
+  },
+  {
+    specifier:
+      '@fast-react/react-test-renderer/cjs/react-test-renderer.production',
+    file: 'cjs/react-test-renderer.production.js'
+  },
+  {
+    specifier:
+      '@fast-react/react-test-renderer/cjs/react-test-renderer.production.js',
+    file: 'cjs/react-test-renderer.production.js'
+  }
+];
+
+const missingReactTestRendererPhysicalSubpaths = [
+  '@fast-react/react-test-renderer/cjs/react-test-renderer',
+  '@fast-react/react-test-renderer/placeholder-utils.js'
+];
+
 const schedulerImplementedRootKeys = [
   'unstable_now',
   'unstable_IdlePriority',
@@ -2923,15 +2975,40 @@ async function assertPackageMetadata() {
   const reactTestRendererPackageJson = require(
     path.join(reactTestRendererPackageRoot, 'package.json')
   );
-  assert.equal(reactTestRendererPackageJson.name, '@fast-react/react-test-renderer');
+  assert.deepEqual(Object.keys(reactTestRendererPackageJson), [
+    'name',
+    'version',
+    'private',
+    'description',
+    'main',
+    'scripts',
+    'dependencies',
+    'peerDependencies',
+    'engines'
+  ]);
+  assert.equal(
+    reactTestRendererPackageJson.name,
+    '@fast-react/react-test-renderer'
+  );
   assert.equal(reactTestRendererPackageJson.version, '0.0.0');
+  assert.equal(
+    reactTestRendererPackageJson.description,
+    'React Test Renderer compatibility package placeholder for Fast React.'
+  );
   assert.equal(reactTestRendererPackageJson.main, 'index.js');
   assert.equal(Object.hasOwn(reactTestRendererPackageJson, 'exports'), false);
+  assert.deepEqual(reactTestRendererPackageJson.scripts, {
+    check: 'node ../../tests/smoke/import-entrypoints.mjs',
+    test: 'node ../../tests/smoke/import-entrypoints.mjs'
+  });
   assert.deepEqual(reactTestRendererPackageJson.dependencies, {
     scheduler: '^0.27.0'
   });
   assert.deepEqual(reactTestRendererPackageJson.peerDependencies, {
     '@fast-react/react': '0.0.0'
+  });
+  assert.deepEqual(reactTestRendererPackageJson.engines, {
+    node: '>=26.0.0'
   });
 
   const schedulerPackageJson = require(
@@ -3242,6 +3319,12 @@ async function runReactTestRendererPackageProbe(tempRoot) {
     const shallowEntrypoints = ${JSON.stringify(
       reactTestRendererShallowEntrypoints
     )};
+    const physicalSubpaths = ${JSON.stringify(
+      reactTestRendererPhysicalSubpaths
+    )};
+    const missingPhysicalSubpaths = ${JSON.stringify(
+      missingReactTestRendererPhysicalSubpaths
+    )};
     const placeholderVersion = ${JSON.stringify(
       reactTestRendererPlaceholderVersion
     )};
@@ -3370,16 +3453,60 @@ async function runReactTestRendererPackageProbe(tempRoot) {
 
     (async () => {
       const packageJson = require('@fast-react/react-test-renderer/package.json');
+      assert.deepEqual(Object.keys(packageJson), [
+        'name',
+        'version',
+        'private',
+        'description',
+        'main',
+        'scripts',
+        'dependencies',
+        'peerDependencies',
+        'engines'
+      ]);
       assert.equal(packageJson.name, '@fast-react/react-test-renderer');
       assert.equal(packageJson.version, '0.0.0');
+      assert.equal(
+        packageJson.description,
+        'React Test Renderer compatibility package placeholder for Fast React.'
+      );
       assert.equal(packageJson.main, 'index.js');
       assert.equal(Object.hasOwn(packageJson, 'exports'), false);
+      assert.deepEqual(packageJson.scripts, {
+        check: 'node ../../tests/smoke/import-entrypoints.mjs',
+        test: 'node ../../tests/smoke/import-entrypoints.mjs'
+      });
       assert.deepEqual(packageJson.dependencies, {
         scheduler: '^0.27.0'
       });
       assert.deepEqual(packageJson.peerDependencies, {
         '@fast-react/react': '0.0.0'
       });
+      assert.deepEqual(packageJson.engines, {
+        node: '>=26.0.0'
+      });
+
+      for (const { specifier, file } of physicalSubpaths) {
+        assert.equal(
+          require.resolve(specifier),
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@fast-react',
+            'react-test-renderer',
+            ...file.split('/')
+          ),
+          specifier
+        );
+      }
+
+      for (const specifier of missingPhysicalSubpaths) {
+        assert.throws(
+          () => require.resolve(specifier),
+          (error) => error.code === 'MODULE_NOT_FOUND',
+          specifier
+        );
+      }
 
       for (const {
         actExport,

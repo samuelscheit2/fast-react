@@ -212,6 +212,70 @@ function assertUndefinedExports(moduleExports, entry, label) {
   }
 }
 
+function expectedUnsupportedErrorName(compatibilityTarget) {
+  if (compatibilityTarget.startsWith('react-dom@')) {
+    return 'FastReactDomUnimplementedError';
+  }
+
+  if (compatibilityTarget.startsWith('react-test-renderer@')) {
+    return 'FastReactTestRendererUnimplementedError';
+  }
+
+  throw new Error(`No unsupported error expectation for ${compatibilityTarget}`);
+}
+
+function expectedUnsupportedMessageFragment(compatibilityTarget) {
+  if (compatibilityTarget.startsWith('react-dom@')) {
+    return 'no React DOM behavior implementation yet';
+  }
+
+  if (compatibilityTarget.startsWith('react-test-renderer@')) {
+    return 'no React Test Renderer behavior implementation yet';
+  }
+
+  throw new Error(
+    `No unsupported message expectation for ${compatibilityTarget}`
+  );
+}
+
+function assertUnsupportedPlaceholderError(error, expected, label) {
+  assert.equal(
+    error.name,
+    expectedUnsupportedErrorName(expected.compatibilityTarget),
+    `${label} error name`
+  );
+  assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', `${label} error code`);
+  assert.equal(
+    error.entrypoint,
+    expected.entrypoint,
+    `${label} error entrypoint`
+  );
+  assert.equal(
+    error.exportName,
+    expected.exportName,
+    `${label} error export name`
+  );
+  assert.equal(
+    error.compatibilityTarget,
+    expected.compatibilityTarget,
+    `${label} compatibility target`
+  );
+  assert.equal(
+    error.message.includes(
+      `${expected.entrypoint}.${expected.exportName} ${expected.action}`
+    ),
+    true,
+    `${label} error message should name the boundary`
+  );
+  assert.equal(
+    error.message.includes(
+      expectedUnsupportedMessageFragment(expected.compatibilityTarget)
+    ),
+    true,
+    `${label} error message should stay unsupported`
+  );
+}
+
 function assertUnsupportedExport(moduleExports, entry, expectedExport, label) {
   const exportName = expectedExport.exportName;
   const exportValue = moduleExports[exportName];
@@ -237,40 +301,15 @@ function assertUnsupportedExport(moduleExports, entry, expectedExport, label) {
   assert.throws(
     () => exportValue(),
     (error) => {
-      assert.equal(
-        error.name,
-        'FastReactDomUnimplementedError',
-        `${label}.${exportName} error name`
-      );
-      assert.equal(
-        error.code,
-        'FAST_REACT_UNIMPLEMENTED',
-        `${label}.${exportName} error code`
-      );
-      assert.equal(
-        error.entrypoint,
-        entrypoint,
-        `${label}.${exportName} error entrypoint`
-      );
-      assert.equal(
-        error.exportName,
-        exportName,
-        `${label}.${exportName} error export name`
-      );
-      assert.equal(
-        error.compatibilityTarget,
-        compatibilityTarget,
-        `${label}.${exportName} compatibility target`
-      );
-      assert.equal(
-        error.message.includes(`${entrypoint}.${exportName} was called`),
-        true,
-        `${label}.${exportName} error message should name the boundary`
-      );
-      assert.equal(
-        error.message.includes('no React DOM behavior implementation yet'),
-        true,
-        `${label}.${exportName} error message should stay unsupported`
+      assertUnsupportedPlaceholderError(
+        error,
+        {
+          action: 'was called',
+          compatibilityTarget,
+          entrypoint,
+          exportName
+        },
+        `${label}.${exportName}`
       );
       return true;
     },
@@ -278,9 +317,256 @@ function assertUnsupportedExport(moduleExports, entry, expectedExport, label) {
   );
 }
 
+function assertReactTestRendererSchedulerPlaceholder(
+  scheduler,
+  entry,
+  exportName,
+  label
+) {
+  const propertyName = exportName.slice('_Scheduler.'.length);
+
+  assert.deepEqual(Object.keys(scheduler), [], `${label} scheduler keys`);
+  assert.deepEqual(Reflect.ownKeys(scheduler), [], `${label} scheduler ownKeys`);
+  assert.throws(
+    () => scheduler[propertyName],
+    (error) => {
+      assertUnsupportedPlaceholderError(
+        error,
+        {
+          action: 'was accessed',
+          compatibilityTarget: entry.metadata.compatibilityTarget,
+          entrypoint: entry.metadata.entrypoint,
+          exportName
+        },
+        `${label}.${exportName}`
+      );
+      return true;
+    },
+    `${label}.${exportName} should remain scheduler-blocked`
+  );
+}
+
+function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
+  const expectedRoot = entry.reactTestRendererRoot;
+  if (!expectedRoot) {
+    return;
+  }
+
+  assert.equal(
+    moduleExports.create.name,
+    expectedRoot.createFunction.functionName,
+    `${label}.create name`
+  );
+  assert.equal(
+    moduleExports.create.length,
+    expectedRoot.createFunction.length,
+    `${label}.create length`
+  );
+  assertReactTestRendererSchedulerPlaceholder(
+    moduleExports._Scheduler,
+    entry,
+    expectedRoot.schedulerProbe,
+    label
+  );
+
+  const renderer = moduleExports.create(null);
+  assert.deepEqual(
+    Object.keys(renderer),
+    snapshot.keySets[expectedRoot.rendererKeySet],
+    `${label}.create() renderer keys`
+  );
+  assertReactTestRendererSchedulerPlaceholder(
+    renderer._Scheduler,
+    entry,
+    expectedRoot.rendererSchedulerProbe,
+    `${label}.create()`
+  );
+
+  const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
+  assert.equal(
+    rootDescriptor.enumerable,
+    expectedRoot.rootAccessor.enumerable,
+    `${label}.root enumerable`
+  );
+  assert.equal(
+    rootDescriptor.configurable,
+    expectedRoot.rootAccessor.configurable,
+    `${label}.root configurable`
+  );
+  assert.equal(
+    rootDescriptor.get.length,
+    expectedRoot.rootAccessor.getterLength,
+    `${label}.root getter length`
+  );
+  assert.equal(rootDescriptor.set, undefined, `${label}.root setter`);
+  assert.throws(
+    () => renderer.root,
+    (error) => {
+      assertUnsupportedPlaceholderError(
+        error,
+        {
+          action: 'was accessed',
+          compatibilityTarget: entry.metadata.compatibilityTarget,
+          entrypoint: entry.metadata.entrypoint,
+          exportName: expectedRoot.rootAccessor.exportName
+        },
+        `${label}.root`
+      );
+      return true;
+    },
+    `${label}.root should remain unsupported`
+  );
+
+  for (const expectedFunction of expectedRoot.rendererFunctions) {
+    const rendererFunction = renderer[expectedFunction.property];
+    assert.equal(
+      rendererFunction.name,
+      expectedFunction.functionName,
+      `${label}.${expectedFunction.property} name`
+    );
+    assert.equal(
+      rendererFunction.length,
+      expectedFunction.length,
+      `${label}.${expectedFunction.property} length`
+    );
+    assert.throws(
+      () => rendererFunction(),
+      (error) => {
+        assertUnsupportedPlaceholderError(
+          error,
+          {
+            action: 'was called',
+            compatibilityTarget: entry.metadata.compatibilityTarget,
+            entrypoint: entry.metadata.entrypoint,
+            exportName: expectedFunction.exportName
+          },
+          `${label}.${expectedFunction.property}`
+        );
+        return true;
+      },
+      `${label}.${expectedFunction.property} should remain unsupported`
+    );
+  }
+}
+
+function assertReactTestRendererShallowBehavior(moduleExports, entry, label) {
+  const expectedShallow = entry.reactTestRendererShallow;
+  if (!expectedShallow) {
+    return;
+  }
+
+  assert.equal(typeof moduleExports, 'function', `${label} type`);
+  assert.equal(moduleExports.name, expectedShallow.functionName, `${label} name`);
+  assert.equal(moduleExports.length, expectedShallow.length, `${label} length`);
+
+  for (const [action, callback] of [
+    ['was called', () => moduleExports()],
+    ['was constructed', () => new moduleExports()]
+  ]) {
+    assert.throws(
+      callback,
+      (error) => {
+        assert.equal(
+          error.name,
+          'FastReactTestRendererShallowUnsupportedError',
+          `${label} ${action} error name`
+        );
+        assert.equal(
+          error.code,
+          'FAST_REACT_TEST_RENDERER_SHALLOW_UNSUPPORTED',
+          `${label} ${action} error code`
+        );
+        assert.equal(
+          error.entrypoint,
+          entry.metadata.entrypoint,
+          `${label} ${action} entrypoint`
+        );
+        assert.equal(
+          error.compatibilityTarget,
+          entry.metadata.compatibilityTarget,
+          `${label} ${action} compatibility target`
+        );
+        assert.equal(
+          Object.hasOwn(error, 'exportName'),
+          false,
+          `${label} ${action} export name`
+        );
+        assert.equal(
+          error.message.includes('public package subpath'),
+          true,
+          `${label} ${action} message`
+        );
+        return true;
+      },
+      `${label} ${action} should remain unsupported`
+    );
+  }
+}
+
 function assertUnsupportedExports(moduleExports, entry, label) {
   for (const expectedExport of entry.unsupportedExports ?? []) {
     assertUnsupportedExport(moduleExports, entry, expectedExport, label);
+  }
+}
+
+function assertPackageMetadata(packageJson, expectedPackage, packageName) {
+  if (expectedPackage.packageJsonKeys) {
+    assert.deepEqual(
+      Object.keys(packageJson),
+      expectedPackage.packageJsonKeys,
+      `${packageName} package.json keys`
+    );
+  }
+
+  for (const [field, expectedValue] of Object.entries(
+    expectedPackage.packageMetadata ?? {}
+  )) {
+    assert.deepEqual(
+      packageJson[field],
+      expectedValue,
+      `${packageName} package.json ${field}`
+    );
+  }
+}
+
+function assertPhysicalNoExportsSubpaths(
+  surfaceManifest,
+  publicResolverFiles,
+  expectedPackage,
+  packageName
+) {
+  if (!expectedPackage.physicalNoExportsSubpaths) {
+    return;
+  }
+
+  assert.equal(
+    surfaceManifest.exports,
+    null,
+    `${packageName} must keep no exports map for physical subpaths`
+  );
+
+  const physicalFiles = [
+    ...new Set(
+      expectedPackage.physicalNoExportsSubpaths.map((subpath) => subpath.file)
+    )
+  ].sort();
+  assert.deepEqual(
+    physicalFiles,
+    publicResolverFiles,
+    `${packageName} physical no-exports file set`
+  );
+
+  for (const subpath of expectedPackage.physicalNoExportsSubpaths) {
+    assert.equal(
+      subpath.specifier.startsWith(surfaceManifest.name),
+      true,
+      `${packageName} physical subpath ${subpath.specifier}`
+    );
+    assert.equal(
+      publicResolverFiles.includes(subpath.file),
+      true,
+      `${packageName} physical subpath ${subpath.specifier} target`
+    );
   }
 }
 
@@ -312,6 +598,8 @@ async function assertRuntimeEntrypoint(packageRoot, entry, packageName) {
   assertRuntimeVersion(moduleExports, entry, label);
   assertUndefinedExports(moduleExports, entry, label);
   assertUnsupportedExports(moduleExports, entry, label);
+  assertReactTestRendererRootBehavior(moduleExports, entry, label);
+  assertReactTestRendererShallowBehavior(moduleExports, entry, label);
 }
 
 async function publicResolverFiles(packageRoot, packageJson) {
@@ -353,17 +641,28 @@ for (const packageName of snapshot.packageDirectories) {
   );
   const surfaceManifest = manifestSurface(packageJson);
 
+  assertPackageMetadata(packageJson, expectedPackage, packageName);
+
   assert.deepEqual(
     surfaceManifest,
     expectedPackage.manifest,
     `${packageName} package.json public surface`
   );
 
-  const actualPublicFiles = await publicResolverFiles(packageRoot, surfaceManifest);
+  const actualPublicFiles = await publicResolverFiles(
+    packageRoot,
+    surfaceManifest
+  );
   assert.deepEqual(
     actualPublicFiles,
     expectedPackage.publicResolverFiles,
     `${packageName} public resolver files`
+  );
+  assertPhysicalNoExportsSubpaths(
+    surfaceManifest,
+    actualPublicFiles,
+    expectedPackage,
+    packageName
   );
 
   for (const publicFile of expectedPackage.publicResolverFiles) {
