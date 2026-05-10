@@ -24,7 +24,9 @@ mod root_bridge_requests {
 
     use crate::handle_table::{
         BridgeEnvironmentId, BridgeHandle, BridgeHandleAdmissionOutcome, BridgeHandleTable,
-        BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
+        BridgeHandleTableError, BridgeHandleTableTeardownIsolationDiagnostics,
+        PlaceholderRootRecord, PlaceholderValueRecord,
+        bridge_handle_table_cross_environment_teardown_diagnostics,
     };
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -639,6 +641,62 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn reconciler_execution(&self) -> bool {
             self.reconciler_execution
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeCrossEnvironmentTeardownGate {
+        status: &'static str,
+        handle_table_model: &'static str,
+        handle_table_diagnostics: BridgeHandleTableTeardownIsolationDiagnostics,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeCrossEnvironmentTeardownGate {
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_table_model(&self) -> &'static str {
+            self.handle_table_model
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_table_diagnostics(
+            &self,
+        ) -> &BridgeHandleTableTeardownIsolationDiagnostics {
+            &self.handle_table_diagnostics
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
         }
     }
 
@@ -1348,6 +1406,20 @@ mod root_bridge_requests {
                 NativeRootBridgeJsonTransportErrorDiagnosticRow::from_parse_error(case, &error)
             })
             .collect()
+    }
+
+    pub(crate) fn native_root_bridge_cross_environment_teardown_gate()
+    -> NativeRootBridgeCrossEnvironmentTeardownGate {
+        NativeRootBridgeCrossEnvironmentTeardownGate {
+            status: super::NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_GATE_STATUS,
+            handle_table_model: super::NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL,
+            handle_table_diagnostics: bridge_handle_table_cross_environment_teardown_diagnostics(),
+            native_addon_loaded: false,
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+            react_behavior_error: false,
+        }
     }
 
     fn parse_json_transport_payload_for_gate(
@@ -2759,6 +2831,8 @@ pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS: &str =
     "smoked-native-root-bridge-js-to-rust-json-transport";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSER_GATE_STATUS: &str =
     "parsed-native-root-bridge-json-transport-schema";
+pub const NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_GATE_STATUS: &str =
+    "diagnosed-native-root-bridge-cross-environment-teardown-isolation";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT: &str = "json";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION: u32 = 1;
 pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS: &str =
@@ -2831,6 +2905,23 @@ pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_RECORD_FIELDS: &[
 ];
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS: &[&str] =
     &["transport", "schemaVersion", "requestRecords"];
+pub const NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_DIAGNOSTIC_FIELDS: &[&str] = &[
+    "id",
+    "operation",
+    "handle_kind",
+    "table_environment_id",
+    "handle_environment_id",
+    "slot",
+    "handle_generation",
+    "current_generation",
+    "record_id",
+    "error_code",
+    "native_addon_loaded",
+    "native_execution",
+    "renderer_execution",
+    "reconciler_execution",
+    "react_behavior_error",
+];
 pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_RECORD_FIELDS: &[&str] = &[
     "request_id",
     "operation",
@@ -3255,6 +3346,7 @@ mod tests {
         NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
+        native_root_bridge_cross_environment_teardown_gate,
         native_root_bridge_json_transport_error_diagnostic_rows,
         parse_native_root_bridge_json_transport_for_gate,
         smoke_admit_js_native_root_bridge_handoff_records,
@@ -4324,6 +4416,98 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_cross_environment_teardown_gate_reports_inert_rows() {
+        fn row<'a>(
+            rows: &'a [crate::handle_table::BridgeHandleTableTeardownIsolationDiagnosticRow],
+            id: &str,
+        ) -> &'a crate::handle_table::BridgeHandleTableTeardownIsolationDiagnosticRow {
+            rows.iter()
+                .find(|row| row.id() == id)
+                .expect("diagnostic row exists")
+        }
+
+        let gate = native_root_bridge_cross_environment_teardown_gate();
+        let diagnostics = gate.handle_table_diagnostics();
+        let rows = diagnostics.rows();
+
+        assert_eq!(
+            gate.status(),
+            NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_GATE_STATUS
+        );
+        assert_eq!(
+            gate.handle_table_model(),
+            NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL
+        );
+        assert!(!gate.native_addon_loaded());
+        assert!(!gate.native_execution());
+        assert!(!gate.renderer_execution());
+        assert!(!gate.reconciler_execution());
+        assert!(!gate.react_behavior_error());
+        assert!(!diagnostics.mismatched_teardown().environment_matched());
+        assert_eq!(
+            diagnostics
+                .mismatched_teardown()
+                .total_handles_invalidated(),
+            0
+        );
+        assert!(diagnostics.matched_teardown().environment_matched());
+        assert_eq!(diagnostics.matched_teardown().root_handles_invalidated(), 1);
+        assert_eq!(
+            diagnostics.matched_teardown().value_handles_invalidated(),
+            1
+        );
+        assert_eq!(rows.len(), 12);
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.error_code() == Some("FAST_REACT_NAPI_STALE_HANDLE"))
+                .count(),
+            4
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.error_code() == Some("FAST_REACT_NAPI_WRONG_ENVIRONMENT"))
+                .count(),
+            2
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|row| !row.rejected_by_handle_table())
+                .count(),
+            6
+        );
+
+        let first_root = row(rows, "first-root-stale-after-own-teardown");
+        let first_value = row(rows, "first-value-stale-after-own-teardown");
+        assert_eq!(first_root.handle_kind(), BridgeHandleKind::Root);
+        assert_eq!(first_root.current_generation(), Some(2));
+        assert_eq!(first_value.handle_kind(), BridgeHandleKind::Value);
+        assert_eq!(first_value.current_generation(), Some(2));
+        assert_eq!(
+            first_root.table_environment_id(),
+            BridgeEnvironmentId::from_raw(496)
+        );
+        assert_eq!(
+            first_value.table_environment_id(),
+            BridgeEnvironmentId::from_raw(496)
+        );
+
+        let peer_root = row(rows, "peer-root-active-after-first-teardown");
+        let replacement_root = row(rows, "replacement-root-active-after-slot-reuse");
+        assert_eq!(peer_root.record_id(), Some(149601));
+        assert_eq!(peer_root.current_generation(), Some(1));
+        assert_eq!(
+            peer_root.handle_environment_id(),
+            BridgeEnvironmentId::from_raw(1496)
+        );
+        assert_eq!(replacement_root.record_id(), Some(49603));
+        assert_eq!(replacement_root.current_generation(), Some(2));
+        assert_eq!(
+            replacement_root.handle_environment_id(),
+            BridgeEnvironmentId::from_raw(496)
+        );
+    }
+
+    #[test]
     fn native_root_bridge_js_request_shape_metadata_matches_handle_validation_model() {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS,
@@ -4344,6 +4528,10 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSER_GATE_STATUS,
             "parsed-native-root-bridge-json-transport-schema"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_GATE_STATUS,
+            "diagnosed-native-root-bridge-cross-environment-teardown-isolation"
         );
         assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT, "json");
         assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION, 1);
@@ -4457,6 +4645,26 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS,
             &["transport", "schemaVersion", "requestRecords"]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_DIAGNOSTIC_FIELDS,
+            &[
+                "id",
+                "operation",
+                "handle_kind",
+                "table_environment_id",
+                "handle_environment_id",
+                "slot",
+                "handle_generation",
+                "current_generation",
+                "record_id",
+                "error_code",
+                "native_addon_loaded",
+                "native_execution",
+                "renderer_execution",
+                "reconciler_execution",
+                "react_behavior_error"
+            ]
         );
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSE_ERROR_CODES,

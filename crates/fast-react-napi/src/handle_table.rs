@@ -290,6 +290,186 @@ impl BridgeEnvironmentTeardown {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BridgeHandleTableTeardownIsolationDiagnostics {
+    mismatched_teardown: BridgeEnvironmentTeardown,
+    matched_teardown: BridgeEnvironmentTeardown,
+    rows: Vec<BridgeHandleTableTeardownIsolationDiagnosticRow>,
+}
+
+impl BridgeHandleTableTeardownIsolationDiagnostics {
+    fn new(
+        mismatched_teardown: BridgeEnvironmentTeardown,
+        matched_teardown: BridgeEnvironmentTeardown,
+        rows: Vec<BridgeHandleTableTeardownIsolationDiagnosticRow>,
+    ) -> Self {
+        Self {
+            mismatched_teardown,
+            matched_teardown,
+            rows,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn mismatched_teardown(&self) -> BridgeEnvironmentTeardown {
+        self.mismatched_teardown
+    }
+
+    #[must_use]
+    pub(crate) const fn matched_teardown(&self) -> BridgeEnvironmentTeardown {
+        self.matched_teardown
+    }
+
+    #[must_use]
+    pub(crate) fn rows(&self) -> &[BridgeHandleTableTeardownIsolationDiagnosticRow] {
+        &self.rows
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BridgeHandleTableTeardownIsolationDiagnosticRow {
+    id: &'static str,
+    operation: &'static str,
+    handle_kind: BridgeHandleKind,
+    table_environment_id: BridgeEnvironmentId,
+    handle_environment_id: BridgeEnvironmentId,
+    slot: u64,
+    handle_generation: u64,
+    current_generation: Option<u64>,
+    record_id: Option<u64>,
+    error_code: Option<&'static str>,
+}
+
+impl BridgeHandleTableTeardownIsolationDiagnosticRow {
+    fn active(
+        id: &'static str,
+        operation: &'static str,
+        table: &BridgeHandleTable,
+        handle: BridgeHandle,
+        record_id: u64,
+    ) -> Self {
+        Self {
+            id,
+            operation,
+            handle_kind: handle.kind(),
+            table_environment_id: table.environment_id(),
+            handle_environment_id: handle.environment_id(),
+            slot: handle.slot(),
+            handle_generation: handle.generation(),
+            current_generation: Some(handle.generation()),
+            record_id: Some(record_id),
+            error_code: None,
+        }
+    }
+
+    fn rejected(
+        id: &'static str,
+        operation: &'static str,
+        table: &BridgeHandleTable,
+        handle: BridgeHandle,
+        error: BridgeHandleTableError,
+    ) -> Self {
+        let current_generation = match error {
+            BridgeHandleTableError::StaleHandle {
+                current_generation, ..
+            } => Some(current_generation),
+            _ => None,
+        };
+
+        Self {
+            id,
+            operation,
+            handle_kind: handle.kind(),
+            table_environment_id: table.environment_id(),
+            handle_environment_id: handle.environment_id(),
+            slot: handle.slot(),
+            handle_generation: handle.generation(),
+            current_generation,
+            record_id: None,
+            error_code: Some(error.code()),
+        }
+    }
+
+    fn root_lookup(
+        id: &'static str,
+        operation: &'static str,
+        table: &BridgeHandleTable,
+        handle: BridgeHandle,
+    ) -> Self {
+        match table.get_root(handle) {
+            Ok(record) => Self::active(id, operation, table, handle, record.root_id()),
+            Err(error) => Self::rejected(id, operation, table, handle, error),
+        }
+    }
+
+    fn value_lookup(
+        id: &'static str,
+        operation: &'static str,
+        table: &BridgeHandleTable,
+        handle: BridgeHandle,
+    ) -> Self {
+        match table.get_value(handle) {
+            Ok(record) => Self::active(id, operation, table, handle, record.value_id()),
+            Err(error) => Self::rejected(id, operation, table, handle, error),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn id(self) -> &'static str {
+        self.id
+    }
+
+    #[must_use]
+    pub(crate) const fn operation(self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub(crate) const fn handle_kind(self) -> BridgeHandleKind {
+        self.handle_kind
+    }
+
+    #[must_use]
+    pub(crate) const fn table_environment_id(self) -> BridgeEnvironmentId {
+        self.table_environment_id
+    }
+
+    #[must_use]
+    pub(crate) const fn handle_environment_id(self) -> BridgeEnvironmentId {
+        self.handle_environment_id
+    }
+
+    #[must_use]
+    pub(crate) const fn slot(self) -> u64 {
+        self.slot
+    }
+
+    #[must_use]
+    pub(crate) const fn handle_generation(self) -> u64 {
+        self.handle_generation
+    }
+
+    #[must_use]
+    pub(crate) const fn current_generation(self) -> Option<u64> {
+        self.current_generation
+    }
+
+    #[must_use]
+    pub(crate) const fn record_id(self) -> Option<u64> {
+        self.record_id
+    }
+
+    #[must_use]
+    pub(crate) const fn error_code(self) -> Option<&'static str> {
+        self.error_code
+    }
+
+    #[must_use]
+    pub(crate) const fn rejected_by_handle_table(self) -> bool {
+        self.error_code.is_some()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum BridgeHandleSlot {
     Vacant { next_generation: u64 },
     Occupied(BridgeHandleEntry),
@@ -709,6 +889,104 @@ impl BridgeHandleTable {
 
         &mut self.slots[(handle.slot() - 1) as usize]
     }
+}
+
+pub(crate) fn bridge_handle_table_cross_environment_teardown_diagnostics()
+-> BridgeHandleTableTeardownIsolationDiagnostics {
+    let mut first = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(496));
+    let mut peer = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(1496));
+    let first_root = first.insert_root(PlaceholderRootRecord::new(49601));
+    let first_value = first.insert_value(PlaceholderValueRecord::new(49602));
+    let peer_root = peer.insert_root(PlaceholderRootRecord::new(149601));
+    let peer_value = peer.insert_value(PlaceholderValueRecord::new(149602));
+
+    let mismatched_teardown = first.teardown_environment(peer.environment_id());
+    let mut rows = vec![
+        BridgeHandleTableTeardownIsolationDiagnosticRow::root_lookup(
+            "first-root-active-after-mismatched-teardown",
+            "mismatched-teardown",
+            &first,
+            first_root,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::value_lookup(
+            "first-value-active-after-mismatched-teardown",
+            "mismatched-teardown",
+            &first,
+            first_value,
+        ),
+    ];
+
+    let matched_teardown = first.teardown_environment(first.environment_id());
+    rows.extend([
+        BridgeHandleTableTeardownIsolationDiagnosticRow::root_lookup(
+            "first-root-stale-after-own-teardown",
+            "matched-teardown",
+            &first,
+            first_root,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::value_lookup(
+            "first-value-stale-after-own-teardown",
+            "matched-teardown",
+            &first,
+            first_value,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::root_lookup(
+            "first-root-wrong-environment-in-peer-table",
+            "wrong-environment-validation",
+            &peer,
+            first_root,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::value_lookup(
+            "first-value-wrong-environment-in-peer-table",
+            "wrong-environment-validation",
+            &peer,
+            first_value,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::root_lookup(
+            "peer-root-active-after-first-teardown",
+            "post-teardown-peer-validation",
+            &peer,
+            peer_root,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::value_lookup(
+            "peer-value-active-after-first-teardown",
+            "post-teardown-peer-validation",
+            &peer,
+            peer_value,
+        ),
+    ]);
+
+    let replacement_root = first.insert_root(PlaceholderRootRecord::new(49603));
+    let replacement_value = first.insert_value(PlaceholderValueRecord::new(49604));
+
+    rows.extend([
+        BridgeHandleTableTeardownIsolationDiagnosticRow::root_lookup(
+            "first-root-stale-after-slot-reuse",
+            "post-reuse-stale-validation",
+            &first,
+            first_root,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::value_lookup(
+            "first-value-stale-after-slot-reuse",
+            "post-reuse-stale-validation",
+            &first,
+            first_value,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::root_lookup(
+            "replacement-root-active-after-slot-reuse",
+            "post-reuse-active-validation",
+            &first,
+            replacement_root,
+        ),
+        BridgeHandleTableTeardownIsolationDiagnosticRow::value_lookup(
+            "replacement-value-active-after-slot-reuse",
+            "post-reuse-active-validation",
+            &first,
+            replacement_value,
+        ),
+    ]);
+
+    BridgeHandleTableTeardownIsolationDiagnostics::new(mismatched_teardown, matched_teardown, rows)
 }
 
 fn validate_entry_generation(
@@ -1149,6 +1427,125 @@ mod tests {
                 current_generation: replacement_value.generation(),
             }
         );
+    }
+
+    #[test]
+    fn cross_environment_teardown_diagnostics_track_root_and_value_generations() {
+        fn row<'a>(
+            rows: &'a [BridgeHandleTableTeardownIsolationDiagnosticRow],
+            id: &str,
+        ) -> &'a BridgeHandleTableTeardownIsolationDiagnosticRow {
+            rows.iter()
+                .find(|row| row.id() == id)
+                .expect("diagnostic row exists")
+        }
+
+        let diagnostics = bridge_handle_table_cross_environment_teardown_diagnostics();
+        let mismatched_teardown = diagnostics.mismatched_teardown();
+        let matched_teardown = diagnostics.matched_teardown();
+        let rows = diagnostics.rows();
+
+        assert_eq!(
+            mismatched_teardown.requested_environment_id(),
+            BridgeEnvironmentId::from_raw(1496)
+        );
+        assert_eq!(
+            mismatched_teardown.table_environment_id(),
+            BridgeEnvironmentId::from_raw(496)
+        );
+        assert!(!mismatched_teardown.environment_matched());
+        assert_eq!(mismatched_teardown.total_handles_invalidated(), 0);
+        assert_eq!(
+            matched_teardown.requested_environment_id(),
+            BridgeEnvironmentId::from_raw(496)
+        );
+        assert!(matched_teardown.environment_matched());
+        assert_eq!(matched_teardown.root_handles_invalidated(), 1);
+        assert_eq!(matched_teardown.value_handles_invalidated(), 1);
+        assert_eq!(matched_teardown.total_handles_invalidated(), 2);
+        assert_eq!(rows.len(), 12);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "first-root-active-after-mismatched-teardown",
+                "first-value-active-after-mismatched-teardown",
+                "first-root-stale-after-own-teardown",
+                "first-value-stale-after-own-teardown",
+                "first-root-wrong-environment-in-peer-table",
+                "first-value-wrong-environment-in-peer-table",
+                "peer-root-active-after-first-teardown",
+                "peer-value-active-after-first-teardown",
+                "first-root-stale-after-slot-reuse",
+                "first-value-stale-after-slot-reuse",
+                "replacement-root-active-after-slot-reuse",
+                "replacement-value-active-after-slot-reuse"
+            ]
+        );
+
+        let first_root_stale = row(rows, "first-root-stale-after-own-teardown");
+        let first_value_stale = row(rows, "first-value-stale-after-own-teardown");
+        let first_root_reuse_stale = row(rows, "first-root-stale-after-slot-reuse");
+        let first_value_reuse_stale = row(rows, "first-value-stale-after-slot-reuse");
+
+        for stale_row in [
+            first_root_stale,
+            first_value_stale,
+            first_root_reuse_stale,
+            first_value_reuse_stale,
+        ] {
+            assert!(stale_row.rejected_by_handle_table());
+            assert_eq!(stale_row.error_code(), Some("FAST_REACT_NAPI_STALE_HANDLE"));
+            assert_eq!(
+                stale_row.current_generation(),
+                Some(stale_row.handle_generation() + 1)
+            );
+            assert_eq!(
+                stale_row.table_environment_id(),
+                stale_row.handle_environment_id()
+            );
+        }
+
+        assert_eq!(first_root_stale.handle_kind(), BridgeHandleKind::Root);
+        assert_eq!(first_value_stale.handle_kind(), BridgeHandleKind::Value);
+        assert_eq!(first_root_stale.slot(), 1);
+        assert_eq!(first_value_stale.slot(), 2);
+        assert_eq!(first_root_stale.operation(), "matched-teardown");
+        assert_eq!(
+            first_value_reuse_stale.operation(),
+            "post-reuse-stale-validation"
+        );
+
+        let wrong_environment_root = row(rows, "first-root-wrong-environment-in-peer-table");
+        let wrong_environment_value = row(rows, "first-value-wrong-environment-in-peer-table");
+        for wrong_environment_row in [wrong_environment_root, wrong_environment_value] {
+            assert_eq!(
+                wrong_environment_row.error_code(),
+                Some("FAST_REACT_NAPI_WRONG_ENVIRONMENT")
+            );
+            assert_eq!(wrong_environment_row.current_generation(), None);
+            assert_ne!(
+                wrong_environment_row.table_environment_id(),
+                wrong_environment_row.handle_environment_id()
+            );
+        }
+
+        let peer_root = row(rows, "peer-root-active-after-first-teardown");
+        let peer_value = row(rows, "peer-value-active-after-first-teardown");
+        assert_eq!(peer_root.error_code(), None);
+        assert_eq!(peer_root.record_id(), Some(149601));
+        assert_eq!(peer_root.current_generation(), Some(1));
+        assert_eq!(peer_value.error_code(), None);
+        assert_eq!(peer_value.record_id(), Some(149602));
+        assert_eq!(peer_value.current_generation(), Some(1));
+
+        let replacement_root = row(rows, "replacement-root-active-after-slot-reuse");
+        let replacement_value = row(rows, "replacement-value-active-after-slot-reuse");
+        assert_eq!(replacement_root.error_code(), None);
+        assert_eq!(replacement_root.record_id(), Some(49603));
+        assert_eq!(replacement_root.current_generation(), Some(2));
+        assert_eq!(replacement_value.error_code(), None);
+        assert_eq!(replacement_value.record_id(), Some(49604));
+        assert_eq!(replacement_value.current_generation(), Some(2));
     }
 
     #[test]
