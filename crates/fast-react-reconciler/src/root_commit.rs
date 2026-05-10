@@ -30,8 +30,8 @@ use crate::root_callbacks::{
     materialize_root_update_callback_invocation_gate,
 };
 use crate::root_config::{
-    PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveUnmountOrigin,
-    RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord,
+    PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
+    PendingPassiveUnmountOrigin, RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord,
 };
 use crate::unsupported_features::unsupported_reconciler_feature_for_fiber_tag;
 use crate::{
@@ -117,6 +117,41 @@ pub enum RootCommitError {
         root: FiberRootId,
         expected: Lanes,
         actual: Lanes,
+    },
+    CommittedPassiveEffectHandoffPendingRootMismatch {
+        commit_root: FiberRootId,
+        pending_root: Option<FiberRootId>,
+    },
+    CommittedPassiveEffectHandoffFinishedWorkMismatch {
+        root: FiberRootId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+    },
+    CommittedPassiveEffectHandoffRecordCountMismatch {
+        root: FiberRootId,
+        expected_unmounts: usize,
+        actual_unmounts: usize,
+        expected_mounts: usize,
+        actual_mounts: usize,
+    },
+    CommittedPassiveEffectHandoffDuplicateOrder {
+        root: FiberRootId,
+        order: PendingPassiveEffectOrder,
+    },
+    CommittedPassiveEffectHandoffFiberStale {
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+    },
+    CommittedPassiveEffectHandoffCommittedQueueMissing {
+        root: FiberRootId,
+        fiber: FiberId,
+    },
+    CommittedPassiveEffectHandoffRecordMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        effect: Option<HookEffectId>,
+        message: String,
     },
     RefHostInstanceMissing {
         root: FiberRootId,
@@ -338,6 +373,78 @@ impl Display for RootCommitError {
                 actual,
                 expected
             ),
+            Self::CommittedPassiveEffectHandoffPendingRootMismatch {
+                commit_root,
+                pending_root,
+            } => write!(
+                formatter,
+                "commit root {} cannot record committed passive effect records with pending passive root {:?}",
+                commit_root.raw(),
+                pending_root.map(FiberRootId::raw)
+            ),
+            Self::CommittedPassiveEffectHandoffFinishedWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} committed passive effect handoff expected finished work fiber slot {}, found {:?}",
+                root.raw(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get())
+            ),
+            Self::CommittedPassiveEffectHandoffRecordCountMismatch {
+                root,
+                expected_unmounts,
+                actual_unmounts,
+                expected_mounts,
+                actual_mounts,
+            } => write!(
+                formatter,
+                "root {} committed passive effect handoff expected {} unmount and {} mount records, found {} unmount and {} mount records",
+                root.raw(),
+                expected_unmounts,
+                expected_mounts,
+                actual_unmounts,
+                actual_mounts
+            ),
+            Self::CommittedPassiveEffectHandoffDuplicateOrder { root, order } => write!(
+                formatter,
+                "root {} committed passive effect handoff has duplicate {:?} passive order {}",
+                root.raw(),
+                order.phase(),
+                order.sequence()
+            ),
+            Self::CommittedPassiveEffectHandoffFiberStale {
+                root,
+                finished_work,
+                fiber,
+            } => write!(
+                formatter,
+                "root {} committed passive effect handoff fiber slot {} is not in committed finished work subtree rooted at slot {}",
+                root.raw(),
+                fiber.slot().get(),
+                finished_work.slot().get()
+            ),
+            Self::CommittedPassiveEffectHandoffCommittedQueueMissing { root, fiber } => write!(
+                formatter,
+                "root {} committed passive effect handoff for function component fiber slot {} has no committed effect queue",
+                root.raw(),
+                fiber.slot().get()
+            ),
+            Self::CommittedPassiveEffectHandoffRecordMismatch {
+                root,
+                fiber,
+                effect,
+                message,
+            } => write!(
+                formatter,
+                "root {} committed passive effect handoff rejected mismatched function component fiber slot {} effect slot {:?}: {}",
+                root.raw(),
+                fiber.slot().get(),
+                effect.map(|effect| effect.slot().get()),
+                message
+            ),
             Self::RefHostInstanceMissing { root, fiber } => write!(
                 formatter,
                 "root {} ref metadata for HostComponent fiber slot {} requires a host instance state node",
@@ -538,6 +645,13 @@ impl Error for RootCommitError {
             | Self::CommittedPassiveEffectsWithoutPendingPassiveHandoff { .. }
             | Self::CommittedPassiveEffectHandoffRootMismatch { .. }
             | Self::CommittedPassiveEffectHandoffLanesMismatch { .. }
+            | Self::CommittedPassiveEffectHandoffPendingRootMismatch { .. }
+            | Self::CommittedPassiveEffectHandoffFinishedWorkMismatch { .. }
+            | Self::CommittedPassiveEffectHandoffRecordCountMismatch { .. }
+            | Self::CommittedPassiveEffectHandoffDuplicateOrder { .. }
+            | Self::CommittedPassiveEffectHandoffFiberStale { .. }
+            | Self::CommittedPassiveEffectHandoffCommittedQueueMissing { .. }
+            | Self::CommittedPassiveEffectHandoffRecordMismatch { .. }
             | Self::RefHostInstanceMissing { .. }
             | Self::EmptyFinishedLanes { .. }
             | Self::CurrentMismatch { .. }
@@ -4127,6 +4241,300 @@ pub enum HostRootCommitOrderMetadataKindForCanary {
     PassiveMount,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentEffectListCommitPhaseOrderSnapshot {
+    root: Option<FiberRootId>,
+    finished_work: Option<FiberId>,
+    lanes: Lanes,
+    records: Vec<FunctionComponentEffectListCommitPhaseOrderRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private function-component effect-list commit phase order diagnostics"
+)]
+impl FunctionComponentEffectListCommitPhaseOrderSnapshot {
+    #[must_use]
+    pub(crate) const fn root(&self) -> Option<FiberRootId> {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> Option<FiberId> {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[FunctionComponentEffectListCommitPhaseOrderRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn before_mutation_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.phase() == FunctionComponentEffectListCommitPhase::BeforeMutation
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn layout_destroy_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn layout_create_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn passive_unmount_schedule_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.kind()
+                    == FunctionComponentEffectListCommitPhaseOrderKind::PassiveUnmountScheduled
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn passive_mount_schedule_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.kind()
+                    == FunctionComponentEffectListCommitPhaseOrderKind::PassiveMountScheduled
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_commit_phase_order(&self) -> bool {
+        self.records
+            .iter()
+            .enumerate()
+            .all(|(sequence, record)| record.sequence() == sequence)
+            && self.records.windows(2).all(|pair| {
+                function_component_effect_list_commit_phase_order(pair[0].phase())
+                    <= function_component_effect_list_commit_phase_order(pair[1].phase())
+            })
+    }
+
+    #[must_use]
+    pub(crate) const fn layout_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_execution_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_effect_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    fn push(&mut self, input: FunctionComponentEffectListCommitPhaseOrderRecordInput) {
+        self.records
+            .push(FunctionComponentEffectListCommitPhaseOrderRecord {
+                sequence: self.records.len(),
+                phase: input.phase,
+                kind: input.kind,
+                root: input.root,
+                finished_work: input.finished_work,
+                fiber: input.fiber,
+                hook_list: input.hook_list,
+                render_phase: input.render_phase,
+                lanes: input.lanes,
+                effect_index: input.effect_index,
+                effect: input.effect,
+                previous_effect: input.previous_effect,
+                create: input.create,
+                destroy: input.destroy,
+                source_order: input.source_order,
+            });
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentEffectListCommitPhaseOrderRecordInput {
+    phase: FunctionComponentEffectListCommitPhase,
+    kind: FunctionComponentEffectListCommitPhaseOrderKind,
+    root: FiberRootId,
+    finished_work: FiberId,
+    fiber: FiberId,
+    hook_list: HookListId,
+    render_phase: FunctionComponentHookRenderPhase,
+    lanes: Lanes,
+    effect_index: Option<usize>,
+    effect: Option<HookEffectId>,
+    previous_effect: Option<HookEffectId>,
+    create: Option<HookEffectCallbackHandle>,
+    destroy: Option<HookEffectCallbackHandle>,
+    source_order: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentEffectListCommitPhaseOrderRecord {
+    sequence: usize,
+    phase: FunctionComponentEffectListCommitPhase,
+    kind: FunctionComponentEffectListCommitPhaseOrderKind,
+    root: FiberRootId,
+    finished_work: FiberId,
+    fiber: FiberId,
+    hook_list: HookListId,
+    render_phase: FunctionComponentHookRenderPhase,
+    lanes: Lanes,
+    effect_index: Option<usize>,
+    effect: Option<HookEffectId>,
+    previous_effect: Option<HookEffectId>,
+    create: Option<HookEffectCallbackHandle>,
+    destroy: Option<HookEffectCallbackHandle>,
+    source_order: u64,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private function-component effect-list commit phase order diagnostics"
+)]
+impl FunctionComponentEffectListCommitPhaseOrderRecord {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn phase(self) -> FunctionComponentEffectListCommitPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub(crate) const fn phase_name(self) -> &'static str {
+        function_component_effect_list_commit_phase_name(self.phase)
+    }
+
+    #[must_use]
+    pub(crate) const fn kind(self) -> FunctionComponentEffectListCommitPhaseOrderKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub(crate) const fn kind_name(self) -> &'static str {
+        function_component_effect_list_commit_phase_order_kind_name(self.kind)
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(self) -> FunctionComponentHookRenderPhase {
+        self.render_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_index(self) -> Option<usize> {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub(crate) const fn effect(self) -> Option<HookEffectId> {
+        self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
+    }
+
+    #[must_use]
+    pub(crate) const fn create(self) -> Option<HookEffectCallbackHandle> {
+        self.create
+    }
+
+    #[must_use]
+    pub(crate) const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub(crate) const fn source_order(self) -> u64 {
+        self.source_order
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentEffectListCommitPhase {
+    BeforeMutation,
+    Mutation,
+    Layout,
+    PassiveScheduling,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentEffectListCommitPhaseOrderKind {
+    EffectListBeforeMutation,
+    LayoutDestroy,
+    LayoutCreate,
+    PassiveUnmountScheduled,
+    PassiveMountScheduled,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
@@ -4144,6 +4552,8 @@ pub struct HostRootCommitRecord {
     function_component_deleted_subtree_passive_effects:
         FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
     function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot,
+    function_component_effect_list_commit_phase_order:
+        FunctionComponentEffectListCommitPhaseOrderSnapshot,
     deletion_lists: Vec<HostRootDeletionListRecord>,
     deletion_subtree_traversal_gate: HostRootDeletionSubtreeTraversalGateSnapshot,
     host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
@@ -4686,6 +5096,69 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "crate-private function-component effect-list commit phase order diagnostics"
+    )]
+    #[must_use]
+    pub(crate) const fn function_component_effect_list_commit_phase_order(
+        &self,
+    ) -> &FunctionComponentEffectListCommitPhaseOrderSnapshot {
+        &self.function_component_effect_list_commit_phase_order
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private function-component effect-list commit phase order diagnostics"
+    )]
+    pub(crate) fn record_function_component_effect_list_commit_phase_order_for_canary<
+        H: HostTypes,
+    >(
+        &mut self,
+        store: &FiberRootStore<H>,
+        hook_store: &mut FunctionComponentHookRenderStore,
+        passive_handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+    ) -> Result<&FunctionComponentEffectListCommitPhaseOrderSnapshot, RootCommitError> {
+        let store_current = store.root(self.root)?.current();
+        if store_current != self.current {
+            return Err(RootCommitError::LayoutEffectHandoffCurrentMismatch {
+                root: self.root,
+                commit_current: self.current,
+                store_current,
+            });
+        }
+
+        let layout_snapshot = self
+            .record_function_component_layout_effects_for_canary(store, hook_store)?
+            .clone();
+        let passive_phase_records = validate_function_component_effect_list_passive_handoffs(
+            store,
+            self.root,
+            self.current,
+            self.finished_lanes,
+            self.pending_passive_handoff,
+            hook_store,
+            passive_handoffs,
+        )?;
+        let passive_snapshot = self
+            .record_function_component_committed_passive_effects_for_canary(passive_handoffs)?
+            .clone();
+
+        self.function_component_effect_list_commit_phase_order =
+            build_function_component_effect_list_commit_phase_order_snapshot(
+                store,
+                self.root,
+                self.current,
+                self.finished_lanes,
+                hook_store,
+                &layout_snapshot,
+                &passive_snapshot,
+                &passive_phase_records,
+            )?;
+
+        Ok(&self.function_component_effect_list_commit_phase_order)
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private deletion metadata for future mutation/passive deletion workers"
     )]
     #[must_use]
@@ -4959,6 +5432,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         function_component_deleted_subtree_passive_effects:
             FunctionComponentDeletedSubtreePassiveEffectsSnapshot::default(),
         function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot::default(),
+        function_component_effect_list_commit_phase_order:
+            FunctionComponentEffectListCommitPhaseOrderSnapshot::default(),
         deletion_lists,
         deletion_subtree_traversal_gate,
         host_node_deletion_cleanup_log,
@@ -5472,6 +5947,488 @@ const fn function_component_layout_effect_commit_record(
         dependencies: metadata.dependencies(),
         dependency_status: metadata.dependency_status(),
         lanes: metadata.lanes(),
+    }
+}
+
+fn validate_function_component_effect_list_passive_handoffs<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+    pending_handoff: Option<PendingPassiveCommitHandoff>,
+    hook_store: &FunctionComponentHookRenderStore,
+    passive_handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+) -> Result<Vec<FunctionComponentPendingPassiveEffectPhaseCommitRecord>, RootCommitError> {
+    let Some(pending_handoff) = pending_handoff else {
+        if passive_handoffs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        return Err(RootCommitError::CommittedPassiveEffectsWithoutPendingPassiveHandoff { root });
+    };
+
+    if pending_handoff.root() != root {
+        return Err(RootCommitError::CommittedPassiveEffectHandoffRootMismatch {
+            commit_root: root,
+            handoff_root: pending_handoff.root(),
+        });
+    }
+    if pending_handoff.finished_work() != finished_work {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffFinishedWorkMismatch {
+                root,
+                expected: finished_work,
+                actual: Some(pending_handoff.finished_work()),
+            },
+        );
+    }
+    if pending_handoff.lanes() != lanes {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                root,
+                expected: lanes,
+                actual: pending_handoff.lanes(),
+            },
+        );
+    }
+
+    let pending_passive = store.root(root)?.scheduling().pending_passive();
+    validate_function_component_effect_list_pending_passive_handoff(
+        pending_handoff,
+        pending_passive,
+    )?;
+
+    let mut phase_records = Vec::new();
+    let mut actual_unmounts = 0;
+    let mut actual_mounts = 0;
+
+    for passive_handoff in passive_handoffs {
+        if passive_handoff.root() != root {
+            return Err(RootCommitError::CommittedPassiveEffectHandoffRootMismatch {
+                commit_root: root,
+                handoff_root: passive_handoff.root(),
+            });
+        }
+        if passive_handoff.lanes() != lanes {
+            return Err(
+                RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                    root,
+                    expected: lanes,
+                    actual: passive_handoff.lanes(),
+                },
+            );
+        }
+        if !committed_subtree_contains_fiber(
+            store.fiber_arena(),
+            finished_work,
+            passive_handoff.fiber(),
+        )? {
+            return Err(RootCommitError::CommittedPassiveEffectHandoffFiberStale {
+                root,
+                finished_work,
+                fiber: passive_handoff.fiber(),
+            });
+        }
+
+        let Some(queue) = hook_store.committed_effect_queue(passive_handoff.fiber()) else {
+            return Err(
+                RootCommitError::CommittedPassiveEffectHandoffCommittedQueueMissing {
+                    root,
+                    fiber: passive_handoff.fiber(),
+                },
+            );
+        };
+        validate_function_component_effect_list_committed_queue(
+            root,
+            queue,
+            passive_handoff.phase(),
+            lanes,
+            passive_handoff
+                .records()
+                .first()
+                .map(|record| record.effect()),
+        )?;
+        for record in passive_handoff.records() {
+            validate_function_component_effect_list_passive_record(root, queue, *record)?;
+        }
+
+        actual_unmounts += passive_handoff.queued_unmount_count();
+        actual_mounts += passive_handoff.queued_mount_count();
+        phase_records.extend(passive_handoff.effect_phase_records());
+    }
+
+    if actual_unmounts != pending_handoff.pending_unmount_count()
+        || actual_mounts != pending_handoff.pending_mount_count()
+    {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffRecordCountMismatch {
+                root,
+                expected_unmounts: pending_handoff.pending_unmount_count(),
+                actual_unmounts,
+                expected_mounts: pending_handoff.pending_mount_count(),
+                actual_mounts,
+            },
+        );
+    }
+
+    phase_records.sort_by_key(|record| record.order());
+    for pair in phase_records.windows(2) {
+        if pair[0].order() == pair[1].order() {
+            return Err(
+                RootCommitError::CommittedPassiveEffectHandoffDuplicateOrder {
+                    root,
+                    order: pair[0].order(),
+                },
+            );
+        }
+    }
+
+    for pending in pending_passive.flush_ordered_records() {
+        let Some(effect_record) = phase_records
+            .iter()
+            .find(|record| record.order() == pending.order())
+        else {
+            return Err(
+                RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                    root,
+                    fiber: pending.fiber(),
+                    effect: None,
+                    message: "pending passive order is missing from effect-list handoff".to_owned(),
+                },
+            );
+        };
+
+        if effect_record.fiber() != pending.fiber()
+            || effect_record.phase() != pending.order().phase()
+            || effect_record.lanes() != pending.lanes()
+        {
+            return Err(
+                RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                    root,
+                    fiber: pending.fiber(),
+                    effect: Some(effect_record.effect()),
+                    message: "pending passive record does not match effect-list handoff".to_owned(),
+                },
+            );
+        }
+    }
+
+    Ok(phase_records)
+}
+
+fn validate_function_component_effect_list_pending_passive_handoff(
+    handoff: PendingPassiveCommitHandoff,
+    pending_passive: &PendingPassiveState,
+) -> Result<(), RootCommitError> {
+    if pending_passive.root() != Some(handoff.root()) {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffPendingRootMismatch {
+                commit_root: handoff.root(),
+                pending_root: pending_passive.root(),
+            },
+        );
+    }
+    if pending_passive.finished_work() != Some(handoff.finished_work()) {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffFinishedWorkMismatch {
+                root: handoff.root(),
+                expected: handoff.finished_work(),
+                actual: pending_passive.finished_work(),
+            },
+        );
+    }
+    if pending_passive.lanes() != handoff.lanes() {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                root: handoff.root(),
+                expected: handoff.lanes(),
+                actual: pending_passive.lanes(),
+            },
+        );
+    }
+
+    let actual_unmounts = pending_passive.passive_unmounts().len();
+    let actual_mounts = pending_passive.passive_mounts().len();
+    if actual_unmounts != handoff.pending_unmount_count()
+        || actual_mounts != handoff.pending_mount_count()
+    {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffRecordCountMismatch {
+                root: handoff.root(),
+                expected_unmounts: handoff.pending_unmount_count(),
+                actual_unmounts,
+                expected_mounts: handoff.pending_mount_count(),
+                actual_mounts,
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_function_component_effect_list_committed_queue(
+    root: FiberRootId,
+    queue: &FunctionComponentCommittedEffectQueue,
+    phase: FunctionComponentHookRenderPhase,
+    lanes: Lanes,
+    effect: Option<HookEffectId>,
+) -> Result<(), RootCommitError> {
+    if queue.phase() != phase {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                root,
+                fiber: queue.fiber(),
+                effect,
+                message: "committed effect queue phase does not match passive handoff".to_owned(),
+            },
+        );
+    }
+    if queue.lanes() != lanes {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                root,
+                expected: lanes,
+                actual: queue.lanes(),
+            },
+        );
+    }
+    Ok(())
+}
+
+fn validate_function_component_effect_list_passive_record(
+    root: FiberRootId,
+    queue: &FunctionComponentCommittedEffectQueue,
+    record: FunctionComponentPendingPassiveEffectCommitRecord,
+) -> Result<(), RootCommitError> {
+    if record.fiber() != queue.fiber() {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                root,
+                fiber: record.fiber(),
+                effect: Some(record.effect()),
+                message: "passive effect record fiber does not match committed queue owner"
+                    .to_owned(),
+            },
+        );
+    }
+    if record.lanes() != queue.lanes() {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                root,
+                expected: queue.lanes(),
+                actual: record.lanes(),
+            },
+        );
+    }
+
+    let Some(committed_record) = queue
+        .records()
+        .iter()
+        .find(|committed| committed.effect() == record.effect())
+    else {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                root,
+                fiber: record.fiber(),
+                effect: Some(record.effect()),
+                message: "passive effect record is missing from committed queue".to_owned(),
+            },
+        );
+    };
+
+    if !committed_record.accepted_for_pending_passive()
+        || committed_record.instance() != record.instance()
+        || committed_record.create() != record.create()
+        || committed_record.destroy() != record.destroy()
+    {
+        return Err(
+            RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                root,
+                fiber: record.fiber(),
+                effect: Some(record.effect()),
+                message: "passive effect record fields do not match committed queue".to_owned(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn committed_subtree_contains_fiber(
+    arena: &FiberArena,
+    fiber: FiberId,
+    target: FiberId,
+) -> Result<bool, RootCommitError> {
+    if fiber == target {
+        return Ok(true);
+    }
+
+    for child in arena.child_ids(fiber)? {
+        if committed_subtree_contains_fiber(arena, child, target)? {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn build_function_component_effect_list_commit_phase_order_snapshot<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+    hook_store: &FunctionComponentHookRenderStore,
+    layout_snapshot: &FunctionComponentLayoutEffectsSnapshot,
+    passive_snapshot: &FunctionComponentCommittedPassiveEffectsSnapshot,
+    passive_phase_records: &[FunctionComponentPendingPassiveEffectPhaseCommitRecord],
+) -> Result<FunctionComponentEffectListCommitPhaseOrderSnapshot, RootCommitError> {
+    let mut snapshot = FunctionComponentEffectListCommitPhaseOrderSnapshot {
+        root: Some(root),
+        finished_work: Some(finished_work),
+        lanes,
+        records: Vec::new(),
+    };
+    let mut effect_list_fibers = Vec::new();
+    collect_committed_function_component_effect_list_fibers(
+        store.fiber_arena(),
+        finished_work,
+        hook_store,
+        &mut effect_list_fibers,
+    )?;
+
+    for (source_order, fiber) in effect_list_fibers.iter().copied().enumerate() {
+        let Some(queue) = hook_store.committed_effect_queue(fiber) else {
+            continue;
+        };
+        snapshot.push(FunctionComponentEffectListCommitPhaseOrderRecordInput {
+            phase: FunctionComponentEffectListCommitPhase::BeforeMutation,
+            kind: FunctionComponentEffectListCommitPhaseOrderKind::EffectListBeforeMutation,
+            root,
+            finished_work,
+            fiber,
+            hook_list: queue.hook_list(),
+            render_phase: queue.phase(),
+            lanes: queue.lanes(),
+            effect_index: None,
+            effect: None,
+            previous_effect: None,
+            create: None,
+            destroy: None,
+            source_order: source_order as u64,
+        });
+    }
+
+    for record in layout_snapshot.destroy_phase_records() {
+        snapshot.push(FunctionComponentEffectListCommitPhaseOrderRecordInput {
+            phase: FunctionComponentEffectListCommitPhase::Mutation,
+            kind: FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy,
+            root,
+            finished_work,
+            fiber: record.fiber(),
+            hook_list: record.hook_list(),
+            render_phase: record.render_phase(),
+            lanes: record.lanes(),
+            effect_index: Some(record.effect_index()),
+            effect: Some(record.effect()),
+            previous_effect: record.previous_effect(),
+            create: record.create(),
+            destroy: record.destroy(),
+            source_order: record.order() as u64,
+        });
+    }
+
+    for record in layout_snapshot.create_phase_records() {
+        snapshot.push(FunctionComponentEffectListCommitPhaseOrderRecordInput {
+            phase: FunctionComponentEffectListCommitPhase::Layout,
+            kind: FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate,
+            root,
+            finished_work,
+            fiber: record.fiber(),
+            hook_list: record.hook_list(),
+            render_phase: record.render_phase(),
+            lanes: record.lanes(),
+            effect_index: Some(record.effect_index()),
+            effect: Some(record.effect()),
+            previous_effect: record.previous_effect(),
+            create: record.create(),
+            destroy: record.destroy(),
+            source_order: record.order() as u64,
+        });
+    }
+
+    for record in passive_phase_records {
+        let queue = hook_store.committed_effect_queue(record.fiber()).ok_or(
+            RootCommitError::CommittedPassiveEffectHandoffCommittedQueueMissing {
+                root,
+                fiber: record.fiber(),
+            },
+        )?;
+        snapshot.push(FunctionComponentEffectListCommitPhaseOrderRecordInput {
+            phase: FunctionComponentEffectListCommitPhase::PassiveScheduling,
+            kind: function_component_effect_list_passive_schedule_kind(record.phase()),
+            root,
+            finished_work,
+            fiber: record.fiber(),
+            hook_list: queue.hook_list(),
+            render_phase: queue.phase(),
+            lanes: record.lanes(),
+            effect_index: Some(record.effect_index()),
+            effect: Some(record.effect()),
+            previous_effect: None,
+            create: record.create(),
+            destroy: record.destroy(),
+            source_order: host_root_commit_order_passive_source_order(record.order()),
+        });
+    }
+
+    debug_assert_eq!(
+        snapshot.passive_unmount_schedule_count(),
+        passive_snapshot.queued_unmount_count()
+    );
+    debug_assert_eq!(
+        snapshot.passive_mount_schedule_count(),
+        passive_snapshot.queued_mount_count()
+    );
+
+    Ok(snapshot)
+}
+
+fn collect_committed_function_component_effect_list_fibers(
+    arena: &FiberArena,
+    fiber: FiberId,
+    hook_store: &FunctionComponentHookRenderStore,
+    effect_list_fibers: &mut Vec<FiberId>,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(fiber)?;
+    if node.tag() == FiberTag::FunctionComponent
+        && let Some(queue) = hook_store.committed_effect_queue(fiber)
+        && (queue.accepted_layout_count() > 0 || queue.accepted_passive_count() > 0)
+    {
+        effect_list_fibers.push(fiber);
+    }
+
+    for child in arena.child_ids(fiber)? {
+        collect_committed_function_component_effect_list_fibers(
+            arena,
+            child,
+            hook_store,
+            effect_list_fibers,
+        )?;
+    }
+
+    Ok(())
+}
+
+const fn function_component_effect_list_passive_schedule_kind(
+    phase: PendingPassiveEffectPhase,
+) -> FunctionComponentEffectListCommitPhaseOrderKind {
+    match phase {
+        PendingPassiveEffectPhase::Unmount => {
+            FunctionComponentEffectListCommitPhaseOrderKind::PassiveUnmountScheduled
+        }
+        PendingPassiveEffectPhase::Mount => {
+            FunctionComponentEffectListCommitPhaseOrderKind::PassiveMountScheduled
+        }
     }
 }
 
@@ -7061,6 +8018,46 @@ const fn host_root_commit_order_metadata_kind_name(
         HostRootCommitOrderMetadataKindForCanary::RootUpdateCallback => "root-update-callback",
         HostRootCommitOrderMetadataKindForCanary::PassiveUnmount => "passive-unmount",
         HostRootCommitOrderMetadataKindForCanary::PassiveMount => "passive-mount",
+    }
+}
+
+const fn function_component_effect_list_commit_phase_name(
+    phase: FunctionComponentEffectListCommitPhase,
+) -> &'static str {
+    match phase {
+        FunctionComponentEffectListCommitPhase::BeforeMutation => "before-mutation",
+        FunctionComponentEffectListCommitPhase::Mutation => "mutation",
+        FunctionComponentEffectListCommitPhase::Layout => "layout",
+        FunctionComponentEffectListCommitPhase::PassiveScheduling => "passive-scheduling",
+    }
+}
+
+const fn function_component_effect_list_commit_phase_order(
+    phase: FunctionComponentEffectListCommitPhase,
+) -> u8 {
+    match phase {
+        FunctionComponentEffectListCommitPhase::BeforeMutation => 0,
+        FunctionComponentEffectListCommitPhase::Mutation => 1,
+        FunctionComponentEffectListCommitPhase::Layout => 2,
+        FunctionComponentEffectListCommitPhase::PassiveScheduling => 3,
+    }
+}
+
+const fn function_component_effect_list_commit_phase_order_kind_name(
+    kind: FunctionComponentEffectListCommitPhaseOrderKind,
+) -> &'static str {
+    match kind {
+        FunctionComponentEffectListCommitPhaseOrderKind::EffectListBeforeMutation => {
+            "effect-list-before-mutation"
+        }
+        FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy => "layout-destroy",
+        FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate => "layout-create",
+        FunctionComponentEffectListCommitPhaseOrderKind::PassiveUnmountScheduled => {
+            "passive-unmount-scheduled"
+        }
+        FunctionComponentEffectListCommitPhaseOrderKind::PassiveMountScheduled => {
+            "passive-mount-scheduled"
+        }
     }
 }
 
@@ -13249,6 +14246,463 @@ mod tests {
         );
         assert_root_update_callback_invocation_gate_is_inert(
             commit.root_update_callback_invocation_gate(),
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_function_component_effect_list_phase_order_without_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(7_900);
+        let current_function = append_function_component_child(
+            &mut store,
+            current_root,
+            PropsHandle::from_raw(7_901),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_layout = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Layout,
+                callback(7_902),
+                deps(7_903),
+                Some(callback(7_904)),
+            )
+            .unwrap();
+        let previous_passive = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_905),
+                deps(7_906),
+                Some(callback(7_907)),
+            )
+            .unwrap();
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7_908),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(7_909),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let layout = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(7_910),
+                deps(7_911),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        let passive = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_912),
+                deps(7_913),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued_passive = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        bubble_test_fiber(&mut store, finished_function);
+        bubble_test_fiber(&mut store, finished_work);
+
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let snapshot = commit
+            .record_function_component_effect_list_commit_phase_order_for_canary(
+                &store,
+                &mut hook_store,
+                std::slice::from_ref(&queued_passive),
+            )
+            .unwrap()
+            .clone();
+        let records = snapshot.records();
+
+        assert_eq!(snapshot.root(), Some(root_id));
+        assert_eq!(snapshot.finished_work(), Some(finished_work));
+        assert_eq!(snapshot.lanes(), Lanes::DEFAULT);
+        assert_eq!(snapshot.len(), 5);
+        assert_eq!(snapshot.before_mutation_count(), 1);
+        assert_eq!(snapshot.layout_destroy_count(), 1);
+        assert_eq!(snapshot.layout_create_count(), 1);
+        assert_eq!(snapshot.passive_unmount_schedule_count(), 1);
+        assert_eq!(snapshot.passive_mount_schedule_count(), 1);
+        assert!(snapshot.records_in_commit_phase_order());
+        assert!(!snapshot.layout_callbacks_invoked());
+        assert!(!snapshot.passive_callbacks_invoked());
+        assert!(!snapshot.public_act_execution_enabled());
+        assert!(!snapshot.public_effect_compatibility_claimed());
+        assert_eq!(
+            commit.function_component_effect_list_commit_phase_order(),
+            &snapshot
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.phase_name())
+                .collect::<Vec<_>>(),
+            vec![
+                "before-mutation",
+                "mutation",
+                "layout",
+                "passive-scheduling",
+                "passive-scheduling",
+            ]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.kind_name())
+                .collect::<Vec<_>>(),
+            vec![
+                "effect-list-before-mutation",
+                "layout-destroy",
+                "layout-create",
+                "passive-unmount-scheduled",
+                "passive-mount-scheduled",
+            ]
+        );
+        assert_eq!(records[0].fiber(), finished_function);
+        assert_eq!(records[0].hook_list(), state.work_in_progress_list());
+        assert_eq!(
+            records[0].render_phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(records[0].effect(), None);
+        assert_eq!(records[0].create(), None);
+        assert_eq!(records[0].destroy(), None);
+
+        assert_eq!(records[1].fiber(), finished_function);
+        assert_eq!(records[1].effect(), Some(previous_layout.effect()));
+        assert_eq!(records[1].previous_effect(), Some(previous_layout.effect()));
+        assert_eq!(records[1].create(), None);
+        assert_eq!(records[1].destroy(), Some(callback(7_904)));
+        assert_eq!(records[1].source_order(), 0);
+
+        assert_eq!(records[2].fiber(), finished_function);
+        assert_eq!(records[2].effect(), Some(layout.effect()));
+        assert_eq!(records[2].previous_effect(), Some(previous_layout.effect()));
+        assert_eq!(records[2].create(), Some(callback(7_910)));
+        assert_eq!(records[2].destroy(), None);
+        assert_eq!(records[2].source_order(), 0);
+
+        assert_eq!(records[3].fiber(), finished_function);
+        assert_eq!(records[3].effect(), Some(passive.effect()));
+        assert_eq!(records[3].create(), None);
+        assert_eq!(records[3].destroy(), Some(callback(7_907)));
+        assert_eq!(records[4].fiber(), finished_function);
+        assert_eq!(records[4].effect(), Some(passive.effect()));
+        assert_eq!(records[4].create(), Some(callback(7_912)));
+        assert_eq!(records[4].destroy(), None);
+        assert!(records[3].source_order() < records[4].source_order());
+
+        assert_eq!(
+            hook_store
+                .committed_effect_queue(finished_function)
+                .unwrap()
+                .accepted_layout_count(),
+            1
+        );
+        assert_eq!(
+            hook_store
+                .committed_effect_queue(finished_function)
+                .unwrap()
+                .accepted_passive_count(),
+            1
+        );
+        assert_eq!(
+            commit
+                .pending_passive_handoff()
+                .unwrap()
+                .pending_record_count(),
+            2
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(previous_passive.instance(), passive.instance());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_effect_list_phase_order_rejects_cross_root_passive_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let other_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+
+        let current_root = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(7_930);
+        let current_function = append_function_component_child(
+            &mut store,
+            current_root,
+            PropsHandle::from_raw(7_931),
+            component,
+        );
+        hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_932),
+                deps(7_933),
+                Some(callback(7_934)),
+            )
+            .unwrap();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7_935),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_function = append_function_component_child(
+            &mut store,
+            render.finished_work(),
+            PropsHandle::from_raw(7_936),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_937),
+                deps(7_938),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+
+        let other_current_root = store.root(other_root).unwrap().current();
+        let other_component = FiberTypeHandle::from_raw(7_940);
+        let other_current_function = append_function_component_child(
+            &mut store,
+            other_current_root,
+            PropsHandle::from_raw(7_941),
+            other_component,
+        );
+        hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                other_current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_942),
+                deps(7_943),
+                Some(callback(7_944)),
+            )
+            .unwrap();
+        update_container(
+            &mut store,
+            other_root,
+            RootElementHandle::from_raw(7_945),
+            None,
+        )
+        .unwrap();
+        let other_render =
+            render_host_root_for_lanes(&mut store, other_root, Lanes::DEFAULT).unwrap();
+        let other_finished_function = append_function_component_child(
+            &mut store,
+            other_render.finished_work(),
+            PropsHandle::from_raw(7_946),
+            other_component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(other_current_function, other_finished_function)
+            .unwrap();
+        let other_state = hook_store
+            .prepare_render_state(store.fiber_arena(), other_finished_function)
+            .unwrap();
+        let mut other_cursor = hook_store.begin_render_cursor(other_state).unwrap();
+        hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut other_cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_947),
+                deps(7_948),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(other_cursor).unwrap();
+        let other_handoff = queue_function_component_pending_passive_effects(
+            &mut store,
+            other_root,
+            &hook_store,
+            other_state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+
+        bubble_test_fiber(&mut store, finished_function);
+        bubble_test_fiber(&mut store, render.finished_work());
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let error = commit
+            .record_function_component_effect_list_commit_phase_order_for_canary(
+                &store,
+                &mut hook_store,
+                std::slice::from_ref(&other_handoff),
+            )
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error,
+                RootCommitError::CommittedPassiveEffectHandoffRootMismatch {
+                    commit_root,
+                    handoff_root,
+                } if commit_root == root_id && handoff_root == other_root
+            ),
+            "unexpected error: {error:?}"
+        );
+        assert!(
+            commit
+                .function_component_effect_list_commit_phase_order()
+                .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_effect_list_phase_order_rejects_stale_passive_handoff_fiber() {
+        let (mut store, root_id, host) = root_store();
+        let mode = store
+            .fiber_arena()
+            .get(store.root(root_id).unwrap().current())
+            .unwrap()
+            .mode();
+        let stale_function = create_function_component_fiber(
+            &mut store,
+            mode,
+            PropsHandle::from_raw(7_960),
+            FiberTypeHandle::from_raw(7_961),
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let stale_state = hook_store
+            .prepare_render_state(store.fiber_arena(), stale_function)
+            .unwrap();
+        let mut stale_cursor = hook_store.begin_render_cursor(stale_state).unwrap();
+        hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut stale_cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(7_962),
+                deps(7_963),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(stale_cursor).unwrap();
+        let stale_handoff = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            stale_state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7_964),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let error = commit
+            .record_function_component_effect_list_commit_phase_order_for_canary(
+                &store,
+                &mut hook_store,
+                std::slice::from_ref(&stale_handoff),
+            )
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error,
+                RootCommitError::CommittedPassiveEffectHandoffFiberStale {
+                    root,
+                    finished_work: error_finished_work,
+                    fiber,
+                } if root == root_id
+                    && error_finished_work == finished_work
+                    && fiber == stale_function
+            ),
+            "unexpected error: {error:?}"
+        );
+        assert!(
+            commit
+                .function_component_effect_list_commit_phase_order()
+                .is_empty()
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
