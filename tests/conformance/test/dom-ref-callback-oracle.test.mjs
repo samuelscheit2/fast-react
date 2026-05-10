@@ -1166,6 +1166,163 @@ test("private controlled DOM ref callback invocation gate records errors without
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private ref callback root error routing records attach and cleanup errors without reporting", () => {
+  const rootOwner = {kind: "PrivateRootErrorRoutingRoot"};
+  const attachHostOwner = {kind: "PrivateRootErrorRoutingAttachHost"};
+  const cleanupHostOwner = {kind: "PrivateRootErrorRoutingCleanupHost"};
+  const attachNode = createElement("DIV");
+  const cleanupNode = createElement("SPAN");
+  const attachToken = componentTree.createHostInstanceToken(
+    attachHostOwner,
+    rootOwner
+  );
+  const cleanupToken = componentTree.createHostInstanceToken(
+    cleanupHostOwner,
+    rootOwner
+  );
+  const attachError = new Error("private attach route error");
+  attachError.code = "ATTACH_ROUTE";
+  const cleanupError = new TypeError("private cleanup route error");
+
+  function throwingAttachRef() {
+    throw attachError;
+  }
+
+  function cleanupRef() {
+    return undefined;
+  }
+
+  function throwingCleanup() {
+    throw cleanupError;
+  }
+
+  componentTree.attachHostInstanceNode(attachNode, attachToken, {
+    ref: throwingAttachRef
+  });
+  componentTree.attachHostInstanceNode(cleanupNode, cleanupToken, {
+    ref: cleanupRef
+  });
+
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner: attachHostOwner,
+    hostInstanceToken: attachToken,
+    fiber: {id: "root-error-attach-fiber"},
+    stateNode: {id: "attach-state-node"},
+    refHandle: {id: "throwing-attach-ref"},
+    ref: throwingAttachRef,
+    sourceToken: "commit-token:root-error-attach"
+  });
+  const cleanupRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner: cleanupHostOwner,
+    hostInstanceToken: cleanupToken,
+    fiber: {id: "root-error-cleanup-fiber"},
+    stateNode: {id: "cleanup-state-node"},
+    refHandle: {id: "cleanup-ref"},
+    ref: cleanupRef,
+    refCleanup: throwingCleanup,
+    sourceToken: "deletion-token:root-error-cleanup",
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+
+  const snapshot =
+    refCallbackGate.createRefCallbackRootErrorRoutingSnapshot({
+      steps: [
+        {
+          label: "attach-error",
+          rootCommitRefMetadata: {detach: [], attach: [attachRecord]}
+        },
+        {
+          label: "cleanup-error",
+          rootCommitRefMetadata: {detach: [cleanupRecord], attach: []}
+        }
+      ]
+    });
+
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackRootErrorRoutingSnapshot(snapshot),
+    true
+  );
+  assert.equal(
+    snapshot.$$typeof,
+    refCallbackGate.privateDomRefCallbackRootErrorRoutingSnapshotType
+  );
+  assert.equal(
+    snapshot.status,
+    refCallbackGate.REF_CALLBACK_ROOT_ERROR_ROUTING_STATUS
+  );
+  assert.equal(snapshot.recordCount, 2);
+  assert.equal(snapshot.callbackAttachErrorCount, 1);
+  assert.equal(snapshot.cleanupReturnErrorCount, 1);
+  assert.equal(snapshot.callbackInvocationErrorCount, 1);
+  assert.equal(snapshot.cleanupInvocationErrorCount, 1);
+  assert.equal(snapshot.rootErrorChannel, "onUncaughtError");
+  assert.equal(snapshot.rootErrorUpdatesScheduled, false);
+  assert.equal(snapshot.publicRootErrorCallbacksInvoked, false);
+  assert.equal(snapshot.rootErrorsReported, false);
+  assert.deepEqual(
+    snapshot.records.map((record) => [
+      record.sequence,
+      record.sourceStepLabel,
+      record.action,
+      record.invocationKind,
+      record.errorName,
+      record.errorMessage,
+      record.errorCode,
+      record.rootErrorChannel,
+      record.publicRootErrorCallbackInvoked
+    ]),
+    [
+      [
+        0,
+        "attach-error",
+        refCallbackGate.REF_ACTION_ATTACH,
+        refCallbackGate.REF_CALLBACK_INVOCATION_ATTACH,
+        "Error",
+        "private attach route error",
+        "ATTACH_ROUTE",
+        "onUncaughtError",
+        false
+      ],
+      [
+        1,
+        "cleanup-error",
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+        "TypeError",
+        "private cleanup route error",
+        null,
+        "onUncaughtError",
+        false
+      ]
+    ]
+  );
+
+  for (const record of snapshot.records) {
+    assert.equal(
+      refCallbackGate.isPrivateRefCallbackRootErrorRoutingRecord(record),
+      true
+    );
+    assert.equal(Object.hasOwn(record, "error"), false);
+    assert.equal(Object.hasOwn(record, "ref"), false);
+    assert.equal(Object.hasOwn(record, "node"), false);
+    assert.equal(record.exposesErrorValue, false);
+  }
+
+  const payload =
+    refCallbackGate.getPrivateRefCallbackRootErrorRoutingSnapshotPayload(
+      snapshot
+    );
+  assert.equal(payload.records[0].error, attachError);
+  assert.equal(payload.records[1].error, cleanupError);
+  assert.equal(componentTree.detachHostInstanceToken(attachToken), attachToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(cleanupToken),
+    cleanupToken
+  );
+});
+
 test("React DOM ref callback oracle artifact has no temp or local path leaks", () => {
   const oracleText = readCheckedDomRefCallbackOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);

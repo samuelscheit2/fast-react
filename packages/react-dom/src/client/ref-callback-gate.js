@@ -12,6 +12,10 @@ const REF_CALLBACK_EXECUTION_HANDOFF_STATUS =
   'private-root-commit-ref-callback-execution-handoff-recorded';
 const REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS =
   'private-ref-callback-host-output-ordering-diagnostic-recorded';
+const REF_CALLBACK_ROOT_ERROR_ROUTING_STATUS =
+  'private-ref-callback-root-error-routing-recorded';
+const REF_CALLBACK_ROOT_ERROR_PUBLIC_CALLBACK_STATUS =
+  'blocked-public-root-error-callback-invocation';
 const REF_CALLBACK_ROOT_COMMIT_METADATA_SNAPSHOT_STATUS =
   'accepted-private-root-commit-ref-metadata-snapshot';
 const REF_CALLBACK_ERROR_PROPAGATION_STATUS =
@@ -69,6 +73,10 @@ const privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType =
   'fast.react_dom.private_ref_callback_host_output_ordering_diagnostic_snapshot';
 const privateDomRefCallbackHostOutputOrderingDiagnosticRecordType =
   'fast.react_dom.private_ref_callback_host_output_ordering_diagnostic_record';
+const privateDomRefCallbackRootErrorRoutingSnapshotType =
+  'fast.react_dom.private_ref_callback_root_error_routing_snapshot';
+const privateDomRefCallbackRootErrorRoutingRecordType =
+  'fast.react_dom.private_ref_callback_root_error_routing_record';
 
 const blockedCapabilities = freezeArray([
   blockedCapability(
@@ -128,6 +136,29 @@ const controlledInvocationBlockedCapabilities = freezeArray([
   )
 ]);
 
+const rootErrorRoutingBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'commit-phase-error-capture',
+    'Ref callback errors are captured as private records only.'
+  ),
+  blockedCapability(
+    'root-error-update-scheduling',
+    'Private ref callback error routing does not enqueue root error updates.'
+  ),
+  blockedCapability(
+    'public-root-error-callback-invocation',
+    'Private ref callback error routing does not invoke root error callbacks.'
+  ),
+  blockedCapability(
+    'public-root-integration',
+    'Public React DOM roots remain placeholder-gated and do not route refs.'
+  ),
+  blockedCapability(
+    'react-dom-ref-compatibility-claim',
+    'React DOM ref compatibility is not claimed by this private gate.'
+  )
+]);
+
 const noSideEffects = freezeRecord({
   callbackRefsInvoked: false,
   objectRefsMutated: false,
@@ -169,6 +200,8 @@ const controlledInvocationGateRecordPayloads = new WeakMap();
 const executionHandoffRecordPayloads = new WeakMap();
 const hostOutputOrderingDiagnosticSnapshotPayloads = new WeakMap();
 const hostOutputOrderingDiagnosticRecordPayloads = new WeakMap();
+const rootErrorRoutingSnapshotPayloads = new WeakMap();
+const rootErrorRoutingRecordPayloads = new WeakMap();
 
 function createRefAttachMetadataRecord(options) {
   return createRefCallbackMetadataRecord({
@@ -637,6 +670,156 @@ function createRefCallbackHostOutputOrderingDiagnosticSnapshot(options) {
   return snapshot;
 }
 
+function createRefCallbackRootErrorRoutingSnapshot(options) {
+  const steps = normalizeRootErrorRoutingSteps(options);
+  const records = [];
+  const controlledSnapshots = [];
+  const controlledPayloads = [];
+  const stepSummaries = [];
+  const metrics = createRootErrorRoutingMetrics();
+
+  for (const step of steps) {
+    const controlledSnapshot =
+      createRefCallbackControlledInvocationGateSnapshot({
+        rootCommitRefMetadata: step.rootCommitRefMetadata
+      });
+    const controlledPayload =
+      getPrivateRefCallbackControlledInvocationGateSnapshotPayload(
+        controlledSnapshot
+      );
+
+    if (controlledPayload === null) {
+      throw createRefCallbackGateError(
+        'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_ROOT_ERROR_ROUTING',
+        'Cannot create ref callback root error routing without a private controlled invocation snapshot.'
+      );
+    }
+
+    controlledSnapshots.push(controlledSnapshot);
+    controlledPayloads.push(controlledPayload);
+    metrics.sourceInvocationRecordCount += controlledSnapshot.recordCount;
+    metrics.callbackInvocationAttemptCount +=
+      controlledSnapshot.callbackInvocationAttemptCount;
+    metrics.cleanupInvocationAttemptCount +=
+      controlledSnapshot.cleanupInvocationAttemptCount;
+    metrics.callbackInvocationErrorCount +=
+      controlledSnapshot.callbackInvocationErrorCount;
+    metrics.cleanupInvocationErrorCount +=
+      controlledSnapshot.cleanupInvocationErrorCount;
+
+    const firstErrorSequence = records.length;
+    for (let index = 0; index < controlledSnapshot.records.length; index++) {
+      const controlledRecord = controlledSnapshot.records[index];
+      const controlledRecordPayload =
+        controlledPayload.invocationResults[index];
+
+      if (controlledRecordPayload.error === null) {
+        continue;
+      }
+
+      const routingRecord = createRootErrorRoutingRecord({
+        controlledRecord,
+        controlledRecordPayload,
+        sequence: records.length,
+        step
+      });
+      records.push(routingRecord);
+      updateRootErrorRoutingMetrics(metrics, routingRecord);
+    }
+
+    stepSummaries.push(
+      freezeRecord({
+        capturedErrorCount: records.length - firstErrorSequence,
+        firstErrorSequence:
+          records.length === firstErrorSequence ? null : firstErrorSequence,
+        hostOutputCanary: step.hostOutputCanary,
+        label: step.label,
+        lastErrorSequence:
+          records.length === firstErrorSequence ? null : records.length - 1,
+        sourceInvocationRecordCount: controlledSnapshot.recordCount,
+        stepSequence: step.sequence
+      })
+    );
+  }
+
+  const frozenRecords = freezeArray(records);
+  const snapshot = freezeRecord({
+    $$typeof: privateDomRefCallbackRootErrorRoutingSnapshotType,
+    kind: 'FastReactDomPrivateRefCallbackRootErrorRoutingSnapshot',
+    status: REF_CALLBACK_ROOT_ERROR_ROUTING_STATUS,
+    rootErrorRoutingStatus: REF_CALLBACK_ROOT_ERROR_ROUTING_STATUS,
+    publicRootErrorCallbackStatus:
+      REF_CALLBACK_ROOT_ERROR_PUBLIC_CALLBACK_STATUS,
+    stepCount: steps.length,
+    sourceInvocationRecordCount: metrics.sourceInvocationRecordCount,
+    recordCount: frozenRecords.length,
+    capturedErrorCount: frozenRecords.length,
+    callbackAttachErrorCount: metrics.callbackAttachErrorCount,
+    callbackNullDetachErrorCount: metrics.callbackNullDetachErrorCount,
+    cleanupReturnErrorCount: metrics.cleanupReturnErrorCount,
+    callbackInvocationAttemptCount:
+      metrics.callbackInvocationAttemptCount,
+    callbackInvocationErrorCount:
+      metrics.callbackInvocationErrorCount,
+    cleanupInvocationAttemptCount:
+      metrics.cleanupInvocationAttemptCount,
+    cleanupInvocationErrorCount:
+      metrics.cleanupInvocationErrorCount,
+    rootErrorChannel: 'onUncaughtError',
+    records: frozenRecords,
+    steps: freezeArray(stepSummaries),
+    blockedCapabilities: rootErrorRoutingBlockedCapabilities,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    sideEffects: freezeRecord({
+      callbackRefsInvoked: metrics.callbackInvocationAttemptCount > 0,
+      callbackCleanupReturnsInvoked:
+        metrics.cleanupInvocationAttemptCount > 0,
+      objectRefsMutated: false,
+      layoutEffectsRun: false,
+      domMutated: false,
+      publicRootsTouched: false,
+      rootErrorUpdatesScheduled: false,
+      publicRootErrorCallbacksInvoked: false,
+      rootErrorsReported: false,
+      compatibilityClaimed: false
+    }),
+    callbackRefsInvoked: metrics.callbackInvocationAttemptCount > 0,
+    callbackCleanupReturnsInvoked:
+      metrics.cleanupInvocationAttemptCount > 0,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorUpdatesScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesFakeHostNode: false,
+    exposesLatestProps: false,
+    exposesErrorValue: false
+  });
+
+  rootErrorRoutingSnapshotPayloads.set(
+    snapshot,
+    freezeRecord({
+      controlledPayloads: freezeArray(controlledPayloads),
+      controlledSnapshots: freezeArray(controlledSnapshots),
+      records: freezeArray(
+        frozenRecords.map((record) =>
+          getPrivateRefCallbackRootErrorRoutingRecordPayload(record)
+        )
+      ),
+      steps
+    })
+  );
+
+  return snapshot;
+}
+
 function getPrivateRefCallbackMetadataRecordPayload(record) {
   return isWeakMapKey(record)
     ? metadataRecordPayloads.get(record) || null
@@ -707,6 +890,18 @@ function getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(
     : null;
 }
 
+function getPrivateRefCallbackRootErrorRoutingSnapshotPayload(snapshot) {
+  return isWeakMapKey(snapshot)
+    ? rootErrorRoutingSnapshotPayloads.get(snapshot) || null
+    : null;
+}
+
+function getPrivateRefCallbackRootErrorRoutingRecordPayload(record) {
+  return isWeakMapKey(record)
+    ? rootErrorRoutingRecordPayloads.get(record) || null
+    : null;
+}
+
 function isPrivateRefCallbackMetadataRecord(value) {
   return getPrivateRefCallbackMetadataRecordPayload(value) !== null;
 }
@@ -762,6 +957,16 @@ function isPrivateRefCallbackHostOutputOrderingDiagnosticRecord(value) {
     getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(value) !==
     null
   );
+}
+
+function isPrivateRefCallbackRootErrorRoutingSnapshot(value) {
+  return (
+    getPrivateRefCallbackRootErrorRoutingSnapshotPayload(value) !== null
+  );
+}
+
+function isPrivateRefCallbackRootErrorRoutingRecord(value) {
+  return getPrivateRefCallbackRootErrorRoutingRecordPayload(value) !== null;
 }
 
 function createRefCallbackMetadataRecord(options) {
@@ -1481,6 +1686,84 @@ function normalizeHostOutputOrderingDiagnosticSteps(options) {
   );
 }
 
+function normalizeRootErrorRoutingSteps(options) {
+  const steps = getRootErrorRoutingStepInputs(options);
+  if (!Array.isArray(steps) || steps.length === 0) {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_ROOT_ERROR_ROUTING_STEPS',
+      'Cannot create ref callback root error routing without root commit ref metadata steps.'
+    );
+  }
+
+  return freezeArray(
+    steps.map((step, sequence) => {
+      if (step == null || typeof step !== 'object') {
+        throw createRefCallbackGateError(
+          'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_ROOT_ERROR_ROUTING_STEP',
+          'Ref callback root error routing steps must be objects.'
+        );
+      }
+
+      const rootCommitRefMetadata =
+        'rootCommitRefMetadata' in step
+          ? step.rootCommitRefMetadata
+          : 'refMetadata' in step
+            ? step.refMetadata
+            : step;
+      if (
+        rootCommitRefMetadata == null ||
+        typeof rootCommitRefMetadata !== 'object'
+      ) {
+        throw createRefCallbackGateError(
+          'FAST_REACT_DOM_REF_CALLBACK_GATE_MISSING_ROOT_ERROR_REF_METADATA',
+          'Ref callback root error routing steps require root commit ref metadata.'
+        );
+      }
+
+      return freezeRecord({
+        hostOutputCanary:
+          'hostOutputCanary' in step
+            ? normalizeHostOutputCanary(step.hostOutputCanary)
+            : null,
+        label: normalizeRootErrorRoutingStepLabel(step.label, sequence),
+        rootCommitRefMetadata,
+        sequence
+      });
+    })
+  );
+}
+
+function getRootErrorRoutingStepInputs(options) {
+  if (Array.isArray(options)) {
+    return options;
+  }
+
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'steps')
+  ) {
+    return options.steps;
+  }
+
+  return [options];
+}
+
+function normalizeRootErrorRoutingStepLabel(label, sequence) {
+  if (label === undefined) {
+    return `root-error-step:${sequence}`;
+  }
+
+  if (typeof label === 'string' && label.length > 0) {
+    return label;
+  }
+
+  throw createRefCallbackGateError(
+    'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_ROOT_ERROR_STEP_LABEL',
+    'Ref callback root error routing step labels must be non-empty strings.'
+  );
+}
+
 function normalizeHostOutputLatestPropsUpdates(updates) {
   if (updates == null) {
     return freezeArray([]);
@@ -1567,6 +1850,31 @@ function createHostOutputOrderingMetrics() {
     unmountCanaryStepCount: 0,
     updateCanaryStepCount: 0
   };
+}
+
+function createRootErrorRoutingMetrics() {
+  return {
+    callbackAttachErrorCount: 0,
+    callbackInvocationAttemptCount: 0,
+    callbackInvocationErrorCount: 0,
+    callbackNullDetachErrorCount: 0,
+    cleanupInvocationAttemptCount: 0,
+    cleanupInvocationErrorCount: 0,
+    cleanupReturnErrorCount: 0,
+    sourceInvocationRecordCount: 0
+  };
+}
+
+function updateRootErrorRoutingMetrics(metrics, record) {
+  if (record.invocationKind === REF_CALLBACK_INVOCATION_ATTACH) {
+    metrics.callbackAttachErrorCount++;
+  } else if (record.invocationKind === REF_CALLBACK_INVOCATION_NULL_DETACH) {
+    metrics.callbackNullDetachErrorCount++;
+  } else if (
+    record.invocationKind === REF_CALLBACK_INVOCATION_CLEANUP_RETURN
+  ) {
+    metrics.cleanupReturnErrorCount++;
+  }
 }
 
 function createHostOutputOrderingDiagnosticRecord({
@@ -1698,6 +2006,93 @@ function createHostOutputOrderingDiagnosticRecord({
       detachedRefBeforeRecord: detachedRef,
       identity,
       metadata,
+      step
+    })
+  );
+
+  return record;
+}
+
+function createRootErrorRoutingRecord({
+  controlledRecord,
+  controlledRecordPayload,
+  sequence,
+  step
+}) {
+  const errorMetadata = describeCapturedError(
+    controlledRecordPayload.error
+  );
+  const rootErrorInfo = freezeRecord({
+    channel: 'onUncaughtError',
+    componentStack: null,
+    componentStackCaptured: false,
+    errorBoundary: null,
+    errorBoundaryCaptured: false
+  });
+  const record = freezeRecord({
+    $$typeof: privateDomRefCallbackRootErrorRoutingRecordType,
+    kind: 'FastReactDomPrivateRefCallbackRootErrorRoutingRecord',
+    sequence,
+    sourceStepSequence: step.sequence,
+    sourceStepLabel: step.label,
+    sourceHostOutputCanary: step.hostOutputCanary,
+    sourceInvocationSequence: controlledRecord.sequence,
+    action: controlledRecord.action,
+    detachReason: controlledRecord.detachReason,
+    refKind: controlledRecord.refKind,
+    operation: controlledRecord.operation,
+    invocationKind: controlledRecord.invocationKind,
+    invocationStatus: controlledRecord.invocationStatus,
+    callbackRefInvocationAttempted:
+      controlledRecord.callbackRefInvocationAttempted,
+    cleanupReturnInvocationAttempted:
+      controlledRecord.cleanupReturnInvocationAttempted,
+    callbackReturnStatus: controlledRecord.callbackReturnStatus,
+    cleanupReturnStatus: controlledRecord.cleanupReturnStatus,
+    errorCaptured: true,
+    errorMetadata,
+    errorName: errorMetadata.name,
+    errorMessage: errorMetadata.message,
+    errorConstructorName: errorMetadata.constructorName,
+    errorCode: errorMetadata.code,
+    errorStackAvailable: errorMetadata.stackAvailable,
+    rootErrorInfo,
+    rootErrorChannel: rootErrorInfo.channel,
+    rootErrorRoutingStatus: REF_CALLBACK_ROOT_ERROR_ROUTING_STATUS,
+    publicRootErrorCallbackStatus:
+      REF_CALLBACK_ROOT_ERROR_PUBLIC_CALLBACK_STATUS,
+    blockedCapabilities: rootErrorRoutingBlockedCapabilities,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    rootErrorUpdatesScheduled: false,
+    publicRootErrorCallbackInvoked: false,
+    publicRootErrorCallbacksInvoked: false,
+    callbackRefsInvoked: controlledRecord.callbackRefsInvoked,
+    callbackCleanupReturnsInvoked:
+      controlledRecord.callbackCleanupReturnsInvoked,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesFakeHostNode: false,
+    exposesLatestProps: false,
+    exposesErrorValue: false
+  });
+
+  rootErrorRoutingRecordPayloads.set(
+    record,
+    freezeRecord({
+      controlledRecord,
+      controlledRecordPayload,
+      error: controlledRecordPayload.error,
+      errorMetadata,
+      metadata: controlledRecordPayload.metadata,
+      rootErrorInfo,
       step
     })
   );
@@ -2022,6 +2417,62 @@ function callbackReturnStatusForValue(value) {
   return REF_CALLBACK_RETURN_VALUE;
 }
 
+function describeCapturedError(error) {
+  const errorType = typeof error;
+  if (error === null || (errorType !== 'object' && errorType !== 'function')) {
+    return freezeRecord({
+      code: null,
+      constructorName: null,
+      message: String(error),
+      name: errorType,
+      stackAvailable: false,
+      thrownValueType: errorType
+    });
+  }
+
+  const name = getStringProperty(error, 'name');
+  const message = getStringProperty(error, 'message');
+  const code = getErrorCode(error);
+  const stack = getStringProperty(error, 'stack');
+
+  return freezeRecord({
+    code,
+    constructorName:
+      error.constructor && typeof error.constructor.name === 'string'
+        ? error.constructor.name
+        : null,
+    message,
+    name,
+    stackAvailable: stack !== null && stack.length > 0,
+    thrownValueType: errorType
+  });
+}
+
+function getStringProperty(value, key) {
+  try {
+    const property = value[key];
+    return typeof property === 'string' ? property : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function getErrorCode(error) {
+  try {
+    const code = error.code;
+    if (
+      typeof code === 'string' ||
+      typeof code === 'number' ||
+      typeof code === 'boolean'
+    ) {
+      return code;
+    }
+  } catch (readError) {
+    return null;
+  }
+  return null;
+}
+
 function operationForRefAction(refKind, action) {
   if (refKind === REF_KIND_CALLBACK) {
     return action === REF_ACTION_ATTACH
@@ -2087,6 +2538,8 @@ module.exports = {
   REF_CALLBACK_INVOCATION_STATUS_SKIPPED,
   REF_CALLBACK_INVOCATION_STATUS_THROWN,
   REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+  REF_CALLBACK_ROOT_ERROR_PUBLIC_CALLBACK_STATUS,
+  REF_CALLBACK_ROOT_ERROR_ROUTING_STATUS,
   REF_CALLBACK_ROOT_COMMIT_METADATA_SNAPSHOT_STATUS,
   REF_CALLBACK_RETURN_CLEANUP,
   REF_CALLBACK_RETURN_NOT_APPLICABLE,
@@ -2108,12 +2561,14 @@ module.exports = {
   blockedPublicRefCompatibility,
   blockedCapabilities,
   controlledInvocationBlockedCapabilities,
+  rootErrorRoutingBlockedCapabilities,
   createRefAttachMetadataRecord,
   createRefCallbackAttachDetachGateSnapshot,
   createRefCallbackComponentTreeGateSnapshot,
   createRefCallbackControlledInvocationGateSnapshot,
   createRefCallbackExecutionHandoffRecord,
   createRefCallbackHostOutputOrderingDiagnosticSnapshot,
+  createRefCallbackRootErrorRoutingSnapshot,
   createRefCallbackRootCommitMetadataSnapshot,
   createRefDetachMetadataRecord,
   getPrivateRefCallbackAttachDetachGateRecordPayload,
@@ -2126,6 +2581,8 @@ module.exports = {
   getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload,
   getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload,
   getPrivateRefCallbackMetadataRecordPayload,
+  getPrivateRefCallbackRootErrorRoutingRecordPayload,
+  getPrivateRefCallbackRootErrorRoutingSnapshotPayload,
   getPrivateRefCallbackRootCommitMetadataSnapshotPayload,
   isPrivateRefCallbackAttachDetachGateRecord,
   isPrivateRefCallbackAttachDetachGateSnapshot,
@@ -2137,6 +2594,8 @@ module.exports = {
   isPrivateRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot,
   isPrivateRefCallbackMetadataRecord,
+  isPrivateRefCallbackRootErrorRoutingRecord,
+  isPrivateRefCallbackRootErrorRoutingSnapshot,
   isPrivateRefCallbackRootCommitMetadataSnapshot,
   noSideEffects,
   privateDomRefCallbackAttachDetachGateRecordType,
@@ -2149,5 +2608,7 @@ module.exports = {
   privateDomRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType,
   privateDomRefCallbackMetadataRecordType,
+  privateDomRefCallbackRootErrorRoutingRecordType,
+  privateDomRefCallbackRootErrorRoutingSnapshotType,
   privateDomRefCallbackRootCommitMetadataSnapshotType
 };

@@ -113,6 +113,8 @@ const privateRootCommitRefMetadataRecordType =
   'fast.react_dom.private_root_commit_ref_metadata_record';
 const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
   'fast.react_dom.private_root_ref_callback_host_output_ordering_diagnostic_record';
+const privateRootRefCallbackErrorRoutingRecordType =
+  'fast.react_dom.private_root_ref_callback_error_routing_record';
 const privateRootPublicFacadeAdapterType =
   'fast.react_dom.private_root_public_facade_adapter';
 const privateRootPublicFacadeRootType =
@@ -167,6 +169,8 @@ const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED =
   'accepted-private-root-commit-ref-metadata';
 const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
   'admitted-private-root-ref-callback-host-output-ordering-diagnostic';
+const ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED =
+  'recorded-private-root-ref-callback-error-routing';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
   'ready-private-react-dom-client-root-public-facade-adapter';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
@@ -722,6 +726,39 @@ const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES = freezeArray([
       'React DOM ref compatibility is not claimed by private metadata admission.'
   })
 ]);
+const ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The routing record consumes private bridge metadata and does not execute public React DOM roots.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'The routing record validates request metadata without running the reconciler.'
+    }),
+    freezeRecord({
+      id: 'root-error-update-scheduling',
+      blocked: true,
+      reason:
+        'Captured ref callback errors are not scheduled as root error updates by this private record.'
+    }),
+    freezeRecord({
+      id: 'public-root-error-callback-invocation',
+      blocked: true,
+      reason:
+        'Root onUncaughtError, onCaughtError, and onRecoverableError callbacks are preserved as metadata only.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason:
+        'React DOM ref error propagation compatibility is not claimed by this private record.'
+    })
+  ]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -747,6 +784,7 @@ const rootHostOutputUpdateHandoffRecords = new WeakMap();
 const rootCommitRefMetadataPayloads = new WeakMap();
 const rootCommitRefMetadataRecordsByRequest = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
+const rootRefCallbackErrorRoutingPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
 
@@ -887,6 +925,13 @@ function createPrivateRootBridgeShell(options) {
     },
     createRefCallbackHostOutputOrderingDiagnostic(rootRequestRecords, options) {
       return createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
+        bridgeState,
+        rootRequestRecords,
+        options
+      );
+    },
+    createRefCallbackRootErrorRouting(rootRequestRecords, options) {
+      return createRefCallbackRootErrorRoutingRecordWithBridge(
         bridgeState,
         rootRequestRecords,
         options
@@ -1133,6 +1178,14 @@ function createRefCallbackHostOutputOrderingDiagnosticRecord(
   options
 ) {
   return createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
+    null,
+    rootRequestRecords,
+    options
+  );
+}
+
+function createRefCallbackRootErrorRoutingRecord(rootRequestRecords, options) {
+  return createRefCallbackRootErrorRoutingRecordWithBridge(
     null,
     rootRequestRecords,
     options
@@ -2123,6 +2176,14 @@ function getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload(record) {
 
 function isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord(value) {
   return rootRefCallbackHostOutputOrderingDiagnosticPayloads.has(value);
+}
+
+function getPrivateRootRefCallbackErrorRoutingPayload(record) {
+  return rootRefCallbackErrorRoutingPayloads.get(record) || null;
+}
+
+function isPrivateRootRefCallbackErrorRoutingRecord(value) {
+  return rootRefCallbackErrorRoutingPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeAdapterPayload(adapter) {
@@ -3953,6 +4014,138 @@ function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
   return record;
 }
 
+function createRefCallbackRootErrorRoutingRecordWithBridge(
+  bridgeState,
+  rootRequestRecords,
+  options
+) {
+  const requestValidation = validateRefCallbackRootErrorRoutingRequests(
+    bridgeState,
+    rootRequestRecords
+  );
+  const routingInput = resolveRefCallbackRootErrorRoutingInput(
+    requestValidation,
+    options
+  );
+  const rootErrorRoutingSnapshot =
+    refCallbackGate.createRefCallbackRootErrorRoutingSnapshot(
+      routingInput.snapshotOptions
+    );
+  const rootErrorRoutingPayload =
+    refCallbackGate.getPrivateRefCallbackRootErrorRoutingSnapshotPayload(
+      rootErrorRoutingSnapshot
+    );
+
+  if (rootErrorRoutingPayload === null) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Expected a private React DOM ref callback root error routing snapshot.'
+    );
+  }
+  if (rootErrorRoutingSnapshot.recordCount === 0) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing requires at least one captured callback ref error.'
+    );
+  }
+
+  const rootBridgeState = requestValidation.bridgeState;
+  const rootErrorCallbacks = describeRootErrorCallbacks(
+    requestValidation.rootHandleState.rootOptions
+  );
+  const record = freezeRecord({
+    $$typeof: privateRootRefCallbackErrorRoutingRecordType,
+    kind: 'FastReactDomPrivateRootRefCallbackErrorRoutingRecord',
+    routingStatus: ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    rootId: requestValidation.rootId,
+    rootKind: requestValidation.rootKind,
+    rootTag: requestValidation.rootTag,
+    sourceRequestCount: requestValidation.records.length,
+    sourceRequestIds: freezeArray(
+      requestValidation.records.map((requestRecord) => requestRecord.requestId)
+    ),
+    sourceRequestTypes: freezeArray(
+      requestValidation.records.map(
+        (requestRecord) => requestRecord.requestType
+      )
+    ),
+    sourceOperations: freezeArray(
+      requestValidation.records.map((requestRecord) => requestRecord.operation)
+    ),
+    sourceUpdateIds: freezeArray(
+      requestValidation.records.map(
+        (requestRecord) => requestRecord.updateId || null
+      )
+    ),
+    rootCommitRefMetadataSource: routingInput.metadataSource,
+    acceptedRootCommitRefMetadataCount:
+      routingInput.acceptedMetadataRecords.length,
+    rootErrorRoutingStatus: rootErrorRoutingSnapshot.status,
+    rootErrorRoutingRecordCount: rootErrorRoutingSnapshot.recordCount,
+    capturedErrorCount: rootErrorRoutingSnapshot.capturedErrorCount,
+    callbackAttachErrorCount:
+      rootErrorRoutingSnapshot.callbackAttachErrorCount,
+    callbackNullDetachErrorCount:
+      rootErrorRoutingSnapshot.callbackNullDetachErrorCount,
+    cleanupReturnErrorCount:
+      rootErrorRoutingSnapshot.cleanupReturnErrorCount,
+    callbackInvocationErrorCount:
+      rootErrorRoutingSnapshot.callbackInvocationErrorCount,
+    cleanupInvocationErrorCount:
+      rootErrorRoutingSnapshot.cleanupInvocationErrorCount,
+    rootErrorChannel: rootErrorRoutingSnapshot.rootErrorChannel,
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootErrorRoutingSnapshot,
+    blockedCapabilities:
+      ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    rootErrorUpdatesScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    callbackRefsInvoked: rootErrorRoutingSnapshot.callbackRefsInvoked,
+    callbackCleanupReturnsInvoked:
+      rootErrorRoutingSnapshot.callbackCleanupReturnsInvoked,
+    objectRefsMutated: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesLatestProps: false,
+    exposesErrorValue: false
+  });
+
+  rootRefCallbackErrorRoutingPayloads.set(
+    record,
+    freezeRecord({
+      acceptedRootCommitRefMetadataRecords:
+        routingInput.acceptedMetadataRecords,
+      bridgeState: rootBridgeState,
+      rootErrorCallbacks,
+      rootErrorRoutingPayload,
+      rootErrorRoutingSnapshot,
+      rootOptions: requestValidation.rootHandleState.rootOptions,
+      rootRequestRecords: requestValidation.records
+    })
+  );
+
+  return record;
+}
+
 function createNativeBridgeHandle(bridgeState, kind) {
   return freezeRecord({
     $$typeof: privateRootNativeBridgeHandleType,
@@ -4921,6 +5114,33 @@ function resolveRefCallbackHostOutputOrderingDiagnosticInput(
   };
 }
 
+function resolveRefCallbackRootErrorRoutingInput(requestValidation, options) {
+  const explicitSteps = getExplicitRefCallbackRootErrorRoutingSteps(options);
+  if (explicitSteps !== null && explicitSteps.some(stepHasRefMetadata)) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing must consume accepted root commit ref metadata records.'
+    );
+  }
+
+  const accepted = getAcceptedRootCommitRefMetadataStepsForRootErrorRouting(
+    requestValidation,
+    explicitSteps
+  );
+  if (accepted.steps.length === 0) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing requires accepted root commit ref metadata records.'
+    );
+  }
+
+  return {
+    acceptedMetadataRecords: accepted.acceptedMetadataRecords,
+    metadataSource: 'accepted-root-commit-ref-metadata',
+    snapshotOptions: freezeRecord({
+      steps: accepted.steps
+    })
+  };
+}
+
 function getExplicitRefOrderingDiagnosticSteps(options) {
   if (Array.isArray(options)) {
     return options;
@@ -4942,6 +5162,27 @@ function getExplicitRefOrderingDiagnosticSteps(options) {
   return null;
 }
 
+function getExplicitRefCallbackRootErrorRoutingSteps(options) {
+  if (Array.isArray(options)) {
+    return options;
+  }
+
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'steps')
+  ) {
+    if (!Array.isArray(options.steps)) {
+      throwInvalidRefCallbackRootErrorRouting(
+        'Ref callback root error routing step options must be an array.'
+      );
+    }
+    return options.steps;
+  }
+
+  return null;
+}
+
 function stepHasRefMetadata(step) {
   return (
     step !== null &&
@@ -4949,6 +5190,71 @@ function stepHasRefMetadata(step) {
     (Object.prototype.hasOwnProperty.call(step, 'rootCommitRefMetadata') ||
       Object.prototype.hasOwnProperty.call(step, 'refMetadata'))
   );
+}
+
+function getAcceptedRootCommitRefMetadataStepsForRootErrorRouting(
+  requestValidation,
+  explicitSteps
+) {
+  const acceptedMetadataRecords = [];
+  const steps = [];
+
+  for (const requestRecord of requestValidation.records) {
+    const acceptedRecord =
+      rootCommitRefMetadataRecordsByRequest.get(requestRecord);
+    if (acceptedRecord === undefined) {
+      continue;
+    }
+
+    const payload = rootCommitRefMetadataPayloads.get(acceptedRecord);
+    if (payload === undefined) {
+      throwInvalidRefCallbackRootErrorRouting(
+        'Accepted root commit ref metadata is missing its private payload.'
+      );
+    }
+
+    acceptedMetadataRecords.push(acceptedRecord);
+    const stepOptions =
+      explicitSteps === null ? null : explicitSteps[steps.length] || null;
+    steps.push(
+      createAcceptedRootCommitRefMetadataRootErrorRoutingStep(
+        payload,
+        stepOptions
+      )
+    );
+  }
+
+  if (
+    explicitSteps !== null &&
+    acceptedMetadataRecords.length > 0 &&
+    explicitSteps.length !== acceptedMetadataRecords.length
+  ) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing step options must match accepted root commit ref metadata records.'
+    );
+  }
+
+  return {
+    acceptedMetadataRecords: freezeArray(acceptedMetadataRecords),
+    steps: freezeArray(steps)
+  };
+}
+
+function createAcceptedRootCommitRefMetadataRootErrorRoutingStep(
+  payload,
+  stepOptions
+) {
+  return freezeRecord({
+    hostOutputCanary:
+      stepOptions !== null && stepOptions.hostOutputCanary !== undefined
+        ? stepOptions.hostOutputCanary
+        : payload.hostOutputCanary,
+    label:
+      stepOptions !== null && stepOptions.label !== undefined
+        ? stepOptions.label
+        : payload.label,
+    rootCommitRefMetadata: payload.rootCommitRefMetadataSnapshot
+  });
 }
 
 function getAcceptedRootCommitRefMetadataSteps(
@@ -5227,6 +5533,83 @@ function validateRefCallbackHostOutputOrderingDiagnosticRequests(
     rootTag,
     unmountRequests,
     updateRenderRequests
+  };
+}
+
+function validateRefCallbackRootErrorRoutingRequests(
+  bridgeState,
+  rootRequestRecords
+) {
+  if (!Array.isArray(rootRequestRecords) || rootRequestRecords.length === 0) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing requires private root request records.'
+    );
+  }
+
+  const validations = rootRequestRecords.map((record) => ({
+    record,
+    validation: validateRootBridgeRequestRecord(record)
+  }));
+  const firstValidation = validations[0].validation;
+  if (firstValidation.operation === 'hydrate') {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing does not support hydration records.'
+    );
+  }
+  if (bridgeState !== null && firstValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const rootId = validations[0].record.rootId;
+  const rootKind = validations[0].record.rootKind;
+  const rootTag = validations[0].record.rootTag;
+  const eligibleRequests = [];
+
+  for (const {record, validation} of validations) {
+    if (validation.operation === 'hydrate') {
+      throwInvalidRefCallbackRootErrorRouting(
+        'Ref callback root error routing does not support hydration records.'
+      );
+    }
+    if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+      throwForeignRootBridgeRequest();
+    }
+    if (validation.bridgeState !== firstValidation.bridgeState) {
+      throwInvalidRefCallbackRootErrorRouting(
+        'Ref callback root error routing requires one private root bridge shell.'
+      );
+    }
+    if (
+      record.rootId !== rootId ||
+      record.rootKind !== rootKind ||
+      record.rootTag !== rootTag
+    ) {
+      throwInvalidRefCallbackRootErrorRouting(
+        'Ref callback root error routing requires one root identity.'
+      );
+    }
+
+    if (
+      record.operation === 'render' ||
+      (record.operation === 'unmount' && record.noOp === false)
+    ) {
+      eligibleRequests.push(record);
+    }
+  }
+
+  if (eligibleRequests.length === 0) {
+    throwInvalidRefCallbackRootErrorRouting(
+      'Ref callback root error routing requires a render or non-noop unmount request.'
+    );
+  }
+
+  return {
+    bridgeState: firstValidation.bridgeState,
+    records: validations.map(({record}) => record),
+    rootHandleState: firstValidation.rootHandleState,
+    rootId,
+    rootKind,
+    rootTag
   };
 }
 
@@ -5677,6 +6060,13 @@ function throwInvalidRefCallbackHostOutputOrderingDiagnostic(message) {
   throw error;
 }
 
+function throwInvalidRefCallbackRootErrorRouting(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_REF_CALLBACK_ROOT_ERROR_ROUTING';
+  throw error;
+}
+
 function throwInvalidRootPublicFacadeAdapter(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
@@ -5791,6 +6181,36 @@ function describeBridgeValue(value) {
   });
 }
 
+function describeRootErrorCallbacks(rootOptions) {
+  const options =
+    rootOptions !== null && typeof rootOptions === 'object'
+      ? rootOptions
+      : null;
+
+  return freezeRecord({
+    onCaughtError: describeRootErrorCallback(options, 'onCaughtError'),
+    onRecoverableError: describeRootErrorCallback(
+      options,
+      'onRecoverableError'
+    ),
+    onUncaughtError: describeRootErrorCallback(options, 'onUncaughtError')
+  });
+}
+
+function describeRootErrorCallback(rootOptions, key) {
+  const value =
+    rootOptions !== null &&
+    Object.prototype.hasOwnProperty.call(rootOptions, key)
+      ? rootOptions[key]
+      : undefined;
+
+  return freezeRecord({
+    configured: typeof value === 'function',
+    key,
+    valueInfo: describeBridgeValue(value)
+  });
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
 }
@@ -5841,6 +6261,8 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
   ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
@@ -5879,6 +6301,7 @@ module.exports = {
   createPrivateRootPublicFacadeAdapter,
   createPrivateRootHandle,
   createPrivateRootOwner,
+  createRefCallbackRootErrorRoutingRecord,
   createRefCallbackHostOutputOrderingDiagnosticRecord,
   createRootRenderRecord,
   createRootUnmountRecord,
@@ -5897,6 +6320,7 @@ module.exports = {
   getPrivateRootPortalFakeDomMountPayload,
   getPrivateRootPublicFacadeAdapterPayload,
   getPrivateRootPublicFacadeRootPayload,
+  getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
   getPrivateRootUnmountHostOutputCleanupPayload,
@@ -5913,6 +6337,7 @@ module.exports = {
   isPrivateRootPublicFacadeAdapter,
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountHostOutputCleanupRecord,
+  isPrivateRootRefCallbackErrorRoutingRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRootHandle,
   isPrivateRootOwner,
@@ -5935,6 +6360,7 @@ module.exports = {
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
+  privateRootRefCallbackErrorRoutingRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootHydrateRecordType,
