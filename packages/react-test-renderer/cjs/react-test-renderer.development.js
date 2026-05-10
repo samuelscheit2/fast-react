@@ -2913,10 +2913,16 @@ const privateErrorBoundaryDiagnosticsStatus =
   'private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked';
 const privateErrorBoundaryDiagnosticName =
   'fast-react-test-renderer.error-boundary.private-root-options-canary';
+const privateErrorBoundaryNativeExecutionDiagnosticName =
+  'fast-react-test-renderer.error-boundary.private-native-execution-evidence';
+const privateErrorBoundaryNativeExecutionStatus =
+  'private-error-boundary-native-execution-update-failure-evidence-public-recovery-blocked';
 const privateErrorBoundaryRootOptionsRustApi =
   'TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary';
 const privateErrorBoundaryUpdateRustApi =
   'TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary';
+const privateErrorBoundaryNativeExecutionRustApi =
+  'TestRendererRoot::describe_private_error_boundary_update_native_execution_for_canary';
 const privateErrorBoundaryDiagnosticPhases = Object.freeze([
   'Update',
   'Commit'
@@ -2959,15 +2965,18 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
     'TestRendererPrivateErrorBoundaryDiagnostics',
     'TestRendererPrivateErrorDiagnosticRow',
     'TestRendererPrivateErrorBoundaryDependencyDiagnostics',
+    'TestRendererPrivateErrorBoundaryNativeExecutionEvidence',
     'TestRendererRootErrorOptionDiagnostics'
   ]),
   acceptedRustApis: Object.freeze([
     privateErrorBoundaryRootOptionsRustApi,
-    privateErrorBoundaryUpdateRustApi
+    privateErrorBoundaryUpdateRustApi,
+    privateErrorBoundaryNativeExecutionRustApi
   ]),
   acceptedRustTests: Object.freeze([
     'root_options_store_error_callback_handles_without_invocation',
-    'root_private_error_boundary_diagnostics_record_update_and_commit_rows_from_options'
+    'root_private_error_boundary_diagnostics_record_update_and_commit_rows_from_options',
+    'root_private_error_boundary_native_execution_evidence_consumes_update_failure_path'
   ]),
   phases: privateErrorBoundaryDiagnosticPhases,
   rows: privateErrorBoundaryDiagnosticRows,
@@ -2979,7 +2988,9 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
     'worker-473-test-renderer-act-passive-effect-drain',
     'worker-482-test-renderer-act-scheduler-flush-gate',
     'worker-484-test-instance-find-by-private-query-gate',
-    'worker-485-test-renderer-totree-multichild-gate'
+    'worker-485-test-renderer-totree-multichild-gate',
+    'worker-637-test-renderer-update-native-execution',
+    'worker-669-test-renderer-error-boundary-native-execution'
   ]),
   acceptedPrivateDiagnosticDependencyIds:
     privateErrorBoundaryDiagnosticDependencyIds,
@@ -2993,8 +3004,18 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
     'onRecoverableError'
   ]),
   privateRootErrorOptionMetadataAvailable: true,
+  privateNativeExecutionEvidenceAvailable: true,
+  nativeExecutionEvidenceDiagnosticName:
+    privateErrorBoundaryNativeExecutionDiagnosticName,
+  nativeExecutionEvidenceStatus: privateErrorBoundaryNativeExecutionStatus,
+  acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+  acceptedNativeExecutionOperations: Object.freeze(['update']),
+  nativeExecutionEvidenceWorker:
+    'worker-669-test-renderer-error-boundary-native-execution',
+  consumesAcceptedRootExecutionDiagnostics: true,
   publicErrorBoundaryBehaviorAvailable: false,
   publicErrorBoundaryBehaviorExposed: false,
+  publicErrorRecoveryAvailable: false,
   publicRootErrorCallbacksInvoked: false,
   publicRendererRootsExecuted: false,
   publicLifecycleMethodsExecuted: false,
@@ -4002,6 +4023,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-534-root-work-loop-finished-work-commit-handoff',
     'worker-465-test-renderer-error-boundary-diagnostics',
     'worker-530-test-renderer-error-boundary-update-refresh',
+    'worker-669-test-renderer-error-boundary-native-execution',
     'worker-539-test-renderer-live-rust-root-create-preflight',
     'worker-573-test-renderer-private-root-work-loop-preflight',
     'worker-574-test-renderer-update-via-root-work-loop',
@@ -4024,7 +4046,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-636-test-renderer-create-native-execution',
     'worker-612-test-renderer-unmount-native-bridge-admission',
     'worker-638-test-renderer-unmount-native-execution',
-    'worker-637-test-renderer-update-native-execution'
+    'worker-637-test-renderer-update-native-execution',
+    'worker-669-test-renderer-error-boundary-native-execution'
   ]),
   root: freezeRecord({
     rustType: 'TestRendererRoot',
@@ -11992,11 +12015,36 @@ function createPrivateErrorBoundaryDiagnosticsForRootRequest(rootRequest) {
     publicRendererRootsExecuted: false,
     publicLifecycleMethodsExecuted: false,
     errorBoundaryRecoveryExecuted: false,
+    privateNativeExecutionEvidenceAvailable: true,
+    nativeExecutionEvidenceDiagnosticName:
+      privateErrorBoundaryNativeExecutionDiagnosticName,
+    nativeExecutionEvidenceStatus: privateErrorBoundaryNativeExecutionStatus,
+    acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+    acceptedNativeExecutionOperations: freezeArray(['update']),
+    consumesAcceptedRootExecutionDiagnostics: true,
+    publicErrorRecoveryAvailable: false,
     nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecution: false,
     reconcilerExecution: false,
-    compatibilityClaimed: false
+    compatibilityClaimed: false,
+    canCreateAcceptedNativeExecutionDiagnosticResult(executionRecord) {
+      try {
+        createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
+          rootRequest,
+          executionRecord
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    createAcceptedNativeExecutionDiagnosticResult(executionRecord) {
+      return createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
+        rootRequest,
+        executionRecord
+      );
+    }
   });
 }
 
@@ -12044,6 +12092,170 @@ function createPrivateErrorBoundaryDiagnosticRow(
     reconcilerExecution: false,
     compatibilityClaimed: false
   });
+}
+
+function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
+  rootRequest,
+  executionRecord
+) {
+  const execution = consumeAcceptedErrorBoundaryNativeExecutionRecord(
+    rootRequest,
+    executionRecord
+  );
+  const diagnostics = getPrivateErrorBoundaryDiagnosticsForRootRequest(
+    rootRequest
+  );
+
+  if (
+    diagnostics.publicErrorBoundaryBehaviorAvailable !== false ||
+    diagnostics.publicRootErrorCallbacksInvoked !== false ||
+    diagnostics.errorBoundaryRecoveryExecuted !== false ||
+    diagnostics.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Private error boundary native execution evidence cannot consume public recovery diagnostics.'
+    );
+  }
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-error-boundary-after-native-update-result',
+    kind: 'FastReactTestRendererPrivateErrorBoundaryNativeExecutionEvidence',
+    diagnosticName: privateErrorBoundaryNativeExecutionDiagnosticName,
+    status: privateErrorBoundaryNativeExecutionStatus,
+    entrypoint,
+    compatibilityTarget,
+    publicSurface: 'create().update error boundary',
+    sourceDiagnostic: privateErrorBoundaryDiagnosticName,
+    sourceDiagnosticResult: diagnostics.id,
+    acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
+    rootRequest,
+    rootExecutionResult: execution,
+    privateUpdateNativeBridgeAdmission:
+      execution.privateUpdateNativeBridgeAdmission,
+    operation: 'update',
+    updateFailurePath: 'update',
+    requestId: execution.requestId,
+    requestSequence: execution.requestSequence,
+    rootId: execution.request.rootId,
+    rootSequence: execution.request.rootSequence,
+    updateKind: 'Update',
+    hostOutputUpdateKind: 'Update',
+    rootErrorOptions: diagnostics.rootErrorOptions,
+    dependencyDiagnostics: diagnostics.dependencyDiagnostics,
+    rows: diagnostics.rows,
+    rowCount: diagnostics.rowCount,
+    consumesAcceptedRootExecutionDiagnostics: true,
+    consumesAcceptedNativeExecutionRecord: true,
+    consumesAcceptedNativeUpdateExecutionRecord: true,
+    consumesPrivateErrorBoundaryDiagnostics: true,
+    consumesUpdateErrorRow: diagnostics.updateErrorRowAvailable,
+    consumesCommitErrorRow: diagnostics.commitErrorRowAvailable,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicErrorBoundaryBehaviorExposed: false,
+    errorBoundaryRecoveryExecuted: false,
+    publicErrorRecoveryAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: true,
+    reconcilerExecutionFromJs: true,
+    privateRootRequestExecution: true,
+    hostOutputProduced: true,
+    compatibilityClaimed: false
+  });
+}
+
+function consumeAcceptedErrorBoundaryNativeExecutionRecord(
+  rootRequest,
+  executionRecord
+) {
+  if (!isRootRequestRecord(rootRequest)) {
+    throwInvalidRootRequest(
+      'Expected a private root request for error boundary native execution evidence.'
+    );
+  }
+  if (rootRequest.operation !== 'update') {
+    throwInvalidRootRequest(
+      'Private error boundary native execution evidence only accepts update requests.'
+    );
+  }
+  if (executionRecord === null || typeof executionRecord !== 'object') {
+    throwInvalidRootRequest(
+      'Expected an accepted private native root execution result.'
+    );
+  }
+  if (
+    executionRecord.kind !== undefined &&
+    executionRecord.kind !== privateToJSONNativeExecutionRecordKind
+  ) {
+    throwInvalidRootRequest(
+      'Expected a FastReactTestRendererPrivateRootExecutionResult record.'
+    );
+  }
+  if (
+    executionRecord.status !== undefined &&
+    executionRecord.status !== 'accepted-private-test-renderer-root-execution-result'
+  ) {
+    throwInvalidRootRequest(
+      'Expected an accepted private root execution result status.'
+    );
+  }
+
+  const request = readDiagnosticField(executionRecord, ['request']);
+  if (request !== rootRequest) {
+    throwInvalidRootRequest(
+      'Expected error boundary native execution evidence to belong to the update request.'
+    );
+  }
+  if (
+    executionRecord.operation !== 'update' ||
+    executionRecord.updateKind !== 'Update' ||
+    executionRecord.scheduled !== true ||
+    executionRecord.privateRootRequestExecution !== true ||
+    executionRecord.rustRootExecutionBridgeStatus !==
+      'admitted-private-test-renderer-native-root-execution-bridge' ||
+    executionRecord.rustRootExecutionBoundaryCalled !== true
+  ) {
+    throwInvalidRootRequest(
+      'Expected accepted private update root execution evidence.'
+    );
+  }
+
+  const updateAdmission = executionRecord.privateUpdateNativeBridgeAdmission;
+  if (
+    updateAdmission === null ||
+    typeof updateAdmission !== 'object' ||
+    updateAdmission.id !== privateUpdateNativeBridgeAdmissionDiagnosticId ||
+    updateAdmission.status !== privateUpdateNativeBridgeAdmissionStatus ||
+    updateAdmission.request !== rootRequest ||
+    updateAdmission.hostOutputHandoffAccepted !== true ||
+    updateAdmission.rootWorkLoopHandoffAccepted !== true ||
+    updateAdmission.lifecycleEvidenceAccepted !== true ||
+    updateAdmission.updateRouteAdmissionAccepted !== true
+  ) {
+    throwInvalidRootRequest(
+      'Expected accepted private update native bridge admission evidence.'
+    );
+  }
+  if (
+    executionRecord.publicRouteAvailable !== false ||
+    executionRecord.publicCreateUpdateUnmountBehaviorAvailable !== false ||
+    executionRecord.serializationAvailable !== false ||
+    executionRecord.nativeBridgeAvailable !== false ||
+    executionRecord.nativeExecution !== false ||
+    executionRecord.compatibilityClaimed !== false ||
+    updateAdmission.publicUpdateCompatibilityClaimed !== false ||
+    updateAdmission.publicSerializationAvailable !== false ||
+    updateAdmission.nativeExecution !== false ||
+    updateAdmission.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Private error boundary native execution evidence cannot claim public recovery compatibility.'
+    );
+  }
+
+  return executionRecord;
 }
 
 function getPrivateErrorBoundaryAcceptedRustApiForRootRequest(rootRequest) {

@@ -3059,6 +3059,10 @@ pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
     "private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked";
+pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.error-boundary.private-native-execution-evidence";
+pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_STATUS: &str =
+    "private-error-boundary-native-execution-update-failure-evidence-public-recovery-blocked";
 pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.act.private-passive-effect-drain-canary";
 pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_STATUS: &str =
@@ -4505,6 +4509,180 @@ impl TestRendererPrivateErrorBoundaryDiagnostics {
     #[must_use]
     pub const fn public_root_error_callbacks_invoked(self) -> bool {
         self.public_root_error_callbacks_invoked
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    public_surface: &'static str,
+    update_failure_path: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    source_execution_scheduled_update_kind: TestRendererRootUpdateKind,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    error_diagnostics: TestRendererPrivateErrorBoundaryDiagnostics,
+    rows: [TestRendererPrivateErrorDiagnosticRow; 2],
+    row_count: usize,
+    consumes_accepted_root_execution_diagnostics: bool,
+    consumes_accepted_native_update_execution_record: bool,
+    consumes_private_error_boundary_diagnostics: bool,
+    consumes_update_error_row: bool,
+    consumes_commit_error_row: bool,
+    root_error_update_scheduled: bool,
+    public_root_error_callbacks_invoked: bool,
+    public_error_boundary_behavior_available: bool,
+    error_boundary_recovery_executed: bool,
+    public_error_recovery_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    rust_execution_from_js: bool,
+    reconciler_execution_from_js: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn update_failure_path(self) -> &'static str {
+        self.update_failure_path
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn source_execution_scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.source_execution_scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn error_diagnostics(self) -> TestRendererPrivateErrorBoundaryDiagnostics {
+        self.error_diagnostics
+    }
+
+    #[must_use]
+    pub const fn rows(&self) -> &[TestRendererPrivateErrorDiagnosticRow; 2] {
+        &self.rows
+    }
+
+    #[must_use]
+    pub const fn row_count(self) -> usize {
+        self.row_count
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_root_execution_diagnostics(self) -> bool {
+        self.consumes_accepted_root_execution_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_update_execution_record(self) -> bool {
+        self.consumes_accepted_native_update_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_private_error_boundary_diagnostics(self) -> bool {
+        self.consumes_private_error_boundary_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_update_error_row(self) -> bool {
+        self.consumes_update_error_row
+    }
+
+    #[must_use]
+    pub const fn consumes_commit_error_row(self) -> bool {
+        self.consumes_commit_error_row
+    }
+
+    #[must_use]
+    pub const fn root_error_update_scheduled(self) -> bool {
+        self.root_error_update_scheduled
+    }
+
+    #[must_use]
+    pub const fn public_root_error_callbacks_invoked(self) -> bool {
+        self.public_root_error_callbacks_invoked
+    }
+
+    #[must_use]
+    pub const fn public_error_boundary_behavior_available(self) -> bool {
+        self.public_error_boundary_behavior_available
+    }
+
+    #[must_use]
+    pub const fn error_boundary_recovery_executed(self) -> bool {
+        self.error_boundary_recovery_executed
+    }
+
+    #[must_use]
+    pub const fn public_error_recovery_available(self) -> bool {
+        self.public_error_recovery_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn rust_execution_from_js(self) -> bool {
+        self.rust_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn reconciler_execution_from_js(self) -> bool {
+        self.reconciler_execution_from_js
     }
 
     #[must_use]
@@ -7405,6 +7583,41 @@ impl Display for TestRendererPrivateUpdateNativeBridgeAdmissionError {
 impl Error for TestRendererPrivateUpdateNativeBridgeAdmissionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateErrorBoundaryNativeExecutionError {
+    RootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    RecordMismatch {
+        reason: &'static str,
+    },
+    PublicRecoveryOpened {
+        reason: &'static str,
+    },
+}
+
+impl Display for TestRendererPrivateErrorBoundaryNativeExecutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootMismatch { expected, actual } => write!(
+                formatter,
+                "private error boundary native execution evidence expected root {expected:?}, found {actual:?}",
+            ),
+            Self::RecordMismatch { reason } => write!(
+                formatter,
+                "private error boundary native execution evidence rejected update execution record: {reason}",
+            ),
+            Self::PublicRecoveryOpened { reason } => write!(
+                formatter,
+                "private error boundary native execution evidence cannot open public recovery: {reason}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateErrorBoundaryNativeExecutionError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererPrivateUnmountNativeBridgeAdmissionError {
     AlreadyUnmountedRoot,
     MissingDeletionCommitHandoff,
@@ -7812,6 +8025,7 @@ pub enum TestRendererRootError {
     SerializationGate(Box<TestRendererSerializationGateError>),
     PrivateUpdateRoute(Box<TestRendererPrivateUpdateRouteError>),
     PrivateUpdateNativeBridgeAdmission(Box<TestRendererPrivateUpdateNativeBridgeAdmissionError>),
+    PrivateErrorBoundaryNativeExecution(Box<TestRendererPrivateErrorBoundaryNativeExecutionError>),
     PrivateUnmountNativeBridgeAdmission(Box<TestRendererPrivateUnmountNativeBridgeAdmissionError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
@@ -7852,6 +8066,7 @@ impl Display for TestRendererRootError {
             Self::SerializationGate(error) => Display::fmt(error, formatter),
             Self::PrivateUpdateRoute(error) => Display::fmt(error, formatter),
             Self::PrivateUpdateNativeBridgeAdmission(error) => Display::fmt(error, formatter),
+            Self::PrivateErrorBoundaryNativeExecution(error) => Display::fmt(error, formatter),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
@@ -7905,6 +8120,7 @@ impl Error for TestRendererRootError {
             Self::SerializationGate(error) => Some(error),
             Self::PrivateUpdateRoute(error) => Some(error),
             Self::PrivateUpdateNativeBridgeAdmission(error) => Some(error),
+            Self::PrivateErrorBoundaryNativeExecution(error) => Some(error),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
@@ -7972,6 +8188,12 @@ impl From<TestRendererPrivateUpdateRouteError> for TestRendererRootError {
 impl From<TestRendererPrivateUpdateNativeBridgeAdmissionError> for TestRendererRootError {
     fn from(error: TestRendererPrivateUpdateNativeBridgeAdmissionError) -> Self {
         Self::PrivateUpdateNativeBridgeAdmission(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateErrorBoundaryNativeExecutionError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateErrorBoundaryNativeExecutionError) -> Self {
+        Self::PrivateErrorBoundaryNativeExecution(Box::new(error))
     }
 }
 
@@ -8723,6 +8945,164 @@ impl TestRendererRoot {
         };
 
         self.describe_private_error_boundary_diagnostics_with_dependencies(dependency_diagnostics)
+    }
+
+    pub fn describe_private_error_boundary_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateErrorBoundaryNativeExecutionEvidence, TestRendererRootError>
+    {
+        let diagnostics =
+            self.describe_private_error_boundary_update_diagnostics_for_canary(output)?;
+        self.validate_private_error_boundary_update_native_execution_for_canary(
+            &diagnostics,
+            execution,
+        )?;
+
+        let rows = *diagnostics.rows();
+        let consumes_update_error_row = rows
+            .iter()
+            .any(|row| row.phase() == TestRendererPrivateErrorDiagnosticPhase::Update);
+        let consumes_commit_error_row = rows
+            .iter()
+            .any(|row| row.phase() == TestRendererPrivateErrorDiagnosticPhase::Commit);
+
+        Ok(TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_STATUS,
+            root: self.root_id,
+            operation: "update",
+            public_surface: "create().update error boundary",
+            update_failure_path: "update",
+            source_execution_record_id:
+                TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            source_execution_status: TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS,
+            source_execution_scheduled_update_kind: execution.scheduled_update_kind(),
+            host_output_update_kind: execution.host_output_update_kind(),
+            error_diagnostics: diagnostics,
+            rows,
+            row_count: rows.len(),
+            consumes_accepted_root_execution_diagnostics: true,
+            consumes_accepted_native_update_execution_record: true,
+            consumes_private_error_boundary_diagnostics: true,
+            consumes_update_error_row,
+            consumes_commit_error_row,
+            root_error_update_scheduled: false,
+            public_root_error_callbacks_invoked: false,
+            public_error_boundary_behavior_available: false,
+            error_boundary_recovery_executed: false,
+            public_error_recovery_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            rust_execution_from_js: execution.rust_execution_from_js(),
+            reconciler_execution_from_js: execution.reconciler_execution_from_js(),
+            compatibility_claimed: false,
+        })
+    }
+
+    fn validate_private_error_boundary_update_native_execution_for_canary(
+        &self,
+        diagnostics: &TestRendererPrivateErrorBoundaryDiagnostics,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.root() != self.root_id {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RootMismatch {
+                    expected: self.root_id,
+                    actual: execution.root(),
+                }
+                .into(),
+            );
+        }
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "update-native-bridge-admission-diagnostic-id",
+                }
+                .into(),
+            );
+        }
+        if execution.status() != TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "update-native-bridge-admission-status",
+                }
+                .into(),
+            );
+        }
+        if execution.scheduled_update_kind() != TestRendererRootUpdateKind::Update {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "scheduled-update-kind",
+                }
+                .into(),
+            );
+        }
+        if execution.host_output_update_kind() != TestRendererRootUpdateKind::Update {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "host-output-update-kind",
+                }
+                .into(),
+            );
+        }
+        if !(execution.update_route_admission_accepted()
+            && execution.lifecycle_evidence_accepted()
+            && execution.root_work_loop_handoff_accepted()
+            && execution.host_output_handoff_accepted()
+            && execution.rust_execution_from_js()
+            && execution.reconciler_execution_from_js())
+        {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "update-execution-admission-not-accepted",
+                }
+                .into(),
+            );
+        }
+        if execution.native_bridge_available()
+            || execution.native_execution()
+            || execution.public_update_compatibility_claimed()
+            || execution.public_serialization_available()
+            || execution.act_flushing_claimed()
+            || execution.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::PublicRecoveryOpened {
+                    reason: "update-execution-record-claimed-public-behavior",
+                }
+                .into(),
+            );
+        }
+        if diagnostics.root() != self.root_id
+            || diagnostics.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || !diagnostics
+                .dependency_diagnostics()
+                .update_commit_rows_ready()
+        {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "error-boundary-update-diagnostics-not-ready",
+                }
+                .into(),
+            );
+        }
+        if diagnostics.public_error_boundary_behavior_available()
+            || diagnostics.public_root_error_callbacks_invoked()
+            || diagnostics.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::PublicRecoveryOpened {
+                    reason: "error-boundary-diagnostics-claimed-public-recovery",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
     }
 
     fn describe_private_error_boundary_diagnostics_with_dependencies(
@@ -18345,6 +18725,104 @@ mod tests {
             assert!(!row.public_error_boundary_behavior_available());
             assert!(!row.compatibility_claimed());
         }
+    }
+
+    #[test]
+    fn root_private_error_boundary_native_execution_evidence_consumes_update_failure_path() {
+        let options = TestRendererOptions::new()
+            .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(701))
+            .with_on_caught_error(RootErrorCallbackHandle::from_raw(702))
+            .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(703));
+        let mut root =
+            TestRendererRoot::create_host_component_with_text_for_canary("span", "hello", options)
+                .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let (_outcome, updated, admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                props().with_attribute("data-error-path", "update"),
+                "goodbye",
+            )
+            .unwrap();
+
+        let evidence = root
+            .describe_private_error_boundary_update_native_execution_for_canary(&updated, admission)
+            .unwrap();
+        let diagnostics = evidence.error_diagnostics();
+
+        assert_eq!(
+            evidence.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            evidence.status(),
+            TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_STATUS
+        );
+        assert_eq!(evidence.root(), root.root_id());
+        assert_eq!(evidence.operation(), "update");
+        assert_eq!(evidence.public_surface(), "create().update error boundary");
+        assert_eq!(evidence.update_failure_path(), "update");
+        assert_eq!(
+            evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            evidence.source_execution_scheduled_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(diagnostics.root(), root.root_id());
+        assert_eq!(evidence.row_count(), 2);
+        assert_eq!(evidence.rows(), diagnostics.rows());
+        assert!(evidence.consumes_accepted_root_execution_diagnostics());
+        assert!(evidence.consumes_accepted_native_update_execution_record());
+        assert!(evidence.consumes_private_error_boundary_diagnostics());
+        assert!(evidence.consumes_update_error_row());
+        assert!(evidence.consumes_commit_error_row());
+        assert!(!evidence.root_error_update_scheduled());
+        assert!(!evidence.public_root_error_callbacks_invoked());
+        assert!(!evidence.public_error_boundary_behavior_available());
+        assert!(!evidence.error_boundary_recovery_executed());
+        assert!(!evidence.public_error_recovery_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(evidence.rust_execution_from_js());
+        assert!(evidence.reconciler_execution_from_js());
+        assert!(!evidence.compatibility_claimed());
+        assert!(!diagnostics.public_error_boundary_behavior_available());
+        assert!(!diagnostics.public_root_error_callbacks_invoked());
+        assert!(!diagnostics.compatibility_claimed());
+
+        let mut stale_admission = admission;
+        stale_admission.host_output_update_kind = TestRendererRootUpdateKind::Create;
+        let error = root
+            .describe_private_error_boundary_update_native_execution_for_canary(
+                &updated,
+                stale_admission,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateErrorBoundaryNativeExecution(error) = error else {
+            panic!("expected private error boundary native execution rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                reason: "host-output-update-kind"
+            }
+        ));
     }
 
     #[test]

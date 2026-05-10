@@ -81,10 +81,17 @@ const privateErrorBoundaryRootOptionsRustApi =
   "TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary";
 const privateErrorBoundaryUpdateRustApi =
   "TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary";
+const privateErrorBoundaryNativeExecutionRustApi =
+  "TestRendererRoot::describe_private_error_boundary_update_native_execution_for_canary";
 const privateErrorBoundaryAcceptedRustApis = [
   privateErrorBoundaryRootOptionsRustApi,
-  privateErrorBoundaryUpdateRustApi
+  privateErrorBoundaryUpdateRustApi,
+  privateErrorBoundaryNativeExecutionRustApi
 ];
+const privateErrorBoundaryNativeExecutionDiagnosticName =
+  "fast-react-test-renderer.error-boundary.private-native-execution-evidence";
+const privateErrorBoundaryNativeExecutionStatus =
+  "private-error-boundary-native-execution-update-failure-evidence-public-recovery-blocked";
 const privateToTreeHostOutputMetadataSymbolDescription =
   "fast.react_test_renderer.private_totree_host_output_metadata";
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
@@ -2387,6 +2394,7 @@ test("react-test-renderer development private error-boundary diagnostics follow 
       "TestRendererPrivateErrorBoundaryDiagnostics",
       "TestRendererPrivateErrorDiagnosticRow",
       "TestRendererPrivateErrorBoundaryDependencyDiagnostics",
+      "TestRendererPrivateErrorBoundaryNativeExecutionEvidence",
       "TestRendererRootErrorOptionDiagnostics"
     ]
   );
@@ -2442,12 +2450,150 @@ test("react-test-renderer development private error-boundary diagnostics follow 
   assert.equal(updateDiagnostics.publicRendererRootsExecuted, false);
   assert.equal(updateDiagnostics.publicLifecycleMethodsExecuted, false);
   assert.equal(updateDiagnostics.errorBoundaryRecoveryExecuted, false);
+  assert.equal(updateDiagnostics.privateNativeExecutionEvidenceAvailable, true);
+  assert.equal(
+    updateDiagnostics.nativeExecutionEvidenceDiagnosticName,
+    privateErrorBoundaryNativeExecutionDiagnosticName
+  );
+  assert.equal(
+    updateDiagnostics.nativeExecutionEvidenceStatus,
+    privateErrorBoundaryNativeExecutionStatus
+  );
+  assert.deepEqual(updateDiagnostics.acceptedNativeExecutionOperations, [
+    "update"
+  ]);
+  assert.equal(
+    typeof updateDiagnostics.createAcceptedNativeExecutionDiagnosticResult,
+    "function"
+  );
+  assert.equal(
+    typeof updateDiagnostics.canCreateAcceptedNativeExecutionDiagnosticResult,
+    "function"
+  );
   assert.equal(updateDiagnostics.compatibilityClaimed, false);
   assert.equal(
     bridge.getRootErrorBoundaryDiagnostics(updateRequest),
     updateDiagnostics
   );
   assert.deepEqual(calls, []);
+});
+
+test("react-test-renderer development private error-boundary native execution evidence consumes update failures", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const calls = [];
+  const renderer = moduleExports.create(
+    { props: { children: "hello" }, type: "span" },
+    {
+      onUncaughtError(error) {
+        calls.push(["uncaught", error.message]);
+      }
+    }
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const updateError = captureThrown(() =>
+    renderer.update({ props: { children: "goodbye" }, type: "span" })
+  );
+  const updateRequest = updateError.rootRequest;
+  const updateDiagnostics = updateError.privateErrorBoundaryDiagnostics;
+  const updateResult = bridge.executeRootRequest(updateRequest, () =>
+    createRustUpdateNativeBridgeAdmissionEvidence(updateRequest)
+  );
+
+  assertRootExecutionResult(updateResult, updateRequest);
+  assert.equal(
+    updateDiagnostics.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult
+    ),
+    true
+  );
+  const evidence =
+    updateDiagnostics.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult
+    );
+
+  assert.equal(
+    evidence.diagnosticName,
+    privateErrorBoundaryNativeExecutionDiagnosticName
+  );
+  assert.equal(evidence.status, privateErrorBoundaryNativeExecutionStatus);
+  assert.equal(
+    evidence.kind,
+    "FastReactTestRendererPrivateErrorBoundaryNativeExecutionEvidence"
+  );
+  assert.equal(evidence.publicSurface, "create().update error boundary");
+  assert.equal(evidence.sourceDiagnosticResult, updateDiagnostics.id);
+  assert.equal(evidence.rootRequest, updateRequest);
+  assert.equal(evidence.rootExecutionResult, updateResult);
+  assert.equal(
+    evidence.privateUpdateNativeBridgeAdmission,
+    updateResult.privateUpdateNativeBridgeAdmission
+  );
+  assert.equal(evidence.operation, "update");
+  assert.equal(evidence.updateFailurePath, "update");
+  assert.equal(evidence.requestId, updateRequest.requestId);
+  assert.equal(evidence.requestSequence, updateRequest.requestSequence);
+  assert.equal(evidence.rootId, updateRequest.rootId);
+  assert.equal(evidence.updateKind, "Update");
+  assert.equal(evidence.hostOutputUpdateKind, "Update");
+  assert.equal(evidence.rootErrorOptions, updateDiagnostics.rootErrorOptions);
+  assert.equal(
+    evidence.dependencyDiagnostics,
+    updateDiagnostics.dependencyDiagnostics
+  );
+  assert.equal(evidence.rows, updateDiagnostics.rows);
+  assert.equal(evidence.rowCount, 2);
+  assert.equal(evidence.consumesAcceptedRootExecutionDiagnostics, true);
+  assert.equal(evidence.consumesAcceptedNativeExecutionRecord, true);
+  assert.equal(evidence.consumesAcceptedNativeUpdateExecutionRecord, true);
+  assert.equal(evidence.consumesPrivateErrorBoundaryDiagnostics, true);
+  assert.equal(evidence.consumesUpdateErrorRow, true);
+  assert.equal(evidence.consumesCommitErrorRow, true);
+  assert.equal(evidence.rootErrorUpdateScheduled, false);
+  assert.equal(evidence.publicRootErrorCallbacksInvoked, false);
+  assert.equal(evidence.publicErrorBoundaryBehaviorAvailable, false);
+  assert.equal(evidence.errorBoundaryRecoveryExecuted, false);
+  assert.equal(evidence.publicErrorRecoveryAvailable, false);
+  assert.equal(evidence.nativeBridgeAvailable, false);
+  assert.equal(evidence.nativeExecution, false);
+  assert.equal(evidence.rustExecutionFromJs, true);
+  assert.equal(evidence.reconcilerExecutionFromJs, true);
+  assert.equal(evidence.privateRootRequestExecution, true);
+  assert.equal(evidence.hostOutputProduced, true);
+  assert.equal(evidence.compatibilityClaimed, false);
+  assert.deepEqual(calls, []);
+
+  const createResult = bridge.executeRootRequest(createRequest, () => ({
+    rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(createRequest),
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rustExecution: true
+  }));
+  assert.equal(
+    updateDiagnostics.canCreateAcceptedNativeExecutionDiagnosticResult(
+      createResult
+    ),
+    false
+  );
+  const mismatchError = captureThrown(() =>
+    updateDiagnostics.createAcceptedNativeExecutionDiagnosticResult(
+      createResult
+    )
+  );
+  assert.equal(
+    mismatchError.name,
+    "FastReactTestRendererPrivateRootRequestError"
+  );
+  assert.equal(
+    mismatchError.code,
+    "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST"
+  );
 });
 
 test("react-test-renderer private root request bridge consumes accepted Rust lifecycle diagnostics", () => {
@@ -4792,6 +4938,15 @@ function assertRustCanaryMetadata(metadata, label) {
       "worker-465-test-renderer-error-boundary-diagnostics",
       "worker-530-test-renderer-error-boundary-update-refresh"
     );
+    if (
+      metadata.acceptedRustWorkers.includes(
+        "worker-669-test-renderer-error-boundary-native-execution"
+      )
+    ) {
+      expectedAcceptedRustWorkers.push(
+        "worker-669-test-renderer-error-boundary-native-execution"
+      );
+    }
   }
   if (metadata.rootCreatePreflight !== undefined) {
     expectedAcceptedRustWorkers.push(
@@ -4871,6 +5026,15 @@ function assertRustCanaryMetadata(metadata, label) {
   if (metadata.hostOutput.updateNativeBridgeAdmissionGate !== undefined) {
     expectedAcceptedJsBridgeWorkers.push(
       "worker-637-test-renderer-update-native-execution"
+    );
+  }
+  if (
+    metadata.acceptedJsBridgeWorkers.includes(
+      "worker-669-test-renderer-error-boundary-native-execution"
+    )
+  ) {
+    expectedAcceptedJsBridgeWorkers.push(
+      "worker-669-test-renderer-error-boundary-native-execution"
     );
   }
   assert.deepEqual(
