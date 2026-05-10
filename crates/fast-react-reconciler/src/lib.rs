@@ -8,6 +8,7 @@ mod execution_context;
 mod fiber_root;
 mod fiber_store;
 mod host_tokens;
+mod root_commit;
 mod root_config;
 mod root_scheduler;
 mod root_updates;
@@ -45,6 +46,7 @@ pub use host_tokens::{
     HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
     HostFiberTokenValidationError,
 };
+pub use root_commit::{HostRootCommitRecord, RootCommitError, commit_finished_host_root};
 pub use root_config::{
     PendingChildrenHandle, PendingCommitCancelHandle, PendingCommitHandle, PendingPassiveState,
     RootCacheHandle, RootCallbackPriority, RootContextHandle, RootDefaultTransitionIndicatorHandle,
@@ -100,6 +102,7 @@ pub enum ReconcilerError {
     RootUpdate(RootUpdateError),
     RootScheduler(RootSchedulerError),
     RootWorkLoop(RootWorkLoopError),
+    RootCommit(RootCommitError),
     WorkInProgress(WorkInProgressError),
 }
 
@@ -126,6 +129,7 @@ impl Display for ReconcilerError {
             Self::RootUpdate(error) => Display::fmt(error, formatter),
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
+            Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
@@ -147,6 +151,7 @@ impl Error for ReconcilerError {
             Self::RootUpdate(error) => Some(error),
             Self::RootScheduler(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
+            Self::RootCommit(error) => Some(error),
             Self::WorkInProgress(error) => Some(error),
         }
     }
@@ -230,6 +235,12 @@ impl From<RootSchedulerError> for ReconcilerError {
 impl From<RootWorkLoopError> for ReconcilerError {
     fn from(error: RootWorkLoopError) -> Self {
         Self::RootWorkLoop(error)
+    }
+}
+
+impl From<RootCommitError> for ReconcilerError {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
     }
 }
 
