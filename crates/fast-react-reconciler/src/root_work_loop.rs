@@ -3806,6 +3806,7 @@ mod tests {
         FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
     };
+    use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
     use crate::test_support::{FakeContainer, RecordingHost, TestHostNode, TestHostTree};
     use crate::unsupported_features::{
         ACTIVITY_UNSUPPORTED_FEATURE, OFFSCREEN_UNSUPPORTED_FEATURE,
@@ -3817,12 +3818,13 @@ mod tests {
         PendingCommitHandle, ReconcilerError, RootContextHandle, RootElementHandle,
         RootHydrationCallbacksHandle, RootKind, RootOptions, RootSchedulerCallbackExecutionStatus,
         RootSuspenseBoundarySetHandle, RootTaskScheduleOutcome, RootTransitionCallbacksHandle,
-        SchedulerCallbackRequest, ensure_root_is_scheduled, execute_scheduled_root_callback,
+        RootUpdateError, RootUpdateLaneSourcePriority, SchedulerCallbackRequest,
+        ensure_root_is_scheduled, execute_scheduled_root_callback,
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
-        ContextHandle, ContextValueHandle, DependenciesHandle, ElementTypeHandle, FiberFlags,
-        FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, ReactKey,
+        ContextHandle, ContextValueHandle, DependenciesHandle, ElementTypeHandle, EventPriority,
+        FiberFlags, FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, ReactKey,
         RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
@@ -4852,6 +4854,82 @@ mod tests {
                 .get(record.work_in_progress())
                 .unwrap()
                 .update_queue()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_lane_priority_canary_records_sync_and_default_without_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let default =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(5351), None).unwrap();
+        validate_update_container_lane_diagnostics_for_canary(&store, &default).unwrap();
+
+        let sync =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(5352), None)
+                .unwrap();
+        validate_update_container_lane_diagnostics_for_canary(&store, &sync).unwrap();
+
+        let sync_and_default = Lanes::SYNC.merge(Lanes::DEFAULT);
+        assert_eq!(default.lane(), Lane::DEFAULT);
+        assert_eq!(default.event_priority(), EventPriority::DEFAULT);
+        assert_eq!(
+            default.source_priority(),
+            RootUpdateLaneSourcePriority::DefaultEventPriority
+        );
+        assert_eq!(default.pending_lanes_before_enqueue(), Lanes::NO);
+        assert_eq!(default.pending_lanes_after_enqueue(), Lanes::DEFAULT);
+        assert_eq!(default.selected_next_lanes(), Lanes::DEFAULT);
+
+        assert_eq!(sync.lane(), Lane::SYNC);
+        assert_eq!(sync.event_priority(), EventPriority::DISCRETE);
+        assert_eq!(
+            sync.source_priority(),
+            RootUpdateLaneSourcePriority::ExplicitSync
+        );
+        assert_eq!(sync.pending_lanes_before_enqueue(), Lanes::DEFAULT);
+        assert_eq!(sync.pending_lanes_after_enqueue(), sync_and_default);
+        assert_eq!(sync.selected_next_lanes(), sync_and_default);
+
+        assert_ne!(default.lane(), sync.lane());
+        assert_ne!(default.event_priority(), sync.event_priority());
+        assert_ne!(default.source_priority(), sync.source_priority());
+        assert_ne!(default.selected_next_lanes(), sync.selected_next_lanes());
+        assert!(default.callback_scheduling_blocked());
+        assert!(default.callback_execution_blocked());
+        assert!(!default.public_batching_compatibility_claimed());
+        assert!(sync.callback_scheduling_blocked());
+        assert!(sync.callback_execution_blocked());
+        assert!(!sync.public_batching_compatibility_claimed());
+        assert_eq!(store.root_scheduler().first_scheduled_root(), None);
+        assert_eq!(store.root_scheduler().last_scheduled_root(), None);
+        assert!(!store.root_scheduler().did_schedule_microtask());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+        assert!(store.scheduler_bridge().microtask_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_work_loop_lane_priority_diagnostics_fail_closed_for_stale_queue_evidence() {
+        let (mut store, root_id, _host) = root_store();
+        let result =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(5353), None).unwrap();
+        validate_update_container_lane_diagnostics_for_canary(&store, &result).unwrap();
+
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let error =
+            validate_update_container_lane_diagnostics_for_canary(&store, &result).unwrap_err();
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(
+            error,
+            RootUpdateError::StaleQueueEvidence {
+                root: root_id,
+                queue: result.queue(),
+                update: result.update(),
+                expected_pending_lanes: Lanes::DEFAULT,
+                actual_pending_lanes: Lanes::DEFAULT
+            }
         );
     }
 
