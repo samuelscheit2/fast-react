@@ -66,6 +66,10 @@ const privateTestInstanceNativeQueryExecutionDiagnosticName =
   "fast-react-test-renderer.testinstance.private-native-query-execution-evidence";
 const privateTestInstanceNativeQueryExecutionStatus =
   "private-test-instance-native-create-update-execution-records-consumed-public-test-instance-blocked";
+const privateTestInstanceClassQueryExecutionDiagnosticName =
+  "fast-react-test-renderer.testinstance.private-class-root-query-execution-evidence";
+const privateTestInstanceClassQueryExecutionStatus =
+  "private-test-instance-class-root-update-query-execution-public-test-instance-blocked";
 const privateErrorBoundaryDiagnosticsSymbolDescription =
   "fast.react_test_renderer.private_error_boundary_diagnostics";
 const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
@@ -3810,6 +3814,100 @@ test("react-test-renderer CJS development private TestInstance query consumes ac
   });
 });
 
+test("react-test-renderer CJS development private TestInstance class-root query evidence stays private", () => {
+  const entry = cjsEntrypoints.find((candidate) =>
+    candidate.entrypoint.endsWith("react-test-renderer.development")
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    { props: { children: "hello" }, type: "span" },
+    {}
+  );
+  const record = Object.getOwnPropertyDescriptor(
+    renderer,
+    privateTestInstanceWrapperRecordSymbol
+  ).value;
+  const updateError = captureThrown(() =>
+    renderer.update({ props: { children: "goodbye" }, type: "span" })
+  );
+  const updateResult = bridge.executeRootRequest(
+    updateError.rootRequest,
+    (handoff) => {
+      assert.equal(handoff.operation, "update");
+      return createRustUpdateNativeBridgeAdmissionEvidence(
+        updateError.rootRequest
+      );
+    }
+  );
+  const classRootReport = createRustPrivateClassRootQueryReport({
+    hostOutputUpdateKind: "Update",
+    text: "goodbye"
+  });
+
+  assert.equal(
+    record.privateClassRootQueryExecutionEvidenceAvailable,
+    true,
+    entry.entrypoint
+  );
+  assert.equal(
+    record.privateClassRootQueryExecutionDiagnosticName,
+    privateTestInstanceClassQueryExecutionDiagnosticName,
+    entry.entrypoint
+  );
+  assert.equal(
+    typeof record.createAcceptedClassRootQueryExecutionDiagnosticResult,
+    "function",
+    entry.entrypoint
+  );
+  assert.equal(
+    typeof record.canCreateAcceptedClassRootQueryExecutionDiagnosticResult,
+    "function",
+    entry.entrypoint
+  );
+  assert.equal(
+    record.canCreateAcceptedClassRootQueryExecutionDiagnosticResult(
+      updateResult,
+      classRootReport
+    ),
+    true,
+    entry.entrypoint
+  );
+
+  const evidence =
+    record.createAcceptedClassRootQueryExecutionDiagnosticResult(
+      updateResult,
+      classRootReport
+    );
+  assertPrivateTestInstanceClassRootQueryExecutionEvidence(
+    evidence,
+    record,
+    updateResult,
+    entry.entrypoint
+  );
+  assert.equal(
+    record.canCreateAcceptedClassRootQueryExecutionDiagnosticResult(
+      updateResult,
+      createRustPrivateClassRootQueryReport({
+        hostOutputUpdateKind: "Create",
+        text: "hello"
+      })
+    ),
+    false,
+    entry.entrypoint
+  );
+  assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+  assert.throws(() => renderer.root, {
+    code: "FAST_REACT_UNIMPLEMENTED",
+    name: "FastReactTestRendererUnimplementedError"
+  });
+});
+
 test("react-test-renderer create routing gate does not load native bridge artifacts", () => {
   const originalLoad = Module._load;
   const originalNodeExtension = Module._extensions[".node"];
@@ -5588,6 +5686,85 @@ function createRustUpdateNativeBridgeAdmissionEvidence(request, overrides = {}) 
     nativeExecution: false,
     rustExecution: true,
     reconcilerExecution: true
+  };
+}
+
+function createRustPrivateClassRootQueryReport({
+  hostOutputUpdateKind = "Update",
+  text = "goodbye"
+} = {}) {
+  const publicBlockers = {
+    jsonMethodBlocked: true,
+    treeMethodBlocked: true,
+    instanceWrapperBlocked: true,
+    jsFacadeRoutingBlocked: true,
+    publicActBlocked: true,
+    compatibilityClaimBlocked: true
+  };
+  const classProps = { attributes: { label: "class-root" } };
+
+  return {
+    diagnosticName: "fast-react-test-renderer.get-instance.private-class-root-canary",
+    sourceTreeDiagnosticName:
+      "fast-react-test-renderer.serialization.private-tree-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent: true,
+    acceptedClassFiberShape: [
+      "HostRoot",
+      "ClassComponent",
+      "HostComponent",
+      "HostText"
+    ],
+    hostRootFailClosed: {
+      rootFiberShape: ["HostRoot", "HostComponent"],
+      rootChildFiberTag: "HostComponent",
+      reactPublicResult: "null-with-default-createNodeMock",
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    },
+    functionRootFailClosed: {
+      rootFiberShape: ["HostRoot", "FunctionComponent"],
+      rootChildFiberTag: "FunctionComponent",
+      reactPublicResult: "null",
+      publicGetInstanceAvailable: false,
+      privateClassInstanceAvailable: false,
+      publicBehaviorFailClosed: true
+    },
+    classComponent: {
+      fiberTag: "ClassComponent",
+      componentType: "CanaryClassComponent",
+      props: classProps,
+      stateNodeAvailable: true,
+      renderedChildFiberTag: "HostComponent",
+      renderedChildCount: 1,
+      instance: {
+        constructorName: "CanaryClassInstance",
+        props: classProps,
+        state: { marker: "initial-state" },
+        reactPublicResult: "class-instance",
+        privateInstanceAvailable: true,
+        publicGetInstanceAvailable: false
+      },
+      publicGetInstanceAvailable: false
+    },
+    renderedHostComponent: {
+      fiberTag: "HostComponent",
+      nodeType: "host",
+      elementType: "span",
+      props: {},
+      instanceAvailable: false,
+      renderedChildCount: 1,
+      renderedText: text
+    },
+    renderedHostText: {
+      fiberTag: "HostText",
+      text
+    },
+    publicBlockers,
+    publicGetInstanceAvailable: false,
+    nativeBridgeAvailable: false,
+    compatibilityClaimed: false
   };
 }
 
@@ -10350,6 +10527,133 @@ function assertPrivateTestInstanceNativeQueryExecutionEvidence(
   assert.equal(evidence.publicRootAvailable, false, entrypoint);
   assert.equal(evidence.publicQueryMethodsAvailable, false, entrypoint);
   assert.equal(evidence.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(evidence.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(evidence.nativeExecution, false, entrypoint);
+  assert.equal(evidence.compatibilityClaimed, false, entrypoint);
+}
+
+function assertPrivateTestInstanceClassRootQueryExecutionEvidence(
+  evidence,
+  owner,
+  execution,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(evidence), true, entrypoint);
+  assert.equal(
+    evidence.id,
+    "react-test-renderer-private-test-instance-class-root-query-execution-result",
+    entrypoint
+  );
+  assert.equal(
+    evidence.diagnosticName,
+    privateTestInstanceClassQueryExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    evidence.status,
+    privateTestInstanceClassQueryExecutionStatus,
+    entrypoint
+  );
+  assert.equal(
+    evidence.gate.id,
+    "react-test-renderer-private-test-instance-class-root-query-execution-gate",
+    entrypoint
+  );
+  assert.equal(
+    evidence.gate.acceptedWorker,
+    "worker-699-test-renderer-testinstance-class-query-execution",
+    entrypoint
+  );
+  assert.deepEqual(evidence.gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_test_instance_class_root_query_after_update_native_execution_for_canary",
+    "TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence",
+    "TestRendererRoot::describe_private_get_instance_class_root_after_update_for_canary"
+  ]);
+  assert.deepEqual(evidence.gate.acceptedRustTests, [
+    "root_private_test_instance_class_query_execution_consumes_update_record_and_updated_child",
+    "root_private_test_instance_class_query_execution_rejects_stale_updated_child"
+  ]);
+  assert.equal(evidence.rootRequest, owner.rootRequest, entrypoint);
+  assert.equal(evidence.rootExecutionResult, execution, entrypoint);
+  assert.equal(evidence.operation, "update", entrypoint);
+  assert.equal(evidence.requestId, execution.requestId, entrypoint);
+  assert.equal(evidence.requestSequence, execution.requestSequence, entrypoint);
+  assert.equal(evidence.rootId, execution.request.rootId, entrypoint);
+  assert.equal(evidence.hostOutputUpdateKind, "Update", entrypoint);
+  assert.equal(evidence.hostOutputSnapshotCurrent, true, entrypoint);
+  assert.equal(
+    evidence.sourceQueryDiagnosticName,
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    evidence.sourceNativeQueryDiagnosticName,
+    privateTestInstanceNativeQueryExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    evidence.sourceQueryBridgePreflight,
+    owner.queryBridgePreflight,
+    entrypoint
+  );
+  assert.deepEqual(evidence.acceptedClassRootFiberShape, [
+    "HostRoot",
+    "ClassComponent",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(evidence.rootQuerySurface, "create().root", entrypoint);
+  assert.equal(evidence.rootResultFiberTag, "ClassComponent", entrypoint);
+  assert.equal(evidence.rootComponentType, "CanaryClassComponent", entrypoint);
+  assert.equal(evidence.rootChildCount, 1, entrypoint);
+  assert.equal(evidence.rootQueryResult.fiberTag, "ClassComponent", entrypoint);
+  assert.equal(evidence.rootQueryResult.publicObject, false, entrypoint);
+  assert.equal(evidence.query, "findByType", entrypoint);
+  assert.equal(evidence.querySurface, "ReactTestInstance.findByType", entrypoint);
+  assert.equal(
+    evidence.queryRecord,
+    owner.queryMethodRecords.findByType,
+    entrypoint
+  );
+  assert.equal(evidence.queryResult.fiberTag, "HostComponent", entrypoint);
+  assert.equal(evidence.queryResult.publicObject, false, entrypoint);
+  assert.equal(evidence.queryResult.children[0].text, "goodbye", entrypoint);
+  assert.equal(evidence.resultKind, "single", entrypoint);
+  assert.equal(evidence.resultFiberTag, "HostComponent", entrypoint);
+  assert.equal(evidence.childElementType, "span", entrypoint);
+  assert.deepEqual(evidence.childProps, {}, entrypoint);
+  assert.equal(evidence.childText, "goodbye", entrypoint);
+  assert.equal(evidence.hostChildUpdated, true, entrypoint);
+  assert.deepEqual(evidence.classRootQueryPath, [
+    "ClassComponent",
+    "HostComponent"
+  ]);
+  assert.deepEqual(evidence.updatedHostChildQueryPath, [
+    "ClassComponent",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(evidence.consumesAcceptedNativeExecutionRecord, true, entrypoint);
+  assert.equal(
+    evidence.consumesAcceptedNativeUpdateExecutionRecord,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    evidence.consumesPrivateTestInstanceQueryDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(evidence.consumesQueryBridgePreflight, true, entrypoint);
+  assert.equal(
+    evidence.consumesPrivateGetInstanceClassRootDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(evidence.publicRootAvailable, false, entrypoint);
+  assert.equal(evidence.publicQueryMethodsAvailable, false, entrypoint);
+  assert.equal(evidence.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(evidence.publicGetInstanceAvailable, false, entrypoint);
   assert.equal(evidence.nativeBridgeAvailable, false, entrypoint);
   assert.equal(evidence.nativeExecution, false, entrypoint);
   assert.equal(evidence.compatibilityClaimed, false, entrypoint);

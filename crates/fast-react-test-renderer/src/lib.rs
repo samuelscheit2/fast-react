@@ -3271,6 +3271,10 @@ pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.private-native-query-execution-evidence";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_STATUS: &str = "private-test-instance-native-create-update-execution-records-consumed-public-test-instance-blocked";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_CLASS_QUERY_EXECUTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.testinstance.private-class-root-query-execution-evidence";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_CLASS_QUERY_EXECUTION_STATUS: &str =
+    "private-test-instance-class-root-update-query-execution-public-test-instance-blocked";
 pub const TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID: &str =
     "fast-react-test-renderer-current-root-canary-metadata";
 pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
@@ -7946,6 +7950,246 @@ impl TestRendererPrivateTestInstanceNativeQueryExecutionEvidence {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    source_query_diagnostic_name: &'static str,
+    source_get_instance_diagnostic_name: &'static str,
+    query_bridge_preflight_status: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    accepted_class_fiber_shape: [&'static str; 4],
+    root_query_surface: &'static str,
+    root_result_fiber_tag: &'static str,
+    root_component_type: &'static str,
+    root_props: TestProps,
+    root_child_count: usize,
+    child_query_surface: &'static str,
+    child_query_kind: TestRendererPrivateTestInstanceFindByQueryKind,
+    child_fiber_tag: &'static str,
+    child_element_type: TestElementType,
+    child_props: TestProps,
+    previous_child_text: String,
+    current_child_text: String,
+    host_child_updated: bool,
+    class_root_query_path: Vec<&'static str>,
+    updated_host_child_query_path: Vec<&'static str>,
+    consumes_accepted_native_update_execution_record: bool,
+    consumes_private_test_instance_query_diagnostics: bool,
+    consumes_query_bridge_preflight: bool,
+    consumes_private_get_instance_class_root_diagnostics: bool,
+    public_root_available: bool,
+    public_query_methods_available: bool,
+    public_test_instance_object_available: bool,
+    public_get_instance_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(&self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(&self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(&self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(&self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn source_query_diagnostic_name(&self) -> &'static str {
+        self.source_query_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_get_instance_diagnostic_name(&self) -> &'static str {
+        self.source_get_instance_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn query_bridge_preflight_status(&self) -> &'static str {
+        self.query_bridge_preflight_status
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn accepted_class_fiber_shape(&self) -> &[&'static str; 4] {
+        &self.accepted_class_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn root_query_surface(&self) -> &'static str {
+        self.root_query_surface
+    }
+
+    #[must_use]
+    pub const fn root_result_fiber_tag(&self) -> &'static str {
+        self.root_result_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn root_component_type(&self) -> &'static str {
+        self.root_component_type
+    }
+
+    #[must_use]
+    pub const fn root_props(&self) -> &TestProps {
+        &self.root_props
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn child_query_surface(&self) -> &'static str {
+        self.child_query_surface
+    }
+
+    #[must_use]
+    pub const fn child_query_kind(&self) -> TestRendererPrivateTestInstanceFindByQueryKind {
+        self.child_query_kind
+    }
+
+    #[must_use]
+    pub const fn child_fiber_tag(&self) -> &'static str {
+        self.child_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn child_element_type(&self) -> &TestElementType {
+        &self.child_element_type
+    }
+
+    #[must_use]
+    pub const fn child_props(&self) -> &TestProps {
+        &self.child_props
+    }
+
+    #[must_use]
+    pub fn previous_child_text(&self) -> &str {
+        &self.previous_child_text
+    }
+
+    #[must_use]
+    pub fn current_child_text(&self) -> &str {
+        &self.current_child_text
+    }
+
+    #[must_use]
+    pub const fn host_child_updated(&self) -> bool {
+        self.host_child_updated
+    }
+
+    #[must_use]
+    pub fn class_root_query_path(&self) -> &[&'static str] {
+        &self.class_root_query_path
+    }
+
+    #[must_use]
+    pub fn updated_host_child_query_path(&self) -> &[&'static str] {
+        &self.updated_host_child_query_path
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_update_execution_record(&self) -> bool {
+        self.consumes_accepted_native_update_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_private_test_instance_query_diagnostics(&self) -> bool {
+        self.consumes_private_test_instance_query_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_query_bridge_preflight(&self) -> bool {
+        self.consumes_query_bridge_preflight
+    }
+
+    #[must_use]
+    pub const fn consumes_private_get_instance_class_root_diagnostics(&self) -> bool {
+        self.consumes_private_get_instance_class_root_diagnostics
+    }
+
+    #[must_use]
+    pub const fn public_root_available(&self) -> bool {
+        self.public_root_available
+    }
+
+    #[must_use]
+    pub const fn public_query_methods_available(&self) -> bool {
+        self.public_query_methods_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_object_available(&self) -> bool {
+        self.public_test_instance_object_available
+    }
+
+    #[must_use]
+    pub const fn public_get_instance_available(&self) -> bool {
+        self.public_get_instance_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(&self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(&self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
     root_fiber_shape: [&'static str; 2],
     root_child_fiber_tag: &'static str,
@@ -11713,6 +11957,41 @@ impl TestRendererRoot {
         )
     }
 
+    pub fn describe_private_test_instance_class_root_query_after_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence, TestRendererRootError>
+    {
+        self.validate_private_test_instance_update_native_execution_record_for_canary(execution)?;
+        let preflight = self
+            .describe_private_test_instance_query_bridge_preflight_after_update_for_canary(
+                output,
+            )?;
+        let find_by =
+            self.describe_private_test_instance_find_by_query_after_update_for_canary(output)?;
+        let class_root =
+            self.describe_private_get_instance_class_root_after_update_for_canary(output)?;
+        let previous_child_text =
+            Self::first_host_component_text_from_snapshot(output.previous_snapshot()).ok_or_else(
+                || {
+                    TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                        operation: "update",
+                        reason: "updated-host-child-previous-text-missing",
+                    }
+                },
+            )?;
+
+        self.private_test_instance_class_root_query_execution_evidence_from_reports(
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS,
+            previous_child_text,
+            &preflight,
+            &find_by,
+            &class_root,
+        )
+    }
+
     pub fn describe_private_get_instance_class_root_for_canary(
         &self,
         output: &TestRendererCommittedHostOutput,
@@ -14494,6 +14773,123 @@ impl TestRendererRoot {
                 compatibility_claimed: false,
             },
         )
+    }
+
+    fn private_test_instance_class_root_query_execution_evidence_from_reports(
+        &self,
+        source_execution_record_id: &'static str,
+        source_execution_status: &'static str,
+        previous_child_text: String,
+        preflight: &TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics,
+        find_by_report: &TestRendererPrivateTestInstanceFindByQueryDiagnostics,
+        class_root: &TestRendererPrivateGetInstanceClassRootReport,
+    ) -> Result<TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence, TestRendererRootError>
+    {
+        let query = find_by_report.find_by_type();
+        let child_element_type = query.expected_type().cloned().ok_or_else(|| {
+            TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "find-by-type-query-type-missing",
+            }
+        })?;
+        let rendered_host_component = class_root.rendered_host_component();
+        let class_component = class_root.class_component();
+        let current_child_text = class_root.rendered_host_text().text().to_owned();
+        let host_child_updated = previous_child_text != current_child_text;
+
+        let class_root_query_path = preflight.host_output_snapshot_current()
+            && class_root.host_output_snapshot_current()
+            && preflight.host_output_update_kind() == TestRendererRootUpdateKind::Update
+            && find_by_report.host_output_update_kind() == TestRendererRootUpdateKind::Update
+            && class_root.host_output_update_kind() == TestRendererRootUpdateKind::Update
+            && class_root.accepted_class_fiber_shape()
+                == &TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE
+            && class_component.fiber_tag() == "ClassComponent"
+            && class_component.component_type()
+                == TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_COMPONENT_TYPE
+            && class_component.rendered_child_fiber_tag() == "HostComponent"
+            && class_component.rendered_child_count() == 1
+            && rendered_host_component.fiber_tag() == "HostComponent"
+            && rendered_host_component.element_type() == &child_element_type
+            && rendered_host_component.rendered_child_count() == 1
+            && rendered_host_component.rendered_text() == current_child_text
+            && class_root.rendered_host_text().fiber_tag() == "HostText"
+            && host_child_updated
+            && !class_component.public_get_instance_available()
+            && !class_root.public_get_instance_available()
+            && !class_root.native_bridge_available()
+            && !class_root.compatibility_claimed()
+            && query.query_kind() == TestRendererPrivateTestInstanceFindByQueryKind::Type
+            && query.result_kind() == "single"
+            && query.matched_candidate_count() == 1
+            && query.candidate_fiber_tags() == ["HostComponent"]
+            && query.skipped_fiber_tags() == ["HostText"]
+            && !query.public_query_method_available()
+            && !query.public_test_instance_object_available()
+            && !query.compatibility_claimed();
+
+        if !class_root_query_path {
+            return self.private_test_instance_native_query_execution_record_error(
+                "update",
+                "class-root-updated-host-child-query-path-missing",
+            );
+        }
+
+        Ok(
+            TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence {
+                diagnostic_name:
+                    TEST_RENDERER_PRIVATE_TEST_INSTANCE_CLASS_QUERY_EXECUTION_DIAGNOSTIC_NAME,
+                status: TEST_RENDERER_PRIVATE_TEST_INSTANCE_CLASS_QUERY_EXECUTION_STATUS,
+                root: self.root_id,
+                operation: "update",
+                public_surface: "create().update -> create().root/ReactTestInstance.findByType",
+                source_execution_record_id,
+                source_execution_status,
+                source_query_diagnostic_name: preflight.diagnostic_name(),
+                source_get_instance_diagnostic_name: class_root.diagnostic_name(),
+                query_bridge_preflight_status: preflight.bridge_status(),
+                host_output_update_kind: TestRendererRootUpdateKind::Update,
+                host_output_snapshot_current: true,
+                accepted_class_fiber_shape:
+                    TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE,
+                root_query_surface: "create().root",
+                root_result_fiber_tag: class_component.fiber_tag(),
+                root_component_type: class_component.component_type(),
+                root_props: class_component.props().clone(),
+                root_child_count: class_component.rendered_child_count(),
+                child_query_surface: query.public_surface(),
+                child_query_kind: query.query_kind(),
+                child_fiber_tag: rendered_host_component.fiber_tag(),
+                child_element_type,
+                child_props: rendered_host_component.props().clone(),
+                previous_child_text,
+                current_child_text,
+                host_child_updated,
+                class_root_query_path: vec!["ClassComponent", "HostComponent"],
+                updated_host_child_query_path: vec!["ClassComponent", "HostComponent", "HostText"],
+                consumes_accepted_native_update_execution_record: true,
+                consumes_private_test_instance_query_diagnostics: true,
+                consumes_query_bridge_preflight: true,
+                consumes_private_get_instance_class_root_diagnostics: true,
+                public_root_available: false,
+                public_query_methods_available: false,
+                public_test_instance_object_available: false,
+                public_get_instance_available: false,
+                native_bridge_available: false,
+                native_execution_available: false,
+                compatibility_claimed: false,
+            },
+        )
+    }
+
+    fn first_host_component_text_from_snapshot(snapshot: &TestContainerSnapshot) -> Option<String> {
+        let TestNodeSnapshot::Element(component) = snapshot.children().first()? else {
+            return None;
+        };
+        let TestNodeSnapshot::Text(text) = component.children().first()? else {
+            return None;
+        };
+        Some(text.text().to_owned())
     }
 
     fn validate_private_test_instance_create_native_execution_record_for_canary(
@@ -19014,6 +19410,170 @@ mod tests {
         assert!(!update_evidence.public_test_instance_object_available());
         assert!(!update_evidence.native_execution_available());
         assert!(!update_evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_class_query_execution_consumes_update_record_and_updated_child() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let (_route, updated, update_admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                TestProps::new(),
+                "goodbye",
+            )
+            .unwrap();
+
+        let evidence = root
+            .describe_private_test_instance_class_root_query_after_update_native_execution_for_canary(
+                &updated,
+                update_admission,
+            )
+            .unwrap();
+
+        assert_eq!(
+            evidence.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_CLASS_QUERY_EXECUTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            evidence.status(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_CLASS_QUERY_EXECUTION_STATUS
+        );
+        assert_eq!(evidence.root(), root.root_id());
+        assert_eq!(evidence.operation(), "update");
+        assert_eq!(
+            evidence.public_surface(),
+            "create().update -> create().root/ReactTestInstance.findByType"
+        );
+        assert_eq!(
+            evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            evidence.source_query_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            evidence.source_get_instance_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(evidence.host_output_snapshot_current());
+        assert_eq!(
+            evidence.accepted_class_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE
+        );
+        assert_eq!(evidence.root_query_surface(), "create().root");
+        assert_eq!(evidence.root_result_fiber_tag(), "ClassComponent");
+        assert_eq!(
+            evidence.root_component_type(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_COMPONENT_TYPE
+        );
+        assert_eq!(
+            evidence.root_props(),
+            &TestProps::new().with_attribute("label", "class-root")
+        );
+        assert_eq!(evidence.root_child_count(), 1);
+        assert_eq!(
+            evidence.child_query_surface(),
+            "ReactTestInstance.findByType"
+        );
+        assert_eq!(
+            evidence.child_query_kind(),
+            TestRendererPrivateTestInstanceFindByQueryKind::Type
+        );
+        assert_eq!(evidence.child_fiber_tag(), "HostComponent");
+        assert_eq!(evidence.child_element_type().as_str(), "span");
+        assert_eq!(evidence.child_props(), &TestProps::new());
+        assert_eq!(evidence.previous_child_text(), "hello");
+        assert_eq!(evidence.current_child_text(), "goodbye");
+        assert!(evidence.host_child_updated());
+        assert_eq!(
+            evidence.class_root_query_path(),
+            &["ClassComponent", "HostComponent"]
+        );
+        assert_eq!(
+            evidence.updated_host_child_query_path(),
+            &["ClassComponent", "HostComponent", "HostText"]
+        );
+        assert!(evidence.consumes_accepted_native_update_execution_record());
+        assert!(evidence.consumes_private_test_instance_query_diagnostics());
+        assert!(evidence.consumes_query_bridge_preflight());
+        assert!(evidence.consumes_private_get_instance_class_root_diagnostics());
+        assert!(!evidence.public_root_available());
+        assert!(!evidence.public_query_methods_available());
+        assert!(!evidence.public_test_instance_object_available());
+        assert!(!evidence.public_get_instance_available());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_class_query_execution_rejects_stale_updated_child() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let (_route, updated, _update_admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                TestProps::new(),
+                "goodbye",
+            )
+            .unwrap();
+        let preflight = root
+            .describe_private_test_instance_query_bridge_preflight_after_update_for_canary(&updated)
+            .unwrap();
+        let find_by = root
+            .describe_private_test_instance_find_by_query_after_update_for_canary(&updated)
+            .unwrap();
+        let mut class_root = root
+            .describe_private_get_instance_class_root_after_update_for_canary(&updated)
+            .unwrap();
+        class_root.rendered_host_component.rendered_text = "hello".to_owned();
+        class_root.rendered_host_text.text = "hello".to_owned();
+
+        let error = root
+            .private_test_instance_class_root_query_execution_evidence_from_reports(
+                TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+                TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS,
+                "hello".to_owned(),
+                &preflight,
+                &find_by,
+                &class_root,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateTestInstanceNativeQueryExecution(error) = error else {
+            panic!("expected private TestInstance class query execution rejection");
+        };
+
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "class-root-updated-host-child-query-path-missing",
+            }
+        ));
     }
 
     #[test]

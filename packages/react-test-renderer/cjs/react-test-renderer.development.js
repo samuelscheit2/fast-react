@@ -3163,6 +3163,10 @@ const privateTestInstanceNativeQueryExecutionDiagnosticName =
   'fast-react-test-renderer.testinstance.private-native-query-execution-evidence';
 const privateTestInstanceNativeQueryExecutionStatus =
   'private-test-instance-native-create-update-execution-records-consumed-public-test-instance-blocked';
+const privateTestInstanceClassQueryExecutionDiagnosticName =
+  'fast-react-test-renderer.testinstance.private-class-root-query-execution-evidence';
+const privateTestInstanceClassQueryExecutionStatus =
+  'private-test-instance-class-root-update-query-execution-public-test-instance-blocked';
 const privateTestInstanceNativeQueryExecutionRecordKind =
   'FastReactTestRendererPrivateRootExecutionResult';
 const privateTestInstanceNativeQueryExecutionAcceptedOperations =
@@ -3968,6 +3972,50 @@ const privateTestInstanceNativeQueryExecutionGate = Object.freeze({
   rustExecutionFromJs: false,
   compatibilityClaimed: false
 });
+const privateTestInstanceClassRootQueryExecutionGate = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-class-root-query-execution-gate',
+  diagnosticName: privateTestInstanceClassQueryExecutionDiagnosticName,
+  status: privateTestInstanceClassQueryExecutionStatus,
+  publicSurface: 'create().update -> create().root/ReactTestInstance.findByType',
+  acceptedWorker:
+    'worker-699-test-renderer-testinstance-class-query-execution',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustDiagnosticName:
+    privateTestInstanceClassQueryExecutionDiagnosticName,
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_test_instance_class_root_query_after_update_native_execution_for_canary',
+    'TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence',
+    'TestRendererRoot::describe_private_get_instance_class_root_after_update_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_test_instance_class_query_execution_consumes_update_record_and_updated_child',
+    'root_private_test_instance_class_query_execution_rejects_stale_updated_child'
+  ]),
+  sourceQueryBridgePreflightDiagnosticName:
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+  sourceGetInstanceDiagnosticName: privateGetInstanceAcceptedDiagnosticName,
+  acceptedClassRootFiberShape: privateGetInstanceAcceptedClassFiberShape,
+  query: 'findByType',
+  rootResultFiberTag: 'ClassComponent',
+  resultFiberTag: 'HostComponent',
+  consumesAcceptedNativeUpdateExecutionRecord: true,
+  consumesPrivateTestInstanceQueryDiagnostics: true,
+  consumesQueryBridgePreflight: true,
+  consumesPrivateGetInstanceClassRootDiagnostics: true,
+  updatedHostChildQueryPath: Object.freeze([
+    'ClassComponent',
+    'HostComponent',
+    'HostText'
+  ]),
+  publicRootAvailable: false,
+  publicQueryMethodsAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  publicGetInstanceAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const privateTestInstanceQueryMethodRecords = Object.freeze({
   find: privateTestInstanceFindQueryRecord,
   findAll: privateTestInstanceFindAllQueryRecord,
@@ -4008,11 +4056,18 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   findByQueryDiagnostics: privateTestInstanceFindByQueryDiagnostics,
   queryBridgePreflightGate: privateTestInstanceQueryBridgePreflightGate,
   nativeQueryExecutionGate: privateTestInstanceNativeQueryExecutionGate,
+  classRootQueryExecutionGate:
+    privateTestInstanceClassRootQueryExecutionGate,
   privateNativeQueryExecutionEvidenceAvailable: true,
   privateNativeQueryExecutionDiagnosticName:
     privateTestInstanceNativeQueryExecutionDiagnosticName,
   privateNativeQueryExecutionStatus:
     privateTestInstanceNativeQueryExecutionStatus,
+  privateClassRootQueryExecutionEvidenceAvailable: true,
+  privateClassRootQueryExecutionDiagnosticName:
+    privateTestInstanceClassQueryExecutionDiagnosticName,
+  privateClassRootQueryExecutionStatus:
+    privateTestInstanceClassQueryExecutionStatus,
   acceptedNativeExecutionRecordKind:
     privateTestInstanceNativeQueryExecutionRecordKind,
   acceptedNativeExecutionOperations:
@@ -13396,6 +13451,31 @@ function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
         return false;
       }
     },
+    createAcceptedClassRootQueryExecutionDiagnosticResult(
+      executionRecord,
+      classRootDiagnostic
+    ) {
+      return createPrivateTestInstanceClassRootQueryExecutionDiagnosticResult(
+        getTestInstanceQueryDiagnosticsForRootRequest(rootRequest),
+        executionRecord,
+        classRootDiagnostic
+      );
+    },
+    canCreateAcceptedClassRootQueryExecutionDiagnosticResult(
+      executionRecord,
+      classRootDiagnostic
+    ) {
+      try {
+        createPrivateTestInstanceClassRootQueryExecutionDiagnosticResult(
+          getTestInstanceQueryDiagnosticsForRootRequest(rootRequest),
+          executionRecord,
+          classRootDiagnostic
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
     consumesRootBridgeMetadata: true,
     standaloneWrapperMetadata: false,
     nativeBridgeAvailable: false,
@@ -13474,6 +13554,133 @@ function createPrivateTestInstanceNativeQueryExecutionDiagnosticResult(
     nativeBridgeAvailable: false,
     nativeExecution: false,
     compatibilityClaimed: false
+  });
+}
+
+function createPrivateTestInstanceClassRootQueryExecutionDiagnosticResult(
+  owner,
+  executionRecord,
+  classRootReport
+) {
+  const execution =
+    consumeAcceptedTestInstanceNativeQueryExecutionRecord(owner, executionRecord);
+  if (execution.operation !== 'update') {
+    throwInvalidRootRequest(
+      'Private class-root TestInstance query execution only accepts update records.'
+    );
+  }
+  const classRoot = validatePrivateGetInstanceClassRootDiagnostic(
+    classRootReport
+  );
+  if (classRoot.hostOutputUpdateKind !== 'Update') {
+    throwInvalidRootRequest(
+      'Private class-root TestInstance query evidence requires updated class-root diagnostics.'
+    );
+  }
+  const hostComponent = createPrivateUpdatedHostChildQueryResult(classRoot);
+  if (
+    owner.queryBridgePreflight.diagnosticName !==
+      privateTestInstanceQueryBridgePreflightDiagnosticName ||
+    owner.queryBridgePreflight.consumesAcceptedRustFindAllDiagnostics !==
+      true ||
+    owner.queryBridgePreflight.consumesAcceptedRustFindByDiagnostics !== true ||
+    owner.queryMethodRecords.findByType.expectedCanaryMatchCount !== 1 ||
+    hostComponent.type !== privateTestInstanceHostComponentType ||
+    hostComponent.children[0].text !== classRoot.text ||
+    hostComponent.publicObject !== false
+  ) {
+    throwInvalidRootRequest(
+      'Expected private class-root TestInstance query evidence to describe an updated HostComponent child.'
+    );
+  }
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-test-instance-class-root-query-execution-result',
+    diagnosticName: privateTestInstanceClassQueryExecutionDiagnosticName,
+    status: privateTestInstanceClassQueryExecutionStatus,
+    gate: privateTestInstanceClassRootQueryExecutionGate,
+    entrypoint,
+    compatibilityTarget,
+    publicSurface:
+      'create().update -> create().root/ReactTestInstance.findByType',
+    sourceQueryDiagnosticName:
+      owner.queryBridgePreflight.diagnosticName,
+    sourceGetInstanceDiagnosticName: privateGetInstanceAcceptedDiagnosticName,
+    sourceNativeQueryDiagnosticName:
+      privateTestInstanceNativeQueryExecutionDiagnosticName,
+    sourceQueryBridgePreflight: owner.queryBridgePreflight,
+    rootRequest: owner.rootRequest,
+    rootExecutionResult: execution,
+    operation: 'update',
+    requestId: execution.requestId,
+    requestSequence: execution.requestSequence,
+    rootId: execution.request.rootId,
+    hostOutputUpdateKind: 'Update',
+    hostOutputSnapshotCurrent: true,
+    acceptedClassRootFiberShape:
+      privateGetInstanceAcceptedClassFiberShape,
+    rootQuerySurface: 'create().root',
+    rootQueryResult: freezeRecord({
+      kind: 'ReactTestInstancePrivateRecord',
+      fiberTag: 'ClassComponent',
+      type: classRoot.componentType,
+      props: classRoot.props,
+      children: freezeArray([hostComponent]),
+      publicObject: false
+    }),
+    rootResultFiberTag: 'ClassComponent',
+    rootComponentType: classRoot.componentType,
+    rootChildCount: 1,
+    query: 'findByType',
+    querySurface: 'ReactTestInstance.findByType',
+    queryRecord: owner.queryMethodRecords.findByType,
+    queryResult: hostComponent,
+    resultKind: 'single',
+    resultFiberTag: 'HostComponent',
+    childElementType: hostComponent.type,
+    childProps: hostComponent.props,
+    childText: classRoot.text,
+    hostChildUpdated: true,
+    classRootQueryPath: freezeArray(['ClassComponent', 'HostComponent']),
+    updatedHostChildQueryPath: freezeArray([
+      'ClassComponent',
+      'HostComponent',
+      'HostText'
+    ]),
+    consumesAcceptedNativeExecutionRecord: true,
+    consumesAcceptedNativeUpdateExecutionRecord: true,
+    consumesPrivateTestInstanceQueryDiagnostics: true,
+    consumesQueryBridgePreflight: true,
+    consumesPrivateGetInstanceClassRootDiagnostics: true,
+    publicRootAvailable: false,
+    publicQueryMethodsAvailable: false,
+    publicTestInstanceObjectAvailable: false,
+    publicGetInstanceAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPrivateUpdatedHostChildQueryResult(classRoot) {
+  return freezeRecord({
+    id: 'react-test-renderer-private-test-instance-updated-host-child-record',
+    kind: 'ReactTestInstancePrivateRecord',
+    source:
+      'TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence.updated_host_child_query_path',
+    fiberTag: 'HostComponent',
+    publicObject: false,
+    type: classRoot.type,
+    props: classRoot.hostProps,
+    children: freezeArray([
+      freezeRecord({
+        id: 'react-test-renderer-private-test-instance-updated-host-text-child',
+        kind: 'ReactTestInstancePrivateTextChildRecord',
+        fiberTag: 'HostText',
+        text: classRoot.text,
+        publicObject: false
+      })
+    ])
   });
 }
 
@@ -15324,6 +15531,7 @@ function validatePrivateGetInstanceClassRootDiagnostic(report) {
         'react_public_result'
       ),
       hostProps,
+      hostOutputUpdateKind: updateKind,
       hostRootReactPublicResult: readPrivateGetInstanceStringField(
         hostRootFailClosed,
         'reactPublicResult',
