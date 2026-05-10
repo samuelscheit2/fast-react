@@ -16,7 +16,7 @@ use fast_react_core::{
     HookEffectRing, HookListArena, HookListError, HookListId, HookListMountCursor,
     HookListTraversalResult, HookListUpdateCursor, HookQueueError, HookQueueId, HookQueueStore,
     HookSlotId, HookSlotPayload, HookStatePayload, HookStateSlot, HookUpdateId, HookUpdateLane,
-    Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
+    Lanes, ProcessHookQueueResult, PropsHandle, StateHandle, UpdateQueueHandle,
 };
 
 use crate::RootElementHandle;
@@ -242,6 +242,149 @@ impl FunctionComponentStateDispatchRecord {
     #[must_use]
     pub const fn action(self) -> FunctionComponentStateActionHandle {
         self.action
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentStateUpdateRenderLanes {
+    render_lanes: Lanes,
+    root_render_lanes: Lanes,
+}
+
+impl FunctionComponentStateUpdateRenderLanes {
+    #[must_use]
+    pub const fn new(render_lanes: Lanes, root_render_lanes: Lanes) -> Self {
+        Self {
+            render_lanes,
+            root_render_lanes,
+        }
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn root_render_lanes(self) -> Lanes {
+        self.root_render_lanes
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentStateUpdateRenderRecord {
+    fiber: FiberId,
+    hook: HookSlotId,
+    queue: HookQueueId,
+    dispatch: FunctionComponentStateDispatchHandle,
+    lanes: FunctionComponentStateUpdateRenderLanes,
+    previous_memoized_state: StateHandle,
+    previous_base_state: StateHandle,
+    previous_base_queue: Option<HookUpdateId>,
+    memoized_state: StateHandle,
+    base_state: StateHandle,
+    base_queue: Option<HookUpdateId>,
+    remaining_lanes: Lanes,
+    applied_update_count: usize,
+    skipped_update_count: usize,
+    reverted_update_count: usize,
+    eager_update_count: usize,
+}
+
+impl FunctionComponentStateUpdateRenderRecord {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn queue(self) -> HookQueueId {
+        self.queue
+    }
+
+    #[must_use]
+    pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> FunctionComponentStateUpdateRenderLanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.lanes.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn root_render_lanes(self) -> Lanes {
+        self.lanes.root_render_lanes()
+    }
+
+    #[must_use]
+    pub const fn previous_memoized_state(self) -> StateHandle {
+        self.previous_memoized_state
+    }
+
+    #[must_use]
+    pub const fn previous_base_state(self) -> StateHandle {
+        self.previous_base_state
+    }
+
+    #[must_use]
+    pub const fn previous_base_queue(self) -> Option<HookUpdateId> {
+        self.previous_base_queue
+    }
+
+    #[must_use]
+    pub const fn memoized_state(self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub const fn resulting_state(self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub const fn base_state(self) -> StateHandle {
+        self.base_state
+    }
+
+    #[must_use]
+    pub const fn base_queue(self) -> Option<HookUpdateId> {
+        self.base_queue
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub const fn applied_update_count(self) -> usize {
+        self.applied_update_count
+    }
+
+    #[must_use]
+    pub const fn skipped_update_count(self) -> usize {
+        self.skipped_update_count
+    }
+
+    #[must_use]
+    pub const fn reverted_update_count(self) -> usize {
+        self.reverted_update_count
+    }
+
+    #[must_use]
+    pub const fn eager_update_count(self) -> usize {
+        self.eager_update_count
     }
 }
 
@@ -884,6 +1027,25 @@ impl FunctionComponentHookRenderStore {
         self.state_hook_record(state.render_fiber(), hook)
     }
 
+    pub fn update_state_hook_with_queued_updates(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        lanes: FunctionComponentStateUpdateRenderLanes,
+        reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+    ) -> Result<FunctionComponentStateUpdateRenderRecord, FunctionComponentRenderError> {
+        let state = cursor.state();
+        if state.phase() != FunctionComponentHookRenderPhase::Update {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: state.phase(),
+            });
+        }
+
+        let hook = self.update_hook_metadata(cursor)?;
+        self.process_state_hook_queue(state.render_fiber(), hook, lanes, reducer)
+    }
+
     pub fn create_current_state_hook(
         &mut self,
         fiber: FiberId,
@@ -1020,23 +1182,8 @@ impl FunctionComponentHookRenderStore {
         fiber: FiberId,
         hook: HookSlotId,
     ) -> Result<FunctionComponentStateHookRecord, FunctionComponentRenderError> {
-        let payload = self
-            .hook_lists
-            .hook(hook)
-            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?
-            .payload()
-            .state_payload()
-            .ok_or(FunctionComponentRenderError::MissingStateHookPayload { fiber, hook })?;
-        let queue = self
-            .state_queues
-            .queue(payload.queue())
-            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?;
-        let dispatch = queue.dispatch().copied().ok_or(
-            FunctionComponentRenderError::MissingStateDispatch {
-                fiber,
-                queue: payload.queue(),
-            },
-        )?;
+        let payload = self.state_payload_for_hook(fiber, hook)?;
+        let dispatch = self.state_dispatch_for_queue(fiber, payload.queue())?;
 
         Ok(FunctionComponentStateHookRecord {
             hook,
@@ -1046,6 +1193,68 @@ impl FunctionComponentHookRenderStore {
             queue: payload.queue(),
             dispatch,
         })
+    }
+
+    fn process_state_hook_queue(
+        &mut self,
+        fiber: FiberId,
+        hook: HookSlotId,
+        lanes: FunctionComponentStateUpdateRenderLanes,
+        reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+    ) -> Result<FunctionComponentStateUpdateRenderRecord, FunctionComponentRenderError> {
+        let previous_payload = self.state_payload_for_hook(fiber, hook)?;
+        let dispatch = self.state_dispatch_for_queue(fiber, previous_payload.queue())?;
+        let mut slot = state_slot_from_payload(previous_payload);
+        let result = self
+            .state_queues
+            .process_update_queue(
+                &mut slot,
+                lanes.render_lanes(),
+                lanes.root_render_lanes(),
+                reducer,
+            )
+            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?;
+        let next_payload = state_payload_from_slot(&slot);
+        self.hook_lists
+            .set_hook_payload(hook, HookSlotPayload::state(next_payload))
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?;
+
+        Ok(state_update_render_record_from_result(
+            fiber,
+            hook,
+            dispatch,
+            lanes,
+            previous_payload,
+            result,
+        ))
+    }
+
+    fn state_payload_for_hook(
+        &self,
+        fiber: FiberId,
+        hook: HookSlotId,
+    ) -> Result<HookStatePayload, FunctionComponentRenderError> {
+        self.hook_lists
+            .hook(hook)
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?
+            .payload()
+            .state_payload()
+            .ok_or(FunctionComponentRenderError::MissingStateHookPayload { fiber, hook })
+    }
+
+    fn state_dispatch_for_queue(
+        &self,
+        fiber: FiberId,
+        queue: HookQueueId,
+    ) -> Result<FunctionComponentStateDispatchHandle, FunctionComponentRenderError> {
+        let queue_record = self
+            .state_queues
+            .queue(queue)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?;
+        queue_record
+            .dispatch()
+            .copied()
+            .ok_or(FunctionComponentRenderError::MissingStateDispatch { fiber, queue })
     }
 
     fn create_state_dispatch(
@@ -1161,6 +1370,41 @@ fn state_payload_from_slot(slot: &HookStateSlot<StateHandle>) -> HookStatePayloa
         slot.base_queue(),
         slot.queue(),
     )
+}
+
+fn state_slot_from_payload(payload: HookStatePayload) -> HookStateSlot<StateHandle> {
+    let mut slot = HookStateSlot::new(payload.memoized_state(), payload.queue());
+    slot.set_base_state(payload.base_state());
+    slot.set_base_queue(payload.base_queue());
+    slot
+}
+
+fn state_update_render_record_from_result(
+    fiber: FiberId,
+    hook: HookSlotId,
+    dispatch: FunctionComponentStateDispatchHandle,
+    lanes: FunctionComponentStateUpdateRenderLanes,
+    previous_payload: HookStatePayload,
+    result: ProcessHookQueueResult<StateHandle>,
+) -> FunctionComponentStateUpdateRenderRecord {
+    FunctionComponentStateUpdateRenderRecord {
+        fiber,
+        hook,
+        queue: previous_payload.queue(),
+        dispatch,
+        lanes,
+        previous_memoized_state: previous_payload.memoized_state(),
+        previous_base_state: previous_payload.base_state(),
+        previous_base_queue: previous_payload.base_queue(),
+        memoized_state: *result.memoized_state(),
+        base_state: *result.base_state(),
+        base_queue: result.base_queue(),
+        remaining_lanes: result.remaining_lanes(),
+        applied_update_count: result.applied_update_count(),
+        skipped_update_count: result.skipped_update_count(),
+        reverted_update_count: result.reverted_update_count(),
+        eager_update_count: result.eager_update_count(),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2470,6 +2714,13 @@ mod tests {
         FunctionComponentStateActionHandle::from_raw(raw)
     }
 
+    fn action_as_state(
+        _state: StateHandle,
+        action: &FunctionComponentStateActionHandle,
+    ) -> StateHandle {
+        StateHandle::from_raw(action.raw())
+    }
+
     #[test]
     fn function_component_render_invokes_registered_component_and_records_output() {
         let (mut arena, current, work_in_progress, component) = function_component_pair();
@@ -3211,6 +3462,264 @@ mod tests {
                 .unwrap(),
             vec![dispatch_record.update()]
         );
+    }
+
+    #[test]
+    fn private_use_state_update_render_processes_queued_update_and_records_state_handle() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(410))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let queued = hook_store
+            .dispatch_state_update(FunctionComponentStateDispatchRequest::new(
+                current_state.dispatch(),
+                action(411),
+                lane,
+            ))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(66)));
+
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = render.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let update_render = hook_store
+            .update_state_hook_with_queued_updates(&mut cursor, lanes, action_as_state)
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        assert_eq!(update_render.fiber(), work_in_progress);
+        assert_eq!(update_render.queue(), current_state.queue());
+        assert_eq!(update_render.dispatch(), current_state.dispatch());
+        assert_eq!(update_render.lanes(), lanes);
+        assert_eq!(update_render.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(update_render.root_render_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            update_render.previous_memoized_state(),
+            StateHandle::from_raw(410)
+        );
+        assert_eq!(
+            update_render.previous_base_state(),
+            StateHandle::from_raw(410)
+        );
+        assert_eq!(update_render.previous_base_queue(), None);
+        assert_eq!(update_render.memoized_state(), StateHandle::from_raw(411));
+        assert_eq!(update_render.resulting_state(), StateHandle::from_raw(411));
+        assert_eq!(update_render.base_state(), StateHandle::from_raw(411));
+        assert_eq!(update_render.base_queue(), None);
+        assert_eq!(update_render.remaining_lanes(), Lanes::NO);
+        assert_eq!(update_render.applied_update_count(), 1);
+        assert_eq!(update_render.skipped_update_count(), 0);
+        assert_eq!(update_render.reverted_update_count(), 0);
+        assert_eq!(update_render.eager_update_count(), 0);
+
+        let work_payload = hook_store
+            .hook_lists()
+            .hook(update_render.hook())
+            .unwrap()
+            .payload()
+            .state_payload()
+            .unwrap();
+        assert_eq!(work_payload.memoized_state(), StateHandle::from_raw(411));
+        assert_eq!(work_payload.base_state(), StateHandle::from_raw(411));
+        assert_eq!(work_payload.base_queue(), None);
+        assert_eq!(work_payload.queue(), current_state.queue());
+        let current_payload = hook_store
+            .hook_lists()
+            .hook(current_state.hook())
+            .unwrap()
+            .payload()
+            .state_payload()
+            .unwrap();
+        assert_eq!(current_payload.memoized_state(), StateHandle::from_raw(410));
+        assert_eq!(current_payload.base_queue(), None);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        let queue = hook_store
+            .state_queues()
+            .queue(current_state.queue())
+            .unwrap();
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(411));
+        assert_eq!(
+            queue.last_rendered_reducer().copied(),
+            Some(FunctionComponentStateReducerId::BasicState)
+        );
+        assert_eq!(
+            *hook_store
+                .state_queues()
+                .update(queued.update())
+                .unwrap()
+                .action(),
+            action(411)
+        );
+    }
+
+    #[test]
+    fn private_use_state_update_render_rebases_skipped_lane_without_applying_action() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(420))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_state_update(FunctionComponentStateDispatchRequest::new(
+                current_state.dispatch(),
+                action(421),
+                lane,
+            ))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(67)));
+
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &mut registry,
+        )
+        .unwrap();
+        let mut cursor = hook_store
+            .begin_render_cursor(render.hook_state().unwrap())
+            .unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC);
+        let update_render = hook_store
+            .update_state_hook_with_queued_updates(&mut cursor, lanes, action_as_state)
+            .unwrap();
+
+        assert_eq!(update_render.memoized_state(), StateHandle::from_raw(420));
+        assert_eq!(update_render.resulting_state(), StateHandle::from_raw(420));
+        assert_eq!(update_render.base_state(), StateHandle::from_raw(420));
+        assert_eq!(update_render.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(update_render.applied_update_count(), 0);
+        assert_eq!(update_render.skipped_update_count(), 1);
+        assert_eq!(update_render.render_lanes(), Lanes::SYNC);
+        assert_eq!(update_render.root_render_lanes(), Lanes::SYNC);
+        let base_tail = update_render.base_queue().unwrap();
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(Some(base_tail))
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .update(rebased[0])
+                .unwrap()
+                .lane()
+                .priority_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            *hook_store
+                .state_queues()
+                .update(rebased[0])
+                .unwrap()
+                .action(),
+            action(421)
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        let work_payload = hook_store
+            .hook_lists()
+            .hook(update_render.hook())
+            .unwrap()
+            .payload()
+            .state_payload()
+            .unwrap();
+        assert_eq!(work_payload.memoized_state(), StateHandle::from_raw(420));
+        assert_eq!(work_payload.base_state(), StateHandle::from_raw(420));
+        assert_eq!(work_payload.base_queue(), Some(base_tail));
+
+        hook_store.finish_render_cursor(cursor).unwrap();
+    }
+
+    #[test]
+    fn private_use_state_update_render_uses_root_lanes_for_hidden_updates() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(430))
+            .unwrap();
+        let hidden_lane = HookUpdateLane::hidden(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_state_update(FunctionComponentStateDispatchRequest::new(
+                current_state.dispatch(),
+                action(431),
+                hidden_lane,
+            ))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(68)));
+
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let mut cursor = hook_store
+            .begin_render_cursor(render.hook_state().unwrap())
+            .unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::NO);
+        let update_render = hook_store
+            .update_state_hook_with_queued_updates(&mut cursor, lanes, action_as_state)
+            .unwrap();
+
+        assert_eq!(update_render.memoized_state(), StateHandle::from_raw(430));
+        assert_eq!(update_render.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(update_render.applied_update_count(), 0);
+        assert_eq!(update_render.skipped_update_count(), 1);
+        assert_eq!(update_render.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(update_render.root_render_lanes(), Lanes::NO);
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(update_render.base_queue())
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .update(rebased[0])
+                .unwrap()
+                .lane()
+                .priority_lanes(),
+            Lanes::DEFAULT
+        );
+        assert!(
+            !hook_store
+                .state_queues()
+                .update(rebased[0])
+                .unwrap()
+                .lane()
+                .is_hidden()
+        );
+
+        hook_store.finish_render_cursor(cursor).unwrap();
     }
 
     #[test]
