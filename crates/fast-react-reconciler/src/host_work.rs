@@ -48,6 +48,11 @@ pub(crate) enum HostWorkError {
         fiber: FiberId,
         tag: FiberTag,
     },
+    FunctionComponentParentTopologyMismatch(Box<FunctionComponentParentTopologyMismatchRecord>),
+    UnexpectedExistingChild {
+        parent: FiberId,
+        child: FiberId,
+    },
     InvalidDetachedInstance {
         handle: StateNodeHandle,
     },
@@ -59,6 +64,16 @@ pub(crate) enum HostWorkError {
         expected: FiberId,
         actual: FiberId,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentParentTopologyMismatchRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    function_component: FiberId,
+    actual_root_child: Option<FiberId>,
+    actual_parent: Option<FiberId>,
+    actual_sibling: Option<FiberId>,
 }
 
 impl Display for HostWorkError {
@@ -90,6 +105,22 @@ impl Display for HostWorkError {
                 "{:?} fiber {} has no detached host state node",
                 tag,
                 fiber.slot().get()
+            ),
+            Self::FunctionComponentParentTopologyMismatch(record) => write!(
+                formatter,
+                "root {} expected HostRoot work-in-progress {} to have FunctionComponent child {} with no sibling; actual root child {:?}, parent {:?}, sibling {:?}",
+                record.root.raw(),
+                record.host_root_work_in_progress.slot().get(),
+                record.function_component.slot().get(),
+                record.actual_root_child.map(|fiber| fiber.slot().get()),
+                record.actual_parent.map(|fiber| fiber.slot().get()),
+                record.actual_sibling.map(|fiber| fiber.slot().get())
+            ),
+            Self::UnexpectedExistingChild { parent, child } => write!(
+                formatter,
+                "fiber {} already has child {}; private host complete-work handoff only admits a fresh single child",
+                parent.slot().get(),
+                child.slot().get()
             ),
             Self::InvalidDetachedInstance { handle } => write!(
                 formatter,
@@ -127,6 +158,8 @@ impl Error for HostWorkError {
             Self::MissingTestRootElement { .. }
             | Self::ExpectedFiberTag { .. }
             | Self::MissingStateNode { .. }
+            | Self::FunctionComponentParentTopologyMismatch(_)
+            | Self::UnexpectedExistingChild { .. }
             | Self::InvalidDetachedInstance { .. }
             | Self::InvalidDetachedText { .. }
             | Self::CommitCurrentMismatch { .. } => None,
@@ -338,6 +371,7 @@ pub(crate) struct HostWorkResult {
     root: FiberRootId,
     work_in_progress: FiberId,
     root_child: Option<FiberId>,
+    completed_child: Option<FiberId>,
     detached_hosts: DetachedHostRecords,
 }
 
@@ -352,6 +386,10 @@ impl HostWorkResult {
 
     pub(crate) const fn root_child(&self) -> Option<FiberId> {
         self.root_child
+    }
+
+    pub(crate) const fn completed_child(&self) -> Option<FiberId> {
+        self.completed_child
     }
 
     pub(crate) fn detached_instance_count(&self) -> usize {
@@ -639,8 +677,99 @@ pub(crate) fn mount_test_host_work(
         root: render.root(),
         work_in_progress: render.work_in_progress(),
         root_child,
+        completed_child: root_child,
         detached_hosts,
     })
+}
+
+pub(crate) fn mount_test_function_component_single_host_child_work(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    function_component: FiberId,
+    child_element: RootElementHandle,
+    source: &TestHostTree,
+) -> Result<HostWorkResult, HostWorkError> {
+    validate_function_component_parent_topology(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        function_component,
+    )?;
+
+    let Some(node) = source.root(child_element) else {
+        return Err(HostWorkError::MissingTestRootElement {
+            handle: child_element,
+        });
+    };
+
+    let container = *store.root(render.root())?.container_info();
+    let mut detached_hosts = DetachedHostRecords::default();
+    host.root_host_context(&container)?;
+    let host_child = begin_test_host_node(
+        store,
+        host,
+        &container,
+        render.root(),
+        function_component,
+        node,
+        &(),
+        true,
+        render.render_lanes(),
+        &mut detached_hosts,
+    )?;
+    store
+        .fiber_arena_mut()
+        .set_children(function_component, &[host_child])?;
+    complete_function_component_parent(store, function_component)?;
+    complete_host_root(store, render.work_in_progress())?;
+
+    Ok(HostWorkResult {
+        root: render.root(),
+        work_in_progress: render.work_in_progress(),
+        root_child: Some(function_component),
+        completed_child: Some(host_child),
+        detached_hosts,
+    })
+}
+
+fn validate_function_component_parent_topology(
+    store: &FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    function_component: FiberId,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, host_root_work_in_progress, FiberTag::HostRoot)?;
+    expect_tag(store, function_component, FiberTag::FunctionComponent)?;
+
+    let root_child = store.fiber_arena().get(host_root_work_in_progress)?.child();
+    let function_node = store.fiber_arena().get(function_component)?;
+    let actual_parent = function_node.return_fiber();
+    let actual_sibling = function_node.sibling();
+    if root_child != Some(function_component)
+        || actual_parent != Some(host_root_work_in_progress)
+        || actual_sibling.is_some()
+    {
+        return Err(HostWorkError::FunctionComponentParentTopologyMismatch(
+            Box::new(FunctionComponentParentTopologyMismatchRecord {
+                root: root_id,
+                host_root_work_in_progress,
+                function_component,
+                actual_root_child: root_child,
+                actual_parent,
+                actual_sibling,
+            }),
+        ));
+    }
+
+    if let Some(child) = function_node.child() {
+        return Err(HostWorkError::UnexpectedExistingChild {
+            parent: function_component,
+            child,
+        });
+    }
+
+    Ok(())
 }
 
 fn update_test_host_text_work(
@@ -1005,6 +1134,18 @@ fn complete_host_root(
     store: &mut FiberRootStore<RecordingHost>,
     fiber: FiberId,
 ) -> Result<(), HostWorkError> {
+    let bubbled = bubble_properties(store.fiber_arena(), fiber)?;
+    let node = store.fiber_arena_mut().get_mut(fiber)?;
+    node.set_child_lanes(bubbled.child_lanes());
+    node.set_subtree_flags(bubbled.subtree_flags());
+    Ok(())
+}
+
+fn complete_function_component_parent(
+    store: &mut FiberRootStore<RecordingHost>,
+    fiber: FiberId,
+) -> Result<(), HostWorkError> {
+    expect_tag(store, fiber, FiberTag::FunctionComponent)?;
     let bubbled = bubble_properties(store.fiber_arena(), fiber)?;
     let node = store.fiber_arena_mut().get_mut(fiber)?;
     node.set_child_lanes(bubbled.child_lanes());
