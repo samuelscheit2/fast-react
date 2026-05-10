@@ -15,17 +15,20 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
     ContextHandle, ContextStackError, ContextStackSnapshot, ContextValueHandle, FiberArena,
-    FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, ReactKey, StateNodeHandle,
+    FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, ReactKey, StateHandle,
+    StateNodeHandle,
 };
 
 use crate::function_component::{
     FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
-    FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
-    FunctionComponentRenderRecord, FunctionComponentSingleChildOutputResolver,
-    FunctionComponentSingleChildReconciliationError,
-    FunctionComponentSingleChildReconciliationRecord,
-    reconcile_function_component_single_child_output, render_function_component,
-    render_function_component_with_context_reads,
+    FunctionComponentHookRenderResult, FunctionComponentHookRenderStore, FunctionComponentInvoker,
+    FunctionComponentOutputHandle, FunctionComponentRenderError, FunctionComponentRenderRecord,
+    FunctionComponentSingleChildOutputResolver, FunctionComponentSingleChildReconciliationError,
+    FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
+    FunctionComponentUseStateHookRenderRecord, FunctionComponentUseStateRenderRecord,
+    FunctionComponentUseStateRenderRequest, reconcile_function_component_single_child_output,
+    render_function_component, render_function_component_with_context_reads,
+    render_function_component_with_use_state,
 };
 
 pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
@@ -177,6 +180,13 @@ pub(crate) struct FunctionComponentSingleChildBeginWorkRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseStateBeginWorkRecord {
+    begin_work: FunctionComponentBeginWorkRecord,
+    hook_result: FunctionComponentHookRenderResult,
+    state_hook: FunctionComponentUseStateHookRenderRecord,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FragmentSingleHostChildBeginWorkRecord {
     fragment: FiberId,
     current: Option<FiberId>,
@@ -238,6 +248,38 @@ impl FunctionComponentSingleChildBeginWorkRecord {
     #[must_use]
     pub const fn render(self) -> FunctionComponentRenderRecord {
         self.begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.begin_work.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.begin_work.output()
+    }
+}
+
+impl FunctionComponentUseStateBeginWorkRecord {
+    #[must_use]
+    pub const fn begin_work(self) -> FunctionComponentBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn hook_result(self) -> FunctionComponentHookRenderResult {
+        self.hook_result
+    }
+
+    #[must_use]
+    pub const fn state_hook(self) -> FunctionComponentUseStateHookRenderRecord {
+        self.state_hook
     }
 
     #[must_use]
@@ -1135,6 +1177,52 @@ pub(crate) fn begin_work(
     }
 }
 
+pub(crate) fn begin_work_with_use_state(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    state_request: FunctionComponentUseStateRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+    reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+) -> Result<FunctionComponentUseStateBeginWorkRecord, BeginWorkError> {
+    let work_in_progress = request.work_in_progress();
+    let tag = arena.get(work_in_progress)?.tag();
+
+    match tag {
+        FiberTag::FunctionComponent => {
+            let state_render = render_function_component_with_use_state(
+                arena,
+                hook_store,
+                work_in_progress,
+                request.render_lanes(),
+                state_request,
+                invoker,
+                reducer,
+            )?;
+            Ok(function_component_use_state_begin_work_record(state_render))
+        }
+        FiberTag::Portal => Err(BeginWorkError::UnsupportedPortal(
+            unsupported_portal_begin_work_record(arena, request)?,
+        )),
+        _ => Err(BeginWorkError::UnsupportedFiberTag {
+            fiber: work_in_progress,
+            tag,
+        }),
+    }
+}
+
+fn function_component_use_state_begin_work_record(
+    state_render: FunctionComponentUseStateRenderRecord,
+) -> FunctionComponentUseStateBeginWorkRecord {
+    FunctionComponentUseStateBeginWorkRecord {
+        begin_work: FunctionComponentBeginWorkRecord {
+            render: state_render.render(),
+        },
+        hook_result: state_render.hook_result(),
+        state_hook: state_render.state_hook(),
+    }
+}
+
 pub(crate) fn begin_work_fragment_single_host_child(
     arena: &mut FiberArena,
     request: BeginWorkRequest,
@@ -1550,13 +1638,15 @@ mod tests {
     use crate::function_component::{
         FunctionComponentInvocationError, FunctionComponentInvocationRequest,
         FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
-        FunctionComponentSingleChildReconciliationError,
+        FunctionComponentSingleChildReconciliationError, FunctionComponentStateDispatchRequest,
+        FunctionComponentStateUpdateRenderLanes,
     };
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{FiberRootStore, RootElementHandle, RootOptions};
     use fast_react_core::{
         ContextHandle, ContextStackSnapshot, ContextValueHandle, ElementTypeHandle, FiberMode,
-        FiberTypeHandle, PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
+        FiberTypeHandle, HookUpdateLane, Lane, PropsHandle, ReactKey, StateHandle, StateNodeHandle,
+        UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -1633,6 +1723,17 @@ mod tests {
 
     fn context_value(raw: u64) -> ContextValueHandle {
         ContextValueHandle::from_raw(raw)
+    }
+
+    fn action(raw: u64) -> FunctionComponentStateActionHandle {
+        FunctionComponentStateActionHandle::from_raw(raw)
+    }
+
+    fn action_as_state(
+        _state: StateHandle,
+        action: &FunctionComponentStateActionHandle,
+    ) -> StateHandle {
+        StateHandle::from_raw(action.raw())
     }
 
     fn push_fake_provider_boundary(
@@ -2533,6 +2634,102 @@ mod tests {
         assert_eq!(
             arena.get(existing_child).unwrap().return_fiber(),
             Some(work_in_progress)
+        );
+    }
+
+    #[test]
+    fn begin_work_with_use_state_mounts_state_hook_on_private_path() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(78);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let state_request =
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(810), lanes);
+
+        let record = begin_work_with_use_state(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut hook_store,
+            state_request,
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+
+        assert_eq!(record.begin_work().current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.output(), output);
+        assert_eq!(record.hook_result().traversal().traversed_count(), 1);
+        assert_eq!(
+            record.state_hook().phase(),
+            crate::function_component::FunctionComponentHookRenderPhase::Mount
+        );
+        assert_eq!(
+            record.state_hook().memoized_state(),
+            StateHandle::from_raw(810)
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(
+            registry.calls()[0].hook_state(),
+            record.render().hook_state()
+        );
+        let work_node = arena.get(work_in_progress).unwrap();
+        assert_eq!(work_node.memoized_props(), PropsHandle::from_raw(2));
+        assert_eq!(work_node.memoized_state(), StateHandle::NONE);
+        assert_eq!(work_node.update_queue(), UpdateQueueHandle::NONE);
+    }
+
+    #[test]
+    fn begin_work_with_use_state_updates_state_hook_from_pending_queue() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(820))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_state_update(FunctionComponentStateDispatchRequest::new(
+                current_state.dispatch(),
+                action(821),
+                lane,
+            ))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(79)));
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let state_request =
+            FunctionComponentUseStateRenderRequest::new(StateHandle::from_raw(999), lanes);
+
+        let record = begin_work_with_use_state(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut hook_store,
+            state_request,
+            &mut registry,
+            action_as_state,
+        )
+        .unwrap();
+
+        let update = record.state_hook().update_record().unwrap();
+        assert_eq!(update.fiber(), work_in_progress);
+        assert_eq!(update.queue(), current_state.queue());
+        assert_eq!(update.dispatch(), current_state.dispatch());
+        assert_eq!(update.memoized_state(), StateHandle::from_raw(821));
+        assert_eq!(update.applied_update_count(), 1);
+        assert_eq!(update.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_state.queue())
+                .unwrap(),
+            Vec::new()
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(
+            registry.calls()[0].hook_state(),
+            record.render().hook_state()
         );
     }
 
