@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 732
+
+- Worker 732 added the static private-admission ledger for Workers 729-731.
+  Worker 729 is recorded as skip/meta ledger work, Worker 730 as accepted
+  private Rust unmount native cleanup evidence with ref/passive/host cleanup
+  proof, and Worker 731 as accepted private Rust nested `toJSON` update native
+  identity evidence.
+- Acceptance audit found two ledger hardening gaps: `privateDiagnosticsRecognized`
+  could remain true when compatibility or public promotion leaks were already
+  reported as violations, and Worker 730's Rust evidence tokens did not pin the
+  host cleanup count/order assertions strongly enough. The accepted follow-up
+  made the aggregate recognition flag fail closed for those leaks and added
+  stable host cleanup count/order source tokens.
+- Worker 732 was accepted after post-fix audit and verification with syntax
+  checks, focused private-admission tests, focused conformance workspace tests,
+  package-surface guard, import smoke, conflict-marker scanning, and `git diff
+  --check`; its subagent, worktree, and branch were removed after merge. This
+  is static ledger evidence only and does not execute runtime paths or promote
+  public/package compatibility.
+
 ### Worker 731
 
 - Worker 731 added Rust-only private react-test-renderer `toJSON` nested update
