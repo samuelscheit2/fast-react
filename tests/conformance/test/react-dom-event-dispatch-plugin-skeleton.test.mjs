@@ -50,11 +50,18 @@ const exportOracle = readCheckedReactDomExportOracle();
 
 test("private event dispatch skeleton creates fail-closed records from wrapper metadata", () => {
   const root = createEventTarget("root");
-  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, root);
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
   const rootOwner = {kind: "DispatchTargetRootOwner"};
-  const hostOwner = {kind: "DispatchTargetHostOwner"};
+  const parentHostOwner = {kind: "DispatchTargetParentHostOwner"};
+  const childHostOwner = {kind: "DispatchTargetChildHostOwner"};
   let latestPropsListenerCalls = 0;
-  const latestProps = {
+  const parentLatestProps = {
+    onClickCapture() {
+      latestPropsListenerCalls++;
+    }
+  };
+  const childLatestProps = {
     onClick() {
       latestPropsListenerCalls++;
     },
@@ -62,8 +69,20 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
       latestPropsListenerCalls++;
     }
   };
-  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
-  componentTree.attachHostInstanceNode(child, token, latestProps);
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(
+    parent,
+    parentToken,
+    parentLatestProps
+  );
+  componentTree.attachHostInstanceNode(child, childToken, childLatestProps);
   const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
     root,
     "click",
@@ -100,13 +119,13 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   assert.equal(dispatchRecord.eventPriorityName, "DiscreteEventPriority");
   assert.equal(dispatchRecord.inCapturePhase, true);
   assert.equal(dispatchRecord.isNonDelegatedEvent, false);
-  assert.equal(dispatchRecord.targetInst, null);
-  assert.equal(dispatchRecord.targetInstStatus, "not-resolved");
-  assert.equal(dispatchRecord.targetResolutionStatus, "blocked");
+  assert.equal(dispatchRecord.targetInst, childToken);
   assert.equal(
-    dispatchRecord.targetResolutionBlockedReason,
-    pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
+    dispatchRecord.targetInstStatus,
+    "resolved-component-tree-host-instance"
   );
+  assert.equal(dispatchRecord.targetResolutionStatus, "resolved");
+  assert.equal(dispatchRecord.targetResolutionBlockedReason, null);
   assert.equal(
     dispatchRecord.targetNormalizationRecord,
     dispatchRecord.extractionRecord.targetNormalizationRecord
@@ -129,22 +148,61 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   );
   assert.equal(
     dispatchRecord.targetNormalizationRecord.closestMountedHostInstanceToken,
-    token
+    childToken
   );
   assert.equal(
     dispatchRecord.targetNormalizationRecord.directMountedHostInstanceToken,
-    token
+    childToken
   );
   assert.equal(
     dispatchRecord.targetNormalizationRecord.closestMountedHostInstanceNode,
     child
   );
-  assert.equal(dispatchRecord.targetNormalizationRecord.hostOwner, hostOwner);
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.hostOwner,
+    childHostOwner
+  );
   assert.equal(dispatchRecord.targetNormalizationRecord.rootOwner, rootOwner);
   assert.equal(dispatchRecord.targetNormalizationRecord.targetNode, child);
   assert.equal(
     dispatchRecord.targetNormalizationRecord.latestPropsStatus,
     "present"
+  );
+  assert.equal(
+    dispatchRecord.targetDispatchPathRecord.kind,
+    componentTree.EVENT_TARGET_DISPATCH_PATH_RECORD_KIND
+  );
+  assert.equal(Object.isFrozen(dispatchRecord.targetDispatchPathRecord), true);
+  assert.equal(
+    dispatchRecord.targetDispatchPathStatus,
+    "resolved-component-tree-dispatch-path"
+  );
+  assert.equal(dispatchRecord.targetDispatchPathLength, 2);
+  assert.equal(dispatchRecord.targetDispatchPathRecord.targetInst, childToken);
+  assert.deepEqual(
+    dispatchRecord.targetDispatchPathRecord.entries.map((entry) => [
+      entry.kind,
+      entry.index,
+      entry.targetHostInstanceToken,
+      entry.hostOwner,
+      entry.latestPropsStatus
+    ]),
+    [
+      [
+        componentTree.EVENT_TARGET_DISPATCH_PATH_ENTRY_RECORD_KIND,
+        0,
+        childToken,
+        childHostOwner,
+        "present"
+      ],
+      [
+        componentTree.EVENT_TARGET_DISPATCH_PATH_ENTRY_RECORD_KIND,
+        1,
+        parentToken,
+        parentHostOwner,
+        "present"
+      ]
+    ]
   );
   assert.equal(
     dispatchRecord.targetListenerLookupRecord,
@@ -199,6 +257,18 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
     dispatchRecord.targetListenerLookupStatus,
     "present"
   );
+  assert.equal(dispatchRecord.targetListenerLookupCount, 2);
+  assert.deepEqual(
+    dispatchRecord.targetListenerLookupRecords.map((record) => [
+      record.registrationName,
+      record.listenerStatus,
+      record.targetHostInstanceToken
+    ]),
+    [
+      ["onClickCapture", "present", childToken],
+      ["onClickCapture", "present", parentToken]
+    ]
+  );
   assert.equal(
     dispatchRecord.targetListenerLookupBlockedReason,
     componentTree.EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE
@@ -227,27 +297,103 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
     componentTree.getEventListenerTargetLookupRecordPayload(
       dispatchRecord.targetListenerLookupRecord
     );
-  assert.equal(lookupPayload.latestProps, latestProps);
-  assert.equal(lookupPayload.listener, latestProps.onClickCapture);
-  assert.equal(lookupPayload.hostInstanceToken, token);
+  assert.equal(lookupPayload.latestProps, childLatestProps);
+  assert.equal(lookupPayload.listener, childLatestProps.onClickCapture);
+  assert.equal(lookupPayload.hostInstanceToken, childToken);
   assert.equal(lookupPayload.hostInstanceNode, child);
   assert.equal(dispatchRecord.targetHostInstanceNode, child);
-  assert.equal(dispatchRecord.targetHostInstanceToken, token);
+  assert.equal(dispatchRecord.targetHostInstanceToken, childToken);
   assert.equal(dispatchRecord.targetHostInstanceStatus, "mounted-host-instance");
   assert.equal(dispatchRecord.willInvokeListeners, false);
   assert.equal(dispatchRecord.listenerInvocationCount, 0);
   assert.equal(dispatchRecord.syntheticEventCount, 0);
   assert.equal(dispatchRecord.publicRootBehaviorChanged, false);
-  assert.deepEqual(dispatchRecord.dispatchQueue, {
-    entries: [],
-    kind: pluginEventSystem.DISPATCH_QUEUE_RECORD_KIND,
-    length: 0,
-    listenerInvocationCount: 0,
-    status: "empty",
-    syntheticEventCount: 0
-  });
+  assert.equal(
+    dispatchRecord.admissionStatus,
+    pluginEventSystem.PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS
+  );
+  assert.equal(dispatchRecord.browserDomEventCompatibilityClaimed, false);
+  assert.equal(
+    dispatchRecord.dispatchQueue.kind,
+    pluginEventSystem.DISPATCH_QUEUE_RECORD_KIND
+  );
+  assert.equal(dispatchRecord.dispatchQueue.status, "blocked-listener-metadata-recorded");
+  assert.equal(dispatchRecord.dispatchQueue.length, 1);
+  assert.equal(dispatchRecord.dispatchQueue.listenerCount, 2);
+  assert.equal(dispatchRecord.dispatchQueue.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.dispatchQueue.syntheticEventCount, 0);
+  assert.equal(dispatchRecord.dispatchQueue.willInvokeListeners, false);
   assert.equal(Object.isFrozen(dispatchRecord.dispatchQueue), true);
   assert.equal(Object.isFrozen(dispatchRecord.dispatchQueue.entries), true);
+  const dispatchEntry = dispatchRecord.dispatchQueue.entries[0];
+  assert.equal(
+    dispatchEntry.kind,
+    pluginEventSystem.DISPATCH_QUEUE_ENTRY_RECORD_KIND
+  );
+  assert.equal(pluginEventSystem.isDispatchQueueEntryRecord(dispatchEntry), true);
+  assert.equal(dispatchEntry.pluginName, pluginEventSystem.SIMPLE_EVENT_PLUGIN_NAME);
+  assert.equal(dispatchEntry.reactName, "onClick");
+  assert.equal(dispatchEntry.registrationName, "onClickCapture");
+  assert.equal(dispatchEntry.accumulationOrder, "target-to-root");
+  assert.equal(dispatchEntry.processingOrder, "root-to-target");
+  assert.equal(dispatchEntry.listenerCount, 2);
+  assert.equal(dispatchEntry.syntheticEventStatus, "not-created");
+  assert.equal(dispatchEntry.exposesSyntheticEvent, false);
+  assert.equal(Object.isFrozen(dispatchEntry.listeners), true);
+  assert.equal(Object.isFrozen(dispatchEntry.processingListenerRecords), true);
+  assert.deepEqual(
+    dispatchEntry.listeners.map((record) => [
+      record.kind,
+      record.registrationName,
+      record.phase,
+      record.targetInst,
+      record.currentTarget
+    ]),
+    [
+      [
+        pluginEventSystem.DISPATCH_LISTENER_RECORD_KIND,
+        "onClickCapture",
+        "capture",
+        childToken,
+        child
+      ],
+      [
+        pluginEventSystem.DISPATCH_LISTENER_RECORD_KIND,
+        "onClickCapture",
+        "capture",
+        parentToken,
+        parent
+      ]
+    ]
+  );
+  assert.deepEqual(
+    dispatchEntry.processingListenerRecords.map((record) => record.targetInst),
+    [parentToken, childToken]
+  );
+  for (const listenerRecord of dispatchEntry.listeners) {
+    assert.equal(
+      pluginEventSystem.isDispatchListenerRecord(listenerRecord),
+      true
+    );
+    assert.equal(listenerRecord.exposesListener, false);
+    assert.equal(listenerRecord.exposesLatestProps, false);
+    assert.equal(Object.hasOwn(listenerRecord, "listener"), false);
+    assert.equal(Object.hasOwn(listenerRecord, "latestProps"), false);
+    assert.equal(listenerRecord.willInvokeListener, false);
+    assert.equal(listenerRecord.listenerInvocationCount, 0);
+  }
+  const childDispatchPayload =
+    pluginEventSystem.getDispatchListenerRecordPayload(
+      dispatchEntry.listeners[0]
+    );
+  const parentDispatchPayload =
+    pluginEventSystem.getDispatchListenerRecordPayload(
+      dispatchEntry.listeners[1]
+    );
+  assert.equal(childDispatchPayload.latestProps, childLatestProps);
+  assert.equal(childDispatchPayload.listener, childLatestProps.onClickCapture);
+  assert.equal(parentDispatchPayload.latestProps, parentLatestProps);
+  assert.equal(parentDispatchPayload.listener, parentLatestProps.onClickCapture);
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
   assert.equal(latestPropsListenerCalls, 0);
@@ -256,7 +402,11 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
   assert.equal(latestPropsListenerCalls, 0);
-  assert.equal(componentTree.detachHostInstanceToken(token), token);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(parentToken),
+    parentToken
+  );
 });
 
 test("private target listener lookup sees current latest props without dispatching", () => {
@@ -303,7 +453,18 @@ test("private target listener lookup sees current latest props without dispatchi
   assert.equal(firstListenerCalls, 0);
   assert.equal(secondListenerCalls, 0);
   assert.equal(root.__registrations.length, 0);
-  assert.equal(dispatchRecord.dispatchQueue.length, 0);
+  assert.equal(dispatchRecord.dispatchQueue.length, 1);
+  assert.equal(dispatchRecord.dispatchQueue.listenerCount, 1);
+  assert.equal(
+    dispatchRecord.dispatchQueue.entries[0].listeners[0].registrationName,
+    "onClick"
+  );
+  assert.equal(
+    pluginEventSystem.getDispatchListenerRecordPayload(
+      dispatchRecord.dispatchQueue.entries[0].listeners[0]
+    ).listener,
+    secondProps.onClick
+  );
   assert.equal(dispatchRecord.syntheticEventCount, 0);
   assert.equal(dispatchRecord.listenerInvocationCount, 0);
   assert.equal(dispatchRecord.willInvokeListeners, false);
@@ -333,8 +494,95 @@ test("private listener dispatch entry points return records while installed list
   assert.equal(listenerDispatchRecord.wrapperRecord, wrapperRecord);
   assert.equal(listenerDispatchRecord.status, "blocked");
   assert.equal(listener(nativeEvent), undefined);
+  assert.equal(
+    rootListeners.getLastRootListenerDispatchRecord(listener).domEventName,
+    "mousemove"
+  );
+  assert.equal(
+    rootListeners.getLastRootListenerDispatchRecord(listener).targetInst,
+    null
+  );
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
+});
+
+test("installed private root listeners record fake DOM dispatch path metadata", () => {
+  const root = createEventTarget("installed-listener-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "InstalledListenerRootOwner"};
+  const parentHostOwner = {kind: "InstalledListenerParentHostOwner"};
+  const childHostOwner = {kind: "InstalledListenerChildHostOwner"};
+  let listenerCalls = 0;
+  const parentProps = {
+    onClick() {
+      listenerCalls++;
+    }
+  };
+  const childProps = {
+    onClick() {
+      listenerCalls++;
+    }
+  };
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+  const listener = rootListeners.listenToNativeEvent("click", false, root);
+  const nativeEvent = createNativeEvent("click", child);
+
+  assert.equal(listener(nativeEvent), undefined);
+  const dispatchRecord =
+    rootListeners.getLastRootListenerDispatchRecord(listener);
+
+  assert.equal(dispatchRecord.kind, pluginEventSystem.EVENT_DISPATCH_RECORD_KIND);
+  assert.equal(dispatchRecord.targetInst, childToken);
+  assert.equal(dispatchRecord.targetResolutionStatus, "resolved");
+  assert.equal(dispatchRecord.targetDispatchPathLength, 2);
+  assert.equal(dispatchRecord.dispatchQueue.length, 1);
+  assert.equal(dispatchRecord.dispatchQueue.listenerCount, 2);
+  assert.equal(
+    dispatchRecord.dispatchQueue.entries[0].processingOrder,
+    "target-to-root"
+  );
+  assert.deepEqual(
+    dispatchRecord.dispatchQueue.entries[0].listeners.map((record) => [
+      record.registrationName,
+      record.phase,
+      record.targetInst,
+      record.currentTarget
+    ]),
+    [
+      ["onClick", "bubble", childToken, child],
+      ["onClick", "bubble", parentToken, parent]
+    ]
+  );
+  assert.equal(
+    pluginEventSystem.getDispatchListenerRecordPayload(
+      dispatchRecord.dispatchQueue.entries[0].listeners[0]
+    ).listener,
+    childProps.onClick
+  );
+  assert.equal(
+    pluginEventSystem.getDispatchListenerRecordPayload(
+      dispatchRecord.dispatchQueue.entries[0].listeners[1]
+    ).listener,
+    parentProps.onClick
+  );
+  assert.equal(listenerCalls, 0);
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(parentToken),
+    parentToken
+  );
 });
 
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
@@ -453,9 +701,12 @@ test("event target normalization reports mounted host diagnostics without enabli
     textDispatch.nativeEventTarget,
     element
   );
-  assert.equal(textDispatch.targetInst, null);
-  assert.equal(textDispatch.targetInstStatus, "not-resolved");
-  assert.equal(textDispatch.targetResolutionStatus, "blocked");
+  assert.equal(textDispatch.targetInst, token);
+  assert.equal(
+    textDispatch.targetInstStatus,
+    "resolved-component-tree-host-instance"
+  );
+  assert.equal(textDispatch.targetResolutionStatus, "resolved");
   assert.equal(
     textDispatch.targetNormalizationRecord.status,
     "mounted-host-instance"
@@ -472,6 +723,9 @@ test("event target normalization reports mounted host diagnostics without enabli
   assert.equal(textDispatch.targetNormalizationRecord.rootOwner, rootOwner);
   assert.equal(textDispatch.targetHostInstanceToken, token);
   assert.equal(textDispatch.targetHostInstanceNode, element);
+  assert.equal(textDispatch.targetDispatchPathLength, 1);
+  assert.equal(textDispatch.dispatchQueue.length, 1);
+  assert.equal(textDispatch.dispatchQueue.listenerCount, 1);
   assert.equal(textDispatch.willInvokeListeners, false);
   assert.equal(
     pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
@@ -497,7 +751,7 @@ test("event target normalization reports mounted host diagnostics without enabli
       wrapperRecord,
       createNativeEvent("click", text)
     ).targetInstStatus,
-    "not-resolved"
+    "resolved-component-tree-host-instance"
   );
   assert.equal(componentTree.detachHostInstanceToken(token), token);
   const detachedDispatch =
@@ -509,6 +763,10 @@ test("event target normalization reports mounted host diagnostics without enabli
     detachedDispatch.targetNormalizationRecord.status,
     "no-mounted-host-instance"
   );
+  assert.equal(detachedDispatch.targetInst, null);
+  assert.equal(detachedDispatch.targetResolutionStatus, "blocked");
+  assert.equal(detachedDispatch.targetDispatchPathLength, 0);
+  assert.equal(detachedDispatch.dispatchQueue.length, 0);
   assert.equal(
     detachedDispatch.targetListenerLookupStatus,
     "no-mounted-host-instance"

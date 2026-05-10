@@ -25,6 +25,9 @@ const {
   createEventListenerWrapperRecordWithPriority
 } = require('./react-dom-event-listener.js');
 const {
+  createEventDispatchRecordFromWrapperRecord
+} = require('./plugin-event-system.js');
+const {
   IS_CAPTURE_PHASE,
   IS_NON_DELEGATED
 } = require('./event-system-flags.js');
@@ -40,16 +43,58 @@ const ROOT_LISTENERS_REVERTED =
 
 const rootListenerRegistrationPayloads = new WeakMap();
 const rootListenerCleanupRecords = new WeakMap();
+const rootListenerDispatchRecords = new WeakMap();
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
-  const wrapperRecord = createEventListenerWrapperRecordWithPriority(
+  const priorityWrapperRecord = createEventListenerWrapperRecordWithPriority(
     target,
     domEventName,
     eventSystemFlags
   );
-  const listener = wrapperRecord.listener;
+  let wrapperRecord;
+  const listener = function reactDomRootEventListenerShell(nativeEvent) {
+    const dispatchRecord = createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      nativeEvent
+    );
+    rootListenerDispatchRecords.set(listener, dispatchRecord);
+    return undefined;
+  };
+
+  wrapperRecord = Object.freeze({
+    dispatcherName: priorityWrapperRecord.dispatcherName,
+    domEventName: priorityWrapperRecord.domEventName,
+    eventPriority: priorityWrapperRecord.eventPriority,
+    eventPriorityLabel: priorityWrapperRecord.eventPriorityLabel,
+    eventPriorityLane: priorityWrapperRecord.eventPriorityLane,
+    eventPriorityName: priorityWrapperRecord.eventPriorityName,
+    eventSystemFlags: priorityWrapperRecord.eventSystemFlags,
+    kind: priorityWrapperRecord.kind,
+    listener,
+    priorityRecord: priorityWrapperRecord.priorityRecord,
+    targetContainer: priorityWrapperRecord.targetContainer,
+    wrapperKind: priorityWrapperRecord.wrapperKind
+  });
 
   Object.defineProperties(listener, {
+    __FAST_REACT_DOM_EVENT_WRAPPER_RECORD__: {
+      value: wrapperRecord
+    },
+    __FAST_REACT_DOM_EVENT_WRAPPER__: {
+      value: true
+    },
+    __FAST_REACT_DOM_EVENT_WRAPPER_KIND__: {
+      value: wrapperRecord.wrapperKind
+    },
+    __FAST_REACT_DOM_EVENT_PRIORITY__: {
+      value: wrapperRecord.eventPriority
+    },
+    __FAST_REACT_DOM_EVENT_PRIORITY_LABEL__: {
+      value: wrapperRecord.eventPriorityLabel
+    },
+    __FAST_REACT_DOM_EVENT_PRIORITY_NAME__: {
+      value: wrapperRecord.eventPriorityName
+    },
     __FAST_REACT_DOM_EVENT_SHELL__: {
       value: true
     },
@@ -68,6 +113,17 @@ function createEventListenerShell(target, domEventName, eventSystemFlags) {
   });
 
   return listener;
+}
+
+function getLastRootListenerDispatchRecord(listener) {
+  if (
+    listener === null ||
+    (typeof listener !== 'object' && typeof listener !== 'function')
+  ) {
+    return null;
+  }
+
+  return rootListenerDispatchRecords.get(listener) || null;
 }
 
 function getAddEventListenerOptions(
@@ -617,6 +673,7 @@ module.exports = {
   describePortalContainerListenerGuard,
   describeRootListenerGuard,
   getAddEventListenerOptions,
+  getLastRootListenerDispatchRecord,
   getRootEventTargetOwnerDocument,
   listenToAllSupportedEvents,
   listenToNativeEvent,

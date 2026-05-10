@@ -312,6 +312,8 @@ const reactDomPackage = require(
 
   componentTree.attachHostInstanceNode(node, token, props);
   const targetRecord = componentTree.createEventTargetNormalizationRecord(node);
+  const dispatchPathRecord =
+    componentTree.createEventTargetDispatchPathRecord(targetRecord);
   const lookupRecord = componentTree.createEventListenerTargetLookupRecord(
     targetRecord,
     'onClick'
@@ -323,6 +325,34 @@ const reactDomPackage = require(
     lookupRecord.kind,
     componentTree.EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND
   );
+  assert.equal(
+    dispatchPathRecord.kind,
+    componentTree.EVENT_TARGET_DISPATCH_PATH_RECORD_KIND
+  );
+  assert.equal(Object.isFrozen(dispatchPathRecord), true);
+  assert.equal(
+    Object.isFrozen(dispatchPathRecord.entries),
+    true
+  );
+  assert.equal(
+    dispatchPathRecord.status,
+    'resolved-component-tree-dispatch-path'
+  );
+  assert.equal(dispatchPathRecord.length, 1);
+  assert.equal(dispatchPathRecord.targetInst, token);
+  assert.equal(
+    dispatchPathRecord.targetInstStatus,
+    'resolved-component-tree-host-instance'
+  );
+  assert.equal(
+    dispatchPathRecord.entries[0].kind,
+    componentTree.EVENT_TARGET_DISPATCH_PATH_ENTRY_RECORD_KIND
+  );
+  assert.equal(dispatchPathRecord.entries[0].targetHostInstanceNode, node);
+  assert.equal(dispatchPathRecord.entries[0].targetHostInstanceToken, token);
+  assert.equal(dispatchPathRecord.entries[0].hostOwner, hostOwner);
+  assert.equal(dispatchPathRecord.entries[0].rootOwner, rootOwner);
+  assert.equal(dispatchPathRecord.browserDomEventCompatibilityClaimed, false);
   assert.equal(Object.isFrozen(lookupRecord), true);
   assert.equal(lookupRecord.status, 'blocked');
   assert.equal(
