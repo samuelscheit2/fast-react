@@ -157,6 +157,8 @@ const privateRootPublicFacadePreflightRecordType =
   'fast.react_dom.private_root_public_facade_preflight_record';
 const privateRootPublicFacadeMarkerListenerPreflightRecordType =
   'fast.react_dom.private_root_public_facade_marker_listener_preflight_record';
+const privateRootPublicFacadeHostOutputRenderRecordType =
+  'fast.react_dom.private_root_public_facade_host_output_render_record';
 const privateRootPublicFacadeAdapterSymbol = Symbol.for(
   'fast.react_dom.client.private_root_public_facade_adapter'
 );
@@ -230,6 +232,8 @@ const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED =
   'accepted-private-react-dom-client-root-public-facade-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
   'preflighted-private-root-public-facade-marker-listener-gate';
+const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED =
+  'applied-private-root-public-facade-host-output-render-diagnostic';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -1108,6 +1112,104 @@ const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHT_BLOCKED_CAPABILITIES =
     reason: 'React DOM public root compatibility remains unclaimed.'
   })
 ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-facade-create-root-record',
+      accepted: true,
+      reason:
+        'The diagnostic starts from the symbol-only private public-facade createRoot record.'
+    }),
+    freezeRecord({
+      id: 'public-facade-root-render-record',
+      accepted: true,
+      reason:
+        'The diagnostic routes the public-shaped private root.render call into a bridge-owned render request record.'
+    }),
+    freezeRecord({
+      id: 'root-marker-setup-cleanup',
+      accepted: true,
+      reason:
+        'The reversible private root marker gate was applied for admission and then cleaned up.'
+    }),
+    freezeRecord({
+      id: 'root-listener-setup-cleanup',
+      accepted: true,
+      reason:
+        'The reversible private root listener gate was applied for admission and then cleaned up.'
+    }),
+    freezeRecord({
+      id: 'create-render-admission',
+      accepted: true,
+      reason:
+        'The private create/render admission record validated marker and listener prerequisites before host output.'
+    }),
+    freezeRecord({
+      id: 'fake-dom-host-output-mutation',
+      accepted: true,
+      reason:
+        'The accepted render was applied through the private fake-DOM mutation adapter only.'
+    }),
+    freezeRecord({
+      id: 'component-tree-host-instance-map',
+      accepted: true,
+      reason:
+        'HostComponent and HostText fake nodes were attached to private component-tree host instance tokens.'
+    }),
+    freezeRecord({
+      id: 'latest-props-publication',
+      accepted: true,
+      reason:
+        'Latest props were published only after the private fake-DOM mutation handoff was accepted.'
+    })
+  ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The diagnostic never enables public React DOM createRoot, render, or unmount behavior.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler scheduling, render, complete-work, or commit traversal is admitted.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-compatibility',
+      blocked: true,
+      reason:
+        'Only deterministic fake-DOM host nodes are admitted by this private diagnostic.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction, dispatch, and listener invocation are not admitted.'
+    }),
+    freezeRecord({
+      id: 'refs',
+      blocked: true,
+      reason: 'Ref attach/detach ordering is not admitted by this diagnostic.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM public root compatibility remains unclaimed.'
+    })
+  ]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -1144,6 +1246,7 @@ const rootPublicFacadePreflightPayloads = new WeakMap();
 const rootPublicFacadePreflightRootPayloads = new WeakMap();
 const rootPublicFacadePreflightRecordPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
+const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -1379,10 +1482,24 @@ function createPrivateRootPublicFacadeAdapter(options) {
           .markerListenerPreflightRecords
       );
     },
+    getRootHostOutputRenderDiagnostics(root) {
+      return freezeArray(
+        assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
+          .hostOutputRenderRecords
+      );
+    },
     preflightRootMarkerListenerSetupAndCleanup(root, options) {
       return preflightPrivateRootPublicFacadeMarkerListenerSetupWithAdapter(
         adapterState,
         root,
+        options
+      );
+    },
+    renderHostOutput(root, element, options) {
+      return renderPrivateRootPublicFacadeHostOutputWithAdapter(
+        adapterState,
+        root,
+        element,
         options
       );
     }
@@ -1484,6 +1601,7 @@ function createPrivateRootPublicFacadeRoot(
     bridge: adapterState.bridge,
     container,
     createRecord,
+    hostOutputRenderRecords: [],
     renderRecords: [],
     markerListenerPreflightRecords: [],
     requestRecords: [createRecord],
@@ -1897,6 +2015,204 @@ function preflightPrivateRootPublicFacadeMarkerListenerSetupFromPayload(
   });
   payload.markerListenerPreflightRecords.push(preflightRecord);
   return preflightRecord;
+}
+
+function renderPrivateRootPublicFacadeHostOutput(root, element, options) {
+  const payload = rootPublicFacadeRootPayloads.get(root);
+  if (payload === undefined) {
+    throwInvalidRootPublicFacadeAdapter(
+      'Expected a private React DOM root public facade root.'
+    );
+  }
+  return renderPrivateRootPublicFacadeHostOutputFromPayload(
+    payload,
+    element,
+    options
+  );
+}
+
+function renderPrivateRootPublicFacadeHostOutputWithAdapter(
+  adapterState,
+  root,
+  element,
+  options
+) {
+  const payload = assertPrivateRootPublicFacadeRootForAdapter(
+    root,
+    adapterState
+  );
+  return renderPrivateRootPublicFacadeHostOutputFromPayload(
+    payload,
+    element,
+    options
+  );
+}
+
+function renderPrivateRootPublicFacadeHostOutputFromPayload(
+  payload,
+  element,
+  options
+) {
+  const createRecord = payload.createRecord;
+  const createPayload = rootRecordPayloads.get(createRecord);
+  if (createPayload === undefined) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Expected a private React DOM createRoot record for public-facade host-output render.'
+    );
+  }
+
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  if (handleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Cannot render private public-facade host output after the private facade root was unmounted.'
+    );
+  }
+  if (hasActivePrivateRootPublicFacadeHostOutputRender(payload)) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Cannot render private public-facade host output while a previous host-output diagnostic is still active.'
+    );
+  }
+  assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
+    createRecord
+  );
+  normalizeInitialHostOutputElement(element);
+
+  let sideEffectRecord = null;
+  let renderRecord = null;
+  let admissionRecord = null;
+  let hostOutputHandoff = null;
+  let sideEffectCleanup = null;
+  const callback = getPublicFacadeHostOutputRenderCallback(options);
+  const sideEffectOptions =
+    getPublicFacadeHostOutputRenderSideEffectOptions(options);
+
+  try {
+    sideEffectRecord = payload.bridge.applyCreateRootSideEffects(
+      createRecord,
+      sideEffectOptions
+    );
+    renderRecord = payload.root.render(element, callback);
+    admissionRecord = payload.bridge.admitCreateRenderPath(
+      createRecord,
+      sideEffectRecord,
+      renderRecord
+    );
+    hostOutputHandoff =
+      payload.bridge.applyInitialRenderHostOutput(admissionRecord);
+    sideEffectCleanup =
+      payload.bridge.revertCreateRootSideEffects(sideEffectRecord);
+  } catch (error) {
+    cleanupPublicFacadeHostOutputRenderAfterFailure({
+      bridge: payload.bridge,
+      error,
+      hostOutputHandoff,
+      sideEffectRecord
+    });
+    throw error;
+  }
+
+  const hostOutputPayload =
+    rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
+  if (hostOutputPayload === undefined) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Public-facade host-output render requires an applied initial host-output handoff.'
+    );
+  }
+
+  const rootBridgeState = handleState.bridgeState;
+  const sequence = rootBridgeState.nextPublicFacadeHostOutputRenderSequence++;
+  const diagnosticId =
+    `${rootBridgeState.publicFacadeHostOutputRenderIdPrefix}:${sequence}`;
+  const diagnosticRecord = freezeRecord({
+    $$typeof: privateRootPublicFacadeHostOutputRenderRecordType,
+    kind: 'FastReactDomPrivateRootPublicFacadeHostOutputRenderDiagnosticRecord',
+    operation: 'public-facade-host-output-render-diagnostic',
+    entrypoint: 'react-dom/client',
+    adapterStatus: ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
+    diagnosticId,
+    diagnosticSequence: sequence,
+    diagnosticStatus: ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    createRequestId: createRecord.requestId,
+    createRequestSequence: createRecord.requestSequence,
+    createRequestType: createRecord.requestType,
+    renderRequestId: renderRecord.requestId,
+    renderRequestSequence: renderRecord.requestSequence,
+    renderRequestType: renderRecord.requestType,
+    renderUpdateId: renderRecord.updateId,
+    renderLifecycleStatusBefore: renderRecord.lifecycleStatusBefore,
+    renderLifecycleStatusAfter: renderRecord.lifecycleStatusAfter,
+    sideEffectId: sideEffectRecord.sideEffectId,
+    sideEffectSequence: sideEffectRecord.sideEffectSequence,
+    setupSideEffectStatus: sideEffectRecord.sideEffectStatus,
+    cleanupSideEffectStatus: sideEffectCleanup.sideEffectStatus,
+    markerStatus: sideEffectRecord.markerRecord.markerStatus,
+    markerCleanupStatus: sideEffectCleanup.markerCleanup.markerStatus,
+    listenerRegistrationStatus:
+      sideEffectRecord.listenerRegistration.registrationStatus,
+    listenerCleanupStatus:
+      sideEffectCleanup.listenerCleanup.registrationStatus,
+    admissionId: admissionRecord.admissionId,
+    admissionSequence: admissionRecord.admissionSequence,
+    admissionStatus: admissionRecord.admissionStatus,
+    hostOutputHandoffId: hostOutputHandoff.handoffId,
+    hostOutputHandoffSequence: hostOutputHandoff.handoffSequence,
+    hostOutputHandoffStatus: hostOutputHandoff.handoffStatus,
+    hostType: hostOutputHandoff.hostType,
+    hostNodeInfo: hostOutputHandoff.hostNodeInfo,
+    textNodeInfo: hostOutputHandoff.textNodeInfo,
+    containerChildCount: hostOutputHandoff.containerChildCount,
+    hostChildCount: hostOutputHandoff.hostChildCount,
+    textContent: hostOutputHandoff.textContent,
+    acceptedCapabilities:
+      ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES,
+    privateFacadeRoot: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    setupMarkerWrites: true,
+    setupListenerInstallation: true,
+    cleanupCompleted: true,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false,
+    cleanupRequired: true
+  });
+
+  rootPublicFacadeHostOutputRenderPayloads.set(diagnosticRecord, {
+    adapter: payload.adapter,
+    admissionRecord,
+    bridge: payload.bridge,
+    callback,
+    container: createPayload.container,
+    createRecord,
+    element,
+    hostOutputHandoff,
+    hostOutputPayload,
+    renderRecord,
+    root: payload.root,
+    rootHandle: payload.rootHandle,
+    sideEffectCleanup,
+    sideEffectRecord
+  });
+  payload.hostOutputRenderRecords.push(diagnosticRecord);
+  return diagnosticRecord;
 }
 
 function createClientRootRecord(container, rootOptions) {
@@ -3299,6 +3615,14 @@ function getPrivateRootPublicFacadeMarkerListenerPreflightPayload(record) {
 
 function isPrivateRootPublicFacadeMarkerListenerPreflightRecord(value) {
   return rootPublicFacadeMarkerListenerPreflightPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeHostOutputRenderPayload(record) {
+  return rootPublicFacadeHostOutputRenderPayloads.get(record) || null;
+}
+
+function isPrivateRootPublicFacadeHostOutputRenderRecord(value) {
+  return rootPublicFacadeHostOutputRenderPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -5696,6 +6020,10 @@ function createBridgeState(options) {
       options && options.publicFacadePreflightIdPrefix,
       'public-facade-preflight'
     ),
+    publicFacadeHostOutputRenderIdPrefix: getIdPrefix(
+      options && options.publicFacadeHostOutputRenderIdPrefix,
+      'public-facade-host-output-render'
+    ),
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
     rootCommitRefMetadataIdPrefix: getIdPrefix(
       options && options.rootCommitRefMetadataIdPrefix,
@@ -5725,6 +6053,7 @@ function createBridgeState(options) {
     nextPortalChildReconciliationSequence: 1,
     nextPortalEventOwnerRootSequence: 1,
     nextPublicFacadePreflightSequence: 1,
+    nextPublicFacadeHostOutputRenderSequence: 1,
     nextRootCommitRefMetadataSequence: 1,
     nextRootSequence: 1,
     nextSideEffectSequence: 1,
@@ -8195,6 +8524,90 @@ function assertNoActiveCreateRootSideEffectsForPublicFacadePreflight(
   }
 }
 
+function assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
+  createRecord
+) {
+  const existing = rootCreateSideEffectRecords.get(createRecord);
+  if (existing === undefined) {
+    return;
+  }
+  const existingPayload = rootCreateSideEffectPayloads.get(existing);
+  if (existingPayload && existingPayload.active) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Cannot render private public-facade host output while createRoot side effects are already active.'
+    );
+  }
+}
+
+function hasActivePrivateRootPublicFacadeHostOutputRender(payload) {
+  for (const record of payload.hostOutputRenderRecords) {
+    const renderPayload = rootPublicFacadeHostOutputRenderPayloads.get(record);
+    if (renderPayload === undefined) {
+      continue;
+    }
+    const hostOutputPayload = rootInitialHostOutputHandoffPayloads.get(
+      renderPayload.hostOutputHandoff
+    );
+    if (hostOutputPayload && hostOutputPayload.active) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getPublicFacadeHostOutputRenderCallback(options) {
+  if (typeof options === 'function') {
+    return options;
+  }
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'callback')
+  ) {
+    return options.callback;
+  }
+  return undefined;
+}
+
+function getPublicFacadeHostOutputRenderSideEffectOptions(options) {
+  if (!options || typeof options !== 'object') {
+    return undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(options, 'sideEffectOptions')) {
+    return options.sideEffectOptions;
+  }
+  return options;
+}
+
+function cleanupPublicFacadeHostOutputRenderAfterFailure({
+  bridge,
+  error,
+  hostOutputHandoff,
+  sideEffectRecord
+}) {
+  if (hostOutputHandoff !== null) {
+    try {
+      bridge.cleanupInitialRenderHostOutput(hostOutputHandoff);
+    } catch (cleanupError) {
+      error.hostOutputCleanupError = {
+        code: cleanupError.code || null,
+        message: cleanupError.message
+      };
+    }
+  }
+
+  if (sideEffectRecord !== null) {
+    try {
+      bridge.revertCreateRootSideEffects(sideEffectRecord);
+    } catch (cleanupError) {
+      error.sideEffectCleanupError = {
+        code: cleanupError.code || null,
+        message: cleanupError.message
+      };
+    }
+  }
+}
+
 function assertPrivateRootPublicFacadeRootForAdapter(root, adapterState) {
   const payload = rootPublicFacadeRootPayloads.get(root);
   if (payload === undefined) {
@@ -8230,6 +8643,7 @@ function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
     bridge: payload.bridge,
     container: payload.container,
     createRecord: payload.createRecord,
+    hostOutputRenderRecords: freezeArray(payload.hostOutputRenderRecords),
     markerListenerPreflightRecords: freezeArray(
       payload.markerListenerPreflightRecords
     ),
@@ -8374,6 +8788,13 @@ function throwInvalidRootPublicFacadeAdapter(message) {
 function throwInvalidRootPublicFacadePreflight(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT';
+  throw error;
+}
+
+function throwInvalidRootPublicFacadeHostOutputRender(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER';
   throw error;
 }
 
@@ -8575,6 +8996,9 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
   ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
   ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
+  ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED,
+  ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
@@ -8645,6 +9069,7 @@ module.exports = {
   getPrivateRootPortalFakeDomMountPayload,
   getPrivateRootPortalPrepareMountListenerIntentPayload,
   getPrivateRootPublicFacadeMarkerListenerPreflightPayload,
+  getPrivateRootPublicFacadeHostOutputRenderPayload,
   getPrivateRootPublicFacadeAdapterPayload,
   getPrivateRootPublicFacadePreflightPayload,
   getPrivateRootPublicFacadePreflightRecordPayload,
@@ -8668,6 +9093,7 @@ module.exports = {
   isPrivateRootPortalPrepareMountListenerIntentRecord,
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootPublicFacadeMarkerListenerPreflightRecord,
+  isPrivateRootPublicFacadeHostOutputRenderRecord,
   isPrivateRootPublicFacadeAdapter,
   isPrivateRootPublicFacadePreflight,
   isPrivateRootPublicFacadePreflightRecord,
@@ -8695,6 +9121,7 @@ module.exports = {
   privateRootPortalEventOwnerRootGateRecordType,
   privateRootPortalPrepareMountListenerIntentRecordType,
   privateRootPublicFacadeMarkerListenerPreflightRecordType,
+  privateRootPublicFacadeHostOutputRenderRecordType,
   privateRootPublicFacadeAdapterSymbol,
   privateRootPublicFacadeAdapterType,
   privateRootPublicFacadePreflightRecordType,
@@ -8712,5 +9139,6 @@ module.exports = {
   privateRootOwnerType,
   privateRootUpdateRecordType,
   preflightPrivateRootPublicFacadeMarkerListenerSetup,
+  renderPrivateRootPublicFacadeHostOutput,
   revertPrivateCreateRootSideEffects
 };
