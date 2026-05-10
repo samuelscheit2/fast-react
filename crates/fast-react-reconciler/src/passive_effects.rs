@@ -149,6 +149,13 @@ pub(crate) enum PassiveEffectsFlushError {
         expected: Lanes,
         actual: Lanes,
     },
+    PendingPassiveRecordCountMismatch {
+        root: FiberRootId,
+        expected_unmounts: usize,
+        actual_unmounts: usize,
+        expected_mounts: usize,
+        actual_mounts: usize,
+    },
 }
 
 impl Display for PassiveEffectsFlushError {
@@ -201,6 +208,21 @@ impl Display for PassiveEffectsFlushError {
                 actual,
                 expected
             ),
+            Self::PendingPassiveRecordCountMismatch {
+                root,
+                expected_unmounts,
+                actual_unmounts,
+                expected_mounts,
+                actual_mounts,
+            } => write!(
+                formatter,
+                "root {} pending passive record counts changed after commit: expected {} unmounts and {} mounts, found {} unmounts and {} mounts",
+                root.raw(),
+                expected_unmounts,
+                expected_mounts,
+                actual_unmounts,
+                actual_mounts
+            ),
         }
     }
 }
@@ -211,7 +233,8 @@ impl Error for PassiveEffectsFlushError {
             Self::FiberRootStore(error) => Some(error),
             Self::PendingPassiveRootMismatch { .. }
             | Self::PendingPassiveFinishedWorkMismatch { .. }
-            | Self::PendingPassiveLanesMismatch { .. } => None,
+            | Self::PendingPassiveLanesMismatch { .. }
+            | Self::PendingPassiveRecordCountMismatch { .. } => None,
         }
     }
 }
@@ -284,6 +307,22 @@ fn validate_pending_passive_handoff(
         });
     }
 
+    let actual_unmounts = pending_passive.passive_unmounts().len();
+    let actual_mounts = pending_passive.passive_mounts().len();
+    if actual_unmounts != handoff.pending_unmount_count()
+        || actual_mounts != handoff.pending_mount_count()
+    {
+        return Err(
+            PassiveEffectsFlushError::PendingPassiveRecordCountMismatch {
+                root: handoff.root(),
+                expected_unmounts: handoff.pending_unmount_count(),
+                actual_unmounts,
+                expected_mounts: handoff.pending_mount_count(),
+                actual_mounts,
+            },
+        );
+    }
+
     Ok(())
 }
 
@@ -311,11 +350,20 @@ fn build_passive_flush_records(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function_component::{
+        FunctionComponentEffectPhase, FunctionComponentHookRenderPhase,
+        FunctionComponentHookRenderStore,
+    };
+    use crate::root_commit::queue_function_component_pending_passive_effects;
     use crate::root_config::PendingPassiveUnmountOrigin;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         RootElementHandle, RootOptions, commit_finished_host_root, render_host_root_for_lanes,
         update_container,
+    };
+    use fast_react_core::{
+        DependenciesHandle, FiberTag, FiberTypeHandle, HookEffectCallbackHandle,
+        HookEffectDependencies, PropsHandle,
     };
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
@@ -325,6 +373,37 @@ mod tests {
             .create_client_root(FakeContainer::new(1), RootOptions::new())
             .unwrap();
         (store, root_id, host)
+    }
+
+    fn append_function_component_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        parent: FiberId,
+        props: PropsHandle,
+        component: FiberTypeHandle,
+    ) -> FiberId {
+        let mode = store.fiber_arena().get(parent).unwrap().mode();
+        let child =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::FunctionComponent, None, props, mode);
+        store
+            .fiber_arena_mut()
+            .get_mut(child)
+            .unwrap()
+            .set_fiber_type(component);
+        store
+            .fiber_arena_mut()
+            .set_children(parent, &[child])
+            .unwrap();
+        child
+    }
+
+    fn callback(raw: u64) -> HookEffectCallbackHandle {
+        HookEffectCallbackHandle::from_raw(raw)
+    }
+
+    fn deps(raw: u64) -> HookEffectDependencies {
+        HookEffectDependencies::array(DependenciesHandle::from_raw(raw))
     }
 
     #[test]
@@ -420,6 +499,94 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().scheduling().pending_passive(),
             &PendingPassiveState::NONE
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_flush_consumes_function_component_passive_metadata_data_only() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(21), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let component = FiberTypeHandle::from_raw(820);
+        let function_fiber = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(821),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), function_fiber)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Mount);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(822),
+                deps(823),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(queued.records().len(), 1);
+        assert_eq!(queued.queued_unmount_count(), 0);
+        assert_eq!(queued.queued_mount_count(), 1);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let handoff = commit.pending_passive_handoff().unwrap();
+        assert_eq!(handoff.pending_unmount_count(), 0);
+        assert_eq!(handoff.pending_mount_count(), 1);
+
+        let flush = flush_passive_effects_after_commit(&mut store, &commit).unwrap();
+
+        assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(flush.consumed_pending_passive());
+        assert_eq!(flush.root(), root_id);
+        assert_eq!(flush.finished_work(), Some(finished_work));
+        assert_eq!(flush.lanes(), Lanes::DEFAULT);
+        assert_eq!(flush.records().len(), 1);
+        let record = flush.records()[0];
+        assert_eq!(record.flush_index(), 0);
+        assert_eq!(record.fiber(), function_fiber);
+        assert_eq!(record.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(record.pending_order(), queued.records()[0].mount_order());
+        assert_eq!(record.unmount_origin(), None);
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_effect(registration.effect())
+                .unwrap()
+                .create(),
+            callback(822)
+        );
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(registration.instance())
+                .unwrap()
+                .destroy(),
+            None
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
@@ -530,6 +697,54 @@ mod tests {
         assert_eq!(pending_passive.root(), Some(root_id));
         assert_eq!(pending_passive.finished_work(), Some(finished_work));
         assert_eq!(pending_passive.lanes(), Lanes::SYNC);
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_flush_rejects_pending_record_count_drift_before_consuming() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(51), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        {
+            let scheduling = store.root_mut(root_id).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(root_id, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(finished_work, Lanes::DEFAULT)
+                .unwrap();
+        }
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        assert_eq!(
+            commit
+                .pending_passive_handoff()
+                .unwrap()
+                .pending_mount_count(),
+            1
+        );
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .pending_passive_mut()
+            .queue_mount(finished_work, Lanes::DEFAULT)
+            .unwrap();
+
+        let error = flush_passive_effects_after_commit(&mut store, &commit).unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::PendingPassiveRecordCountMismatch {
+                root,
+                expected_unmounts: 0,
+                actual_unmounts: 0,
+                expected_mounts: 1,
+                actual_mounts: 2,
+            } if root == root_id
+        ));
+        assert_eq!(pending_passive.passive_mounts().len(), 2);
         assert!(pending_passive.has_commit_handoff());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
