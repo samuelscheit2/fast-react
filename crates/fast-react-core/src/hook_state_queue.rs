@@ -255,6 +255,75 @@ impl<Action: Clone, State: Clone> HookUpdate<Action, State> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HookUpdateDispatchMetadata<Action, State> {
+    lane: HookUpdateLane,
+    revert_lane: HookRevertLane,
+    action: Action,
+    eager_state: Option<State>,
+}
+
+impl<Action, State> HookUpdateDispatchMetadata<Action, State> {
+    #[must_use]
+    pub fn new(lane: HookUpdateLane, action: Action) -> Self {
+        Self {
+            lane,
+            revert_lane: HookRevertLane::NO,
+            action,
+            eager_state: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_revert_lane(mut self, revert_lane: HookRevertLane) -> Self {
+        self.revert_lane = revert_lane;
+        self
+    }
+
+    #[must_use]
+    pub fn with_eager_state(mut self, eager_state: State) -> Self {
+        self.eager_state = Some(eager_state);
+        self
+    }
+
+    #[must_use]
+    pub const fn lane(&self) -> HookUpdateLane {
+        self.lane
+    }
+
+    #[must_use]
+    pub const fn revert_lane(&self) -> HookRevertLane {
+        self.revert_lane
+    }
+
+    #[must_use]
+    pub const fn action(&self) -> &Action {
+        &self.action
+    }
+
+    #[must_use]
+    pub const fn eager_state(&self) -> Option<&State> {
+        self.eager_state.as_ref()
+    }
+
+    #[must_use]
+    pub const fn has_eager_state(&self) -> bool {
+        self.eager_state.is_some()
+    }
+}
+
+impl<Action, State> From<HookUpdateDispatchMetadata<Action, State>> for HookUpdate<Action, State> {
+    fn from(metadata: HookUpdateDispatchMetadata<Action, State>) -> Self {
+        Self {
+            lane: metadata.lane,
+            revert_lane: metadata.revert_lane,
+            action: metadata.action,
+            eager_state: metadata.eager_state,
+            next: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HookQueue<State, ReducerId = (), DispatchId = ()> {
     pending: Option<HookUpdateId>,
     lanes: Lanes,
@@ -778,6 +847,13 @@ impl<State: Clone, Action, ReducerId, DispatchId>
 impl<State, Action, ReducerId, DispatchId> HookQueueStore<State, Action, ReducerId, DispatchId> {
     pub fn create_update(&mut self, lane: HookUpdateLane, action: Action) -> HookUpdateId {
         self.insert_update(HookUpdate::new(lane, action))
+    }
+
+    pub fn create_update_from_dispatch_metadata(
+        &mut self,
+        metadata: HookUpdateDispatchMetadata<Action, State>,
+    ) -> HookUpdateId {
+        self.insert_update(HookUpdate::from(metadata))
     }
 
     pub fn update(&self, id: HookUpdateId) -> Result<&HookUpdate<Action, State>, HookQueueError> {
@@ -1430,6 +1506,53 @@ mod tests {
         assert_eq!(result.remaining_lanes(), Lanes::NO);
         assert_eq!(result.eager_update_count(), 1);
         assert_eq!(reducer_calls, 0);
+    }
+
+    #[test]
+    fn eager_dispatch_metadata_rebases_deterministically() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let mut slot = store.create_state_slot(1);
+        let update = store.create_update_from_dispatch_metadata(
+            HookUpdateDispatchMetadata::new(lane(Lane::DEFAULT), 1000).with_eager_state(7),
+        );
+        store.append_pending_update(slot.queue(), update).unwrap();
+
+        let skipped = store
+            .process_update_queue(&mut slot, Lanes::SYNC, Lanes::SYNC, add)
+            .unwrap();
+        let rebased = store.update_ring(slot.base_queue()).unwrap();
+
+        assert_eq!(*skipped.memoized_state(), 1);
+        assert_eq!(skipped.skipped_update_count(), 1);
+        assert_eq!(skipped.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(rebased.len(), 1);
+        let rebased_update = store.update(rebased[0]).unwrap();
+        assert_eq!(rebased_update.lane().priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(rebased_update.revert_lane(), HookRevertLane::NO);
+        assert_eq!(*rebased_update.action(), 1000);
+        assert_eq!(rebased_update.eager_state(), Some(&7));
+
+        let mut reducer_calls = 0;
+        let applied = store
+            .process_update_queue(
+                &mut slot,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+                |state, action| {
+                    reducer_calls += 1;
+                    state + action
+                },
+            )
+            .unwrap();
+
+        assert_eq!(*applied.memoized_state(), 7);
+        assert_eq!(applied.applied_update_count(), 1);
+        assert_eq!(applied.eager_update_count(), 1);
+        assert_eq!(reducer_calls, 0);
+        assert_eq!(
+            store.update_ring(slot.base_queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
     }
 
     #[test]

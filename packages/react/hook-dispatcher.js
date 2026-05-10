@@ -102,6 +102,7 @@ const privateStateHookDispatcherMetadata = freezeRecord({
   compatibilityClaimed: false,
   exposesPublicHookImplementation: false,
   rendererIntegration: false,
+  schedulesPublicJsUpdates: false,
   hookNames: freezeArray(['useReducer', 'useState']),
   hookStateRecordFields: freezeArray([
     'memoizedState',
@@ -170,14 +171,27 @@ const privateStateHookDispatcherMetadata = freezeRecord({
     'revertedUpdateCount',
     'eagerUpdateCount'
   ]),
-  stateDispatchRequestFields: freezeArray(['dispatch', 'action', 'lane']),
+  stateDispatchEagerStateFields: freezeArray([
+    'lastRenderedState',
+    'eagerState'
+  ]),
+  stateDispatchRequestFields: freezeArray([
+    'dispatch',
+    'action',
+    'lane',
+    'revertLane',
+    'eagerState'
+  ]),
   stateDispatchRecordFields: freezeArray([
     'fiber',
     'queue',
     'dispatch',
     'update',
     'lane',
-    'action'
+    'revertLane',
+    'action',
+    'hasEagerState',
+    'eagerState'
   ]),
   reducerDispatchRequestFields: freezeArray(['dispatch', 'action', 'lane']),
   reducerDispatchRecordFields: freezeArray([
@@ -199,6 +213,7 @@ const privateStateHookDispatcherMetadata = freezeRecord({
     'FunctionComponentStateUpdateRenderLanes',
     'FunctionComponentStateUpdateRenderRecord',
     'FunctionComponentReducerUpdateRenderRecord',
+    'FunctionComponentStateDispatchEagerState',
     'FunctionComponentStateDispatchRequest',
     'FunctionComponentStateDispatchRecord',
     'FunctionComponentReducerDispatchRequest',
@@ -214,6 +229,7 @@ const privateStateHookDispatcherMetadataArrayKeys = freezeArray([
   'hookUpdateRecordFields',
   'stateUpdateRenderRecordFields',
   'reducerUpdateRenderRecordFields',
+  'stateDispatchEagerStateFields',
   'stateDispatchRequestFields',
   'stateDispatchRecordFields',
   'reducerDispatchRequestFields',
@@ -503,7 +519,8 @@ function isPrivateStateHookDispatcherMetadata(metadata) {
       privateStateHookDispatcherMetadata.compatibilityTarget ||
     metadata.compatibilityClaimed !== false ||
     metadata.exposesPublicHookImplementation !== false ||
-    metadata.rendererIntegration !== false
+    metadata.rendererIntegration !== false ||
+    metadata.schedulesPublicJsUpdates !== false
   ) {
     return false;
   }
