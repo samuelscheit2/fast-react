@@ -859,6 +859,54 @@ impl TestRendererUpdatedHostOutput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererHostParentPlacedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    commit: HostRootCommitRecord,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    previous_snapshot: TestContainerSnapshot,
+    snapshot: TestContainerSnapshot,
+    placed_text_snapshot: TestTextSnapshot,
+    host_parent_placement_apply_count: usize,
+}
+
+impl TestRendererHostParentPlacedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn previous_snapshot(&self) -> &TestContainerSnapshot {
+        &self.previous_snapshot
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+
+    #[must_use]
+    pub const fn placed_text_snapshot(&self) -> &TestTextSnapshot {
+        &self.placed_text_snapshot
+    }
+
+    #[must_use]
+    pub const fn host_parent_placement_apply_count(&self) -> usize {
+        self.host_parent_placement_apply_count
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererUnmountedHostOutput {
     render: HostRootRenderPhaseRecord,
     deleted_fibers: TestRendererHostOutputCanaryDeletedFibers,
@@ -1780,6 +1828,10 @@ pub enum TestRendererRootError {
     MissingCommittedHostOutput {
         operation: TestRendererRootUpdateKind,
     },
+    MissingHostParentPlacementApply {
+        parent_state_node_raw: u64,
+        child_state_node_raw: u64,
+    },
     UnexpectedHostOutputUpdateKind {
         expected: TestRendererRootUpdateKind,
         actual: TestRendererRootUpdateKind,
@@ -1809,6 +1861,13 @@ impl Display for TestRendererRootError {
                 "test-renderer host-output canary cannot {:?} without committed host output",
                 operation
             ),
+            Self::MissingHostParentPlacementApply {
+                parent_state_node_raw,
+                child_state_node_raw,
+            } => write!(
+                formatter,
+                "test-renderer host-output canary did not receive a host-parent placement apply record for parent state node {parent_state_node_raw} and child state node {child_state_node_raw}",
+            ),
             Self::UnexpectedHostOutputUpdateKind { expected, actual } => write!(
                 formatter,
                 "test-renderer host-output canary expected a {:?} update, found {:?}",
@@ -1833,6 +1892,7 @@ impl Error for TestRendererRootError {
             Self::FiberInspection(error) => Some(error),
             Self::MissingHostOutputFixture { .. }
             | Self::MissingCommittedHostOutput { .. }
+            | Self::MissingHostParentPlacementApply { .. }
             | Self::UnexpectedHostOutputUpdateKind { .. } => None,
         }
     }
@@ -2380,6 +2440,103 @@ impl TestRendererRoot {
         }))
     }
 
+    pub fn render_and_commit_host_parent_text_placement_for_canary(
+        &mut self,
+        text: impl Into<String>,
+    ) -> Result<TestRendererHostParentPlacedHostOutput, TestRendererRootError> {
+        let current = self.current_host_output.clone().ok_or(
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update,
+            },
+        )?;
+        let scheduled = self.schedule_root_update(
+            TestRendererRootUpdateKind::Update,
+            current.fixture.element,
+            None,
+        )?;
+        self.scheduled_updates.push(scheduled);
+        let render = self
+            .render_latest_scheduled_host_root_for_commit_handoff()?
+            .expect("host-parent placement canary schedules an update before rendering");
+        let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let placed_text = text.into();
+        let placed_text_props_raw =
+            self.next_host_parent_placement_text_props_raw_for_canary(&current);
+        let (next_fibers, placed_text_fiber, text_token) = self
+            .store
+            .prepare_test_renderer_host_parent_text_placement_canary_fibers(
+                render,
+                current.fibers,
+                placed_text_props_raw,
+            )?;
+
+        let container = self.container;
+        let root_context = self.renderer.root_host_context(&container)?;
+        let child_context = self.renderer.child_host_context(
+            &root_context,
+            &current.fixture.element_type,
+            &current.fixture.props,
+        )?;
+        let text_token_raw = text_token.raw();
+        let placed_text_instance = self.renderer.create_text_instance(
+            HostFiberTokenRef::new(
+                &text_token_raw,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            &placed_text,
+            &container,
+            &child_context,
+        )?;
+        let parent_state_node_raw = Self::instance_state_node_raw(current.instance);
+        let child_state_node_raw = Self::text_state_node_raw(placed_text_instance);
+        self.store
+            .finish_test_renderer_host_parent_text_placement_canary_fibers(
+                next_fibers,
+                placed_text_fiber,
+                child_state_node_raw,
+                placed_text_props_raw,
+            )?;
+
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+        let host_parent_placement_apply_count =
+            commit.test_only_host_parent_placement_apply_count_for_canary();
+        if !commit.has_test_only_host_parent_placement_apply_for_canary(
+            parent_state_node_raw,
+            child_state_node_raw,
+        ) {
+            return Err(TestRendererRootError::MissingHostParentPlacementApply {
+                parent_state_node_raw,
+                child_state_node_raw,
+            });
+        }
+
+        let mut parent = current.instance;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        self.renderer
+            .append_child(&mut parent, HostChild::Text(&placed_text_instance))?;
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+        let placed_text_snapshot = self.renderer.snapshot_text(&placed_text_instance)?;
+        self.current_host_output = Some(TestRendererCurrentHostOutput {
+            fixture: current.fixture,
+            fibers: next_fibers,
+            instance: parent,
+            text: current.text,
+        });
+
+        Ok(TestRendererHostParentPlacedHostOutput {
+            render,
+            commit,
+            commit_diagnostics,
+            previous_snapshot,
+            snapshot,
+            placed_text_snapshot,
+            host_parent_placement_apply_count,
+        })
+    }
+
     pub fn render_and_commit_host_output_unmount_for_canary(
         &mut self,
     ) -> Result<Option<TestRendererUnmountedHostOutput>, TestRendererRootError> {
@@ -2528,6 +2685,18 @@ impl TestRendererRoot {
             .get((element.raw() - 1) as usize)
             .filter(|fixture| fixture.element == element)
             .ok_or(TestRendererRootError::MissingHostOutputFixture { element })
+    }
+
+    fn next_host_parent_placement_text_props_raw_for_canary(
+        &self,
+        current: &TestRendererCurrentHostOutput,
+    ) -> u64 {
+        current
+            .fixture
+            .canary_fixture
+            .text_props_raw()
+            .saturating_add(self.renderer.texts.len() as u64)
+            .saturating_add(1000)
     }
 
     fn create_detached_host_output_for_canary(
@@ -3592,6 +3761,68 @@ mod tests {
             root.diagnostic_container_snapshot().unwrap(),
             snapshot.clone()
         );
+    }
+
+    #[test]
+    fn root_host_output_canary_applies_host_parent_text_placement_privately() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let placed = root
+            .render_and_commit_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+        let render = placed.render();
+        let commit = placed.commit();
+        let diagnostics = placed.commit_diagnostics();
+
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(render.current(), created.commit().current());
+        assert_eq!(render.resulting_element(), root_element(1));
+        assert_eq!(commit.previous_current(), created.commit().current());
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(placed.host_parent_placement_apply_count(), 1);
+        assert!(commit.has_test_only_host_parent_placement_apply_for_canary(1, 2));
+        assert_eq!(diagnostics.deletion_lists().len(), 0);
+        assert_eq!(diagnostics.mutation_records().len(), 1);
+        assert_eq!(
+            diagnostics.mutation_records()[0].kind(),
+            TestRendererHostOutputCanaryMutationKind::Placement
+        );
+        assert_eq!(diagnostics.mutation_records()[0].state_node_raw(), 2);
+        assert_eq!(diagnostics.mutation_records()[0].memoized_props_raw(), 1003);
+        assert_eq!(host_storage_counts(&root), (1, 1, 2));
+        assert_eq!(placed.placed_text_snapshot().text(), "inserted");
+
+        let TestNodeSnapshot::Element(previous) = &placed.previous_snapshot().children()[0] else {
+            panic!("expected previous host component");
+        };
+        assert_eq!(child_texts(previous), vec!["hello"]);
+        let TestNodeSnapshot::Element(element) = &placed.snapshot().children()[0] else {
+            panic!("expected placed host component");
+        };
+        assert_eq!(element.element_type().as_str(), "span");
+        assert_eq!(child_texts(element), vec!["hello", "inserted"]);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            placed.snapshot().clone()
+        );
+        assert_eq!(current_host_root_element(&root), root_element(1));
+
+        let inspection_error = root
+            .describe_committed_fiber_tree_for_canary(commit)
+            .unwrap_err();
+        assert!(matches!(
+            inspection_error,
+            TestRendererRootError::FiberInspection(_)
+        ));
     }
 
     #[test]
