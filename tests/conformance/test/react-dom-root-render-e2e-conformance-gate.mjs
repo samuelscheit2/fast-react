@@ -8,6 +8,10 @@ import {
   readCheckedReactDomRootRenderE2EOracle
 } from "../src/react-dom-root-render-e2e-oracle.mjs";
 import {
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS,
   evaluateReactDomRootRenderE2EConformanceGate
@@ -62,6 +66,58 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
       .privateReactDomMetadataPublicControlledInputCompatibilityClaimed,
     false
   );
+  assert.equal(
+    result.summary.privatePromotion503533RejectedRowCount,
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.length
+  );
+  assert.deepEqual(
+    result.privatePromotion503533Gate.rejectedPrivateMetadataIds,
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.map(
+      (row) => row.id
+    )
+  );
+  assert.equal(result.summary.privatePromotion503533CompatibilityClaimed, false);
+  assert.equal(
+    result.summary.privatePromotion503533PublicRootCompatibilitySurface,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicEventCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicResourceCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicFormCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privatePromotion503533PublicControlledInputCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privatePromotion503533PublicTestRendererCompatibilityClaimed,
+    false
+  );
+  assert.deepEqual(
+    result.privatePromotionRejectionRows503533.map((row) => row.workerId),
+    Array.from({ length: 31 }, (_, index) => String(503 + index))
+  );
 
   for (const row of result.privateReactDomMetadataDiagnosticRows) {
     assert.equal(
@@ -78,6 +134,31 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
     assert.equal(row.publicResourceCompatibilityClaimed, false);
     assert.equal(row.publicFormCompatibilityClaimed, false);
     assert.equal(row.publicControlledInputCompatibilityClaimed, false);
+  }
+
+  for (const row of result.privatePromotionRejectionRows503533) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS
+    );
+    assert.equal(row.admission, "accepted-private-diagnostic");
+    assert.equal(row.promotion, "rejected");
+    assert.equal(row.privateEvidenceOnly, true);
+    assert.equal(row.comparedToReactDomOracle, false);
+    assert.equal(row.comparedToReactTestRendererOracle, false);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.deepEqual(
+      row.blockedPublicCompatibilitySurfaces,
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES
+    );
+    for (const claimKey of REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS) {
+      assert.equal(row[claimKey], false, `${row.id} ${claimKey}`);
+      assert.equal(
+        row.publicCompatibilityClaims[claimKey],
+        false,
+        `${row.id} publicCompatibilityClaims.${claimKey}`
+      );
+    }
   }
 
   const developmentRows = Object.fromEntries(

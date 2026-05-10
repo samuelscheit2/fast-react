@@ -10,6 +10,9 @@ import {
 import {
   evaluateReactTestRendererErrorSurfaceLocalGate
 } from "../src/react-test-renderer-serialization-local-gate.mjs";
+import {
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS
+} from "../src/react-dom-root-render-e2e-conformance-gate.mjs";
 
 const require = createRequire(import.meta.url);
 const Module = require("node:module");
@@ -5419,6 +5422,35 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(getInstanceRecord, undefined);
   }
 }
+
+test("public promotion rows reject 503-533 private test-renderer compatibility", () => {
+  const testRendererRows =
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.filter(
+      (row) => row.primaryCompatibilityArea === "test-renderer"
+    );
+
+  assert.deepEqual(
+    testRendererRows.map((row) => row.workerId),
+    ["515", "516", "517", "518", "530"]
+  );
+
+  for (const row of testRendererRows) {
+    assert.equal(row.promotion, "rejected", row.id);
+    assert.equal(row.privateEvidenceOnly, true, row.id);
+    assert.equal(row.compatibilityClaimed, false, row.id);
+    assert.equal(row.publicTestRendererCompatibilityClaimed, false, row.id);
+    assert.equal(
+      row.publicCompatibilityClaims.publicTestRendererCompatibilityClaimed,
+      false,
+      row.id
+    );
+    assert.equal(row.comparedToReactTestRendererOracle, false, row.id);
+    assert.ok(
+      row.blockedPublicCompatibilitySurfaces.includes("test-renderer"),
+      row.id
+    );
+  }
+});
 
 function captureThrown(callback) {
   try {

@@ -24,6 +24,10 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS,
+  REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
@@ -193,6 +197,86 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
       .privateReactDomMetadataPublicControlledInputCompatibilityClaimed,
     false
   );
+  assert.equal(
+    gate.rootRenderGate.summary.privatePromotion503533RejectedRowCount,
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.length
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privatePromotion503533CompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicRootCompatibilitySurface,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicEventCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicResourceCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicFormCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicControlledInputCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privatePromotion503533PublicTestRendererCompatibilityClaimed,
+    false
+  );
+  assert.deepEqual(
+    gate.privatePromotionRejectionRows503533.map((row) => row.id),
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.map(
+      (row) => row.id
+    )
+  );
+  for (const row of gate.privatePromotionRejectionRows503533) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS
+    );
+    assert.equal(row.promotion, "rejected");
+    assert.equal(row.privateEvidenceOnly, true);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.deepEqual(
+      row.blockedPublicCompatibilitySurfaces,
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES
+    );
+    for (const claimKey of REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS) {
+      assert.equal(row[claimKey], false, `${row.id} ${claimKey}`);
+      assert.equal(
+        row.publicCompatibilityClaims[claimKey],
+        false,
+        `${row.id} publicCompatibilityClaims.${claimKey}`
+      );
+    }
+  }
   assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(
     gate.rootRenderGate.summary.privatePortalMetadataPromotesPublicRootRender,
@@ -1614,7 +1698,6 @@ test("React DOM public root facade remains blocked with hydration resource/form 
   assert.equal(record.canHydrate, false);
   assert.equal(record.publicRootCreated, false);
   assert.equal(record.eventsReplayed, false);
-
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,
     currentOracle: rootRenderOracle,
@@ -1637,6 +1720,81 @@ test("React DOM public root facade remains blocked with hydration resource/form 
     gate.rootRenderGate.summary
       .privateReactDomMetadataPublicFormCompatibilityClaimed,
     false
+  );
+});
+
+test("React DOM public root facade gate rejects accepted 503-533 private diagnostic promotion", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privatePromotion503533CompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicRootCompatibilitySurface = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicRenderCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicRootRenderCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicHydrationCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicEventCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicResourceCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicFormCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicControlledInputCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privatePromotion503533PublicTestRendererCompatibilityClaimed = true;
+  rootRenderGate.privatePromotion503533Gate.compatibilityClaimed = true;
+  rootRenderGate.privatePromotion503533Gate.publicTestRendererCompatibilityClaimed =
+    true;
+  rootRenderGate.privatePromotionRejectionRows503533[0] = {
+    ...rootRenderGate.privatePromotionRejectionRows503533[0],
+    compatibilityClaimed: true,
+    comparedToReactDomOracle: true,
+    promotion: "accepted",
+    publicCompatibilityClaims: {
+      ...rootRenderGate.privatePromotionRejectionRows503533[0]
+        .publicCompatibilityClaims,
+      publicRootCompatibilitySurface: true,
+      publicTestRendererCompatibilityClaimed: true
+    },
+    publicRootCompatibilitySurface: true,
+    publicTestRendererCompatibilityClaimed: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-promotion-503-533-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-promotion-503-533-gate-public-claim-leaked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-promotion-503-533-row-not-rejected"
+    )
   );
 });
 
