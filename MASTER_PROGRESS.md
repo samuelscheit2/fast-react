@@ -145,9 +145,21 @@ sequencing belong in `MASTER_PLAN.md`.
   for package directories, public resolver files, declaration-file presence,
   runtime export keys, and placeholder metadata, wired into `check:js` without
   dropping the benchmark gate.
+- Worker 167 React DOM private root bridge was merged, adding a private
+  JavaScript `root-bridge.js` shell for deterministic client-root
+  create/update/unmount records, private root owners and handles, hidden
+  WeakMap payloads for raw containers/elements/callbacks, and a focused smoke
+  test proving public `react-dom/client` root APIs remain placeholders with no
+  marker, listener, native, or Rust side effects.
 
 ## Latest Accepted Verification
 
+- Worker 167 was verified on its integrated worktree and again on `main` with
+  root-bridge and smoke-test syntax checks, the focused
+  `react-dom-private-root-bridge-shell` smoke test,
+  `npm run check:package-surface`, `npm run check:js` covering the package
+  guard, smoke imports, benchmark gate, workspace checks, and 428 conformance
+  tests, plus `git diff --check`.
 - Worker 165 was verified on its integrated worktree and again on `main` with
   `node --check tests/smoke/package-surface-guard.mjs`,
   `npm run check:package-surface`, `npm run check:js` covering the package
