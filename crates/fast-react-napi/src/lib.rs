@@ -20,6 +20,8 @@ mod root_bridge_requests {
     use std::error::Error;
     use std::fmt::{self, Display, Formatter};
 
+    use serde_json::{Map, Value};
+
     use crate::handle_table::{
         BridgeEnvironmentId, BridgeHandle, BridgeHandleAdmissionOutcome, BridgeHandleTable,
         BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
@@ -585,6 +587,78 @@ mod root_bridge_requests {
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonTransportParserGate {
+        transport: &'static str,
+        schema_version: u32,
+        request_records: Vec<NativeRootBridgeJsonTransportRecord>,
+        admission_smoke: NativeRootBridgeHandleTableAdmissionSmoke,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+    }
+
+    impl NativeRootBridgeJsonTransportParserGate {
+        #[must_use]
+        pub(crate) fn transport(&self) -> &'static str {
+            self.transport
+        }
+
+        #[must_use]
+        pub(crate) fn schema_version(&self) -> u32 {
+            self.schema_version
+        }
+
+        #[must_use]
+        pub(crate) fn request_records(&self) -> &[NativeRootBridgeJsonTransportRecord] {
+            &self.request_records
+        }
+
+        #[must_use]
+        pub(crate) fn admission_smoke(&self) -> &NativeRootBridgeHandleTableAdmissionSmoke {
+            &self.admission_smoke
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeJsonTransportValueKind {
+        Null,
+        Boolean,
+        Number,
+        String,
+        Array,
+        Object,
+    }
+
+    impl NativeRootBridgeJsonTransportValueKind {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::Null => "null",
+                Self::Boolean => "boolean",
+                Self::Number => "number",
+                Self::String => "string",
+                Self::Array => "array",
+                Self::Object => "object",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeRequestError {
         HandleTable(BridgeHandleTableError),
         RecordEnvironmentMismatch {
@@ -746,6 +820,126 @@ mod root_bridge_requests {
     }
 
     impl Error for NativeRootBridgeRequestError {}
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeJsonTransportParseError {
+        InvalidJson {
+            line: usize,
+            column: usize,
+        },
+        ExpectedObject {
+            path: String,
+            actual: NativeRootBridgeJsonTransportValueKind,
+        },
+        MissingField {
+            path: String,
+            field: &'static str,
+        },
+        UnexpectedField {
+            path: String,
+            field: String,
+        },
+        InvalidFieldType {
+            path: String,
+            expected: &'static str,
+            actual: NativeRootBridgeJsonTransportValueKind,
+        },
+        UnsupportedFieldValue {
+            path: String,
+            expected: &'static str,
+            actual: String,
+        },
+        Validation(NativeRootBridgeRequestError),
+    }
+
+    impl NativeRootBridgeJsonTransportParseError {
+        #[must_use]
+        pub(crate) const fn code(&self) -> &'static str {
+            match self {
+                Self::InvalidJson { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_JSON"
+                }
+                Self::ExpectedObject { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT"
+                }
+                Self::MissingField { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_MISSING_FIELD"
+                }
+                Self::UnexpectedField { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNEXPECTED_FIELD"
+                }
+                Self::InvalidFieldType { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_FIELD_TYPE"
+                }
+                Self::UnsupportedFieldValue { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE"
+                }
+                Self::Validation(error) => error.code(),
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn source_error_code(&self) -> Option<&'static str> {
+            match self {
+                Self::Validation(error) => Some(error.code()),
+                _ => None,
+            }
+        }
+    }
+
+    impl Display for NativeRootBridgeJsonTransportParseError {
+        fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::InvalidJson { line, column } => write!(
+                    formatter,
+                    "native root bridge JSON transport payload is invalid JSON at line {line}, column {column}"
+                ),
+                Self::ExpectedObject { path, actual } => write!(
+                    formatter,
+                    "native root bridge JSON transport expected object at {path}, got {}",
+                    actual.code()
+                ),
+                Self::MissingField { path, field } => write!(
+                    formatter,
+                    "native root bridge JSON transport object at {path} is missing required field {field}"
+                ),
+                Self::UnexpectedField { path, field } => write!(
+                    formatter,
+                    "native root bridge JSON transport object at {path} has unexpected field {field}"
+                ),
+                Self::InvalidFieldType {
+                    path,
+                    expected,
+                    actual,
+                } => write!(
+                    formatter,
+                    "native root bridge JSON transport field {path} expected {expected}, got {}",
+                    actual.code()
+                ),
+                Self::UnsupportedFieldValue {
+                    path,
+                    expected,
+                    actual,
+                } => write!(
+                    formatter,
+                    "native root bridge JSON transport field {path} has unsupported value {actual}, expected {expected}"
+                ),
+                Self::Validation(error) => write!(
+                    formatter,
+                    "native root bridge JSON transport failed validation: {error}"
+                ),
+            }
+        }
+    }
+
+    impl Error for NativeRootBridgeJsonTransportParseError {
+        fn source(&self) -> Option<&(dyn Error + 'static)> {
+            match self {
+                Self::Validation(error) => Some(error),
+                _ => None,
+            }
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub(crate) struct NativeRootBridgeRequestSequenceValidator {
@@ -1017,6 +1211,38 @@ mod root_bridge_requests {
         smoke_admit_js_native_root_bridge_handoff_records(&requests)
     }
 
+    pub(crate) fn parse_native_root_bridge_json_transport_for_gate(
+        json: &str,
+    ) -> Result<NativeRootBridgeJsonTransportParserGate, NativeRootBridgeJsonTransportParseError>
+    {
+        let value = serde_json::from_str::<Value>(json).map_err(|error| {
+            NativeRootBridgeJsonTransportParseError::InvalidJson {
+                line: error.line(),
+                column: error.column(),
+            }
+        })?;
+        let envelope = parse_json_transport_envelope(&value)?;
+        let admission_smoke =
+            smoke_admit_js_native_root_bridge_json_transport_records(&envelope.request_records)
+                .map_err(NativeRootBridgeJsonTransportParseError::Validation)?;
+
+        Ok(NativeRootBridgeJsonTransportParserGate {
+            transport: envelope.transport,
+            schema_version: envelope.schema_version,
+            request_records: envelope.request_records,
+            admission_smoke,
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+        })
+    }
+
+    struct ParsedJsonTransportEnvelope {
+        transport: &'static str,
+        schema_version: u32,
+        request_records: Vec<NativeRootBridgeJsonTransportRecord>,
+    }
+
     fn admit_js_native_root_bridge_handoff_record(
         table: &mut BridgeHandleTable,
         request: NativeRootBridgeRequestRecord,
@@ -1273,6 +1499,354 @@ mod root_bridge_requests {
 
         table.get_value(value_handle)?;
         Ok(true)
+    }
+
+    fn parse_json_transport_envelope(
+        value: &Value,
+    ) -> Result<ParsedJsonTransportEnvelope, NativeRootBridgeJsonTransportParseError> {
+        let object = expect_exact_json_object(
+            value,
+            "$",
+            super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS,
+        )?;
+        let transport = expect_exact_string_value(
+            expect_json_field(
+                object,
+                "$",
+                super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS[0],
+            )?,
+            "$.transport",
+            super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT,
+        )?;
+        let schema_version = expect_exact_schema_version(expect_json_field(
+            object,
+            "$",
+            super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS[1],
+        )?)?;
+        let request_records = expect_json_array(
+            expect_json_field(
+                object,
+                "$",
+                super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS[2],
+            )?,
+            "$.requestRecords",
+        )?
+        .iter()
+        .enumerate()
+        .map(|(index, record)| parse_json_transport_record(record, index))
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ParsedJsonTransportEnvelope {
+            transport,
+            schema_version,
+            request_records,
+        })
+    }
+
+    fn parse_json_transport_record(
+        value: &Value,
+        index: usize,
+    ) -> Result<NativeRootBridgeJsonTransportRecord, NativeRootBridgeJsonTransportParseError> {
+        let path = format!("$.requestRecords[{index}]");
+        let object = expect_exact_json_object(
+            value,
+            &path,
+            super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS,
+        )?;
+        let request_id = expect_positive_u64(
+            expect_json_field(
+                object,
+                &path,
+                super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[0],
+            )?,
+            &format!("{path}.request_id"),
+        )?;
+        let kind = expect_string_code(
+            expect_json_field(
+                object,
+                &path,
+                super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[1],
+            )?,
+            &format!("{path}.kind"),
+            super::NATIVE_ROOT_BRIDGE_REQUEST_KIND_CODES,
+        )?;
+        let environment_id = expect_positive_u64(
+            expect_json_field(
+                object,
+                &path,
+                super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[2],
+            )?,
+            &format!("{path}.environment_id"),
+        )?;
+        let root_handle = parse_json_transport_handle(
+            expect_json_field(
+                object,
+                &path,
+                super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[3],
+            )?,
+            &format!("{path}.root_handle"),
+        )?;
+        let root_id = expect_positive_u64(
+            expect_json_field(
+                object,
+                &path,
+                super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[4],
+            )?,
+            &format!("{path}.root_id"),
+        )?;
+        let value_handle_value = expect_json_field(
+            object,
+            &path,
+            super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[5],
+        )?;
+        let value_handle = if value_handle_value.is_null() {
+            None
+        } else {
+            Some(parse_json_transport_handle(
+                value_handle_value,
+                &format!("{path}.value_handle"),
+            )?)
+        };
+        let root_handle_state = expect_string_code(
+            expect_json_field(
+                object,
+                &path,
+                super::NATIVE_ROOT_BRIDGE_RUST_REQUEST_RECORD_FIELDS[6],
+            )?,
+            &format!("{path}.root_handle_state"),
+            super::NATIVE_ROOT_BRIDGE_ROOT_HANDLE_STATE_CODES,
+        )?;
+
+        Ok(NativeRootBridgeJsonTransportRecord::new(
+            request_id,
+            kind,
+            environment_id,
+            root_handle,
+            root_id,
+            value_handle,
+            root_handle_state,
+        ))
+    }
+
+    fn parse_json_transport_handle(
+        value: &Value,
+        path: &str,
+    ) -> Result<NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportParseError> {
+        let object =
+            expect_exact_json_object(value, path, super::NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS)?;
+        let environment_id = expect_positive_u64(
+            expect_json_field(
+                object,
+                path,
+                super::NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS[0],
+            )?,
+            &format!("{path}.environment_id"),
+        )?;
+        let slot = expect_positive_u64(
+            expect_json_field(
+                object,
+                path,
+                super::NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS[1],
+            )?,
+            &format!("{path}.slot"),
+        )?;
+        let generation = expect_positive_u64(
+            expect_json_field(
+                object,
+                path,
+                super::NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS[2],
+            )?,
+            &format!("{path}.generation"),
+        )?;
+        let kind = expect_string_code(
+            expect_json_field(
+                object,
+                path,
+                super::NATIVE_ROOT_BRIDGE_RUST_HANDLE_FIELDS[3],
+            )?,
+            &format!("{path}.kind"),
+            super::NATIVE_ROOT_BRIDGE_HANDLE_KIND_CODES,
+        )?;
+
+        Ok(NativeRootBridgeJsonTransportHandle::new(
+            environment_id,
+            slot,
+            generation,
+            kind,
+        ))
+    }
+
+    fn expect_exact_json_object<'a>(
+        value: &'a Value,
+        path: &str,
+        expected_fields: &[&'static str],
+    ) -> Result<&'a Map<String, Value>, NativeRootBridgeJsonTransportParseError> {
+        let Value::Object(object) = value else {
+            return Err(NativeRootBridgeJsonTransportParseError::ExpectedObject {
+                path: path.to_owned(),
+                actual: json_transport_value_kind(value),
+            });
+        };
+
+        for field in expected_fields {
+            if !object.contains_key(*field) {
+                return Err(NativeRootBridgeJsonTransportParseError::MissingField {
+                    path: path.to_owned(),
+                    field,
+                });
+            }
+        }
+
+        if let Some(field) = object
+            .keys()
+            .find(|field| !expected_fields.contains(&field.as_str()))
+        {
+            return Err(NativeRootBridgeJsonTransportParseError::UnexpectedField {
+                path: path.to_owned(),
+                field: field.clone(),
+            });
+        }
+
+        Ok(object)
+    }
+
+    fn expect_json_field<'a>(
+        object: &'a Map<String, Value>,
+        path: &str,
+        field: &'static str,
+    ) -> Result<&'a Value, NativeRootBridgeJsonTransportParseError> {
+        object
+            .get(field)
+            .ok_or_else(|| NativeRootBridgeJsonTransportParseError::MissingField {
+                path: path.to_owned(),
+                field,
+            })
+    }
+
+    fn expect_json_array<'a>(
+        value: &'a Value,
+        path: &str,
+    ) -> Result<&'a [Value], NativeRootBridgeJsonTransportParseError> {
+        match value {
+            Value::Array(items) => Ok(items),
+            _ => Err(NativeRootBridgeJsonTransportParseError::InvalidFieldType {
+                path: path.to_owned(),
+                expected: "array",
+                actual: json_transport_value_kind(value),
+            }),
+        }
+    }
+
+    fn expect_positive_u64(
+        value: &Value,
+        path: &str,
+    ) -> Result<u64, NativeRootBridgeJsonTransportParseError> {
+        let Some(number) = value.as_u64() else {
+            return Err(NativeRootBridgeJsonTransportParseError::InvalidFieldType {
+                path: path.to_owned(),
+                expected: "positive integer",
+                actual: json_transport_value_kind(value),
+            });
+        };
+
+        if number > 0 {
+            return Ok(number);
+        }
+
+        Err(
+            NativeRootBridgeJsonTransportParseError::UnsupportedFieldValue {
+                path: path.to_owned(),
+                expected: "positive integer",
+                actual: number.to_string(),
+            },
+        )
+    }
+
+    fn expect_exact_schema_version(
+        value: &Value,
+    ) -> Result<u32, NativeRootBridgeJsonTransportParseError> {
+        let Some(number) = value.as_u64() else {
+            return Err(NativeRootBridgeJsonTransportParseError::InvalidFieldType {
+                path: "$.schemaVersion".to_owned(),
+                expected: "integer",
+                actual: json_transport_value_kind(value),
+            });
+        };
+
+        if number == u64::from(super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION) {
+            return Ok(super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION);
+        }
+
+        Err(
+            NativeRootBridgeJsonTransportParseError::UnsupportedFieldValue {
+                path: "$.schemaVersion".to_owned(),
+                expected: "1",
+                actual: number.to_string(),
+            },
+        )
+    }
+
+    fn expect_exact_string_value(
+        value: &Value,
+        path: &str,
+        expected: &'static str,
+    ) -> Result<&'static str, NativeRootBridgeJsonTransportParseError> {
+        let Some(actual) = value.as_str() else {
+            return Err(NativeRootBridgeJsonTransportParseError::InvalidFieldType {
+                path: path.to_owned(),
+                expected: "string",
+                actual: json_transport_value_kind(value),
+            });
+        };
+
+        if actual == expected {
+            return Ok(expected);
+        }
+
+        Err(
+            NativeRootBridgeJsonTransportParseError::UnsupportedFieldValue {
+                path: path.to_owned(),
+                expected,
+                actual: actual.to_owned(),
+            },
+        )
+    }
+
+    fn expect_string_code(
+        value: &Value,
+        path: &str,
+        codes: &[&'static str],
+    ) -> Result<&'static str, NativeRootBridgeJsonTransportParseError> {
+        let Some(actual) = value.as_str() else {
+            return Err(NativeRootBridgeJsonTransportParseError::InvalidFieldType {
+                path: path.to_owned(),
+                expected: "string",
+                actual: json_transport_value_kind(value),
+            });
+        };
+
+        codes
+            .iter()
+            .copied()
+            .find(|code| *code == actual)
+            .ok_or_else(
+                || NativeRootBridgeJsonTransportParseError::UnsupportedFieldValue {
+                    path: path.to_owned(),
+                    expected: "known code",
+                    actual: actual.to_owned(),
+                },
+            )
+    }
+
+    fn json_transport_value_kind(value: &Value) -> NativeRootBridgeJsonTransportValueKind {
+        match value {
+            Value::Null => NativeRootBridgeJsonTransportValueKind::Null,
+            Value::Bool(_) => NativeRootBridgeJsonTransportValueKind::Boolean,
+            Value::Number(_) => NativeRootBridgeJsonTransportValueKind::Number,
+            Value::String(_) => NativeRootBridgeJsonTransportValueKind::String,
+            Value::Array(_) => NativeRootBridgeJsonTransportValueKind::Array,
+            Value::Object(_) => NativeRootBridgeJsonTransportValueKind::Object,
+        }
     }
 
     fn decode_json_transport_request_kind(
@@ -1706,6 +2280,8 @@ pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_STATUS: &str =
     "mirrored-native-root-bridge-rust-handle-table-admission-smoke";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS: &str =
     "smoked-native-root-bridge-js-to-rust-json-transport";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSER_GATE_STATUS: &str =
+    "parsed-native-root-bridge-json-transport-schema";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT: &str = "json";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION: u32 = 1;
 pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS: &str =
@@ -1794,6 +2370,14 @@ pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_RECORD_FIELDS: &[&str] = &[
     "host_output_produced",
     "public_create_update_unmount_available",
     "compatibility_claimed",
+];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSE_ERROR_CODES: &[&str] = &[
+    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_JSON",
+    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT",
+    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_MISSING_FIELD",
+    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNEXPECTED_FIELD",
+    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_FIELD_TYPE",
+    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2188,11 +2772,13 @@ mod tests {
     };
     use crate::root_bridge_requests::{
         NativeRootBridgeCreateRequest, NativeRootBridgeHandleAdmissionAction,
-        NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportRecord,
+        NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportParseError,
+        NativeRootBridgeJsonTransportRecord, NativeRootBridgeJsonTransportValueKind,
         NativeRootBridgeLifecycleTransition, NativeRootBridgeRenderRequest,
         NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
+        parse_native_root_bridge_json_transport_for_gate,
         smoke_admit_js_native_root_bridge_handoff_records,
         smoke_admit_js_native_root_bridge_json_transport_records,
     };
@@ -3022,6 +3608,169 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_json_transport_parser_gate_accepts_schema_and_admits_handles() {
+        let json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":435,"root_handle":{"environment_id":435,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":435,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":435,"root_handle":{"environment_id":435,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":435,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":435,"root_handle":{"environment_id":435,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+
+        let gate = parse_native_root_bridge_json_transport_for_gate(json).unwrap();
+        let admission_records = gate.admission_smoke().admission_records();
+        let validation_records = gate.admission_smoke().validation_records();
+
+        assert_eq!(gate.transport(), "json");
+        assert_eq!(gate.schema_version(), 1);
+        assert_eq!(gate.request_records().len(), 3);
+        assert!(!gate.native_execution());
+        assert!(!gate.renderer_execution());
+        assert!(!gate.reconciler_execution());
+        assert_eq!(
+            gate.admission_smoke().environment_id(),
+            BridgeEnvironmentId::from_raw(435)
+        );
+        assert_eq!(gate.admission_smoke().root_id(), Some(1));
+        assert!(gate.admission_smoke().root_retired());
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_action().code())
+                .collect::<Vec<_>>(),
+            [
+                "admit-root-handle",
+                "validate-active-root-handle",
+                "retire-root-handle"
+            ]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [1, 1, 2]
+        );
+        assert_eq!(
+            validation_records
+                .iter()
+                .map(|record| record.kind().code())
+                .collect::<Vec<_>>(),
+            ["create", "render", "unmount"]
+        );
+        assert_eq!(
+            admission_records[2].retired_root_source_error_code(),
+            Some("FAST_REACT_NAPI_STALE_HANDLE")
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_json_transport_parser_gate_reports_deterministic_parse_errors() {
+        let invalid_json = parse_native_root_bridge_json_transport_for_gate("{").unwrap_err();
+        assert_eq!(
+            invalid_json.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_JSON"
+        );
+        assert!(matches!(
+            invalid_json,
+            NativeRootBridgeJsonTransportParseError::InvalidJson { .. }
+        ));
+        assert_eq!(invalid_json.source_error_code(), None);
+
+        let expected_object = parse_native_root_bridge_json_transport_for_gate("[]").unwrap_err();
+        assert_eq!(
+            expected_object,
+            NativeRootBridgeJsonTransportParseError::ExpectedObject {
+                path: "$".to_owned(),
+                actual: NativeRootBridgeJsonTransportValueKind::Array
+            }
+        );
+        assert_eq!(
+            expected_object.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT"
+        );
+
+        let missing_field = parse_native_root_bridge_json_transport_for_gate(
+            r#"{"transport":"json","schemaVersion":1}"#,
+        )
+        .unwrap_err();
+        assert_eq!(
+            missing_field,
+            NativeRootBridgeJsonTransportParseError::MissingField {
+                path: "$".to_owned(),
+                field: "requestRecords"
+            }
+        );
+        assert_eq!(
+            missing_field.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_MISSING_FIELD"
+        );
+
+        let unexpected_field = parse_native_root_bridge_json_transport_for_gate(
+            r#"{"transport":"json","schemaVersion":1,"requestRecords":[],"extra":true}"#,
+        )
+        .unwrap_err();
+        assert_eq!(
+            unexpected_field,
+            NativeRootBridgeJsonTransportParseError::UnexpectedField {
+                path: "$".to_owned(),
+                field: "extra".to_owned()
+            }
+        );
+        assert_eq!(
+            unexpected_field.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNEXPECTED_FIELD"
+        );
+
+        let wrong_records_type = parse_native_root_bridge_json_transport_for_gate(
+            r#"{"transport":"json","schemaVersion":1,"requestRecords":{}}"#,
+        )
+        .unwrap_err();
+        assert_eq!(
+            wrong_records_type,
+            NativeRootBridgeJsonTransportParseError::InvalidFieldType {
+                path: "$.requestRecords".to_owned(),
+                expected: "array",
+                actual: NativeRootBridgeJsonTransportValueKind::Object
+            }
+        );
+        assert_eq!(
+            wrong_records_type.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_FIELD_TYPE"
+        );
+
+        let wrong_transport = parse_native_root_bridge_json_transport_for_gate(
+            r#"{"transport":"binary","schemaVersion":1,"requestRecords":[]}"#,
+        )
+        .unwrap_err();
+        assert_eq!(
+            wrong_transport,
+            NativeRootBridgeJsonTransportParseError::UnsupportedFieldValue {
+                path: "$.transport".to_owned(),
+                expected: "json",
+                actual: "binary".to_owned()
+            }
+        );
+        assert_eq!(
+            wrong_transport.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE"
+        );
+
+        let unknown_kind =
+            parse_native_root_bridge_json_transport_for_gate(
+                r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"hydrate","environment_id":435,"root_handle":{"environment_id":435,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+            )
+            .unwrap_err();
+        assert_eq!(
+            unknown_kind,
+            NativeRootBridgeJsonTransportParseError::UnsupportedFieldValue {
+                path: "$.requestRecords[0].kind".to_owned(),
+                expected: "known code",
+                actual: "hydrate".to_owned()
+            }
+        );
+        assert_eq!(
+            unknown_kind.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE"
+        );
+        assert!(!unknown_kind.to_string().contains("React behavior"));
+    }
+
+    #[test]
     fn native_root_bridge_js_request_shape_metadata_matches_handle_validation_model() {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS,
@@ -3038,6 +3787,10 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS,
             "smoked-native-root-bridge-js-to-rust-json-transport"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSER_GATE_STATUS,
+            "parsed-native-root-bridge-json-transport-schema"
         );
         assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT, "json");
         assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION, 1);
@@ -3151,6 +3904,17 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS,
             &["transport", "schemaVersion", "requestRecords"]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_PARSE_ERROR_CODES,
+            &[
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_JSON",
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT",
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_MISSING_FIELD",
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNEXPECTED_FIELD",
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_FIELD_TYPE",
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE"
+            ]
         );
         assert_eq!(
             TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS,

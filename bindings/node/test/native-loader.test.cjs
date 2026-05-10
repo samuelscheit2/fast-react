@@ -211,6 +211,49 @@ const expectedNativeRootBridgeRequestShape = {
       'generation',
       'kind'
     ],
+    parserGate: {
+      parserGateStatus: 'parsed-native-root-bridge-json-transport-schema',
+      transport: 'json',
+      schemaVersion: 1,
+      jsonTransportEnvelopeFields: [
+        'transport',
+        'schemaVersion',
+        'requestRecords'
+      ],
+      jsonTransportRequestRecordFields: [
+        'request_id',
+        'kind',
+        'environment_id',
+        'root_handle',
+        'root_id',
+        'value_handle',
+        'root_handle_state'
+      ],
+      jsonTransportHandleFields: [
+        'environment_id',
+        'slot',
+        'generation',
+        'kind'
+      ],
+      parseErrorCodes: {
+        expectedObject:
+          'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_EXPECTED_OBJECT',
+        invalidFieldType:
+          'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_FIELD_TYPE',
+        invalidJson:
+          'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_JSON',
+        missingField:
+          'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_MISSING_FIELD',
+        unexpectedField:
+          'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNEXPECTED_FIELD',
+        unsupportedFieldValue:
+          'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE'
+      },
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rendererExecution: false,
+      reconcilerExecution: false
+    },
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -338,6 +381,15 @@ for (const shapeValue of [
     .jsonTransportRequestRecordFields,
   native.nativeRootBridgeRequestShape.jsonTransportSmoke
     .jsonTransportHandleFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .jsonTransportEnvelopeFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .jsonTransportRequestRecordFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .jsonTransportHandleFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .parseErrorCodes,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -904,6 +956,7 @@ function assertNativeRootBridgeJsonTransportSmoke(smoke, expected) {
     native.nativeRootBridgeRequestShape.jsonTransportSmoke
       .jsonTransportHandleFields
   );
+  assertNativeRootBridgeJsonTransportParserGate(smoke.parserGate, expected);
 
   const envelope = JSON.parse(smoke.json);
   assert.deepEqual(Object.keys(envelope), [
@@ -973,6 +1026,99 @@ function assertNativeRootBridgeJsonTransportSmoke(smoke, expected) {
     smoke.rustHandleTableAdmissionSmoke,
     expected
   );
+}
+
+function assertNativeRootBridgeJsonTransportParserGate(parserGate, expected) {
+  assert.equal(Object.isFrozen(parserGate), true);
+  assert.equal(Object.isFrozen(parserGate.decodedRequestRecords), true);
+  assert.equal(Object.isFrozen(parserGate.deterministicParseErrors), true);
+  assert.equal(
+    parserGate.parserGateStatus,
+    'parsed-native-root-bridge-json-transport-schema'
+  );
+  assert.equal(parserGate.transport, 'json');
+  assert.equal(parserGate.schemaVersion, 1);
+  assert.equal(parserGate.requestCount, 3);
+  assert.equal(parserGate.nativeAddonLoaded, false);
+  assert.equal(parserGate.nativeExecution, false);
+  assert.equal(parserGate.rendererExecution, false);
+  assert.equal(parserGate.reconcilerExecution, false);
+  assert.equal(
+    parserGate.jsonTransportEnvelopeFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .jsonTransportEnvelopeFields
+  );
+  assert.equal(
+    parserGate.jsonTransportRequestRecordFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .jsonTransportRequestRecordFields
+  );
+  assert.equal(
+    parserGate.jsonTransportHandleFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .jsonTransportHandleFields
+  );
+  assert.equal(
+    parserGate.parseErrorCodes,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .parseErrorCodes
+  );
+  assert.deepEqual(
+    parserGate.decodedRequestRecords.map((record) => record.kind),
+    ['create', 'render', 'unmount']
+  );
+  assert.deepEqual(parserGate.decodedRequestRecords[0], {
+    requestId: 1,
+    kind: 'create',
+    environmentId: expected.environmentId,
+    rootHandle: {
+      environmentId: expected.environmentId,
+      generation: 1,
+      kind: 'root',
+      slot: expected.rootSlot
+    },
+    rootId: expected.rootId,
+    valueHandle: {
+      environmentId: expected.environmentId,
+      generation: 1,
+      kind: 'value',
+      slot: 2
+    },
+    rootHandleState: 'active'
+  });
+  assert.deepEqual(
+    parserGate.deterministicParseErrors.map((error) => error.id),
+    [
+      'invalid-json',
+      'non-object-envelope',
+      'missing-request-records',
+      'unexpected-envelope-field',
+      'request-records-not-array',
+      'unsupported-transport',
+      'unknown-request-kind'
+    ]
+  );
+  assert.deepEqual(
+    parserGate.deterministicParseErrors.map((error) => error.code),
+    [
+      parserGate.parseErrorCodes.invalidJson,
+      parserGate.parseErrorCodes.expectedObject,
+      parserGate.parseErrorCodes.missingField,
+      parserGate.parseErrorCodes.unexpectedField,
+      parserGate.parseErrorCodes.invalidFieldType,
+      parserGate.parseErrorCodes.unsupportedFieldValue,
+      parserGate.parseErrorCodes.unsupportedFieldValue
+    ]
+  );
+  for (const error of parserGate.deterministicParseErrors) {
+    assert.equal(Object.isFrozen(error), true);
+    assert.equal(Object.isFrozen(error.details), true);
+    assert.equal(error.name, 'FastReactNativeJsonTransportParserError');
+    assert.equal(error.nativeAddonLoaded, false);
+    assert.equal(error.nativeExecution, false);
+    assert.equal(error.rendererExecution, false);
+    assert.equal(error.reconcilerExecution, false);
+  }
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {
