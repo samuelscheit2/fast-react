@@ -62,10 +62,10 @@ use crate::{
         ContextProviderBeginWorkRequest, ContextProviderUseContextBeginWorkRecord,
         ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
         ContextProviderUseContextSingleChildBeginWorkRecord,
-        FunctionComponentSingleChildBeginWorkRecord, HostRootOneLevelChildSet,
-        HostRootOneLevelChildSetBeginWorkError, HostRootOneLevelChildSetBeginWorkRecord,
-        HostRootOneLevelChildSetEntry, HostRootOneLevelChildSetKind,
-        NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
+        FunctionComponentSingleChildBeginWorkRecord, FunctionComponentUseStateBeginWorkRecord,
+        HostRootOneLevelChildSet, HostRootOneLevelChildSetBeginWorkError,
+        HostRootOneLevelChildSetBeginWorkRecord, HostRootOneLevelChildSetEntry,
+        HostRootOneLevelChildSetKind, NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
         UnsupportedActivityChildShapeKind, UnsupportedOffscreenChildShapeKind,
         UnsupportedSuspenseChildShapeKind, UnsupportedSuspenseListChildShapeKind,
         UnsupportedThenableIdentityClass, UnsupportedThenableRetryQueueKind,
@@ -74,7 +74,7 @@ use crate::{
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
         begin_work_host_root_one_level_child_set,
         begin_work_nested_context_provider_two_consumer_use_context_children,
-        begin_work_reconcile_function_component_single_child,
+        begin_work_reconcile_function_component_single_child, begin_work_with_use_state,
     },
     complete_work::{
         ContextProviderStackRestorationError, ContextProviderStackRestorationPhase,
@@ -90,14 +90,12 @@ use crate::{
         FunctionComponentContextChangePropagationError,
         FunctionComponentContextChangePropagationRecord,
         FunctionComponentContextChangePropagationRequest, FunctionComponentHookRenderStore,
-        FunctionComponentRenderError, FunctionComponentSingleChildOutput,
-        FunctionComponentSingleChildOutputResolver,
+        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
         FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
-        FunctionComponentStateUpdateRenderLanes, FunctionComponentUseStateRenderRecord,
-        FunctionComponentUseStateRenderRequest,
+        FunctionComponentStateUpdateRenderLanes, FunctionComponentUseStateRenderRequest,
         propagate_context_change_to_function_component_dependencies,
-        reconcile_function_component_single_child_output, render_function_component_with_use_state,
+        reconcile_function_component_single_child_output,
     },
     host_work::{
         HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
@@ -1773,18 +1771,18 @@ impl HostRootFunctionComponentSingleChildCompleteWorkHandoffRecord {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct HostRootFunctionComponentUseStateHostTextCommitHandoffRecord {
+struct HostRootFunctionComponentUseStateHostChildCommitHandoffRecord {
     root: FiberRootId,
     host_root_work_in_progress: FiberId,
     original_root_element: RootElementHandle,
     function_component: FiberId,
-    use_state_render: FunctionComponentUseStateRenderRecord,
+    use_state_begin_work: FunctionComponentUseStateBeginWorkRecord,
     single_child: FunctionComponentSingleChildReconciliationRecord,
     complete_commit: HostRootCompleteWorkCommitHandoffRecord,
 }
 
 #[cfg(test)]
-impl HostRootFunctionComponentUseStateHostTextCommitHandoffRecord {
+impl HostRootFunctionComponentUseStateHostChildCommitHandoffRecord {
     #[must_use]
     const fn root(&self) -> FiberRootId {
         self.root
@@ -1806,8 +1804,8 @@ impl HostRootFunctionComponentUseStateHostTextCommitHandoffRecord {
     }
 
     #[must_use]
-    const fn use_state_render(&self) -> FunctionComponentUseStateRenderRecord {
-        self.use_state_render
+    const fn use_state_begin_work(&self) -> FunctionComponentUseStateBeginWorkRecord {
+        self.use_state_begin_work
     }
 
     #[must_use]
@@ -1967,9 +1965,9 @@ impl From<HostRootCompleteWorkHandoffError>
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum HostRootFunctionComponentUseStateHostTextCommitHandoffError {
+enum HostRootFunctionComponentUseStateHostChildCommitHandoffError {
+    BeginWork(BeginWorkError),
     CompleteWork(HostRootCompleteWorkHandoffError),
-    FunctionComponentRender(FunctionComponentRenderError),
     FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
     FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
     MissingFunctionComponentChild {
@@ -1988,11 +1986,6 @@ enum HostRootFunctionComponentUseStateHostTextCommitHandoffError {
         function_component: FiberId,
         sibling: FiberId,
     },
-    ExpectedHostTextOutput {
-        function_component: FiberId,
-        output: crate::function_component::FunctionComponentOutputHandle,
-        actual: FiberTag,
-    },
     CompletedChildTagMismatch {
         expected: FiberTag,
         actual: Option<FiberTag>,
@@ -2000,11 +1993,11 @@ enum HostRootFunctionComponentUseStateHostTextCommitHandoffError {
 }
 
 #[cfg(test)]
-impl Display for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
+impl Display for HostRootFunctionComponentUseStateHostChildCommitHandoffError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::BeginWork(error) => Display::fmt(error, formatter),
             Self::CompleteWork(error) => Display::fmt(error, formatter),
-            Self::FunctionComponentRender(error) => Display::fmt(error, formatter),
             Self::FunctionComponentSingleChild(error) => Display::fmt(error, formatter),
             Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
             Self::MissingFunctionComponentChild {
@@ -2012,7 +2005,7 @@ impl Display for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
                 host_root_work_in_progress,
             } => write!(
                 formatter,
-                "root {} HostRoot work-in-progress {} has no FunctionComponent child for private useState HostText commit handoff",
+                "root {} HostRoot work-in-progress {} has no FunctionComponent child for private useState host-child commit handoff",
                 root.raw(),
                 host_root_work_in_progress.slot().get()
             ),
@@ -2023,7 +2016,7 @@ impl Display for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
                 tag,
             } => write!(
                 formatter,
-                "root {} HostRoot work-in-progress {} child {} must be FunctionComponent for private useState HostText commit handoff, found {:?}",
+                "root {} HostRoot work-in-progress {} child {} must be FunctionComponent for private useState host-child commit handoff, found {:?}",
                 root.raw(),
                 host_root_work_in_progress.slot().get(),
                 child.slot().get(),
@@ -2036,26 +2029,15 @@ impl Display for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
                 sibling,
             } => write!(
                 formatter,
-                "root {} HostRoot work-in-progress {} has FunctionComponent child {} with sibling {}; private useState HostText commit handoff admits only one function child",
+                "root {} HostRoot work-in-progress {} has FunctionComponent child {} with sibling {}; private useState host-child commit handoff admits only one function child",
                 root.raw(),
                 host_root_work_in_progress.slot().get(),
                 function_component.slot().get(),
                 sibling.slot().get()
             ),
-            Self::ExpectedHostTextOutput {
-                function_component,
-                output,
-                actual,
-            } => write!(
-                formatter,
-                "function component {} output {} resolved to {:?}; private useState commit handoff only admits HostText",
-                function_component.slot().get(),
-                output.raw(),
-                actual
-            ),
             Self::CompletedChildTagMismatch { expected, actual } => write!(
                 formatter,
-                "private useState HostText complete-work produced {:?}, expected {:?}",
+                "private useState host-child complete-work produced {:?}, expected {:?}",
                 actual, expected
             ),
         }
@@ -2063,17 +2045,16 @@ impl Display for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
 }
 
 #[cfg(test)]
-impl Error for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
+impl Error for HostRootFunctionComponentUseStateHostChildCommitHandoffError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            Self::BeginWork(error) => Some(error),
             Self::CompleteWork(error) => Some(error),
-            Self::FunctionComponentRender(error) => Some(error),
             Self::FunctionComponentSingleChild(error) => Some(error),
             Self::FinishedWorkCommitHandoff(error) => Some(error),
             Self::MissingFunctionComponentChild { .. }
             | Self::ExpectedFunctionComponentChild { .. }
             | Self::UnexpectedFunctionComponentSibling { .. }
-            | Self::ExpectedHostTextOutput { .. }
             | Self::CompletedChildTagMismatch { .. } => None,
         }
     }
@@ -2081,7 +2062,7 @@ impl Error for HostRootFunctionComponentUseStateHostTextCommitHandoffError {
 
 #[cfg(test)]
 impl From<HostRootCompleteWorkHandoffError>
-    for HostRootFunctionComponentUseStateHostTextCommitHandoffError
+    for HostRootFunctionComponentUseStateHostChildCommitHandoffError
 {
     fn from(error: HostRootCompleteWorkHandoffError) -> Self {
         Self::CompleteWork(error)
@@ -2089,17 +2070,15 @@ impl From<HostRootCompleteWorkHandoffError>
 }
 
 #[cfg(test)]
-impl From<FunctionComponentRenderError>
-    for HostRootFunctionComponentUseStateHostTextCommitHandoffError
-{
-    fn from(error: FunctionComponentRenderError) -> Self {
-        Self::FunctionComponentRender(error)
+impl From<BeginWorkError> for HostRootFunctionComponentUseStateHostChildCommitHandoffError {
+    fn from(error: BeginWorkError) -> Self {
+        Self::BeginWork(error)
     }
 }
 
 #[cfg(test)]
 impl From<FunctionComponentSingleChildReconciliationError>
-    for HostRootFunctionComponentUseStateHostTextCommitHandoffError
+    for HostRootFunctionComponentUseStateHostChildCommitHandoffError
 {
     fn from(error: FunctionComponentSingleChildReconciliationError) -> Self {
         Self::FunctionComponentSingleChild(error)
@@ -2108,7 +2087,7 @@ impl From<FunctionComponentSingleChildReconciliationError>
 
 #[cfg(test)]
 impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
-    for HostRootFunctionComponentUseStateHostTextCommitHandoffError
+    for HostRootFunctionComponentUseStateHostChildCommitHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
         Self::FinishedWorkCommitHandoff(error)
@@ -2216,7 +2195,7 @@ fn handoff_completed_function_component_single_child_to_test_complete_work(
 }
 
 #[cfg(test)]
-fn handoff_completed_function_component_use_state_host_text_to_test_complete_work_and_commit(
+fn handoff_completed_function_component_use_state_host_child_to_test_complete_work_and_commit(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
     render: HostRootRenderPhaseRecord,
@@ -2227,8 +2206,8 @@ fn handoff_completed_function_component_use_state_host_text_to_test_complete_wor
     resolver: &impl FunctionComponentSingleChildOutputResolver,
     reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
 ) -> Result<
-    HostRootFunctionComponentUseStateHostTextCommitHandoffRecord,
-    HostRootFunctionComponentUseStateHostTextCommitHandoffError,
+    HostRootFunctionComponentUseStateHostChildCommitHandoffRecord,
+    HostRootFunctionComponentUseStateHostChildCommitHandoffError,
 > {
     validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
     let validated = validate_host_root_child_preflight(
@@ -2239,20 +2218,20 @@ fn handoff_completed_function_component_use_state_host_text_to_test_complete_wor
     )
     .map_err(HostRootCompleteWorkHandoffError::from)?;
     let function_component = validated.child.ok_or(
-        HostRootFunctionComponentUseStateHostTextCommitHandoffError::MissingFunctionComponentChild {
+        HostRootFunctionComponentUseStateHostChildCommitHandoffError::MissingFunctionComponentChild {
             root: render.root(),
             host_root_work_in_progress: render.work_in_progress(),
         },
     )?;
     let child_tag = validated.child_tag.ok_or(
-        HostRootFunctionComponentUseStateHostTextCommitHandoffError::MissingFunctionComponentChild {
+        HostRootFunctionComponentUseStateHostChildCommitHandoffError::MissingFunctionComponentChild {
             root: render.root(),
             host_root_work_in_progress: render.work_in_progress(),
         },
     )?;
     if child_tag != FiberTag::FunctionComponent {
         return Err(
-            HostRootFunctionComponentUseStateHostTextCommitHandoffError::ExpectedFunctionComponentChild {
+            HostRootFunctionComponentUseStateHostChildCommitHandoffError::ExpectedFunctionComponentChild {
                 root: render.root(),
                 host_root_work_in_progress: render.work_in_progress(),
                 child: function_component,
@@ -2267,7 +2246,7 @@ fn handoff_completed_function_component_use_state_host_text_to_test_complete_wor
         .sibling()
     {
         return Err(
-            HostRootFunctionComponentUseStateHostTextCommitHandoffError::UnexpectedFunctionComponentSibling {
+            HostRootFunctionComponentUseStateHostChildCommitHandoffError::UnexpectedFunctionComponentSibling {
                 root: render.root(),
                 host_root_work_in_progress: render.work_in_progress(),
                 function_component,
@@ -2276,29 +2255,19 @@ fn handoff_completed_function_component_use_state_host_text_to_test_complete_wor
         );
     }
 
-    let use_state_render = render_function_component_with_use_state(
+    let use_state_begin_work = begin_work_with_use_state(
         store.fiber_arena_mut(),
+        BeginWorkRequest::new(function_component, render.render_lanes()),
         hook_store,
-        function_component,
-        render.render_lanes(),
         state_request,
         invoker,
         reducer,
     )?;
     let single_child = reconcile_function_component_single_child_output(
         store.fiber_arena_mut(),
-        use_state_render.render(),
+        use_state_begin_work.render(),
         resolver,
     )?;
-    if single_child.child_tag() != FiberTag::HostText {
-        return Err(
-            HostRootFunctionComponentUseStateHostTextCommitHandoffError::ExpectedHostTextOutput {
-                function_component,
-                output: single_child.output(),
-                actual: single_child.child_tag(),
-            },
-        );
-    }
 
     let host_work = mount_test_function_component_single_host_child_work(
         store,
@@ -2315,10 +2284,10 @@ fn handoff_completed_function_component_use_state_host_text_to_test_complete_wor
         single_child.child_element(),
         &host_work,
     )?;
-    if complete_work.completed_child_tag() != Some(FiberTag::HostText) {
+    if complete_work.completed_child_tag() != Some(single_child.child_tag()) {
         return Err(
-            HostRootFunctionComponentUseStateHostTextCommitHandoffError::CompletedChildTagMismatch {
-                expected: FiberTag::HostText,
+            HostRootFunctionComponentUseStateHostChildCommitHandoffError::CompletedChildTagMismatch {
+                expected: single_child.child_tag(),
                 actual: complete_work.completed_child_tag(),
             },
         );
@@ -2346,12 +2315,12 @@ fn handoff_completed_function_component_use_state_host_text_to_test_complete_wor
     };
 
     Ok(
-        HostRootFunctionComponentUseStateHostTextCommitHandoffRecord {
+        HostRootFunctionComponentUseStateHostChildCommitHandoffRecord {
             root: render.root(),
             host_root_work_in_progress: render.work_in_progress(),
             original_root_element: render.resulting_element(),
             function_component,
-            use_state_render,
+            use_state_begin_work,
             single_child,
             complete_commit,
         },
@@ -10718,7 +10687,7 @@ mod tests {
             FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT),
         );
         let record =
-            handoff_completed_function_component_use_state_host_text_to_test_complete_work_and_commit(
+            handoff_completed_function_component_use_state_host_child_to_test_complete_work_and_commit(
                 &mut store,
                 &mut host,
                 render,
@@ -10738,14 +10707,17 @@ mod tests {
         );
         assert_eq!(record.original_root_element(), render.resulting_element());
         assert_eq!(record.function_component(), function_work_in_progress);
-        assert_eq!(record.use_state_render().current(), Some(function_current));
         assert_eq!(
-            record.use_state_render().work_in_progress(),
+            record.use_state_begin_work().render().current(),
+            Some(function_current)
+        );
+        assert_eq!(
+            record.use_state_begin_work().work_in_progress(),
             function_work_in_progress
         );
-        assert_eq!(record.use_state_render().output(), output);
+        assert_eq!(record.use_state_begin_work().output(), output);
         let state_update = record
-            .use_state_render()
+            .use_state_begin_work()
             .state_hook()
             .update_record()
             .unwrap();
@@ -10800,13 +10772,22 @@ mod tests {
         assert_eq!(record.commit().current(), render.work_in_progress());
         assert_eq!(record.commit().finished_lanes(), Lanes::DEFAULT);
         assert_eq!(record.commit().pending_lanes(), Lanes::NO);
-        assert!(record.commit().mutation_log().is_empty());
-        assert!(record.commit().mutation_apply_log().is_empty());
+        assert_eq!(record.commit().mutation_log().len(), 1);
+        assert_eq!(record.commit().mutation_apply_log().len(), 1);
         assert!(record.host_operations_unchanged_by_commit());
         assert!(record.public_render_blocked());
 
         let diagnostics = record.placement_apply_diagnostics();
-        assert!(diagnostics.is_empty());
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].root(), root_id);
+        assert_eq!(diagnostics[0].host_root(), render.finished_work());
+        assert_eq!(diagnostics[0].tag(), FiberTag::HostText);
+        assert_eq!(diagnostics[0].tag_name(), "HostText");
+        assert_eq!(diagnostics[0].apply_kind(), "append-placement-to-container");
+        assert_eq!(diagnostics[0].sibling_status(), "append");
+        assert_eq!(diagnostics[0].sibling(), None);
+        assert_eq!(diagnostics[0].sibling_tag(), None);
+        assert!(!diagnostics[0].can_insert_before());
         assert_eq!(
             store
                 .fiber_arena()
@@ -10842,10 +10823,10 @@ mod tests {
     }
 
     #[test]
-    fn root_work_loop_use_state_dispatch_handoff_rejects_non_text_output_before_commit() {
+    fn root_work_loop_use_state_dispatch_renders_function_host_component_and_commits_metadata() {
         let (mut store, root_id, mut host) = root_store();
         let mut source = TestHostTree::new();
-        let child_element = source.insert_host_element_with_text("section", "not text");
+        let child_element = source.insert_host_element_with_text("section", "host component state");
         let root_current = store.root(root_id).unwrap().current();
         let (function_current, function_work_in_progress, component) =
             attach_function_component_current_child_with_work_pair(&mut store, root_id);
@@ -10888,8 +10869,8 @@ mod tests {
             FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT),
         );
 
-        let error =
-            handoff_completed_function_component_use_state_host_text_to_test_complete_work_and_commit(
+        let record =
+            handoff_completed_function_component_use_state_host_child_to_test_complete_work_and_commit(
                 &mut store,
                 &mut host,
                 render,
@@ -10900,24 +10881,85 @@ mod tests {
                 &resolver,
                 action_as_state,
             )
-            .unwrap_err();
+            .unwrap();
 
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.function_component(), function_work_in_progress);
         assert_eq!(
-            error,
-            HostRootFunctionComponentUseStateHostTextCommitHandoffError::ExpectedHostTextOutput {
-                function_component: function_work_in_progress,
-                output,
-                actual: FiberTag::HostComponent,
-            }
+            record.use_state_begin_work().render().current(),
+            Some(function_current)
         );
-        assert_eq!(host.operations(), Vec::<&'static str>::new());
-        assert_eq!(store.root(root_id).unwrap().current(), root_current);
+        assert_eq!(
+            record.use_state_begin_work().work_in_progress(),
+            function_work_in_progress
+        );
+        assert_eq!(record.use_state_begin_work().output(), output);
+        let state_update = record
+            .use_state_begin_work()
+            .state_hook()
+            .update_record()
+            .unwrap();
+        assert_eq!(
+            state_update.previous_memoized_state(),
+            StateHandle::from_raw(710)
+        );
+        assert_eq!(state_update.memoized_state(), StateHandle::from_raw(711));
+        assert_eq!(state_update.applied_update_count(), 1);
+        assert_eq!(state_update.remaining_lanes(), Lanes::NO);
+        assert_eq!(record.single_child().child_tag(), FiberTag::HostComponent);
+        assert_eq!(record.single_child().child_element(), child_element);
+        assert_eq!(
+            record.complete_work().root_child_tag(),
+            Some(FiberTag::FunctionComponent)
+        );
+        assert_eq!(
+            record.complete_work().completed_child_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(record.complete_work().detached_instance_count(), 1);
+        assert_eq!(record.complete_work().detached_text_count(), 1);
+
+        let finished_work_handoff = record.finished_work_handoff();
+        assert_eq!(finished_work_handoff.pending().root(), root_id);
+        assert_eq!(
+            finished_work_handoff.pending().finished_work(),
+            render.finished_work()
+        );
+        assert!(finished_work_handoff.consumed_finished_work_record());
+        assert_eq!(record.commit().previous_current(), root_current);
+        assert_eq!(record.commit().current(), render.work_in_progress());
+        assert_eq!(record.commit().finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.commit().pending_lanes(), Lanes::NO);
+        assert_eq!(record.commit().mutation_log().len(), 1);
+        assert_eq!(record.commit().mutation_apply_log().len(), 1);
+        assert!(record.host_operations_unchanged_by_commit());
+        assert!(record.public_render_blocked());
+
+        let diagnostics = record.placement_apply_diagnostics();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].root(), root_id);
+        assert_eq!(diagnostics[0].host_root(), render.finished_work());
+        assert_eq!(diagnostics[0].tag(), FiberTag::HostComponent);
+        assert_eq!(diagnostics[0].tag_name(), "HostComponent");
+        assert_eq!(diagnostics[0].apply_kind(), "append-placement-to-container");
+        assert_eq!(diagnostics[0].sibling_status(), "append");
+        assert_eq!(diagnostics[0].sibling(), None);
+        assert_eq!(diagnostics[0].sibling_tag(), None);
+        assert!(!diagnostics[0].can_insert_before());
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(record.complete_work().completed_child().unwrap())
+                .unwrap()
+                .tag(),
+            FiberTag::HostComponent
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.work_in_progress()
+        );
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
-        assert_eq!(
-            store.root(root_id).unwrap().pending_commit(),
-            PendingCommitHandle::NONE
-        );
         assert_eq!(registry.calls().len(), 1);
         assert_eq!(
             hook_store
@@ -10925,6 +10967,18 @@ mod tests {
                 .pending_updates(current_state.queue())
                 .unwrap(),
             Vec::<fast_react_core::HookUpdateId>::new()
+        );
+        assert_eq!(
+            host.operations(),
+            vec![
+                "root_host_context",
+                "child_host_context",
+                "should_set_text_content",
+                "create_text_instance",
+                "create_instance",
+                "append_initial_child",
+                "finalize_initial_children",
+            ]
         );
     }
 
