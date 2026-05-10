@@ -50,25 +50,25 @@ Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 accepted and cleaned up. Workers 715-717 and 721 have also been accepted and
 cleaned up.
 
-- No active worker branches are open.
+- Worker 718: sync-flush/root-scheduler finished-work handoff integration.
+- Worker 719: function-component effect destroy-handle persistence.
+- Worker 720: test-renderer serialization finished-work identity gate.
 
 ## Near-Term Sequencing
 
-1. Run post-worker-721 verification on `main`, including focused React DOM and
-   conformance gates plus full workspace checks.
-2. Launch the next root/effect/test-renderer follow-ups only after post-merge
-   verification is green.
+1. Monitor workers 718-720 and accept only scoped private evidence that keeps
+   public root, act, flushSync, hooks/effects, test-renderer, and React DOM
+   compatibility blocked.
+2. Audit and merge completed workers one at a time or in a small non-conflicting
+   batch, with focused reruns before each merge and full workspace checks after
+   the batch.
 3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
 
-- Worker 718: sync-flush/root-scheduler finished-work handoff integration,
-  dependent on worker 717 if it adds shared helpers.
-- Worker 719: function-component effect destroy-handle persistence, dependent
-  on workers 688/689 and stable commit ownership from worker 717.
-- Worker 720: test-renderer serialization finished-work identity gate,
-  dependent on workers 695-702 and 717.
+- Select the next queue after workers 718-720 finish, based on the blockers and
+  follow-up evidence they report.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `flushSync`, public Scheduler timing, public hydration,
