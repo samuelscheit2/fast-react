@@ -253,7 +253,7 @@ export const PRIVATE_ADMISSION_473_502_ROWS = freezeArray([
       ]),
       evidence("crates/fast-react-reconciler/src/root_work_loop.rs", [
         "HostRootChildBeginWorkPreflightError::UnsupportedSuspenseChildShape",
-        "root_work_loop_pinged_retry_scheduler_handoff_keeps_suspense_offscreen_fail_closed"
+        "root_work_loop_pinged_retry_scheduler_handoff_keeps_blocker_tags_fail_closed"
       ])
     ],
     publicCompatibilityClaims: {

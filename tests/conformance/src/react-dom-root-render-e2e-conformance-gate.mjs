@@ -49,6 +49,401 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS =
 export const REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS =
   "blocked-private-root-bridge-record-only";
 
+export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_GATE_ID =
+  "public-facade-private-promotion-503-533-blocked-gate-1";
+
+export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS =
+  "rejected-accepted-private-503-533-public-compatibility-promotion";
+
+export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS =
+  Object.freeze([
+    "publicRootCompatibilitySurface",
+    "publicRenderCompatibilityClaimed",
+    "publicRootRenderCompatibilityClaimed",
+    "publicHydrationCompatibilityClaimed",
+    "publicEventCompatibilityClaimed",
+    "publicResourceCompatibilityClaimed",
+    "publicFormCompatibilityClaimed",
+    "publicControlledInputCompatibilityClaimed",
+    "publicTestRendererCompatibilityClaimed"
+  ]);
+
+export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES =
+  Object.freeze([
+    "root",
+    "render",
+    "root-render",
+    "hydration",
+    "event",
+    "resource",
+    "form",
+    "controlled",
+    "test-renderer"
+  ]);
+
+function privatePromotion503533Claims() {
+  return Object.freeze(
+    Object.fromEntries(
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS.map(
+        (key) => [key, false]
+      )
+    )
+  );
+}
+
+function privatePromotion503533Row({
+  acceptedPrivateMetadataIds,
+  category,
+  id,
+  primaryCompatibilityArea,
+  reason,
+  workerId
+}) {
+  const publicCompatibilityClaims = privatePromotion503533Claims();
+
+  return Object.freeze({
+    id,
+    workerId,
+    category,
+    primaryCompatibilityArea,
+    admission: "accepted-private-diagnostic",
+    gateStatus:
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS,
+    promotion: "rejected",
+    privateEvidenceOnly: true,
+    acceptedPrivateMetadataIds: Object.freeze(acceptedPrivateMetadataIds),
+    blockedPublicCompatibilitySurfaces:
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES,
+    comparedToReactDomOracle: false,
+    comparedToReactTestRendererOracle: false,
+    compatibilityClaimed: false,
+    ...publicCompatibilityClaims,
+    publicCompatibilityClaims,
+    reason
+  });
+}
+
+export const REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS =
+  Object.freeze([
+    privatePromotion503533Row({
+      id: "worker-503-deleted-subtree-passive-flush-execution",
+      workerId: "503",
+      category: "passive-effect-root-render",
+      primaryCompatibilityArea: "root-render",
+      acceptedPrivateMetadataIds: [
+        "deleted-subtree-passive-destroy-flush-diagnostic"
+      ],
+      reason:
+        "Deleted-subtree passive destroy flush metadata is private executor evidence and cannot promote public root render, passive effect, or test-renderer compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-504-deletion-fragment-portal-traversal",
+      workerId: "504",
+      category: "root-unmount-portal-deletion",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: [
+        "fragment-deletion-subtree-traversal-diagnostic",
+        "portal-deletion-subtree-traversal-diagnostic"
+      ],
+      reason:
+        "Fragment and Portal deletion traversal diagnostics stay private and cannot promote public root unmount or portal rendering compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-505-form-action-event-extraction",
+      workerId: "505",
+      category: "form-event",
+      primaryCompatibilityArea: "form",
+      acceptedPrivateMetadataIds: ["form-action-event-extraction-metadata"],
+      reason:
+        "Form action event-extraction rows are metadata-only and cannot promote public form, event, root render, or test-renderer compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-506-form-reset-queue-commit",
+      workerId: "506",
+      category: "form-reset",
+      primaryCompatibilityArea: "form",
+      acceptedPrivateMetadataIds: ["form-reset-queue-commit-diagnostic"],
+      reason:
+        "Form reset queue/commit diagnostics do not inspect real forms or run resets, so public form compatibility remains blocked."
+    }),
+    privatePromotion503533Row({
+      id: "worker-507-resource-map-commit",
+      workerId: "507",
+      category: "resource",
+      primaryCompatibilityArea: "resource",
+      acceptedPrivateMetadataIds: ["resource-map-commit-diagnostic"],
+      reason:
+        "Resource-map commit rows are redacted private records and cannot promote public resource hint or root resource compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-508-stylesheet-load-error-state",
+      workerId: "508",
+      category: "resource",
+      primaryCompatibilityArea: "resource",
+      acceptedPrivateMetadataIds: ["stylesheet-load-error-state-diagnostic"],
+      reason:
+        "Stylesheet load/error state diagnostics do not mutate real resource maps or suspend commits, so public resource compatibility remains blocked."
+    }),
+    privatePromotion503533Row({
+      id: "worker-509-controlled-restore-flush-order",
+      workerId: "509",
+      category: "controlled",
+      primaryCompatibilityArea: "controlled",
+      acceptedPrivateMetadataIds: ["controlled-restore-flush-order-diagnostic"],
+      reason:
+        "Controlled restore write/flush ordering metadata does not execute wrapper restores or mutate live controls."
+    }),
+    privatePromotion503533Row({
+      id: "worker-510-controlled-radio-sibling-props",
+      workerId: "510",
+      category: "controlled",
+      primaryCompatibilityArea: "controlled",
+      acceptedPrivateMetadataIds: [
+        "controlled-radio-sibling-props-lookup-diagnostic"
+      ],
+      reason:
+        "Radio sibling-props lookup diagnostics are explicit metadata and cannot promote public controlled radio compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-511-react-dom-facade-update-host-output",
+      workerId: "511",
+      category: "root-render",
+      primaryCompatibilityArea: "root-render",
+      acceptedPrivateMetadataIds: [
+        "public-facade-host-output-update-diagnostic"
+      ],
+      reason:
+        "Private facade update host-output evidence is fake-DOM only and cannot promote public createRoot/root.render compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-512-react-dom-facade-unmount-cleanup",
+      workerId: "512",
+      category: "root-unmount",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: [
+        "public-facade-host-output-unmount-cleanup-diagnostic"
+      ],
+      reason:
+        "Private facade unmount cleanup clears fake-DOM diagnostics only and cannot promote public root unmount compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-513-dom-event-broader-type-dispatch",
+      workerId: "513",
+      category: "event",
+      primaryCompatibilityArea: "event",
+      acceptedPrivateMetadataIds: ["event-type-dispatch-canary-record"],
+      reason:
+        "Broader event-type dispatch canaries record priority/listener metadata without public browser dispatch or SyntheticEvent compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-514-dom-event-portal-error-routing",
+      workerId: "514",
+      category: "event-portal",
+      primaryCompatibilityArea: "event",
+      acceptedPrivateMetadataIds: ["portal-event-error-routing-diagnostic"],
+      reason:
+        "Portal event error routing metadata stays behind private owner-root records and cannot promote public portal bubbling or callback compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-515-test-renderer-query-bridge-preflight",
+      workerId: "515",
+      category: "test-renderer",
+      primaryCompatibilityArea: "test-renderer",
+      acceptedPrivateMetadataIds: [
+        "test-instance-query-bridge-preflight-diagnostic"
+      ],
+      reason:
+        "TestInstance query bridge preflight consumes accepted records only and cannot promote public react-test-renderer root or query compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-516-test-renderer-committed-fiber-inspection",
+      workerId: "516",
+      category: "test-renderer",
+      primaryCompatibilityArea: "test-renderer",
+      acceptedPrivateMetadataIds: [
+        "committed-fiber-tree-inspection-shape-diagnostic"
+      ],
+      reason:
+        "Committed-fiber inspection shape diagnostics stay record-only and cannot promote public toTree or TestInstance compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-517-test-renderer-act-warning-thenable-blockers",
+      workerId: "517",
+      category: "test-renderer-act",
+      primaryCompatibilityArea: "test-renderer",
+      acceptedPrivateMetadataIds: [
+        "react-test-renderer-act-warning-thenable-blocker-row"
+      ],
+      reason:
+        "Act warning/thenable blocker rows are private CJS-development metadata and cannot promote public async act compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-518-scheduler-mock-expired-act-route",
+      workerId: "518",
+      category: "test-renderer-scheduler",
+      primaryCompatibilityArea: "test-renderer",
+      acceptedPrivateMetadataIds: [
+        "scheduler-mock-expired-work-act-route-diagnostic"
+      ],
+      reason:
+        "Expired mock Scheduler act-route metadata does not flush public Scheduler work or promote react-test-renderer act compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-519-package-surface-private-audit",
+      workerId: "519",
+      category: "package-surface",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: ["package-surface-private-facade-audit"],
+      reason:
+        "Package-surface private audit evidence pins hidden diagnostics only and cannot promote any public compatibility surface."
+    }),
+    privatePromotion503533Row({
+      id: "worker-520-benchmark-private-diagnostics-canaries",
+      workerId: "520",
+      category: "benchmark",
+      primaryCompatibilityArea: "render",
+      acceptedPrivateMetadataIds: ["benchmark-private-diagnostic-canaries"],
+      reason:
+        "Diagnostic-only benchmark canaries do not collect compatible timings or promote public render/test-renderer compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-521-root-render-e2e-private-gate-refresh",
+      workerId: "521",
+      category: "root-render",
+      primaryCompatibilityArea: "root-render",
+      acceptedPrivateMetadataIds: [
+        "root-render-private-react-dom-metadata-admissions"
+      ],
+      reason:
+        "Root-render private metadata admissions from workers 486-492 remain explicit source evidence and cannot promote public root compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-522-suspenselist-activity-blockers",
+      workerId: "522",
+      category: "root-render",
+      primaryCompatibilityArea: "render",
+      acceptedPrivateMetadataIds: [
+        "suspenselist-child-shape-blocker-diagnostic",
+        "activity-child-shape-blocker-diagnostic"
+      ],
+      reason:
+        "SuspenseList and Activity child-shape blockers are private fail-closed records and cannot promote public render or hydration compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-523-scheduler-post-task-environment",
+      workerId: "523",
+      category: "scheduler",
+      primaryCompatibilityArea: "render",
+      acceptedPrivateMetadataIds: [
+        "scheduler-post-task-environment-diagnostic"
+      ],
+      reason:
+        "postTask environment diagnostics are opt-in Scheduler metadata and cannot promote browser task, render, or test-renderer compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-524-native-transport-worker-thread-teardown",
+      workerId: "524",
+      category: "native",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: [
+        "native-transport-worker-thread-teardown-diagnostic"
+      ],
+      reason:
+        "Native worker-thread teardown diagnostics do not load native addons or promote public root/render compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-525-react-hook-dispatcher-public-blocker",
+      workerId: "525",
+      category: "hooks",
+      primaryCompatibilityArea: "render",
+      acceptedPrivateMetadataIds: [
+        "hook-dispatcher-public-blocker-refresh-metadata"
+      ],
+      reason:
+        "Hook dispatcher blocker metadata requires marked private dispatchers and cannot promote public root render or hook compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-526-conformance-private-admission-refresh",
+      workerId: "526",
+      category: "conformance",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: ["private-admission-473-502-manifest"],
+      reason:
+        "The private-admission conformance manifest records accepted diagnostics only and cannot promote public facade compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-527-worker-launcher-simplification",
+      workerId: "527",
+      category: "orchestration",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: ["worker-launcher-exit-diagnostics"],
+      reason:
+        "Worker-launcher diagnostics are operational metadata and cannot promote package runtime compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-528-hydration-replay-error-metadata",
+      workerId: "528",
+      category: "hydration-event",
+      primaryCompatibilityArea: "hydration",
+      acceptedPrivateMetadataIds: [
+        "hydration-replay-error-metadata-diagnostic"
+      ],
+      reason:
+        "Hydration replay error metadata records root-option callbacks without event replay, DOM mutation, callback invocation, or hydration compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-529-portal-root-render-public-blocker",
+      workerId: "529",
+      category: "root-render-event",
+      primaryCompatibilityArea: "root-render",
+      acceptedPrivateMetadataIds: [
+        "portal-root-render-public-blocker-diagnostic"
+      ],
+      reason:
+        "Portal root-render blocker diagnostics keep private portal metadata outside public root rendering and event compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-530-test-renderer-error-boundary-update",
+      workerId: "530",
+      category: "test-renderer",
+      primaryCompatibilityArea: "test-renderer",
+      acceptedPrivateMetadataIds: [
+        "test-renderer-error-boundary-update-commit-diagnostic"
+      ],
+      reason:
+        "Error-boundary update/commit rows consume accepted private test-renderer metadata without public recovery or callback compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-531-scheduler-native-entry-guard",
+      workerId: "531",
+      category: "scheduler",
+      primaryCompatibilityArea: "render",
+      acceptedPrivateMetadataIds: ["scheduler-native-entry-guard-diagnostic"],
+      reason:
+        "Scheduler native-entry guard rows pin hidden variant diagnostics and cannot promote public Scheduler, render, or test-renderer compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-532-native-package-surface-guard",
+      workerId: "532",
+      category: "native",
+      primaryCompatibilityArea: "root",
+      acceptedPrivateMetadataIds: ["native-package-surface-guard-diagnostic"],
+      reason:
+        "Native package-surface guard diagnostics remain inert loader metadata and cannot promote public root/native compatibility."
+    }),
+    privatePromotion503533Row({
+      id: "worker-533-controlled-restore-queue-write-preflight",
+      workerId: "533",
+      category: "controlled",
+      primaryCompatibilityArea: "controlled",
+      acceptedPrivateMetadataIds: [
+        "controlled-restore-queue-write-preflight-diagnostic"
+      ],
+      reason:
+        "Controlled restore queue write preflight rows model intents only and cannot promote public controlled input compatibility."
+    })
+  ]);
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
   Object.freeze([
     Object.freeze({
@@ -239,6 +634,8 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_GATE = Object.freeze({
   localTargetPackageName: REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET.packageName,
   scenarioAdmissions: REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
   blockedBoundaryRows: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS,
+  privatePromotionRejectionRows503533:
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS,
   unsupportedBehavior: Object.freeze({
     publicFacadeStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
     privateBridgeStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
@@ -1586,6 +1983,23 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       publicFormCompatibilityClaimed: false,
       publicControlledInputCompatibilityClaimed: false
     },
+    privatePromotion503533Gate: {
+      id: REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_GATE_ID,
+      rejectedPrivateMetadataIds:
+        REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.map(
+          (row) => row.id
+        ),
+      compatibilityClaimed: false,
+      publicRootCompatibilitySurface: false,
+      publicRenderCompatibilityClaimed: false,
+      publicRootRenderCompatibilityClaimed: false,
+      publicHydrationCompatibilityClaimed: false,
+      publicEventCompatibilityClaimed: false,
+      publicResourceCompatibilityClaimed: false,
+      publicFormCompatibilityClaimed: false,
+      publicControlledInputCompatibilityClaimed: false,
+      publicTestRendererCompatibilityClaimed: false
+    },
     privateHostOutputDiagnosticScenarioModeRows:
       privateHostOutputDiagnosticRows,
     privateHostOutputBlockedScenarioModeRows: privateHostOutputBlockedRows,
@@ -1602,6 +2016,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateActPassiveBlockedScenarioModeRows: privateActPassiveBlockedRows,
     privateReactDomMetadataDiagnosticRows:
       privateReactDomMetadataDiagnosticRows,
+    privatePromotionRejectionRows503533:
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS,
     portalRootRenderGate,
     portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
     portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
@@ -1631,6 +2047,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateActPassiveBlockedRows.length,
       privateReactDomMetadataDiagnosticRowCount:
         privateReactDomMetadataDiagnosticRows.length,
+      privatePromotion503533RejectedRowCount:
+        REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.length,
       portalRootRenderPrerequisiteRowCount:
         portalRootRenderGate.summary.prerequisiteRowCount,
       portalRootRenderBlockedRowCount:
@@ -1663,6 +2081,16 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateReactDomMetadataPublicResourceCompatibilityClaimed: false,
       privateReactDomMetadataPublicFormCompatibilityClaimed: false,
       privateReactDomMetadataPublicControlledInputCompatibilityClaimed: false,
+      privatePromotion503533CompatibilityClaimed: false,
+      privatePromotion503533PublicRootCompatibilitySurface: false,
+      privatePromotion503533PublicRenderCompatibilityClaimed: false,
+      privatePromotion503533PublicRootRenderCompatibilityClaimed: false,
+      privatePromotion503533PublicHydrationCompatibilityClaimed: false,
+      privatePromotion503533PublicEventCompatibilityClaimed: false,
+      privatePromotion503533PublicResourceCompatibilityClaimed: false,
+      privatePromotion503533PublicFormCompatibilityClaimed: false,
+      privatePromotion503533PublicControlledInputCompatibilityClaimed: false,
+      privatePromotion503533PublicTestRendererCompatibilityClaimed: false,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -1745,6 +2173,8 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
     blockedScenarioModeRows,
     blockedPublicFacadeRows,
     blockedPrivateBridgeRows,
+    privatePromotionRejectionRows503533:
+      rootRenderGateResult?.privatePromotionRejectionRows503533 ?? [],
     localPublicFacadeBoundary,
     privateRootBridgeBoundary,
     failures,
@@ -1758,6 +2188,9 @@ export function evaluateReactDomRootPublicFacadeBlockedGate({
       blockedScenarioModeRowCount: blockedScenarioModeRows.length,
       blockedPublicFacadeRowCount: blockedPublicFacadeRows.length,
       blockedPrivateBridgeRowCount: blockedPrivateBridgeRows.length,
+      privatePromotion503533RejectedRowCount:
+        rootRenderGateResult?.summary
+          ?.privatePromotion503533RejectedRowCount ?? 0,
       failureCount: failures.length,
       compatibilityAdmitted: false,
       compatibilityClaimed: false
@@ -1849,6 +2282,7 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Private act/passive diagnostic rows admitted: ${result.summary.privateActPassiveDiagnosticScenarioModeRowCount}`,
     `Private act/passive diagnostic rows blocked: ${result.summary.privateActPassiveBlockedScenarioModeRowCount}`,
     `Private React DOM metadata diagnostic rows admitted: ${result.summary.privateReactDomMetadataDiagnosticRowCount}`,
+    `Private 503-533 promotion rows rejected: ${result.summary.privatePromotion503533RejectedRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
     `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
@@ -1887,6 +2321,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateReactDomMetadataDiagnosticRows.length > 0) {
     lines.push(
       "Private React DOM metadata diagnostics consume accepted host-output, event, hydration, resource, form, and controlled evidence only; all matching public compatibility surfaces remain blocked."
+    );
+  }
+  if ((result.privatePromotionRejectionRows503533?.length ?? 0) > 0) {
+    lines.push(
+      "Accepted private diagnostics from workers 503-533 have explicit rejected-promotion rows; public root, render, hydration, event, resource, form, controlled, and test-renderer compatibility remain blocked."
     );
   }
   if (result.portalRootRenderBlockedRows.length > 0) {
@@ -1956,6 +2395,9 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateReactDomMetadataDiagnosticRowCount ?? 0
     }`,
+    `Root-render private 503-533 promotion rows rejected: ${
+      result.rootRenderGate?.summary.privatePromotion503533RejectedRowCount ?? 0
+    }`,
     `Root-render portal rows blocked: ${
       result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0
     }`,
@@ -2010,6 +2452,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private React DOM metadata diagnostics remain private evidence only and do not unblock public root, hydration, event, resource, form, or controlled-input compatibility."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary.privatePromotion503533RejectedRowCount ??
+      0) > 0
+  ) {
+    lines.push(
+      "Accepted private 503-533 diagnostics remain rejected as public-promotion evidence for root, render, hydration, event, resource, form, controlled-input, and test-renderer compatibility."
     );
   }
   if ((result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0) > 0) {
@@ -2848,6 +3298,10 @@ function validateRootRenderGatePrerequisites({
     rootRenderGateResult,
     failures
   });
+  validateRootRenderPrivatePromotion503533Blockers({
+    rootRenderGateResult,
+    failures
+  });
   validateRootRenderPortalBlockers({
     rootRenderGateResult,
     failures
@@ -3575,6 +4029,151 @@ function validateRootRenderPrivateReactDomMetadataBlockers({
         modeId: row.modeId,
         scenarioId: row.scenarioId,
         gateStatus: "root-render-private-react-dom-metadata-row-not-private",
+        row
+      });
+    }
+  }
+}
+
+function validateRootRenderPrivatePromotion503533Blockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const expectedRowIds =
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.map(
+      (row) => row.id
+    );
+  const expectedWorkerIds =
+    REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_ROWS.map(
+      (row) => row.workerId
+    );
+
+  if (
+    rootRenderGateResult.summary.privatePromotion503533RejectedRowCount !==
+    expectedRowIds.length
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-promotion-503-533-row-count-mismatch",
+      actual:
+        rootRenderGateResult.summary.privatePromotion503533RejectedRowCount ??
+        null,
+      expected: expectedRowIds.length
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary.privatePromotion503533CompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.privatePromotion503533Gate?.compatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicRootCompatibilitySurface !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicRenderCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicRootRenderCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicHydrationCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicEventCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicResourceCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicFormCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicControlledInputCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privatePromotion503533PublicTestRendererCompatibilityClaimed !== false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-promotion-503-533-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary.privatePromotion503533CompatibilityClaimed ??
+        null,
+      gateClaim:
+        rootRenderGateResult.privatePromotion503533Gate
+          ?.compatibilityClaimed ?? null,
+      summaryPublicRootClaim:
+        rootRenderGateResult.summary
+          .privatePromotion503533PublicRootCompatibilitySurface ?? null,
+      summaryPublicTestRendererClaim:
+        rootRenderGateResult.summary
+          .privatePromotion503533PublicTestRendererCompatibilityClaimed ?? null
+    });
+  }
+
+  for (const claimKey of REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS) {
+    if (rootRenderGateResult.privatePromotion503533Gate?.[claimKey] !== false) {
+      failures.push({
+        gateStatus:
+          "root-render-private-promotion-503-533-gate-public-claim-leaked",
+        claimKey,
+        actual: rootRenderGateResult.privatePromotion503533Gate?.[claimKey]
+      });
+    }
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privatePromotion503533Gate
+        ?.rejectedPrivateMetadataIds ?? [],
+      expectedRowIds
+    ) !== null ||
+    findFirstDifferencePath(
+      (rootRenderGateResult.privatePromotionRejectionRows503533 ?? []).map(
+        (row) => row.workerId
+      ),
+      expectedWorkerIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-promotion-503-533-rejection-set-mismatch",
+      rejected:
+        rootRenderGateResult.privatePromotion503533Gate
+          ?.rejectedPrivateMetadataIds ?? null,
+      workers: (
+        rootRenderGateResult.privatePromotionRejectionRows503533 ?? []
+      ).map((row) => row.workerId)
+    });
+  }
+
+  for (const row of rootRenderGateResult.privatePromotionRejectionRows503533 ??
+    []) {
+    const publicClaimLeak =
+      REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_CLAIM_KEYS.some(
+        (claimKey) =>
+          row[claimKey] !== false ||
+          row.publicCompatibilityClaims?.[claimKey] !== false
+      );
+
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_REJECTED_STATUS ||
+      row.admission !== "accepted-private-diagnostic" ||
+      row.promotion !== "rejected" ||
+      row.privateEvidenceOnly !== true ||
+      row.comparedToReactDomOracle !== false ||
+      row.comparedToReactTestRendererOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      publicClaimLeak ||
+      findFirstDifferencePath(
+        row.blockedPublicCompatibilitySurfaces ?? [],
+        REACT_DOM_ROOT_PUBLIC_FACADE_PRIVATE_PROMOTION_503_533_BLOCKED_SURFACES
+      ) !== null ||
+      !Array.isArray(row.acceptedPrivateMetadataIds) ||
+      row.acceptedPrivateMetadataIds.length === 0
+    ) {
+      failures.push({
+        workerId: row.workerId ?? null,
+        gateStatus:
+          "root-render-private-promotion-503-533-row-not-rejected",
         row
       });
     }
