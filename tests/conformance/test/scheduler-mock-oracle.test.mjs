@@ -1170,6 +1170,16 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
     );
     assert.equal(described.drainsExpiredMockSchedulerWork, false, nodeEnv);
     assert.equal(described.executesRendererWork, false, nodeEnv);
+    assert.equal(
+      described.routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      described.consumesAcceptedExpiredActRootWorkRecords,
+      true,
+      nodeEnv
+    );
 
     const report = diagnostics.drainExpiredMockSchedulerWork(metadata);
     assert.equal(
@@ -1206,9 +1216,59 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
     );
     assert.equal(report.actQueueDrainReport.drainedCount, 2, nodeEnv);
     assert.equal(report.rootWorkRecordCount, 2, nodeEnv);
+    assert.equal(report.rootWorkRecordsPendingBefore, 2, nodeEnv);
+    assert.equal(report.rootWorkRecordsPendingAfter, 0, nodeEnv);
+    assert.equal(report.rootWorkRecordsConsumedCount, 2, nodeEnv);
+    assert.equal(
+      report.rootWorkRecordConsumptionReport.status,
+      "consumed-accepted-expired-act-root-work-records",
+      nodeEnv
+    );
+    assert.equal(
+      report.rootWorkRecordConsumptionReport.consumedCount,
+      2,
+      nodeEnv
+    );
+    assert.equal(
+      report.rootWorkRecordConsumptionReport.remainingCount,
+      0,
+      nodeEnv
+    );
     assert.deepEqual(
       report.rootWorkRecords.map((record) => record.recordKind),
       ["RootLaneSchedulingSnapshot", "RootTaskScheduleRecord"],
+      nodeEnv
+    );
+    assert.deepEqual(
+      report.rootWorkRecordConsumptionReport.consumedRecords.map(
+        (record) => record.recordKind
+      ),
+      ["RootLaneSchedulingSnapshot", "RootTaskScheduleRecord"],
+      nodeEnv
+    );
+    assert.deepEqual(
+      report.flushAllOrFlushExpiredRoute.availableFlushHelpers,
+      ["unstable_flushAll", "unstable_flushExpired"],
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.selectedFlushHelper,
+      "unstable_flushExpired",
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.invokesPublicSchedulerFlushHelper,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.publicSchedulerFlushBehaviorExecuted,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.consumesAcceptedExpiredActRootWorkRecords,
+      true,
       nodeEnv
     );
     assert.equal(report.sourceDrainFlushedExpiredWork, true, nodeEnv);
@@ -1219,6 +1279,16 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
     );
     assert.equal(report.drainsExpiredMockSchedulerWork, true, nodeEnv);
     assert.equal(report.drainsAcceptedInternalTestQueues, true, nodeEnv);
+    assert.equal(
+      report.routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      report.consumesAcceptedExpiredActRootWorkRecords,
+      true,
+      nodeEnv
+    );
     assert.equal(report.drainsPublicSchedulerTaskQueue, false, nodeEnv);
     assert.equal(report.drainsPublicReactActQueue, false, nodeEnv);
     assert.equal(report.publicSchedulerTimingCompatibilityClaimed, false);
@@ -1243,6 +1313,7 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
       nodeEnv
     );
     assert.equal(publicSchedulerCallbackRan, false, nodeEnv);
+    assert.equal(metadata.rootWorkRecords.length, 0, nodeEnv);
     assert.deepEqual(Scheduler.unstable_clearLog(), [
       "expired-act-root-callback",
       "act-root-schedule",
@@ -1262,6 +1333,128 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
       "stale-act-queue",
       nodeEnv
     );
+
+    Scheduler.reset();
+  }
+});
+
+test("scheduler mock private flushAll route consumes act/root records without public flushAll", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler,
+      "unstable_flushAll"
+    );
+    assert.equal(
+      diagnostics,
+      readSchedulerMockPrivateActQueueFlushDiagnostics(
+        Scheduler,
+        "unstable_flushExpired"
+      ),
+      nodeEnv
+    );
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const events = [];
+    const expiredCallback = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        events.push([
+          "flush-all-expired-act-root-callback",
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log("flush-all-expired-act-root-callback");
+      },
+      { label: "flush-all-expired-act-root-callback" }
+    );
+    const expiredHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      expiredCallback
+    );
+    let publicSchedulerCallbackRan = false;
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        publicSchedulerCallbackRan = true;
+        Scheduler.log("public-flush-all-work");
+      }
+    );
+    Scheduler.unstable_advanceTime(251);
+
+    const acceptedRootRecordKinds = [
+      "RootLaneSchedulingSnapshot",
+      "UpdateContainerResult",
+      "RootScheduleUpdateRecord",
+      "RootTaskScheduleRecord",
+      "SchedulerCallbackRequest",
+      "RootSchedulerCallbackExecutionRecord",
+      "HostRootFinishedWorkPendingCommitRecordForCanary",
+      "HostRootFinishedWorkCommitHandoffRecordForCanary"
+    ];
+    const rootWorkRecords = acceptedRootRecordKinds.map((recordKind) =>
+      createAcceptedRootWorkRecord(recordKind)
+    );
+    const metadata = createExpiredActRootWorkMetadata(
+      Scheduler,
+      expiredHandle,
+      createAcceptedActRootWorkQueue(reactGate),
+      { rootWorkRecords }
+    );
+
+    const report = Scheduler.unstable_flushAll(metadata);
+    assert.equal(
+      report.status,
+      "drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.selectedFlushHelper,
+      "unstable_flushAll",
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.effectivePrivateDrainHelper,
+      "drainExpiredMockSchedulerWork",
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.publicSchedulerFlushBehaviorExecuted,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      report.rootWorkRecordsConsumedCount,
+      acceptedRootRecordKinds.length,
+      nodeEnv
+    );
+    assert.equal(report.rootWorkRecordsPendingAfter, 0, nodeEnv);
+    assert.deepEqual(
+      report.rootWorkRecordConsumptionReport.consumedRecords.map(
+        (record) => record.recordKind
+      ),
+      acceptedRootRecordKinds,
+      nodeEnv
+    );
+    assert.equal(metadata.rootWorkRecords.length, 0, nodeEnv);
+    assert.deepEqual(events, [
+      [
+        "flush-all-expired-act-root-callback",
+        true,
+        Scheduler.unstable_UserBlockingPriority,
+        251
+      ]
+    ]);
+    assert.equal(publicSchedulerCallbackRan, false, nodeEnv);
+    assert.deepEqual(
+      Scheduler.unstable_clearLog(),
+      ["flush-all-expired-act-root-callback"],
+      nodeEnv
+    );
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
 
     Scheduler.reset();
   }
@@ -2578,6 +2771,16 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   );
   assert.equal(
     diagnostics.linksExpiredCallbacksToAcceptedActRootWorkRecords,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.routesExpiredActRootWorkThroughFlushAllOrFlushExpiredDiagnostics,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.consumesAcceptedExpiredActRootWorkRecords,
     true,
     label
   );
