@@ -45,27 +45,12 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Remaining workers from queue 323-352 are running in
-isolated worktrees with overlapping implementation allowed where write scopes
-differ.
+Top-level cap: 30 workers. Queue 323-352 has been accepted; refill the queue
+after stale accepted sessions/worktrees are cleaned.
 
 | Worker | Focus |
 | --- | --- |
-| 323 | Root commit host-parent placement apply |
-| 324 | Root commit stable-sibling insertion apply |
-| 325 | Root commit host deletion cleanup apply |
-| 333 | Test renderer `toJSON` host output private path |
-| 334 | Test renderer TestInstance private query path |
-| 335 | Test renderer act scheduler flush private path |
-| 338 | DOM mutation latest-props commit handoff |
-| 339 | DOM event plugin target dispatch path |
-| 342 | DOM portal private commit boundary |
-| 343 | Resource hint private dispatcher DOM adapter gate |
-| 344 | Controlled input private wrapper metadata gate |
-| 345 | Native root bridge real handle admission preflight |
-| 350 | Root work loop complete-work multiple-child handoff |
-| 351 | Suspense/Offscreen preflight after child handoff |
-| 352 | Root render E2E private admissions after host output |
+| _None_ | Refill pending |
 
 ## Near-Term Sequencing
 

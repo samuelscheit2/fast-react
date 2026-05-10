@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 323-325, 333-335, 338, 339, 342-345, and 350-352 were accepted from
+  queue 323-352. The batch added private root commit host-parent placement,
+  stable sibling insertion, and host deletion cleanup apply canaries; private
+  react-test-renderer host-output serialization, TestInstance query, and act
+  scheduler metadata paths; React DOM latest-props mutation handoff, event
+  dispatch target metadata, portal commit boundary, resource hint and
+  controlled-input private gates; native root bridge handle-admission preflight;
+  complete-work multi-child and unsupported-child handoff hardening; and private
+  root-render E2E host-output diagnostic admissions while keeping public root
+  compatibility blocked.
+- Workers 323-325, 333-335, 338, 339, 342-345, and 350-352 were verified after
+  merge with focused root commit, host output, deletion cleanup,
+  react-test-renderer, React DOM, resource/form, property, event, portal,
+  native, root-work-loop, begin-work, root-render E2E, and public facade checks.
+  Broad verification passed for Rust fmt, reconciler/test-renderer/napi tests,
+  workspace clippy, React test-renderer/React DOM/native workspace checks,
+  package-surface, benchmark, `npm run check:js`, and `git diff --check`.
 - Workers 326-332, 336, 337, 340, 341, and 346-349 were accepted from queue
   323-352. The batch added private passive callback invocation and destroy
   executor paths, function-component `useState` and `useReducer` render/eager
