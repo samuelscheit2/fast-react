@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "react-test-renderer-root-lifecycle",
+  "description": "Admission manifest for initial react-test-renderer root lifecycle operation timings.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "renderer-object-shape",
+    "raw-create-act-boundary",
+    "create-update-unmount-flow",
+    "root-access-boundaries",
+    "get-instance-boundaries",
+    "create-node-mock-ref-lifecycle",
+    "strict-and-concurrent-options"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-test-renderer-root-lifecycle",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-root-lifecycle-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "renderer-object-shape",
+      "area": "test renderer root object",
+      "entrypoints": ["react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "raw-create-act-boundary",
+      "area": "test renderer create scheduling",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "create-update-unmount-flow",
+      "area": "test renderer update flow",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "root-access-boundaries",
+      "area": "test renderer root access",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "get-instance-boundaries",
+      "area": "test renderer instance access",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "create-node-mock-ref-lifecycle",
+      "area": "test renderer refs",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    },
+    {
+      "id": "strict-and-concurrent-options",
+      "area": "test renderer root options",
+      "entrypoints": ["react", "react-test-renderer"],
+      "conformanceGateIds": ["react-test-renderer-root-lifecycle"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked test-renderer root lifecycle oracle is oracle-only and does not compare Fast React."
+    }
+  ]
+}
