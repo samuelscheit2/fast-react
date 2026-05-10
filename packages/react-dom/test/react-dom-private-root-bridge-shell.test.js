@@ -903,6 +903,355 @@ test('private root render host-output consumes accepted Rust metadata and render
   assert.equal(container.childNodes.length, 0);
 });
 
+test('private root render host-output creates nested fake-DOM host output only', () => {
+  const document = createDocument('private-root-render-nested-host-output');
+  const container = createElement('DIV', document);
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-root-render-nested-host-output-public')
+  );
+  const childElement = {
+    props: {
+      children: 'accepted nested rust host output',
+      id: 'nested-child',
+      title: 'Nested child'
+    },
+    type: 'span'
+  };
+  const element = {
+    props: {
+      children: childElement,
+      className: 'nested-parent',
+      id: 'nested-parent',
+      onClick() {
+        return 'not-invoked';
+      },
+      title: 'Nested parent'
+    },
+    type: 'section'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: 'root-render-nested-admission',
+    initialHostOutputIdPrefix: 'root-render-nested-initial',
+    requestIdPrefix: 'root-render-nested-request',
+    rootIdPrefix: 'root-render-nested-root',
+    rootRenderHostOutputIdPrefix: 'root-render-nested-host-output',
+    sideEffectIdPrefix: 'root-render-nested-side-effect',
+    updateIdPrefix: 'root-render-nested-update'
+  });
+  const create = bridge.createClientRoot(container);
+  const metadata = createRootWorkLoopFinishedWorkMetadata({
+    childTags: ['HostComponent', 'HostComponent', 'HostText'],
+    hostComponentCount: 2,
+    hostOutputShape: 'nested-host-component',
+    hostTextCount: 1,
+    hostType: 'section',
+    renderUpdateId: 'root-render-nested-update:1',
+    rootId: create.rootId,
+    rootTag: create.rootTag,
+    textContent: 'accepted nested rust host output'
+  });
+
+  const record = bridge.renderRootHostOutput(create, element, {
+    rootWorkLoopFinishedWorkMetadata: metadata
+  });
+  const hidden = rootBridge.getPrivateRootRenderHostOutputPayload(record);
+  const handoffPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      hidden.hostOutputHandoff
+    );
+  const finishedWork = record.rootWorkLoopFinishedWorkRecord;
+  const finishedWorkPayload =
+    rootBridge.getPrivateRootRenderHostOutputFinishedWorkPayload(
+      finishedWork
+    );
+  const parentNode = container.firstChild;
+  const childNode = parentNode.firstChild;
+  const textNode = childNode.firstChild;
+
+  assert.equal(record.hostOutputShape, 'nested-host-component');
+  assert.equal(record.hostType, 'section');
+  assert.equal(record.hostComponentCount, 2);
+  assert.equal(record.hostTextCount, 1);
+  assert.deepEqual(record.childTags, [
+    'HostComponent',
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(record.containerChildCount, 1);
+  assert.equal(record.hostChildCount, 1);
+  assert.equal(record.textContent, 'accepted nested rust host output');
+  assert.equal(record.publicRootExecution, false);
+  assert.equal(record.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.browserDomMutation, false);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.refEffects, false);
+  assert.equal(record.compatibilityClaimed, false);
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'private-create-root-record',
+      'private-root-render-record',
+      'root-marker-setup-cleanup',
+      'root-listener-setup-cleanup',
+      'create-render-admission',
+      'root-work-loop-finished-work-handoff',
+      'fake-dom-host-output-mutation',
+      'component-tree-host-instance-map',
+      'latest-props-publication',
+      'fake-dom-nested-host-component-child'
+    ]
+  );
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+
+  assert.equal(finishedWork.hostOutputShape, 'nested-host-component');
+  assert.equal(finishedWork.hostComponentCount, 2);
+  assert.equal(finishedWork.hostTextCount, 1);
+  assert.deepEqual(finishedWork.childTags, [
+    'HostComponent',
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(finishedWork.rootChildTag, 'HostComponent');
+  assert.equal(finishedWork.completedChildTag, 'HostComponent');
+  assert.equal(finishedWork.hostTextChildTag, 'HostText');
+  assert.equal(finishedWork.publicRootRenderingBlocked, true);
+  assert.equal(finishedWork.compatibilityClaimed, false);
+  assert.equal(finishedWorkPayload.metadata, metadata);
+  assert.equal(finishedWorkPayload.hostOutputPayload, handoffPayload);
+
+  assert.equal(handoffPayload.hostOutputShape, 'nested-host-component');
+  assert.equal(handoffPayload.hostNode, parentNode);
+  assert.equal(handoffPayload.childHostNode, childNode);
+  assert.equal(handoffPayload.textNode, textNode);
+  assert.deepEqual(handoffPayload.hostNodes, [parentNode, childNode]);
+  assert.deepEqual(handoffPayload.textNodes, [textNode]);
+  assert.equal(handoffPayload.latestPropsAfterCommit, element.props);
+  assert.equal(
+    handoffPayload.childLatestPropsAfterCommit,
+    childElement.props
+  );
+  assert.deepEqual(handoffPayload.latestPropsAfterCommits, [
+    element.props,
+    childElement.props
+  ]);
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(handoffPayload.hostToken),
+    parentNode
+  );
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(
+      handoffPayload.childHostToken
+    ),
+    childNode
+  );
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(handoffPayload.textToken),
+    textNode
+  );
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(
+      handoffPayload.hostTokens[0]
+    ),
+    parentNode
+  );
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(
+      handoffPayload.hostTokens[1]
+    ),
+    childNode
+  );
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(
+      handoffPayload.childHostToken
+    ),
+    create.owner
+  );
+  assert.equal(componentTree.getRootOwnerFromNode(parentNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(childNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), create.owner);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), element.props);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    childElement.props
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(parentNode.nodeName, 'SECTION');
+  assert.equal(childNode.nodeName, 'SPAN');
+  assert.equal(textNode.nodeName, '#text');
+  assert.equal(textNode.nodeValue, 'accepted nested rust host output');
+  assert.equal(parentNode.textContent, 'accepted nested rust host output');
+  assert.equal(childNode.textContent, 'accepted nested rust host output');
+  assert.equal(container.textContent, 'accepted nested rust host output');
+  assert.deepEqual(attributeEntries(parentNode), [
+    ['class', 'nested-parent'],
+    ['id', 'nested-parent'],
+    ['title', 'Nested parent']
+  ]);
+  assert.deepEqual(attributeEntries(childNode), [
+    ['id', 'nested-child'],
+    ['title', 'Nested child']
+  ]);
+  assert.deepEqual(container.mutationLog, [['appendChild', 'SECTION']]);
+  assert.deepEqual(parentNode.mutationLog, [['appendChild', 'SPAN']]);
+  assert.deepEqual(childNode.mutationLog, [['appendChild', '#text']]);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+
+  const serialized = JSON.stringify(record);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('not-invoked'), false);
+
+  const cleanup = bridge.cleanupInitialRenderHostOutput(
+    hidden.hostOutputHandoff
+  );
+  assert.equal(cleanup.removedRootChild, true);
+  assert.equal(cleanup.removedRootChildCount, 1);
+  assert.equal(cleanup.detachedHostInstanceCount, 3);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(componentTree.getRootOwnerFromNode(parentNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(childNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+});
+
+test('private root render nested host-output rollback detaches all partial nodes', () => {
+  const document = createDocument(
+    'private-root-render-nested-host-output-rollback'
+  );
+  const container = createElement('DIV', document);
+  const createdElements = [];
+  const createdTextNodes = [];
+  const originalCreateElement = document.createElement;
+  const originalCreateTextNode = document.createTextNode;
+  document.createElement = function createThrowingNestedElement(tagName) {
+    const node = originalCreateElement.call(this, tagName);
+    createdElements.push(node);
+    if (node.nodeName === 'SECTION') {
+      const originalAppendChild = node.appendChild;
+      node.appendChild = function appendChildWithNestedFailure(child) {
+        if (child.nodeName === 'SPAN') {
+          throw new Error('synthetic nested HostComponent append failure');
+        }
+        return originalAppendChild.call(this, child);
+      };
+    }
+    return node;
+  };
+  document.createTextNode = function createTrackedTextNode(text) {
+    const node = originalCreateTextNode.call(this, text);
+    createdTextNodes.push(node);
+    return node;
+  };
+  const childElement = {
+    props: {
+      children: 'rollback nested rust host output',
+      id: 'rollback-child',
+      title: 'Rollback child'
+    },
+    type: 'span'
+  };
+  const element = {
+    props: {
+      children: childElement,
+      className: 'rollback-parent',
+      id: 'rollback-parent',
+      title: 'Rollback parent'
+    },
+    type: 'section'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    initialHostOutputIdPrefix: 'root-render-nested-rollback-initial',
+    requestIdPrefix: 'root-render-nested-rollback-request',
+    rootIdPrefix: 'root-render-nested-rollback-root',
+    rootRenderHostOutputIdPrefix: 'root-render-nested-rollback-host-output',
+    sideEffectIdPrefix: 'root-render-nested-rollback-side-effect',
+    updateIdPrefix: 'root-render-nested-rollback-update'
+  });
+  const create = bridge.createClientRoot(container);
+  const metadata = createRootWorkLoopFinishedWorkMetadata({
+    childTags: ['HostComponent', 'HostComponent', 'HostText'],
+    hostComponentCount: 2,
+    hostOutputShape: 'nested-host-component',
+    hostTextCount: 1,
+    hostType: 'section',
+    renderUpdateId: 'root-render-nested-rollback-update:1',
+    rootId: create.rootId,
+    rootTag: create.rootTag,
+    textContent: 'rollback nested rust host output'
+  });
+
+  assert.throws(
+    () =>
+      bridge.renderRootHostOutput(create, element, {
+        rootWorkLoopFinishedWorkMetadata: metadata
+      }),
+    {
+      message: /synthetic nested HostComponent append failure/
+    }
+  );
+
+  assert.equal(createdElements.length, 2);
+  assert.equal(createdTextNodes.length, 1);
+  const parentNode = createdElements[0];
+  const childNode = createdElements[1];
+  const textNode = createdTextNodes[0];
+
+  assert.equal(parentNode.nodeName, 'SECTION');
+  assert.equal(childNode.nodeName, 'SPAN');
+  assert.equal(textNode.nodeName, '#text');
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.textContent, '');
+  assert.equal(parentNode.parentNode, null);
+  assert.equal(childNode.parentNode, null);
+  assert.equal(textNode.parentNode, null);
+  assert.equal(parentNode.childNodes.length, 0);
+  assert.equal(childNode.childNodes.length, 0);
+  assert.equal(componentTree.getRootOwnerFromNode(parentNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(childNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(parentNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(childNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.deepEqual(attributeEntries(parentNode), []);
+  assert.deepEqual(attributeEntries(childNode), []);
+  assert.deepEqual(childNode.mutationLog, [
+    ['appendChild', '#text'],
+    ['removeChild', '#text']
+  ]);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+});
+
 test('private initial host output handoff validates admission and rolls back unsupported children', () => {
   const document = createDocument('private-initial-host-output-validation');
   const container = createElement('DIV', document);
@@ -9513,6 +9862,7 @@ function createHostOutputAttributeStyleProps(phase) {
 }
 
 function createRootWorkLoopFinishedWorkMetadata(options) {
+  const childTags = options.childTags || ['HostComponent', 'HostText'];
   return {
     source: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
     status: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
@@ -9524,13 +9874,16 @@ function createRootWorkLoopFinishedWorkMetadata(options) {
       rootTag: options.rootTag,
       renderUpdateId: options.renderUpdateId,
       hostType: options.hostType,
+      hostOutputShape: options.hostOutputShape,
+      hostComponentCount: options.hostComponentCount,
+      hostTextCount: options.hostTextCount,
       textContent: options.textContent
     },
     completeWork: {
-      rootChildTag: 'HostComponent',
-      completedChildTag: 'HostComponent',
-      hostTextChildTag: 'HostText',
-      childTags: ['HostComponent', 'HostText']
+      rootChildTag: options.rootChildTag || 'HostComponent',
+      completedChildTag: options.completedChildTag || 'HostComponent',
+      hostTextChildTag: options.hostTextChildTag || 'HostText',
+      childTags
     },
     pending: {
       recordsFinishedWork: true,
@@ -9550,8 +9903,9 @@ function createRootWorkLoopFinishedWorkMetadata(options) {
       effectsRefsAndHydrationBlocked: true
     },
     placement: {
-      tag: 'HostComponent',
-      applyKind: 'append-placement-to-container',
+      tag: options.placementTag || 'HostComponent',
+      applyKind:
+        options.placementApplyKind || 'append-placement-to-container',
       siblingStatus: 'append'
     }
   };
