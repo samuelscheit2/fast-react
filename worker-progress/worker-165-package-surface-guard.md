@@ -102,7 +102,8 @@ git status --short --untracked-files=all
 
 - `npm run check:package-surface` passed.
 - `npm run check:js` passed, including the new package-surface guard, existing
-  smoke import test, workspace checks, and 415 conformance tests.
+  smoke import test, benchmark gate, workspace checks, and 428 conformance
+  tests.
 - `git diff --check` passed after marking new files intent-to-add so the
   untracked guard files were included in the whitespace check.
 - npm printed the existing `minimum-release-age` config warning during npm
