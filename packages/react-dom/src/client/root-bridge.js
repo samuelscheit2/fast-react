@@ -6241,6 +6241,21 @@ function createPortalEventOwnerRootGateRecordWithBridge(
       eventOwnerRootGateRecord.rootContainerContainsTarget,
     portalContainerIsRootContainer:
       eventOwnerRootGateRecord.portalContainerIsRootContainer,
+    portalContainerNestedInRootContainer:
+      eventOwnerRootGateRecord.portalContainerNestedInRootContainer,
+    portalContainerPath:
+      eventOwnerRootGateRecord.portalContainerPath,
+    portalContainerPathLength:
+      eventOwnerRootGateRecord.portalContainerPathLength,
+    portalContainerPathStatus:
+      eventOwnerRootGateRecord.portalContainerPathStatus,
+    portalContainerPathRootOwnerMatchCount:
+      eventOwnerRootGateRecord.portalContainerPathRootOwnerMatchCount,
+    portalOwnerRootEventPath:
+      eventOwnerRootGateRecord.portalOwnerRootEventPath,
+    portalOwnerRootEventPathLength:
+      eventOwnerRootGateRecord.portalOwnerRootEventPathLength,
+    ownerRootInfo: eventOwnerRootGateRecord.ownerRootInfo,
     ownerRootAttachment: freezeRecord({
       eventTargetRootOwnerMatchesPortalOwner:
         eventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
@@ -6258,6 +6273,7 @@ function createPortalEventOwnerRootGateRecordWithBridge(
     portalEventPathDiagnostic: true,
     portalEventBubbling: false,
     publicPortalBubbling: false,
+    publicPortalBubblingBlocked: true,
     publicPortalMounting: false,
     publicRootCompatibilitySurface: false,
     publicRootRenderCompatibilityClaimed: false,
@@ -6271,6 +6287,8 @@ function createPortalEventOwnerRootGateRecordWithBridge(
     resourceSideEffects: false,
     hydration: false,
     eventDispatch: false,
+    publicDispatchBlocked: true,
+    portalContainerListenerDispatchBlocked: true,
     listenerInvocationCount: 0,
     syntheticEventCount: 0,
     browserDomEventCompatibilityClaimed: false,
@@ -6903,11 +6921,21 @@ function createEventListenerRootErrorRoutingRecordWithBridge(
       portalEventOwnerRootValidation.targetDispatchPathLength,
     portalContainerContainsEventTarget:
       portalEventOwnerRootValidation.portalContainerContainsTarget,
+    portalContainerNestedInRootContainer:
+      portalEventOwnerRootValidation.portalContainerNestedInRootContainer,
+    portalContainerPathLength:
+      portalEventOwnerRootValidation.portalContainerPathLength,
+    portalContainerPathStatus:
+      portalEventOwnerRootValidation.portalContainerPathStatus,
     rootContainerContainsEventTarget:
       portalEventOwnerRootValidation.rootContainerContainsTarget,
     portalEventBubbling: false,
     publicPortalBubbling: false,
+    publicPortalBubblingBlocked:
+      portalEventOwnerRootValidation.publicPortalBubblingBlocked,
     portalEventDispatch: false,
+    publicDispatchBlocked:
+      portalEventOwnerRootValidation.publicDispatchBlocked,
     portalListenerInstallation: false,
     rootErrorOptionCallbackRecordStatus:
       ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
@@ -9424,8 +9452,13 @@ function validateEventListenerRootErrorRoutingPortalEventOwnerRootGate(
       pluginGatePayload: null,
       pluginGateRecord: null,
       portalContainerContainsTarget: false,
+      portalContainerNestedInRootContainer: false,
+      portalContainerPathLength: 0,
+      portalContainerPathStatus: 'not-applicable',
       rootContainerContainsTarget: false,
-      targetDispatchPathLength: 0
+      targetDispatchPathLength: 0,
+      publicDispatchBlocked: false,
+      publicPortalBubblingBlocked: false
     });
   }
 
@@ -9488,7 +9521,10 @@ function validateEventListenerRootErrorRoutingPortalEventOwnerRootGate(
   if (
     pluginGatePayload.ownerRoot !== requestValidation.rootOwner ||
     pluginGateRecord.ownerRootMatchesTargetRoot !== true ||
+    pluginGateRecord.publicDispatchBlocked !== true ||
     pluginGateRecord.publicPortalBubblingEnabled !== false ||
+    pluginGateRecord.publicPortalBubblingBlocked !== true ||
+    pluginGateRecord.portalContainerListenerDispatchBlocked !== true ||
     pluginGateRecord.eventDispatch !== false
   ) {
     throwInvalidEventListenerRootErrorRouting(
@@ -9509,8 +9545,16 @@ function validateEventListenerRootErrorRoutingPortalEventOwnerRootGate(
     pluginGateRecord,
     portalContainerContainsTarget:
       pluginGateRecord.portalContainerContainsTarget,
+    portalContainerNestedInRootContainer:
+      pluginGateRecord.portalContainerNestedInRootContainer,
+    portalContainerPathLength:
+      pluginGateRecord.portalContainerPathLength,
+    portalContainerPathStatus:
+      pluginGateRecord.portalContainerPathStatus,
     rootContainerContainsTarget: pluginGateRecord.rootContainerContainsTarget,
-    targetDispatchPathLength: pluginGateRecord.targetDispatchPathLength
+    targetDispatchPathLength: pluginGateRecord.targetDispatchPathLength,
+    publicDispatchBlocked: pluginGateRecord.publicDispatchBlocked,
+    publicPortalBubblingBlocked: pluginGateRecord.publicPortalBubblingBlocked
   });
 }
 
@@ -9563,11 +9607,21 @@ function createEventListenerRootErrorOptionCallbackRecord({
       portalEventOwnerRootValidation.targetDispatchPathLength,
     portalContainerContainsEventTarget:
       portalEventOwnerRootValidation.portalContainerContainsTarget,
+    portalContainerNestedInRootContainer:
+      portalEventOwnerRootValidation.portalContainerNestedInRootContainer,
+    portalContainerPathLength:
+      portalEventOwnerRootValidation.portalContainerPathLength,
+    portalContainerPathStatus:
+      portalEventOwnerRootValidation.portalContainerPathStatus,
     rootContainerContainsEventTarget:
       portalEventOwnerRootValidation.rootContainerContainsTarget,
     portalEventBubbling: false,
     publicPortalBubbling: false,
+    publicPortalBubblingBlocked:
+      portalEventOwnerRootValidation.publicPortalBubblingBlocked,
     portalEventDispatch: false,
+    publicDispatchBlocked:
+      portalEventOwnerRootValidation.publicDispatchBlocked,
     errorName: errorSummary.name,
     errorMessage: errorSummary.message,
     errorCode: errorSummary.code,
@@ -10435,9 +10489,19 @@ function summarizePortalEventOwnerRootGateRecord(record) {
     eventRecordKind: record.kind,
     eventRecordStatus: record.status,
     listenerInvocationCount: record.listenerInvocationCount,
+    ownerRootInfo: record.ownerRootInfo,
     ownerRootMatchesTargetRoot: record.ownerRootMatchesTargetRoot,
     portalContainerContainsTarget: record.portalContainerContainsTarget,
+    portalContainerNestedInRootContainer:
+      record.portalContainerNestedInRootContainer,
+    portalContainerPathLength: record.portalContainerPathLength,
+    portalContainerPathStatus: record.portalContainerPathStatus,
+    portalContainerPathRootOwnerMatchCount:
+      record.portalContainerPathRootOwnerMatchCount,
+    portalOwnerRootEventPathLength: record.portalOwnerRootEventPathLength,
     publicPortalBubblingEnabled: record.publicPortalBubblingEnabled,
+    publicPortalBubblingBlocked: record.publicPortalBubblingBlocked,
+    publicDispatchBlocked: record.publicDispatchBlocked,
     rootContainerContainsTarget: record.rootContainerContainsTarget,
     syntheticEventCount: record.syntheticEventCount,
     targetDispatchPathLength: record.targetDispatchPathLength,
