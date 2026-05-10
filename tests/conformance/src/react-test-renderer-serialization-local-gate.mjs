@@ -633,6 +633,40 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bpublicTestInstanceObjectAvailable\s*:\s*false\b/u
     );
+  const privateRecordOnlyTestInstanceQueryPathPresent =
+    privateRecordOnlyTestInstanceWrapperPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceAcceptedInspectionRecords\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceQueryPath\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceQueryMethodRecords\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-private-test-instance-find-all-query\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererCommittedFiberTreeInspection::host_component\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bskippedByQueryTraversal\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpredicateExecution\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicQueryMethodAvailable\s*:\s*false\b/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -674,6 +708,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
+    privateRecordOnlyTestInstanceQueryPathPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,
@@ -892,6 +927,7 @@ function isErrorSurfacePrivateDiagnosticRowReady(rowId, localChecks) {
   if (rowId === "react-test-renderer-test-instance-private-fiber-diagnostic") {
     return (
       localChecks.committedFiberInspectionPresent &&
+      localChecks.privateRecordOnlyTestInstanceQueryPathPresent &&
       localChecks.publicTestInstanceErrorSurfaceBlocked &&
       !localChecks.publicTestInstanceWrappersPresent
     );

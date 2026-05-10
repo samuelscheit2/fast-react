@@ -174,6 +174,10 @@ test("React test renderer error surface local gate admits only private diagnosti
   assert.equal(gate.localChecks.unmountPrivateRoutePresent, true);
   assert.equal(gate.localChecks.privateJsonDiagnosticsPresent, true);
   assert.equal(gate.localChecks.committedFiberInspectionPresent, true);
+  assert.equal(
+    gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
+    true
+  );
   assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
   assert.equal(
     gate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked,
