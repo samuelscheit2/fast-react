@@ -6,7 +6,7 @@
 //! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
 //! HostRoot render/commit handoff, including callback snapshot diagnostics,
 //! plus a private committed host-output canary for one HostComponent with one
-//! HostText child. It still stops before serialization, act, or public
+//! HostText child. It still stops before public serialization, act, or public
 //! `react-test-renderer` compatibility.
 
 use std::collections::BTreeMap;
@@ -844,6 +844,8 @@ impl TestRendererRootUpdateOutcome {
 
 pub const TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME: &str =
     "fast-react-test-renderer.serialization.private-canary";
+pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.serialization.private-json-canary";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
     "react-19.2.6-react-test-renderer-serialization-oracle";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
@@ -1159,6 +1161,188 @@ impl TestRendererSerializationGateReport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererPrivateJsonNodeKind {
+    HostComponent,
+    Text,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateJsonPublicSurfaceBlockers {
+    json_method_blocked: bool,
+    tree_method_blocked: bool,
+    instance_wrapper_blocked: bool,
+    js_facade_routing_blocked: bool,
+    public_act_blocked: bool,
+    compatibility_claim_blocked: bool,
+}
+
+impl TestRendererPrivateJsonPublicSurfaceBlockers {
+    #[must_use]
+    pub const fn blocked() -> Self {
+        Self {
+            json_method_blocked: true,
+            tree_method_blocked: true,
+            instance_wrapper_blocked: true,
+            js_facade_routing_blocked: true,
+            public_act_blocked: true,
+            compatibility_claim_blocked: true,
+        }
+    }
+
+    #[must_use]
+    pub const fn json_method_blocked(self) -> bool {
+        self.json_method_blocked
+    }
+
+    #[must_use]
+    pub const fn tree_method_blocked(self) -> bool {
+        self.tree_method_blocked
+    }
+
+    #[must_use]
+    pub const fn instance_wrapper_blocked(self) -> bool {
+        self.instance_wrapper_blocked
+    }
+
+    #[must_use]
+    pub const fn js_facade_routing_blocked(self) -> bool {
+        self.js_facade_routing_blocked
+    }
+
+    #[must_use]
+    pub const fn public_act_blocked(self) -> bool {
+        self.public_act_blocked
+    }
+
+    #[must_use]
+    pub const fn compatibility_claim_blocked(self) -> bool {
+        self.compatibility_claim_blocked
+    }
+
+    #[must_use]
+    pub const fn all_blocked(self) -> bool {
+        self.json_method_blocked
+            && self.tree_method_blocked
+            && self.instance_wrapper_blocked
+            && self.js_facade_routing_blocked
+            && self.public_act_blocked
+            && self.compatibility_claim_blocked
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateJsonTextDiagnostic {
+    text: String,
+    hidden: bool,
+}
+
+impl TestRendererPrivateJsonTextDiagnostic {
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    #[must_use]
+    pub const fn node_kind(&self) -> TestRendererPrivateJsonNodeKind {
+        TestRendererPrivateJsonNodeKind::Text
+    }
+
+    #[must_use]
+    pub const fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateJsonHostComponentDiagnostic {
+    element_type: TestElementType,
+    props: TestProps,
+    hidden: bool,
+    detached: bool,
+    child_count: usize,
+    text_child: TestRendererPrivateJsonTextDiagnostic,
+}
+
+impl TestRendererPrivateJsonHostComponentDiagnostic {
+    #[must_use]
+    pub fn element_type(&self) -> &TestElementType {
+        &self.element_type
+    }
+
+    #[must_use]
+    pub fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn node_kind(&self) -> TestRendererPrivateJsonNodeKind {
+        TestRendererPrivateJsonNodeKind::HostComponent
+    }
+
+    #[must_use]
+    pub const fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+
+    #[must_use]
+    pub const fn is_detached(&self) -> bool {
+        self.detached
+    }
+
+    #[must_use]
+    pub const fn child_count(&self) -> usize {
+        self.child_count
+    }
+
+    #[must_use]
+    pub const fn text_child(&self) -> &TestRendererPrivateJsonTextDiagnostic {
+        &self.text_child
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateJsonSerializationReport {
+    diagnostic_name: &'static str,
+    gate: TestRendererSerializationGateReport,
+    root_child_count: usize,
+    root_node_kind: TestRendererPrivateJsonNodeKind,
+    component: TestRendererPrivateJsonHostComponentDiagnostic,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+}
+
+impl TestRendererPrivateJsonSerializationReport {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn gate(&self) -> &TestRendererSerializationGateReport {
+        &self.gate
+    }
+
+    #[must_use]
+    pub const fn root_child_count(&self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn root_node_kind(&self) -> TestRendererPrivateJsonNodeKind {
+        self.root_node_kind
+    }
+
+    #[must_use]
+    pub const fn component(&self) -> &TestRendererPrivateJsonHostComponentDiagnostic {
+        &self.component
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
@@ -1217,6 +1401,54 @@ impl Display for TestRendererSerializationGateError {
 impl Error for TestRendererSerializationGateError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateJsonSerializationError {
+    HostOutputSnapshotStale,
+    RootChildCount {
+        actual: usize,
+    },
+    RootChildIsText,
+    HostComponentChildCount {
+        element_type: TestElementType,
+        actual: usize,
+    },
+    HostComponentChildIsElement {
+        element_type: TestElementType,
+    },
+}
+
+impl Display for TestRendererPrivateJsonSerializationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::HostOutputSnapshotStale => formatter.write_str(
+                "private JSON serialization canary snapshot is not the current host output",
+            ),
+            Self::RootChildCount { actual } => write!(
+                formatter,
+                "private JSON serialization canary expected exactly one root child, found {actual}",
+            ),
+            Self::RootChildIsText => formatter.write_str(
+                "private JSON serialization canary expected a root host component, found text",
+            ),
+            Self::HostComponentChildCount {
+                element_type,
+                actual,
+            } => write!(
+                formatter,
+                "private JSON serialization canary expected host component '{}' to have exactly one text child, found {actual}",
+                element_type.as_str()
+            ),
+            Self::HostComponentChildIsElement { element_type } => write!(
+                formatter,
+                "private JSON serialization canary expected host component '{}' child to be text, found host component",
+                element_type.as_str()
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateJsonSerializationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererRootError {
     Host(HostError),
     FiberRootStore(FiberRootStoreError),
@@ -1225,6 +1457,7 @@ pub enum TestRendererRootError {
     RootWorkLoop(RootWorkLoopError),
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
+    PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     HostOutputCanary(TestRendererHostOutputCanaryError),
     MissingHostOutputFixture { element: RootElementHandle },
 }
@@ -1239,6 +1472,7 @@ impl Display for TestRendererRootError {
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::SerializationGate(error) => Display::fmt(error, formatter),
+            Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::HostOutputCanary(error) => Display::fmt(error, formatter),
             Self::MissingHostOutputFixture { element } => write!(
                 formatter,
@@ -1259,6 +1493,7 @@ impl Error for TestRendererRootError {
             Self::RootWorkLoop(error) => Some(error),
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
+            Self::PrivateJsonSerialization(error) => Some(error),
             Self::HostOutputCanary(error) => Some(error),
             Self::MissingHostOutputFixture { .. } => None,
         }
@@ -1304,6 +1539,12 @@ impl From<RootCommitError> for TestRendererRootError {
 impl From<TestRendererSerializationGateError> for TestRendererRootError {
     fn from(error: TestRendererSerializationGateError) -> Self {
         Self::SerializationGate(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateJsonSerializationError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateJsonSerializationError) -> Self {
+        Self::PrivateJsonSerialization(Box::new(error))
     }
 }
 
@@ -1599,6 +1840,28 @@ impl TestRendererRoot {
         }
     }
 
+    pub fn describe_private_json_serialization_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
+        let gate = self.describe_serialization_gate_for_canary(output.commit())?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
+        }
+
+        let component = Self::private_json_component_from_snapshot(output.snapshot())?;
+
+        Ok(TestRendererPrivateJsonSerializationReport {
+            diagnostic_name: TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+            gate,
+            root_child_count: output.snapshot().children().len(),
+            root_node_kind: component.node_kind(),
+            component,
+            public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers::blocked(),
+        })
+    }
+
     pub fn render_and_commit_host_output_for_canary(
         &mut self,
     ) -> Result<Option<TestRendererCommittedHostOutput>, TestRendererRootError> {
@@ -1774,6 +2037,52 @@ impl TestRendererRoot {
             &root_context,
         )?;
         Ok((instance, text))
+    }
+
+    fn private_json_component_from_snapshot(
+        snapshot: &TestContainerSnapshot,
+    ) -> Result<
+        TestRendererPrivateJsonHostComponentDiagnostic,
+        TestRendererPrivateJsonSerializationError,
+    > {
+        if snapshot.children().len() != 1 {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildCount {
+                actual: snapshot.children().len(),
+            });
+        }
+
+        let TestNodeSnapshot::Element(element) = &snapshot.children()[0] else {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildIsText);
+        };
+
+        if element.children().len() != 1 {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostComponentChildCount {
+                    element_type: element.element_type().clone(),
+                    actual: element.children().len(),
+                },
+            );
+        }
+
+        let TestNodeSnapshot::Text(text) = &element.children()[0] else {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostComponentChildIsElement {
+                    element_type: element.element_type().clone(),
+                },
+            );
+        };
+
+        Ok(TestRendererPrivateJsonHostComponentDiagnostic {
+            element_type: element.element_type().clone(),
+            props: element.props().clone(),
+            hidden: element.is_hidden(),
+            detached: element.is_detached(),
+            child_count: element.children().len(),
+            text_child: TestRendererPrivateJsonTextDiagnostic {
+                text: text.text().to_owned(),
+                hidden: text.is_hidden(),
+            },
+        })
     }
 
     const fn instance_state_node_raw(instance: TestInstance) -> u64 {
@@ -2572,6 +2881,149 @@ mod tests {
             root.diagnostic_container_snapshot().unwrap(),
             snapshot.clone()
         );
+    }
+
+    #[test]
+    fn root_private_json_serialization_canary_describes_minimal_host_component_with_text() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_json_serialization_for_canary(&output)
+            .unwrap();
+        let gate = report.gate();
+        let host_output = gate.host_output();
+        let blockers = report.public_blockers();
+        let component = report.component();
+        let text = component.text_child();
+
+        assert_eq!(
+            report.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            gate.status(),
+            TestRendererSerializationGateStatus::ClosedMissingFiberInspection
+        );
+        assert!(gate.is_closed());
+        assert!(!gate.is_ready());
+        assert_eq!(host_output.container_child_count(), 1);
+        assert_eq!(host_output.instance_count(), 1);
+        assert_eq!(host_output.text_count(), 1);
+        assert!(host_output.real_host_output_available());
+        assert!(gate.requirements().root_commit_diagnostics_available());
+        assert!(gate.requirements().real_host_output_available());
+        assert!(!gate.requirements().committed_fiber_inspection_available());
+        assert!(!gate.requirements().private_serialization_ready());
+        assert_eq!(report.root_child_count(), 1);
+        assert_eq!(
+            report.root_node_kind(),
+            TestRendererPrivateJsonNodeKind::HostComponent
+        );
+        assert_eq!(
+            component.node_kind(),
+            TestRendererPrivateJsonNodeKind::HostComponent
+        );
+        assert_eq!(component.element_type().as_str(), "span");
+        assert_eq!(component.props(), &TestProps::new());
+        assert_eq!(component.child_count(), 1);
+        assert!(!component.is_hidden());
+        assert!(!component.is_detached());
+        assert_eq!(text.node_kind(), TestRendererPrivateJsonNodeKind::Text);
+        assert_eq!(text.text(), "hello");
+        assert!(!text.is_hidden());
+        assert!(blockers.all_blocked());
+        assert!(blockers.json_method_blocked());
+        assert!(blockers.tree_method_blocked());
+        assert!(blockers.instance_wrapper_blocked());
+        assert!(blockers.js_facade_routing_blocked());
+        assert!(blockers.public_act_blocked());
+        assert!(blockers.compatibility_claim_blocked());
+    }
+
+    #[test]
+    fn root_private_json_serialization_canary_rejects_stale_host_output_snapshot() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let mut output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        output.snapshot = TestContainerSnapshot { children: vec![] };
+
+        let error = root
+            .describe_private_json_serialization_for_canary(&output)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON serialization error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale
+        ));
+    }
+
+    #[test]
+    fn root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes() {
+        let empty_snapshot = TestContainerSnapshot { children: vec![] };
+        let text_root_snapshot = TestContainerSnapshot {
+            children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                text: "hello".to_owned(),
+                hidden: false,
+            })],
+        };
+        let nested_component_snapshot = TestContainerSnapshot {
+            children: vec![TestNodeSnapshot::Element(TestElementSnapshot {
+                element_type: TestElementType::new("span"),
+                props: TestProps::new(),
+                hidden: false,
+                detached: false,
+                children: vec![TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: TestElementType::new("b"),
+                    props: TestProps::new(),
+                    hidden: false,
+                    detached: false,
+                    children: vec![],
+                })],
+            })],
+        };
+
+        let empty_error =
+            TestRendererRoot::private_json_component_from_snapshot(&empty_snapshot).unwrap_err();
+        let text_root_error =
+            TestRendererRoot::private_json_component_from_snapshot(&text_root_snapshot)
+                .unwrap_err();
+        let nested_component_error =
+            TestRendererRoot::private_json_component_from_snapshot(&nested_component_snapshot)
+                .unwrap_err();
+
+        assert!(matches!(
+            empty_error,
+            TestRendererPrivateJsonSerializationError::RootChildCount { actual: 0 }
+        ));
+        assert!(matches!(
+            text_root_error,
+            TestRendererPrivateJsonSerializationError::RootChildIsText
+        ));
+        assert!(matches!(
+            nested_component_error,
+            TestRendererPrivateJsonSerializationError::HostComponentChildIsElement {
+                element_type
+            } if element_type.as_str() == "span"
+        ));
     }
 
     #[test]
