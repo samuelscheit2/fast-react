@@ -78,9 +78,17 @@ sequencing belong in `MASTER_PLAN.md`.
 - Worker 174 ref token lifecycle hardening was merged, making host token
   metadata reads and invalidation phase/target scoped for future ref
   attach/detach commit phases.
+- Worker 150 sync flush execution context foundation was merged, adding
+  explicit execution-context guards and deterministic sync-flush render records
+  for later HostRoot commit handoff without public facade behavior or host
+  mutation.
 
 ## Latest Accepted Verification
 
+- Worker 150 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused execution-context and root-scheduler
+  tests, full `fast-react-reconciler` tests, reconciler clippy with warnings
+  denied, and `git diff --check`.
 - Worker 174 was verified on its worktree and again on `main` with `cargo fmt
   --all --check`, focused host token tests, full `fast-react-reconciler` tests,
   reconciler clippy with warnings denied, and `git diff --check`.

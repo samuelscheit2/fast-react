@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 150: sync flush execution context in
-  `/Users/user/Developer/Developer/fast-react-worker-150-sync-flush-execution-context`.
 - Worker 151: HostComponent/HostText complete-work skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-151-host-complete-work-skeleton`.
 - Worker 153: Rust test-renderer root canary in
