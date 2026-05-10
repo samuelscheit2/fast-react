@@ -1129,6 +1129,36 @@ mod tests {
     }
 
     #[test]
+    fn pinged_retry_lanes_do_not_unblock_warm_offscreen_work() {
+        let mut state = RootLaneState::new();
+        let retry_lanes = lanes(&[Lane::RETRY_1, Lane::RETRY_2]);
+        let suspended_lanes = retry_lanes.merge(Lanes::OFFSCREEN);
+        state.mark_updated(Lane::RETRY_1);
+        state.mark_updated(Lane::RETRY_2);
+        state.mark_updated(Lane::OFFSCREEN);
+        state.mark_suspended(suspended_lanes, Lane::NO, true);
+
+        // A retry ping represents only the accepted lane bookkeeping. It must
+        // not imply Suspense wakeable support or Offscreen hidden rendering.
+        state.mark_pinged(Lanes::from(Lane::RETRY_2));
+
+        assert_eq!(state.pending_lanes(), suspended_lanes);
+        assert_eq!(state.suspended_lanes(), suspended_lanes);
+        assert_eq!(state.pinged_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(state.warm_lanes(), lanes(&[Lane::RETRY_1, Lane::OFFSCREEN]));
+        assert_eq!(
+            state.get_next_lanes(Lanes::NO, false),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            state.get_next_lanes_to_flush_sync(suspended_lanes),
+            lanes(&[Lane::SYNC, Lane::RETRY_2])
+        );
+        assert!(!state.check_if_root_is_prerendering(Lanes::from(Lane::RETRY_2)));
+        assert!(state.check_if_root_is_prerendering(Lanes::OFFSCREEN));
+    }
+
+    #[test]
     fn get_next_lanes_groups_sync_updates_like_react_source() {
         let mut state = RootLaneState::new();
         state.mark_updated(Lane::SYNC);

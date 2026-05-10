@@ -1402,13 +1402,15 @@ mod tests {
     use crate::{
         HostRootHydrationState, PendingChildrenHandle, PendingCommitHandle, RootContextHandle,
         RootElementHandle, RootHydrationCallbacksHandle, RootKind, RootOptions,
-        RootSuspenseBoundarySetHandle, RootTaskScheduleOutcome, RootTransitionCallbacksHandle,
-        ensure_root_is_scheduled, process_root_schedule_in_microtask, update_container,
-        update_container_sync,
+        RootSchedulerCallbackExecutionStatus, RootSuspenseBoundarySetHandle,
+        RootTaskScheduleOutcome, RootTransitionCallbacksHandle, SchedulerCallbackRequest,
+        ensure_root_is_scheduled, execute_scheduled_root_callback,
+        process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
         ContextValueHandle, ElementTypeHandle, FiberFlags, FiberMode, FiberTag, FiberTypeHandle,
-        Lane, Lanes, PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
+        Lane, Lanes, PropsHandle, ReactKey, RootFinishedLanes, StateHandle, StateNodeHandle,
+        UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -1543,6 +1545,32 @@ mod tests {
             RootTaskScheduleOutcome::Scheduled
         );
         store.root(root_id).unwrap().scheduling().callback_node()
+    }
+
+    fn scheduled_pinged_retry_callback(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) -> SchedulerCallbackRequest {
+        let result =
+            update_container(store, root_id, RootElementHandle::from_raw(1), None).unwrap();
+        ensure_root_is_scheduled(store, result.schedule()).unwrap();
+        let retry_lanes = Lanes::from(Lane::RETRY_1).merge_lane(Lane::RETRY_2);
+        let retry_and_offscreen = retry_lanes.merge(Lanes::OFFSCREEN);
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_updated(Lane::RETRY_1);
+            lanes.mark_updated(Lane::RETRY_2);
+            lanes.mark_updated(Lane::OFFSCREEN);
+            lanes.mark_finished(RootFinishedLanes::new(Lanes::DEFAULT, retry_and_offscreen));
+            lanes.mark_suspended(retry_and_offscreen, Lane::NO, true);
+            lanes.mark_pinged(Lanes::from(Lane::RETRY_2));
+        }
+        let processed = process_root_schedule_in_microtask(store).unwrap();
+        let record = processed.records()[0];
+
+        assert_eq!(record.outcome(), RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(record.next_lanes(), Lanes::from(Lane::RETRY_2));
+        record.scheduled_callback().unwrap()
     }
 
     fn attach_function_component_wip_child(
@@ -2215,6 +2243,65 @@ mod tests {
             assert_eq!(child_node.memoized_state(), StateHandle::NONE);
             assert_eq!(child_node.update_queue(), UpdateQueueHandle::NONE);
             assert_eq!(child_node.flags(), FiberFlags::NO);
+        }
+    }
+
+    #[test]
+    fn root_work_loop_pinged_retry_scheduler_handoff_keeps_suspense_offscreen_fail_closed() {
+        for (tag, feature) in [
+            (FiberTag::Suspense, SUSPENSE_UNSUPPORTED_FEATURE),
+            (FiberTag::Offscreen, OFFSCREEN_UNSUPPORTED_FEATURE),
+        ] {
+            let (mut store, root_id, host) = root_store();
+            let current = store.root(root_id).unwrap().current();
+            let callback = scheduled_pinged_retry_callback(&mut store, root_id);
+
+            let execution = execute_scheduled_root_callback(&mut store, callback).unwrap();
+            let render = execution.render_phase().unwrap();
+            let child = attach_wip_child_with_tag(&mut store, render.work_in_progress(), tag);
+            let mut registry = TestFunctionComponentRegistry::default();
+
+            let error = preflight_host_root_child_begin_work(
+                &mut store,
+                root_id,
+                render.work_in_progress(),
+                render.render_lanes(),
+                &mut registry,
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                execution.status(),
+                RootSchedulerCallbackExecutionStatus::Rendered
+            );
+            assert_eq!(execution.selected_lanes(), Lanes::from(Lane::RETRY_2));
+            assert_eq!(render.render_lanes(), Lanes::from(Lane::RETRY_2));
+            assert_eq!(render.applied_update_count(), 0);
+            assert_eq!(render.skipped_update_count(), 1);
+            assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
+            assert_eq!(
+                error,
+                HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                    fiber: child,
+                    tag,
+                    feature,
+                }
+            );
+            assert!(registry.calls().is_empty());
+            assert_eq!(
+                current_host_root_element(&store, root_id),
+                RootElementHandle::NONE
+            );
+            assert_client_root_fail_closed_without_side_effects(
+                &store, &host, root_id, current, render, child,
+            );
+
+            let child_node = store.fiber_arena().get(child).unwrap();
+            assert_eq!(child_node.memoized_props(), PropsHandle::NONE);
+            assert_eq!(child_node.memoized_state(), StateHandle::NONE);
+            assert_eq!(child_node.update_queue(), UpdateQueueHandle::NONE);
+            assert_eq!(child_node.flags(), FiberFlags::NO);
+            assert_eq!(child_node.child(), None);
         }
     }
 
