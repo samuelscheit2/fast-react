@@ -2817,6 +2817,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     privateToJSONNativeExecutionDiagnosticName,
   privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
   privateFinishedWorkIdentityGateAvailable: true,
+  privateUpdateFinishedWorkIdentityGateAvailable: true,
+  validatesUpdateRootRequestIdentity: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
   privateFinishedWorkIdentityStatus:
@@ -2848,6 +2850,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch',
     'root_private_to_json_native_execution_evidence_rejects_stale_update_record',
     'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_evidence',
@@ -2946,6 +2950,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_unmount_host_output_row_rejects_stale_snapshot',
     'root_private_to_json_update_host_output_row_rejects_mismatched_row_kind',
     'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
     'root_private_serialization_finished_work_identity_gate_rejects_stale_evidence',
@@ -3169,6 +3175,8 @@ const toTreePrivateFacadeGate = Object.freeze({
     privateToTreeNativeExecutionDiagnosticName,
   privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
   privateFinishedWorkIdentityGateAvailable: true,
+  privateUpdateFinishedWorkIdentityGateAvailable: true,
+  validatesUpdateRootRequestIdentity: true,
   privateFinishedWorkIdentityDiagnosticName:
     privateSerializationFinishedWorkIdentityDiagnosticName,
   privateFinishedWorkIdentityStatus:
@@ -3224,6 +3232,8 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
     'root_private_to_tree_native_execution_evidence_records_composite_host_shape',
     'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
   ]),
   nativeExecutionEvidenceWorker:
@@ -14381,6 +14391,8 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
       privateToJSONNativeExecutionDiagnosticName,
     privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
     privateFinishedWorkIdentityGateAvailable: true,
+    privateUpdateFinishedWorkIdentityGateAvailable: true,
+    validatesUpdateRootRequestIdentity: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
     privateFinishedWorkIdentityStatus:
@@ -14461,27 +14473,37 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
         finishedWorkIdentityEvidence
       );
     },
-    canValidateAcceptedFinishedWorkIdentity(evidence, report) {
+    canValidateAcceptedFinishedWorkIdentity(
+      evidence,
+      report,
+      sourceRootRequest = undefined
+    ) {
       try {
         createPrivateSerializationFinishedWorkIdentityGateResult(
           rootRequest,
           'create().toJSON',
           privateToJSONAcceptedDiagnosticName,
           evidence,
-          report
+          report,
+          sourceRootRequest
         );
         return true;
       } catch (_error) {
         return false;
       }
     },
-    validateAcceptedFinishedWorkIdentity(evidence, report) {
+    validateAcceptedFinishedWorkIdentity(
+      evidence,
+      report,
+      sourceRootRequest = undefined
+    ) {
       return createPrivateSerializationFinishedWorkIdentityGateResult(
         rootRequest,
         'create().toJSON',
         privateToJSONAcceptedDiagnosticName,
         evidence,
-        report
+        report,
+        sourceRootRequest
       );
     }
   });
@@ -14536,6 +14558,8 @@ function createPrivateToTreeFacade(rootRequest) {
       privateToTreeNativeExecutionDiagnosticName,
     privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
     privateFinishedWorkIdentityGateAvailable: true,
+    privateUpdateFinishedWorkIdentityGateAvailable: true,
+    validatesUpdateRootRequestIdentity: true,
     privateFinishedWorkIdentityDiagnosticName:
       privateSerializationFinishedWorkIdentityDiagnosticName,
     privateFinishedWorkIdentityStatus:
@@ -14595,27 +14619,37 @@ function createPrivateToTreeFacade(rootRequest) {
         finishedWorkIdentityEvidence
       );
     },
-    canValidateAcceptedFinishedWorkIdentity(evidence, report) {
+    canValidateAcceptedFinishedWorkIdentity(
+      evidence,
+      report,
+      sourceRootRequest = undefined
+    ) {
       try {
         createPrivateSerializationFinishedWorkIdentityGateResult(
           rootRequest,
           'create().toTree',
           privateToTreeAcceptedDiagnosticName,
           evidence,
-          report
+          report,
+          sourceRootRequest
         );
         return true;
       } catch (_error) {
         return false;
       }
     },
-    validateAcceptedFinishedWorkIdentity(evidence, report) {
+    validateAcceptedFinishedWorkIdentity(
+      evidence,
+      report,
+      sourceRootRequest = undefined
+    ) {
       return createPrivateSerializationFinishedWorkIdentityGateResult(
         rootRequest,
         'create().toTree',
         privateToTreeAcceptedDiagnosticName,
         evidence,
-        report
+        report,
+        sourceRootRequest
       );
     }
   });
@@ -16553,7 +16587,8 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
   publicSurface,
   sourceSerializationDiagnosticName,
   evidence,
-  report
+  report,
+  sourceRootRequest = undefined
 ) {
   if (!isRootRequestRecord(rootRequest)) {
     throwPrivateSerializationFinishedWorkIdentityError(
@@ -16586,8 +16621,54 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
       'Private serialization finished-work identity diagnostic identity is not accepted.'
     );
   }
+  const identityRootRequest =
+    sourceRootRequest === undefined ? rootRequest : sourceRootRequest;
+  if (!isRootRequestRecord(identityRootRequest)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected a private root request for serialization finished-work identity evidence.'
+    );
+  }
   if (
-    normalized.rootRequestId !== rootRequest.requestId
+    identityRootRequest.rootHandle !== rootRequest.rootHandle ||
+    identityRootRequest.rootId !== rootRequest.rootId
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity belongs to a foreign root.'
+    );
+  }
+  if (
+    identityRootRequest.operation !==
+    rootRequestOperationForHostOutputUpdateKind(
+      publicSurface,
+      normalized.hostOutputUpdateKind
+    )
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity root request operation does not match the host output update kind.'
+    );
+  }
+  if (identityRootRequest.scheduled !== true) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity root request was not scheduled.'
+    );
+  }
+  if (
+    identityRootRequest.operation === 'update' &&
+    getLatestScheduledRootRequestForSerializationIdentity(
+      identityRootRequest.rootHandle
+    ) !== identityRootRequest
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity request sequence is stale.'
+    );
+  }
+  if (
+    normalized.rootRequestId !== identityRootRequest.requestId
   ) {
     throwPrivateSerializationFinishedWorkIdentityError(
       publicSurface,
@@ -16595,14 +16676,14 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     );
   }
   if (
-    normalized.rootRequestSequence !== rootRequest.requestSequence
+    normalized.rootRequestSequence !== identityRootRequest.requestSequence
   ) {
     throwPrivateSerializationFinishedWorkIdentityError(
       publicSurface,
       'Private serialization finished-work identity request sequence is stale.'
     );
   }
-  if (normalized.rootId !== rootRequest.rootId) {
+  if (normalized.rootId !== identityRootRequest.rootId) {
     throwPrivateSerializationFinishedWorkIdentityError(
       publicSurface,
       'Private serialization finished-work identity belongs to a foreign root.'
@@ -16694,10 +16775,11 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     entrypoint,
     publicSurface,
     sourceSerializationDiagnosticName,
-    rootRequest,
-    rootRequestId: rootRequest.requestId,
-    rootRequestSequence: rootRequest.requestSequence,
-    rootId: rootRequest.rootId,
+    rootRequest: identityRootRequest,
+    rootRequestId: identityRootRequest.requestId,
+    rootRequestSequence: identityRootRequest.requestSequence,
+    rootRequestOperation: identityRootRequest.operation,
+    rootId: identityRootRequest.rootId,
     hostOutputUpdateKind: normalized.hostOutputUpdateKind,
     renderCurrent: normalized.renderCurrent,
     renderFinishedWork: normalized.renderFinishedWork,
@@ -16728,6 +16810,39 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     publicSerializationAvailable: false,
     compatibilityClaimed: false
   });
+}
+
+function getLatestScheduledRootRequestForSerializationIdentity(rootHandle) {
+  const requests = getRootRequestsForHandle(rootHandle);
+  for (let index = requests.length - 1; index >= 0; index -= 1) {
+    const request = requests[index];
+    if (
+      request.scheduled === true &&
+      (request.operation === 'create' ||
+        request.operation === 'update' ||
+        request.operation === 'unmount')
+    ) {
+      return request;
+    }
+  }
+  return null;
+}
+
+function rootRequestOperationForHostOutputUpdateKind(
+  publicSurface,
+  hostOutputUpdateKind
+) {
+  switch (hostOutputUpdateKind) {
+    case 'Create':
+      return 'create';
+    case 'Update':
+      return 'update';
+    default:
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private serialization finished-work identity host output update kind is not accepted.'
+      );
+  }
 }
 
 function normalizePrivateSerializationFinishedWorkIdentityEvidence(

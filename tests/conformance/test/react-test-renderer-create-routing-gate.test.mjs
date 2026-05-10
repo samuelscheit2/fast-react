@@ -2388,6 +2388,8 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
     "root_private_to_json_native_execution_evidence_rejects_stale_update_record",
     "root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff",
+    "root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff",
+    "root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence",
     "root_private_serialization_finished_work_identity_gate_rejects_missing_evidence",
     "root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence",
     "root_private_serialization_finished_work_identity_gate_rejects_stale_evidence",
@@ -9458,6 +9460,12 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
   assert.equal(gate.privateTreeMetadataSerializable, true, entrypoint);
   assert.equal(gate.privateFinishedWorkIdentityGateAvailable, true, entrypoint);
   assert.equal(
+    gate.privateUpdateFinishedWorkIdentityGateAvailable,
+    true,
+    entrypoint
+  );
+  assert.equal(gate.validatesUpdateRootRequestIdentity, true, entrypoint);
+  assert.equal(
     gate.privateFinishedWorkIdentityDiagnosticName,
     "fast-react-test-renderer.serialization.private-finished-work-identity",
     entrypoint
@@ -9605,6 +9613,8 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
         ]
       : []),
     "root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff",
+    "root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff",
+    "root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence",
     "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
   ]);
   if (nativeToTreeEvidence) {
@@ -9658,6 +9668,12 @@ function assertPrivateToTreeFacade(record, entrypoint) {
     true,
     entrypoint
   );
+  assert.equal(
+    record.privateUpdateFinishedWorkIdentityGateAvailable,
+    true,
+    entrypoint
+  );
+  assert.equal(record.validatesUpdateRootRequestIdentity, true, entrypoint);
   assert.equal(
     record.privateFinishedWorkIdentityDiagnosticName,
     "fast-react-test-renderer.serialization.private-finished-work-identity",

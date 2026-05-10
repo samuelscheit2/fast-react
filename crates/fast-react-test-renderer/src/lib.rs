@@ -19576,6 +19576,146 @@ mod tests {
     }
 
     #[test]
+    fn root_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff()
+     {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_after_update_for_canary(&updated)
+            .unwrap();
+
+        let identity = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(updated.render()),
+                Some(updated.commit()),
+                Some(&report),
+            )
+            .unwrap();
+
+        assert_eq!(identity.public_surface(), "create().toJSON");
+        assert_eq!(
+            identity.source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            identity.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            identity.render_current(),
+            identity.commit_previous_current()
+        );
+        assert_eq!(identity.render_finished_work(), identity.commit_current());
+        assert_eq!(identity.report_finished_work(), identity.commit_current());
+        assert_ne!(
+            identity.commit_previous_current(),
+            identity.commit_current()
+        );
+        assert_eq!(
+            identity.render_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(
+            identity.report_finished_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert!(identity.commit_current_matches_render_finished_work());
+        assert!(identity.commit_previous_current_matches_render_current());
+        assert!(identity.report_finished_work_matches_commit_current());
+        assert!(identity.committed_fiber_inspection_current_matches_commit());
+        assert!(identity.host_output_snapshot_current());
+        assert!(identity.consumes_committed_host_root_finished_work_identity());
+        assert!(identity.consumes_committed_host_root_finished_work_lanes());
+        assert!(identity.consumes_private_to_json_evidence());
+        assert!(!identity.consumes_private_to_tree_evidence());
+        assert!(!identity.public_serialization_available());
+        assert!(!identity.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff()
+     {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_tree_metadata_after_update_for_canary(&updated)
+            .unwrap();
+
+        let identity = root
+            .describe_private_to_tree_finished_work_identity_gate_for_canary(
+                Some(updated.render()),
+                Some(updated.commit()),
+                Some(&report),
+            )
+            .unwrap();
+
+        assert_eq!(identity.public_surface(), "create().toTree");
+        assert_eq!(
+            identity.source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            identity.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            identity.render_current(),
+            identity.commit_previous_current()
+        );
+        assert_eq!(identity.render_finished_work(), identity.commit_current());
+        assert_eq!(identity.report_finished_work(), identity.commit_current());
+        assert_ne!(
+            identity.commit_previous_current(),
+            identity.commit_current()
+        );
+        assert_eq!(
+            identity.render_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(
+            identity.report_finished_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert!(identity.commit_current_matches_render_finished_work());
+        assert!(identity.commit_previous_current_matches_render_current());
+        assert!(identity.report_finished_work_matches_commit_current());
+        assert!(identity.committed_fiber_inspection_current_matches_commit());
+        assert!(identity.host_output_snapshot_current());
+        assert!(identity.consumes_committed_host_root_finished_work_identity());
+        assert!(identity.consumes_committed_host_root_finished_work_lanes());
+        assert!(!identity.consumes_private_to_json_evidence());
+        assert!(identity.consumes_private_to_tree_evidence());
+        assert!(!identity.public_serialization_available());
+        assert!(!identity.compatibility_claimed());
+    }
+
+    #[test]
     fn root_private_serialization_finished_work_identity_gate_rejects_missing_evidence() {
         let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
             "span",
@@ -19668,6 +19808,51 @@ mod tests {
             .describe_private_to_json_finished_work_identity_gate_for_canary(
                 Some(stale_output.render()),
                 Some(stale_output.commit()),
+                Some(&stale_report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                reason: "commit-current-not-root-current"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let stale_update = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let stale_report = root
+            .describe_private_json_serialization_after_update_for_canary(&stale_update)
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "later")
+            .unwrap();
+        root.render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(stale_update.render()),
+                Some(stale_update.commit()),
                 Some(&stale_report),
             )
             .unwrap_err();

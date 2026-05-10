@@ -1056,6 +1056,22 @@ export function inspectReactTestRendererSerializationLocalTargets({
       /\bcreatePrivateSerializationFinishedWorkIdentityGateResult\b/u
     ) &&
     hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatesUpdateRootRequestIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bgetLatestScheduledRootRequestForSerializationIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bidentityRootRequest\.operation\s*===\s*['"]update['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brootRequestOperationForHostOutputUpdateKind\b/u
+    ) &&
+    hasSourcePattern(
       testRendererSource,
       /\bTestRendererPrivateSerializationFinishedWorkIdentityGate\b/u
     ) &&
@@ -1066,6 +1082,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       testRendererSource,
       /\broot_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_json_update_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence\b/u
     ) &&
     hasSourcePattern(
       testRendererSource,
@@ -1367,6 +1391,22 @@ export function inspectReactTestRendererSerializationLocalTargets({
       /\bcreatePrivateSerializationFinishedWorkIdentityGateResult\b/u
     ) &&
     hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bvalidatesUpdateRootRequestIdentity\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bgetLatestScheduledRootRequestForSerializationIdentity\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bidentityRootRequest\.operation\s*===\s*['"]update['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brootRequestOperationForHostOutputUpdateKind\b/u
+    ) &&
+    hasSourcePattern(
       testRendererSource,
       /\bTestRendererPrivateSerializationFinishedWorkIdentityGate\b/u
     ) &&
@@ -1377,6 +1417,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
     hasSourcePattern(
       testRendererSource,
       /\broot_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence\b/u
     );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
