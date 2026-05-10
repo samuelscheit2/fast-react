@@ -374,6 +374,18 @@ mod tests {
         assert_eq!(root.lifecycle(), RootLifecycleState::Active);
         assert_eq!(root.work_status(), RootWorkStatus::Idle);
         assert_eq!(root.lanes().pending_lanes(), Lanes::NO);
+        assert_eq!(
+            root.options().on_uncaught_error(),
+            RootErrorCallbackHandle::NONE
+        );
+        assert_eq!(
+            root.options().on_caught_error(),
+            RootErrorCallbackHandle::NONE
+        );
+        assert_eq!(
+            root.options().on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::NONE
+        );
         assert_eq!(current.tag(), FiberTag::HostRoot);
         assert_eq!(current.state_node(), id.state_node_handle());
         assert_eq!(current.update_queue(), UpdateQueueHandle::NONE);
@@ -399,7 +411,8 @@ mod tests {
             .with_identifier_prefix("app-")
             .with_strict_mode(true)
             .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(10))
-            .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(11));
+            .with_on_caught_error(RootErrorCallbackHandle::from_raw(11))
+            .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(12));
         let id = store
             .create_client_root(FakeContainer::new(3), options)
             .unwrap();
@@ -413,7 +426,11 @@ mod tests {
         );
         assert_eq!(
             root.options().on_recoverable_error(),
-            RootRecoverableErrorCallbackHandle::from_raw(11)
+            RootRecoverableErrorCallbackHandle::from_raw(12)
+        );
+        assert_eq!(
+            root.options().on_caught_error(),
+            RootErrorCallbackHandle::from_raw(11)
         );
         assert!(
             current
