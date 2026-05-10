@@ -42,7 +42,9 @@ const expectedToJSONFacadeRustApis = [
   "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
   "TestRendererRoot::describe_private_to_json_facade_result_for_canary",
   "TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary",
+  "TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics",
   "TestRendererPrivateJsonSerializationReport",
+  "TestRendererPrivateJsonRenderedRoot",
   "TestRendererPrivateToJsonFacadeResult",
   "TestRendererPrivateJsonPublicSurfaceBlockers"
 ];
@@ -53,6 +55,9 @@ const expectedToJSONFacadeRustTests = [
   "root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot",
   "root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update",
   "root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes",
+  "root_private_to_json_shape_diagnostics_serialize_empty_root_as_null",
+  "root_private_to_json_shape_diagnostics_serialize_multiple_host_children_and_text_siblings",
+  "root_private_to_json_shape_diagnostics_elide_children_prop",
   "root_private_to_json_facade_result_canary_wraps_create_serialization_evidence",
   "root_private_to_json_facade_result_canary_wraps_update_serialization_evidence"
 ];
@@ -108,6 +113,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToJSONSerializationFacadeGatePresent: true,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics: true,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics: true,
+    privateToJSONSerializationFacadeCoversBroaderHostShapes: true,
     privateToJSONSerializationFacadeExposesDiagnosticResult: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateToTreeHostOutputMetadataGatePresent: true,
@@ -149,6 +155,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-tojson-private-serialization-facade-gate",
       "js-tojson-accepted-rust-private-json-diagnostics",
       "js-tojson-serializes-accepted-host-output-diagnostics",
+      "js-tojson-broader-host-shape-diagnostics",
       "js-tojson-exposes-private-diagnostic-result",
       "js-tojson-public-serialization-blocked"
     ]
@@ -239,6 +246,10 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       facadeGate.acceptedWorker,
       "worker-265-test-renderer-private-json-ready-diagnostics"
     );
+    assert.equal(
+      facadeGate.broaderHostShapesWorker,
+      "worker-424-test-renderer-tojson-broader-host-shapes"
+    );
     assert.equal(facadeGate.acceptedRustCrate, "fast-react-test-renderer");
     assert.equal(
       facadeGate.acceptedRustDiagnosticName,
@@ -256,10 +267,17 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       facadeGate.acceptedRustNodeKinds,
       ["HostComponent", "Text"]
     );
+    assert.deepEqual(facadeGate.acceptedHostRootShapes, [
+      "EmptyRoot",
+      "SingleHostChild",
+      "MultipleHostChildren",
+      "TextSibling"
+    ]);
     assert.deepEqual(facadeGate.acceptedHostOutputUpdateKinds, [
       "Create",
       "Update"
     ]);
+    assert.equal(facadeGate.propElisionFromSerializedProps, true);
     assert.equal(facadeGate.hostOutputSnapshotFreshnessRequired, true);
     assert.equal(facadeGate.staleSnapshotRejection, true);
     assert.deepEqual(
@@ -353,6 +371,37 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       props: {},
       children: ["goodbye"]
     });
+    const broadPrivateJson = privateFacade.serializeAcceptedHostOutputDiagnostic(
+      createAcceptedBroaderHostOutputDiagnostic()
+    );
+    assert.equal(Object.isFrozen(broadPrivateJson), true);
+    assert.equal(Object.isFrozen(broadPrivateJson[0]), true);
+    assert.equal(Object.isFrozen(broadPrivateJson[0].props), true);
+    assert.equal(Object.isFrozen(broadPrivateJson[0].children), true);
+    assert.equal(Object.isFrozen(broadPrivateJson[2]), true);
+    assert.equal(Object.isFrozen(broadPrivateJson[2].props), true);
+    assert.equal(Object.isFrozen(broadPrivateJson[2].children), true);
+    assert.deepEqual(broadPrivateJson, [
+      {
+        type: "div",
+        props: {
+          id: "first"
+        },
+        children: ["one"]
+      },
+      "tail",
+      {
+        type: "span",
+        props: {
+          className: "tag"
+        },
+        children: ["two", "three"]
+      }
+    ]);
+    const emptyPrivateJson = privateFacade.serializeAcceptedHostOutputDiagnostic(
+      createAcceptedEmptyRootHostOutputDiagnostic()
+    );
+    assert.equal(emptyPrivateJson, null);
     assert.equal(
       privateFacade.canSerializeAcceptedHostOutputDiagnostic(
         createAcceptedMinimalHostOutputDiagnostic()
@@ -365,6 +414,18 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
           hostOutputUpdateKind: "Update",
           text: "goodbye"
         })
+      ),
+      true
+    );
+    assert.equal(
+      privateFacade.canSerializeAcceptedHostOutputDiagnostic(
+        createAcceptedBroaderHostOutputDiagnostic()
+      ),
+      true
+    );
+    assert.equal(
+      privateFacade.canSerializeAcceptedHostOutputDiagnostic(
+        createAcceptedEmptyRootHostOutputDiagnostic()
       ),
       true
     );
@@ -390,6 +451,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     );
     assert.equal(privateDiagnosticResult.hostOutputUpdateKind, "Create");
     assert.equal(privateDiagnosticResult.hostOutputSnapshotCurrent, true);
+    assert.equal(privateDiagnosticResult.sourceNodeCount, 2);
     assert.deepEqual(privateDiagnosticResult.result, {
       type: "span",
       props: {},
@@ -427,6 +489,18 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       props: {},
       children: ["goodbye"]
     });
+    const broadPrivateDiagnosticResult =
+      privateFacade.createAcceptedHostOutputDiagnosticResult(
+        createAcceptedBroaderHostOutputDiagnostic()
+      );
+    assert.equal(broadPrivateDiagnosticResult.sourceNodeCount, 6);
+    assert.deepEqual(broadPrivateDiagnosticResult.result, broadPrivateJson);
+    const emptyPrivateDiagnosticResult =
+      privateFacade.createAcceptedHostOutputDiagnosticResult(
+        createAcceptedEmptyRootHostOutputDiagnostic()
+      );
+    assert.equal(emptyPrivateDiagnosticResult.sourceNodeCount, 0);
+    assert.equal(emptyPrivateDiagnosticResult.result, null);
     assert.equal(
       privateFacade.canCreateAcceptedHostOutputDiagnosticResult(
         createAcceptedMinimalHostOutputDiagnostic()
@@ -1013,6 +1087,125 @@ function createAcceptedMinimalHostOutputDiagnostic({
       publicActBlocked: true,
       compatibilityClaimBlocked: true
     }
+  };
+}
+
+function createAcceptedBroaderHostOutputDiagnostic({
+  hostOutputSnapshotCurrent = true,
+  hostOutputUpdateKind = "Create"
+} = {}) {
+  return {
+    diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent,
+    rootChildCount: 3,
+    rootNodeKind: "MultipleHostChildren",
+    nodes: [
+      {
+        ordinal: 0,
+        nodeKind: "HostComponent",
+        parentOrdinal: null,
+        childOrdinals: [1],
+        elementType: { name: "div" },
+        props: {
+          attributes: {
+            children: "prop child",
+            id: "first"
+          },
+          textContent: null
+        },
+        text: null,
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 1,
+        nodeKind: "Text",
+        parentOrdinal: 0,
+        childOrdinals: [],
+        elementType: null,
+        props: null,
+        text: "one",
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 2,
+        nodeKind: "Text",
+        parentOrdinal: null,
+        childOrdinals: [],
+        elementType: null,
+        props: null,
+        text: "tail",
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 3,
+        nodeKind: "HostComponent",
+        parentOrdinal: null,
+        childOrdinals: [4, 5],
+        elementType: { name: "span" },
+        props: {
+          attributes: {
+            className: "tag"
+          },
+          textContent: null
+        },
+        text: null,
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 4,
+        nodeKind: "Text",
+        parentOrdinal: 3,
+        childOrdinals: [],
+        elementType: null,
+        props: null,
+        text: "two",
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 5,
+        nodeKind: "Text",
+        parentOrdinal: 3,
+        childOrdinals: [],
+        elementType: null,
+        props: null,
+        text: "three",
+        hidden: false,
+        detached: false
+      }
+    ],
+    publicBlockers: createAcceptedPrivateJsonPublicBlockers()
+  };
+}
+
+function createAcceptedEmptyRootHostOutputDiagnostic({
+  hostOutputSnapshotCurrent = true,
+  hostOutputUpdateKind = "Create"
+} = {}) {
+  return {
+    diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent,
+    rootChildCount: 0,
+    rootNodeKind: "EmptyRoot",
+    nodes: [],
+    publicBlockers: createAcceptedPrivateJsonPublicBlockers()
+  };
+}
+
+function createAcceptedPrivateJsonPublicBlockers() {
+  return {
+    jsonMethodBlocked: true,
+    treeMethodBlocked: true,
+    instanceWrapperBlocked: true,
+    jsFacadeRoutingBlocked: true,
+    publicActBlocked: true,
+    compatibilityClaimBlocked: true
   };
 }
 

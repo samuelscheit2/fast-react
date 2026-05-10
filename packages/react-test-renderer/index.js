@@ -977,6 +977,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   nativeExecution: false,
   compatibilityClaimed: false,
   acceptedWorker: 'worker-265-test-renderer-private-json-ready-diagnostics',
+  broaderHostShapesWorker:
+    'worker-424-test-renderer-tojson-broader-host-shapes',
   acceptedRustCrate: 'fast-react-test-renderer',
   acceptedRustDiagnosticName: privateToJSONAcceptedDiagnosticName,
   acceptedRustDiagnosticResultName: privateToJSONFacadeResultDiagnosticName,
@@ -985,7 +987,9 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
     'TestRendererRoot::describe_private_to_json_facade_result_for_canary',
     'TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary',
+    'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
     'TestRendererPrivateJsonSerializationReport',
+    'TestRendererPrivateJsonRenderedRoot',
     'TestRendererPrivateToJsonFacadeResult',
     'TestRendererPrivateJsonPublicSurfaceBlockers'
   ]),
@@ -993,10 +997,17 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'HostComponent',
     'Text'
   ]),
+  acceptedHostRootShapes: Object.freeze([
+    'EmptyRoot',
+    'SingleHostChild',
+    'MultipleHostChildren',
+    'TextSibling'
+  ]),
   acceptedHostOutputUpdateKinds: Object.freeze([
     'Create',
     'Update'
   ]),
+  propElisionFromSerializedProps: true,
   hostOutputSnapshotFreshnessRequired: true,
   staleSnapshotRejection: true,
   acceptedRustTests: Object.freeze([
@@ -1006,6 +1017,9 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot',
     'root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update',
     'root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes',
+    'root_private_to_json_shape_diagnostics_serialize_empty_root_as_null',
+    'root_private_to_json_shape_diagnostics_serialize_multiple_host_children_and_text_siblings',
+    'root_private_to_json_shape_diagnostics_elide_children_prop',
     'root_private_to_json_facade_result_canary_wraps_create_serialization_evidence',
     'root_private_to_json_facade_result_canary_wraps_update_serialization_evidence'
   ]),
@@ -1905,7 +1919,16 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     createApi: 'TestRendererRoot::describe_private_json_serialization_for_canary',
     updateApi:
       'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
+    hostShapeApi:
+      'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
     acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update']),
+    acceptedHostRootShapes: freezeArray([
+      'EmptyRoot',
+      'SingleHostChild',
+      'MultipleHostChildren',
+      'TextSibling'
+    ]),
+    propElisionFromSerializedProps: true,
     hostOutputSnapshotFreshnessRequired: true,
     staleSnapshotRejection: true,
     publicSerializationAvailable: false
@@ -4109,12 +4132,11 @@ function serializePrivateToTreeMetadataDiagnostic(report) {
 function serializePrivateToJSONHostOutputDiagnostic(report) {
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
 
-  return createPrivateToJSONResultNode(diagnostic);
+  return diagnostic.result;
 }
 
 function createPrivateToJSONHostOutputDiagnosticResult(report) {
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
-  const result = createPrivateToJSONResultNode(diagnostic);
 
   return freezeRecord({
     id: 'react-test-renderer-private-tojson-diagnostic-result',
@@ -4125,21 +4147,14 @@ function createPrivateToJSONHostOutputDiagnosticResult(report) {
     sourceDiagnostic: privateToJSONAcceptedDiagnosticName,
     hostOutputUpdateKind: diagnostic.hostOutputUpdateKind,
     hostOutputSnapshotCurrent: true,
-    result,
+    sourceNodeCount: diagnostic.sourceNodeCount,
+    result: diagnostic.result,
     publicBlockers: createPrivateToJSONPublicBlockerRecord(),
     publicSerializationAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
     nativeExecution: false,
     compatibilityClaimed: false
-  });
-}
-
-function createPrivateToJSONResultNode(diagnostic) {
-  return freezeRecord({
-    type: diagnostic.type,
-    props: diagnostic.props,
-    children: freezeArray([diagnostic.text])
   });
 }
 
@@ -4151,12 +4166,15 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
     'diagnostic_name',
     privateToJSONAcceptedDiagnosticName
   );
-  assertPrivateToJSONNumberField(report, 'rootChildCount', 'root_child_count', 1);
-  assertPrivateToJSONKindField(
+  const rootChildCount = readPrivateToJSONNonNegativeIntegerField(
+    report,
+    'rootChildCount',
+    'root_child_count'
+  );
+  const rootNodeKind = readPrivateToJSONField(
     report,
     'rootNodeKind',
-    'root_node_kind',
-    'HostComponent'
+    'root_node_kind'
   );
   const hostOutputUpdateKind = assertPrivateToJSONHostOutputUpdateKind(report);
   assertPrivateToJSONBooleanField(
@@ -4171,65 +4189,213 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
   assertPrivateToJSONGateIfPresent(readPrivateToJSONField(report, 'gate'));
 
   const nodes = readPrivateToJSONArrayField(report, 'nodes');
-  if (nodes.length !== 2) {
+  const diagnosticNodes = validatePrivateToJSONDiagnosticNodes(nodes);
+  const rootOrdinals = diagnosticNodes
+    .filter((node) => node.parentOrdinal === null)
+    .map((node) => node.ordinal);
+  if (rootOrdinals.length !== rootChildCount) {
     throwPrivateToJSONSerializationError(
-      `Expected exactly two private JSON diagnostic nodes, found ${nodes.length}.`
+      `Expected ${rootChildCount} private JSON root child diagnostic node(s), found ${rootOrdinals.length}.`
     );
   }
+  assertPrivateToJSONRootNodeKind(rootNodeKind, diagnosticNodes, rootOrdinals);
 
-  const componentNode = nodes[0];
-  const textNode = nodes[1];
-  assertPrivateToJSONRecord(componentNode, 'nodes[0]');
-  assertPrivateToJSONRecord(textNode, 'nodes[1]');
-  assertPrivateToJSONNumberField(componentNode, 'ordinal', undefined, 0);
-  assertPrivateToJSONNumberField(textNode, 'ordinal', undefined, 1);
-  assertPrivateToJSONKindField(
-    componentNode,
-    'nodeKind',
-    'node_kind',
-    'HostComponent'
+  const result = createPrivateToJSONRenderedRoot(
+    diagnosticNodes,
+    rootOrdinals
   );
-  assertPrivateToJSONKindField(textNode, 'nodeKind', 'node_kind', 'Text');
-  assertPrivateToJSONParentOrdinal(componentNode, null);
-  assertPrivateToJSONParentOrdinal(textNode, 0);
-  assertPrivateToJSONChildOrdinals(componentNode, [1]);
-  assertPrivateToJSONChildOrdinals(textNode, []);
-  assertPrivateToJSONVisibleAttached(componentNode, 'nodes[0]');
-  assertPrivateToJSONVisibleAttached(textNode, 'nodes[1]');
-
-  const component = readPrivateToJSONRecordField(report, 'component');
-  assertPrivateToJSONKindField(
-    component,
-    'nodeKind',
-    'node_kind',
-    'HostComponent'
-  );
-  assertPrivateToJSONNumberField(component, 'childCount', 'child_count', 1);
-  assertPrivateToJSONVisibleAttached(component, 'component');
-  const textChild = readPrivateToJSONRecordField(
-    component,
-    'textChild',
-    'text_child'
-  );
-  assertPrivateToJSONKindField(textChild, 'nodeKind', 'node_kind', 'Text');
-  assertPrivateToJSONVisibleAttached(textChild, 'component.textChild');
-
-  const type = readPrivateToJSONElementType(component, componentNode);
-  const props = readPrivateToJSONEmptyProps(component, componentNode);
-  const nodeText = readPrivateToJSONStringField(textNode, 'text');
-  const childText = readPrivateToJSONStringField(textChild, 'text');
-  if (nodeText !== childText) {
-    throwPrivateToJSONSerializationError(
-      'Private JSON diagnostic text node does not match component text child.'
-    );
-  }
 
   return {
     hostOutputUpdateKind,
-    props,
-    text: nodeText,
-    type
+    result,
+    sourceNodeCount: diagnosticNodes.length
   };
+}
+
+function validatePrivateToJSONDiagnosticNodes(nodes) {
+  const diagnosticNodes = nodes.map((node, index) => {
+    assertPrivateToJSONRecord(node, `nodes[${index}]`);
+    const ordinal = readPrivateToJSONNonNegativeIntegerField(node, 'ordinal');
+    if (ordinal !== index) {
+      throwPrivateToJSONSerializationError(
+        `Expected private JSON diagnostic node ordinal ${index}, found ${ordinal}.`
+      );
+    }
+    const nodeKind = readPrivateToJSONStringField(node, 'nodeKind', 'node_kind');
+    if (nodeKind !== 'HostComponent' && nodeKind !== 'Text') {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON diagnostic node kind to be HostComponent or Text.'
+      );
+    }
+    const parentOrdinal = normalizePrivateToJSONParentOrdinal(
+      readPrivateToJSONField(node, 'parentOrdinal', 'parent_ordinal')
+    );
+    const childOrdinals = normalizePrivateToJSONChildOrdinals(
+      readPrivateToJSONField(node, 'childOrdinals', 'child_ordinals')
+    );
+    assertPrivateToJSONVisibleAttached(node, `nodes[${index}]`);
+
+    if (nodeKind === 'Text') {
+      if (childOrdinals.length !== 0) {
+        throwPrivateToJSONSerializationError(
+          'Private JSON diagnostic text nodes cannot have children.'
+        );
+      }
+      return {
+        ordinal,
+        nodeKind,
+        parentOrdinal,
+        childOrdinals,
+        text: readPrivateToJSONStringField(node, 'text')
+      };
+    }
+
+    return {
+      ordinal,
+      nodeKind,
+      parentOrdinal,
+      childOrdinals,
+      props: normalizePrivateToJSONProps(readPrivateToJSONField(node, 'props')),
+      type: normalizePrivateToJSONElementType(
+        readPrivateToJSONField(node, 'elementType', 'element_type')
+      )
+    };
+  });
+
+  for (const node of diagnosticNodes) {
+    if (node.parentOrdinal !== null) {
+      const parent = diagnosticNodes[node.parentOrdinal];
+      if (parent === undefined) {
+        throwPrivateToJSONSerializationError(
+          'Private JSON diagnostic parent ordinal does not resolve to a node.'
+        );
+      }
+      if (!parent.childOrdinals.includes(node.ordinal)) {
+        throwPrivateToJSONSerializationError(
+          'Private JSON diagnostic parent/child ordinals are inconsistent.'
+        );
+      }
+    }
+
+    for (const childOrdinal of node.childOrdinals) {
+      const child = diagnosticNodes[childOrdinal];
+      if (child === undefined) {
+        throwPrivateToJSONSerializationError(
+          'Private JSON diagnostic child ordinal does not resolve to a node.'
+        );
+      }
+      if (child.parentOrdinal !== node.ordinal) {
+        throwPrivateToJSONSerializationError(
+          'Private JSON diagnostic child parent ordinal is inconsistent.'
+        );
+      }
+    }
+  }
+
+  return diagnosticNodes;
+}
+
+function assertPrivateToJSONRootNodeKind(
+  rootNodeKind,
+  diagnosticNodes,
+  rootOrdinals
+) {
+  if (rootNodeKind === undefined || rootNodeKind === null) {
+    return;
+  }
+  if (typeof rootNodeKind !== 'string') {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON diagnostic rootNodeKind to be a string.'
+    );
+  }
+  if (rootOrdinals.length === 0) {
+    if (rootNodeKind !== 'EmptyRoot') {
+      throwPrivateToJSONSerializationError(
+        'Expected empty private JSON diagnostic rootNodeKind to be EmptyRoot.'
+      );
+    }
+    return;
+  }
+  if (rootOrdinals.length > 1) {
+    if (
+      rootNodeKind !== 'MultipleHostChildren' &&
+      rootNodeKind !== 'Multiple'
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected multi-root private JSON diagnostic rootNodeKind to be MultipleHostChildren.'
+      );
+    }
+    return;
+  }
+
+  const rootNode = diagnosticNodes[rootOrdinals[0]];
+  if (rootNodeKind !== rootNode.nodeKind) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic rootNodeKind to be ${rootNode.nodeKind}.`
+    );
+  }
+}
+
+function createPrivateToJSONRenderedRoot(diagnosticNodes, rootOrdinals) {
+  const visited = new Set();
+  const stack = new Set();
+  const renderedChildren = rootOrdinals.map((ordinal) =>
+    createPrivateToJSONRenderedValue(diagnosticNodes, ordinal, visited, stack)
+  );
+  if (visited.size !== diagnosticNodes.length) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic contains nodes that are not reachable from the root.'
+    );
+  }
+  if (renderedChildren.length === 0) {
+    return null;
+  }
+  if (renderedChildren.length === 1) {
+    return renderedChildren[0];
+  }
+  return freezeArray(renderedChildren);
+}
+
+function createPrivateToJSONRenderedValue(
+  diagnosticNodes,
+  ordinal,
+  visited,
+  stack
+) {
+  if (stack.has(ordinal)) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic child ordinals contain a cycle.'
+    );
+  }
+  const node = diagnosticNodes[ordinal];
+  if (node === undefined) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic child ordinal does not resolve to a node.'
+    );
+  }
+
+  visited.add(ordinal);
+  if (node.nodeKind === 'Text') {
+    return node.text;
+  }
+
+  stack.add(ordinal);
+  const renderedChildren = node.childOrdinals.map((childOrdinal) =>
+    createPrivateToJSONRenderedValue(
+      diagnosticNodes,
+      childOrdinal,
+      visited,
+      stack
+    )
+  );
+  stack.delete(ordinal);
+
+  return freezeRecord({
+    type: node.type,
+    props: node.props,
+    children:
+      renderedChildren.length === 0 ? null : freezeArray(renderedChildren)
+  });
 }
 
 function readPrivateToJSONField(record, camelName, snakeName) {
@@ -4273,6 +4439,32 @@ function readPrivateToJSONStringField(record, camelName, snakeName) {
   return value;
 }
 
+function readPrivateToJSONNumberField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be a number.`
+    );
+  }
+
+  return value;
+}
+
+function readPrivateToJSONNonNegativeIntegerField(
+  record,
+  camelName,
+  snakeName
+) {
+  const value = readPrivateToJSONNumberField(record, camelName, snakeName);
+  if (!Number.isInteger(value) || value < 0) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be a non-negative integer.`
+    );
+  }
+
+  return value;
+}
+
 function assertPrivateToJSONRecord(value, label) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throwPrivateToJSONSerializationError(
@@ -4301,12 +4493,13 @@ function assertPrivateToJSONNumberField(
   snakeName,
   expected
 ) {
-  const actual = readPrivateToJSONField(record, camelName, snakeName);
+  const actual = readPrivateToJSONNumberField(record, camelName, snakeName);
   if (actual !== expected) {
     throwPrivateToJSONSerializationError(
       `Expected private JSON diagnostic field ${camelName} to be ${expected}.`
     );
   }
+  return actual;
 }
 
 function assertPrivateToJSONKindField(record, camelName, snakeName, expected) {
@@ -4357,6 +4550,34 @@ function assertPrivateToJSONParentOrdinal(record, expected) {
       `Expected private JSON diagnostic parent ordinal to be ${expected}.`
     );
   }
+}
+
+function normalizePrivateToJSONParentOrdinal(value) {
+  if (value === null) {
+    return null;
+  }
+  if (Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+  throwPrivateToJSONSerializationError(
+    'Expected private JSON diagnostic parent ordinal to be null or a non-negative integer.'
+  );
+}
+
+function normalizePrivateToJSONChildOrdinals(value) {
+  if (!Array.isArray(value)) {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON diagnostic child ordinals to be an array.'
+    );
+  }
+  for (const ordinal of value) {
+    if (!Number.isInteger(ordinal) || ordinal < 0) {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON diagnostic child ordinal to be a non-negative integer.'
+      );
+    }
+  }
+  return value.slice();
 }
 
 function assertPrivateToJSONChildOrdinals(record, expected) {
@@ -4505,6 +4726,42 @@ function normalizePrivateToJSONElementType(value) {
   throwPrivateToJSONSerializationError(
     'Expected private JSON diagnostic host component element type.'
   );
+}
+
+function normalizePrivateToJSONProps(props) {
+  if (props === undefined || props === null) {
+    return freezeRecord({});
+  }
+
+  assertPrivateToJSONRecord(props, 'props');
+  const normalized = {};
+  const attributes = readPrivateToJSONField(props, 'attributes');
+  if (attributes !== undefined && attributes !== null) {
+    assertPrivateToJSONRecord(attributes, 'props.attributes');
+    for (const key of Object.keys(attributes).sort()) {
+      assignPrivateToJSONProp(normalized, key, attributes[key]);
+    }
+  }
+
+  for (const key of Object.keys(props).sort()) {
+    if (
+      key === 'attributes' ||
+      key === 'textContent' ||
+      key === 'text_content'
+    ) {
+      continue;
+    }
+    assignPrivateToJSONProp(normalized, key, props[key]);
+  }
+
+  return freezeRecord(normalized);
+}
+
+function assignPrivateToJSONProp(target, key, value) {
+  if (key === 'children') {
+    return;
+  }
+  target[key] = value;
 }
 
 function readPrivateToJSONEmptyProps(component, componentNode) {
