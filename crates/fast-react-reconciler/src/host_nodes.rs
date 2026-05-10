@@ -11,7 +11,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, StateNodeHandle};
+use fast_react_core::{FiberId, PropsHandle, StateNodeHandle};
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 use crate::{FiberRootId, HostFiberTokenId};
@@ -106,6 +106,111 @@ impl HostNodeMetadata {
     #[must_use]
     pub(crate) const fn is_active(self) -> bool {
         self.active
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostNodePropertyUpdate {
+    prop_name: &'static str,
+    property_name: &'static str,
+    old_props: PropsHandle,
+    new_props: PropsHandle,
+}
+
+impl HostNodePropertyUpdate {
+    #[must_use]
+    pub(crate) const fn new(
+        prop_name: &'static str,
+        property_name: &'static str,
+        old_props: PropsHandle,
+        new_props: PropsHandle,
+    ) -> Self {
+        Self {
+            prop_name,
+            property_name,
+            old_props,
+            new_props,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn prop_name(self) -> &'static str {
+        self.prop_name
+    }
+
+    #[must_use]
+    pub(crate) const fn property_name(self) -> &'static str {
+        self.property_name
+    }
+
+    #[must_use]
+    pub(crate) const fn old_props(self) -> PropsHandle {
+        self.old_props
+    }
+
+    #[must_use]
+    pub(crate) const fn new_props(self) -> PropsHandle {
+        self.new_props
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostNodeAppliedPropertyUpdate {
+    sequence: usize,
+    handle: StateNodeHandle,
+    root_id: FiberRootId,
+    fiber_id: FiberId,
+    token_id: HostFiberTokenId,
+    prop_name: &'static str,
+    property_name: &'static str,
+    old_props: PropsHandle,
+    new_props: PropsHandle,
+}
+
+impl HostNodeAppliedPropertyUpdate {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn handle(self) -> StateNodeHandle {
+        self.handle
+    }
+
+    #[must_use]
+    pub(crate) const fn root_id(self) -> FiberRootId {
+        self.root_id
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber_id(self) -> FiberId {
+        self.fiber_id
+    }
+
+    #[must_use]
+    pub(crate) const fn token_id(self) -> HostFiberTokenId {
+        self.token_id
+    }
+
+    #[must_use]
+    pub(crate) const fn prop_name(self) -> &'static str {
+        self.prop_name
+    }
+
+    #[must_use]
+    pub(crate) const fn property_name(self) -> &'static str {
+        self.property_name
+    }
+
+    #[must_use]
+    pub(crate) const fn old_props(self) -> PropsHandle {
+        self.old_props
+    }
+
+    #[must_use]
+    pub(crate) const fn new_props(self) -> PropsHandle {
+        self.new_props
     }
 }
 
@@ -305,6 +410,38 @@ impl<H: HostTypes> HostNodeStore<H> {
             .metadata())
     }
 
+    pub(crate) fn apply_instance_property_update(
+        &mut self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+        update: HostNodePropertyUpdate,
+    ) -> Result<HostNodeAppliedPropertyUpdate, HostNodeValidationError> {
+        let record = self.record_mut(handle, scope, HostFiberTokenTarget::Instance, true)?;
+        let applied = HostNodeAppliedPropertyUpdate {
+            sequence: record.property_updates.len(),
+            handle,
+            root_id: record.metadata.root_id,
+            fiber_id: record.metadata.fiber_id,
+            token_id: record.metadata.token_id,
+            prop_name: update.prop_name(),
+            property_name: update.property_name(),
+            old_props: update.old_props(),
+            new_props: update.new_props(),
+        };
+        record.property_updates.push(applied);
+        Ok(applied)
+    }
+
+    pub(crate) fn instance_property_updates(
+        &self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+    ) -> Result<&[HostNodeAppliedPropertyUpdate], HostNodeValidationError> {
+        Ok(&self
+            .record(handle, scope, HostFiberTokenTarget::Instance, true)?
+            .property_updates)
+    }
+
     pub(crate) fn invalidate_instance(
         &mut self,
         handle: StateNodeHandle,
@@ -444,6 +581,7 @@ impl<H: HostTypes> HostNodeStore<H> {
                 active: true,
             },
             value,
+            property_updates: Vec::new(),
         }));
         handle
     }
@@ -680,6 +818,7 @@ impl<H: HostTypes> Default for HostNodeStore<H> {
 struct HostNodeRecord<H: HostTypes> {
     metadata: HostNodeMetadata,
     value: HostNodeValue<H>,
+    property_updates: Vec<HostNodeAppliedPropertyUpdate>,
 }
 
 impl<H: HostTypes> HostNodeRecord<H> {
@@ -863,6 +1002,82 @@ mod tests {
             }
         );
         assert!(store.is_empty());
+    }
+
+    #[test]
+    fn host_nodes_apply_instance_property_updates_behind_validated_handles() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let scope = instance_scope();
+        let handle = store.insert_instance(
+            scope,
+            TestInstance {
+                id: 1,
+                label: "button",
+            },
+        );
+        let update = HostNodePropertyUpdate::new(
+            "testHostProperty",
+            "testHostProperty",
+            PropsHandle::from_raw(10),
+            PropsHandle::from_raw(11),
+        );
+
+        let applied = store
+            .apply_instance_property_update(handle, scope, update)
+            .unwrap();
+
+        assert_eq!(applied.sequence(), 0);
+        assert_eq!(applied.handle(), handle);
+        assert_eq!(applied.root_id(), scope.root_id());
+        assert_eq!(applied.fiber_id(), scope.fiber_id());
+        assert_eq!(applied.token_id(), scope.token_id());
+        assert_eq!(applied.prop_name(), "testHostProperty");
+        assert_eq!(applied.property_name(), "testHostProperty");
+        assert_eq!(applied.old_props(), PropsHandle::from_raw(10));
+        assert_eq!(applied.new_props(), PropsHandle::from_raw(11));
+
+        let updates = store.instance_property_updates(handle, scope).unwrap();
+        assert_eq!(updates, &[applied]);
+        assert_eq!(store.instance(handle, scope).unwrap().label, "button");
+    }
+
+    #[test]
+    fn host_nodes_reject_property_updates_for_stale_or_wrong_targets() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let instance_scope = instance_scope();
+        let text_scope = text_scope();
+        let instance_handle = store.insert_instance(
+            instance_scope,
+            TestInstance {
+                id: 1,
+                label: "section",
+            },
+        );
+        let text_handle = store.insert_text(
+            text_scope,
+            TestTextInstance {
+                id: 1,
+                text: "child".to_owned(),
+            },
+        );
+        let update = HostNodePropertyUpdate::new(
+            "testHostProperty",
+            "testHostProperty",
+            PropsHandle::from_raw(20),
+            PropsHandle::from_raw(21),
+        );
+
+        assert_violation(
+            store.apply_instance_property_update(text_handle, text_scope, update),
+            HostNodeViolation::WrongTarget,
+        );
+        store
+            .invalidate_instance(instance_handle, instance_scope)
+            .unwrap();
+        assert_violation(
+            store.apply_instance_property_update(instance_handle, instance_scope, update),
+            HostNodeViolation::Stale,
+        );
     }
 
     #[test]
