@@ -31,7 +31,8 @@
     "wrapper-object:print": "node scripts/print-wrapper-object-oracle.mjs --format=json",
     "wrapper-object:print:markdown": "node scripts/print-wrapper-object-oracle.mjs --format=markdown",
     "check": "npm test",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs src/react-test-renderer-serialization-local-gate.test.mjs",
+    "test:react-test-renderer:serialization": "node --test test/react-test-renderer-serialization-oracle.test.mjs src/react-test-renderer-serialization-local-gate.test.mjs"
   },
   "engines": {
     "node": ">=26.0.0"
