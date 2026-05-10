@@ -92,6 +92,285 @@ const expectedPlatformPackages = Object.fromEntries(
   ])
 );
 
+const expectedNativeRootBridgeEnvironmentTeardownFields = [
+  'requestedEnvironmentId',
+  'tableEnvironmentId',
+  'environmentMatched',
+  'rootHandlesInvalidated',
+  'valueHandlesInvalidated',
+  'totalHandlesInvalidated',
+  'toreDownHandles'
+];
+const expectedNativeRootBridgeCrossEnvironmentTeardownRowFields = [
+  'id',
+  'operation',
+  'handleKind',
+  'tableEnvironmentId',
+  'handleEnvironmentId',
+  'slot',
+  'handleGeneration',
+  'currentGeneration',
+  'recordId',
+  'errorCode',
+  'rejectedByHandleTable',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'reactBehaviorError'
+];
+const expectedNativeRootBridgeCrossEnvironmentTeardownRows = [
+  {
+    id: 'first-root-active-after-mismatched-teardown',
+    operation: 'mismatched-teardown',
+    handleKind: 'root',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 49601,
+    errorCode: null,
+    rejectedByHandleTable: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-value-active-after-mismatched-teardown',
+    operation: 'mismatched-teardown',
+    handleKind: 'value',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 49602,
+    errorCode: null,
+    rejectedByHandleTable: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-root-stale-after-own-teardown',
+    operation: 'matched-teardown',
+    handleKind: 'root',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    rejectedByHandleTable: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-value-stale-after-own-teardown',
+    operation: 'matched-teardown',
+    handleKind: 'value',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    rejectedByHandleTable: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-root-wrong-environment-in-peer-table',
+    operation: 'wrong-environment-validation',
+    handleKind: 'root',
+    tableEnvironmentId: 1496,
+    handleEnvironmentId: 496,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: null,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    rejectedByHandleTable: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-value-wrong-environment-in-peer-table',
+    operation: 'wrong-environment-validation',
+    handleKind: 'value',
+    tableEnvironmentId: 1496,
+    handleEnvironmentId: 496,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: null,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    rejectedByHandleTable: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'peer-root-active-after-first-teardown',
+    operation: 'post-teardown-peer-validation',
+    handleKind: 'root',
+    tableEnvironmentId: 1496,
+    handleEnvironmentId: 1496,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 149601,
+    errorCode: null,
+    rejectedByHandleTable: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'peer-value-active-after-first-teardown',
+    operation: 'post-teardown-peer-validation',
+    handleKind: 'value',
+    tableEnvironmentId: 1496,
+    handleEnvironmentId: 1496,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 149602,
+    errorCode: null,
+    rejectedByHandleTable: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-root-stale-after-slot-reuse',
+    operation: 'post-reuse-stale-validation',
+    handleKind: 'root',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    rejectedByHandleTable: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'first-value-stale-after-slot-reuse',
+    operation: 'post-reuse-stale-validation',
+    handleKind: 'value',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    rejectedByHandleTable: true,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'replacement-root-active-after-slot-reuse',
+    operation: 'post-reuse-active-validation',
+    handleKind: 'root',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 1,
+    handleGeneration: 2,
+    currentGeneration: 2,
+    recordId: 49603,
+    errorCode: null,
+    rejectedByHandleTable: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'replacement-value-active-after-slot-reuse',
+    operation: 'post-reuse-active-validation',
+    handleKind: 'value',
+    tableEnvironmentId: 496,
+    handleEnvironmentId: 496,
+    slot: 2,
+    handleGeneration: 2,
+    currentGeneration: 2,
+    recordId: 49604,
+    errorCode: null,
+    rejectedByHandleTable: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  }
+];
+const expectedNativeRootBridgeCrossEnvironmentTeardownGate = {
+  teardownGateStatus:
+    'diagnosed-native-root-bridge-cross-environment-teardown-isolation',
+  handleTableModel: 'fast-react-napi.BridgeHandleTable',
+  environmentTeardownFields:
+    expectedNativeRootBridgeEnvironmentTeardownFields,
+  teardownDiagnosticRowFields:
+    expectedNativeRootBridgeCrossEnvironmentTeardownRowFields,
+  mismatchedTeardown: {
+    requestedEnvironmentId: 1496,
+    tableEnvironmentId: 496,
+    environmentMatched: false,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0,
+    totalHandlesInvalidated: 0,
+    toreDownHandles: false
+  },
+  matchedTeardown: {
+    requestedEnvironmentId: 496,
+    tableEnvironmentId: 496,
+    environmentMatched: true,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 1,
+    totalHandlesInvalidated: 2,
+    toreDownHandles: true
+  },
+  rows: expectedNativeRootBridgeCrossEnvironmentTeardownRows,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  reactBehaviorError: false
+};
+
 const expectedPackageExports = {
   '.': {
     import: './index.mjs',
@@ -316,6 +595,8 @@ const expectedNativeRootBridgeRequestShape = {
     rendererExecution: false,
     reconcilerExecution: false
   },
+  crossEnvironmentTeardownGate:
+    expectedNativeRootBridgeCrossEnvironmentTeardownGate,
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -457,10 +738,23 @@ for (const shapeValue of [
     .batchedRecordGate.jsonTransportBatchLifecycleRowFields,
   native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
     .batchedRecordGate.jsonTransportBatchErrorCaseIds,
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate,
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+    .environmentTeardownFields,
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+    .teardownDiagnosticRowFields,
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+    .mismatchedTeardown,
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+    .matchedTeardown,
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
 }
+assertNativeRootBridgeCrossEnvironmentTeardownGate(
+  native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+);
 
 const document = createDocument('native-request-shape');
 const container = createElement('DIV', document);
@@ -1402,6 +1696,135 @@ function assertNativeRootBridgeBatchedJsonTransportGate(batchGate) {
     assert.equal(row.reconcilerExecution, false);
     assert.equal(row.reactBehaviorError, false);
   }
+}
+
+function assertNativeRootBridgeCrossEnvironmentTeardownGate(teardownGate) {
+  assert.equal(Object.isFrozen(teardownGate), true);
+  assert.equal(Object.isFrozen(teardownGate.environmentTeardownFields), true);
+  assert.equal(Object.isFrozen(teardownGate.teardownDiagnosticRowFields), true);
+  assert.equal(Object.isFrozen(teardownGate.mismatchedTeardown), true);
+  assert.equal(Object.isFrozen(teardownGate.matchedTeardown), true);
+  assert.equal(Object.isFrozen(teardownGate.rows), true);
+  assert.equal(
+    teardownGate.teardownGateStatus,
+    'diagnosed-native-root-bridge-cross-environment-teardown-isolation'
+  );
+  assert.equal(
+    teardownGate.handleTableModel,
+    'fast-react-napi.BridgeHandleTable'
+  );
+  assert.equal(
+    teardownGate.environmentTeardownFields,
+    native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+      .environmentTeardownFields
+  );
+  assert.equal(
+    teardownGate.teardownDiagnosticRowFields,
+    native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+      .teardownDiagnosticRowFields
+  );
+  assert.deepEqual(
+    teardownGate.environmentTeardownFields,
+    expectedNativeRootBridgeEnvironmentTeardownFields
+  );
+  assert.deepEqual(
+    teardownGate.teardownDiagnosticRowFields,
+    expectedNativeRootBridgeCrossEnvironmentTeardownRowFields
+  );
+  assert.deepEqual(teardownGate.mismatchedTeardown, {
+    requestedEnvironmentId: 1496,
+    tableEnvironmentId: 496,
+    environmentMatched: false,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0,
+    totalHandlesInvalidated: 0,
+    toreDownHandles: false
+  });
+  assert.deepEqual(teardownGate.matchedTeardown, {
+    requestedEnvironmentId: 496,
+    tableEnvironmentId: 496,
+    environmentMatched: true,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 1,
+    totalHandlesInvalidated: 2,
+    toreDownHandles: true
+  });
+  assert.deepEqual(
+    teardownGate.rows.map((row) => row.id),
+    [
+      'first-root-active-after-mismatched-teardown',
+      'first-value-active-after-mismatched-teardown',
+      'first-root-stale-after-own-teardown',
+      'first-value-stale-after-own-teardown',
+      'first-root-wrong-environment-in-peer-table',
+      'first-value-wrong-environment-in-peer-table',
+      'peer-root-active-after-first-teardown',
+      'peer-value-active-after-first-teardown',
+      'first-root-stale-after-slot-reuse',
+      'first-value-stale-after-slot-reuse',
+      'replacement-root-active-after-slot-reuse',
+      'replacement-value-active-after-slot-reuse'
+    ]
+  );
+  assert.deepEqual(
+    teardownGate.rows.map((row) => row.errorCode),
+    [
+      null,
+      null,
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+      'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+      null,
+      null,
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      null,
+      null
+    ]
+  );
+  assert.deepEqual(
+    teardownGate.rows.map((row) => row.currentGeneration),
+    [1, 1, 2, 2, null, null, 1, 1, 2, 2, 2, 2]
+  );
+  assert.deepEqual(
+    teardownGate.rows.map((row) => row.rejectedByHandleTable),
+    [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  );
+  assert.deepEqual(
+    teardownGate.rows[10],
+    expectedNativeRootBridgeCrossEnvironmentTeardownRows[10]
+  );
+  for (const row of teardownGate.rows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(
+      Object.keys(row),
+      teardownGate.teardownDiagnosticRowFields
+    );
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+  assert.equal(teardownGate.nativeAddonLoaded, false);
+  assert.equal(teardownGate.nativeExecution, false);
+  assert.equal(teardownGate.rendererExecution, false);
+  assert.equal(teardownGate.reconcilerExecution, false);
+  assert.equal(teardownGate.reactBehaviorError, false);
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {

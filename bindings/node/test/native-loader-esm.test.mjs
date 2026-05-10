@@ -141,6 +141,15 @@ assert.equal(
   shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.batchGateStatus,
   'validated-native-root-bridge-batched-json-transport-records'
 );
+assert.equal(
+  nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.teardownGateStatus,
+  'diagnosed-native-root-bridge-cross-environment-teardown-isolation'
+);
+assert.equal(
+  nativeBindingManifest.nativeRootBridgeRequestShape
+    .crossEnvironmentTeardownGate,
+  nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+);
 assert.deepEqual(
   shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.lifecycleRows.map(
     (row) => row.lifecycleTransition
@@ -174,6 +183,55 @@ assert.deepEqual(
 );
 assert.equal(
   shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.errorRows.every(
+    (row) =>
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.reactBehaviorError === false
+  ),
+  true
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.map(
+    (row) => row.id
+  ),
+  [
+    'first-root-active-after-mismatched-teardown',
+    'first-value-active-after-mismatched-teardown',
+    'first-root-stale-after-own-teardown',
+    'first-value-stale-after-own-teardown',
+    'first-root-wrong-environment-in-peer-table',
+    'first-value-wrong-environment-in-peer-table',
+    'peer-root-active-after-first-teardown',
+    'peer-value-active-after-first-teardown',
+    'first-root-stale-after-slot-reuse',
+    'first-value-stale-after-slot-reuse',
+    'replacement-root-active-after-slot-reuse',
+    'replacement-value-active-after-slot-reuse'
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.map(
+    (row) => row.errorCode
+  ),
+  [
+    null,
+    null,
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    null,
+    null,
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    null,
+    null
+  ]
+);
+assert.equal(
+  nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.every(
     (row) =>
       row.nativeAddonLoaded === false &&
       row.nativeExecution === false &&

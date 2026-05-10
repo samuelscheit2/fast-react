@@ -623,6 +623,203 @@ function assertNoPrivateDiagnosticRuntimeExports(
   }
 }
 
+function createNativeDiagnosticRecords() {
+  const rootHandle = Object.freeze({
+    environmentId: 532,
+    generation: 1,
+    kind: 'root',
+    slot: 1
+  });
+
+  return [
+    {
+      environmentId: 532,
+      kind: 'create',
+      requestId: 1,
+      rootHandle,
+      rootHandleState: 'active',
+      rootId: 1,
+      valueHandle: Object.freeze({
+        environmentId: 532,
+        generation: 1,
+        kind: 'value',
+        slot: 2
+      })
+    },
+    {
+      environmentId: 532,
+      kind: 'render',
+      requestId: 2,
+      rootHandle,
+      rootHandleState: 'active',
+      rootId: 1,
+      valueHandle: Object.freeze({
+        environmentId: 532,
+        generation: 1,
+        kind: 'value',
+        slot: 3
+      })
+    },
+    {
+      environmentId: 532,
+      kind: 'unmount',
+      requestId: 3,
+      rootHandle,
+      rootHandleState: 'retired',
+      rootId: 1,
+      valueHandle: null
+    }
+  ];
+}
+
+function assertNativeNoExecutionFlags(record, label) {
+  assert.equal(record.nativeAddonLoaded, false, `${label} native addon`);
+  assert.equal(record.nativeExecution, false, `${label} native execution`);
+  assert.equal(record.rendererExecution, false, `${label} renderer execution`);
+  assert.equal(
+    record.reconcilerExecution,
+    false,
+    `${label} reconciler execution`
+  );
+  if (Object.hasOwn(record, 'reactBehaviorError')) {
+    assert.equal(
+      record.reactBehaviorError,
+      false,
+      `${label} React behavior error`
+    );
+  }
+}
+
+function assertNativePackageDiagnosticSurface(nativeRuntime) {
+  const requestShape = nativeRuntime.nativeRootBridgeRequestShape;
+  const batchMetadata =
+    requestShape.jsonTransportSmoke.parserGate.batchedRecordGate;
+  const runtimeGate = nativeRuntime.createNativeRootBridgeRequestShapeGate(
+    createNativeDiagnosticRecords()
+  );
+  const batchGate =
+    runtimeGate.jsonTransportSmoke.parserGate.batchedRecordGate;
+  const teardownGate = requestShape.crossEnvironmentTeardownGate;
+
+  assert.equal(
+    batchMetadata.batchGateStatus,
+    'validated-native-root-bridge-batched-json-transport-records',
+    'native batched JSON metadata status'
+  );
+  assert.deepEqual(
+    batchMetadata.jsonTransportBatchErrorCaseIds,
+    [
+      'batch-render-before-create-lifecycle-order',
+      'batch-root-handle-state-mismatch',
+      'batch-create-after-create-lifecycle-order',
+      'batch-request-after-unmount-lifecycle-order',
+      'batch-request-id-out-of-order'
+    ],
+    'native batched JSON deterministic error case ids'
+  );
+  assert.deepEqual(
+    batchGate.lifecycleRows.map((row) => row.lifecycleTransition),
+    ['none->active', 'active->active', 'active->retired'],
+    'native batched JSON accepted lifecycle transitions'
+  );
+  assert.deepEqual(
+    batchGate.errorRows.map((row) => row.code),
+    [
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+      'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+      'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
+      'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER'
+    ],
+    'native batched JSON deterministic error codes'
+  );
+  for (const row of [...batchGate.lifecycleRows, ...batchGate.errorRows]) {
+    assert.deepEqual(
+      Object.keys(row),
+      batchGate.jsonTransportBatchLifecycleRowFields,
+      `native batched JSON row fields ${row.id}`
+    );
+    assertNativeNoExecutionFlags(row, `native batched JSON ${row.id}`);
+  }
+
+  assert.equal(
+    teardownGate.teardownGateStatus,
+    'diagnosed-native-root-bridge-cross-environment-teardown-isolation',
+    'native teardown status'
+  );
+  assert.deepEqual(
+    teardownGate.mismatchedTeardown,
+    {
+      requestedEnvironmentId: 1496,
+      tableEnvironmentId: 496,
+      environmentMatched: false,
+      rootHandlesInvalidated: 0,
+      valueHandlesInvalidated: 0,
+      totalHandlesInvalidated: 0,
+      toreDownHandles: false
+    },
+    'native mismatched teardown summary'
+  );
+  assert.deepEqual(
+    teardownGate.matchedTeardown,
+    {
+      requestedEnvironmentId: 496,
+      tableEnvironmentId: 496,
+      environmentMatched: true,
+      rootHandlesInvalidated: 1,
+      valueHandlesInvalidated: 1,
+      totalHandlesInvalidated: 2,
+      toreDownHandles: true
+    },
+    'native matched teardown summary'
+  );
+  assert.deepEqual(
+    teardownGate.rows.map((row) => row.id),
+    [
+      'first-root-active-after-mismatched-teardown',
+      'first-value-active-after-mismatched-teardown',
+      'first-root-stale-after-own-teardown',
+      'first-value-stale-after-own-teardown',
+      'first-root-wrong-environment-in-peer-table',
+      'first-value-wrong-environment-in-peer-table',
+      'peer-root-active-after-first-teardown',
+      'peer-value-active-after-first-teardown',
+      'first-root-stale-after-slot-reuse',
+      'first-value-stale-after-slot-reuse',
+      'replacement-root-active-after-slot-reuse',
+      'replacement-value-active-after-slot-reuse'
+    ],
+    'native teardown row ids'
+  );
+  assert.deepEqual(
+    teardownGate.rows.map((row) => row.errorCode),
+    [
+      null,
+      null,
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+      'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+      null,
+      null,
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      null,
+      null
+    ],
+    'native teardown row error codes'
+  );
+  for (const row of teardownGate.rows) {
+    assert.deepEqual(
+      Object.keys(row),
+      teardownGate.teardownDiagnosticRowFields,
+      `native teardown row fields ${row.id}`
+    );
+    assertNativeNoExecutionFlags(row, `native teardown ${row.id}`);
+  }
+  assertNativeNoExecutionFlags(teardownGate, 'native teardown gate');
+}
+
 function assertLoadError(error, expected, label) {
   assert.equal(error.name, expected.name, `${label} error name`);
 
@@ -1472,5 +1669,6 @@ assertNoPrivateDiagnosticRuntimeExports(
   'native/index.cjs',
   acceptedNativeDiagnosticRuntimeKeys
 );
+assertNativePackageDiagnosticSurface(nativeRuntime);
 
 console.log('package surface snapshot guard passed');
