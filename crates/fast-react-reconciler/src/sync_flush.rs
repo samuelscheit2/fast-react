@@ -14,8 +14,10 @@ use fast_react_host_config::HostTypes;
 
 use crate::root_commit::PendingPassiveCommitHandoff;
 use crate::root_scheduler::{
+    SchedulerBridgeActContinuationExecutionError, SchedulerBridgeActContinuationExecutionResult,
     SyncFlushActContinuationDrainRecord, SyncFlushActPostPassiveContinuationGateRecord,
-    SyncFlushPostPassiveContinuationExecutionGateRecord, recompute_might_have_pending_sync_work,
+    SyncFlushPostPassiveContinuationExecutionGateRecord,
+    execute_scheduler_bridge_act_continuations, recompute_might_have_pending_sync_work,
     sync_flush_act_continuation_drain_record_after_host_output_canary,
     sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
     sync_flush_lanes_for_root, sync_flush_post_passive_continuation_execution_gate,
@@ -312,6 +314,16 @@ impl SyncFlushActPrivateExecutionDiagnosticsForCanary {
     #[must_use]
     pub(crate) const fn executes_effects(&self) -> bool {
         false
+    }
+
+    pub(crate) fn execute_accepted_scheduler_bridge_act_continuations<H: HostTypes>(
+        &self,
+        store: &mut FiberRootStore<H>,
+    ) -> Result<
+        SchedulerBridgeActContinuationExecutionResult,
+        SchedulerBridgeActContinuationExecutionError,
+    > {
+        execute_scheduler_bridge_act_continuations(store, &self.drained_act_continuations)
     }
 }
 
@@ -911,6 +923,7 @@ fn commit_render_phase<H: HostTypes>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::root_scheduler::SchedulerBridgeActContinuationExecutionStatus;
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
@@ -1297,6 +1310,87 @@ mod tests {
             store.root(root_id).unwrap().lanes().pending_lanes(),
             Lanes::DEFAULT
         );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_scheduler_bridge_executes_drained_act_continuation_after_canary() {
+        let (mut store, root_id, host) = root_store();
+        let sync_element = RootElementHandle::from_raw(827);
+        let default_element = RootElementHandle::from_raw(828);
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, sync_element);
+        let default_update = update_container(&mut store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            render_phase,
+            TestRendererHostOutputCanaryFixture::new(829, 840, 841),
+        )
+        .unwrap();
+        finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 842, 843).unwrap();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let (mut committed, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+        let private_execution =
+            committed.drain_accepted_act_continuations_after_host_output_canary(diagnostics);
+
+        assert_eq!(private_execution.drained_count(), 1);
+        assert!(!private_execution.executes_queued_work());
+        assert_eq!(current_host_root_element(&store, root_id), sync_element);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
+
+        let continuation_execution = private_execution
+            .execute_accepted_scheduler_bridge_act_continuations(&mut store)
+            .unwrap();
+
+        assert_eq!(continuation_execution.records().len(), 1);
+        assert_eq!(continuation_execution.executed_count(), 1);
+        assert_eq!(continuation_execution.rejected_count(), 0);
+        assert_eq!(continuation_execution.blocked_count(), 0);
+        assert!(continuation_execution.did_execute_accepted_internal_act_continuations());
+        assert!(!continuation_execution.drains_public_react_act_queue());
+        assert!(!continuation_execution.public_act_compatibility_claimed());
+        assert!(!continuation_execution.public_scheduler_timing_compatibility_claimed());
+        assert!(!continuation_execution.executes_effects());
+        let record = &continuation_execution.records()[0];
+        assert_eq!(
+            record.status(),
+            SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            record.render_phase().unwrap().resulting_element(),
+            default_element
+        );
+        assert_eq!(record.commit().unwrap().finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.commit().unwrap().remaining_lanes(), Lanes::NO);
+        assert_eq!(current_host_root_element(&store, root_id), default_element);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
         assert_eq!(
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
