@@ -224,7 +224,7 @@ impl DetachedHostRecords {
 
         match child_fiber.tag() {
             FiberTag::HostComponent => {
-                let scope = self.validated_child_scope(
+                let scope = self.validated_scope(
                     tokens,
                     state_node,
                     root_id,
@@ -235,7 +235,7 @@ impl DetachedHostRecords {
                 host.append_initial_child(parent, HostChild::Instance(child))?;
             }
             FiberTag::HostText => {
-                let scope = self.validated_child_scope(
+                let scope = self.validated_scope(
                     tokens,
                     state_node,
                     root_id,
@@ -265,7 +265,7 @@ impl DetachedHostRecords {
         self.scopes[index] = Some(scope);
     }
 
-    fn validated_child_scope(
+    fn validated_scope(
         &self,
         tokens: &HostFiberTokenStore,
         handle: StateNodeHandle,
@@ -329,6 +329,54 @@ impl HostWorkResult {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostTextUpdateDiff {
+    current: FiberId,
+    work_in_progress: FiberId,
+    state_node: StateNodeHandle,
+    metadata: HostNodeMetadata,
+    old_text: String,
+    new_text: String,
+    changed: bool,
+}
+
+impl HostTextUpdateDiff {
+    #[must_use]
+    const fn current(&self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    const fn work_in_progress(&self) -> FiberId {
+        self.work_in_progress
+    }
+
+    #[must_use]
+    const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    const fn metadata(&self) -> HostNodeMetadata {
+        self.metadata
+    }
+
+    #[must_use]
+    fn old_text(&self) -> &str {
+        &self.old_text
+    }
+
+    #[must_use]
+    fn new_text(&self) -> &str {
+        &self.new_text
+    }
+
+    #[must_use]
+    const fn changed(&self) -> bool {
+        self.changed
+    }
+}
+
 fn mount_test_host_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -379,6 +427,33 @@ fn mount_test_host_work(
         root_child,
         detached_hosts,
     })
+}
+
+fn update_test_host_text_work(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    current: FiberId,
+    text: &TestHostText,
+    render_lanes: Lanes,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<HostTextUpdateDiff, HostWorkError> {
+    expect_tag(store, current, FiberTag::HostText)?;
+    let work_in_progress = store
+        .fiber_arena_mut()
+        .create_work_in_progress(current, text.props())?;
+    {
+        let node = store.fiber_arena_mut().get_mut(work_in_progress)?;
+        node.set_lanes(render_lanes);
+    }
+
+    complete_host_text_update(
+        store,
+        root_id,
+        current,
+        work_in_progress,
+        text,
+        detached_hosts,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -605,6 +680,69 @@ fn complete_host_text(
     )
 }
 
+fn complete_host_text_update(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    current: FiberId,
+    work_in_progress: FiberId,
+    text: &TestHostText,
+    detached_hosts: &DetachedHostRecords,
+) -> Result<HostTextUpdateDiff, HostWorkError> {
+    expect_tag(store, current, FiberTag::HostText)?;
+    expect_tag(store, work_in_progress, FiberTag::HostText)?;
+    store
+        .fiber_arena()
+        .validate_alternate_pair(current, work_in_progress)?;
+
+    let state_node = store.fiber_arena().get(work_in_progress)?.state_node();
+    if state_node.is_none() {
+        return Err(HostWorkError::MissingStateNode {
+            fiber: work_in_progress,
+            tag: FiberTag::HostText,
+        });
+    }
+
+    let scope = detached_hosts.validated_scope(
+        store.host_tokens(),
+        state_node,
+        root_id,
+        current,
+        HostFiberTokenTarget::TextInstance,
+    )?;
+    let metadata = detached_hosts.nodes.text_metadata(state_node, scope)?;
+    let old_text = detached_hosts
+        .nodes
+        .text(state_node, scope)?
+        .text()
+        .to_owned();
+    let new_text = text.text().to_owned();
+    let changed = old_text != new_text;
+
+    if changed {
+        store
+            .fiber_arena_mut()
+            .get_mut(work_in_progress)?
+            .merge_flags(FiberFlags::UPDATE);
+    }
+    complete_fiber_common(
+        store,
+        work_in_progress,
+        text.props(),
+        state_node,
+        InitialChildrenFinalization::NoCommitMount,
+    )?;
+
+    Ok(HostTextUpdateDiff {
+        current,
+        work_in_progress,
+        state_node,
+        metadata,
+        old_text,
+        new_text,
+        changed,
+    })
+}
+
 fn issue_creation_host_node_scope(
     store: &mut FiberRootStore<RecordingHost>,
     root_id: FiberRootId,
@@ -698,6 +836,13 @@ mod tests {
     ) -> HostRootRenderPhaseRecord {
         update_container(store, root_id, element, None).unwrap();
         render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap()
+    }
+
+    fn text_from_root(source: &TestHostTree, element: RootElementHandle) -> &TestHostText {
+        match source.root(element).unwrap() {
+            TestHostNode::Text(text) => text,
+            TestHostNode::Element(_) => panic!("expected text root"),
+        }
     }
 
     #[test]
@@ -860,6 +1005,122 @@ mod tests {
                 .violation(),
             HostNodeViolation::WrongTarget
         );
+    }
+
+    #[test]
+    fn host_work_host_text_update_records_changed_diff_through_host_node_store() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("span", "before");
+        let render = render_test_root(&mut store, root_id, element);
+        let result = mount_test_host_work(&mut store, &mut host, render, &source).unwrap();
+        let component = result.root_child.unwrap();
+        let current_text = store.fiber_arena().get(component).unwrap().child().unwrap();
+        let current_text_node = store.fiber_arena().get(current_text).unwrap();
+        let state_node = current_text_node.state_node();
+        let update_element = source.insert_text("after");
+        let update_text = text_from_root(&source, update_element);
+        let operations_before_update = host.operations();
+
+        let diff = update_test_host_text_work(
+            &mut store,
+            root_id,
+            current_text,
+            update_text,
+            Lanes::DEFAULT,
+            result.detached_hosts(),
+        )
+        .unwrap();
+
+        assert_eq!(diff.current(), current_text);
+        assert_ne!(diff.work_in_progress(), current_text);
+        assert_eq!(diff.state_node(), state_node);
+        assert_eq!(diff.old_text(), "before");
+        assert_eq!(diff.new_text(), "after");
+        assert!(diff.changed());
+        assert_eq!(diff.metadata().handle(), state_node);
+        assert_eq!(diff.metadata().root_id(), root_id);
+        assert_eq!(diff.metadata().fiber_id(), current_text);
+        assert_eq!(diff.metadata().phase(), HostFiberTokenPhase::Creation);
+        assert_eq!(diff.metadata().target(), HostFiberTokenTarget::TextInstance);
+
+        let work_text = store.fiber_arena().get(diff.work_in_progress()).unwrap();
+        assert_eq!(work_text.alternate(), Some(current_text));
+        assert_eq!(work_text.state_node(), state_node);
+        assert_eq!(work_text.memoized_props(), update_text.props());
+        assert!(work_text.flags().contains_all(FiberFlags::UPDATE));
+        assert!(!work_text.flags().contains_all(FiberFlags::PLACEMENT));
+        assert_eq!(
+            result.detached_hosts().text(state_node).unwrap().text(),
+            "before"
+        );
+        assert_eq!(result.detached_hosts().text_count(), 1);
+        assert_eq!(store.host_tokens().len(), 2);
+        assert_eq!(host.operations(), operations_before_update);
+
+        let wip_scope = HostNodeScope::new(
+            root_id,
+            diff.work_in_progress(),
+            diff.metadata().token_id(),
+            HostFiberTokenPhase::Creation,
+        );
+        assert_eq!(
+            result
+                .detached_hosts()
+                .nodes
+                .text(state_node, wip_scope)
+                .unwrap_err()
+                .violation(),
+            HostNodeViolation::WrongFiber
+        );
+        store.fiber_arena().validate_topology().unwrap();
+    }
+
+    #[test]
+    fn host_work_host_text_update_records_unchanged_diff_without_update_flag() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("span", "stable");
+        let render = render_test_root(&mut store, root_id, element);
+        let result = mount_test_host_work(&mut store, &mut host, render, &source).unwrap();
+        let component = result.root_child.unwrap();
+        let current_text = store.fiber_arena().get(component).unwrap().child().unwrap();
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let update_element = source.insert_text("stable");
+        let update_text = text_from_root(&source, update_element);
+        let operations_before_update = host.operations();
+
+        let diff = update_test_host_text_work(
+            &mut store,
+            root_id,
+            current_text,
+            update_text,
+            Lanes::DEFAULT,
+            result.detached_hosts(),
+        )
+        .unwrap();
+
+        assert_eq!(diff.current(), current_text);
+        assert_eq!(diff.state_node(), state_node);
+        assert_eq!(diff.old_text(), "stable");
+        assert_eq!(diff.new_text(), "stable");
+        assert!(!diff.changed());
+        assert_eq!(diff.metadata().fiber_id(), current_text);
+
+        let work_text = store.fiber_arena().get(diff.work_in_progress()).unwrap();
+        assert_eq!(work_text.state_node(), state_node);
+        assert_eq!(work_text.memoized_props(), update_text.props());
+        assert_eq!(work_text.flags(), FiberFlags::NO);
+        assert_eq!(
+            result.detached_hosts().text(state_node).unwrap().text(),
+            "stable"
+        );
+        assert_eq!(result.detached_hosts().text_count(), 1);
+        assert_eq!(store.host_tokens().len(), 2);
+        assert_eq!(host.operations(), operations_before_update);
+        store.fiber_arena().validate_topology().unwrap();
     }
 
     #[test]
