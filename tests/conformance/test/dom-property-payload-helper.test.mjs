@@ -29,12 +29,15 @@ const reactDomPackageJson = require(
 const {
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_REMOVE_PROPERTY,
   ENTRY_REMOVE_STYLE,
   ENTRY_SET_ATTRIBUTE,
   ENTRY_SET_INNER_HTML,
+  ENTRY_SET_PROPERTY,
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
-  diffDomPropertyPayload
+  diffDomPropertyPayload,
+  isOrdinaryPropertyPayloadEntry
 } = propertyPayload;
 
 test("private DOM property payload preserves insertion order for ordinary attributes", () => {
@@ -551,6 +554,45 @@ test("private DOM property payload helper remains private to the package surface
   );
 });
 
+test("private DOM property payload classifies only ordinary application records", () => {
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(setAttribute("id", "id", "alpha")),
+    true
+  );
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(removeAttribute("hidden", "hidden")),
+    true
+  );
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(setProperty("boolProp", true)),
+    true
+  );
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(removeProperty("objectProp")),
+    true
+  );
+
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(
+      setStyle("color", "propertyAssignment", "red")
+    ),
+    false
+  );
+  assert.equal(isOrdinaryPropertyPayloadEntry(setInnerHTML("<b>x</b>")), false);
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(
+      nonPayload("children", "children", "handled elsewhere")
+    ),
+    false
+  );
+  assert.equal(
+    isOrdinaryPropertyPayloadEntry(
+      unsupported("value", "controlled-input", "handled elsewhere")
+    ),
+    false
+  );
+});
+
 function orderedProps(entries) {
   const props = {};
   for (const [key, value] of entries) {
@@ -573,6 +615,23 @@ function removeAttribute(propName, attributeName) {
     kind: ENTRY_REMOVE_ATTRIBUTE,
     propName,
     attributeName
+  };
+}
+
+function setProperty(propertyName, value) {
+  return {
+    kind: ENTRY_SET_PROPERTY,
+    propName: propertyName,
+    propertyName,
+    value
+  };
+}
+
+function removeProperty(propertyName) {
+  return {
+    kind: ENTRY_REMOVE_PROPERTY,
+    propName: propertyName,
+    propertyName
   };
 }
 

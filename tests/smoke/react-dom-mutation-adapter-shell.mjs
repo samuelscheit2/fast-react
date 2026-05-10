@@ -13,6 +13,9 @@ const repoRoot = path.resolve(
 const domHost = require(
   path.join(repoRoot, 'packages/react-dom/src/dom-host/index.js')
 );
+const propertyPayload = require(
+  path.join(repoRoot, 'packages/react-dom/src/dom-host/property-payload.js')
+);
 const reactDomClient = require(
   path.join(repoRoot, 'packages/react-dom/client.js')
 );
@@ -48,6 +51,185 @@ function runSmokeChecks() {
     domHost.shouldSetTextContent('noscript', {children: 'text'}),
     false
   );
+
+  {
+    const element = createElement('button');
+    const previousProps = orderedProps([
+      ['id', 'mutable'],
+      ['className', 'alpha'],
+      ['disabled', true],
+      ['title', 'first'],
+      ['data-state', 'open'],
+      ['aria-hidden', true],
+      ['custom-attr', 'initial']
+    ]);
+    const nextProps = orderedProps([
+      ['id', 'mutable'],
+      ['className', undefined],
+      ['disabled', false],
+      ['title', 'second'],
+      ['data-state', null],
+      ['aria-hidden', false],
+      ['custom-attr', undefined]
+    ]);
+
+    assert.deepEqual(
+      domHost.applyDomPropertyPayload(
+        element,
+        propertyPayload.diffDomPropertyPayload('button', {}, previousProps)
+      ),
+      [
+        appliedSetAttribute('id', 'mutable'),
+        appliedSetAttribute('class', 'alpha'),
+        appliedSetAttribute('disabled', ''),
+        appliedSetAttribute('title', 'first'),
+        appliedSetAttribute('data-state', 'open'),
+        appliedSetAttribute('aria-hidden', 'true'),
+        appliedSetAttribute('custom-attr', 'initial')
+      ]
+    );
+    assert.deepEqual(attributeEntries(element), [
+      ['aria-hidden', 'true'],
+      ['class', 'alpha'],
+      ['custom-attr', 'initial'],
+      ['data-state', 'open'],
+      ['disabled', ''],
+      ['id', 'mutable'],
+      ['title', 'first']
+    ]);
+
+    assert.deepEqual(
+      domHost.applyDomPropertyPayload(
+        element,
+        propertyPayload.diffDomPropertyPayload(
+          'button',
+          previousProps,
+          nextProps
+        )
+      ),
+      [
+        appliedRemoveAttribute('class'),
+        appliedRemoveAttribute('disabled'),
+        appliedSetAttribute('title', 'second'),
+        appliedRemoveAttribute('data-state'),
+        appliedSetAttribute('aria-hidden', 'false'),
+        appliedRemoveAttribute('custom-attr')
+      ]
+    );
+    assert.deepEqual(attributeEntries(element), [
+      ['aria-hidden', 'false'],
+      ['id', 'mutable'],
+      ['title', 'second']
+    ]);
+    assert.deepEqual(element.attributeLog, [
+      ['setAttribute', 'id', 'mutable'],
+      ['setAttribute', 'class', 'alpha'],
+      ['setAttribute', 'disabled', ''],
+      ['setAttribute', 'title', 'first'],
+      ['setAttribute', 'data-state', 'open'],
+      ['setAttribute', 'aria-hidden', 'true'],
+      ['setAttribute', 'custom-attr', 'initial'],
+      ['removeAttribute', 'class', true],
+      ['removeAttribute', 'disabled', true],
+      ['setAttribute', 'title', 'second'],
+      ['removeAttribute', 'data-state', true],
+      ['setAttribute', 'aria-hidden', 'false'],
+      ['removeAttribute', 'custom-attr', true]
+    ]);
+  }
+
+  {
+    const element = createElement('fast-widget');
+    const value = {answer: 42};
+
+    assert.deepEqual(
+      domHost.applyDomPropertyPayload(element, [
+        {
+          kind: propertyPayload.ENTRY_SET_PROPERTY,
+          propertyName: 'boolProp',
+          value: true
+        },
+        {
+          kind: propertyPayload.ENTRY_SET_PROPERTY,
+          propertyName: 'objectProp',
+          value
+        },
+        {
+          kind: propertyPayload.ENTRY_REMOVE_PROPERTY,
+          propertyName: 'boolProp'
+        }
+      ]),
+      [
+        appliedSetProperty('boolProp', true),
+        appliedSetProperty('objectProp', value),
+        appliedRemoveProperty('boolProp')
+      ]
+    );
+    assert.equal(element.boolProp, null);
+    assert.equal(element.objectProp, value);
+    assert.deepEqual(element.propertyLog, [
+      ['setProperty', 'boolProp', true],
+      ['setProperty', 'objectProp', value],
+      ['setProperty', 'boolProp', null]
+    ]);
+  }
+
+  {
+    const element = createElement('div');
+    const blockedPayloads = [
+      propertyPayload.diffDomPropertyPayload(
+        'div',
+        {},
+        orderedProps([['style', {color: 'red'}]])
+      ),
+      propertyPayload.diffDomPropertyPayload(
+        'div',
+        {},
+        orderedProps([
+          ['dangerouslySetInnerHTML', {__html: '<span>raw</span>'}]
+        ])
+      ),
+      propertyPayload.diffDomPropertyPayload(
+        'div',
+        {},
+        orderedProps([['onClick', () => {}]])
+      ),
+      propertyPayload.diffDomPropertyPayload(
+        'input',
+        {},
+        orderedProps([['value', 'Ada']])
+      ),
+      [
+        {
+          kind: propertyPayload.ENTRY_SET_PROPERTY,
+          propertyName: 'onClick',
+          value: null
+        }
+      ]
+    ];
+
+    for (const payload of blockedPayloads) {
+      const error = captureThrown(() =>
+        domHost.applyDomPropertyPayload(element, [
+          {
+            kind: propertyPayload.ENTRY_SET_ATTRIBUTE,
+            attributeName: 'id',
+            value: 'must-not-apply'
+          },
+          ...payload
+        ])
+      );
+      assert.ok(error);
+      assert.match(
+        error.code,
+        /^FAST_REACT_DOM_(BLOCKED|INVALID)_PROPERTY_PAYLOAD_ENTRY$/u
+      );
+    }
+
+    assert.equal(element.getAttribute('id'), null);
+    assert.deepEqual(element.attributeLog, []);
+    assert.deepEqual(element.propertyLog, []);
+  }
 
   {
     const parent = createElement('section');
@@ -224,6 +406,60 @@ function childNames(parent) {
   return parent.childNodes.map((child) => child.nodeName);
 }
 
+function orderedProps(entries) {
+  const props = {};
+  for (const [key, value] of entries) {
+    props[key] = value;
+  }
+  return props;
+}
+
+function attributeEntries(element) {
+  return [...element.attributes.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
+}
+
+function appliedSetAttribute(attributeName, value) {
+  return {
+    kind: propertyPayload.ENTRY_SET_ATTRIBUTE,
+    attributeName,
+    value
+  };
+}
+
+function appliedRemoveAttribute(attributeName) {
+  return {
+    kind: propertyPayload.ENTRY_REMOVE_ATTRIBUTE,
+    attributeName
+  };
+}
+
+function appliedSetProperty(propertyName, value) {
+  return {
+    kind: propertyPayload.ENTRY_SET_PROPERTY,
+    propertyName,
+    value
+  };
+}
+
+function appliedRemoveProperty(propertyName) {
+  return {
+    kind: propertyPayload.ENTRY_REMOVE_PROPERTY,
+    propertyName,
+    value: null
+  };
+}
+
+function captureThrown(operation) {
+  try {
+    operation();
+  } catch (error) {
+    return error;
+  }
+  return null;
+}
+
 class FakeNode {
   constructor(nodeName, nodeType) {
     this.childNodes = [];
@@ -281,6 +517,11 @@ class FakeElement extends FakeNode {
   constructor(nodeName) {
     super(nodeName, 1);
     this._textContent = '';
+    this._boolProp = null;
+    this._objectProp = null;
+    this.attributes = new Map();
+    this.attributeLog = [];
+    this.propertyLog = [];
   }
 
   get textContent() {
@@ -295,6 +536,52 @@ class FakeElement extends FakeNode {
       detachFromParent(child);
     }
     this._textContent = String(value);
+  }
+
+  get boolProp() {
+    return this._boolProp;
+  }
+
+  set boolProp(value) {
+    this.propertyLog.push(['setProperty', 'boolProp', value]);
+    this._boolProp = value;
+  }
+
+  get objectProp() {
+    return this._objectProp;
+  }
+
+  set objectProp(value) {
+    this.propertyLog.push(['setProperty', 'objectProp', value]);
+    this._objectProp = value;
+  }
+
+  setAttribute(name, value) {
+    const attributeName = String(name);
+    const stringValue = String(value);
+    this.attributeLog.push(['setAttribute', attributeName, stringValue]);
+    this.attributes.set(attributeName, stringValue);
+  }
+
+  removeAttribute(name) {
+    const attributeName = String(name);
+    this.attributeLog.push([
+      'removeAttribute',
+      attributeName,
+      this.attributes.has(attributeName)
+    ]);
+    this.attributes.delete(attributeName);
+  }
+
+  getAttribute(name) {
+    const attributeName = String(name);
+    return this.attributes.has(attributeName)
+      ? this.attributes.get(attributeName)
+      : null;
+  }
+
+  hasAttribute(name) {
+    return this.attributes.has(String(name));
   }
 }
 
