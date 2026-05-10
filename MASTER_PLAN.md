@@ -48,15 +48,15 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
 accepted and cleaned up. Workers 715-736 have also been accepted and cleaned
-up.
+up. Worker 737 has been accepted, merged, and cleaned up.
 
-Workers 737-738 are active in isolated worktrees.
+Worker 738 is active in an isolated worktree.
 
 ## Near-Term Sequencing
 
-1. Select the next runtime or research queue from accepted Worker 736 nested
-   source-report identity evidence, Worker 735 sibling snapshot blocker
-   evidence, Worker 734 ledger evidence, and remaining private blockers only;
+1. Select the next runtime or research queue from accepted Worker 737 ledger
+   evidence, accepted Worker 736 nested source-report identity evidence,
+   Worker 735 sibling snapshot blocker evidence, and remaining private blockers;
    keep public root, act, flushSync, hooks/effects, test-renderer, and React
    DOM compatibility blocked until each private gate is proven.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
@@ -67,8 +67,6 @@ Workers 737-738 are active in isolated worktrees.
 
 ## Next Queue Candidates
 
-- Active Worker 737 is adding the static private-admission ledger for Workers
-  734-736.
 - Active Worker 738 is adding the real committed sibling-text host-output
   handoff and private JSON report prerequisite while keeping sibling identity
   admission blocked.

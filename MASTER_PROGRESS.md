@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 737
+
+- Worker 737 added the static private-admission ledger for Workers 734-736.
+  Worker 734 is recorded as prior ledger context for Workers 732-733, Worker
+  735 is recorded as accepted Rust-only private sibling snapshot blocker
+  evidence, and Worker 736 is recorded as accepted Rust-only private nested
+  `toJSON` source-report finished-work identity generation.
+- The accepted ledger carries forward Workers 732-733 blocked public claims,
+  blocked public surfaces, and blocked admission claims as a fail-closed
+  superset while preserving Worker 735's sibling snapshot blocker. Sibling
+  snapshot identity remains blocked until a committed sibling-text fiber
+  report shape and real sibling-text handoff exist.
+- Worker 737 was accepted after syntax checks, focused private-admission and
+  serialization conformance tests, package-surface guard, import smoke,
+  conflict-marker scanning, and `git diff --check`. This is static/read-only
+  conformance evidence only; public/package/native/JS compatibility, native
+  bridge loading/execution, broad multichild identity, and sibling snapshot
+  identity remain blocked. Its subagent, worktree, and branch were cleaned up
+  after merge.
+
 ### Worker 736
 
 - Worker 736 added Rust-only nested `toJSON` source-report finished-work
