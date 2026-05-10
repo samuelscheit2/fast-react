@@ -90,6 +90,17 @@ const privateToJSONSiblingTextJSAdmissionDiagnosticName =
   "fast-react-test-renderer.tojson.sibling-text.private-js-cjs-admission";
 const privateToJSONSiblingTextJSAdmissionStatus =
   "private-tojson-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
+const privateRootFinishedLanesHandoffDiagnosticName =
+  "react-test-renderer-root-finished-lanes-handoff-private-diagnostic";
+const privateRootFinishedLanesHandoffStatus =
+  "private-root-finished-work-lanes-handoff-public-serialization-native-blocked";
+const privateRootFinishedLanesHandoffAliasKeys = [
+  "root_finished_lanes_handoff",
+  "finishedLanesHandoff",
+  "finished_lanes_handoff",
+  "finishedWorkHandoff",
+  "finished_work_handoff"
+];
 const privateToJSONUpdateHostOutputRowId =
   "react-test-renderer-tojson-update-host-output-private-diagnostic";
 const privateToJSONNestedUpdateHostOutputRowId =
@@ -2037,6 +2048,20 @@ test("react-test-renderer JS private serialization finished-work identity valida
       jsonIdentity.status,
       privateSerializationFinishedWorkIdentityStatus
     );
+    assert.equal(jsonIdentity.rootFinishedLanesHandoffAccepted, true);
+    assert.equal(
+      jsonIdentity.consumesPrivateRootFinishedLanesHandoffGate,
+      true
+    );
+    assert.equal(
+      jsonIdentity.rootFinishedLanesHandoffDiagnosticName,
+      privateRootFinishedLanesHandoffDiagnosticName
+    );
+    assert.equal(
+      jsonIdentity.rootFinishedLanesHandoffStatus,
+      privateRootFinishedLanesHandoffStatus
+    );
+    assert.equal(Object.isFrozen(jsonIdentity.rootFinishedLanesHandoff), true);
     assert.equal(jsonIdentity.publicSurface, "create().toJSON");
     assert.equal(jsonIdentity.rootRequest, jsonError.rootRequest);
     assert.deepEqual(jsonIdentity.renderCurrent, jsonEvidence.renderCurrent);
@@ -2274,6 +2299,61 @@ test("react-test-renderer JS private serialization finished-work identity valida
       "FastReactTestRendererPrivateToJSONSerializationError",
       updateError.rootRequest
     );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        delete evidence.rootFinishedLanesHandoff;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertRootFinishedLanesHandoffAliasRejections(
+      jsonFacade,
+      jsonEvidence,
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.rootRequestSequence += 1;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.rootId =
+          `${evidence.rootFinishedLanesHandoff.rootId}:foreign`;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.nativeBridgeAvailable = true;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.packageCompatibilityClaimed = true;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
 
     assertFinishedWorkIdentityRejection(
       jsonFacade,
@@ -2373,6 +2453,19 @@ test("react-test-renderer JS private serialization finished-work identity valida
       treeReport
     );
     assert.equal(treeIdentity.publicSurface, "create().toTree");
+    assert.equal(treeIdentity.rootFinishedLanesHandoffAccepted, true);
+    assert.equal(
+      treeIdentity.consumesPrivateRootFinishedLanesHandoffGate,
+      true
+    );
+    assert.equal(
+      treeIdentity.rootFinishedLanesHandoffDiagnosticName,
+      privateRootFinishedLanesHandoffDiagnosticName
+    );
+    assert.equal(
+      treeIdentity.rootFinishedLanesHandoffStatus,
+      privateRootFinishedLanesHandoffStatus
+    );
     assert.deepEqual(treeIdentity.renderCurrent, treeEvidence.renderCurrent);
     assert.deepEqual(
       treeIdentity.commitPreviousCurrent,
@@ -2531,6 +2624,12 @@ test("react-test-renderer JS private serialization finished-work identity valida
         delete evidence.rootRequestSequence;
         delete evidence.rootId;
       }),
+      treeReport,
+      "FastReactTestRendererPrivateToTreeMetadataError"
+    );
+    assertRootFinishedLanesHandoffAliasRejections(
+      treeFacade,
+      treeEvidence,
       treeReport,
       "FastReactTestRendererPrivateToTreeMetadataError"
     );
@@ -3813,6 +3912,10 @@ function createAcceptedFinishedWorkIdentityEvidence({
     publicSerializationAvailable: false,
     compatibilityClaimed: false
   };
+  evidence.rootFinishedLanesHandoff = createAcceptedRootFinishedLanesHandoff(
+    rootRequest,
+    evidence
+  );
   if (hostOutputUpdateKind === "Unmount") {
     const deletionCommitHandoff =
       createAcceptedUnmountDeletionCommitHandoff(rootRequest, {
@@ -3830,6 +3933,40 @@ function createAcceptedFinishedWorkIdentityEvidence({
     );
   }
   return evidence;
+}
+
+function createAcceptedRootFinishedLanesHandoff(rootRequest, evidence) {
+  return {
+    diagnosticName: privateRootFinishedLanesHandoffDiagnosticName,
+    status: privateRootFinishedLanesHandoffStatus,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootId: rootRequest.rootId,
+    operation: rootRequest.operation,
+    updateKind: rootRequest.updateKind,
+    hostOutputUpdateKind: evidence.hostOutputUpdateKind,
+    renderCurrent: evidence.renderCurrent,
+    renderFinishedWork: evidence.renderFinishedWork,
+    commitPreviousCurrent: evidence.commitPreviousCurrent,
+    commitCurrent: evidence.commitCurrent,
+    renderLanesBits: evidence.renderLanesBits,
+    commitFinishedLanesBits: evidence.commitFinishedLanesBits,
+    commitRemainingLanesBits: evidence.commitRemainingLanesBits,
+    commitPendingLanesBits: evidence.commitPendingLanesBits,
+    commitCurrentMatchesRenderFinishedWork:
+      evidence.commitCurrentMatchesRenderFinishedWork,
+    commitPreviousCurrentMatchesRenderCurrent:
+      evidence.commitPreviousCurrentMatchesRenderCurrent,
+    commitLanesMatchRenderLanes: evidence.commitLanesMatchRenderLanes,
+    consumesFinishedWork: true,
+    consumesFinishedLanes: true,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
 }
 
 function createAcceptedSiblingTextFinishedWorkIdentityEvidence({
@@ -4061,6 +4198,28 @@ function assertPrivateUnmountExecutionEvidenceBlocked(record) {
   );
   assert.equal(passiveRefCleanupOrder.publicUnmountCompatibilityClaimed, false);
   assert.equal(passiveRefCleanupOrder.actFlushingClaimed, false);
+}
+
+function assertRootFinishedLanesHandoffAliasRejections(
+  privateFacade,
+  evidence,
+  report,
+  errorName,
+  sourceRootRequest = undefined
+) {
+  for (const alias of privateRootFinishedLanesHandoffAliasKeys) {
+    assertFinishedWorkIdentityRejection(
+      privateFacade,
+      withFinishedWorkIdentityChange(evidence, (changedEvidence) => {
+        const handoff = changedEvidence.rootFinishedLanesHandoff;
+        delete changedEvidence.rootFinishedLanesHandoff;
+        changedEvidence[alias] = handoff;
+      }),
+      report,
+      errorName,
+      sourceRootRequest
+    );
+  }
 }
 
 function assertFinishedWorkIdentityRejection(

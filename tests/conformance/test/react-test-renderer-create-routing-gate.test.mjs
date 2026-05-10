@@ -188,6 +188,17 @@ const privateToJSONSiblingTextJSAdmissionDiagnosticName =
   "fast-react-test-renderer.tojson.sibling-text.private-js-cjs-admission";
 const privateToJSONSiblingTextJSAdmissionStatus =
   "private-tojson-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
+const privateRootFinishedLanesHandoffDiagnosticName =
+  "react-test-renderer-root-finished-lanes-handoff-private-diagnostic";
+const privateRootFinishedLanesHandoffStatus =
+  "private-root-finished-work-lanes-handoff-public-serialization-native-blocked";
+const privateRootFinishedLanesHandoffAliasKeys = [
+  "root_finished_lanes_handoff",
+  "finishedLanesHandoff",
+  "finished_lanes_handoff",
+  "finishedWorkHandoff",
+  "finished_work_handoff"
+];
 const privateToTreeAcceptedDiagnosticName =
   "fast-react-test-renderer.serialization.private-tree-canary";
 const privateToTreeCommittedFiberInspectionDiagnosticName =
@@ -324,6 +335,7 @@ const expectedPrivateRoutes = [
       "root_private_create_native_bridge_handoff_consumes_actual_host_output",
       "root_private_create_native_bridge_handoff_rejects_stale_admission",
       "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight",
+      "root_private_create_native_bridge_handoff_rejects_mismatched_finished_lanes_preflight",
       "root_private_create_route_admission_rejects_missing_rust_admission_record",
       "root_private_create_route_admission_rejects_stale_rust_admission_record",
       "root_private_create_route_admission_rejects_missing_root_create_preflight"
@@ -626,6 +638,16 @@ test("react-test-renderer package root private serialization facades advertise u
   const treeFacade = renderer.toTree[privateToTreeFacadeSymbol];
 
   assert.equal(jsonFacade.privateUnmountFinishedWorkIdentityGateAvailable, true);
+  assert.equal(jsonFacade.privateRootFinishedLanesHandoffGateAvailable, true);
+  assert.equal(
+    jsonFacade.privateRootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName
+  );
+  assert.equal(
+    jsonFacade.privateRootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus
+  );
+  assert.equal(jsonFacade.requiresRootFinishedLanesHandoffEvidence, true);
   assert.equal(jsonFacade.validatesUnmountRootRequestIdentity, true);
   assert.equal(
     jsonFacade.validatesUnmountDeletionAndCleanupHandoffIdentity,
@@ -638,6 +660,16 @@ test("react-test-renderer package root private serialization facades advertise u
   assert.equal(jsonFacade.compatibilityClaimed, false);
 
   assert.equal(treeFacade.privateUnmountFinishedWorkIdentityGateAvailable, true);
+  assert.equal(treeFacade.privateRootFinishedLanesHandoffGateAvailable, true);
+  assert.equal(
+    treeFacade.privateRootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName
+  );
+  assert.equal(
+    treeFacade.privateRootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus
+  );
+  assert.equal(treeFacade.requiresRootFinishedLanesHandoffEvidence, true);
   assert.equal(treeFacade.validatesUnmountRootRequestIdentity, true);
   assert.equal(
     treeFacade.validatesUnmountDeletionAndCleanupHandoffIdentity,
@@ -2298,6 +2330,35 @@ test("react-test-renderer development private create execution can consume Rust 
   assert.equal(result.serializationAvailable, false);
   assert.equal(result.publicRouteAvailable, false);
   assert.equal(result.compatibilityClaimed, false);
+  const staleRenderer = moduleExports.create(
+    { props: { children: "stale lanes" }, type: "span" },
+    {}
+  );
+  const [staleRequest] = bridge.getRendererRootRequests(staleRenderer);
+  const staleAdmission = bridge.getRootCreateRouteAdmission(staleRequest);
+  const staleLaneHandoff =
+    createRustCreateNativeBridgeHostOutputHandoffSource(
+      staleRequest,
+      staleAdmission
+    );
+  const staleLaneError = captureThrown(() =>
+    bridge.executeRootRequest(staleRequest, () => ({
+      rustLifecycleDiagnostic:
+        createRustLifecycleDiagnosticSource(staleRequest),
+      privateCreateNativeBridgeHostOutputHandoff: {
+        ...staleLaneHandoff,
+        commitFinishedLanesBits: 2
+      },
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    }))
+  );
+  assert.equal(
+    staleLaneError.name,
+    "FastReactTestRendererPrivateRootRequestError"
+  );
+  assert.match(staleLaneError.message, /finished lanes/u);
   assert.throws(() => renderer.toJSON(), {
     code: "FAST_REACT_UNIMPLEMENTED",
     name: "FastReactTestRendererUnimplementedError"
@@ -2517,6 +2578,22 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     createEvidence.finishedWorkIdentity.rootRequestId,
     createRequest.requestId
   );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootFinishedLanesHandoffAccepted,
+    true
+  );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.consumesPrivateRootFinishedLanesHandoffGate,
+    true
+  );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName
+  );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus
+  );
   assert.equal(createEvidence.consumesPrivateToJSONEvidence, true);
   assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
   assert.equal(createEvidence.minimalTreeShape, true);
@@ -2574,6 +2651,81 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
   assert.match(staleIdentityError.message, /request sequence is stale/u);
   assert.equal(staleIdentityError.compatibilityClaimed, false);
+  const {
+    rootFinishedLanesHandoff: createJSONHandoff,
+    ...createJSONIdentityWithoutHandoff
+  } = createJSONIdentity;
+  const missingHandoffError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport,
+      createJSONIdentityWithoutHandoff
+    )
+  );
+  assert.equal(
+    missingHandoffError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    missingHandoffError.message,
+    /rootFinishedLanesHandoff/u
+  );
+  for (const alias of privateRootFinishedLanesHandoffAliasKeys) {
+    const aliasOnlyHandoffError = captureThrown(() =>
+      facade.createAcceptedNativeExecutionDiagnosticResult(
+        createResult,
+        createJSONReport,
+        {
+          ...createJSONIdentityWithoutHandoff,
+          [alias]: createJSONHandoff
+        }
+      )
+    );
+    assert.equal(
+      aliasOnlyHandoffError.name,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assert.match(
+      aliasOnlyHandoffError.message,
+      /rootFinishedLanesHandoff/u
+    );
+  }
+  const staleHandoffLanesError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport,
+      {
+        ...createJSONIdentity,
+        rootFinishedLanesHandoff: {
+          ...createJSONIdentity.rootFinishedLanesHandoff,
+          commitFinishedLanesBits: 2
+        }
+      }
+    )
+  );
+  assert.equal(
+    staleHandoffLanesError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(staleHandoffLanesError.message, /finished_lanes handoff/u);
+  const compatibilityHandoffError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport,
+      {
+        ...createJSONIdentity,
+        rootFinishedLanesHandoff: {
+          ...createJSONIdentity.rootFinishedLanesHandoff,
+          packageCompatibilityClaimed: true
+        }
+      }
+    )
+  );
+  assert.equal(
+    compatibilityHandoffError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(compatibilityHandoffError.message, /compatibility/u);
   const foreignIdentityError = captureThrown(() =>
     facade.createAcceptedNativeExecutionDiagnosticResult(
       createResult,
@@ -3139,6 +3291,22 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(createEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
   assert.equal(createEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
   assert.equal(createEvidence.finishedWorkIdentity.publicSurface, "create().toTree");
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootFinishedLanesHandoffAccepted,
+    true
+  );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.consumesPrivateRootFinishedLanesHandoffGate,
+    true
+  );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName
+  );
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus
+  );
   assert.equal(createEvidence.consumesPrivateToTreeEvidence, true);
   assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
   assert.equal(createEvidence.minimalTreeShape, true);
@@ -4869,7 +5037,7 @@ function privateSerializationFinishedWorkIdentityEvidence({
 }) {
   const current = { arenaId: 1, slot: 10, generation: 1 };
   const finishedWork = { arenaId: 1, slot: 11, generation: 1 };
-  return {
+  const evidence = {
     diagnosticName: privateSerializationFinishedWorkIdentityDiagnosticName,
     status: privateSerializationFinishedWorkIdentityStatus,
     publicSurface,
@@ -4903,6 +5071,45 @@ function privateSerializationFinishedWorkIdentityEvidence({
     publicToTreeAvailable: false,
     publicTestInstanceAvailable: false,
     publicSerializationAvailable: false,
+    compatibilityClaimed: false
+  };
+  evidence.rootFinishedLanesHandoff = privateRootFinishedLanesHandoffEvidence(
+    rootRequest,
+    evidence
+  );
+  return evidence;
+}
+
+function privateRootFinishedLanesHandoffEvidence(rootRequest, evidence) {
+  return {
+    diagnosticName: privateRootFinishedLanesHandoffDiagnosticName,
+    status: privateRootFinishedLanesHandoffStatus,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootId: rootRequest.rootId,
+    operation: rootRequest.operation,
+    updateKind: rootRequest.updateKind,
+    hostOutputUpdateKind: evidence.hostOutputUpdateKind,
+    renderCurrent: evidence.renderCurrent,
+    renderFinishedWork: evidence.renderFinishedWork,
+    commitPreviousCurrent: evidence.commitPreviousCurrent,
+    commitCurrent: evidence.commitCurrent,
+    renderLanesBits: evidence.renderLanesBits,
+    commitFinishedLanesBits: evidence.commitFinishedLanesBits,
+    commitRemainingLanesBits: evidence.commitRemainingLanesBits,
+    commitPendingLanesBits: evidence.commitPendingLanesBits,
+    commitCurrentMatchesRenderFinishedWork:
+      evidence.commitCurrentMatchesRenderFinishedWork,
+    commitPreviousCurrentMatchesRenderCurrent:
+      evidence.commitPreviousCurrentMatchesRenderCurrent,
+    commitLanesMatchRenderLanes: evidence.commitLanesMatchRenderLanes,
+    consumesFinishedWork: true,
+    consumesFinishedLanes: true,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
 }
@@ -6040,7 +6247,8 @@ function assertPrivateCreateRouteAdmissionGate(gate, label) {
     );
     if (gate.consumesCurrentRustRootFinishedWorkIdentity === true) {
       expectedAcceptedRustTests.push(
-        "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight"
+        "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight",
+        "root_private_create_native_bridge_handoff_rejects_mismatched_finished_lanes_preflight"
       );
     }
   }
@@ -6398,10 +6606,21 @@ function assertPrivateCreateNativeBridgeHostOutputHandoff(handoff, request) {
     handoff.workLoopFinishedWorkPreflight.finishedWork
   );
   assert.deepEqual(handoff.commitCurrent, handoff.renderFinishedWork);
+  assert.equal(handoff.workLoopFinishedWorkPreflight.renderLanesBits, 1);
+  assert.equal(handoff.workLoopFinishedWorkPreflight.remainingLanesBits, 0);
+  assert.equal(handoff.renderLanesBits, 1);
+  assert.equal(handoff.commitFinishedLanesBits, 1);
+  assert.equal(handoff.commitRemainingLanesBits, 0);
+  assert.equal(handoff.commitPendingLanesBits, 0);
   assert.equal(handoff.renderFinishedWorkMatchesCreateRoutePreflight, true);
   assert.equal(handoff.commitCurrentMatchesRenderFinishedWork, true);
+  assert.equal(handoff.commitLanesMatchRenderLanes, true);
   assert.equal(
     handoff.minimalTreeHostOutputConsumesRootFinishedWork,
+    true
+  );
+  assert.equal(
+    handoff.minimalTreeHostOutputConsumesRootFinishedLanes,
     true
   );
   assert.equal(handoff.createRouteAdmissionAccepted, true);
@@ -6440,7 +6659,9 @@ function createRustRootCreateWorkLoopFinishedWorkPreflightSource(row) {
     previousCurrent: createRustRootCreatePreviousCurrentHandle(),
     finishedWork: createRustRootCreateFinishedWorkHandle(),
     renderLanesEmpty: false,
+    renderLanesBits: 1,
     remainingLanesEmpty: true,
+    remainingLanesBits: 0,
     finishedWorkMatchesRenderPhase: true
   };
 }
@@ -6521,9 +6742,15 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
       ),
     renderFinishedWork: finishedWork,
     commitCurrent: finishedWork,
+    renderLanesBits: 1,
+    commitFinishedLanesBits: 1,
+    commitRemainingLanesBits: 0,
+    commitPendingLanesBits: 0,
     renderFinishedWorkMatchesCreateRoutePreflight: true,
     commitCurrentMatchesRenderFinishedWork: true,
+    commitLanesMatchRenderLanes: true,
     minimalTreeHostOutputConsumesRootFinishedWork: true,
+    minimalTreeHostOutputConsumesRootFinishedLanes: true,
     createRouteAdmissionAccepted: true,
     hostOutputHandoffAccepted: true,
     actualRustCreateHostOutputHandoff: true,
@@ -8652,7 +8879,9 @@ function assertPrivateRoute(privateRoute, expected) {
     expectedAcceptedRustTests = expectedAcceptedRustTests.filter(
       (testName) =>
         testName !==
-        "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight"
+          "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight" &&
+        testName !==
+          "root_private_create_native_bridge_handoff_rejects_mismatched_finished_lanes_preflight"
     );
   }
   if (privateRoute.deletionCommitHandoff !== undefined) {
@@ -10041,6 +10270,22 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     true,
     entrypoint
   );
+  assert.equal(
+    gate.privateRootFinishedLanesHandoffGateAvailable,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    gate.privateRootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    gate.privateRootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus,
+    entrypoint
+  );
+  assert.equal(gate.requiresRootFinishedLanesHandoffEvidence, true, entrypoint);
   const nativeToTreeEvidence =
     gate.privateNativeExecutionEvidenceAvailable === true;
   const packageRootUnmountIdentity =
@@ -10285,6 +10530,26 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   );
   assert.equal(
     record.consumesCommittedHostRootFinishedWorkLanes,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    record.privateRootFinishedLanesHandoffGateAvailable,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    record.privateRootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    record.privateRootFinishedLanesHandoffStatus,
+    privateRootFinishedLanesHandoffStatus,
+    entrypoint
+  );
+  assert.equal(
+    record.requiresRootFinishedLanesHandoffEvidence,
     true,
     entrypoint
   );
