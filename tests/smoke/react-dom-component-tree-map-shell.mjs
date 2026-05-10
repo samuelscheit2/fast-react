@@ -1181,6 +1181,59 @@ const reactDomPackage = require(
 }
 
 {
+  const rootOwner = {kind: 'SubtreeDetachRoot'};
+  const parentOwner = {kind: 'SubtreeParentHost'};
+  const childOwner = {kind: 'SubtreeChildHost'};
+  const parent = createElement('SECTION');
+  const child = createTextNode('subtree text');
+  const parentToken = componentTree.createHostInstanceToken(
+    parentOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childOwner,
+    rootOwner
+  );
+
+  appendChild(parent, child);
+  componentTree.attachHostInstanceNode(parent, parentToken, {
+    id: 'subtree-parent'
+  });
+  componentTree.attachHostInstanceNode(child, childToken, null);
+
+  const detachRecord = componentTree.detachHostInstanceSubtree(parent, {
+    includeRoot: true
+  });
+  const detachPayload =
+    componentTree.getPrivateHostInstanceSubtreeDetachRecordPayload(
+      detachRecord
+    );
+
+  assert.equal(
+    detachRecord.$$typeof,
+    componentTree.privateHostInstanceSubtreeDetachRecordType
+  );
+  assert.equal(
+    detachRecord.kind,
+    componentTree.HOST_INSTANCE_SUBTREE_DETACH_RECORD_KIND
+  );
+  assert.equal(detachRecord.status, 'detached-host-instance-subtree');
+  assert.equal(detachRecord.detachedHostInstanceCount, 2);
+  assert.equal(detachRecord.includeRoot, true);
+  assert.equal(detachRecord.rootNodeType, domContainer.ELEMENT_NODE);
+  assert.equal(detachRecord.visitedNodeCount, 2);
+  assert.equal(detachRecord.exposesHostNodes, false);
+  assert.equal(detachRecord.exposesHostTokens, false);
+  assert.equal(componentTree.isPrivateHostInstanceSubtreeDetachRecord(detachRecord), true);
+  assert.equal(detachPayload.rootNode, parent);
+  assert.deepEqual(detachPayload.detachedTokens, [childToken, parentToken]);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(parent), null);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(child), null);
+  assert.equal(componentTree.getLatestPropsFromNode(parent), null);
+  assert.equal(componentTree.getLatestPropsFromHostInstanceToken(parentToken), null);
+}
+
+{
   assert.equal(componentTree.isHostInstanceNode(createElement('DIV')), true);
   assert.equal(componentTree.isHostInstanceNode(createTextNode('text')), true);
   assert.equal(componentTree.isHostInstanceNode(createContainer()), false);
@@ -1220,6 +1273,7 @@ const reactDomPackage = require(
     'createHostInstanceToken',
     'createMountedHostInstanceNodeRecord',
     'detachHostInstanceNode',
+    'detachHostInstanceSubtree',
     'detachHostInstanceToken',
     'getClosestMountedHostInstanceNodeFromNode',
     'getClosestMountedHostInstanceTokenFromNode',
@@ -1229,6 +1283,8 @@ const reactDomPackage = require(
     'getMountedHostInstanceNodeFromToken',
     'getMountedHostInstanceTokenFromNode',
     'getPrivateHostInstanceNodeRecordPayload',
+    'getPrivateHostInstanceSubtreeDetachRecordPayload',
+    'isPrivateHostInstanceSubtreeDetachRecord',
     'updateLatestPropsForHostInstanceToken',
     'updateLatestPropsForNode',
     'createRefAttachMetadataRecord',

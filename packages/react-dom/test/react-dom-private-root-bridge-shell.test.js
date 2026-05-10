@@ -15,6 +15,10 @@ const rootBridge = require(path.join(
   packageRoot,
   'src/client/root-bridge.js'
 ));
+const componentTree = require(path.join(
+  packageRoot,
+  'src/client/component-tree.js'
+));
 const rootMarkers = require(path.join(
   packageRoot,
   'src/client/root-markers.js'
@@ -29,7 +33,8 @@ const rootListeners = require(path.join(
 ));
 const {
   DOCUMENT_NODE,
-  ELEMENT_NODE
+  ELEMENT_NODE,
+  TEXT_NODE
 } = require(path.join(packageRoot, 'src/client/dom-container.js'));
 
 test('private root bridge native handoff mirrors create/render/unmount records only', () => {
@@ -784,6 +789,172 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
   assert.equal(portalContainer.__mutationLog.length, 0);
 });
 
+test('private root unmount host-output cleanup clears fake DOM and metadata', () => {
+  const document = createDocument('private-unmount-host-output');
+  const container = createElement('DIV', document);
+  const hostChild = createElement('SECTION', document);
+  const textChild = createTextNode('committed text', document);
+  const hostOwner = {kind: 'HostComponentOwner'};
+  const textOwner = {kind: 'HostTextOwner'};
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: 'unmount-admission',
+    sideEffectIdPrefix: 'unmount-side-effects',
+    unmountCleanupIdPrefix: 'unmount-cleanup'
+  });
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, {
+    props: {
+      children: 'committed text'
+    },
+    type: 'section'
+  });
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const hostToken = componentTree.createHostInstanceToken(
+    hostOwner,
+    create.owner
+  );
+  const textToken = componentTree.createHostInstanceToken(
+    textOwner,
+    create.owner
+  );
+
+  container.appendChild(hostChild);
+  hostChild.appendChild(textChild);
+  container.__mutationLog.length = 0;
+  hostChild.__mutationLog.length = 0;
+  componentTree.attachHostInstanceNode(hostChild, hostToken, {
+    id: 'host-child'
+  });
+  componentTree.attachHostInstanceNode(textChild, textToken, null);
+
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(hostChild), hostToken);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(textChild), textToken);
+  assert.equal(rootMarkers.getContainerRoot(container), create.owner);
+  assert.equal(listenerRegistry.hasListeningMarker(container), true);
+
+  const unmount = bridge.unmountContainer(create.handle);
+  const cleanup = bridge.cleanupUnmountHostOutput(admission, unmount);
+  const hiddenCleanup =
+    rootBridge.getPrivateRootUnmountHostOutputCleanupPayload(cleanup);
+
+  assert.equal(
+    rootBridge.cleanupPrivateRootUnmountHostOutput(admission, unmount),
+    cleanup
+  );
+  assert.equal(bridge.cleanupUnmountHostOutput(admission, unmount), cleanup);
+  assert.equal(Object.isFrozen(cleanup), true);
+  assert.equal(
+    cleanup.$$typeof,
+    rootBridge.privateRootUnmountHostOutputCleanupRecordType
+  );
+  assert.equal(
+    cleanup.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(cleanup.cleanupId, 'unmount-cleanup:1');
+  assert.equal(cleanup.sourceAdmissionId, 'unmount-admission:1');
+  assert.equal(cleanup.sourceUnmountRequestId, unmount.requestId);
+  assert.equal(cleanup.sideEffectId, sideEffects.sideEffectId);
+  assert.deepEqual(cleanup.fakeDomCleanup, {
+    clearContainerStatus: 'cleared',
+    componentTreeDetachStatus: 'detached-host-instance-subtree',
+    removedRootChildCount: 1,
+    detachedHostInstanceCount: 2,
+    detachRecordCount: 1
+  });
+  assert.equal(cleanup.clearContainerRecord.removedChildCount, 1);
+  assert.equal(cleanup.componentTreeDetachRecords.length, 1);
+  assert.equal(
+    cleanup.componentTreeDetachRecords[0].detachedHostInstanceCount,
+    2
+  );
+  assert.equal(
+    cleanup.sideEffectCleanup.sideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_REVERTED
+  );
+  assert.deepEqual(
+    cleanup.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'fake-dom-clear-container',
+      'component-tree-metadata-detach',
+      'root-marker-listener-revert'
+    ]
+  );
+  assert.deepEqual(
+    cleanup.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-unmount',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(cleanup.fakeDomMutation, true);
+  assert.equal(cleanup.rootContainerChildrenCleared, true);
+  assert.equal(cleanup.componentTreeMetadataDetached, true);
+  assert.equal(cleanup.rootMarkerReverted, true);
+  assert.equal(cleanup.rootListenersReverted, true);
+  assert.equal(cleanup.publicRootUnmounted, false);
+  assert.equal(cleanup.publicRootBehaviorChanged, false);
+  assert.equal(cleanup.nativeExecution, false);
+  assert.equal(cleanup.reconcilerExecution, false);
+  assert.equal(cleanup.domMutation, true);
+  assert.equal(cleanup.markerWrites, false);
+  assert.equal(cleanup.listenerInstallation, false);
+  assert.equal(cleanup.compatibilityClaimed, false);
+
+  assert.equal(hiddenCleanup.admissionRecord, admission);
+  assert.equal(hiddenCleanup.unmountRecord, unmount);
+  assert.equal(hiddenCleanup.container, container);
+  assert.equal(hiddenCleanup.clearContainerPayload.removedChildren[0], hostChild);
+  assert.equal(hiddenCleanup.componentTreeDetachRecords.length, 1);
+  assert.equal(
+    rootBridge.isPrivateRootUnmountHostOutputCleanupRecord(cleanup),
+    true
+  );
+  assert.equal(
+    rootBridge.getPrivateRootUnmountHostOutputCleanupPayload({}),
+    null
+  );
+
+  assert.deepEqual(container.childNodes, []);
+  assert.equal(hostChild.parentNode, null);
+  assert.equal(textChild.parentNode, hostChild);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(hostChild), null);
+  assert.equal(componentTree.getHostInstanceTokenFromNode(textChild), null);
+  assert.equal(componentTree.getLatestPropsFromNode(hostChild), null);
+  assert.equal(componentTree.getLatestPropsFromHostInstanceToken(hostToken), null);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.deepEqual(container.__mutationLog, [
+    {
+      child: hostChild,
+      type: 'removeChild'
+    }
+  ]);
+  assert.equal(hostChild.__mutationLog.length, 0);
+
+  assert.throws(() => bridge.cleanupUnmountHostOutput({}, unmount), {
+    code: 'FAST_REACT_DOM_INVALID_UNMOUNT_HOST_OUTPUT_CLEANUP_RECORD'
+  });
+  assert.throws(
+    () => otherBridge.cleanupUnmountHostOutput(admission, unmount),
+    {
+      code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+    }
+  );
+});
+
 test('public react-dom/client root placeholders remain inert', () => {
   const document = createDocument('public-placeholder');
   const container = createElement('DIV', document);
@@ -907,12 +1078,27 @@ function createElement(nodeName, ownerDocument) {
   });
 }
 
+function createTextNode(text, ownerDocument) {
+  const textNode = createEventTarget({
+    data: String(text),
+    nodeName: '#text',
+    nodeType: TEXT_NODE,
+    nodeValue: String(text),
+    ownerDocument
+  });
+  textNode.textContent = String(text);
+  textNode.__mutationLog.length = 0;
+  return textNode;
+}
+
 function createEventTarget(fields) {
   const target = {
     ...fields,
+    childNodes: [],
     __mutationLog: [],
     __removals: [],
     __registrations: [],
+    parentNode: null,
     addEventListener(type, listener, options) {
       this.__registrations.push({
         listener,
@@ -936,14 +1122,47 @@ function createEventTarget(fields) {
         type
       });
     },
+    get firstChild() {
+      return this.childNodes[0] || null;
+    },
+    get lastChild() {
+      return this.childNodes[this.childNodes.length - 1] || null;
+    },
     appendChild(child) {
+      if (child.parentNode && child.parentNode !== this) {
+        child.parentNode.removeChild(child);
+      }
+      if (!this.childNodes.includes(child)) {
+        this.childNodes.push(child);
+      }
+      child.parentNode = this;
       this.__mutationLog.push({child, type: 'appendChild'});
+      return child;
     },
     insertBefore(child, beforeChild) {
+      if (child.parentNode && child.parentNode !== this) {
+        child.parentNode.removeChild(child);
+      }
+      const currentIndex = this.childNodes.indexOf(child);
+      if (currentIndex !== -1) {
+        this.childNodes.splice(currentIndex, 1);
+      }
+      const beforeIndex = this.childNodes.indexOf(beforeChild);
+      const insertionIndex =
+        beforeIndex === -1 ? this.childNodes.length : beforeIndex;
+      this.childNodes.splice(insertionIndex, 0, child);
+      child.parentNode = this;
       this.__mutationLog.push({beforeChild, child, type: 'insertBefore'});
+      return child;
     },
     removeChild(child) {
+      const index = this.childNodes.indexOf(child);
+      if (index !== -1) {
+        this.childNodes.splice(index, 1);
+        child.parentNode = null;
+      }
       this.__mutationLog.push({child, type: 'removeChild'});
+      return child;
     }
   };
   let textContent = '';
