@@ -2964,6 +2964,9 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateNativeExecutionDiagnosticName:
     privateToTreeNativeExecutionDiagnosticName,
   privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
+  privateNativeExecutionFunctionComponentShapeAvailable: true,
+  nativeExecutionCompositeAcceptedFiberShape:
+    privateToTreeCompositeAcceptedFiberShape,
   acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
   acceptedNativeExecutionOperations:
     privateToJSONNativeExecutionAcceptedOperations,
@@ -3006,10 +3009,13 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
+    'root_private_to_tree_native_execution_evidence_records_composite_host_shape',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
   ]),
   nativeExecutionEvidenceWorker:
     'worker-667-test-renderer-totree-native-execution',
+  nativeExecutionCompositeWorker:
+    'worker-698-test-renderer-totree-composite-native-execution',
   multiChildAcceptedWorker:
     'worker-485-test-renderer-totree-multichild-gate',
   multiChildAcceptedRustApis: Object.freeze([
@@ -13500,6 +13506,11 @@ function createPrivateToTreeFacade(rootRequest) {
     privateNativeExecutionDiagnosticName:
       privateToTreeNativeExecutionDiagnosticName,
     privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
+    privateNativeExecutionFunctionComponentShapeAvailable: true,
+    nativeExecutionCompositeAcceptedFiberShape:
+      privateToTreeCompositeAcceptedFiberShape,
+    nativeExecutionCompositeWorker:
+      'worker-698-test-renderer-totree-composite-native-execution',
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     acceptedNativeExecutionOperations:
       privateToJSONNativeExecutionAcceptedOperations,
@@ -13653,8 +13664,12 @@ function describePrivateToTreeHostOutputDiagnostic(report) {
   });
 }
 
-function validatePrivateToTreeHostOutputDiagnostic(report) {
+function validatePrivateToTreeHostOutputDiagnostic(report, options = undefined) {
   try {
+    const requireCompositeNativeExecutionShape =
+      options !== undefined &&
+      options !== null &&
+      options.requireCompositeNativeExecutionShape === true;
     assertPrivateToJSONRecord(report, 'report');
     assertPrivateToJSONStringField(
       report,
@@ -13877,14 +13892,18 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     );
     const committedFiberInspection =
       validatePrivateToTreeCommittedFiberInspectionDiagnostic(report, {
-        expectedFiberShape: privateToTreeAcceptedFiberShape,
-        expectedRootChildFiberTags: ['HostComponent'],
+        expectedFiberShape: requireCompositeNativeExecutionShape
+          ? privateToTreeCompositeAcceptedFiberShape
+          : privateToTreeAcceptedFiberShape,
+        expectedRootChildFiberTags: requireCompositeNativeExecutionShape
+          ? ['FunctionComponent']
+          : ['HostComponent'],
         expectedHostChildFiberTags: ['HostComponent'],
         expectedRootChildCount: 1,
         expectedHostChildCount: 1,
         expectedHostTextCount: 1,
-        expectedFunctionComponentPresent: false,
-        expectedWrapsCommittedHostOutput: false
+        expectedFunctionComponentPresent: requireCompositeNativeExecutionShape,
+        expectedWrapsCommittedHostOutput: requireCompositeNativeExecutionShape
       });
 
     return {
@@ -13893,7 +13912,11 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
       hostOutputShape,
       hostOutputRow,
       rootChildCount,
-      sourceFiberCount: privateToTreeAcceptedFiberShape.length,
+      sourceFiberCount: requireCompositeNativeExecutionShape
+        ? privateToTreeCompositeAcceptedFiberShape.length
+        : privateToTreeAcceptedFiberShape.length,
+      functionComponentAboveHostOutputShape:
+        requireCompositeNativeExecutionShape,
       committedFiberInspection,
       componentProps,
       componentType: readPrivateToJSONStringField(
@@ -14561,6 +14584,8 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
     consumesPrivateToTreeEvidence: true,
     consumesAcceptedHostOutputRow: diagnostic.hostOutputRow !== null,
     minimalTreeShape: true,
+    functionComponentAboveHostOutputShape:
+      diagnostic.functionComponentAboveHostOutputShape,
     publicTreeAvailable: false,
     publicSerializationAvailable: false,
     publicRouteAvailable: false,
@@ -14599,7 +14624,9 @@ function validatePrivateToTreeNativeExecutionDiagnostic(report) {
     return validatePrivateToTreeUnmountNativeExecutionDiagnostic(report);
   }
 
-  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
+  const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report, {
+    requireCompositeNativeExecutionShape: true
+  });
   if (diagnostic.kind !== 'minimal') {
     throwPrivateToTreeMetadataError(
       'Expected private native toTree evidence to use the minimal tree diagnostic.'
@@ -14612,7 +14639,21 @@ function validatePrivateToTreeNativeExecutionDiagnostic(report) {
     hostOutputRow: diagnostic.hostOutputRow,
     rootChildCount: diagnostic.rootChildCount,
     sourceFiberCount: diagnostic.sourceFiberCount,
-    result: serializePrivateToTreeMetadataDiagnostic(report)
+    functionComponentAboveHostOutputShape:
+      diagnostic.functionComponentAboveHostOutputShape,
+    result: freezeRecord({
+      nodeType: 'component',
+      type: diagnostic.componentType,
+      props: diagnostic.componentProps,
+      instance: null,
+      rendered: freezeRecord({
+        nodeType: 'host',
+        type: diagnostic.type,
+        props: diagnostic.props,
+        instance: null,
+        rendered: freezeArray([diagnostic.text])
+      })
+    })
   };
 }
 
@@ -14675,6 +14716,7 @@ function validatePrivateToTreeUnmountNativeExecutionDiagnostic(report) {
     hostOutputRow,
     rootChildCount,
     sourceFiberCount: 0,
+    functionComponentAboveHostOutputShape: false,
     result: null
   };
 }
@@ -14692,7 +14734,9 @@ function isMinimalToTreeNativeExecutionShape(diagnostic) {
   return (
     diagnostic.hostOutputShape === 'SingleHostText' &&
     diagnostic.rootChildCount === 1 &&
-    diagnostic.sourceFiberCount === privateToTreeAcceptedFiberShape.length &&
+    diagnostic.sourceFiberCount ===
+      privateToTreeCompositeAcceptedFiberShape.length &&
+    diagnostic.functionComponentAboveHostOutputShape === true &&
     result !== null &&
     typeof result === 'object' &&
     result.nodeType === 'component' &&

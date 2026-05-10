@@ -981,6 +981,10 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     );
     const nativeToTreeEvidence =
       facadeGate.privateNativeExecutionEvidenceAvailable === true;
+    const compositeNativeToTreeEvidence =
+      nativeToTreeEvidence &&
+      facadeGate.nativeExecutionCompositeWorker ===
+        "worker-698-test-renderer-totree-composite-native-execution";
     assert.deepEqual(
       facadeGate.acceptedHostOutputUpdateKinds,
       nativeToTreeEvidence ? ["Create", "Update", "Unmount"] : ["Create", "Update"]
@@ -1020,7 +1024,12 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "root_private_tree_metadata_canary_describes_function_component_above_host_output",
       ...(nativeToTreeEvidence
         ? [
-            "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records"
+            "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records",
+            ...(compositeNativeToTreeEvidence
+              ? [
+                  "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
+                ]
+              : [])
           ]
         : []),
       "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
@@ -1029,6 +1038,20 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       assert.equal(
         facadeGate.nativeExecutionEvidenceWorker,
         "worker-667-test-renderer-totree-native-execution"
+      );
+    }
+    if (compositeNativeToTreeEvidence) {
+      assert.equal(
+        facadeGate.privateNativeExecutionFunctionComponentShapeAvailable,
+        true
+      );
+      assert.deepEqual(
+        facadeGate.nativeExecutionCompositeAcceptedFiberShape,
+        privateToTreeCompositeAcceptedFiberShape
+      );
+      assert.equal(
+        facadeGate.nativeExecutionCompositeWorker,
+        "worker-698-test-renderer-totree-composite-native-execution"
       );
     }
     if (entry.entrypoint.endsWith(".development")) {
@@ -1238,6 +1261,24 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.equal(privateFacade.privateCompositeFunctionMetadataSerializable, true);
     if (entry.entrypoint.endsWith(".development")) {
       assert.equal(privateFacade.privateMultiChildTreeMetadataSerializable, true);
+    }
+    if (
+      nativeToTreeEvidence &&
+      privateFacade.nativeExecutionCompositeWorker ===
+        "worker-698-test-renderer-totree-composite-native-execution"
+    ) {
+      assert.equal(
+        privateFacade.privateNativeExecutionFunctionComponentShapeAvailable,
+        true
+      );
+      assert.deepEqual(
+        privateFacade.nativeExecutionCompositeAcceptedFiberShape,
+        privateToTreeCompositeAcceptedFiberShape
+      );
+      assert.equal(
+        privateFacade.nativeExecutionCompositeWorker,
+        "worker-698-test-renderer-totree-composite-native-execution"
+      );
     }
     assert.equal(privateFacade.publicTreeAvailable, false);
     assert.equal(privateFacade.publicRouteAvailable, false);

@@ -6255,6 +6255,7 @@ pub struct TestRendererPrivateToTreeNativeExecutionEvidence {
     consumes_private_to_tree_evidence: bool,
     consumes_accepted_host_output_row: bool,
     minimal_tree_shape: bool,
+    function_component_above_host_output_shape: bool,
     public_to_tree_available: bool,
     public_serialization_available: bool,
     public_route_available: bool,
@@ -6362,6 +6363,11 @@ impl TestRendererPrivateToTreeNativeExecutionEvidence {
     #[must_use]
     pub const fn minimal_tree_shape(&self) -> bool {
         self.minimal_tree_shape
+    }
+
+    #[must_use]
+    pub const fn function_component_above_host_output_shape(&self) -> bool {
+        self.function_component_above_host_output_shape
     }
 
     #[must_use]
@@ -11263,6 +11269,7 @@ impl TestRendererRoot {
             consumes_private_to_tree_evidence: true,
             consumes_accepted_host_output_row: true,
             minimal_tree_shape,
+            function_component_above_host_output_shape: false,
             public_to_tree_available: false,
             public_serialization_available: false,
             public_route_available: false,
@@ -11783,6 +11790,17 @@ impl TestRendererRoot {
                 .into(),
             );
         }
+        let function_component_above_host_output_shape =
+            Self::private_to_tree_report_has_function_component_above_host_output(report);
+        if !function_component_above_host_output_shape {
+            return Err(
+                TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                    operation,
+                    reason: "function-component-above-host-output-shape-missing",
+                }
+                .into(),
+            );
+        }
 
         Ok(TestRendererPrivateToTreeNativeExecutionEvidence {
             diagnostic_name: TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
@@ -11797,7 +11815,7 @@ impl TestRendererRoot {
             host_output_shape: report.host_output_shape(),
             host_output_row: report.host_output_row(),
             rendered_root: Self::private_to_tree_rendered_root_from_report(report),
-            source_fiber_count: report.accepted_fiber_shape().len(),
+            source_fiber_count: report.accepted_composite_fiber_shape().len(),
             root_child_count: report.root_child_count(),
             consumes_accepted_native_create_execution_record: consumes_create,
             consumes_accepted_native_update_execution_record: consumes_update,
@@ -11805,6 +11823,7 @@ impl TestRendererRoot {
             consumes_private_to_tree_evidence: true,
             consumes_accepted_host_output_row: report.host_output_row().is_some(),
             minimal_tree_shape,
+            function_component_above_host_output_shape,
             public_to_tree_available: false,
             public_serialization_available: false,
             public_route_available: false,
@@ -11885,6 +11904,28 @@ impl TestRendererRoot {
             && !host_text.public_tree_object_available()
             && !report.public_tree_object_available()
             && report.public_blockers().all_blocked()
+    }
+
+    fn private_to_tree_report_has_function_component_above_host_output(
+        report: &TestRendererPrivateTreeMetadataReport,
+    ) -> bool {
+        let function_component = report.function_component();
+
+        report.accepted_composite_fiber_shape()
+            == &TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE
+            && function_component.fiber_tag() == "FunctionComponent"
+            && function_component.node_type() == TestRendererPrivateTreeNodeType::Component
+            && function_component.component_type()
+                == TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+            && !function_component.instance_available()
+            && function_component.rendered_child_fiber_tag() == "HostComponent"
+            && function_component.rendered_child_node_type()
+                == TestRendererPrivateTreeNodeType::Host
+            && function_component.rendered_child_count() == 1
+            && function_component.wraps_committed_host_output()
+            && !function_component.public_tree_object_available()
+            && report.host_component().fiber_tag() == function_component.rendered_child_fiber_tag()
+            && report.host_component().node_type() == function_component.rendered_child_node_type()
     }
 
     fn validate_private_to_json_create_native_execution_record_for_canary(
@@ -16533,7 +16574,10 @@ mod tests {
         assert_eq!(create_component.component_type(), "CanaryFunctionComponent");
         assert_eq!(create_host.element_type().as_str(), "span");
         assert_eq!(create_host.rendered()[0].as_text(), Some("hello"));
-        assert_eq!(create_evidence.source_fiber_count(), 3);
+        assert_eq!(
+            create_evidence.source_fiber_count(),
+            TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE.len()
+        );
         assert_eq!(create_evidence.root_child_count(), 1);
         assert!(create_evidence.consumes_accepted_native_create_execution_record());
         assert!(!create_evidence.consumes_accepted_native_update_execution_record());
@@ -16541,6 +16585,7 @@ mod tests {
         assert!(create_evidence.consumes_private_to_tree_evidence());
         assert!(!create_evidence.consumes_accepted_host_output_row());
         assert!(create_evidence.minimal_tree_shape());
+        assert!(create_evidence.function_component_above_host_output_shape());
         assert!(!create_evidence.public_to_tree_available());
         assert!(!create_evidence.public_serialization_available());
         assert!(!create_evidence.public_route_available());
@@ -16589,6 +16634,7 @@ mod tests {
             .unwrap();
         let update_host = update_component.rendered().as_host_component().unwrap();
         assert_eq!(update_host.rendered()[0].as_text(), Some("goodbye"));
+        assert!(update_evidence.function_component_above_host_output_shape());
         assert!(!update_evidence.public_to_tree_available());
         assert!(!update_evidence.compatibility_claimed());
 
@@ -16639,10 +16685,77 @@ mod tests {
         assert!(unmount_evidence.consumes_accepted_native_unmount_execution_record());
         assert!(unmount_evidence.consumes_accepted_host_output_row());
         assert!(unmount_evidence.minimal_tree_shape());
+        assert!(!unmount_evidence.function_component_above_host_output_shape());
         assert!(!unmount_evidence.public_to_tree_available());
         assert!(!unmount_evidence.native_bridge_available());
         assert!(!unmount_evidence.native_execution_available());
         assert!(!unmount_evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_tree_native_execution_evidence_records_composite_host_shape() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let create_input =
+            TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+                root_element(1),
+                "span",
+            );
+        let create_preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            create_input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let create_admission =
+            TestRendererRoot::describe_private_create_route_admission_for_canary(
+                Some(create_preflight),
+                Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+            )
+            .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let evidence = root
+            .describe_private_to_tree_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+            )
+            .unwrap();
+        let component = evidence.rendered_root().as_function_component().unwrap();
+        let rendered_host = component.rendered().as_host_component().unwrap();
+
+        assert_eq!(
+            evidence.source_fiber_count(),
+            TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE.len()
+        );
+        assert!(evidence.minimal_tree_shape());
+        assert!(evidence.function_component_above_host_output_shape());
+        assert_eq!(
+            component.node_type(),
+            TestRendererPrivateTreeNodeType::Component
+        );
+        assert_eq!(
+            component.component_type(),
+            TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE
+        );
+        assert!(!component.instance_available());
+        assert!(component.wraps_committed_host_output());
+        assert_eq!(
+            rendered_host.node_type(),
+            TestRendererPrivateTreeNodeType::Host
+        );
+        assert_eq!(rendered_host.rendered()[0].as_text(), Some("hello"));
+        assert!(!evidence.public_to_tree_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
     }
 
     #[test]

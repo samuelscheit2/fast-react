@@ -2403,6 +2403,20 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     facade.privateNativeExecutionStatus,
     privateToTreeNativeExecutionStatus
   );
+  assert.equal(
+    facade.privateNativeExecutionFunctionComponentShapeAvailable,
+    true
+  );
+  assert.deepEqual(facade.nativeExecutionCompositeAcceptedFiberShape, [
+    "HostRoot",
+    "FunctionComponent",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(
+    facade.nativeExecutionCompositeWorker,
+    "worker-698-test-renderer-totree-composite-native-execution"
+  );
   assert.deepEqual(facade.acceptedNativeExecutionOperations, [
     "create",
     "update",
@@ -2425,7 +2439,8 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
         rowId: null,
         rowShape: null,
         rootChildCount: 1,
-        text: "hello"
+        text: "hello",
+        compositeNativeExecution: true
       })
     );
   assert.equal(createEvidence.diagnosticName, privateToTreeNativeExecutionDiagnosticName);
@@ -2434,7 +2449,7 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(createEvidence.hostOutputUpdateKind, "Create");
   assert.equal(createEvidence.hostOutputShape, "SingleHostText");
   assert.equal(createEvidence.hostOutputRowId, null);
-  assert.equal(createEvidence.sourceFiberCount, 3);
+  assert.equal(createEvidence.sourceFiberCount, 4);
   assert.equal(createEvidence.rootChildCount, 1);
   assert.deepEqual(createEvidence.result, {
     nodeType: "component",
@@ -2456,6 +2471,7 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(createEvidence.consumesPrivateToTreeEvidence, true);
   assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
   assert.equal(createEvidence.minimalTreeShape, true);
+  assert.equal(createEvidence.functionComponentAboveHostOutputShape, true);
   assert.equal(createEvidence.publicTreeAvailable, false);
   assert.equal(createEvidence.publicSerializationAvailable, false);
   assert.equal(createEvidence.publicRouteAvailable, false);
@@ -2471,7 +2487,8 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
         rowId: privateToJSONUpdateHostOutputRowId,
         rowShape: "SingleHostText",
         rootChildCount: 1,
-        text: "goodbye"
+        text: "goodbye",
+        compositeNativeExecution: true
       })
     );
   assert.equal(updateEvidence.operation, "update");
@@ -2481,6 +2498,7 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(updateEvidence.consumesAcceptedNativeUpdateExecutionRecord, true);
   assert.equal(updateEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
   assert.equal(updateEvidence.consumesAcceptedHostOutputRow, true);
+  assert.equal(updateEvidence.functionComponentAboveHostOutputShape, true);
   assert.equal(updateEvidence.result.rendered.rendered[0], "goodbye");
 
   const unmountEvidence =
@@ -2508,6 +2526,7 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(unmountEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
   assert.equal(unmountEvidence.consumesAcceptedNativeUnmountExecutionRecord, true);
   assert.equal(unmountEvidence.consumesAcceptedHostOutputRow, true);
+  assert.equal(unmountEvidence.functionComponentAboveHostOutputShape, false);
   assert.equal(unmountEvidence.publicTreeAvailable, false);
   assert.equal(unmountEvidence.nativeExecution, false);
   assert.equal(unmountEvidence.compatibilityClaimed, false);
@@ -2520,7 +2539,8 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
         rowId: null,
         rowShape: null,
         rootChildCount: 1,
-        text: "wrong"
+        text: "wrong",
+        compositeNativeExecution: true
       })
     ),
     false
@@ -2533,7 +2553,8 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
         rowId: null,
         rowShape: null,
         rootChildCount: 1,
-        text: "wrong"
+        text: "wrong",
+        compositeNativeExecution: true
       })
     )
   );
@@ -3842,7 +3863,8 @@ function privateToTreeReport({
   rowId,
   rowShape,
   rootChildCount,
-  text
+  text,
+  compositeNativeExecution = false
 }) {
   const report = {
     diagnosticName: privateToTreeAcceptedDiagnosticName,
@@ -3936,16 +3958,22 @@ function privateToTreeReport({
     committedFiberInspection: {
       diagnosticName: privateToTreeCommittedFiberInspectionDiagnosticName,
       sourceTreeDiagnosticName: privateToTreeAcceptedDiagnosticName,
-      fiberShape: ["HostRoot", "HostComponent", "HostText"],
-      rootChildFiberTags: ["HostComponent"],
+      fiberShape: compositeNativeExecution
+        ? ["HostRoot", "FunctionComponent", "HostComponent", "HostText"]
+        : ["HostRoot", "HostComponent", "HostText"],
+      rootChildFiberTags: compositeNativeExecution
+        ? ["FunctionComponent"]
+        : ["HostComponent"],
       hostChildFiberTags: ["HostComponent"],
       rootChildCount: 1,
       hostChildCount: 1,
       hostComponentCount: 1,
       hostTextCount: 1,
-      functionComponentFiberTag: null,
-      functionComponentPresent: false,
-      wrapsCommittedHostOutput: false,
+      functionComponentFiberTag: compositeNativeExecution
+        ? "FunctionComponent"
+        : null,
+      functionComponentPresent: compositeNativeExecution,
+      wrapsCommittedHostOutput: compositeNativeExecution,
       publicTreeObjectAvailable: false,
       compatibilityClaimed: false
     }
@@ -8361,6 +8389,10 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
   assert.equal(gate.privateTreeMetadataSerializable, true, entrypoint);
   const nativeToTreeEvidence =
     gate.privateNativeExecutionEvidenceAvailable === true;
+  const developmentCompositeToTreeEvidence =
+    nativeToTreeEvidence &&
+    gate.nativeExecutionCompositeWorker ===
+      "worker-698-test-renderer-totree-composite-native-execution";
   if (entrypoint.includes("/cjs/")) {
     assert.equal(nativeToTreeEvidence, true, entrypoint);
   }
@@ -8375,6 +8407,18 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
       privateToTreeNativeExecutionStatus,
       entrypoint
     );
+    if (developmentCompositeToTreeEvidence) {
+      assert.equal(
+        gate.privateNativeExecutionFunctionComponentShapeAvailable,
+        true,
+        entrypoint
+      );
+      assert.deepEqual(
+        gate.nativeExecutionCompositeAcceptedFiberShape,
+        ["HostRoot", "FunctionComponent", "HostComponent", "HostText"],
+        entrypoint
+      );
+    }
     assert.equal(
       gate.acceptedNativeExecutionRecordKind,
       "FastReactTestRendererPrivateRootExecutionResult",
@@ -8460,7 +8504,12 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     "root_private_tree_metadata_canary_describes_function_component_above_host_output",
     ...(nativeToTreeEvidence
       ? [
-          "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records"
+          "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records",
+          ...(developmentCompositeToTreeEvidence
+            ? [
+                "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
+              ]
+            : [])
         ]
       : []),
     "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
@@ -8469,6 +8518,13 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
     assert.equal(
       gate.nativeExecutionEvidenceWorker,
       "worker-667-test-renderer-totree-native-execution",
+      entrypoint
+    );
+  }
+  if (developmentCompositeToTreeEvidence) {
+    assert.equal(
+      gate.nativeExecutionCompositeWorker,
+      "worker-698-test-renderer-totree-composite-native-execution",
       entrypoint
     );
   }
@@ -8506,6 +8562,10 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   assert.equal(record.privateTreeMetadataSerializable, true, entrypoint);
   const nativeToTreeEvidence =
     record.privateNativeExecutionEvidenceAvailable === true;
+  const developmentCompositeToTreeEvidence =
+    nativeToTreeEvidence &&
+    record.nativeExecutionCompositeWorker ===
+      "worker-698-test-renderer-totree-composite-native-execution";
   if (entrypoint.includes("/cjs/")) {
     assert.equal(nativeToTreeEvidence, true, entrypoint);
   }
@@ -8520,6 +8580,23 @@ function assertPrivateToTreeFacade(record, entrypoint) {
       privateToTreeNativeExecutionStatus,
       entrypoint
     );
+    if (developmentCompositeToTreeEvidence) {
+      assert.equal(
+        record.privateNativeExecutionFunctionComponentShapeAvailable,
+        true,
+        entrypoint
+      );
+      assert.deepEqual(
+        record.nativeExecutionCompositeAcceptedFiberShape,
+        ["HostRoot", "FunctionComponent", "HostComponent", "HostText"],
+        entrypoint
+      );
+      assert.equal(
+        record.nativeExecutionCompositeWorker,
+        "worker-698-test-renderer-totree-composite-native-execution",
+        entrypoint
+      );
+    }
     assert.deepEqual(record.acceptedNativeExecutionOperations, [
       "create",
       "update",
