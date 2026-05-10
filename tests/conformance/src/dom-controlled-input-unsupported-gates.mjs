@@ -16,9 +16,9 @@ export const FAST_REACT_CONTROLLED_FORM_UNSUPPORTED_SOURCE_PATTERNS = [
   {
     id: "controlled-restore-queue",
     pattern:
-      /\b(?:enqueueStateRestore|restoreStateIfNeeded|restoreControlledState|restoreControlledInputState)\b/u,
+      /\b(?:enqueueStateRestore|restoreStateIfNeeded|restoreControlledState|restoreControlledInputState|restoreControlledSelectState|restoreControlledTextareaState)\b/u,
     reason:
-      "Post-event controlled restore requires event dispatch and latest-props lookup gates."
+      "Actual post-event controlled restore queue writes, flushes, and wrapper invocations must stay unsupported."
   },
   {
     id: "input-wrapper",
