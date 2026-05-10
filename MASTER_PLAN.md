@@ -95,6 +95,16 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-176-act-queue-routing-skeleton`.
 - Worker 178: test-renderer serialization gate in
   `/Users/user/Developer/Developer/fast-react-worker-178-test-renderer-serialization-gate`.
+- Worker 179: sync flush commit integration in
+  `/Users/user/Developer/Developer/fast-react-worker-179-sync-flush-commit-integration`.
+- Worker 180: core context stack foundation in
+  `/Users/user/Developer/Developer/fast-react-worker-180-core-context-stack-foundation`.
+- Worker 181: React DOM createPortal object in
+  `/Users/user/Developer/Developer/fast-react-worker-181-react-dom-create-portal-object`.
+- Worker 182: React hook dispatcher guard in
+  `/Users/user/Developer/Developer/fast-react-worker-182-react-hook-dispatcher-guard`.
+- Worker 183: React transition facade in
+  `/Users/user/Developer/Developer/fast-react-worker-183-react-transition-facade`.
 
 ## Near-Term Sequencing
 
