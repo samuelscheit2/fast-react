@@ -1057,6 +1057,251 @@ test('private hydration replay queue drain-order diagnostics sort blocked target
   assert.deepEqual(document.__registrations, []);
 });
 
+test('private hydration replay error metadata connects ownership rows to root options without callbacks', () => {
+  const document = createDocument('replay-error-metadata');
+  const container = createElement('DIV', document);
+  const firstBoundaryTarget = createElement('BUTTON', document);
+  const rootTarget = createElement('INPUT', document);
+  const secondBoundaryTarget = createElement('A', document);
+  const publicRootErrorCalls = [];
+  firstBoundaryTarget.parentNode = container;
+  rootTarget.parentNode = container;
+  secondBoundaryTarget.parentNode = container;
+  container.childNodes = [
+    createComment('$'),
+    firstBoundaryTarget,
+    createComment('/$'),
+    rootTarget,
+    createComment('$'),
+    secondBoundaryTarget,
+    createComment('/$')
+  ];
+
+  function onUncaughtError(error) {
+    publicRootErrorCalls.push(['uncaught', error.message]);
+  }
+  function onCaughtError(error) {
+    publicRootErrorCalls.push(['caught', error.message]);
+  }
+  function onRecoverableError(error) {
+    publicRootErrorCalls.push(['recoverable', error.message]);
+  }
+
+  const hydrationOptions = {
+    identifierPrefix: 'replay-error-',
+    onCaughtError,
+    onRecoverableError,
+    onUncaughtError
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hydrateIdPrefix: 'replay-error-hydrate',
+    hydrationRecordIdPrefix: 'replay-error-boundary',
+    requestIdPrefix: 'replay-error-request'
+  });
+  const hydrateRecord = bridge.createHydrateRoot(
+    container,
+    {
+      props: {
+        children: 'replay error metadata'
+      },
+      type: 'App'
+    },
+    hydrationOptions
+  );
+  const secondBoundaryRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        'mouseover',
+        0
+      ),
+      createNativeEvent('mouseover', secondBoundaryTarget)
+    );
+  const rootRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        'change',
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent('change', rootTarget)
+    );
+  const firstBoundaryRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        'click',
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent('click', firstBoundaryTarget)
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      hydrateRecord.hydrationBoundaryRecord,
+      [secondBoundaryRecord, rootRecord, firstBoundaryRecord],
+      {
+        source: 'hydration-boundary-test-replay-error-metadata'
+      }
+    );
+
+  const metadata = bridge.createHydrationReplayErrorMetadata(
+    hydrateRecord,
+    ownershipDiagnostics,
+    {
+      replayTargetLabels: ['first-boundary', 'root-target', 'second-boundary'],
+      source: 'hydration-boundary-test-replay-error-metadata'
+    }
+  );
+
+  assert.equal(
+    rootBridge.isPrivateRootHydrationReplayErrorMetadataRecord(metadata),
+    true
+  );
+  assert.equal(
+    metadata.$$typeof,
+    rootBridge.privateRootHydrationReplayErrorMetadataRecordType
+  );
+  assert.equal(
+    metadata.metadataStatus,
+    rootBridge.ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED
+  );
+  assert.equal(metadata.sourceRequestId, 'replay-error-request:1');
+  assert.equal(metadata.hydrateId, 'replay-error-hydrate:1');
+  assert.equal(metadata.rootRecordId, 'replay-error-boundary:1');
+  assert.equal(metadata.sourceOwnershipDiagnosticKind, ownershipDiagnostics.kind);
+  assert.equal(
+    metadata.sourceOwnershipDiagnosticStatus,
+    'blocked-replay-ownership-retained-through-drain-order'
+  );
+  assert.equal(metadata.ownershipRowCount, 3);
+  assert.equal(metadata.rootOwnershipRetainedCount, 3);
+  assert.equal(metadata.dehydratedBoundaryOwnershipRequiredCount, 2);
+  assert.equal(metadata.dehydratedBoundaryOwnershipRetainedCount, 2);
+  assert.equal(metadata.rootErrorOptionCallbackRecordCount, 3);
+  assert.equal(metadata.onUncaughtErrorConfigured, true);
+  assert.equal(metadata.onCaughtErrorConfigured, true);
+  assert.equal(metadata.onRecoverableErrorConfigured, true);
+  assert.equal(metadata.hydration, false);
+  assert.equal(metadata.eventDispatch, false);
+  assert.equal(metadata.eventsReplayed, false);
+  assert.equal(metadata.publicRootErrorCallbacksInvoked, false);
+  assert.equal(metadata.rootErrorCallbackInvocationCount, 0);
+  assert.equal(metadata.reportGlobalErrorInvoked, false);
+  assert.equal(metadata.rootErrorsReported, false);
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.deepEqual(publicRootErrorCalls, []);
+  assert.deepEqual(
+    metadata.rootErrorOptionCallbackRecords.map((record) => [
+      record.phase,
+      record.sourceLabel,
+      record.domEventName,
+      record.queueName,
+      record.targetPath,
+      record.rootOwnershipStatus,
+      record.dehydratedBoundaryOwnerId,
+      record.rootErrorCallbacksInvoked,
+      record.reportGlobalErrorInvoked,
+      record.willReplay
+    ]),
+    [
+      [
+        'hydration-replay',
+        'first-boundary',
+        'click',
+        'discrete-hydration-replay-attempt',
+        'container.childNodes[1]',
+        'owned-by-dehydrated-root',
+        'replay-error-boundary:1:boundary:0',
+        false,
+        false,
+        false
+      ],
+      [
+        'hydration-replay',
+        'root-target',
+        'change',
+        'queuedChangeEventTargets',
+        'container.childNodes[3]',
+        'owned-by-dehydrated-root',
+        null,
+        false,
+        false,
+        false
+      ],
+      [
+        'hydration-replay',
+        'second-boundary',
+        'mouseover',
+        'queuedMouse',
+        'container.childNodes[5]',
+        'owned-by-dehydrated-root',
+        'replay-error-boundary:1:boundary:1',
+        false,
+        false,
+        false
+      ]
+    ]
+  );
+  assert.equal(
+    metadata.rootErrorOptionCallbackRecords[0].errorMessage,
+    'Hydration replay for click at container.childNodes[1] remained blocked-on-dehydrated-boundary.'
+  );
+  assert.equal(
+    Object.hasOwn(metadata.rootErrorOptionCallbackRecords[0], 'error'),
+    false
+  );
+
+  const payload =
+    rootBridge.getPrivateRootHydrationReplayErrorMetadataPayload(metadata);
+  assert.equal(payload.hydrateRootRecord, hydrateRecord);
+  assert.equal(payload.hydrationOptions, hydrationOptions);
+  assert.equal(payload.ownershipDiagnostics, ownershipDiagnostics);
+  assert.equal(payload.rootErrorCallbacks.onUncaughtError.configured, true);
+  assert.equal(payload.rootErrorOptionCallbackRecords[0], metadata.rootErrorOptionCallbackRecords[0]);
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+
+  const otherContainer = createElement('SECTION', document);
+  const outsideTarget = createElement('BUTTON', document);
+  const unownedRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        otherContainer,
+        'click',
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent('click', outsideTarget)
+    );
+  const unownedOwnership =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      hydrateRecord.hydrationBoundaryRecord,
+      unownedRecord,
+      {
+        source: 'hydration-boundary-test-unowned-replay-target'
+      }
+    );
+  assert.throws(
+    () =>
+      bridge.createHydrationReplayErrorMetadata(
+        hydrateRecord,
+        unownedOwnership
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA'
+    }
+  );
+  assert.throws(
+    () =>
+      bridge.createHydrationReplayErrorMetadata(
+        hydrateRecord,
+        hydrateRecord.hydrationBoundaryRecord.eventReplayOwnershipDiagnostics
+      ),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA'
+    }
+  );
+});
+
 test('public hydrateRoot remains an unsupported placeholder with no guard side effects', () => {
   const document = createDocument('public');
   const container = createElement('DIV', document);

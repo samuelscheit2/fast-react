@@ -33,6 +33,8 @@ const {
   revertContainerRootMarkerMutation
 } = require('./root-markers.js');
 const {
+  HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
+  HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   createHydrationBoundaryGate,
   getPrivateHydrationBoundaryRecordPayload,
@@ -62,6 +64,7 @@ const {
   revertRootListenersForPrivateRoot
 } = require('../events/root-listeners.js');
 const {
+  HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
   createPortalEventOwnerRootGateRecord:
     createPluginPortalEventOwnerRootGateRecord,
   getDispatchListenerErrorRouteRecordPayload,
@@ -151,6 +154,8 @@ const privateRootRefCallbackErrorRoutingRecordType =
   'fast.react_dom.private_root_ref_callback_error_routing_record';
 const privateRootEventListenerErrorRoutingRecordType =
   'fast.react_dom.private_root_event_listener_error_routing_record';
+const privateRootHydrationReplayErrorMetadataRecordType =
+  'fast.react_dom.private_root_hydration_replay_error_metadata_record';
 const privateRootPublicFacadeAdapterType =
   'fast.react_dom.private_root_public_facade_adapter';
 const privateRootPublicFacadeRootType =
@@ -234,6 +239,8 @@ const ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED =
   'recorded-private-root-ref-callback-error-routing';
 const ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED =
   'recorded-private-root-event-listener-error-routing';
+const ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED =
+  'recorded-private-root-hydration-replay-error-metadata';
 const ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED =
   'accepted-private-root-error-option-callback-record';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
@@ -1157,6 +1164,66 @@ const ROOT_BRIDGE_PORTAL_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES =
         'Portal SyntheticEvent creation, propagation, and listener dispatch remain blocked.'
     })
   ]);
+const ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'hydration-replay-ownership-order-metadata',
+      accepted: true,
+      reason:
+        'The diagnostic consumes retained dehydrated root and boundary ownership rows from the private hydration replay drain-order gate.'
+    }),
+    freezeRecord({
+      id: 'root-error-option-callback-metadata',
+      accepted: true,
+      reason:
+        'Hydrate root onUncaughtError, onCaughtError, and onRecoverableError options are preserved as metadata-only callback records.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-hydrate-root-execution',
+      blocked: true,
+      reason:
+        'The metadata record consumes private hydrateRoot bridge records and does not execute public hydration roots.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-event-replay',
+      blocked: true,
+      reason:
+        'The replay targets come from private dispatch records; no browser DOM events are replayed.'
+    }),
+    freezeRecord({
+      id: 'hydration-compatibility',
+      blocked: true,
+      reason:
+        'Hydratable instances, Suspense hydration, and compatibility claims remain blocked.'
+    }),
+    freezeRecord({
+      id: 'root-error-update-scheduling',
+      blocked: true,
+      reason:
+        'Hydration replay error metadata is not scheduled as root error updates by this private record.'
+    }),
+    freezeRecord({
+      id: 'public-root-error-callback-invocation',
+      blocked: true,
+      reason:
+        'Root onUncaughtError, onCaughtError, and onRecoverableError callbacks are preserved as metadata only.'
+    }),
+    freezeRecord({
+      id: 'report-global-error',
+      blocked: true,
+      reason:
+        'The diagnostic records metadata without reporting errors globally.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason:
+        'React DOM hydration replay and root error callback compatibility are not claimed by this private record.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-facade-create-root-record',
@@ -1461,6 +1528,7 @@ const rootCommitRefMetadataRecordsByRequest = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
 const rootRefCallbackErrorRoutingPayloads = new WeakMap();
 const rootEventListenerErrorRoutingPayloads = new WeakMap();
+const rootHydrationReplayErrorMetadataPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
 const rootPublicFacadePreflightPayloads = new WeakMap();
@@ -1654,6 +1722,18 @@ function createPrivateRootBridgeShell(options) {
         bridgeState,
         rootRequestRecords,
         eventDispatchCanaryRecord,
+        options
+      );
+    },
+    createHydrationReplayErrorMetadata(
+      hydrateRootRecord,
+      ownershipDiagnostics,
+      options
+    ) {
+      return createHydrationReplayErrorMetadataRecordWithBridge(
+        bridgeState,
+        hydrateRootRecord,
+        ownershipDiagnostics,
         options
       );
     }
@@ -2868,6 +2948,19 @@ function createEventListenerRootErrorRoutingRecord(
   );
 }
 
+function createHydrationReplayErrorMetadataRecord(
+  hydrateRootRecord,
+  ownershipDiagnostics,
+  options
+) {
+  return createHydrationReplayErrorMetadataRecordWithBridge(
+    null,
+    hydrateRootRecord,
+    ownershipDiagnostics,
+    options
+  );
+}
+
 function applyPrivateRootHostOutputUpdate(record, options) {
   return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
 }
@@ -4035,6 +4128,14 @@ function getPrivateRootEventListenerErrorRoutingPayload(record) {
 
 function isPrivateRootEventListenerErrorRoutingRecord(value) {
   return rootEventListenerErrorRoutingPayloads.has(value);
+}
+
+function getPrivateRootHydrationReplayErrorMetadataPayload(record) {
+  return rootHydrationReplayErrorMetadataPayloads.get(record) || null;
+}
+
+function isPrivateRootHydrationReplayErrorMetadataRecord(value) {
+  return rootHydrationReplayErrorMetadataPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeAdapterPayload(adapter) {
@@ -6574,6 +6675,165 @@ function createEventListenerRootErrorRoutingRecordWithBridge(
   return record;
 }
 
+function createHydrationReplayErrorMetadataRecordWithBridge(
+  bridgeState,
+  hydrateRootRecord,
+  ownershipDiagnostics,
+  options
+) {
+  const requestValidation = validateHydrationReplayErrorMetadataRequest(
+    bridgeState,
+    hydrateRootRecord
+  );
+  const ownershipValidation = validateHydrationReplayErrorMetadataOwnership(
+    requestValidation,
+    ownershipDiagnostics
+  );
+  const rootErrorCallbacks = describeRootErrorCallbacks(
+    requestValidation.hydrationOptions
+  );
+  const metadataOptions =
+    normalizeHydrationReplayErrorMetadataOptions(options);
+  const rootErrorOptionCallbackRecords = freezeArray(
+    ownershipValidation.ownershipRows.map((ownershipRow, index) =>
+      createHydrationReplayErrorOptionCallbackRecord({
+        index,
+        metadataOptions,
+        ownershipRow,
+        requestValidation,
+        rootErrorCallbacks
+      })
+    )
+  );
+  const record = freezeRecord({
+    $$typeof: privateRootHydrationReplayErrorMetadataRecordType,
+    kind: 'FastReactDomPrivateRootHydrationReplayErrorMetadataRecord',
+    metadataStatus: ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    source:
+      typeof metadataOptions.source === 'string'
+        ? metadataOptions.source
+        : 'private-root-hydration-replay-error-metadata',
+    operation: 'hydration-replay-error-metadata',
+    sourceRequestId: hydrateRootRecord.requestId,
+    sourceRequestSequence: hydrateRootRecord.requestSequence,
+    sourceRequestType: hydrateRootRecord.requestType,
+    sourceOperation: hydrateRootRecord.operation,
+    hydrateId: hydrateRootRecord.hydrateId,
+    rootId: hydrateRootRecord.rootId,
+    rootKind: hydrateRootRecord.rootKind,
+    rootTag: hydrateRootRecord.rootTag,
+    rootRecordId: requestValidation.rootRecordId,
+    sourceHydrationBoundaryKind:
+      requestValidation.hydrationBoundaryRecord.kind,
+    sourceHydrationBoundaryStatus:
+      requestValidation.hydrationBoundaryRecord.status,
+    sourceOwnershipDiagnosticKind: ownershipDiagnostics.kind,
+    sourceOwnershipDiagnosticStatus: ownershipDiagnostics.status,
+    sourceOwnershipDiagnosticSource: ownershipDiagnostics.source,
+    sourceEventReplayQueueDiagnosticKind:
+      ownershipDiagnostics.eventReplayQueueDiagnostics.kind,
+    sourceEventReplayQueueDiagnosticStatus:
+      ownershipDiagnostics.eventReplayQueueDiagnostics.status,
+    sourceEventReplayQueueDiagnosticSource:
+      ownershipDiagnostics.eventReplayQueueDiagnostics.source,
+    ownershipRowCount: ownershipValidation.ownershipRows.length,
+    ownershipRetainedCount: ownershipDiagnostics.ownershipRetainedCount,
+    ownershipRetainedThroughDrainOrder:
+      ownershipDiagnostics.ownershipRetainedThroughDrainOrder,
+    rootOwnershipRetainedCount:
+      ownershipDiagnostics.rootOwnershipRetainedCount,
+    dehydratedBoundaryOwnershipRequiredCount:
+      ownershipDiagnostics.dehydratedBoundaryOwnershipRequiredCount,
+    dehydratedBoundaryOwnershipRetainedCount:
+      ownershipDiagnostics.dehydratedBoundaryOwnershipRetainedCount,
+    blockedEventReplayTargetCount:
+      ownershipDiagnostics.blockedEventReplayTargetCount,
+    drainOrderCount: ownershipDiagnostics.drainOrderCount,
+    queuedEventReplayTargetCount: 0,
+    replayedEventCount: 0,
+    targetResolutionDiagnosticsAccepted:
+      ownershipDiagnostics.targetResolutionDiagnosticsAccepted,
+    drainOrderDiagnosticsAccepted:
+      ownershipDiagnostics.drainOrderDiagnosticsAccepted,
+    eventReplayQueueDiagnosticsAccepted:
+      ownershipDiagnostics.eventReplayQueueDiagnosticsAccepted,
+    orderSource: ownershipDiagnostics.orderSource,
+    rootErrorChannel: 'hydration-replay-root-option-metadata',
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootErrorOptionCallbackRecordStatus:
+      ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+    rootErrorOptionCallbackRecordCount:
+      rootErrorOptionCallbackRecords.length,
+    rootErrorOptionCallbackRecords,
+    acceptedCapabilities:
+      ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_BLOCKED_CAPABILITIES,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    rootErrorUpdatesScheduled: false,
+    hydrationRequested: true,
+    hydration: false,
+    canHydrate: false,
+    hydrationCompatibilityClaimed: false,
+    hostInstanceHydrationAttempted: false,
+    suspenseHydrationScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventsReplayed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
+    willDispatchEvents: false,
+    willHydrateHostInstances: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    reportGlobalErrorInvoked: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    exposesErrorValue: false,
+    exposesNativeEvent: false,
+    exposesSyntheticEvent: false,
+    exposesHydrationTarget: false
+  });
+
+  rootHydrationReplayErrorMetadataPayloads.set(
+    record,
+    freezeRecord({
+      bridgeState: requestValidation.bridgeState,
+      container: requestValidation.container,
+      eventReplayQueueDiagnostics:
+        ownershipDiagnostics.eventReplayQueueDiagnostics,
+      hydrateRootRecord,
+      hydrationBoundaryRecord: requestValidation.hydrationBoundaryRecord,
+      hydrationOptions: requestValidation.hydrationOptions,
+      initialChildren: requestValidation.initialChildren,
+      options: metadataOptions.rawOptions,
+      ownershipDiagnostics,
+      ownershipRows: ownershipValidation.ownershipRows,
+      rootErrorCallbacks,
+      rootErrorOptionCallbackRecords
+    })
+  );
+
+  return record;
+}
+
 function createNativeBridgeHandle(bridgeState, kind) {
   return freezeRecord({
     $$typeof: privateRootNativeBridgeHandleType,
@@ -9018,6 +9278,303 @@ function createEventListenerRootErrorOptionCallbackRecord({
   });
 }
 
+function validateHydrationReplayErrorMetadataRequest(
+  bridgeState,
+  hydrateRootRecord
+) {
+  const validation = validateRootBridgeRequestRecord(hydrateRootRecord);
+  if (validation.operation !== 'hydrate') {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires a private hydrateRoot request record.'
+    );
+  }
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const payload = rootRecordPayloads.get(hydrateRootRecord);
+  if (payload === undefined) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires a private hydrateRoot payload.'
+    );
+  }
+  const hydrationBoundaryRecord = hydrateRootRecord.hydrationBoundaryRecord;
+  if (!isPrivateHydrationBoundaryRecord(hydrationBoundaryRecord)) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires a private hydration boundary record.'
+    );
+  }
+
+  return {
+    bridgeState: validation.bridgeState,
+    container: payload.container,
+    hydrateRootRecord,
+    hydrationBoundaryRecord,
+    hydrationOptions: payload.hydrationOptions,
+    initialChildren: payload.initialChildren,
+    rootRecordId: hydrationBoundaryRecord.recordId
+  };
+}
+
+function validateHydrationReplayErrorMetadataOwnership(
+  requestValidation,
+  ownershipDiagnostics
+) {
+  if (
+    !ownershipDiagnostics ||
+    typeof ownershipDiagnostics !== 'object' ||
+    ownershipDiagnostics.kind !==
+      HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires a private replay ownership diagnostic.'
+    );
+  }
+  if (
+    ownershipDiagnostics.rootRecordId !== requestValidation.rootRecordId ||
+    ownershipDiagnostics.rootKind !==
+      requestValidation.hydrationBoundaryRecord.rootKind ||
+    ownershipDiagnostics.rootTag !==
+      requestValidation.hydrationBoundaryRecord.rootTag
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay ownership metadata must match the hydrateRoot boundary record.'
+    );
+  }
+  if (
+    ownershipDiagnostics.eventReplayQueueDiagnosticsAccepted !== true ||
+    ownershipDiagnostics.targetResolutionDiagnosticsAccepted !== true ||
+    ownershipDiagnostics.drainOrderDiagnosticsAccepted !== true ||
+    ownershipDiagnostics.orderSource !== 'dehydrated-target-root-metadata' ||
+    !ownershipDiagnostics.eventReplayQueueDiagnostics ||
+    typeof ownershipDiagnostics.eventReplayQueueDiagnostics !== 'object' ||
+    ownershipDiagnostics.eventReplayQueueDiagnostics.kind !==
+      HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires accepted target resolution and drain-order diagnostics.'
+    );
+  }
+  if (
+    ownershipDiagnostics.status !==
+      'blocked-replay-ownership-retained-through-drain-order' ||
+    ownershipDiagnostics.ownershipRetainedThroughDrainOrder !== true
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires retained dehydrated ownership through drain order.'
+    );
+  }
+
+  const ownershipRows = Array.isArray(ownershipDiagnostics.ownershipRows)
+    ? ownershipDiagnostics.ownershipRows
+    : [];
+  if (
+    ownershipRows.length === 0 ||
+    ownershipRows.length !== ownershipDiagnostics.ownershipRowCount ||
+    ownershipRows.length !== ownershipDiagnostics.drainOrderCount ||
+    ownershipRows.length !==
+      ownershipDiagnostics.blockedEventReplayTargetCount
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires retained replay target ownership rows.'
+    );
+  }
+  if (
+    ownershipDiagnostics.rootOwnershipRetainedCount !== ownershipRows.length ||
+    ownershipDiagnostics.ownershipRetainedCount !== ownershipRows.length ||
+    ownershipDiagnostics.dehydratedBoundaryOwnershipRetainedCount !==
+      ownershipDiagnostics.dehydratedBoundaryOwnershipRequiredCount
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata is fail-closed for missing dehydrated ownership.'
+    );
+  }
+
+  for (const ownershipRow of ownershipRows) {
+    validateHydrationReplayErrorMetadataOwnershipRow(ownershipRow);
+  }
+
+  return {
+    ownershipRows: freezeArray(ownershipRows)
+  };
+}
+
+function validateHydrationReplayErrorMetadataOwnershipRow(ownershipRow) {
+  if (
+    !ownershipRow ||
+    typeof ownershipRow !== 'object' ||
+    ownershipRow.kind !== HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires private ownership row records.'
+    );
+  }
+  if (
+    ownershipRow.ownershipRetainedThroughDrainOrder !== true ||
+    ownershipRow.rootOwnershipRetained !== true ||
+    ownershipRow.eventQueueRootOwnershipStatus !==
+      'owned-by-dehydrated-root' ||
+    ownershipRow.drainOrderRootOwnershipStatus !==
+      'owned-by-dehydrated-root' ||
+    ownershipRow.targetPathRetained !== true ||
+    ownershipRow.queueIdentityRetained !== true ||
+    ownershipRow.blockedOwnerRetained !== true
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires retained dehydrated root ownership.'
+    );
+  }
+  if (
+    ownershipRow.dehydratedBoundaryOwnershipRequired === true &&
+    ownershipRow.dehydratedBoundaryOwnershipRetained !== true
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata requires retained dehydrated boundary ownership.'
+    );
+  }
+  if (
+    ownershipRow.queued !== false ||
+    ownershipRow.replayQueueDrained !== false ||
+    ownershipRow.willDrainReplayQueues !== false ||
+    ownershipRow.willDispatch !== false ||
+    ownershipRow.willHydrate !== false ||
+    ownershipRow.willReplay !== false
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata must not consume replayed or queued event rows.'
+    );
+  }
+}
+
+function createHydrationReplayErrorOptionCallbackRecord({
+  index,
+  metadataOptions,
+  ownershipRow,
+  requestValidation,
+  rootErrorCallbacks
+}) {
+  const sourceLabel =
+    metadataOptions.replayTargetLabels[index] === undefined
+      ? null
+      : metadataOptions.replayTargetLabels[index];
+
+  return freezeRecord({
+    kind: 'FastReactDomPrivateRootHydrationReplayErrorOptionCallbackRecord',
+    status: ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+    acceptedRootOptionCallbackRecord: true,
+    diagnosticOnly: true,
+    phase: 'hydration-replay',
+    hydrateId: requestValidation.hydrateRootRecord.hydrateId,
+    rootId: requestValidation.hydrateRootRecord.rootId,
+    rootKind: requestValidation.hydrateRootRecord.rootKind,
+    rootTag: requestValidation.hydrateRootRecord.rootTag,
+    rootRecordId: requestValidation.rootRecordId,
+    replayTargetIndex: index,
+    sourceLabel,
+    inputOrder: ownershipRow.inputOrder,
+    replayQueueOrder: ownershipRow.replayQueueOrder,
+    drainOrder: ownershipRow.drainOrder,
+    prioritySortKey: ownershipRow.prioritySortKey,
+    domEventName: ownershipRow.domEventName,
+    nativeEventType: ownershipRow.nativeEventType,
+    queueCategory: ownershipRow.queueCategory,
+    queueName: ownershipRow.queueName,
+    queuePolicy: ownershipRow.queuePolicy,
+    replayableEvent: ownershipRow.replayableEvent,
+    targetPath: ownershipRow.drainOrderTargetPath,
+    targetPathStatus: ownershipRow.drainOrderTargetPathStatus,
+    rootOwnershipStatus: ownershipRow.drainOrderRootOwnershipStatus,
+    dehydratedRootOwnerStatus:
+      ownershipRow.drainOrderDehydratedRootOwnerStatus,
+    dehydratedBoundaryOwnershipRequired:
+      ownershipRow.dehydratedBoundaryOwnershipRequired,
+    dehydratedBoundaryOwnerId:
+      ownershipRow.drainOrderDehydratedBoundaryOwnerId,
+    dehydratedBoundaryOwnerIndex:
+      ownershipRow.drainOrderDehydratedBoundaryOwnerIndex,
+    dehydratedBoundaryOwnerPath:
+      ownershipRow.drainOrderDehydratedBoundaryOwnerPath,
+    dehydratedBoundaryOwnerStatus:
+      ownershipRow.drainOrderDehydratedBoundaryOwnerStatus,
+    blockedOnKind: ownershipRow.blockedOnKind,
+    blockedOnStatus: ownershipRow.blockedOnStatus,
+    blockedOnSortKey: ownershipRow.blockedOnSortKey,
+    errorName: 'Error',
+    errorMessage: createHydrationReplayErrorMetadataMessage(ownershipRow),
+    errorCode: 'FAST_REACT_DOM_HYDRATION_REPLAY_BLOCKED',
+    errorType: 'synthetic-diagnostic-metadata',
+    errorReported: false,
+    reportGlobalErrorInvoked: false,
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootErrorCallbacksInvoked: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    rootErrorUpdatesScheduled: false,
+    queuedRecoverableError: false,
+    recoverableErrorCompatibilityClaimed: false,
+    publicErrorBoundariesEnabled: false,
+    publicRootBehaviorChanged: false,
+    compatibilityClaimed: false,
+    hydration: false,
+    eventDispatch: false,
+    eventsReplayed: false,
+    replayQueueDrained: false,
+    willDrainReplayQueues: false,
+    willDispatch: false,
+    willHydrate: false,
+    willReplay: false,
+    exposesErrorValue: false,
+    exposesNativeEvent: false,
+    exposesSyntheticEvent: false,
+    exposesHydrationTarget: false
+  });
+}
+
+function createHydrationReplayErrorMetadataMessage(ownershipRow) {
+  const domEventName =
+    typeof ownershipRow.domEventName === 'string'
+      ? ownershipRow.domEventName
+      : 'unknown-event';
+  const targetPath =
+    typeof ownershipRow.drainOrderTargetPath === 'string'
+      ? ownershipRow.drainOrderTargetPath
+      : 'unknown-target';
+  const blockedOnStatus =
+    typeof ownershipRow.blockedOnStatus === 'string'
+      ? ownershipRow.blockedOnStatus
+      : 'blocked';
+  return `Hydration replay for ${domEventName} at ${targetPath} remained ${blockedOnStatus}.`;
+}
+
+function normalizeHydrationReplayErrorMetadataOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const replayTargetLabels = Array.isArray(
+    normalizedOptions.replayTargetLabels
+  )
+    ? normalizedOptions.replayTargetLabels.map((label) =>
+        typeof label === 'string' ? label : null
+      )
+    : [];
+
+  return freezeRecord({
+    rawOptions: options,
+    replayTargetLabels: freezeArray(replayTargetLabels),
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-root-hydration-replay-error-metadata'
+  });
+}
+
 function normalizeEventListenerRootErrorRoutingOptions(options) {
   const normalizedOptions =
     options !== null &&
@@ -9955,6 +10512,13 @@ function throwInvalidEventListenerRootErrorRouting(message) {
   throw error;
 }
 
+function throwInvalidHydrationReplayErrorMetadata(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA';
+  throw error;
+}
+
 function throwInvalidRootPublicFacadeAdapter(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
@@ -10143,6 +10707,9 @@ module.exports = {
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED,
+  ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED,
   ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_CREATE_RENDER_ADMITTED,
   ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES,
@@ -10241,6 +10808,7 @@ module.exports = {
   createPrivateRootHandle,
   createPrivateRootOwner,
   createEventListenerRootErrorRoutingRecord,
+  createHydrationReplayErrorMetadataRecord,
   createRefCallbackRootErrorRoutingRecord,
   createRefCallbackHostOutputOrderingDiagnosticRecord,
   createRootRenderRecord,
@@ -10270,6 +10838,7 @@ module.exports = {
   getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootEventListenerErrorRoutingPayload,
+  getPrivateRootHydrationReplayErrorMetadataPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
@@ -10297,6 +10866,7 @@ module.exports = {
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootEventListenerErrorRoutingRecord,
+  isPrivateRootHydrationReplayErrorMetadataRecord,
   isPrivateRootRefCallbackErrorRoutingRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRootHandle,
@@ -10330,6 +10900,7 @@ module.exports = {
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
   privateRootEventListenerErrorRoutingRecordType,
+  privateRootHydrationReplayErrorMetadataRecordType,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateRootRefCallbackErrorRoutingRecordType,
   privateRootCreateRecordType,
